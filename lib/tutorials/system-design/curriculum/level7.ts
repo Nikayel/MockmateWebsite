@@ -161,6 +161,64 @@ Once you have an SLO and an error budget, the question is when to wake a human. 
 
 **Burn rate** is how many times faster than sustainable you are consuming the error budget. A burn rate of **1x** means you are spending the budget exactly on pace: at 1x you will use precisely 100% of it by the end of the SLO window and no more. A burn rate of **2x** means you will exhaust the whole window's budget in half the window. **14.4x** means you burn a 30-day budget in about 2 days, or equivalently 2% of a 30-day budget in one hour. Concretely, burn rate = (observed error rate) / (1 - SLO). For a 99.9% SLO the budget is 0.1%, so a sustained 1.44% error rate is a 14.4x burn.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Error budget depletion time",
+  "predictPrompt": {
+    "question": "At a sustained 14.4x burn rate against a 30-day error budget, how long until the entire budget is gone?",
+    "options": [
+      "About 2 hours",
+      "About 2 days",
+      "About 2 weeks",
+      "The full 30 days"
+    ]
+  },
+  "workedExample": "At the initial 14.4x burn against a 30-day window, the whole month's budget is gone in 50 hours, about 2 days, and every hour spends 2% of it. Drag the burn rate down to 1x and the budget lasts exactly the full 30 days; push it to 100x and it vanishes in just over 7 hours.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "burn_rate",
+      "label": "Burn rate multiplier",
+      "min": 1,
+      "max": 100,
+      "scale": "log",
+      "initial": 14.4,
+      "unit": "x"
+    },
+    {
+      "kind": "slider",
+      "id": "window_days",
+      "label": "SLO window",
+      "min": 7,
+      "max": 90,
+      "scale": "linear",
+      "step": 1,
+      "initial": 30,
+      "unit": "days"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "time_to_empty",
+      "label": "Time until budget exhausted",
+      "expr": "window_days * 86400 / burn_rate",
+      "format": "duration",
+      "sparkline": {
+        "over": "burn_rate"
+      }
+    },
+    {
+      "id": "budget_per_hour",
+      "label": "Budget spent per hour",
+      "expr": "burn_rate / (window_days * 24)",
+      "format": "percent"
+    }
+  ],
+  "caption": "Alert thresholds are picked so that tripping means a meaningful slice of the budget is already gone."
+}
+\`\`\`
+
 ## The canonical multi-window ladder
 
 You pick a burn rate and a window so that tripping means you would consume a meaningful fraction of your total budget. The Google SRE canonical setup for a 99.9% SLO:
