@@ -2321,6 +2321,56 @@ per cell to scan and filter. Rule of thumb: pick a resolution near your **typica
 query a **ring of neighbor cells**, then do a final exact-distance filter and sort on the small
 candidate set.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Geohash precision: bits to cell size",
+  "predictPrompt": {
+    "question": "You append two more base-32 characters (10 more bits) to your geohash keys. What happens to the cell width?",
+    "options": [
+      "It halves",
+      "It shrinks about 10x",
+      "It shrinks 32x",
+      "It shrinks 1024x"
+    ]
+  },
+  "workedExample": "The lesson's geohash 9q8yy is 5 base-32 characters at 5 bits each, 25 bits of interleaved lat/lng, so start the slider one notch up at 26 bits. Half the bits slice longitude: 2 to the power 13 is 8192 slices of the 40075 km equator, so the cell is 40075 / 8192, about 4.9 km wide, and 20004 / 8192, about 2.4 km tall along the pole-to-pole half meridian. That roughly 5 km cell is exactly the resolution where a 5-character prefix range scan matches a city-scale query radius. Each 2-bit step of the slider halves both dimensions, so 10 extra bits (two more characters) shrink the cell width 32x.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "bits",
+      "label": "Interleaved bits in the cell key",
+      "min": 10,
+      "max": 50,
+      "scale": "linear",
+      "step": 2,
+      "initial": 26,
+      "unit": "bits"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "cellWidthKm",
+      "label": "Cell width",
+      "expr": "40075 / pow(2, bits / 2)",
+      "format": "number",
+      "unit": "km",
+      "sparkline": {
+        "over": "bits"
+      }
+    },
+    {
+      "id": "cellHeightKm",
+      "label": "Cell height",
+      "expr": "20004 / pow(2, bits / 2)",
+      "format": "number",
+      "unit": "km"
+    }
+  ],
+  "caption": "Pick the precision whose cell width sits near your typical query radius, then query the cell plus its 8 neighbors; finer cells mean cheaper scans but more cells per radius query."
+}
+\`\`\`
+
 The failure mode that separates seniors from juniors is the **hot cell**. A dense downtown or a
 stadium at concert-end becomes a single cell with a huge point set: a hotspot on both writes and
 reads. Fixes: **subdivide adaptively** (quadtree, or drop to a finer S2/H3 resolution just for that
