@@ -1731,6 +1731,29 @@ precisely where semantic similarity fails, because the embedding blurs the exact
 production systems use **hybrid search**: run **BM25 for exact/lexical matching** and **dense vectors
 for semantic recall** in parallel, then combine.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your hybrid pipeline ran both retrievers. BM25 scores one document 27.4 and cosine similarity scores another 0.91. How should the two ranked lists be combined?",
+  "options": [
+    {
+      "label": "Add each document's BM25 and cosine scores and sort by the sum",
+      "feedback": "Tempting because both look like relevance scores, but BM25 is unbounded and dataset dependent while cosine lives in 0 to 1, so the sum is dominated by BM25 and effectively meaningless."
+    },
+    {
+      "label": "Normalize both scores to 0 to 1 first, then add them",
+      "feedback": "Closer, but min-max normalizing BM25 still depends on whatever happened to land in this result set, so the blend shifts from query to query. The robust fix ignores raw scores entirely."
+    },
+    {
+      "label": "Ignore the raw scores and fuse by rank position",
+      "correct": true,
+      "feedback": "Right. Reciprocal Rank Fusion gives each document 1 / (k + rank) from each list and sums those contributions, so a document ranked high by either method surfaces and the incompatible score scales never touch."
+    }
+  ]
+}
+\`\`\`
+
 You cannot just add the scores: BM25 scores are unbounded and dataset-dependent, cosine similarity is
 bounded 0 to 1, so summing them is meaningless. The clean fix is **Reciprocal Rank Fusion (RRF)**,
 which ignores raw scores and fuses by **rank**: each result gets \`1 / (k + rank)\` from each list
@@ -1763,6 +1786,42 @@ Recap: use embeddings + an ANN index (HNSW/IVF) for semantic recall, run it alon
 tokens like codes and IDs, fuse the two by rank with RRF (never by raw score), add a cross-encoder
 reranker over the top-k for precision, and plan for metadata filtering and the migration cost of
 re-embedding.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Map each job to the pipeline stage that owns it.",
+  "buckets": [
+    "BM25 lexical index",
+    "Dense vectors + ANN",
+    "Cross-encoder reranker"
+  ],
+  "items": [
+    {
+      "label": "Match the exact error code 'E-4021'",
+      "bucket": "BM25 lexical index",
+      "feedback": "Embeddings blur exact strings; the inverted index matches the literal token."
+    },
+    {
+      "label": "Match 'my card was declined' to 'payment authorization failed'",
+      "bucket": "Dense vectors + ANN",
+      "feedback": "Zero shared tokens, so only semantic similarity in embedding space finds it."
+    },
+    {
+      "label": "Reorder the top 100 candidates into a precise top 5",
+      "bucket": "Cross-encoder reranker",
+      "feedback": "It reads the query together with each candidate: far too expensive for the whole corpus, affordable over 100 items."
+    },
+    {
+      "label": "Trade a little recall for a big latency win via HNSW or IVF",
+      "bucket": "Dense vectors + ANN",
+      "feedback": "ANN indexes make nearest-neighbor search sublinear; 'efSearch' and 'nprobe' tune where you sit on the recall/latency/memory curve."
+    }
+  ],
+  "reveal": "That is the whole design: two cheap recall-oriented retrievers in parallel, RRF fusing them by rank because their score scales are incompatible, and one expensive precision stage over a small candidate set. In your design write, name all three stages, say where metadata pre-filtering happens, and flag the re-embedding migration cost of changing the embedding model."
+}
+\`\`\`
 `.trim()
 
 const geospatialIndexingTeach = `
