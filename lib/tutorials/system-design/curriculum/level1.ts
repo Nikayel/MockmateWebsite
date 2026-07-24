@@ -1932,6 +1932,201 @@ client cannot fabricate positions and you can change the encoding later. Always 
 max page size, and prefer a \`has_more\` boolean over an exact total count, because \`COUNT(*)\` on a
 large table is itself an expensive scan.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Page 5,000: offset walks, cursor seeks",
+  "frames": [
+    {
+      "note": "Two ways to ask for page 5000 of the feed. Offset says skip 100000 rows and give me 20; keyset says give me 20 rows after this exact position in the index.",
+      "rows": [
+        {
+          "label": "the ask",
+          "cells": [
+            {
+              "text": "page 5000",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "offset/limit",
+          "cells": [
+            {
+              "text": "offset=100000",
+              "state": "new"
+            },
+            {
+              "text": "limit=20",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "cursor (keyset)",
+          "cells": [
+            {
+              "text": "(created_at,id) < cursor",
+              "state": "new"
+            },
+            {
+              "text": "LIMIT 20",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "predict": {
+        "question": "The sort column is indexed. How many rows does the database actually touch to serve offset=100000&limit=20?",
+        "options": [
+          "About 20: the index jumps straight to row 100,000",
+          "100,020: it walks and discards 100,000 rows first",
+          "Just the B-tree height: a handful of index pages"
+        ]
+      },
+      "note": "A B-tree does not know row numbers. To honor the offset the database walks the index from the start, discarding 100000 rows to return 20. Every fetch of a deep page repeats the walk, and each page deeper is linearly slower.",
+      "rows": [
+        {
+          "label": "index walk",
+          "cells": [
+            {
+              "text": "rows 1-25k",
+              "state": "dropped"
+            },
+            {
+              "text": "25k-50k",
+              "state": "dropped"
+            },
+            {
+              "text": "50k-75k",
+              "state": "dropped"
+            },
+            {
+              "text": "75k-100k",
+              "state": "dropped"
+            },
+            {
+              "text": "20 returned",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "offset/limit",
+          "cells": [
+            {
+              "text": "offset=100000",
+              "state": "active"
+            },
+            {
+              "text": "limit=20",
+              "state": "normal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Offset is also unstable: a new row lands at the top between fetches, every row shifts down, and the next offset page repeats a row the user already saw. On a live feed this happens constantly.",
+      "rows": [
+        {
+          "label": "feed head",
+          "cells": [
+            {
+              "text": "new row",
+              "state": "new"
+            },
+            {
+              "text": "was row 1",
+              "state": "dim"
+            },
+            {
+              "text": "was row 2",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "next offset page",
+          "cells": [
+            {
+              "text": "dup: old row 20",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The keyset query seeks the index directly: WHERE (created_at, id) < cursor lands on a stable row identity and reads 20 rows forward. No counting, 0 rows discarded, and inserts at the top cannot shift the window.",
+      "rows": [
+        {
+          "label": "index seek",
+          "cells": [
+            {
+              "text": "seek to cursor",
+              "state": "active"
+            },
+            {
+              "text": "read 20 fwd",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "discarded",
+          "cells": [
+            {
+              "text": "0 rows",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "First page or page 5000, the cursor query costs the same. Hand back an opaque next_cursor built from the last row's sort key, cap the page size server-side, and return has_more instead of an expensive COUNT(*).",
+      "rows": [
+        {
+          "label": "offset p5000",
+          "cells": [
+            {
+              "text": "100,020 rows walked",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "cursor p5000",
+          "cells": [
+            {
+              "text": "20 rows read",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "response",
+          "cells": [
+            {
+              "text": "next_cursor",
+              "state": "new"
+            },
+            {
+              "text": "has_more",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Keyset pagination is O(1) and stable; offset is O(n) and shifts under inserts. Say it with the SQL."
+}
+\`\`\`
+
 ### Errors: machine-readable and precisely coded
 
 Clients need machine-readable, consistent errors to retry correctly, and humans need enough detail to
