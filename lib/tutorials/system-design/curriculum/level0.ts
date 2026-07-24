@@ -1723,6 +1723,40 @@ it. "I'll use Cassandra" is a fact. "I'll use Cassandra because I need multi-reg
 tolerate read-repair latency, which costs me easy cross-partition transactions" is a decision.
 Staff-level interviewers grade the second sentence, not the first.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Which of these interview sentences are facts, and which are decisions?",
+  "buckets": [
+    "Fact",
+    "Decision"
+  ],
+  "items": [
+    {
+      "label": "I'll use Cassandra",
+      "bucket": "Fact",
+      "feedback": "Naming a technology is a fact. Nothing was weighed and nothing was given up."
+    },
+    {
+      "label": "I'll use Cassandra for multi-region writes, accepting read-repair latency and giving up easy cross-partition transactions",
+      "bucket": "Decision",
+      "feedback": "A lens, a commitment, and a named cost. This is the sentence staff-level interviewers grade."
+    },
+    {
+      "label": "We should add Redis here",
+      "bucket": "Fact",
+      "feedback": "Tempting to count as a decision because it sounds decisive, but there is no assumption, no trade, and no cost named. It is a brand name, not a choice."
+    },
+    {
+      "label": "Assuming reads outnumber writes 100 to 1, I'll denormalize the counter into the post row, doubling write cost to make reads a single-key lookup",
+      "bucket": "Decision",
+      "feedback": "Assumption stated, option picked, cost quantified. The interviewer can push on any part of it, which is exactly what you want."
+    }
+  ]
+}
+\`\`\`
+
 ### Reach for the lens before the answer
 
 Every real choice in a design is a tradeoff, and there is almost always a principled lens that frames
@@ -1765,6 +1799,30 @@ Choice --> pick the lens --> state the assumption --> commit --> name what you g
 
 Recap: Frame every major choice through a principled lens, commit to one option on a stated
 assumption, quantify the trade, and name what you gave up.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You committed to Cassandra and the interviewer asks 'why not Postgres?' What is happening, and what is the strong reply?",
+  "options": [
+    {
+      "label": "They disagree with the pick, so walk it back and switch to Postgres",
+      "feedback": "Tempting read, but the probe is usually not disagreement. Reversing instantly signals you never understood why you chose, which is worse than the original pick being debatable."
+    },
+    {
+      "label": "They are checking you understood the trade: name the losing option's one real advantage, then re-state the assumption that overruled it",
+      "correct": true,
+      "feedback": "Right. Postgres offers easy transactions and mature SQL; your multi-region write requirement is what overruled it. Holding the position with the trade visible is exactly what is being graded."
+    },
+    {
+      "label": "They want an exhaustive list of every alternative database",
+      "feedback": "Enumerating options without a stance is the stall that reads as indecision. One committed choice with the losing option's advantage acknowledged beats a catalog."
+    }
+  ],
+  "reveal": "In the design write, run the chain on every major choice: pick the lens, state the assumption, commit, quantify the trade, and name what you gave up, plus the seam where 10x traffic would make you revisit."
+}
+\`\`\`
 `.trim()
 
 const levelCalibrationTeach = `
