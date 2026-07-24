@@ -164,6 +164,27 @@ availability and latency: W=1 is fast but weakly durable, R=1 can read stale dat
 
 \`\`\`cswidget
 {
+  "type": "quorum",
+  "title": "Tune the quorum dial: N, W, R",
+  "predictPrompt": {
+    "question": "Common config: N=3, W=2, R=2. One replica crashes. Can writes and reads still succeed?",
+    "options": [
+      "No: every quorum needs all 3 replicas to answer",
+      "Yes: the 2 survivors can still form both the W=2 write set and the R=2 read set",
+      "Writes keep working but reads start failing"
+    ]
+  },
+  "workedExample": "Start at N=3, W=2, R=2. A write is acknowledged once 2 of the 3 replicas have it, say nodes 1 and 2. A read waits for 2 answers, say nodes 2 and 3. Since R + W = 4 is greater than N = 3, the read set and the write set must overlap in at least one node, here node 2, which holds the latest acknowledged write. Kill one replica and exactly 2 remain: still enough for W=2 and R=2, so the system stays available. Now drop W to 1: writes get fast but weakly durable, and R + W = 3 no longer beats N, so a read can miss the only replica that saw the write.",
+  "preset": "dynamo",
+  "n": 3,
+  "r": 2,
+  "w": 2,
+  "caption": "Slide W and R to trade consistency against availability and latency, then kill a replica and watch which quorums still form."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "check",
   "kind": "classify",
   "prompt": "Match each behavior to the replication topology that produces it.",
