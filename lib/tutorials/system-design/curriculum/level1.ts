@@ -1224,6 +1224,45 @@ recognize, do not choke on extra data) is what makes that safe on the consumer s
 never renumber or reuse a field tag; in GraphQL you deprecate a field rather than delete it; in REST
 you add fields rather than repurpose them.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "A consumer team depends on your order API and follows the tolerant-reader pattern. Sort each schema change.",
+  "buckets": [
+    "Breaks consumers",
+    "Safe to ship"
+  ],
+  "items": [
+    {
+      "label": "Rename 'amount_cents' to 'amount'",
+      "bucket": "Breaks consumers",
+      "feedback": "A rename is a removal plus an addition. Every reader of 'amount_cents' finds nothing there, tolerant or not."
+    },
+    {
+      "label": "Add an optional 'discount_cents' field",
+      "bucket": "Safe to ship",
+      "feedback": "Tolerant readers ignore fields they do not recognize, so adding optional fields is the default safe move."
+    },
+    {
+      "label": "A field that is sometimes null and sometimes missing entirely",
+      "bucket": "Breaks consumers",
+      "feedback": "The classic trap: clients must handle two different absence cases and one of them ships untested. Pick one representation and document it."
+    },
+    {
+      "label": "Add a brand-new endpoint",
+      "bucket": "Safe to ship",
+      "feedback": "Existing consumers never call it, so it cannot break them."
+    },
+    {
+      "label": "Change 'status' from a string to an object",
+      "bucket": "Breaks consumers",
+      "feedback": "A type change breaks every parser that expected a string, even a tolerant one. Add a new field instead of repurposing the old one."
+    }
+  ]
+}
+\`\`\`
+
 ### Enforcement: contract tests in CI
 
 Enforcement is where teams actually get burned. Consumer-driven contract testing (Pact is the common
@@ -1238,6 +1277,30 @@ releases." Coordination does not scale past a handful of services.
 
 Recap: make a machine-readable schema the source of truth, name and type it for tolerant additive
 evolution, and enforce it with consumer-driven contract tests in CI.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Two teams ship independent services that talk to each other, deploying many times a day. What actually keeps the provider from breaking the consumer?",
+  "options": [
+    {
+      "label": "Coordinated releases: both teams deploy together",
+      "feedback": "Tempting because it feels careful, but coordination does not scale past a handful of services, and in a distributed deploy the two sides are never upgraded at the same instant anyway."
+    },
+    {
+      "label": "The consumer team reads the provider's code before each release",
+      "feedback": "Cross-team code review is slow, optional, and misses behavioral expectations. The code is not the contract; the schema is."
+    },
+    {
+      "label": "A machine-readable schema as source of truth plus consumer-driven contract tests in CI",
+      "correct": true,
+      "feedback": "Right. The schema stops silent drift because everything is generated from or validated against it, and contract tests replay each consumer's real expectations so a breaking change fails the build before deploy, not at 2am."
+    }
+  ],
+  "reveal": "Carry this into the design write: name the schema artifact (OpenAPI, Protobuf, or SDL), state that evolution is additive with tolerant readers, and name the CI enforcement that catches the breaks people miss."
+}
+\`\`\`
 `.trim()
 
 const versioningTeach = `
