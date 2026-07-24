@@ -897,6 +897,190 @@ If two requests both read \`available = 1\`, both decide "yes, buy," and both wr
 
 **Interview nuance:** interviewers deliberately probe the race. State plainly that you never do "read available, then write" in app code; the check and decrement must be a single atomic operation, and you verify the affected-row count to confirm you actually won the decrement.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "Flash sale: two buyers, one seat",
+  "actors": [
+    {
+      "id": "buyer1",
+      "label": "Buyer 1"
+    },
+    {
+      "id": "buyer2",
+      "label": "Buyer 2"
+    },
+    {
+      "id": "service",
+      "label": "Service"
+    },
+    {
+      "id": "db",
+      "label": "Database"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "atomic",
+      "label": "Atomic decrement",
+      "description": "check and decrement in one conditional UPDATE where available > 0; verify exactly one row changed"
+    }
+  ],
+  "steps": [
+    {
+      "from": "buyer1",
+      "to": "service",
+      "label": "buy 1 ticket",
+      "kind": "request",
+      "state": {
+        "available": "1",
+        "sold": "0"
+      }
+    },
+    {
+      "from": "buyer2",
+      "to": "service",
+      "label": "buy 1 ticket",
+      "kind": "request"
+    },
+    {
+      "from": "service",
+      "to": "db",
+      "label": "read available (B1)",
+      "kind": "request",
+      "when": "!atomic"
+    },
+    {
+      "from": "db",
+      "to": "service",
+      "label": "available = 1",
+      "kind": "response",
+      "when": "!atomic"
+    },
+    {
+      "from": "service",
+      "to": "db",
+      "label": "read available (B2)",
+      "kind": "request",
+      "when": "!atomic"
+    },
+    {
+      "from": "db",
+      "to": "service",
+      "label": "available = 1 again",
+      "kind": "response",
+      "when": "!atomic"
+    },
+    {
+      "from": "service",
+      "to": "db",
+      "label": "B1 write: decrement",
+      "kind": "request",
+      "when": "!atomic",
+      "state": {
+        "available": "0",
+        "sold": "1"
+      }
+    },
+    {
+      "from": "service",
+      "to": "db",
+      "label": "B2 write: decrement",
+      "kind": "request",
+      "status": "error",
+      "when": "!atomic",
+      "state": {
+        "available": "-1",
+        "sold": "2"
+      },
+      "predict": {
+        "question": "Buyer 2's write is about to commit. What does the database end up with?",
+        "options": [
+          "available -1, sold 2: oversell",
+          "the write fails, 0 rows changed",
+          "the database blocks buyer 2"
+        ]
+      }
+    },
+    {
+      "from": "service",
+      "to": "buyer1",
+      "label": "confirmed",
+      "kind": "response",
+      "when": "!atomic"
+    },
+    {
+      "from": "service",
+      "to": "buyer2",
+      "label": "confirmed: oversold!",
+      "kind": "response",
+      "status": "error",
+      "when": "!atomic"
+    },
+    {
+      "from": "service",
+      "to": "db",
+      "label": "B1: decrement if > 0",
+      "kind": "request",
+      "when": "atomic",
+      "state": {
+        "available": "0",
+        "sold": "1"
+      }
+    },
+    {
+      "from": "db",
+      "to": "service",
+      "label": "1 row changed",
+      "kind": "response",
+      "when": "atomic"
+    },
+    {
+      "from": "service",
+      "to": "db",
+      "label": "B2: decrement if > 0",
+      "kind": "request",
+      "when": "atomic",
+      "predict": {
+        "question": "Buyer 2's write is about to commit. What does the database end up with?",
+        "options": [
+          "available -1, sold 2: oversell",
+          "the write fails, 0 rows changed",
+          "the database blocks buyer 2"
+        ]
+      }
+    },
+    {
+      "from": "db",
+      "to": "service",
+      "label": "0 rows changed",
+      "kind": "response",
+      "status": "error",
+      "when": "atomic",
+      "state": {
+        "available": "0",
+        "sold": "1"
+      }
+    },
+    {
+      "from": "service",
+      "to": "buyer1",
+      "label": "confirmed",
+      "kind": "response",
+      "when": "atomic"
+    },
+    {
+      "from": "service",
+      "to": "buyer2",
+      "label": "sold out, no oversell",
+      "kind": "response",
+      "when": "atomic"
+    }
+  ],
+  "caption": "With the toggle off, both buyers read available = 1 and both writes land: sold = 2, available = -1. Flip 'Atomic decrement' and the check and decrement become one operation, so buyer 2 changes 0 rows and fails cleanly."
+}
+\`\`\`
+
 ## Reservation holds
 
 Real commerce does not charge instantly, so you need reservation holds. When a buyer adds a seat to their cart, you decrement inventory and create a hold with a TTL (say 10 minutes). The seat is unavailable to others during the hold. If the buyer completes checkout, the hold converts to a sale; if the TTL expires, a background sweeper (or a lazy check on next read) releases the seat back to inventory via an atomic increment. This prevents both oversell and permanent leakage from abandoned carts. Optimistic locking (version numbers, retry on conflict) works when contention is low; pessimistic locking or serialized queues are better for genuinely hot items where most optimistic attempts would fail and retry-storm.
