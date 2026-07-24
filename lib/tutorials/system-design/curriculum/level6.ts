@@ -1039,6 +1039,194 @@ An *aggregate* (say Account #42) has a fold function: start from an empty state,
 
 (1) *Full audit trail* for free: every change is a first-class, retained fact, which regulators love for financial and medical systems. (2) *Temporal / time-travel queries*: reconstruct any past state. (3) *Debugging*: replay production events into a fixed build to reproduce a bug exactly. (4) *New read models retroactively*: a new projection can be built by replaying the entire history (see the CQRS lesson).
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Folding the event log into state",
+  "frames": [
+    {
+      "note": "The source of truth for Account #42 is an append-only log of four events. No balance is stored anywhere; state starts empty and will be derived by folding the events in order.",
+      "rows": [
+        {
+          "label": "events",
+          "cells": [
+            {
+              "text": "AccountOpened"
+            },
+            {
+              "text": "Deposited 50"
+            },
+            {
+              "text": "Withdrew 20"
+            },
+            {
+              "text": "Deposited 10"
+            }
+          ]
+        },
+        {
+          "label": "state",
+          "cells": [
+            {
+              "text": "empty"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The fold starts from the empty state and applies each event in order. AccountOpened initializes the aggregate: balance 0.",
+      "rows": [
+        {
+          "label": "events",
+          "cells": [
+            {
+              "text": "AccountOpened",
+              "state": "active"
+            },
+            {
+              "text": "Deposited 50",
+              "state": "dim"
+            },
+            {
+              "text": "Withdrew 20",
+              "state": "dim"
+            },
+            {
+              "text": "Deposited 10",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "state",
+          "cells": [
+            {
+              "text": "balance 0",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Deposited 50 is applied to the running state: 0 + 50 = 50. The event itself is never overwritten; only the derived view changes.",
+      "rows": [
+        {
+          "label": "events",
+          "cells": [
+            {
+              "text": "AccountOpened",
+              "state": "dim"
+            },
+            {
+              "text": "Deposited 50",
+              "state": "active"
+            },
+            {
+              "text": "Withdrew 20",
+              "state": "dim"
+            },
+            {
+              "text": "Deposited 10",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "state",
+          "cells": [
+            {
+              "text": "balance 50",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Withdrew 20 folds in next: 50 - 20 = 30. Because the log is ordered per aggregate, replay is deterministic: the same events always yield the same state.",
+      "rows": [
+        {
+          "label": "events",
+          "cells": [
+            {
+              "text": "AccountOpened",
+              "state": "dim"
+            },
+            {
+              "text": "Deposited 50",
+              "state": "dim"
+            },
+            {
+              "text": "Withdrew 20",
+              "state": "active"
+            },
+            {
+              "text": "Deposited 10",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "state",
+          "cells": [
+            {
+              "text": "balance 30",
+              "state": "new"
+            }
+          ]
+        }
+      ],
+      "predict": {
+        "question": "After the last event, Deposited 10, is applied, what is the derived balance?",
+        "options": [
+          "30",
+          "40",
+          "60"
+        ]
+      }
+    },
+    {
+      "note": "Deposited 10 completes the fold: 30 + 10 = 40. That 40 is a computed view, not stored truth. Fold only the events up to a timestamp and you get the balance as of that instant, which is how a ledger answers what the balance was last Tuesday 5pm.",
+      "rows": [
+        {
+          "label": "events",
+          "cells": [
+            {
+              "text": "AccountOpened",
+              "state": "dim"
+            },
+            {
+              "text": "Deposited 50",
+              "state": "dim"
+            },
+            {
+              "text": "Withdrew 20",
+              "state": "dim"
+            },
+            {
+              "text": "Deposited 10",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "state",
+          "cells": [
+            {
+              "text": "balance 40",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "fold(events) = events.reduce(apply, initialState): the log is the truth, state is always derived."
+}
+\`\`\`
+
 ## The replay-cost problem, and snapshots
 
 An account open for 10 years may have 100k events. Folding all of them on every read is too slow. The fix is **snapshots**: periodically persist the derived state (e.g. every 500 events) as \`Snapshot(version=N, state=...)\`. To load, take the latest snapshot and fold only the *tail* of events after it. Replay cost becomes bounded by snapshot frequency, not aggregate age. Snapshots are a cache, never the source of truth: you can always delete every snapshot and rebuild from the log.
