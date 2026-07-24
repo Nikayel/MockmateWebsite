@@ -1395,6 +1395,29 @@ Every message pipeline makes one of three promises, and stating which one, end t
 
 **At-most-once**: a message is delivered zero or one times. You never see a duplicate, but you can lose messages. You get this by acknowledging (committing your read position) *before* you process. If the consumer crashes after the commit but before the work finishes, that message is gone forever. Fine for a metrics sample or a best-effort log line, unacceptable for a payment.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Now flip the ack: the consumer processes first and commits its position only after success, then crashes between processing and the commit. What do you observe on restart?",
+  "options": [
+    {
+      "label": "The message is redelivered and processed again: no loss, but a duplicate, which is at-least-once",
+      "correct": true,
+      "feedback": "Right: moving the ack after the work converts possible loss into possible repetition."
+    },
+    {
+      "label": "The message is gone, exactly like the commit-before-process case",
+      "feedback": "Loss requires the position to advance past unprocessed work; here the commit never happened, so the broker still holds the message."
+    },
+    {
+      "label": "Neither loss nor duplicate, since the crash happened after the work finished",
+      "feedback": "The broker cannot see that the work finished, only that no ack arrived, so it must redeliver; that ambiguity is the Two Generals problem."
+    }
+  ]
+}
+\`\`\`
+
 **At-least-once**: a message is delivered one or more times. You never lose a message, but you can see duplicates. You get this by processing *first* and acknowledging *after* success. If the consumer crashes after processing but before the ack, the broker redelivers on restart and you process again. This is the practical default for anything that matters, because losing data is usually worse than repeating work, and repeats can be neutralized (see the idempotency lesson).
 
 **Exactly-once**: every message takes effect once, no loss, no duplicate. This is what everyone wants and what the network cannot give you.
@@ -1402,6 +1425,29 @@ Every message pipeline makes one of three promises, and stating which one, end t
 ## From impossible delivery to exactly-once processing
 
 Since delivery itself cannot be exactly-once (the impossibility is stated above and proved in Level 5), the useful move is to redefine the goal. So what do the vendors mean by "exactly-once"? They mean **exactly-once processing**, achieved by taking at-least-once delivery and making the effect idempotent or transactional so that duplicates do not change the outcome. You convert a delivery guarantee into a processing guarantee at the consumer.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A streaming vendor advertises exactly-once. Given that exactly-once delivery over a network is impossible, what are they actually selling?",
+  "options": [
+    {
+      "label": "Exactly-once processing: at-least-once delivery whose duplicates are neutralized by idempotent or transactional effects at the consumer",
+      "correct": true,
+      "feedback": "Right: the guarantee is converted from delivery to processing at the consumer; the network still duplicates."
+    },
+    {
+      "label": "A broker that solved the Two Generals problem with a better ack protocol",
+      "feedback": "No ack protocol escapes it: a sender still cannot tell a lost message from a lost ack."
+    },
+    {
+      "label": "At-most-once delivery with a very low loss rate",
+      "feedback": "At-most-once drops data; vendors build on at-least-once and make the repeats harmless, not rarer."
+    }
+  ]
+}
+\`\`\`
 
 \`\`\`
   producer --(at-least-once delivery, may duplicate)--> broker --> consumer
@@ -1418,6 +1464,30 @@ Kafka's "exactly-once semantics" (EOS) is real but narrowly scoped. It combines 
 Where the ack sits is the whole game: commit-before-process is at-most-once, process-before-commit is at-least-once. Pick at-least-once plus idempotency for anything with real-world consequences.
 
 **Recap:** three guarantees (lose / duplicate / neither), exactly-once delivery over a network is impossible so you get exactly-once *processing* via idempotency or transactions, Kafka EOS is scoped to read-process-write inside Kafka only, and ack timing decides which guarantee you actually have.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A consumer with Kafka EOS enabled reads an event, calls Stripe to charge the card, and writes a result record, all inside a Kafka transaction. A rebalance causes redelivery. Is the customer charged exactly once?",
+  "options": [
+    {
+      "label": "Not guaranteed: EOS atomically commits the offset and the output records inside Kafka, but the Stripe call is an external side effect that needs its own idempotency key",
+      "correct": true,
+      "feedback": "Right: EOS covers only the read-process-write loop inside Kafka, so the external call still rides at-least-once and must be deduped yourself."
+    },
+    {
+      "label": "Yes: the transaction rolls the Stripe charge back along with the offsets",
+      "feedback": "Kafka transactions span Kafka topics only; no third-party API joins the transaction, so the charge cannot be rolled back."
+    },
+    {
+      "label": "Yes, as long as the producer also sets acks=all",
+      "feedback": "acks controls durability of writes into Kafka, not duplication of an external call on redelivery."
+    }
+  ],
+  "reveal": "Two ideas combine: redelivery duplicates are inherent to at-least-once, and Kafka EOS neutralizes them only for offsets and records inside Kafka. Any effect that leaves Kafka, an email, a charge, a non-transactional write, needs its own idempotency."
+}
+\`\`\`
 `.trim()
 
 const idempotencyDedupTeach = `
