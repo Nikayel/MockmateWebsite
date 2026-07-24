@@ -2443,6 +2443,29 @@ sound junior. **Latency** is how long one request takes. **Throughput** is how m
 per second (QPS). **Concurrency** is how many requests are in flight at once. They are not
 independent, and the glue between them is Little's Law.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "100 requests hit your service: 99 finish in 10 ms and one takes 2000 ms. Your dashboard shows only the average latency. What does it report, and what should you conclude?",
+  "options": [
+    {
+      "label": "About 10 ms, and the system is healthy",
+      "feedback": "That is the median, not the mean. A single 2000 ms outlier drags the average far above the typical request."
+    },
+    {
+      "label": "About 30 ms, and 30 ms means the system is healthy",
+      "feedback": "The arithmetic is right, and that is exactly the trap: the average looks fine while 1 in 100 users just waited two full seconds."
+    },
+    {
+      "label": "About 30 ms, but that average is hiding a 2-second experience for 1 percent of users",
+      "correct": true,
+      "feedback": "Right. (99 x 10 + 2000) / 100 is about 30 ms, yet what users feel lives in the tail. That is why you report percentiles like 'p99' instead of means."
+    }
+  ]
+}
+\`\`\`
+
 ### Averages lie
 
 Imagine 100 requests, 99 at 10ms and one at 2000ms. The mean is 30ms, which sounds healthy, but 1% of
@@ -2542,6 +2565,30 @@ average percentiles.
 Recap: Averages hide the tail, p99 is the number users feel and fan-out makes it common, and Little's
 Law (L = arrival_rate x latency) sizes your concurrency and exposes when latency is capping
 throughput.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You run a fixed pool of 200 workers and normally serve 2000 QPS at 50 ms per request. A slow dependency pushes latency to 200 ms while arrivals stay at 2000 QPS. What happens?",
+  "options": [
+    {
+      "label": "Nothing structural, every request is just slower",
+      "feedback": "Tempting, but concurrency is finite. Little's Law says in-flight work equals arrival rate times latency, and that product now exceeds your 200 workers."
+    },
+    {
+      "label": "Throughput caps near 1000 QPS and the excess queues or fails",
+      "correct": true,
+      "feedback": "Right. 200 workers divided by 0.2 seconds is a 1000 QPS ceiling, half your traffic. Rising latency silently converts into falling throughput once the pool saturates."
+    },
+    {
+      "label": "Throughput rises because more requests are in flight at once",
+      "feedback": "More requests in flight is higher concurrency, not higher throughput. The pool is fixed at 200, so extra arrivals wait in queues or get shed."
+    }
+  ],
+  "reveal": "The lesson in three moves for the design exercise: quote 'p50', 'p99', and 'p99.9' instead of averages because fan-out turns rare tails into the common case, size pools with Little's Law (concurrency equals QPS times latency), and trust only measurements that dodge coordinated omission by timing from intended send time and aggregating with histograms."
+}
+\`\`\`
 `.trim()
 
 const resiliencePrimitivesTeach = `
