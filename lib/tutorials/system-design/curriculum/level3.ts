@@ -1211,6 +1211,29 @@ the background while the still-valid cached value keeps serving everyone else. T
 expires under load. A simpler cousin is **stale-while-revalidate**: serve the stale value immediately
 and kick off one async refresh.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A flash-sale SKU is read 500K times per second. The value is sitting in cache, nowhere near expiry, but the one Redis shard that owns the key is at 100% CPU. Does singleflight coalescing fix this?",
+  "options": [
+    {
+      "label": "Yes: it collapses the 500K reads into one",
+      "feedback": "Tempting, but coalescing dedups rebuilds on a miss. These requests are hits: there is nothing to rebuild, just one shard drowning in reads for one key."
+    },
+    {
+      "label": "No: the value is present, so there is no rebuild to coalesce; the shard itself is saturated",
+      "correct": true,
+      "feedback": "Right. Expiry misses and raw volume are different failures. A genuinely hot key needs its reads spread out or absorbed before they ever reach the shard."
+    },
+    {
+      "label": "Yes, if you upgrade the process-local lock to a distributed lock",
+      "feedback": "Tempting: a distributed lock widens coalescing to the whole fleet, but it still only governs rebuild-on-miss. It does nothing for hit traffic on a value that is already there."
+    }
+  ]
+}
+\`\`\`
+
 ### The genuinely hot key
 
 Sometimes the problem is not expiry but sheer volume: one key (a viral tweet, a flash-sale SKU) is
@@ -1220,6 +1243,29 @@ saturated. The fixes are **key replication** (write the value under N suffixed k
 \`hotkey:0..N\` spread across shards and have clients read a random one) and a **client-side near
 cache (L1)** on each app server so most reads never reach Redis at all. Hot-key detection (per-key
 request rates) tells you which keys need this treatment.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An engineer flushes the entire cache at peak traffic to clear a bad config, reasoning that each key will just miss once and refill. What actually happens?",
+  "options": [
+    {
+      "label": "A brief blip: one miss per key, then normal service",
+      "feedback": "Tempting per-key logic, but every key misses at the same moment, so the DB takes the entire read volume at once instead of a trickle of misses."
+    },
+    {
+      "label": "A whole-keyspace stampede: the DB absorbs close to the full read load and can spiral",
+      "correct": true,
+      "feedback": "Right. A cold cache is the stampede on every key simultaneously. That is why flushes and cold starts call for cache warming or a gradual traffic ramp."
+    },
+    {
+      "label": "Only the hottest few keys cause trouble; the long tail refills quietly",
+      "feedback": "Tempting, but the tail is huge in aggregate: even rarely-read keys all missing together adds up to the full pre-cache load."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** the subtlety interviewers push on is what happens right after a cache flush or
 cold start. A cold cache is a stampede on every key at once, so "just flush and warm up" is dangerous
@@ -1237,6 +1283,42 @@ NAIVE (stampede)                 COALESCED (singleflight)
 Recap: stop expiry stampedes with request coalescing (singleflight) plus jittered TTLs and
 probabilistic early refresh, and handle a genuinely hot key with replication across shards or an L1
 near cache, layering the defenses and never treating a cold cache as safe.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Match each failure to the defense family you would lead with. You will layer them in your design, but know which one carries each case.",
+  "buckets": [
+    "Request coalescing",
+    "Jitter or early refresh",
+    "Replication or L1 near cache"
+  ],
+  "items": [
+    {
+      "label": "A popular key expires and 3,000 concurrent requests all miss at once",
+      "bucket": "Request coalescing",
+      "feedback": "Singleflight turns those 3,000 rebuilds into exactly one DB query; everyone else waits briefly and reads the fresh value."
+    },
+    {
+      "label": "A cohort of keys cached together all vanish at the same instant",
+      "bucket": "Jitter or early refresh",
+      "feedback": "TTL jitter spreads a cohort's expiries across a window so there is no single cliff."
+    },
+    {
+      "label": "A key under constant heavy load must never actually hit its expiry",
+      "bucket": "Jitter or early refresh",
+      "feedback": "Probabilistic early recomputation (XFetch) refreshes it in the background before the TTL lands, so readers never see a miss."
+    },
+    {
+      "label": "A viral key saturates its shard even though the cached value is valid",
+      "bucket": "Replication or L1 near cache",
+      "feedback": "Only spreading the reads helps: N suffixed copies across shards, or a per-node L1 so most reads never reach Redis at all."
+    }
+  ],
+  "reveal": "A strong design write layers all three families and adds the cold-start rule: never bring an empty cache online under full load; warm it or ramp traffic, with coalescing on."
+}
+\`\`\`
 `.trim()
 
 const distributedCacheArchTeach = `
