@@ -474,14 +474,99 @@ when you are busiest. "Leveled" compaction (RocksDB default) gives better read a
 amplification but more write amplification; "size-tiered" (Cassandra default) is the reverse. Naming
 this tradeoff signals you have actually operated one.
 
-\`\`\`
-B+TREE (read/update-heavy OLTP)     LSM-TREE (write-heavy ingest)
-  in-place page updates               memtable (RAM) --> flush
-  sorted leaves, fast range scan          |
-  writes = random + WAL               immutable SSTables on disk
-  amp: low read, higher write             |  bloom filter per SSTable
-                                      compaction merges in background
-                                      amp: high write, higher read
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "The LSM write path",
+  "layout": "lr",
+  "nodes": [
+    {
+      "id": "writer",
+      "label": "Incoming write",
+      "kind": "client"
+    },
+    {
+      "id": "commit_log",
+      "label": "Commit log (sequential append)",
+      "kind": "db"
+    },
+    {
+      "id": "memtable",
+      "label": "Memtable (sorted, in RAM)",
+      "kind": "cache"
+    },
+    {
+      "id": "sstables",
+      "label": "Immutable SSTables, bloom filter each",
+      "kind": "db"
+    },
+    {
+      "id": "compaction",
+      "label": "Background compaction",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "writer",
+      "to": "memtable",
+      "kind": "sync",
+      "label": "insert sorted"
+    },
+    {
+      "from": "writer",
+      "to": "commit_log",
+      "kind": "sync",
+      "label": "append"
+    },
+    {
+      "from": "memtable",
+      "to": "sstables",
+      "kind": "async",
+      "label": "flush when full"
+    },
+    {
+      "from": "sstables",
+      "to": "compaction",
+      "kind": "async",
+      "label": "merge inputs"
+    },
+    {
+      "from": "compaction",
+      "to": "sstables",
+      "kind": "async",
+      "label": "fewer, merged files"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "writer"
+      ],
+      "note": "A write never edits a page in place; the whole path is append-only and sequential, which is why LSM write throughput is high and SSD-friendly."
+    },
+    {
+      "adds": [
+        "memtable",
+        "commit_log"
+      ],
+      "note": "The memtable keeps recent writes sorted in RAM; the commit log exists so an acknowledged write survives a crash before any flush."
+    },
+    {
+      "adds": [
+        "sstables"
+      ],
+      "note": "A full memtable is flushed to disk as an immutable, sorted SSTable; each file carries a bloom filter so a read can skip files that definitely do not contain the key."
+    },
+    {
+      "adds": [
+        "compaction"
+      ],
+      "note": "Compaction merges SSTables in the background, discarding overwritten and tombstoned rows; it bounds read amplification but competes for disk I/O, so sustained write pressure brings compaction stalls."
+    }
+  ],
+  "caption": "Contrast with a B+tree, which updates fixed-size pages in place: a clean 3 to 4 page reads per lookup and fast range scans, paid for with write amplification on every small change."
+}
 \`\`\`
 
 Recap: B-tree updates pages in place for fast reads and range scans at the cost of write
