@@ -981,10 +981,68 @@ On a warm path (browser cache fresh, or CDN hit, or Redis hit) most hops are ski
 in single-digit ms. On a full cold miss (cold DNS, new connection, CDN miss, Redis miss) you pay
 every RTT plus the DB query, easily hundreds of ms.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A signed-in user loads their personalized dashboard and gets a fast warm-path response. Which caches are most likely doing the heavy lifting?",
+  "options": [
+    {
+      "label": "The CDN; it caches whatever passes through it at the edge",
+      "feedback": "Tempting because CDN and cache feel like synonyms, but the CDN cannot serve one user's personalized HTML to anyone else, so for a dashboard it mostly holds static assets."
+    },
+    {
+      "label": "The browser cache and the app-tier Redis cache",
+      "correct": true,
+      "feedback": "Right. Personalized responses live in caches that know the user: the browser's own cache in front, and Redis behind the app server skipping the database."
+    },
+    {
+      "label": "The DNS cache; skipping the resolver walk is the big win",
+      "feedback": "A DNS cache saves one lookup's worth of RTT. The request still travels the entire chain and does full origin work, so it cannot explain a warm path by itself."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** for a **signed-in user on a dynamic page**, the CDN usually cannot cache the
 personalized HTML, so the browser cache and the app-tier Redis cache do the heavy lifting, and the
 CDN mostly accelerates static assets and terminates TLS near the user. Say this; it is the
 distinction between caching a public marketing page and a logged-in dashboard.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Which layer does each job on this page load?",
+  "buckets": [
+    "Browser cache",
+    "CDN POP",
+    "Redis app cache"
+  ],
+  "items": [
+    {
+      "label": "Serves a fresh response with zero network traffic at all",
+      "bucket": "Browser cache",
+      "feedback": "The cheapest possible hit: the entire chain, DNS included, is short-circuited before a single packet leaves the device."
+    },
+    {
+      "label": "Serves static assets and public pages from near the user",
+      "bucket": "CDN POP",
+      "feedback": "Shared, non-personalized content is the CDN's home turf: a hit returns at the edge without touching origin."
+    },
+    {
+      "label": "Answers hot reads in about 1ms so the database is skipped",
+      "bucket": "Redis app cache",
+      "feedback": "The app server checks Redis before the database; a hit skips the authoritative store, a miss falls through and populates it."
+    },
+    {
+      "label": "Terminates TLS close to the user even on pages it cannot cache",
+      "bucket": "CDN POP",
+      "feedback": "Easy to miss: even with nothing cacheable, the POP makes the expensive handshakes happen over a short hop instead of the long haul."
+    }
+  ]
+}
+\`\`\`
 
 Failure points and timeouts, per hop: DNS resolution timeout, TCP connect timeout, TLS handshake
 failure (expired cert), LB/gateway 502/503/504 when a backend is down or slow, app-to-DB query
@@ -996,6 +1054,30 @@ Recap: a request walks browser cache -> DNS -> TCP -> TLS -> CDN/WAF/LB/gateway 
 cache -> DB/downstream and back through serialize/compress/cache-header/render, where each layer adds
 an RTT and offers a cache that can short-circuit the rest, and every hop needs its own timeout so one
 slow dependency cannot stall the whole path.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Fully cold start: DNS uncached, new connection, CDN miss, Redis miss, and the user is 200ms from origin. Roughly how much time passes before the app server even begins real work?",
+  "options": [
+    {
+      "label": "Almost none; the setup steps overlap with sending the request",
+      "feedback": "Each stage needs the previous one's answer: you cannot handshake TCP before DNS returns an IP, or send HTTP before TLS finishes. Cold setup is strictly sequential."
+    },
+    {
+      "label": "Around 2 to 3 RTTs, so 400 to 600ms, before the first request byte even reaches origin",
+      "correct": true,
+      "feedback": "Right. The DNS walk plus the TCP handshake plus TLS 1.3 is 2+ RTTs of pure ceremony at 200ms each, and the request still has to clear the WAF, LB, gateway, and auth before a Redis miss sends it to the database."
+    },
+    {
+      "label": "About one RTT; each of these layers is individually cheap",
+      "feedback": "That is exactly the trap: each layer is cheap alone, but DNS, TCP, and TLS each bill their own round trip, and a cold miss makes you pay every one of them at once."
+    }
+  ],
+  "reveal": "This chain is your design-write checklist: name every hop, the RTT it adds, the cache that can short-circuit it, and the timeout that bounds it. Showing where hits land and what happens when each hop fails is what turns a diagram into a system."
+}
+\`\`\`
 `.trim()
 
 const apiParadigmsTeach = `
