@@ -1523,6 +1523,46 @@ writes and the same hot keys repeat, so caching cuts p99 and datastore QPS." A b
 justification is the single most common wrong turn: adding Kafka or sharding you cannot yet defend
 makes you look like you are pattern-matching, not designing.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Each situation justifies exactly one added box. Which component earns its place on the diagram?",
+  "buckets": [
+    "Message queue",
+    "Cache",
+    "Object store"
+  ],
+  "items": [
+    {
+      "label": "Work is spiky and must survive a consumer being down",
+      "bucket": "Message queue",
+      "feedback": "Queues (Kafka, SQS) buffer async work so a burst or a dead consumer does not lose requests."
+    },
+    {
+      "label": "Reads are 10x writes and the same hot keys repeat",
+      "bucket": "Cache",
+      "feedback": "Repeated hot reads are the cache case: Redis cuts datastore QPS and 'p99'."
+    },
+    {
+      "label": "User-uploaded videos that do not belong in a database row",
+      "bucket": "Object store",
+      "feedback": "Large blobs go to S3-class storage; the database keeps only the metadata and the storage key."
+    },
+    {
+      "label": "Thumbnail generation the upload response should not wait for",
+      "bucket": "Message queue",
+      "feedback": "Async work the caller does not block on is queue work: accept the upload, enqueue the job, return."
+    },
+    {
+      "label": "Cutting tail latency on a read-heavy product page",
+      "bucket": "Cache",
+      "feedback": "Serving repeats from memory is the standard tail-latency lever on read-heavy paths."
+    }
+  ]
+}
+\`\`\`
+
 ### Trace a concrete request
 
 Now the part that separates a strong answer: pick one real operation and follow it through every box,
@@ -1545,6 +1585,30 @@ have a working design now."
 Recap: start with the minimal client-LB-app-DB-cache skeleton, add each component only with a
 requirement-tied justification, label arrows with data and protocol, and prove the design by tracing
 one concrete request through both its write and its read or delivery path.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your diagram has 12 labeled boxes and covers every requirement on paper. What proves the design actually works before you move to deep dives?",
+  "options": [
+    {
+      "label": "Add one more layer of detail inside each box",
+      "feedback": "Tempting because detail feels like rigor, but 15 detailed boxes with no flow shown is the classic failure: nobody knows whether a single request survives the trip."
+    },
+    {
+      "label": "Trace one concrete request end to end through the write path and the read or delivery path",
+      "correct": true,
+      "feedback": "Right. Walking a real operation box by box exposes the gaps: where data waits, what happens when the recipient is offline, how the sender gets an ack. Then point at where each functional requirement is satisfied."
+    },
+    {
+      "label": "List the specific technologies you would use for each box",
+      "feedback": "Naming Kafka and Redis proves nothing by itself. A box or a brand name without a traced flow and a requirement-tied justification reads as pattern-matching."
+    }
+  ],
+  "reveal": "In the design write, start from the client-LB-app-DB-cache skeleton, justify every added box against a requirement, label arrows with what flows and how, then walk one request end to end before you claim the design is complete."
+}
+\`\`\`
 `.trim()
 
 const deepDivesWrapupTeach = `
