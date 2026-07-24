@@ -2239,6 +2239,193 @@ memory balloons, pages split constantly, and the index **fragments**. On a large
 multiply write cost and index size several-fold. Using a random UUIDv4 as a clustered primary key is
 one of the most common and expensive modeling mistakes.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "Index locality: sequential vs random UUID keys",
+  "actors": [
+    {
+      "id": "writer",
+      "label": "Writer"
+    },
+    {
+      "id": "index",
+      "label": "Clustered index (B-tree)"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "uuidKeys",
+      "label": "Random UUIDv4 keys",
+      "description": "OFF: sequential auto-increment ids. ON: random UUIDv4 as the clustered primary key."
+    }
+  ],
+  "steps": [
+    {
+      "from": "index",
+      "label": "Rows stored in PK order",
+      "kind": "note",
+      "status": "ok"
+    },
+    {
+      "from": "writer",
+      "to": "index",
+      "label": "INSERT id 1001",
+      "kind": "request",
+      "status": "ok",
+      "when": "!uuidKeys"
+    },
+    {
+      "from": "index",
+      "to": "writer",
+      "label": "Append to rightmost page",
+      "kind": "response",
+      "status": "ok",
+      "when": "!uuidKeys",
+      "state": {
+        "pageSplits": "0"
+      }
+    },
+    {
+      "from": "writer",
+      "to": "index",
+      "label": "INSERT id 1002",
+      "kind": "request",
+      "status": "ok",
+      "when": "!uuidKeys"
+    },
+    {
+      "from": "index",
+      "to": "writer",
+      "label": "Tail append, no split",
+      "kind": "response",
+      "status": "ok",
+      "when": "!uuidKeys",
+      "state": {
+        "pageSplits": "0"
+      }
+    },
+    {
+      "from": "writer",
+      "to": "index",
+      "label": "INSERT id 1003",
+      "kind": "request",
+      "status": "ok",
+      "when": "!uuidKeys",
+      "predict": {
+        "question": "Sequential id 1003 arrives. Where does the insert land?",
+        "options": [
+          "On the same rightmost (tail) page again",
+          "On a random page in the middle of the B-tree"
+        ]
+      }
+    },
+    {
+      "from": "index",
+      "to": "writer",
+      "label": "Rightmost page: one hot page",
+      "kind": "response",
+      "status": "ok",
+      "when": "!uuidKeys",
+      "state": {
+        "pageSplits": "0"
+      }
+    },
+    {
+      "from": "index",
+      "label": "Rest of the tree sits idle",
+      "kind": "note",
+      "status": "ok",
+      "when": "!uuidKeys"
+    },
+    {
+      "from": "writer",
+      "to": "index",
+      "label": "INSERT 9f3a... (random)",
+      "kind": "request",
+      "status": "ok",
+      "when": "uuidKeys"
+    },
+    {
+      "from": "index",
+      "to": "writer",
+      "label": "Lands on a random mid page",
+      "kind": "response",
+      "status": "ok",
+      "when": "uuidKeys",
+      "state": {
+        "pageSplits": "0"
+      }
+    },
+    {
+      "from": "writer",
+      "to": "index",
+      "label": "INSERT 41c7... (random)",
+      "kind": "request",
+      "status": "ok",
+      "when": "uuidKeys"
+    },
+    {
+      "from": "index",
+      "label": "Full page splits in two",
+      "kind": "note",
+      "status": "error",
+      "when": "uuidKeys",
+      "state": {
+        "pageSplits": "1"
+      }
+    },
+    {
+      "from": "writer",
+      "to": "index",
+      "label": "INSERT 07be... (random)",
+      "kind": "request",
+      "status": "ok",
+      "when": "uuidKeys",
+      "predict": {
+        "question": "Another random UUIDv4 arrives. Where does this insert land?",
+        "options": [
+          "The rightmost page, like sequential ids",
+          "An unpredictable page anywhere in the tree"
+        ]
+      }
+    },
+    {
+      "from": "index",
+      "label": "Another page split",
+      "kind": "note",
+      "status": "error",
+      "when": "uuidKeys",
+      "state": {
+        "pageSplits": "2"
+      }
+    },
+    {
+      "from": "index",
+      "to": "writer",
+      "label": "Every page is now hot",
+      "kind": "response",
+      "status": "ok",
+      "when": "uuidKeys",
+      "state": {
+        "pageSplits": "2"
+      }
+    },
+    {
+      "from": "index",
+      "label": "Working set balloons in memory",
+      "kind": "note",
+      "status": "error",
+      "when": "uuidKeys",
+      "state": {
+        "pageSplits": "3"
+      }
+    }
+  ],
+  "caption": "Sequential keys pile every insert onto the same rightmost page: perfect locality, one hot page. Random UUIDv4 keys scatter inserts across the whole B-tree, so pages split constantly, the index fragments, and the working set of pages you must keep in memory balloons, multiplying write cost and index size several-fold on a large table."
+}
+\`\`\`
+
 ### Time-ordered IDs, the actual answer
 
 You want the coordination-free, information-hiding property of a UUID with the locality of a
