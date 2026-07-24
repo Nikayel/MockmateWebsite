@@ -542,6 +542,183 @@ A circuit breaker is a state machine wrapped around a dependency that trips like
 
 The key insight is that failing fast is a feature. A breaker in Open state gives an instant error, which is far better than a client waiting 500 ms for a timeout on every request, and it is the only thing that lets an overloaded dependency drain its queue.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "Drive the breaker: Closed to Open to Half-Open",
+  "actors": [
+    {
+      "id": "caller",
+      "label": "Caller"
+    },
+    {
+      "id": "breaker",
+      "label": "Circuit breaker"
+    },
+    {
+      "id": "dep",
+      "label": "Dependency"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "depDown",
+      "label": "Dependency failing",
+      "description": "Calls time out instead of answering; timeouts count as failures in the rolling window of the last 20 calls."
+    },
+    {
+      "id": "probeFails",
+      "label": "Probe fails in Half-Open",
+      "description": "Only matters once the breaker reaches Half-Open: turn on Dependency failing first to get there."
+    }
+  ],
+  "steps": [
+    {
+      "from": "caller",
+      "to": "breaker",
+      "label": "call dependency",
+      "kind": "request",
+      "status": "ok",
+      "state": {
+        "breaker": "Closed",
+        "window": "0/20 fail"
+      }
+    },
+    {
+      "from": "breaker",
+      "to": "dep",
+      "label": "forward (Closed)",
+      "kind": "request",
+      "status": "ok"
+    },
+    {
+      "from": "dep",
+      "to": "breaker",
+      "label": "200 OK",
+      "kind": "response",
+      "status": "ok",
+      "when": "!depDown"
+    },
+    {
+      "from": "breaker",
+      "to": "caller",
+      "label": "200 OK",
+      "kind": "response",
+      "status": "ok",
+      "when": "!depDown"
+    },
+    {
+      "from": "breaker",
+      "label": "500 ms timeout = failure",
+      "kind": "timer",
+      "status": "error",
+      "when": "depDown",
+      "state": {
+        "window": "11/20 fail"
+      }
+    },
+    {
+      "from": "breaker",
+      "label": "over half of last 20: trip",
+      "kind": "note",
+      "status": "error",
+      "when": "depDown",
+      "state": {
+        "breaker": "Open"
+      },
+      "predict": {
+        "question": "Failures just crossed half of the rolling window of 20 calls, so the breaker trips to Open. What happens to the caller's next request?",
+        "options": [
+          "It fails instantly and never touches the dependency",
+          "It waits the full 500 ms timeout, then errors",
+          "It queues inside the breaker until the dependency recovers"
+        ]
+      }
+    },
+    {
+      "from": "caller",
+      "to": "breaker",
+      "label": "next call",
+      "kind": "request",
+      "status": "ok",
+      "when": "depDown"
+    },
+    {
+      "from": "breaker",
+      "to": "caller",
+      "label": "instant fail, no call out",
+      "kind": "response",
+      "status": "error",
+      "when": "depDown"
+    },
+    {
+      "from": "breaker",
+      "label": "5 s cooldown ends",
+      "kind": "timer",
+      "status": "ok",
+      "when": "depDown",
+      "state": {
+        "breaker": "Half-Open"
+      }
+    },
+    {
+      "from": "breaker",
+      "to": "dep",
+      "label": "trial probe",
+      "kind": "request",
+      "status": "ok",
+      "when": "depDown",
+      "predict": {
+        "question": "Half-Open lets a small number of trial requests through. If this probe fails, what does the breaker do?",
+        "options": [
+          "Re-opens and waits out another cooldown",
+          "Stays Half-Open and probes forever",
+          "Closes anyway and resumes full traffic"
+        ]
+      }
+    },
+    {
+      "from": "dep",
+      "to": "breaker",
+      "label": "probe fails",
+      "kind": "response",
+      "status": "error",
+      "when": "probeFails"
+    },
+    {
+      "from": "breaker",
+      "label": "re-open, cooldown again",
+      "kind": "note",
+      "status": "error",
+      "when": "probeFails",
+      "state": {
+        "breaker": "Open"
+      }
+    },
+    {
+      "from": "dep",
+      "to": "breaker",
+      "label": "probe 200 OK",
+      "kind": "response",
+      "status": "ok",
+      "when": "depDown"
+    },
+    {
+      "from": "breaker",
+      "label": "close: traffic flows again",
+      "kind": "note",
+      "status": "ok",
+      "when": "depDown",
+      "state": {
+        "breaker": "Closed",
+        "window": "0/20 fail"
+      }
+    }
+  ],
+  "caption": "Turn on Dependency failing to watch the trip to Open and the fail-fast; then flip Probe fails to see Half-Open send the breaker back to Open instead of Closed."
+}
+\`\`\`
+
 ## Bulkhead
 
 A bulkhead isolates resources per dependency, named after ship compartments that stop one flooded section from sinking the vessel. If your service calls Dependencies A, B, and C from a single shared thread pool of 200 threads, and C gets slow, requests to C hold threads until they time out. Enough slow C calls and all 200 threads are stuck in C, so calls to A and B, which are perfectly healthy, get no threads and fail too. One sick dependency starved the others. The fix is to give each dependency its own bounded pool (for example 60 threads for A, 60 for B, 40 for C). Now a C brownout can consume at most C's 40 threads; A and B keep serving. Bulkheads convert a total outage into a partial one.
