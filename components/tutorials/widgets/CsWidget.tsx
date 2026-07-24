@@ -45,6 +45,9 @@ function estimateMinHeight(spec: WidgetSpec): number {
     case "sequence":
       // Lanes header + step rows (the diagram allocates all slots up front).
       return 170 + Math.max(spec.steps.length, 2) * 40
+    case "steps":
+      // Title bar + first frame's rows + note box + Prev/Next controls.
+      return 160 + Math.min(spec.frames[0]?.rows.length ?? 1, 8) * 30
     default:
       return 120
   }

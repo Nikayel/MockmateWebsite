@@ -23,6 +23,7 @@ const SIM_TYPES = new Set([
   "partition-sim",
   "replication-lag",
   "watermark-sim",
+  "steps",
 ])
 const ANIMATED_DIAGRAM_TYPES = new Set(["topology", "ladder"])
 

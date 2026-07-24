@@ -13,6 +13,7 @@ import { QueueSimWidget } from "./QueueSimWidget"
 import { PartitionSimWidget } from "./PartitionSimWidget"
 import { ReplicationLagWidget } from "./ReplicationLagWidget"
 import { WatermarkSimWidget } from "./WatermarkSimWidget"
+import { StepsWidget } from "./StepsWidget"
 
 /**
  * Dispatches a VALIDATED widget spec to its family component. This module (plus the
@@ -50,6 +51,8 @@ function renderSpec(spec: WidgetSpec) {
       return <ReplicationLagWidget spec={spec} />
     case "watermark-sim":
       return <WatermarkSimWidget spec={spec} />
+    case "steps":
+      return <StepsWidget spec={spec} />
     default: {
       // Exhaustiveness guard: adding a spec type without a case is a compile error here.
       const _exhaustive: never = spec
