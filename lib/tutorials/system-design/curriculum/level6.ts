@@ -98,11 +98,44 @@ analytics team can start today and read the last 30 days from offset zero.
 
 ### The two axes: retention and who tracks delivery
 
-\`\`\`
-              delete on consume?     who tracks position?      replay?    fan-out?
-Queue (SQS)         yes              broker (per message ack)     no       no (competing)
-Pub/Sub (SNS)   yes (per sub)        broker (per subscriber)      no       yes
-Log (Kafka)          no             consumer (own offset)         yes      yes (per group)
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Model",
+    "Delete on consume?",
+    "Who tracks position?",
+    "Replay?",
+    "Fan-out?"
+  ],
+  "rows": [
+    [
+      "Queue (SQS)",
+      "yes",
+      "broker (per-message ack)",
+      "no",
+      "no (competing consumers)"
+    ],
+    [
+      "Pub/Sub (SNS)",
+      "yes (per subscriber)",
+      "broker (per subscriber)",
+      "no",
+      "yes"
+    ],
+    [
+      "Log (Kafka)",
+      "no",
+      "consumer (own offset)",
+      "yes",
+      "yes (per group)"
+    ]
+  ],
+  "highlightCols": [
+    "Who tracks position?"
+  ],
+  "caption": "The two axes that separate the models: whether consuming deletes the message, and who owns the position. Consumer-owned offsets are the whole reason a log gives replay and many independent reader groups."
+}
 \`\`\`
 
 A queue's broker tracks per-message delivery and acks; it is push-ish and the broker owns state. A
