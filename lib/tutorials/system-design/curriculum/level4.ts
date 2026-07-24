@@ -1792,6 +1792,36 @@ arriving) rather than the *symptom* (CPU rising), buying precious lead time.
 
 \`\`\`cswidget
 {
+  "type": "queue-sim",
+  "title": "Scale on the Backlog, Not the CPU",
+  "predictPrompt": {
+    "question": "A wave of jobs lands while the lone worker is already flat out on the job in hand. Which signal tells the autoscaler to add workers first?",
+    "options": [
+      "CPU utilization: the worker heats up as the wave arrives",
+      "Queue depth: the backlog grows the moment arrivals outpace the drain",
+      "p99 latency: alerts fire once jobs start missing their deadlines"
+    ]
+  },
+  "workedExample": "At the start the drain slightly outruns arrivals, so the queue idles near empty even though the busy worker's CPU already reads as pegged. When the wave hits, arrivals run several times the single consumer's drain and depth climbs steeply, while a CPU trigger would still see nothing new: a worker grinding through one job looks exactly the same at 100 percent whether zero jobs or hundreds are waiting behind it. Turn on scale on backlog and the moment depth crosses the threshold, extra consumers attach and the combined drain overtakes arrivals, so the backlog crests and then empties well before the run ends. Queue depth is the cause-side signal: it moves the instant work outpaces the drain, minutes before any utilization number would.",
+  "producerRate": 1.5,
+  "consumerRate": 2,
+  "ticks": 180,
+  "capacity": 120,
+  "burst": {
+    "from": 40,
+    "to": 100,
+    "multiplier": 6
+  },
+  "scaleOnBacklog": {
+    "threshold": 20,
+    "maxConsumers": 5
+  },
+  "caption": "Flip scale on backlog to watch KEDA-style scaling catch a wave that a CPU-based trigger would sleep through."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "check",
   "kind": "classify",
   "prompt": "Sort each autoscaling metric.",
