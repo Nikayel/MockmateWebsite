@@ -495,12 +495,39 @@ availability: shopping-cart-scale and like-count-scale systems live here.
 }
 \`\`\`
 
-\`\`\`
-strong <--------------------------------------------------> weak
-linearizable   sequential   causal   |   eventual
-(real-time)    (total ord)  (cause)  |   (converges)
-      more coordination  <-----  |  ----->  more availability
-                          partition line
+\`\`\`csdiagram
+{
+  "type": "ladder",
+  "title": "The consistency spectrum, by coordination cost",
+  "scale": "linear",
+  "bands": [
+    {
+      "label": "Eventual",
+      "value": 1,
+      "display": "converges",
+      "note": "Promises only that replicas converge once writes stop; along the way you see stale reads, reordered updates, and (without conflict handling) lost writes. Cheapest to run, highest availability: like counts and shopping carts live here."
+    },
+    {
+      "label": "Causal",
+      "value": 2,
+      "display": "cause order",
+      "note": "Keeps only the orderings that matter: if A causally influenced B, everyone sees A before B. The strongest model that stays available under a network partition; anything stronger must block or reject writes when the network splits."
+    },
+    {
+      "label": "Sequential",
+      "value": 3,
+      "display": "total order",
+      "note": "All clients agree on one total order and each client keeps its program order, but that order need not match wall-clock reality; two users comparing notes out of band can be surprised."
+    },
+    {
+      "label": "Linearizable",
+      "value": 4,
+      "display": "real-time order",
+      "note": "Behaves as if there is one copy of the data, with real-time order. What unique-username checks, distributed locks, and leader election need; the cost is coordination through a leader or a quorum, and round trips to agree on order."
+    }
+  ],
+  "caption": "Coordination cost rises monotonically toward the strong end. The design skill is picking the weakest model that is still correct for the specific data."
+}
 \`\`\`
 
 **Interview nuance:** the coordination cost rises monotonically to the left. Stronger models need
