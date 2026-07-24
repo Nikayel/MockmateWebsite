@@ -1246,6 +1246,25 @@ of 20 nodes independently enforces "100 req/min," a user spraying across all 20 
 req/min**, 20x the intended limit. The whole problem of distributed rate limiting is enforcing one
 global limit across N nodes without paying an unacceptable latency or availability tax.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The fleet moves the counter to shared Redis. Each gateway node runs 'GET count', checks it against the limit of 100, and calls 'INCR' if allowed. Two nodes execute this at the same instant when the count is 99. What happens?",
+  "options": [
+    {
+      "label": "Redis is single-threaded, so it serializes the commands and only one request is allowed",
+      "feedback": "Tempting, because each individual Redis command is atomic. But the race lives between the GET and the INCR: both nodes read 99 before either one increments."
+    },
+    {
+      "label": "Both nodes read 99, both allow, and the limit is overshot",
+      "correct": true,
+      "feedback": "Right. A read-then-write across two commands is not atomic. Fix it by making the decision one atomic operation: a bare 'INCR' whose returned value you check, or a Lua script via 'EVAL' when multiple fields must update together, as in a token bucket."
+    }
+  ]
+}
+\`\`\`
+
 **Approach 1: centralized exact, with a shared store.** Put the counter in **Redis** and have every
 node read-modify-write it. The trap is the race: two nodes doing \`GET count; if under limit INCR\`
 can both read 99 and both allow, overshooting. You must make the decision **atomic**. For simple
@@ -1286,6 +1305,43 @@ Recap: naive per-node limits grant Nx, so either enforce exactly via atomic Redi
 paying a per-request round trip) or approximate locally and async-sync to a shared store for bounded
 overshoot, and always decide the fail-open path plus hot-key sharding so the limiter never becomes
 the outage.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Match each property to the distributed enforcement approach it describes.",
+  "buckets": [
+    "Centralized Redis",
+    "Local budget slices",
+    "Hybrid with async sync"
+  ],
+  "items": [
+    {
+      "label": "Exact global enforcement, but every request pays a network round trip",
+      "bucket": "Centralized Redis"
+    },
+    {
+      "label": "Zero coordination, but a hot user concentrated on a few nodes gets throttled while global budget sits unused",
+      "bucket": "Local budget slices"
+    },
+    {
+      "label": "Overshoot bounded to roughly one sync interval of traffic",
+      "bucket": "Hybrid with async sync"
+    },
+    {
+      "label": "How Envoy global rate limiting and many CDNs actually work",
+      "bucket": "Hybrid with async sync"
+    },
+    {
+      "label": "Only correct while the load balancer spreads traffic evenly",
+      "bucket": "Local budget slices",
+      "feedback": "The moment balancing skews, some nodes throttle early while others waste their slice."
+    }
+  ],
+  "reveal": "In the design write, pick an approach and defend its tradeoff (exactness vs per-request latency vs bounded overshoot), then pre-empt the interviewer: say what happens when Redis is down (fail open to permissive local limits, let load shedding backstop) and how you handle hot keys and clock skew."
+}
+\`\`\`
 `.trim()
 
 const loadSheddingBackpressureTeach = `
