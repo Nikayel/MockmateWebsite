@@ -2680,6 +2680,247 @@ threads. After a cool-down it goes **Half-open:** it lets a trickle of trial cal
 they succeed it closes, if they fail it re-opens. This converts a slow, thread-eating failure into a
 fast, cheap one.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "Circuit breaker: Closed, Open, Half-open",
+  "actors": [
+    {
+      "id": "client",
+      "label": "Client"
+    },
+    {
+      "id": "breaker",
+      "label": "Circuit breaker"
+    },
+    {
+      "id": "dependency",
+      "label": "Dependency"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "depDown",
+      "label": "Dependency goes down",
+      "description": "Errors climb toward the 50% of the last 20 calls threshold and the breaker trips Open."
+    },
+    {
+      "id": "probeFails",
+      "label": "Half-open trial fails",
+      "description": "Use with the dependency down: the first half-open trial call fails, so the breaker re-opens for another cool-down."
+    }
+  ],
+  "steps": [
+    {
+      "from": "client",
+      "to": "breaker",
+      "label": "call (breaker closed)",
+      "kind": "request",
+      "status": "ok",
+      "state": {
+        "breaker": "closed",
+        "failures": "0 of last 20"
+      }
+    },
+    {
+      "from": "breaker",
+      "to": "dependency",
+      "label": "pass through",
+      "kind": "request",
+      "status": "ok"
+    },
+    {
+      "from": "dependency",
+      "to": "breaker",
+      "label": "200 OK",
+      "kind": "response",
+      "status": "ok"
+    },
+    {
+      "from": "breaker",
+      "to": "client",
+      "label": "response returned",
+      "kind": "response",
+      "status": "ok"
+    },
+    {
+      "from": "client",
+      "to": "breaker",
+      "label": "call as dep degrades",
+      "kind": "request",
+      "status": "ok",
+      "when": "depDown"
+    },
+    {
+      "from": "breaker",
+      "to": "dependency",
+      "label": "pass through (still closed)",
+      "kind": "request",
+      "status": "ok",
+      "when": "depDown"
+    },
+    {
+      "from": "dependency",
+      "to": "breaker",
+      "label": "timeout",
+      "kind": "response",
+      "status": "error",
+      "when": "depDown",
+      "state": {
+        "breaker": "closed",
+        "failures": "1 of last 20"
+      }
+    },
+    {
+      "from": "breaker",
+      "to": "client",
+      "label": "error surfaced",
+      "kind": "response",
+      "status": "error",
+      "when": "depDown"
+    },
+    {
+      "from": "client",
+      "to": "breaker",
+      "label": "more calls keep failing",
+      "kind": "request",
+      "status": "ok",
+      "when": "depDown"
+    },
+    {
+      "from": "breaker",
+      "to": "dependency",
+      "label": "pass through",
+      "kind": "request",
+      "status": "ok",
+      "when": "depDown"
+    },
+    {
+      "from": "dependency",
+      "to": "breaker",
+      "label": "timeout again",
+      "kind": "response",
+      "status": "error",
+      "when": "depDown",
+      "state": {
+        "breaker": "closed",
+        "failures": "10 of last 20 (50%)"
+      }
+    },
+    {
+      "from": "breaker",
+      "label": "failures hit 50%: OPEN",
+      "kind": "note",
+      "status": "error",
+      "when": "depDown",
+      "state": {
+        "breaker": "open"
+      },
+      "predict": {
+        "question": "The breaker just tripped to Open. What happens to the very next client call?",
+        "options": [
+          "It fails fast at the breaker without touching the network",
+          "The breaker forwards it so the dependency gets another chance",
+          "It waits at the breaker until the cool-down ends"
+        ]
+      }
+    },
+    {
+      "from": "client",
+      "to": "breaker",
+      "label": "call while open",
+      "kind": "request",
+      "status": "ok",
+      "when": "depDown"
+    },
+    {
+      "from": "breaker",
+      "to": "client",
+      "label": "fail fast, no network call",
+      "kind": "response",
+      "status": "error",
+      "when": "depDown",
+      "state": {
+        "breaker": "open"
+      }
+    },
+    {
+      "from": "breaker",
+      "label": "cool-down elapses: half-open",
+      "kind": "timer",
+      "status": "ok",
+      "when": "depDown",
+      "state": {
+        "breaker": "half-open"
+      }
+    },
+    {
+      "from": "breaker",
+      "to": "dependency",
+      "label": "trial call (half-open)",
+      "kind": "request",
+      "status": "ok",
+      "when": "depDown"
+    },
+    {
+      "from": "dependency",
+      "to": "breaker",
+      "label": "trial call fails",
+      "kind": "response",
+      "status": "error",
+      "when": "probeFails"
+    },
+    {
+      "from": "breaker",
+      "label": "re-opens: fail fast again",
+      "kind": "note",
+      "status": "error",
+      "when": "probeFails",
+      "state": {
+        "breaker": "open"
+      }
+    },
+    {
+      "from": "breaker",
+      "label": "second cool-down: half-open",
+      "kind": "timer",
+      "status": "ok",
+      "when": "probeFails",
+      "state": {
+        "breaker": "half-open"
+      }
+    },
+    {
+      "from": "breaker",
+      "to": "dependency",
+      "label": "another trial call",
+      "kind": "request",
+      "status": "ok",
+      "when": "probeFails"
+    },
+    {
+      "from": "dependency",
+      "to": "breaker",
+      "label": "trial succeeds",
+      "kind": "response",
+      "status": "ok",
+      "when": "depDown"
+    },
+    {
+      "from": "breaker",
+      "label": "trial ok: breaker CLOSES",
+      "kind": "note",
+      "status": "ok",
+      "when": "depDown",
+      "state": {
+        "breaker": "closed"
+      }
+    }
+  ],
+  "caption": "Closed lets calls flow. When failures cross the threshold (50% of the last 20 calls) it trips Open and fails fast without touching the network. After a cool-down, Half-open lets a trial call through: success closes it, failure re-opens it."
+}
+\`\`\`
+
 ### Isolation and fallback
 
 **Bulkheads** give each dependency its own bounded connection pool or thread pool, so one slow
