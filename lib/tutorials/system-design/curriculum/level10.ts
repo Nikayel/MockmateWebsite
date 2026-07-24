@@ -591,6 +591,67 @@ An object store (S3, GCS, Azure Blob) holds arbitrary blobs keyed by name, in fl
 
 Durability drives cost. Full replication (store 3 copies) gives durability and simple reads but costs 3x storage. Erasure coding gives the same or better durability for far less overhead. Split an object into k data shards, compute m parity shards (Reed-Solomon), and store all k + m shards on different disks, racks, or AZs. Any k of the k + m shards reconstruct the object, so you tolerate m simultaneous failures. A common scheme is 10 + 4: 40% overhead to survive any 4 losses, versus 200% overhead for 3-way replication with weaker tolerance. The tradeoff: erasure coding adds CPU (encode on write, reconstruct on degraded read) and read amplification when a shard is missing, so hot small objects sometimes still use replication and large cold objects use erasure coding.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Erasure coding overhead vs 3x replication",
+  "predictPrompt": {
+    "question": "Keep 4 parity shards but widen the stripe from 10 to 20 data shards. What happens to the storage overhead multiplier?",
+    "options": [
+      "It doubles to 2.8x",
+      "It stays at 1.4x",
+      "It falls to 1.2x",
+      "It rises to 1.8x"
+    ]
+  },
+  "workedExample": "At the initial 10 data + 4 parity shards you store 14 shards for every 10 shards of data, a 1.4x multiplier, while surviving any 4 simultaneous shard losses; 3-way replication costs 3.0x and dies after just 2 lost copies. Widen the stripe to 20 data shards and overhead falls to 1.2x with the same 4-loss tolerance, because the fixed parity is amortized over more data. Then ask what the wider stripe costs at reconstruction time: rebuilding one lost shard now reads 20 survivors instead of 10.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "data_shards",
+      "label": "Data shards (k)",
+      "min": 4,
+      "max": 20,
+      "scale": "linear",
+      "step": 1,
+      "initial": 10,
+      "unit": "shards"
+    },
+    {
+      "kind": "slider",
+      "id": "parity_shards",
+      "label": "Parity shards (m)",
+      "min": 1,
+      "max": 6,
+      "scale": "linear",
+      "step": 1,
+      "initial": 4,
+      "unit": "shards"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "overhead_multiplier",
+      "label": "Storage overhead multiplier",
+      "expr": "(data_shards + parity_shards) / data_shards",
+      "format": "number",
+      "unit": "x",
+      "sparkline": {
+        "over": "data_shards"
+      }
+    },
+    {
+      "id": "losses_survived",
+      "label": "Simultaneous shard losses survived",
+      "expr": "parity_shards",
+      "format": "number",
+      "unit": "shards"
+    }
+  ],
+  "caption": "For comparison, 3-way replication is a 3.0x multiplier and survives only 2 lost copies."
+}
+\`\`\`
+
 **Interview nuance:** if you say "just keep 3 copies everywhere," name erasure coding immediately as the cost-saver and quantify it (roughly 1.4x vs 3x). Not knowing erasure coding is the tell that separates junior from senior on this problem.
 
 ## The metadata service
