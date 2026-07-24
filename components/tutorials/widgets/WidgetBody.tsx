@@ -6,6 +6,8 @@ import { CheckWidget } from "./CheckWidget"
 import { CalcWidget } from "./CalcWidget"
 import { HashRingWidget } from "./HashRingWidget"
 import { SequenceWidget } from "./SequenceWidget"
+import { RateLimiterWidget } from "./RateLimiterWidget"
+import { QuorumWidget } from "./QuorumWidget"
 
 /**
  * Dispatches a VALIDATED widget spec to its family component. This module (plus the
@@ -29,6 +31,10 @@ function renderSpec(spec: WidgetSpec) {
       return <HashRingWidget spec={spec} />
     case "sequence":
       return <SequenceWidget spec={spec} />
+    case "rate-limiter":
+      return <RateLimiterWidget spec={spec} />
+    case "quorum":
+      return <QuorumWidget spec={spec} />
     default: {
       // Exhaustiveness guard: adding a spec type without a case is a compile error here.
       const _exhaustive: never = spec
