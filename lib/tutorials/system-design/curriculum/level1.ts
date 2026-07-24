@@ -2315,6 +2315,41 @@ your database.
 - **Write-behind (write-back)** writes to the cache immediately and flushes to the DB asynchronously.
   Fast writes, but you risk data loss if the cache dies before the flush.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Four policies just went by. Match each observed behavior to the policy that produces it.",
+  "buckets": [
+    "Cache-aside",
+    "Write-through",
+    "Write-behind"
+  ],
+  "items": [
+    {
+      "label": "A cache outage means slower reads, not wrong answers",
+      "bucket": "Cache-aside",
+      "feedback": "The app falls back to the database on every miss, so losing the cache degrades speed, never correctness."
+    },
+    {
+      "label": "Writes pay extra latency, but reads never see stale data",
+      "bucket": "Write-through",
+      "feedback": "Writing cache and database together keeps them in lockstep, and you pay for it on every write, even for data nobody reads."
+    },
+    {
+      "label": "Writes are fast, but a cache crash can lose acknowledged data",
+      "bucket": "Write-behind",
+      "feedback": "The database is updated asynchronously, so data that looked committed can vanish if the cache dies before the flush."
+    },
+    {
+      "label": "The first read after a write misses unless you invalidate",
+      "bucket": "Cache-aside",
+      "feedback": "Tempting to expect the cache to stay current on its own, but lazy loading only fills entries on reads, so a write leaves a gap until the next miss."
+    }
+  ]
+}
+\`\`\`
+
 ### Invalidation, the hard part
 
 Three strategies, usually combined. **TTL** expires entries after N seconds; simple and self-healing,
@@ -2340,6 +2375,29 @@ the URL**: ship \`app.9f3a1c.js\` (a content fingerprint) with a one-year \`immu
 the file changes the filename changes, so clients fetch the new URL and the old one just ages out.
 Purge APIs exist for emergencies, but fingerprinting avoids the need.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You put the CDN in front of everything, and 'GET /account', each user's own dashboard, gets cached with 's-maxage=300' like any other page. What is the failure?",
+  "options": [
+    {
+      "label": "Dashboards go stale for up to five minutes",
+      "feedback": "Tempting, staleness is the usual caching worry, but a shared cache holding per-user content has a far worse failure mode than being out of date."
+    },
+    {
+      "label": "The CDN serves Alice's account page to Bob",
+      "correct": true,
+      "feedback": "Right. A shared cache stores one copy per cache key, so the first user's personalized response becomes everyone's response. Authenticated pages need 'Cache-Control: private, no-store' at shared layers."
+    },
+    {
+      "label": "The hit rate collapses because every user becomes a separate cache key",
+      "feedback": "That only happens if something per-user, like 'Vary: Cookie', is in the key. Here nothing user-specific keys the entry, which is exactly why users receive each other's pages."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** The correctness landmine is caching **personalized or authenticated**
 responses. Never let a shared cache (CDN or proxy) store a response that contains one user's data, or
 you will serve Alice's account page to Bob. Mark those \`Cache-Control: private, no-store\`, and be
@@ -2351,6 +2409,30 @@ Recap: Cache as high up the browser-CDN-proxy-app-Redis-DB stack as you can, def
 invalidate with a mix of TTL, explicit purge, and events plus stale-while-revalidate, version CDN
 URLs instead of purging, defend hot keys against stampedes, and never let a shared cache store
 authenticated responses.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your logo file shipped with a rendering bug. It is cached at the CDN under '/static/logo.png' with a one-year 'max-age'. What is the cleanest fix?",
+  "options": [
+    {
+      "label": "Call the CDN purge API for that path",
+      "feedback": "It works in an emergency, but purges are per-provider, easy to miss a layer with, and do nothing about copies already sitting in browser caches for a year."
+    },
+    {
+      "label": "Drop the TTL to sixty seconds going forward",
+      "feedback": "New headers only apply to future fetches. Every cache already holding the old file keeps serving it until the original year runs out."
+    },
+    {
+      "label": "Ship the fixed file at a new fingerprinted URL and reference that",
+      "correct": true,
+      "feedback": "Right. Content-fingerprinted names like 'logo.8c2f91.png' with long 'immutable' TTLs make invalidation unnecessary: change the content, change the URL, and the stale copy ages out unreferenced."
+    }
+  ],
+  "reveal": "The caching story to carry into the design exercise: serve each read as high in the browser-CDN-proxy-app-Redis stack as you can, default to cache-aside, invalidate with TTLs plus purges plus events and stale-while-revalidate, defend hot keys from stampedes with single-flight and jittered TTLs, version CDN URLs instead of purging, and never let a shared cache store an authenticated response."
+}
+\`\`\`
 `.trim()
 
 const latencyPercentilesTeach = `
