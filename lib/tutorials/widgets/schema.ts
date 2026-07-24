@@ -33,6 +33,9 @@ import { rateLimiterSpecSchema, addRateLimiterIssues } from "./families/rate-lim
 import { quorumSpecSchema, addQuorumIssues } from "./families/quorum"
 import { cacheSimSpecSchema, addCacheSimIssues } from "./families/cache-sim"
 import { queueSimSpecSchema, addQueueSimIssues } from "./families/queue-sim"
+import { partitionSimSpecSchema, addPartitionSimIssues } from "./families/partition-sim"
+import { replicationLagSpecSchema, addReplicationLagIssues } from "./families/replication-lag"
+import { watermarkSimSpecSchema, addWatermarkSimIssues } from "./families/watermark-sim"
 
 export type { CheckSpec } from "./families/check"
 export type { CalcSpec, CalcInput, CalcOutput } from "./families/calc"
@@ -42,6 +45,9 @@ export type { RateLimiterSpec } from "./families/rate-limiter"
 export type { QuorumSpec } from "./families/quorum"
 export type { CacheSimSpec } from "./families/cache-sim"
 export type { QueueSimSpec } from "./families/queue-sim"
+export type { PartitionSimSpec } from "./families/partition-sim"
+export type { ReplicationLagSpec } from "./families/replication-lag"
+export type { WatermarkSimSpec } from "./families/watermark-sim"
 
 // Future families (sequence, sims, steps) append here — one schema file each,
 // composed into this union. Adding a member without wiring its renderer is a compile
@@ -55,6 +61,9 @@ const widgetSpecUnion = z.discriminatedUnion("type", [
   quorumSpecSchema,
   cacheSimSpecSchema,
   queueSimSpecSchema,
+  partitionSimSpecSchema,
+  replicationLagSpecSchema,
+  watermarkSimSpecSchema,
 ])
 
 /** The union PLUS per-family cross-field integrity checks Zod field rules can't express. */
@@ -67,6 +76,9 @@ export const widgetSpecSchema = widgetSpecUnion.superRefine((spec, ctx) => {
   if (spec.type === "quorum") addQuorumIssues(spec, ctx)
   if (spec.type === "cache-sim") addCacheSimIssues(spec, ctx)
   if (spec.type === "queue-sim") addQueueSimIssues(spec, ctx)
+  if (spec.type === "partition-sim") addPartitionSimIssues(spec, ctx)
+  if (spec.type === "replication-lag") addReplicationLagIssues(spec, ctx)
+  if (spec.type === "watermark-sim") addWatermarkSimIssues(spec, ctx)
 })
 
 export type WidgetSpec = z.infer<typeof widgetSpecSchema>
