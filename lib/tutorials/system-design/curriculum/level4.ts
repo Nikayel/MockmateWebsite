@@ -182,10 +182,108 @@ volume and spreads it across a fleet of **L7 proxies** behind it, which do the s
 canonical shapes are **NLB in front of ALB** on AWS, or **Maglev in front of Envoy** at Google. The
 L4 layer gives you cheap, protocol-agnostic scale and DDoS surface; the L7 layer gives you features.
 
-\`\`\`
-            +------------------ L7 proxy (Envoy/ALB) --> app pool A  (/api)
-client --> L4 (NLB/Maglev) --+-- L7 proxy --------------> app pool B  (/static)
-  raw TCP, high throughput   +-- L7 proxy --------------> app pool C  (routing, TLS, rate limit)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Stacked L4 edge in front of an L7 fleet",
+  "layout": "lr",
+  "nodes": [
+    {
+      "id": "client",
+      "label": "client",
+      "kind": "client"
+    },
+    {
+      "id": "l4_edge",
+      "label": "L4 edge (NLB/Maglev)",
+      "kind": "lb"
+    },
+    {
+      "id": "l7_1",
+      "label": "L7 proxy (Envoy/ALB)",
+      "kind": "lb"
+    },
+    {
+      "id": "l7_2",
+      "label": "L7 proxy (Envoy/ALB)",
+      "kind": "lb"
+    },
+    {
+      "id": "pool_api",
+      "label": "app pool A (/api)",
+      "kind": "service"
+    },
+    {
+      "id": "pool_static",
+      "label": "app pool B (/static)",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "client",
+      "to": "l4_edge",
+      "kind": "sync",
+      "label": "raw TCP, high throughput"
+    },
+    {
+      "from": "l4_edge",
+      "to": "l7_1",
+      "kind": "sync"
+    },
+    {
+      "from": "l4_edge",
+      "to": "l7_2",
+      "kind": "sync"
+    },
+    {
+      "from": "l7_1",
+      "to": "pool_api",
+      "kind": "sync",
+      "label": "path /api"
+    },
+    {
+      "from": "l7_1",
+      "to": "pool_static",
+      "kind": "sync",
+      "label": "path /static"
+    },
+    {
+      "from": "l7_2",
+      "to": "pool_api",
+      "kind": "sync"
+    },
+    {
+      "from": "l7_2",
+      "to": "pool_static",
+      "kind": "sync"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "client",
+        "l4_edge"
+      ],
+      "note": "The L4 edge sees only IP and port and forwards packets without parsing the payload, so it absorbs the raw connection volume: fast, protocol-agnostic, and content-blind."
+    },
+    {
+      "adds": [
+        "l7_1",
+        "l7_2"
+      ],
+      "note": "The thin L4 layer spreads connections across a fleet of L7 proxies, which terminate the connection, parse HTTP/gRPC, and add TLS termination and rate limiting at a higher per-request CPU cost."
+    },
+    {
+      "adds": [
+        "pool_api",
+        "pool_static"
+      ],
+      "note": "Only the L7 layer can route on content: any proxy sends /api and /static traffic to different app pools, which the content-blind L4 tier cannot do."
+    }
+  ],
+  "caption": "The canonical production stack: NLB in front of ALB on AWS, or Maglev in front of Envoy at Google. The LB tier itself runs active-active with a floating IP or anycast so it is never a SPOF."
+}
 \`\`\`
 
 ### The LB tier itself must be HA
