@@ -841,11 +841,70 @@ quotas**, **routing**, **request/response transformation**, **response aggregati
 versioning and canary routing**, and **observability**. Concrete implementations: Kong, AWS API
 Gateway, Envoy-based gateways, Apigee, or a Netflix Zuul-style edge service.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The order service needs to call the inventory service inside the cluster. Should that call route through the API gateway, which already owns auth, rate limiting, and observability?",
+  "options": [
+    {
+      "label": "Yes. The gateway already centralizes the cross-cutting concerns, so internal calls should get them the same way.",
+      "feedback": "Tempting, since centralizing is the whole point of the gateway. But the gateway owns north-south traffic (client to system). Routing internal east-west calls through it adds a needless hop, makes the edge a bottleneck, and is a classic design error."
+    },
+    {
+      "label": "No. Service-to-service traffic is a different layer's job.",
+      "correct": true,
+      "feedback": "Right. East-west traffic belongs to the service mesh (Istio, Linkerd, Envoy sidecars), which handles mTLS, retries, and load balancing between services. The gateway owns the north-south boundary only."
+    }
+  ]
+}
+\`\`\`
+
 Draw the boundary carefully. The gateway handles **north-south** traffic (client to system).
 Service-to-service **east-west** traffic is the job of a **service mesh** (Istio, Linkerd, Envoy
 sidecars), which handles mTLS, retries, and load balancing *between* services. Routing internal calls
 through the public gateway is a common design error. Business logic belongs *inside services*, not in
 either the gateway or the mesh.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each concern into the layer that should own it.",
+  "buckets": [
+    "API gateway",
+    "Service mesh",
+    "Owning service"
+  ],
+  "items": [
+    {
+      "label": "TLS termination and rate limiting for client traffic",
+      "bucket": "API gateway"
+    },
+    {
+      "label": "mTLS and retries between internal services",
+      "bucket": "Service mesh"
+    },
+    {
+      "label": "The discount calculation for checkout",
+      "bucket": "Owning service",
+      "feedback": "Domain business rules never live at the edge or in the mesh, no matter how convenient the placement looks."
+    },
+    {
+      "label": "Canary routing of client requests to a new API version",
+      "bucket": "API gateway"
+    },
+    {
+      "label": "Load balancing calls from the order service to inventory",
+      "bucket": "Service mesh"
+    },
+    {
+      "label": "Deciding whether a refund is allowed",
+      "bucket": "Owning service"
+    }
+  ]
+}
+\`\`\`
 
 ### Backend-for-frontend (BFF)
 
@@ -882,6 +941,26 @@ business logic lives in the owning service.
 Recap: put auth, TLS, rate limiting, routing, and observability at a horizontally scaled gateway for
 north-south traffic, use a BFF per client type to avoid over/under-fetching, leave service-to-service
 concerns to the mesh, and hold the line against business logic creeping into the edge.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A teammate proposes putting the coupon-validation rules in the gateway, since every checkout request already passes through it. If you say yes, what does the system look like six months later?",
+  "options": [
+    {
+      "label": "Fine: coupon logic lives in one place and the services stay thinner.",
+      "feedback": "Tempting, and this is exactly how gateway rot starts: each addition looks convenient in isolation. But coupon rules are domain logic owned by the checkout service, not a cross-cutting concern."
+    },
+    {
+      "label": "The gateway has become a god-object: feature changes need edge deploys and teams serialize on one component.",
+      "correct": true,
+      "feedback": "Right. 'Just one more' pieces of business logic accrete until you have rebuilt the distributed monolith you split up to avoid. Hold the rule: the gateway does cross-cutting concerns and routing only."
+    }
+  ],
+  "reveal": "In your design write, name the gateway's exact responsibility list (TLS, authn, rate limits, routing, observability), give each client type a BFF if payload needs genuinely differ, and state explicitly that business logic stays in the owning services while the mesh handles east-west."
+}
+\`\`\`
 `.trim()
 
 const tlsConnectionMgmtTeach = `
