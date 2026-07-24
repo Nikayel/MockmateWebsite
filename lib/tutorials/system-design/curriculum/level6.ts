@@ -676,6 +676,142 @@ After compaction keeps latest per key:
 Compaction keeps the tombstone long enough for all consumers to observe the deletion, then removes
 both the tombstone and all prior values for that key.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Log compaction: latest value per key",
+  "frames": [
+    {
+      "note": "A compacted topic keyed by user_id. u1 was written three times (A, then B, then C), u2 twice (X, then Y), and u3 once (Q). The raw log still holds every superseded version.",
+      "rows": [
+        {
+          "label": "log",
+          "cells": [
+            {
+              "text": "u1=A"
+            },
+            {
+              "text": "u2=X"
+            },
+            {
+              "text": "u1=B"
+            },
+            {
+              "text": "u3=Q"
+            },
+            {
+              "text": "u1=C"
+            },
+            {
+              "text": "u2=Y"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Compaction guarantees at least the latest value for every key. For u1 the latest is C, so the superseded A and B are garbage-collected in the background.",
+      "rows": [
+        {
+          "label": "log",
+          "cells": [
+            {
+              "text": "u1=A",
+              "state": "dropped"
+            },
+            {
+              "text": "u2=X",
+              "state": "dim"
+            },
+            {
+              "text": "u1=B",
+              "state": "dropped"
+            },
+            {
+              "text": "u3=Q",
+              "state": "dim"
+            },
+            {
+              "text": "u1=C",
+              "state": "active"
+            },
+            {
+              "text": "u2=Y",
+              "state": "dim"
+            }
+          ]
+        }
+      ],
+      "predict": {
+        "question": "Which u2 record survives compaction?",
+        "options": [
+          "u2=X, it was written first",
+          "u2=Y, it is the latest value",
+          "Both survive"
+        ]
+      }
+    },
+    {
+      "note": "Same rule for u2: Y supersedes X, so X is dropped. u3 only ever wrote Q, so Q is already the latest for its key and is kept untouched.",
+      "rows": [
+        {
+          "label": "log",
+          "cells": [
+            {
+              "text": "u1=A",
+              "state": "dropped"
+            },
+            {
+              "text": "u2=X",
+              "state": "dropped"
+            },
+            {
+              "text": "u1=B",
+              "state": "dropped"
+            },
+            {
+              "text": "u3=Q",
+              "state": "active"
+            },
+            {
+              "text": "u1=C",
+              "state": "dim"
+            },
+            {
+              "text": "u2=Y",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The compacted tail is the current state of every key: u3=Q, u1=C, u2=Y. A brand-new consumer reads from offset 0 and materializes this entire table with no database, exactly how Kafka Streams rebuilds a KTable and CDC pipelines bootstrap read models.",
+      "rows": [
+        {
+          "label": "compacted",
+          "cells": [
+            {
+              "text": "u3=Q",
+              "state": "new"
+            },
+            {
+              "text": "u1=C",
+              "state": "new"
+            },
+            {
+              "text": "u2=Y",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "cleanup.policy=compact keeps at least the latest value per key, turning the log into a rebuildable table/changelog."
+}
+\`\`\`
+
 **Interview nuance:** GDPR/right-to-erasure collides with long retention. An immutable 7-year audit
 stream cannot literally delete one user's records without breaking immutability, so the standard
 pattern is **crypto-shredding**: encrypt per-subject data with a per-user key and delete the key to
