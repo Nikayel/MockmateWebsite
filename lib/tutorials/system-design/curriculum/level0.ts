@@ -2112,6 +2112,29 @@ one person, usually with about 45 minutes, who is simultaneously your collaborat
 signal. Their attention is the scarce resource you manage. Everything below is about keeping them
 inside your head and using their input as a steering wheel rather than a distraction.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Mid-design, you go quiet for ten seconds to think through the write path. From the interviewer's side of the table, how does that read?",
+  "options": [
+    {
+      "label": "Composed and deliberate; strong candidates think before they speak",
+      "feedback": "Tempting, and true in everyday conversation. But the interviewer cannot see thinking: ten unannounced silent seconds are indistinguishable from being stuck."
+    },
+    {
+      "label": "Invisible; unannounced silence reads as being stuck",
+      "correct": true,
+      "feedback": "Right. Silent thinking is invisible thinking. The fix costs one sentence, 'let me think for a few seconds about the write path,' which turns the same pause into a visible, deliberate move."
+    },
+    {
+      "label": "Neutral; the interviewer grades the diagram, not the talking",
+      "feedback": "Communication is a graded axis of its own. The board and the narration are both scoring signal, and silence spends the interviewer's scarce attention without buying anything."
+    }
+  ]
+}
+\`\`\`
+
 ### Narrate continuously
 
 Silent thinking is invisible, and invisible thinking reads as being stuck. The habit to build is
@@ -2158,6 +2181,45 @@ order work for you?" Steamrolling is marching through a rehearsed outline and ig
 The first reads as senior and collaborative; the second reads as not listening, which tanks the
 communication axis even when the design is correct.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Mid-round, each of these comes up. Do you follow it now, or write it in the parking lot?",
+  "buckets": [
+    "Follow it now",
+    "Park it"
+  ],
+  "items": [
+    {
+      "label": "Interviewer: 'What happens if two writes hit the same counter?'",
+      "bucket": "Follow it now",
+      "feedback": "An interviewer question is almost never idle curiosity; it is steering toward a deep dive they want to see. Confirm the intent out loud and go."
+    },
+    {
+      "label": "You suddenly want to explain the analytics pipeline, which is off the critical path",
+      "bucket": "Park it",
+      "feedback": "A self-generated tangent off the critical path goes to the parking lot, with one sentence saying you will come back to it."
+    },
+    {
+      "label": "Interviewer: 'I am a bit worried about message ordering.'",
+      "bucket": "Follow it now",
+      "feedback": "A voiced worry is the strongest hint there is: it names exactly where they think the design has a gap."
+    },
+    {
+      "label": "You realize custom URL aliases would be fun to design but are not a core feature",
+      "bucket": "Park it",
+      "feedback": "Fun but non-core is exactly what the parking lot exists for. Parking it out loud shows discipline, not forgetfulness."
+    },
+    {
+      "label": "Interviewer: 'How does this behave when the cache goes down?'",
+      "bucket": "Follow it now",
+      "feedback": "A failure-mode question is an invitation to the deep dive they want to grade. Following it immediately is points on the communication axis."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** Remote and shared-whiteboard rounds (Excalidraw, a Google Doc, CoderPad's
 diagram tool) change the physics. You lose body-language signal and drawing is slower, so pre-learn
 the tool's shortcuts before the interview, keep shapes to plain boxes and labeled arrows, and talk a
@@ -2171,6 +2233,30 @@ and treat every hint as a course correction you welcome.
 Recap: Narrate assumption-option-choice continuously, lay the board out in fixed zones with a parking
 lot, follow interviewer hints as intentional steering while parking your own tangents, and lead by
 proposing and checking rather than steamrolling.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You are 20 minutes in with a planned outline: data model next, then scaling. The interviewer interjects with a durability question. What move scores best?",
+  "options": [
+    {
+      "label": "Acknowledge it politely and continue with the data model, since finishing your outline shows structure",
+      "feedback": "Tempting, because structure is real signal. But ignoring a hint to protect an outline is steamrolling, and it tanks the communication axis even when the design underneath is right."
+    },
+    {
+      "label": "Confirm the intent out loud, follow the hint now, and re-propose the order afterward",
+      "correct": true,
+      "feedback": "Right. 'Sounds like you want me to go deep on durability, let me do that now' follows the steering and keeps the interviewer inside your head; leading resumes with a new proposal and a check-in."
+    },
+    {
+      "label": "Write durability in the parking lot next to your other deferred topics",
+      "feedback": "The parking lot is for your own tangents. Parking the interviewer's hint treats their steering as a distraction, which is the exact inversion of the rule."
+    }
+  ],
+  "reveal": "Hints from them you follow; tangents from you, you park. In the design exercise, practice the whole loop: narrate assumption, options, choice; keep the board in fixed zones with a parking lot; and close each hint with a check-in before returning to your plan."
+}
+\`\`\`
 `.trim()
 
 export const systemDesignLevel0: DesignLevel = {
