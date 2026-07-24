@@ -1634,6 +1634,29 @@ Look at what the requirements and your QPS numbers stress:
 You name the bottleneck out loud: "My tightest NFR is redirect availability, and my design has the
 datastore as a single point of failure, so that is where I will dive."
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "New scenario: a read-heavy feed with a tight 'p99' target and a handful of celebrity keys everyone requests. Where does the dive go?",
+  "options": [
+    {
+      "label": "Sharding, since the datastore will not scale",
+      "feedback": "Tempting default, but this load is read-heavy, not write-heavy past a node's capacity. Sharding is the lever for write volume, and it does not fix a hot key that lands on one shard anyway."
+    },
+    {
+      "label": "Caching and the hot-partition problem",
+      "correct": true,
+      "feedback": "Right. Tight read latency plus hot keys is exactly the caching branch: repeated reads of the same keys are what caches remove, and the celebrity keys are the hot partitions to call out."
+    },
+    {
+      "label": "Replication and failover for the primary",
+      "feedback": "That branch answers a high-availability requirement built on a single point of failure. Nothing here says availability is the tightest NFR, so diving there is depth chosen at random."
+    }
+  ]
+}
+\`\`\`
+
 ### Step two: reach for the right lever
 
 Use the standard levers deliberately: sharding (and the partition key), replication (and sync vs
@@ -1666,6 +1689,30 @@ step." Naming your own gaps is a seniority signal, not a weakness.
 Recap: let the NFRs and traffic model pick the bottleneck, dive with the right lever, compare two
 options and commit with a quantified reason, then close in 2 to 3 minutes on the top remaining
 bottleneck, failure mode, monitoring, and cost driver.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "1M write QPS against a single primary that handles a few thousand writes per second, and reads are light. Pick the dive and the lever.",
+  "options": [
+    {
+      "label": "Add a cache in front of the primary",
+      "feedback": "Tempting reflex, but caches absorb reads and this load is writes. Every one of the 1M writes still lands on the primary."
+    },
+    {
+      "label": "Add read replicas",
+      "feedback": "Replicas scale reads and availability, but all writes still funnel through one primary. The write ceiling is untouched."
+    },
+    {
+      "label": "Shard the datastore, defend the partition key, compare one alternative, and commit",
+      "correct": true,
+      "feedback": "Right. Write-heavy load past one node's capacity is the sharding branch, roughly 200 shards at these numbers. Compare two viable options, commit with a quantified reason, and keep 2 to 3 minutes for the operational wrap-up."
+    }
+  ],
+  "reveal": "In the design write, let the NFRs and traffic model pick the bottleneck, compare two options and commit with a number, then close on where it breaks at 10x, the main failure mode, what you would monitor, and the dominant cost driver, naming any gap you did not cover."
+}
+\`\`\`
 `.trim()
 
 const tradeoffArticulationTeach = `
