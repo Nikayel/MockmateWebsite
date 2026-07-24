@@ -390,6 +390,29 @@ technique interviewers mean by "shard it."
 The design choice is the **partition function**: given a key, which partition owns it. Three families
 dominate.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You are sharding an append-heavy events table. A teammate suggests partitioning by timestamp so recent events sit together. Predict the write pattern.",
+  "options": [
+    {
+      "label": "Writes spread evenly, since events arrive continuously",
+      "feedback": "Tempting because time feels continuous, but at any given moment every new event carries roughly the newest timestamp, so they all map into the same range."
+    },
+    {
+      "label": "All writes land on the newest partition while the others sit idle",
+      "correct": true,
+      "feedback": "Right. Sequential keys under range partitioning send 100 percent of writes to the highest range: one hot node and a fleet of spectators. This is the single most common partitioning mistake."
+    },
+    {
+      "label": "Writes spread fine, but reads get slow",
+      "feedback": "Backwards in this case: time-range reads are actually the scheme's strength. It is the write side that collapses onto one partition."
+    }
+  ]
+}
+\`\`\`
+
 **Range partitioning** assigns contiguous key ranges to partitions (users A to F on p0, G to M on p1;
 or time ranges for events). Its superpower is **range scans**: "all orders from last Tuesday" touches
 one or two partitions. Its curse is **hotspots on sequential keys**. If you range-partition by an
@@ -434,6 +457,52 @@ Recap: horizontal partitioning is the only way to scale writes and data past one
 range scans but hotspots on sequential keys, hash spreads evenly but loses ranges and reshuffles on
 mod N, directory adds a flexible routing hop, and secondary indexes are either scatter-gather locals
 or write-costly globals.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Match each behavior to the partitioning strategy that produces it.",
+  "buckets": [
+    "Range",
+    "Hash",
+    "Directory"
+  ],
+  "items": [
+    {
+      "label": "'All orders from last Tuesday' touches one or two partitions",
+      "bucket": "Range",
+      "feedback": "Contiguous key ranges make time and prefix scans local. This is range partitioning's superpower."
+    },
+    {
+      "label": "An auto-increment key turns one node into the sole write target",
+      "bucket": "Range",
+      "feedback": "The curse that comes with the superpower: sequential keys pile onto the highest range."
+    },
+    {
+      "label": "Adjacent keys scatter, so a date query fans out to every partition",
+      "bucket": "Hash",
+      "feedback": "Hashing kills hotspots by destroying locality, so range queries become scatter-gather."
+    },
+    {
+      "label": "Adding one node under plain 'hash(key) mod N' remaps almost every key",
+      "bucket": "Hash",
+      "feedback": "The 'mod N' trap: change N and nearly everything moves. Consistent hashing exists to fix exactly this."
+    },
+    {
+      "label": "Move one heavy tenant to its own node by editing a routing table",
+      "bucket": "Directory",
+      "feedback": "Explicit lookup gives surgical control over placement and rebalancing."
+    },
+    {
+      "label": "An extra lookup hop and a routing service that must stay highly available",
+      "bucket": "Directory",
+      "feedback": "Flexibility is paid for on the critical path: the routing metadata becomes infrastructure you operate."
+    }
+  ],
+  "reveal": "Each family trades the same three things: scan locality, write spread, and rebalance flexibility. In the design write, state your dominant query first, pick the partition function that keeps that query single-partition, and say out loud which queries you just turned into scatter-gather."
+}
+\`\`\`
 `.trim()
 
 const consistentHashingTeach = `
