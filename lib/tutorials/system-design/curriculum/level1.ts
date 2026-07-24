@@ -576,6 +576,29 @@ one IP hosting many tenants (a CDN, a shared LB) can present the right certifica
 unrotated cert on a load balancer takes the whole site down at midnight). Always mention automated
 rotation (ACME/Let's Encrypt, AWS ACM) as part of a TLS design.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "TLS 1.3 0-RTT lets a returning client send application data in its very first flight, saving a full round trip. Should you enable it for every endpoint, including 'POST /charge'?",
+  "options": [
+    {
+      "label": "Yes; the early data is encrypted, so it is as safe as any other TLS traffic",
+      "feedback": "Tempting because encryption feels like the whole story, but replay is a different threat: an attacker who captures the encrypted flight can resend it verbatim, without ever decrypting a byte."
+    },
+    {
+      "label": "No; 0-RTT early data is replayable, so only idempotent requests may ride it",
+      "correct": true,
+      "feedback": "Right. A captured 'POST /charge' replayed five times is five charges. Allow 0-RTT for GETs, or for writes guarded by an idempotency key, and never for raw non-idempotent writes."
+    },
+    {
+      "label": "No, because 0-RTT only works on the very first connection to a server, before any trust exists",
+      "feedback": "Backwards: 0-RTT only exists on resumption, after a first full handshake has already issued a session ticket. The risk is not missing trust; it is that the saved round trip removes the replay protection."
+    }
+  ]
+}
+\`\`\`
+
 ### Cutting handshake cost
 
 - **Session resumption**: after a first full handshake, the server issues a session ticket; a
@@ -612,6 +635,42 @@ internal CA, and the mesh rotates them automatically.
 Recap: TLS 1.3 is a 1-RTT handshake (0-RTT on resumption, but only for idempotent requests due to
 replay), you cut cost with session resumption and connection reuse, you choose termination by trading
 internal visibility for edge features, and mTLS gives services cryptographic identity for zero-trust.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Match each requirement from a design review to the TLS termination choice it points to.",
+  "buckets": [
+    "Terminate at the edge/LB",
+    "End-to-end passthrough",
+    "Re-encrypt inside the mesh"
+  ],
+  "items": [
+    {
+      "label": "Route on paths and headers; the internal network is trusted, so plaintext behind the LB is acceptable",
+      "bucket": "Terminate at the edge/LB",
+      "feedback": "Edge termination buys L7 routing and offloaded crypto, at the price of plaintext on the inside."
+    },
+    {
+      "label": "Not even the load balancer may read requests; confidentiality beats everything",
+      "bucket": "End-to-end passthrough",
+      "feedback": "Passthrough forces an L4 LB and gives up L7 routing, retries, and rate limiting; that is the cost of maximum confidentiality."
+    },
+    {
+      "label": "Want L7 routing at the edge and encrypted hops inside too",
+      "bucket": "Re-encrypt inside the mesh",
+      "feedback": "The common enterprise answer: decrypt for routing at the edge, then open a fresh TLS connection to each backend."
+    },
+    {
+      "label": "Centralize certificate management and take crypto load off the app servers",
+      "bucket": "Terminate at the edge/LB",
+      "feedback": "One fleet of proxies holding the certs is far easier to rotate and monitor than certs scattered across every app server."
+    }
+  ],
+  "reveal": "Termination is a dial between edge features and how far encryption reaches. In your design write, say where TLS terminates, how certs rotate automatically so an expired cert cannot take the site down, and whether internal hops use mTLS for service identity."
+}
+\`\`\`
 `.trim()
 
 const httpVersionsTeach = `
