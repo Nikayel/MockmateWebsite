@@ -1407,6 +1407,157 @@ abort. This guarantees atomicity: all commit or all abort.
 
 \`\`\`cswidget
 {
+  "type": "sequence",
+  "title": "2PC: prepare, vote, commit",
+  "actors": [
+    {
+      "id": "coord",
+      "label": "Coordinator"
+    },
+    {
+      "id": "pa",
+      "label": "Participant A"
+    },
+    {
+      "id": "pb",
+      "label": "Participant B"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "coordCrash",
+      "label": "Coordinator crash",
+      "description": "The coordinator dies after both yes votes, before broadcasting the decision."
+    }
+  ],
+  "steps": [
+    {
+      "from": "coord",
+      "to": "pa",
+      "label": "prepare: can you commit?",
+      "kind": "request"
+    },
+    {
+      "from": "coord",
+      "to": "pb",
+      "label": "prepare: can you commit?",
+      "kind": "request"
+    },
+    {
+      "from": "pa",
+      "to": "coord",
+      "label": "vote yes (prepared, locked)",
+      "kind": "response",
+      "state": {
+        "A_locks": "held"
+      }
+    },
+    {
+      "from": "pb",
+      "to": "coord",
+      "label": "vote yes (prepared, locked)",
+      "kind": "response",
+      "state": {
+        "A_locks": "held",
+        "B_locks": "held"
+      }
+    },
+    {
+      "from": "coord",
+      "label": "writes commit record",
+      "kind": "note",
+      "when": "!coordCrash"
+    },
+    {
+      "from": "coord",
+      "to": "pa",
+      "label": "commit",
+      "kind": "request",
+      "when": "!coordCrash"
+    },
+    {
+      "from": "coord",
+      "to": "pb",
+      "label": "commit",
+      "kind": "request",
+      "when": "!coordCrash"
+    },
+    {
+      "from": "pa",
+      "label": "committed, locks released",
+      "kind": "note",
+      "when": "!coordCrash",
+      "state": {
+        "A_locks": "released"
+      }
+    },
+    {
+      "from": "pb",
+      "label": "committed, locks released",
+      "kind": "note",
+      "when": "!coordCrash",
+      "state": {
+        "A_locks": "released",
+        "B_locks": "released"
+      }
+    },
+    {
+      "from": "coord",
+      "label": "crash before decision sent",
+      "kind": "note",
+      "status": "error",
+      "when": "coordCrash",
+      "predict": {
+        "question": "Both participants voted yes and now hold row locks, and the coordinator is silent. What can they safely do?",
+        "options": [
+          "Time out and abort to free the locks",
+          "Commit: they already voted yes",
+          "Neither: hold locks and wait for the coordinator"
+        ]
+      }
+    },
+    {
+      "from": "pa",
+      "label": "cannot commit or abort alone",
+      "kind": "timer",
+      "status": "late",
+      "when": "coordCrash",
+      "state": {
+        "A_locks": "held"
+      }
+    },
+    {
+      "from": "pb",
+      "label": "cannot commit or abort alone",
+      "kind": "timer",
+      "status": "late",
+      "when": "coordCrash",
+      "state": {
+        "A_locks": "held",
+        "B_locks": "held"
+      }
+    },
+    {
+      "from": "pa",
+      "label": "BLOCKED: in-doubt window",
+      "kind": "note",
+      "status": "error",
+      "when": "coordCrash"
+    },
+    {
+      "from": "pb",
+      "label": "BLOCKED: in-doubt window",
+      "kind": "note",
+      "status": "error",
+      "when": "coordCrash"
+    }
+  ],
+  "caption": "With the toggle on, the coordinator dies after both yes votes: each participant can neither commit (maybe someone voted no) nor abort (maybe everyone voted yes and others were told to commit), so they hold their locks for as long as the coordinator is down."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "check",
   "kind": "predict",
   "prompt": "A 2PC participant voted yes, and then the coordinator goes silent. The participant is holding row locks. Can it just time out and abort to free them?",
