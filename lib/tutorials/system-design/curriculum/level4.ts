@@ -1387,6 +1387,35 @@ memory of fixed window.
 
 \`\`\`cswidget
 {
+  "type": "rate-limiter",
+  "title": "Three limiters, one boundary burst",
+  "predictPrompt": {
+    "question": "The stream bursts 20 requests right on the boundary between two 10-tick windows, with a limit of 10 per window. How many of the burst does the fixed-window limiter admit?",
+    "options": [
+      "About 10: the limit is 10 per window, so the limit holds",
+      "Up to about 20: each window contributes its full quota, roughly 2x the stated limit",
+      "Almost none: a burst that size trips the limiter and is rejected outright"
+    ]
+  },
+  "workedExample": "This is the lesson's 100 requests per minute at one tenth scale: a limit of 10 per 10-tick window. The sim opens on fixed window: one counter per aligned window, reset every 10 ticks. Even the steady seeded stream clusters enough that fixed window sheds 6 of 48 requests while its worst trailing 10-tick span reaches 16: aligned counters bound aligned windows, not the spans that straddle them. Toggle the boundary burst: 20 extra requests land at tick 30 and the worst trailing span hits 19, nearly double the stated limit, because each side of the boundary gets a fresh budget. Switch to sliding window: every trailing span caps at exactly 10. Token bucket reads the same burst differently: saved capacity plus refill let its worst span reach 17 while it bounds the long-run rate, the controlled burst the lesson describes.",
+  "algorithms": [
+    "fixed-window",
+    "sliding-window",
+    "token-bucket"
+  ],
+  "limit": 10,
+  "windowSize": 10,
+  "seed": "boundary-spike-l4",
+  "requests": 48,
+  "horizon": 60,
+  "burstAt": 30,
+  "burstSize": 20,
+  "caption": "Same stream, three verdicts. Watch the admitted count in the two ticks around the boundary: fixed window near 20, sliding window and token bucket near 10."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "check",
   "kind": "classify",
   "prompt": "Match each property to the algorithm it belongs to.",
