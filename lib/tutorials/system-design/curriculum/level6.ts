@@ -360,6 +360,29 @@ satisfies them. Kafka is a superb distributed log, but it is also operationally 
 consumer groups, rebalancing, retention tuning, and a ZooKeeper or KRaft quorum to run). If you do
 not need what it gives, you are paying its tax for nothing.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A three-person team with no streaming platform needs to decouple two AWS services exchanging a few thousand messages per hour, with no replay requirement. What is the senior pick?",
+  "options": [
+    {
+      "label": "A managed queue like SQS: it satisfies every driver with zero broker ops",
+      "correct": true,
+      "feedback": "Right: match the workload to the cheapest tool that satisfies the drivers; nothing here needs a log's retention or throughput."
+    },
+    {
+      "label": "Self-hosted Kafka, so the platform is ready for future scale",
+      "feedback": "That is paying the partitions, rebalancing, and quorum tax for guarantees nobody asked for."
+    },
+    {
+      "label": "Pulsar, since it supports both queue and log semantics in one system",
+      "feedback": "Pulsar is an even heavier deployment; its multi-tenancy and compute/storage split are not requirements here."
+    }
+  ]
+}
+\`\`\`
+
 The drivers to reason about out loud:
 
 - **Throughput.** Millions of messages/sec favors a partitioned log (Kafka, Kinesis, Pulsar).
@@ -396,6 +419,29 @@ The cost is a more complex deployment. Choose it when multi-tenancy or independe
 scaling is a real requirement, not by default. **NATS and Redis Streams** cover the low-latency,
 lightweight end when you want simple pub/sub or a small stream with minimal ops.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "When is Pulsar the right call over Kafka?",
+  "options": [
+    {
+      "label": "When multi-tenancy or scaling compute independently from storage is a real requirement",
+      "correct": true,
+      "feedback": "Right: the broker/BookKeeper separation and first-class multi-tenancy are what you buy with its extra deployment complexity."
+    },
+    {
+      "label": "Whenever you need higher raw throughput than Kafka can reach",
+      "feedback": "Throughput is not the differentiator; both are high-throughput partitioned logs."
+    },
+    {
+      "label": "Whenever you want simpler operations than Kafka",
+      "feedback": "Pulsar's stated cost is a more complex deployment, not a simpler one."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the strongest answer is sometimes "no broker at all." If the requirement is a
 strong-consistency CRUD read after write, a broker adds latency and a stale-read window for nothing;
 a direct synchronous call or a database is correct. Reaching for Kafka to decouple two services that
@@ -404,6 +450,30 @@ make ten calls a second is over-engineering you should call out.
 Recap: match the broker to the drivers (throughput, ordering, retention/replay, delivery, routing,
 ops budget); use a log only when replay/throughput justify its ops, a queue for work distribution and
 routing, managed services when the team is small, and sometimes no broker at all.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A settings service handles ten writes per second, and users read their setting back immediately after saving. A teammate proposes putting writes behind Kafka for scalability. What is the strongest counter?",
+  "options": [
+    {
+      "label": "Use no broker at all: a direct synchronous write to the database is correct, since a broker only adds latency and a stale-read window here",
+      "correct": true,
+      "feedback": "Right: a strong-consistency read after write plus tiny throughput fails every driver that would justify any broker."
+    },
+    {
+      "label": "Use SQS instead of Kafka, since the team is small",
+      "feedback": "A cheaper broker still leaves the stale-read window; the requirement rules out the async hop entirely, not just Kafka."
+    },
+    {
+      "label": "Use Kafka but with a single partition to preserve ordering",
+      "feedback": "Ordering was never the problem; the read-after-write requirement makes any async hop the wrong shape."
+    }
+  ],
+  "reveal": "This combines the driver checklist with the strongest answer of all: when the caller needs a consistent read of its own write and throughput is trivial, the cheapest tool that satisfies the drivers is no broker."
+}
+\`\`\`
 `.trim()
 
 const kafkaInternalsTeach = `
