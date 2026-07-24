@@ -1632,6 +1632,41 @@ A consumer that calls anything flaky (a third-party API, a downstream service) w
 
 **Transient vs permanent errors.** Classify the failure. A timeout or 429 is transient: retry it. A 400 "malformed payload" or a schema violation is permanent: retrying will never succeed, so send it straight to the dead-letter queue instead of burning 5 attempts. Blindly retrying permanent errors wastes capacity and delays the DLQ signal.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each failure by what the consumer should do with it.",
+  "buckets": [
+    "Retry with backoff",
+    "Straight to the DLQ"
+  ],
+  "items": [
+    {
+      "label": "Downstream returns a 503 during a deploy",
+      "bucket": "Retry with backoff",
+      "feedback": "A 503 is transient; capped exponential backoff plus jitter gives the downstream room to recover."
+    },
+    {
+      "label": "A 429 throttle from a third-party API",
+      "bucket": "Retry with backoff",
+      "feedback": "Throttles pass; backing off is exactly what the 429 is asking for."
+    },
+    {
+      "label": "A 400 malformed payload",
+      "bucket": "Straight to the DLQ",
+      "feedback": "Retrying a permanently bad payload will never succeed; burning 5 attempts just delays the DLQ signal."
+    },
+    {
+      "label": "A message that violates the topic schema",
+      "bucket": "Straight to the DLQ",
+      "feedback": "A schema violation is permanent; no number of retries fixes the bytes."
+    }
+  ],
+  "reveal": "Classify before you retry: transient errors get capped backoff with jitter, permanent errors skip retries entirely so the DLQ alert fires sooner."
+}
+\`\`\`
+
 ## The dead-letter queue
 
 When a message exhausts its retries (or fails permanently), you must not drop it silently and you must not let it block the stream. You route it to a **dead-letter queue or topic**: a separate destination holding failed messages with their error context and attempt count. The DLQ needs three things to be useful: **alerting** (DLQ depth greater than zero pages someone), **inspection** (you can read why each message failed), and **redrive** (tooling to replay fixed messages back onto the main topic after you deploy a fix). A DLQ with no alerting is just a place data goes to die.
@@ -1639,6 +1674,29 @@ When a message exhausts its retries (or fails permanently), you must not drop it
 ## Head-of-line blocking, the core Kafka trap
 
 A Kafka partition is a strictly ordered log, and a consumer processes it in order, one offset at a time. If message at offset 100 keeps failing and you retry it in place, you **cannot advance to offset 101** without either committing past the failure (losing it) or blocking forever. One poison message stalls the entire partition and everything behind it. This is head-of-line blocking, and it is the number one wrong turn in async design.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Offset 100 on a partition keeps failing. You move it to a delayed retry topic, commit offset 100, and let the partition flow. What did you just trade away?",
+  "options": [
+    {
+      "label": "Strict per-key ordering: the failed message will now be processed after messages that were behind it",
+      "correct": true,
+      "feedback": "Right: leaving the ordered partition is the price of unblocking it, which is why this fits workloads where per-message success beats strict order."
+    },
+    {
+      "label": "Durability: the message only lives in consumer memory until the retry fires",
+      "feedback": "A retry topic is itself a durable log; nothing sits in memory waiting for the delay."
+    },
+    {
+      "label": "Nothing: the retry topic preserves the original partition's ordering guarantees",
+      "feedback": "Ordering is a property of one partition's sequence; a message that leaves and re-enters later has left that sequence."
+    }
+  ]
+}
+\`\`\`
 
 \`\`\`
   partition:  ... 98  99  [100 FAILS] 101  102  103 ...
@@ -1655,6 +1713,29 @@ When a consumer is slower than the producer, something has to give. With a **pul
 **Interview nuance:** if asked "what happens when your consumer can't keep up," the strong answer is "the durable log absorbs it as lag, I alert and autoscale on lag up to partition count, and I make sure a poison message goes to a retry topic or DLQ rather than blocking the partition." That covers both the slow-consumer and the bad-message failure modes in one breath.
 
 **Recap:** retry transient errors with capped exponential backoff plus jitter, send permanent failures and exhausted retries to an alerted, redrivable DLQ, never retry in place on an ordered partition (use retry topics to avoid head-of-line blocking), and lean on the durable log as your backpressure buffer while autoscaling on consumer lag.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Lag is climbing on exactly one partition while its siblings drain fine, and the consumer log shows the same offset failing over and over. Why will adding more consumers not fix this?",
+  "options": [
+    {
+      "label": "The partition is head-of-line blocked by a poison message; only moving it to a retry topic or DLQ unblocks the flow, and no extra consumer can take over an in-order partition",
+      "correct": true,
+      "feedback": "Right: this is the bad-message failure mode, not the slow-consumer one, so the autoscale-on-lag playbook does not apply."
+    },
+    {
+      "label": "Autoscaling only helps once lag exceeds the broker's retention window",
+      "feedback": "Retention bounds how long the log can buffer, not when scaling helps; the blocker here is ordering, not capacity."
+    },
+    {
+      "label": "More consumers would help, but only after you raise the partition count",
+      "feedback": "Repartitioning adds parallelism for throughput problems; a poison message would still wedge whichever partition it lands on."
+    }
+  ]
+}
+\`\`\`
 `.trim()
 
 const streamProcessingTeach = `
