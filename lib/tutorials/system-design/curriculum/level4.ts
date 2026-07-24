@@ -1640,6 +1640,32 @@ spiral**: throughput actually drops toward zero under increasing load. The defin
 enables it is the **unbounded queue**, which hides overload by accepting work it will never complete
 in time until memory runs out.
 
+\`\`\`cswidget
+{
+  "type": "queue-sim",
+  "title": "The Unbounded Queue at 150 Percent Load",
+  "predictPrompt": {
+    "question": "Arrivals hold at 150 percent of capacity, and a retry surge hits partway through the run. With the queue unbounded, what does the depth curve do?",
+    "options": [
+      "It levels off at a plateau once the queue absorbs the extra 50 percent",
+      "It climbs steadily, then the retry surge steepens the slope, and it never comes back down",
+      "It spikes during the retry surge but drains back to empty once the surge ends"
+    ]
+  },
+  "workedExample": "Arrivals run at 3 per tick against a drain of 2, a steady 150 percent of capacity, so depth starts climbing from the first tick and never gets a chance to recover. Midway through, the retry surge triples arrivals and the slope turns sharply steeper: this is the death spiral feeding itself. In unbounded mode the curve only ever goes up, because the drain never once exceeds arrivals; the queue is hiding overload by accepting work it will never finish in time. Flip to bounded mode and depth stops hard at the cap, with the excess refused at the door: the 1ms rejection the lesson argues is almost free, instead of the accept-queue-fail path that burns capacity you needed for good traffic.",
+  "producerRate": 3,
+  "consumerRate": 2,
+  "ticks": 160,
+  "capacity": 60,
+  "burst": {
+    "from": 70,
+    "to": 110,
+    "multiplier": 3
+  },
+  "caption": "Toggle bounded mode to see the difference between a queue that hides overload until memory runs out and one that refuses work it cannot finish."
+}
+\`\`\`
+
 ### Load shedding: reject early, by priority
 
 A request you reject in 1ms costs almost nothing; a request you accept, queue for 5s, then fail costs
