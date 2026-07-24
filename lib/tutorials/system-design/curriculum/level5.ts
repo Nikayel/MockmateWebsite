@@ -210,6 +210,39 @@ their copies would diverge. So:
   (last-writer-wins, CRDTs, or surfacing siblings). Examples: DynamoDB, Cassandra, Riak in their
   default modes.
 
+\`\`\`cswidget
+{
+  "type": "partition-sim",
+  "title": "The Choice During a Partition: Refuse or Diverge",
+  "predictPrompt": {
+    "question": "The link between the two replicas drops and a client on each side writes a different value to the same register. Under AP with last-writer-wins reconciliation, what do you find after the partition heals?",
+    "options": [
+      "Both values survive and the application is handed siblings to resolve",
+      "One side's write silently disappears: whichever timestamp lost",
+      "Neither write was accepted, so the register never diverged"
+    ]
+  },
+  "workedExample": "Both replicas agree on the register before anything goes wrong. Cut the link, then fire each side's write yourself: under AP every non-failing node keeps answering, so both replicas accept locally and their copies diverge. Heal, and last-writer-wins keeps whichever write carries the later timestamp and discards the other with no error and no warning: a client got an OK and its write is simply gone. Now flip to CP and replay: the minority side refuses the write it cannot coordinate, returning an error instead of accepting it. That is the whole forced choice CAP actually makes: refuse during the partition, or accept on both sides and pay at reconciliation.",
+  "kind": "register",
+  "writes": [
+    {
+      "side": "A",
+      "value": "expedited",
+      "label": "US client sets shipping to expedited"
+    },
+    {
+      "side": "B",
+      "value": "standard",
+      "label": "EU client sets shipping to standard"
+    }
+  ],
+  "strategies": [
+    "lww"
+  ],
+  "caption": "CP sacrifices availability (the minority refuses); AP sacrifices consistency (both accept, and last-writer-wins silently drops one write on heal)."
+}
+\`\`\`
+
 **Interview nuance:** the strongest candidates immediately add that real systems are **not globally
 CP or AP.** Consistency is usually **tunable per operation or per key.** Cassandra lets you pick
 consistency level ONE (AP-ish) or QUORUM/ALL (CP-ish) on each query. DynamoDB offers eventually
