@@ -34,7 +34,7 @@ loadEnvLocal()
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || ""
 const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || ""
-const PINNED_FLASH = process.env.GEMINI_MODEL_FLASH || "gemini-2.5-flash"
+const PINNED_FLASH = process.env.GEMINI_MODEL_FLASH || "gemini-3.6-flash"
 const PROMPT = 'Reply with ONLY this exact JSON: {"ok": true}'
 const TIMEOUT_MS = 30000
 

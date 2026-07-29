@@ -103,12 +103,19 @@ export async function generateAIResponseEdge(
   }
 
   try {
+    const generationConfig: Record<string, unknown> = {
+      maxOutputTokens: options?.maxTokens ?? 2048,
+      temperature: options?.temperature ?? 0.3,
+    }
+    // gemini-3.x flash models think by default; cap the budget so streamed
+    // feedback is not stalled behind unbounded thought. gemini-3.6-flash
+    // rejects a 0 budget, so 1024 mirrors thinkingLevel "low" in ai-providers.
+    if (GEMINI_MODELS.flash.includes("gemini-3")) {
+      generationConfig.thinkingConfig = { thinkingBudget: 1024 }
+    }
     const model = genAI.getGenerativeModel({
       model: GEMINI_MODELS.flash,
-      generationConfig: {
-        maxOutputTokens: options?.maxTokens ?? 2048,
-        temperature: options?.temperature ?? 0.3,
-      },
+      generationConfig,
       systemInstruction: systemPrompt,
     })
 

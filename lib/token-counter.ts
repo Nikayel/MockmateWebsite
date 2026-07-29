@@ -50,6 +50,9 @@ export const MODEL_FAMILIES = {
   'gemini-2.0-flash': 'cl100k_base',
   'gemini-2.5-flash': 'cl100k_base',
   'gemini-2.5-flash-lite': 'cl100k_base',
+  'gemini-3.5-flash': 'cl100k_base',
+  'gemini-3.5-flash-lite': 'cl100k_base',
+  'gemini-3.6-flash': 'cl100k_base',
 
   // DeepSeek - cl100k_base approximation
   'deepseek': 'cl100k_base',
@@ -245,6 +248,9 @@ export const MODEL_CONTEXT_LIMITS = {
   'gemini-2.0-flash': 1000000,
   'gemini-2.5-flash': 1000000,
   'gemini-2.5-flash-lite': 1000000,
+  'gemini-3.5-flash': 1000000,
+  'gemini-3.5-flash-lite': 1000000,
+  'gemini-3.6-flash': 1000000,
   'deepseek': 128000,
   'deepseek-chat': 128000,
   'deepseek-coder': 128000,

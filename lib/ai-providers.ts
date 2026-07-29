@@ -78,22 +78,25 @@ interface ProviderConfig {
 }
 
 // Provider configurations - Updated Jan 2025 pricing
-// Strategy: Gemini 3.0 Flash for dialogue/complex, 2.5 Flash-Lite for simple, DeepSeek for critique
+// Strategy: Gemini 3.6 Flash for dialogue/complex, 3.5 Flash-Lite for simple, DeepSeek for critique
 const PROVIDERS: Record<AIProvider, ProviderConfig> = {
   gemini: {
     name: "gemini",
     enabled: true,
     apiKey: process.env.GEMINI_API_KEY,
-    model: GEMINI_MODELS.flash, // Gemini 2.5 Flash - fast without thinking overhead
+    model: GEMINI_MODELS.flash, // Gemini 3.6 Flash (see lib/ai/model-ids.ts for pin rationale)
     maxTokens: 4096, // Increased further to prevent feedback truncation
     temperature: 0.7,
+    // gemini-3.6-flash always thinks and rejects a 0 budget; "low" caps the
+    // spend at 1024 thought tokens so interview latency stays bounded.
+    thinkingLevel: "low",
     costPer1kTokens: 0.00015, // $0.10/1M input, $0.40/1M output averaged
   },
   "gemini-lite": {
     name: "gemini-lite",
     enabled: true,
     apiKey: process.env.GEMINI_API_KEY,
-    model: GEMINI_MODELS.flashLite, // Actually use Flash-Lite now: $0.10/1M input, $0.40/1M output
+    model: GEMINI_MODELS.flashLite, // Gemini 3.5 Flash-Lite: cheapest tier, no default thinking
     maxTokens: 1024,
     temperature: 0.7,
     costPer1kTokens: 0.00025, // Averaged - very cheap
@@ -196,8 +199,10 @@ async function callGemini(
       temperature: config.temperature,
     }
 
-    // Add thinking config for Gemini 3.0 Flash
+    // Add thinking config for Gemini 3.x Flash
     // thinkingConfig must be set with thinkingBudget for MINIMAL to actually limit thinking
+    // CAUTION: gemini-3.6-flash rejects thinkingBudget 0 (400 INVALID_ARGUMENT),
+    // so "minimal" must not be used while that model is the flash pin.
     if (config.thinkingLevel && config.model.includes("gemini-3")) {
       const thinkingLevel = config.thinkingLevel.toUpperCase()
       const thinkingBudget =
