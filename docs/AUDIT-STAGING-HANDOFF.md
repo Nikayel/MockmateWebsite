@@ -3,7 +3,7 @@
 **For:** the next agent taking over the tail of the 2026-07-12 platform audit.
 **Source of truth:** `docs/PLATFORM-AUDIT-FIX-PLAN.md` (checkboxes + Progress Log).
 
-## STATUS UPDATE (2026-07-12, later the same day) — 4 of 5 items closed or resolved
+## STATUS UPDATE (2026-07-12, updated 2026-07-28) — all 5 items closed or resolved
 
 - **Item 1 (Stripe webhook replay): DONE.** 8/8 asserted checks pass against the real
   route + Firestore emulator (signed events via Stripe's `generateTestHeaderString`;
@@ -14,11 +14,12 @@
 - **Item 2 (composite index): DONE.** `profile_quota (user_id ASC, period_start DESC)`
   deployed (`firebase deploy --only firestore:indexes`, no --force) and confirmed live
   via `firebase firestore:indexes`.
-- **Item 3 (API-1 Deepgram): STILL BLOCKED — needs the account owner.** Smoke test of
-  the exact production mint path: the key has keys:read but LACKS keys:write
-  (403 INSUFFICIENT_PERMISSIONS), so minting ALWAYS fails today and prod hands the raw
-  account key to browsers. Do NOT flip line 43 to 503 until the scope is granted in the
-  Deepgram dashboard and the smoke test passes.
+- **Item 3 (API-1 Deepgram): RESOLVED 2026-07-28.** The owner created a Member-role
+  (keys:write-capable) key; the mint smoke test now PASSES end-to-end (project
+  resolves, ephemeral usage:write key minted, differs from the account key, cleanup
+  delete succeeds). The fail-closed 503 (shipped 2026-07-19) stays as the safety net.
+  Remaining prod-env step: set the key as server-side `DEEPGRAM_API_KEY` in Vercel,
+  delete stale `NEXT_PUBLIC_DEEPGRAM_API_KEY`, redeploy, verify a voice interview.
 - **Item 4 (PERF-C12 part A): KEEP-DEFERRED, now evidence-backed.** features-section
   uses a domMax-only `layoutId`; shared `lib/motion.tsx` fans a strict-m contract onto
   login/careers/why-codesparring/pricing (inert `m.*` = invisible copy). Safe
