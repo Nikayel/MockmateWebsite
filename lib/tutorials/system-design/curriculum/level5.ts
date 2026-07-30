@@ -2606,10 +2606,30 @@ distributed lock *must* have: a lock that only tells the client "you have it" is
 client can be paused between acquiring and using it. This is exactly Martin Kleppmann's **critique of
 Redlock**.
 
-\`\`\`
-  L holds lease, token=33 ----GC pause 15s---------------> writes(token=33) -> REJECTED
-                        lease expires, elect L2, token=34 -> writes(token=34) -> accepted
-  storage rule: accept iff token > highest_seen
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "The token is checked where the damage would happen",
+  "layout": "lr",
+  "nodes": [
+    { "id": "coord", "label": "Coordinator (etcd, ZooKeeper, Raft)", "kind": "external" },
+    { "id": "old_leader", "label": "L: old leader, GC-paused 15s", "kind": "service" },
+    { "id": "new_leader", "label": "L2: new leader", "kind": "service" },
+    { "id": "storage", "label": "Storage: accept iff token > highest_seen", "kind": "db" }
+  ],
+  "edges": [
+    { "from": "coord", "to": "old_leader", "kind": "sync", "label": "grants lease, token = 33" },
+    { "from": "coord", "to": "new_leader", "kind": "sync", "label": "lease expired, token = 34" },
+    { "from": "old_leader", "to": "storage", "kind": "sync", "label": "write(token = 33) → REJECTED" },
+    { "from": "new_leader", "to": "storage", "kind": "sync", "label": "write(token = 34) → accepted" }
+  ],
+  "stages": [
+    { "adds": ["coord", "old_leader"], "note": "Leadership is granted with a monotonically increasing token: an etcd revision, a ZooKeeper zxid, or a Raft term." },
+    { "adds": ["new_leader"], "note": "L pauses for 15 seconds. Its lease expires and the coordinator elects L2 with a strictly higher token. L does not know any of this happened." },
+    { "adds": ["storage"], "note": "The enforcement point. Storage has already accepted token 34, so when L wakes and writes token 33 it is rejected on arrival." }
+  ],
+  "caption": "A paused leader cannot be trusted to check whether it is still the leader, because its own view is exactly what went stale. Only the resource can know, which is why a lock that merely tells the client 'you have it' is unsafe. This is Kleppmann's critique of Redlock in one picture."
+}
 \`\`\`
 
 ### Split-brain and partitions
