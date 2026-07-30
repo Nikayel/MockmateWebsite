@@ -22,3 +22,38 @@ export type {
   LearnerModelCondition,
   ChallengeReason,
 } from "./types"
+
+export {
+  createChallenge,
+  updateChallengeCorrection,
+  buildBeliefSnapshot,
+  ChallengeError,
+  type ChallengeDoc,
+  type ChallengeCorrection,
+  type BeliefSnapshot,
+} from "./challenges"
+
+export {
+  amendForChallenge,
+  computeAmendedCard,
+  correctedRatingForReason,
+  applyVerificationPull,
+  verificationDueAt,
+  type AmendmentSource,
+} from "./amendment"
+
+export {
+  resolveVerificationForReview,
+  getRecentChallenges,
+  isVerificationPassed,
+  VERIFICATION_PASS_THRESHOLD,
+} from "./verification"
+
+export { getCardEvidence, type EvidenceRow } from "./evidence"
+
+export {
+  logLearnerModelEvent,
+  LEARNER_MODEL_EVENTS,
+  CLIENT_REPORTABLE_EVENTS,
+  type LearnerModelEventType,
+} from "./events"
