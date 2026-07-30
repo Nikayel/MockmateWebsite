@@ -2664,6 +2664,44 @@ L7 terminates TLS at the edge so backends speak plain HTTP inside the trusted ne
 for zero-trust); L4 passes TLS straight through, so the backend does the handshake and the LB never
 sees plaintext.
 
+Where TLS ends is the whole difference, and it decides what the balancer is even capable of:
+
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Where the TLS connection terminates",
+  "layout": "lr",
+  "nodes": [
+    { "id": "client", "label": "Client", "kind": "client" },
+    { "id": "l7", "label": "L7 LB (ALB, Envoy, Nginx)", "kind": "lb" },
+    { "id": "backend_plain", "label": "Backend speaks plain HTTP", "kind": "service" },
+    { "id": "l4", "label": "L4 LB (NLB, IPVS)", "kind": "lb" },
+    { "id": "backend_tls", "label": "Backend terminates TLS itself", "kind": "service" }
+  ],
+  "edges": [
+    { "from": "client", "to": "l7", "kind": "sync", "label": "TLS ends here" },
+    { "from": "l7", "to": "backend_plain", "kind": "sync", "label": "decrypted: can route on path, header, cookie" },
+    { "from": "client", "to": "l4", "kind": "sync", "label": "TLS passes straight through" },
+    { "from": "l4", "to": "backend_tls", "kind": "sync", "label": "still encrypted: LB sees only IP and port" }
+  ],
+  "stages": [
+    {
+      "adds": ["client"],
+      "note": "One client, one HTTPS request. The only question is which box decrypts it."
+    },
+    {
+      "adds": ["l7", "backend_plain"],
+      "note": "L7 terminates TLS at the edge. Now it can read the request, so path routing, header routing, retries, and sticky sessions all become possible. It pays CPU per request for that."
+    },
+    {
+      "adds": ["l4", "backend_tls"],
+      "note": "L4 forwards packets without decrypting. It cannot route on /api/* because it never sees the path, but it is fast, cheap per connection, and works for any protocol."
+    }
+  ],
+  "caption": "Every L7 capability follows from decrypting, and every L4 limitation follows from not decrypting. Answer the TLS question and the L4-or-L7 answer falls out of it."
+}
+\`\`\`
+
 ### The algorithm
 
 **Round robin** rotates evenly and is fine when every request costs about the same. **Least
