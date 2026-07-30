@@ -6,19 +6,25 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import type { CardBelief } from "@/lib/learner-model/types"
 
-/** Retrievability chip colors follow the PatternMastery thresholds. */
+/**
+ * Retrievability chip colors follow the PatternMastery thresholds.
+ *
+ * Light mode uses the -700 text shades: the -400 shades used on dark render
+ * at roughly 1.8:1 on a light background, far below the AA 4.5:1 bar for
+ * text this small. Same light/dark pairing convention as app/roadmap.
+ */
 function chipClass(urgency: string | undefined): string {
   switch (urgency) {
     case "safe":
-      return "bg-emerald-400/10 text-emerald-400 border-emerald-400/20"
+      return "border-emerald-600/20 bg-emerald-100 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-400"
     case "ok":
-      return "bg-amber-400/10 text-amber-400 border-amber-400/20"
+      return "border-amber-600/20 bg-amber-100 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-400"
     case "warning":
-      return "bg-orange-400/10 text-orange-400 border-orange-400/20"
+      return "border-orange-600/20 bg-orange-100 text-orange-700 dark:border-orange-400/20 dark:bg-orange-400/10 dark:text-orange-400"
     case "urgent":
-      return "bg-rose-400/10 text-rose-400 border-rose-400/20"
+      return "border-rose-600/20 bg-rose-100 text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-400"
     default:
-      return "bg-muted text-muted-foreground border-border"
+      return "border-border bg-muted text-muted-foreground"
   }
 }
 

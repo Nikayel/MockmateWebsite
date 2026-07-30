@@ -255,7 +255,10 @@ export default function KnowledgePage() {
           </div>
 
           {error && (
-            <div className="mb-6 rounded-lg border border-rose-500/10 bg-rose-500/5 p-4 text-sm text-rose-400">
+            <div
+              role="alert"
+              className="mb-6 rounded-lg border border-rose-600/20 bg-rose-100 p-4 text-sm text-rose-700 dark:border-rose-500/10 dark:bg-rose-500/5 dark:text-rose-400"
+            >
               {error}
             </div>
           )}

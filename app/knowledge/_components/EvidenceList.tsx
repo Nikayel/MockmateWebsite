@@ -34,7 +34,11 @@ export function EvidenceList({ loading, error, rows }: EvidenceListProps) {
     )
   }
   if (error) {
-    return <p className="mt-2 text-xs text-rose-400">{error}</p>
+    return (
+      <p role="alert" className="mt-2 text-xs text-rose-700 dark:text-rose-400">
+        {error}
+      </p>
+    )
   }
   if (rows.length === 0) {
     return (

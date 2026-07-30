@@ -36,9 +36,9 @@ export function CorrectionTraceBanner({ corrections }: { corrections: Correction
       {visible.map((c) => (
         <div
           key={c.id}
-          className="flex items-start gap-2 rounded-lg border border-purple-500/10 bg-purple-500/5 px-3 py-2 text-sm"
+          className="flex items-start gap-2 rounded-lg border border-purple-600/20 bg-purple-100 px-3 py-2 text-sm dark:border-purple-500/10 dark:bg-purple-500/5"
         >
-          <Brain className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" />
+          <Brain className="mt-0.5 h-4 w-4 shrink-0 text-purple-700 dark:text-purple-400" />
           <p className="text-muted-foreground flex-1">
             {c.status === "pending_verification" ? (
               <>
