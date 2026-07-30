@@ -2491,11 +2491,23 @@ Always write patterns as raw strings (\`r"..."\`). Regex leans on the backslash 
 
 ### The pieces you will use most
 
-\`\`\`text
-\\d  a digit 0-9        \\w  letter, digit, or _
-\\s  whitespace          .  any character
-+   one or more         *  zero or more
-[abc] any of a,b,c     () a capture group
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Pattern", "Matches", "Note"],
+  "rows": [
+    ["\\\\d", "one digit, 0 to 9", "\\\\D is the negation: one non-digit"],
+    ["\\\\w", "one letter, digit, or underscore", "\\\\W negates it"],
+    ["\\\\s", "one whitespace character", "space, tab, or newline"],
+    [".", "any single character", "except a newline, unless re.DOTALL"],
+    ["+", "one or more of what precedes it", "greedy: use +? to take as few as possible"],
+    ["*", "zero or more of what precedes it", "can match nothing at all"],
+    ["[abc]", "any single one of a, b, or c", "[^abc] means any character EXCEPT those"],
+    ["( )", "a capture group", "its contents come back from .group(1)"]
+  ],
+  "highlightCols": ["Pattern"],
+  "caption": "Two rows quietly cause most regex surprises. * can match zero characters, so a pattern built only from * always succeeds without consuming anything, and + is greedy by default, so it runs to the LAST possible match rather than the first."
+}
 \`\`\`
 
 ### The three workhorse functions
