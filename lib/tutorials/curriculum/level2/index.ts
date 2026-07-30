@@ -2056,6 +2056,21 @@ except ZeroDivisionError:
 
 A \`finally\` block runs whether the \`try\` succeeded, raised, or returned early. Use it for cleanup that must happen no matter what, like closing a file or releasing a lock:
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Block", "Runs when", "Typical use"],
+  "rows": [
+    ["try", "always, first", "the operation that might fail"],
+    ["except", "only if a matching exception was raised", "handle that specific failure"],
+    ["else", "only if NO exception was raised", "the follow-up work that must not be inside try"],
+    ["finally", "always, last, even on return or re-raise", "cleanup: close the file, release the lock"]
+  ],
+  "highlightCols": ["Runs when"],
+  "caption": "else is the block people forget, and it exists to keep the try body narrow: code that must not be guarded goes in else, so an exception raised there is not caught by your own except."
+}
+\`\`\`
+
 \`\`\`python
 try:
     risky()
