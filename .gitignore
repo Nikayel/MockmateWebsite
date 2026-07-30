@@ -74,6 +74,12 @@ docs/._*
 # Future Sprints
 /future-sprints/
 
+# Firebase emulator artifacts (pnpm test:integration)
+firestore-debug.log
+firebase-debug.log
+ui-debug.log
+/.firebase/
+
 # Graphify cache (41 MB, regenerated every session — untracked in DEAD-11) + local scratch
 /graphify-out/
 scratch.ts

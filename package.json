@@ -19,6 +19,7 @@
     "audit:bugfix": "tsx scripts/audit-bugfix-scenarios.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:integration": "firebase emulators:exec --only firestore --project codesparring-integration \"vitest run --config vitest.integration.config.ts\"",
     "prepare": "husky"
   },
   "dependencies": {

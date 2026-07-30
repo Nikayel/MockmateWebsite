@@ -6,7 +6,17 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["**/*.test.ts", "**/*.test.tsx"],
-    exclude: ["node_modules", ".next", "dist", "extension/**", "**/._*"],
+    // *.integration.test.ts needs a live Firestore emulator and must NOT run
+    // under this config (which globally mocks firebase-admin). See
+    // vitest.integration.config.ts / `pnpm test:integration`.
+    exclude: [
+      "node_modules",
+      ".next",
+      "dist",
+      "extension/**",
+      "**/._*",
+      "**/*.integration.test.ts",
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
