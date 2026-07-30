@@ -48,6 +48,7 @@ import {
   mapPerformanceToFSRSRating,
 } from "@/lib/spaced-repetition"
 import { updateLearningStateAfterSession } from "@/lib/learning-state"
+import { resolveVerificationForReview } from "@/lib/learner-model/verification"
 import { triggerSessionNotifications } from "@/lib/services/session-notifications"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import { resolvePatternForScenario } from "@/lib/spaced-repetition/pattern-resolution"
@@ -354,6 +355,17 @@ export async function POST(request: NextRequest) {
       } catch (researchError) {
         logger.error("Failed to record research event for new problem", { error: researchError })
       }
+    }
+
+    // Learner model: if this card had a pending challenge, this review is its
+    // verification — record whether the learner's dispute held up. Non-fatal.
+    try {
+      await resolveVerificationForReview(userId, problem_id, {
+        masteryScore,
+        reviewedAt: completed_at,
+      })
+    } catch (verificationError) {
+      logger.error("Failed to resolve challenge verification", { error: verificationError })
     }
 
     // Update legacy learning state for backwards compatibility
