@@ -1912,11 +1912,49 @@ if x in big_set:    # O(1) average
 if x in big_list:   # O(n), linear scan every time
 \`\`\`
 
-Turning an \`O(n^2)\` nested loop into an \`O(n)\` pass with a \`set\` lookup is the difference between a request that returns and one that times out.
+Turning an \`O(n²)\` nested loop into an \`O(n)\` pass with a \`set\` lookup is the difference between a request that returns and one that times out.
+
+### Memory is a lever too: \`__slots__\`
+
+By default every instance carries its own \`__dict__\`, a hash map holding its attributes. That is what
+makes \`obj.anything = 1\` work at runtime, and it costs memory on every object you create. Declaring
+\`__slots__\` replaces that dict with a fixed set of descriptors:
+
+\`\`\`python
+class Point:
+    __slots__ = ("x", "y")
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+\`\`\`
+
+Measured on CPython 3.11 for a two-attribute object, \`sys.getsizeof\` reports 48 bytes with \`__slots__\`
+against 56 bytes **plus** a separate per-instance dict without it. Across a million objects that gap
+is the difference between fitting in memory and not. Attribute access also gets slightly faster,
+because it is an array offset rather than a dict lookup.
+
+The cost is flexibility, and it is worth naming precisely:
+
+- Assigning an undeclared attribute raises \`AttributeError\`, not a silent success. That is often a
+  feature: typos in attribute names become errors instead of new attributes.
+- There is no \`__dict__\`, so code that introspects one (some serializers, some mocking) breaks.
+- A subclass that does not declare its own \`__slots__\` gets a \`__dict__\` back, and the saving with it.
+
+Reach for it when you have many small, fixed-shape objects (points, rows, events, graph nodes). Skip
+it for the handful of long-lived service objects, where the memory is irrelevant and the flexibility
+is not.
+
+**Interview nuance:** CPython already softens the default case with **key-sharing dictionaries**
+(PEP 412): instances of the same class share one copy of their key layout, so the marginal per-instance
+dict is smaller than a standalone dict of the same size. That is why the honest claim is "slots remove
+the per-instance dict entirely", not a fixed multiplier. If someone quotes you a flat "slots saves 50
+percent", the useful follow-up is: measured on which Python, with how many attributes, and against
+shared keys or not?
 
 ### Cache repeated work with \`lru_cache\`
 
-When a pure function is called repeatedly with the same arguments, \`functools.lru_cache\` stores results keyed by the arguments. Naive \`fib\` recomputes \`fib(n-1)\` and \`fib(n-2)\` down overlapping trees, so it runs in roughly \`O(phi^n)\` time (\`fib(35)\` already triggers tens of millions of calls). Memoization computes each distinct \`n\` exactly once:
+When a pure function is called repeatedly with the same arguments, \`functools.lru_cache\` stores results keyed by the arguments. Naive \`fib\` recomputes \`fib(n-1)\` and \`fib(n-2)\` down overlapping trees, so it runs in roughly \`O(φⁿ)\` time, where φ ≈ 1.618 is the golden ratio (\`fib(35)\` already triggers tens of millions of calls). Memoization computes each distinct \`n\` exactly once:
 
 \`\`\`python
 from functools import lru_cache
