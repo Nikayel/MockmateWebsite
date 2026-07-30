@@ -30,8 +30,15 @@ export function isVerificationPassed(masteryScore: number): boolean {
 
 /**
  * Resolve every pending challenge on (userId, problemId) with this review's
- * outcome. Equality-only query — no composite index needed. Idempotent:
- * already-verified challenges are not matched again.
+ * outcome. Idempotent: already-verified challenges no longer match.
+ *
+ * Deliberately equality-only, with NO orderBy: Firestore can serve pure
+ * equality filters by merging single-field indexes, so this keeps working even
+ * if the composite index build lags a deploy — and this runs inside the review
+ * write path, where a failed query would be user-visible. The
+ * (user_id, status, created_at DESC) composite index is still declared in
+ * firestore.indexes.json as insurance; ordering is not needed because every
+ * matching challenge is resolved with the same outcome.
  */
 export async function resolveVerificationForReview(
   userId: string,
