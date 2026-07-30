@@ -423,6 +423,23 @@ The loop variable (\`name\`) is reassigned each pass. When the collection is exh
 
 \`range(start, stop)\` produces the integers from \`start\` up to but not including \`stop\`:
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["You write", "You get", "How many items"],
+  "rows": [
+    ["range(4)", "0, 1, 2, 3", "4"],
+    ["range(1, 4)", "1, 2, 3", "3"],
+    ["range(0, 10, 2)", "0, 2, 4, 6, 8", "5"],
+    ["range(4, 0, -1)", "4, 3, 2, 1", "4"],
+    ["range(4, 4)", "nothing", "0"],
+    ["range(0, 10, -1)", "nothing", "0"]
+  ],
+  "highlightCols": ["How many items"],
+  "caption": "stop is always excluded, which is why range(4) gives exactly 4 items starting at 0. The last two rows are the silent ones: an empty range is not an error, so a loop over it simply never runs and the bug shows up as missing output rather than a traceback."
+}
+\`\`\`
+
 \`\`\`python
 for i in range(1, 4):
     print(i)         # 1, 2, 3
