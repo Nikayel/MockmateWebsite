@@ -1844,6 +1844,24 @@ text = p.read_text(encoding="utf-8")   # whole file -> one str
 
 The \`/\` operator is real: \`Path\` overloads it so \`Path("data") / "scores.txt"\` builds the joined path with the correct separator on any OS. Prefer it over \`"data/" + name\`.
 
+Once you have a \`Path\`, its parts are attributes rather than string surgery:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Attribute", "Value for Path('data/reports/scores.csv')", "What you reach for it for"],
+  "rows": [
+    [".name", "scores.csv", "the filename, extension included"],
+    [".stem", "scores", "the filename without the extension"],
+    [".suffix", ".csv", "the extension, INCLUDING the leading dot"],
+    [".parent", "data/reports", "the containing directory, itself a Path"],
+    [".parts", "('data', 'reports', 'scores.csv')", "every segment as a tuple"]
+  ],
+  "highlightCols": ["Value for Path('data/reports/scores.csv')"],
+  "caption": "Two of these bite. .suffix keeps the dot, so comparing it to 'csv' always fails and you want '.csv'. And on a double extension like archive.tar.gz, .suffix is only '.gz' while .stem is still 'archive.tar', because both look at the LAST dot only."
+}
+\`\`\`
+
 ## Turning text into data
 
 \`read_text()\` hands you the entire file as one string. Split it into lines, then convert:
