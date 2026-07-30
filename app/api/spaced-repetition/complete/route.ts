@@ -50,6 +50,7 @@ import {
 import { updateLearningStateAfterSession } from "@/lib/learning-state"
 import { triggerSessionNotifications } from "@/lib/services/session-notifications"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
+import { resolvePatternForScenario } from "@/lib/spaced-repetition/pattern-resolution"
 import type { Difficulty } from "@/lib/spaced-repetition"
 import type { SpacedRepetitionMasteryLevel } from "@/lib/types"
 
@@ -132,7 +133,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const pattern = ((scenario as any).pattern as DSAPattern) || "arrays-hashing"
+    // Non-DSA scenarios (system design, labs) bucket under "case-lab" —
+    // they used to silently mis-tag as "arrays-hashing".
+    const pattern: DSAPattern = resolvePatternForScenario(
+      scenario as { type?: string; pattern?: string }
+    )
     const difficulty = scenario.difficulty as Difficulty
 
     // Calculate mastery score for spaced repetition
@@ -307,8 +312,7 @@ export async function POST(request: NextRequest) {
         // mastery_score they schedule from, so research logs match reality.
         // SM-2 quality (0-5): mapScoreToQuality. FSRS rating (1-4): mapPerformanceToFSRSRating.
         const expectedMinutes = difficulty === "easy" ? 10 : difficulty === "medium" ? 20 : 30
-        const timeRatio =
-          time_spent_minutes > 0 ? time_spent_minutes / expectedMinutes : 1.0
+        const timeRatio = time_spent_minutes > 0 ? time_spent_minutes / expectedMinutes : 1.0
         const qualityRating =
           userAlgorithm === "fsrs"
             ? mapPerformanceToFSRSRating(masteryScore, hints_used, timeRatio)
