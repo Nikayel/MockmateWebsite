@@ -8,6 +8,14 @@
  * - RAG integration for personalized recommendations
  */
 
+// Global algorithm config (admin "end A/B" switch)
+export {
+  getAlgorithmConfig,
+  markAbTestEnded,
+  clearAlgorithmConfigCache,
+  type AlgorithmResearchConfig,
+} from "./algorithm-config"
+
 // Algorithm Router (A/B Testing) - Use this for new implementations
 export {
   getUserAlgorithm,

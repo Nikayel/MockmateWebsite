@@ -10,6 +10,7 @@
  */
 
 import { adminDb } from "../firebase-admin"
+import { getAlgorithmConfig } from "./algorithm-config"
 import type { SpacedRepetitionAlgorithm, SpacedRepetitionMasteryLevel } from "../types"
 import type { Difficulty, MasteryLevel as SM2MasteryLevel } from "./sm2-algorithm"
 import {
@@ -142,22 +143,47 @@ function reconstructFSRSCardFromFields(data: {
  * Uses 50/50 random assignment for A/B testing
  */
 export async function getUserAlgorithm(userId: string): Promise<SpacedRepetitionAlgorithm> {
+  const config = await getAlgorithmConfig()
   const profileRef = adminDb.collection("profiles").doc(userId)
   const profileDoc = await profileRef.get()
 
   if (!profileDoc.exists) {
-    // User doesn't exist yet, return default (will be assigned on profile creation)
-    return assignRandomAlgorithm()
+    // User doesn't exist yet, return default (will be assigned on profile creation).
+    // Once the A/B has ended this is deterministic; before that it was a
+    // non-persisted coin flip that could differ per call.
+    return config.ab_ended ? config.default_algorithm : assignRandomAlgorithm()
   }
 
   const profile = profileDoc.data()
 
   if (profile?.spaced_repetition_algorithm) {
-    return profile.spaced_repetition_algorithm as SpacedRepetitionAlgorithm
+    const assigned = profile.spaced_repetition_algorithm as SpacedRepetitionAlgorithm
+
+    // Self-heal: after the A/B ended, any non-overridden sm2 user is lazily
+    // migrated to the default. This is the safety net for users the batch
+    // migration missed (created mid-sweep, failed page, etc.). Users who
+    // explicitly chose their algorithm keep it.
+    if (
+      config.ab_ended &&
+      assigned !== config.default_algorithm &&
+      profile.algorithm_user_overridden !== true
+    ) {
+      await profileRef.update({
+        spaced_repetition_algorithm: config.default_algorithm,
+        algorithm_migrated_at: new Date().toISOString(),
+        algorithm_migrated_from: assigned,
+      })
+      console.log(
+        `[AlgorithmRouter] Self-healed user ${userId} from ${assigned} to ${config.default_algorithm} (A/B ended)`
+      )
+      return config.default_algorithm
+    }
+
+    return assigned
   }
 
   // No algorithm assigned - assign one now
-  const algorithm = assignRandomAlgorithm()
+  const algorithm = config.ab_ended ? config.default_algorithm : assignRandomAlgorithm()
   await profileRef.update({
     spaced_repetition_algorithm: algorithm,
     algorithm_assigned_at: new Date().toISOString(),
