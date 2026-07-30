@@ -1568,6 +1568,41 @@ print(a is b)   # False (two separate list objects)
 
 \`a\` and \`b\` hold equal contents, so \`==\` is \`True\`. But they are two different lists built at two different moments, so their identities differ and \`is\` is \`False\`.
 
+\`\`\`csdiagram
+{
+  "type": "python-memory",
+  "steps": [
+    {
+      "code": "a = [1, 2, 3]",
+      "names": { "a": "L1" },
+      "objects": { "L1": { "kind": "list", "value": "[1, 2, 3]" } },
+      "note": "One list object exists, and the name a points at it."
+    },
+    {
+      "code": "b = [1, 2, 3]",
+      "names": { "a": "L1", "b": "L2" },
+      "objects": {
+        "L1": { "kind": "list", "value": "[1, 2, 3]" },
+        "L2": { "kind": "list", "value": "[1, 2, 3]" }
+      },
+      "note": "A SECOND list is built. Same contents, different object: a == b is True, a is b is False."
+    },
+    {
+      "code": "c = a",
+      "names": { "a": "L1", "b": "L2", "c": "L1" },
+      "objects": {
+        "L1": { "kind": "list", "value": "[1, 2, 3]" },
+        "L2": { "kind": "list", "value": "[1, 2, 3]" }
+      },
+      "note": "Assignment copies the arrow, never the object. c and a name the same list, so c is a is True."
+    }
+  ],
+  "caption": "== compares what is inside the boxes. is compares which box. b matches a on contents only; c IS a."
+}
+\`\`\`
+
+That is the whole model in one line: \`==\` compares what is inside the boxes, \`is\` compares which box.
+
 ### \`None\` is a singleton, so test it with \`is\`
 
 There is exactly one \`None\` object in a running program. \`NoneType\` never creates a second one. That is why \`value is None\` is the idiomatic and correct test: you are checking against the one true \`None\`, not against something that merely equals it.
