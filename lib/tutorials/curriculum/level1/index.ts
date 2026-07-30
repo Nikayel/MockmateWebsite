@@ -1196,6 +1196,23 @@ Common methods. Most return a new string; \`.split()\` returns a list. None of t
 "aca".replace("a", "b")    # "bcb"   replaces every match, not just the first
 \`\`\`
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["You call", "You get back", "Type"],
+  "rows": [
+    ["'  Hello  '.strip()", "'Hello'", "str"],
+    ["'Hello'.lower()", "'hello'", "str"],
+    ["'a,b,c'.split(',')", "['a', 'b', 'c']", "list of str"],
+    ["','.join(['a', 'b'])", "'a,b'", "str, the inverse of split"],
+    ["'aca'.replace('a', 'b')", "'bcb'", "str, EVERY match, not just the first"],
+    ["'Hello'.find('z')", "-1", "int, and it does not raise"]
+  ],
+  "highlightCols": ["Type"],
+  "caption": "The type column is what decides whether you can keep chaining. split hands back a list, so .strip() cannot follow it directly, and find hands back an int whose -1 miss is easy to mistake for a real index."
+}
+\`\`\`
+
 Because \`.strip()\` and \`.lower()\` each return a string, you can **chain** them left to right. The demo below runs \`messy.strip().lower()\` on \`"  PyThOn  "\`: \`.strip()\` yields \`"PyThOn"\`, then \`.lower()\` turns that into \`"python"\`.
 
 ### f-strings build text from values
