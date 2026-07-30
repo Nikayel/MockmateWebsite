@@ -17,6 +17,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   SignificanceTestCard,
   PredictionAccuracyPanel,
   SampleSizeAnalysisPanel,
@@ -48,6 +58,7 @@ import {
   FileSpreadsheet,
   ChevronDown,
   Users,
+  ShieldAlert,
 } from "lucide-react"
 
 // Helper component for trend indicators
@@ -99,6 +110,12 @@ export default function ResearchDashboard() {
     backfillData,
     migrating,
     backfilling,
+    runAbDryRun,
+    confirmEndAbTest,
+    clearAbDryRun,
+    endingAb,
+    abDryRunResult,
+    abFinalResult,
   } = useResearchData(firebaseUser)
 
   // Enhanced statistical analysis
@@ -147,6 +164,7 @@ export default function ResearchDashboard() {
   const comp = comparison?.comparison
 
   const totalUsers = (distribution?.sm2.total || 0) + (distribution?.fsrs.total || 0)
+  const abEnded = data?.abStatus?.ab_ended === true
 
   return (
     <AdminLayout
@@ -226,19 +244,37 @@ export default function ResearchDashboard() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button
-            onClick={migrateUsers}
-            variant="outline"
-            disabled={migrating}
-            className="border-gray-700 text-gray-300 hover:bg-gray-800"
-          >
-            {migrating ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Database className="mr-2 h-4 w-4" />
-            )}
-            Migrate Users
-          </Button>
+          {/* Random-assignment migration is meaningless once the A/B has ended */}
+          {!abEnded && (
+            <Button
+              onClick={migrateUsers}
+              variant="outline"
+              disabled={migrating}
+              className="border-gray-700 text-gray-300 hover:bg-gray-800"
+            >
+              {migrating ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Database className="mr-2 h-4 w-4" />
+              )}
+              Migrate Users
+            </Button>
+          )}
+          {!abEnded && (
+            <Button
+              onClick={runAbDryRun}
+              variant="outline"
+              disabled={endingAb}
+              className="border-red-800 text-red-400 hover:bg-red-900/20"
+            >
+              {endingAb ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <ShieldAlert className="mr-2 h-4 w-4" />
+              )}
+              End A/B — Switch All to FSRS
+            </Button>
+          )}
           <Button
             onClick={backfillData}
             variant="outline"
@@ -255,6 +291,104 @@ export default function ResearchDashboard() {
         </>
       }
     >
+      {/* End-A/B confirmation: opens once the dry run has counts */}
+      <AlertDialog open={!!abDryRunResult} onOpenChange={(open) => !open && clearAbDryRun()}>
+        <AlertDialogContent className="border-gray-700 bg-gray-900">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-gray-100">
+              End the SM-2/FSRS A/B test?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-gray-400">
+                <p>
+                  This is final: comparison data stops accruing and every new user gets FSRS.
+                  Dry-run results:
+                </p>
+                <ul className="list-inside list-disc space-y-1 text-sm">
+                  <li>
+                    <span className="font-medium text-gray-200">
+                      {abDryRunResult?.usersFlippedToFsrs ?? 0}
+                    </span>{" "}
+                    users will switch to FSRS ({abDryRunResult?.usersAlreadyFsrs ?? 0} already on
+                    it)
+                  </li>
+                  <li>
+                    <span className="font-medium text-gray-200">
+                      {abDryRunResult?.cardsConverted ?? 0}
+                    </span>{" "}
+                    cards will be converted in place (schedules preserved)
+                  </li>
+                  {(abDryRunResult?.usersOverriddenSkipped ?? 0) > 0 && (
+                    <li>
+                      {abDryRunResult?.usersOverriddenSkipped} users chose their algorithm manually
+                      and keep it
+                    </li>
+                  )}
+                  {(abDryRunResult?.errors.length ?? 0) > 0 && (
+                    <li className="text-red-400">
+                      {abDryRunResult?.errors.length} users hit errors in the dry run — inspect
+                      before proceeding
+                    </li>
+                  )}
+                </ul>
+                <p className="text-sm">
+                  Historical A/B research data stays in Firestore for later analysis.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-gray-700 bg-transparent text-gray-300 hover:bg-gray-800">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmEndAbTest}
+              className="bg-red-700 text-white hover:bg-red-600"
+            >
+              End A/B and switch everyone
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* A/B ended banner */}
+      {abEnded && (
+        <Card className="border-emerald-900/60 bg-emerald-950/30">
+          <CardContent className="flex items-center gap-3 py-3">
+            <CheckCircle className="h-5 w-5 shrink-0 text-emerald-400" />
+            <div className="text-sm text-emerald-200">
+              A/B test ended
+              {data?.abStatus?.ended_at
+                ? ` on ${new Date(data.abStatus.ended_at).toLocaleDateString()}`
+                : ""}{" "}
+              — all users are on FSRS. The comparison data below is historical.
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Completion notice for the just-run sweep */}
+      {abFinalResult && (
+        <Card className="border-gray-800 bg-gray-900/50">
+          <CardContent className="py-3 text-sm text-gray-300">
+            Sweep complete: flipped {abFinalResult.usersFlippedToFsrs} users, converted{" "}
+            {abFinalResult.cardsConverted} cards
+            {abFinalResult.usersOverriddenSkipped > 0
+              ? `, ${abFinalResult.usersOverriddenSkipped} overridden users kept their choice`
+              : ""}
+            {abFinalResult.errors.length > 0 ? (
+              <span className="text-red-400">
+                {" "}
+                — {abFinalResult.errors.length} errors (see admin audit log)
+              </span>
+            ) : (
+              ""
+            )}
+            . Re-run the dry run to verify all-zero deltas.
+          </CardContent>
+        </Card>
+      )}
+
       {/* Data Health Summary */}
       <Card className="border-gray-800 bg-gray-900/50">
         <CardContent className="py-3">
