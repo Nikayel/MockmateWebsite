@@ -894,6 +894,25 @@ str(42)       # "42"   number -> text
 
 In a condition, every value is either **truthy** or **falsy**. Memorise the falsy ones: \`False\`, \`None\`, \`0\`, \`0.0\`, \`""\`, \`[]\`, \`{}\`, and \`()\`. Everything else is truthy.
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Falsy value", "Type", "The truthy version"],
+  "rows": [
+    ["False", "bool", "True"],
+    ["None", "NoneType", "there is no truthy None"],
+    ["0", "int", "any non-zero int, including negatives"],
+    ["0.0", "float", "any non-zero float"],
+    ["\"\"", "str", "any string with a character in it, even \" \""],
+    ["[]", "list", "any list with an item, even [0]"],
+    ["{}", "dict", "any dict with a pair"],
+    ["()", "tuple", "any tuple with an item"]
+  ],
+  "highlightCols": ["The truthy version"],
+  "caption": "Every falsy value is empty or zero. Two traps live in the right column: \" \" is a space and therefore truthy, and [0] is a list containing a falsy item and is itself truthy. Emptiness is about the container, never its contents."
+}
+\`\`\`
+
 \`\`\`python
 "yes" if "hello" else "no"   # "yes"   non-empty string is truthy
 "yes" if "" else "no"        # "no"    empty string is falsy
