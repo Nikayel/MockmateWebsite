@@ -193,8 +193,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
     }
 
+    // Editing feedback is a mutation, so it takes the same gate as DELETE below. A truthy-role
+    // check would admit `analyst` (documented read-only) and `support`.
     const role = await getAdminRole(auth.userId)
-    if (!role) {
+    if (!role || !["super_admin", "admin"].includes(role)) {
       return NextResponse.json(
         { success: false, error: "Insufficient permissions" },
         { status: 403 }
