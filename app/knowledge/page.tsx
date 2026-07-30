@@ -18,10 +18,16 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/lib/auth-context"
-import type { CardBelief, ConceptBelief, LearnerModelPayload } from "@/lib/learner-model/types"
+import type {
+  CardBelief,
+  ChallengeReason,
+  ConceptBelief,
+  LearnerModelPayload,
+} from "@/lib/learner-model/types"
 import { ConceptCard } from "./_components/ConceptCard"
 import { BlackBoxNotice } from "./_components/BlackBoxNotice"
 import { EvidenceList, type EvidenceRowView } from "./_components/EvidenceList"
+import { ChallengeDialog } from "./_components/ChallengeDialog"
 
 interface ModelResponse {
   enabled: boolean
@@ -37,6 +43,7 @@ export default function KnowledgePage() {
   const [error, setError] = useState<string | null>(null)
   const [isPro, setIsPro] = useState<boolean | null>(null)
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
+  const [challengeCard, setChallengeCard] = useState<CardBelief | null>(null)
   const [evidence, setEvidence] = useState<EvidenceRowView[]>([])
   const [evidenceLoading, setEvidenceLoading] = useState(false)
   const [evidenceError, setEvidenceError] = useState<string | null>(null)
@@ -165,6 +172,27 @@ export default function KnowledgePage() {
     <EvidenceList loading={evidenceLoading} error={evidenceError} rows={evidence} />
   )
 
+  /** POST the challenge; on success re-fetch the model so the correction shows. */
+  const submitChallenge = useCallback(
+    async (problemId: string, reason: ChallengeReason, details?: string) => {
+      const token = await getAuthToken()
+      if (!token) throw new Error("Not signed in")
+      const res = await fetch("/api/learner-model/challenge", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ problem_id: problemId, reason, details }),
+      })
+      if (!res.ok) throw new Error(`Request failed (${res.status})`)
+      const data = await res.json()
+      void fetchModel() // beliefs changed; refresh in the background
+      return data.challenge.correction
+    },
+    [getAuthToken, fetchModel]
+  )
+
   if (!initialized || authLoading || (user && isPro === null)) {
     return (
       <div className="bg-background flex min-h-screen items-center justify-center">
@@ -273,6 +301,7 @@ export default function KnowledgePage() {
                   key={concept.pattern}
                   concept={concept}
                   challengesEnabled={model.challenges_enabled}
+                  onChallenge={model.challenges_enabled ? setChallengeCard : undefined}
                   onExpand={handleConceptExpand}
                   onExpandEvidence={blackBox ? undefined : handleExpandEvidence}
                   expandedCardId={expandedCardId}
@@ -288,6 +317,7 @@ export default function KnowledgePage() {
                       key={concept.pattern}
                       concept={concept}
                       challengesEnabled={model.challenges_enabled}
+                      onChallenge={model.challenges_enabled ? setChallengeCard : undefined}
                       onExpand={handleConceptExpand}
                       onExpandEvidence={blackBox ? undefined : handleExpandEvidence}
                       expandedCardId={expandedCardId}
@@ -296,6 +326,12 @@ export default function KnowledgePage() {
                   ))}
                 </>
               )}
+
+              <ChallengeDialog
+                card={challengeCard}
+                onClose={() => setChallengeCard(null)}
+                submitChallenge={submitChallenge}
+              />
             </div>
           )}
         </div>
