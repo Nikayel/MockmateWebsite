@@ -1851,6 +1851,23 @@ print(Point(1, 2) == Point(1, 2))   # True
 
 The generated \`__eq__\` compares instances field by field, which is exactly what the Apply exercise leans on: two points built from the same coordinates are equal because their \`(x, y)\` tuples are equal.
 
+Which methods the decorator writes depends on the flags you pass it:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["You write", "Generates", "Instances are"],
+  "rows": [
+    ["@dataclass", "__init__, __repr__, __eq__", "mutable, and NOT hashable"],
+    ["@dataclass(frozen=True)", "the above plus __hash__", "immutable, so usable as dict keys and in sets"],
+    ["@dataclass(order=True)", "the above plus __lt__, __le__, __gt__, __ge__", "sortable, compared field by field"],
+    ["@dataclass(eq=False)", "__init__ and __repr__ only", "compared by identity, like a plain class"]
+  ],
+  "highlightCols": ["Instances are"],
+  "caption": "The first row is the surprise: defining __eq__ sets __hash__ to None, so a plain dataclass cannot go in a set or be a dict key. frozen=True is what gives it back, which is why value objects are usually frozen."
+}
+\`\`\`
+
 ### Type hints describe intent, they do not enforce it
 
 Annotations like \`x: int\` are metadata. Python does not check them at runtime; passing \`Point("a", "b")\` still constructs an object. Their value is for readers and tools like \`mypy\` or your editor, which flag mismatches before you run.
