@@ -2103,6 +2103,22 @@ const loggingErrorsLesson: PythonLevel["modules"][number]["lessons"][number] = {
 
 A logger is a named channel. You grab one per module with \`logging.getLogger(__name__)\` and emit at a level: \`debug\`, \`info\`, \`warning\`, \`error\`, \`critical\`. Where those messages go (console, file, or both) and how verbose they are is configured once, at program start, not at each call site:
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Level", "Use it for", "Visible by default?", "Who reads it"],
+  "rows": [
+    ["debug", "values while tracing a problem", "no", "you, while debugging"],
+    ["info", "normal milestones: job started, 500 rows written", "no", "you, reading yesterday's run"],
+    ["warning", "something odd but survivable: a retry, a fallback", "yes", "whoever is on call"],
+    ["error", "this operation failed", "yes", "whoever is on call"],
+    ["critical", "the process cannot continue", "yes", "whoever gets paged"]
+  ],
+  "highlightCols": ["Visible by default?"],
+  "caption": "The highlighted column is the whole of the vanishing-logs mystery: a fresh logger's effective level is WARNING, so debug and info are discarded silently until basicConfig(level=logging.INFO) lowers the bar. Nothing errors, the lines simply never appear."
+}
+\`\`\`
+
 \`\`\`python
 import logging
 
