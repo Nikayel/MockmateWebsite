@@ -1368,6 +1368,25 @@ Wrapping a list in \`set(...)\` is the idiomatic way to drop duplicates or count
 - \`tuple\`: a small fixed record whose fields will not change.
 - \`set\`: you care about uniqueness or membership, not order or position.
 
+Braces and parentheses are overloaded in Python, and the literal you write is not always the type you get:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["You write", "You get", "Watch out for"],
+  "rows": [
+    ["[1, 2]", "list", "mutable, so it can never go inside a set"],
+    ["(1, 2)", "tuple", "immutable and hashable, so it can"],
+    ["(3)", "the int 3, not a tuple", "a one-element tuple needs the comma: (3,)"],
+    ["{1, 2}", "set", "unordered; my_set[0] raises TypeError"],
+    ["{}", "an empty dict, not a set", "use set() when you want an empty set"],
+    ["{\"a\": 1}", "dict", "braces mean dict the moment a colon appears"]
+  ],
+  "highlightCols": ["You get"],
+  "caption": "Two of these six produce a different type than the shape suggests. Both are ordinary beginner bugs that fail late, because (3) and {} are perfectly valid values and only misbehave once something tries to iterate or add to them."
+}
+\`\`\`
+
 ### Pitfalls
 
 - Empty braces \`{}\` make an empty \`dict\`, not a \`set\`. Use \`set()\` for an empty set.
