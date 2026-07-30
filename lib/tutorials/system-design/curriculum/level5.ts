@@ -2477,10 +2477,33 @@ refute ("I'm alive") before being confirmed dead: sharply cutting false positive
 blips. Membership changes **piggyback on probe messages** and spread infection-style, so the whole
 cluster learns in O(log n) rounds. This is what HashiCorp memberlist (Consul, Serf) implements.
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Scheme", "Messages per interval at n = 500", "Growth per node", "What happens as the cluster grows"],
+  "rows": [
+    ["All-to-all heartbeat", "~250,000: every node pings all 499 others", "O(n²)", "The detector itself becomes the bottleneck"],
+    ["SWIM", "1 direct probe, plus k indirect probes only on a miss", "O(1)", "Flat. Membership piggybacks on probe traffic and spreads in O(log n) rounds"]
+  ],
+  "highlightCols": ["Growth per node"],
+  "caption": "The highlighted column is the whole argument for gossip-based membership: all-to-all heartbeating does not fail at 500 nodes because the messages are expensive, but because the count grows with the square of the cluster."
+}
 \`\`\`
-  all-to-all heartbeat:  n=500 -> ~250,000 msgs/interval  (O(n²))
-  SWIM per node/interval: 1 direct probe + k indirect on miss (O(1))
-  suspect -> (refute window) -> confirm dead, gossiped on probe traffic
+
+And a node that misses a probe is not declared dead, it is declared **suspect**:
+
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "stages": [
+    { "label": "Alive", "note": "answering direct probes" },
+    { "label": "Suspect", "note": "missed a probe; gossiped as suspect, not as dead" },
+    { "label": "Refute window", "note": "the node can answer 'I am alive' and return straight to alive" },
+    { "label": "Confirmed dead", "note": "only after the window closes, gossiped on ordinary probe traffic" }
+  ],
+  "highlight": ["Refute window"],
+  "caption": "The refute window is the cheap accuracy buy. Without it every GC pause and transient blip evicts a healthy node, and the cluster spends its time reacting to its own false positives."
+}
 \`\`\`
 
 **Interview nuance:** the tell of a weak answer is tuning a single timeout as if slow and dead were
