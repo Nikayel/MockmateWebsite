@@ -29,6 +29,15 @@ export const FLAGS = {
   // pack runtime yet, so the state-scoped prompt block stays dormant until the post-launch
   // wire work. Flip via FEATURE_FLAG_PACK_INTERVIEWER=true only once a client is wired.
   PACK_INTERVIEWER: false,
+
+  // Open learner model ("What CodeSparring Thinks You Know") — /knowledge page +
+  // challenge/correct APIs. Kill switch: FEATURE_FLAG_OPEN_LEARNER_MODEL=false.
+  OPEN_LEARNER_MODEL: true,
+
+  // Study-control condition: when ON for a user, the learner model page lists
+  // concepts but masks every number/forecast and disables challenges. Assign a
+  // deterministic cohort via FEATURE_FLAG_LEARNER_MODEL_BLACK_BOX_PCT.
+  LEARNER_MODEL_BLACK_BOX: false,
 } as const
 
 export type FlagName = keyof typeof FLAGS
