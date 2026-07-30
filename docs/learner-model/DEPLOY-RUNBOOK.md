@@ -17,7 +17,15 @@ Wait for the indexes to finish building (Firebase console) before flipping traff
 
 ## 2. Deploy the Vercel app
 
-Standard deploy. No firestore.rules changes in this feature (all new collections are Admin-SDK-only, default-deny for clients). Standing order: app deploys before any rules deploys.
+Standard deploy.
+
+## 2b. Deploy Firestore rules (AFTER the app)
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+This feature **does** change `firestore.rules`: it adds explicit server-only deny blocks for `learner_model_challenges`, `learner_model_events`, `problem_mastery`, `algorithm_research_*`, and `research_config`. These were already closed by the catch-all default-deny, so the change is **defense-in-depth and auditability, not a behavior change** — nothing breaks if this step lags. Per the standing deploy order, rules go out after the app.
 
 ## 3. End the A/B (one-time admin action)
 
@@ -36,7 +44,15 @@ Safety nets: `getUserAlgorithm` self-heals any missed non-overridden sm2 user to
 - Kill switch: `FEATURE_FLAG_OPEN_LEARNER_MODEL=false` disables `/knowledge` + all learner-model APIs (page shows a friendly disabled state).
 - Study control: `FEATURE_FLAG_LEARNER_MODEL_BLACK_BOX=true` (all users) or `FEATURE_FLAG_LEARNER_MODEL_BLACK_BOX_PCT=50` (deterministic half).
 
-## 5. Manual smoke (Pro account with review history)
+## 5. Pre-flight: run the integration suite locally
+
+```bash
+pnpm test:integration
+```
+
+Boots a real Firestore emulator and exercises the migration (dry-run/real/idempotent/paged) and the full challenge → FSRS replay → verification chain against actual documents. Run this before any production migration — it is the closest thing to a rehearsal of step 3.
+
+## 6. Manual smoke (Pro account with review history)
 
 1. `/knowledge` from the nav: concepts grouped (SD under "Systems"), belief sentences render, expand a card → evidence rows.
 2. Challenge a low-scoring card as "typo" → dialog shows stability before → after and the verification date; Firestore challenge doc has `correction.amendment_source`.
