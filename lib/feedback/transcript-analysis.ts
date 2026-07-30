@@ -22,30 +22,8 @@ import type { ExtractedEvidence } from "./structured-extraction"
 // TYPES
 // =============================================================================
 
-export interface TranscriptMessage {
-  role: "user" | "interviewer" | "assistant" | "candidate" | "ai_partner"
-  content: string
-  timestamp?: number
-}
-
-export interface ProblemContext {
-  title: string
-  optimalTimeComplexity: string
-  optimalSpaceComplexity: string
-  criticalEdgeCases: string[]
-  scenarioType?: string
-}
-
-interface AnalysisResult {
-  silentNotes: SilentNote[]
-  analysisMetadata: {
-    transcriptLength: number
-    candidateMessages: number
-    mistakesDetected: number
-    algorithmicDetections: number
-    semanticDetections: number
-  }
-}
+import type { TranscriptMessage, ProblemContext, AnalysisResult } from "./transcript-analysis-types"
+export type { TranscriptMessage, ProblemContext, AnalysisResult }
 
 // =============================================================================
 // MAIN ANALYSIS FUNCTION
