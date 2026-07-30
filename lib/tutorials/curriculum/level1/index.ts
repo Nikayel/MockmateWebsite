@@ -2035,6 +2035,22 @@ x in a_dict    # O(1) average: same hashing, keyed lookup
 
 \`O(n)\` means cost grows with size; \`O(1)\` means it stays flat whether the set holds ten items or ten million. That is the instinct to build: when you repeatedly ask "have I seen this?", reach for a set.
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Operation", "list", "set", "dict"],
+  "rows": [
+    ["x in c", "O(n): scans until found", "O(1) average", "O(1) average, over keys"],
+    ["c[i] by position", "O(1)", "not supported", "not supported"],
+    ["c[key] by key", "not supported", "not supported", "O(1) average"],
+    ["Add one item", "O(1) amortised (append)", "O(1) average (add)", "O(1) average"],
+    ["Keeps insertion order", "yes", "no", "yes, since Python 3.7"],
+    ["Accepts unhashable items", "yes", "no", "values yes, keys no"]
+  ],
+  "caption": "Only the first row differs by an order of magnitude, and it is the row that reads identically in source. x in c looks the same for all three, which is exactly why the wrong container hides so well."
+}
+\`\`\`
+
 ### The classic upgrade
 
 The demo below turns a list into a set and compares lengths. \`set(nums)\` drops duplicates, so if the set is shorter than the list, something repeated. That length comparison is the whole idea behind \`has_duplicates\`. When you need the scan itself, grow a \`seen\` set as you go:
