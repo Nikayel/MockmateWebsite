@@ -190,6 +190,23 @@ Level 2's "Vector Databases & Embeddings" lesson introduced embeddings and simil
 
 Exact (flat) search is fine only up to maybe a few hundred thousand vectors, or as a re-ranking step over a small ANN candidate set.
 
+Laid out side by side, the choice is really one question, and it is a budget question:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Index", "Where it lives", "Recall", "Query latency", "Cost at 1B vectors", "Main dial"],
+  "rows": [
+    ["Flat (exact)", "RAM", "perfect", "O(N), unusable at scale", "prohibitive", "none"],
+    ["HNSW", "RAM", "highest", "lowest", "~3 TB raw, plus graph overhead", "ef_search"],
+    ["IVF-PQ", "RAM, quantized", "good", "low", "10 to 50x cheaper than HNSW", "nprobe"],
+    ["DiskANN", "NVMe SSD", "good", "a few ms more", "cheapest per vector", "beam width"]
+  ],
+  "highlightCols": ["Where it lives", "Cost at 1B vectors"],
+  "caption": "Recall and latency differ modestly across the three production families. Where the index lives differs by orders of magnitude in cost, which is why that column, not the recall column, usually decides the answer."
+}
+\`\`\`
+
 ## Filtered and hybrid search
 
 Real queries are "similar vectors WHERE category = docs AND updated_at > X." There are three strategies. Post-filter: run ANN, then drop results failing the predicate. Cheap but broken when the filter is selective, because your top-k might all get filtered out, returning too few results. Pre-filter: compute the allowed id set first, then search only within it. Correct but expensive if the allowed set is huge and the index cannot restrict its walk. Modern stores use filtered-HNSW that pushes the predicate into the graph traversal so it only visits allowed nodes. Interview nuance: the right answer names the pre vs post filter tradeoff and says selective filters need the predicate inside the index, not bolted on after.
