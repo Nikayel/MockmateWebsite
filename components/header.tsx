@@ -10,6 +10,7 @@ import {
   Terminal,
   LogOut,
   Map,
+  Brain,
   GraduationCap,
   Database,
   Network,
@@ -82,6 +83,12 @@ const APP_NAV: AppNavItem[] = [
     href: "/roadmap",
     icon: Map,
     isActive: (pathname) => pathname.startsWith("/roadmap"),
+  },
+  {
+    label: "Knowledge",
+    href: "/knowledge",
+    icon: Brain,
+    isActive: (pathname) => pathname.startsWith("/knowledge"),
   },
 ]
 
