@@ -1884,6 +1884,50 @@ class Cart:
 
 Use \`field(default_factory=list)\` (or \`dict\`, \`set\`) so each instance gets its own container.
 
+### Validating and deriving with \`__post_init__\`
+
+The generated \`__init__\` only assigns fields, so there is no obvious place to check them or to compute
+a value from the others. \`__post_init__\` is that place: the dataclass calls it immediately after the
+constructor finishes.
+
+\`\`\`python
+from dataclasses import dataclass, field
+
+@dataclass
+class Order:
+    unit_price: float
+    quantity: int
+    total: float = field(init=False)     # not a constructor argument
+
+    def __post_init__(self):
+        if self.quantity < 1:
+            raise ValueError("quantity must be at least 1")
+        self.total = self.unit_price * self.quantity
+
+print(Order(2.5, 4))       # Order(unit_price=2.5, quantity=4, total=10.0)
+print(Order(2.5, 0))       # ValueError: quantity must be at least 1
+\`\`\`
+
+Two jobs, both worth naming. **Validation** keeps an invalid object from ever existing, which is far
+easier to reason about than checking validity at each use site. **Derived fields** pair
+\`__post_init__\` with \`field(init=False)\`, so \`total\` is computed rather than passed in and cannot
+drift out of sync with the values it came from.
+
+One trap: under \`frozen=True\` ordinary assignment raises \`FrozenInstanceError\`, so a derived field
+has to be set through the back door:
+
+\`\`\`python
+@dataclass(frozen=True)
+class Doubled:
+    x: int
+    doubled: int = field(init=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "doubled", self.x * 2)   # frozen blocks self.doubled = ...
+
+print(Doubled(21))         # Doubled(x=21, doubled=42)
+\`\`\`
+
 **Interview nuance:** the generated \`__eq__\` compares field values only when the other object is the *same* dataclass type; against anything else it returns \`NotImplemented\`, so \`Point(1, 2) == (1, 2)\` is \`False\`, not \`True\`. Equality here means "same type and same fields," which is why dataclasses are safe to put in a \`set\` or use as dict keys once you add \`frozen=True\` (that also generates \`__hash__\`).`,
     demoCode: `from dataclasses import dataclass
 
