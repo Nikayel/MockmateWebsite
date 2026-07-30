@@ -204,6 +204,23 @@ def total_area(shapes: list[HasArea]) -> float:
 
 This is structural (duck) typing made checkable. A third-party \`Circle\` you cannot subclass still passes \`total_area\` as long as it has an \`area()\` method. Reach for a Protocol to accept things that already fit the shape, especially across library boundaries you do not control.
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Question", "ABC (abc.ABC)", "Protocol (typing.Protocol)"],
+  "rows": [
+    ["How does a class conform?", "By inheriting: class Rectangle(Shape)", "By having the right methods, with no inheritance"],
+    ["Typing style", "Nominal: conformance is declared", "Structural: conformance is observed"],
+    ["Can it accept a third-party class?", "Only if you can edit it to subclass", "Yes, it never needs to know your type exists"],
+    ["Enforced when?", "At instantiation: TypeError on a missing method", "At type-check time; runtime needs @runtime_checkable"],
+    ["Can it ship shared code?", "Yes, concrete helpers live on the base", "No, it is a shape description only"],
+    ["Reach for it when", "You own the hierarchy and want shared behaviour", "You are accepting things that already fit"]
+  ],
+  "highlightCols": ["Question"],
+  "caption": "One question decides it: do you control the classes that must conform? If yes, an ABC also buys you shared code. If they come from a library you do not own, only a Protocol can describe them."
+}
+\`\`\`
+
 ### Pitfalls
 
 - A subclass that forgets even one abstract method stays abstract itself. Remove \`area\` from \`Rectangle\` and \`Rectangle(3, 4)\` raises \`TypeError\`. The failure comes at construction time, not when the class is defined, so a broken subclass can look fine until someone builds one.
