@@ -3281,6 +3281,27 @@ biggest, most active users hit constantly. Report p50, p95, p99, and p99.9, and 
 user number**, because a heavy user who makes 100 requests per page load will almost certainly hit
 your p99 on every single page.
 
+Percentiles are not evenly spaced. The gap from p50 to p90 is usually small, and then the curve turns
+almost vertical:
+
+\`\`\`csdiagram
+{
+  "type": "ladder",
+  "title": "The same endpoint, read at four percentiles",
+  "scale": "log",
+  "bands": [
+    { "label": "p50 (median)", "value": 10, "display": "10 ms", "note": "The typical request. This is the number that makes a dashboard look healthy." },
+    { "label": "p90", "value": 15, "display": "15 ms", "note": "Still flat. Nine in ten users cannot tell the difference from the median." },
+    { "label": "p99", "value": 200, "display": "200 ms", "note": "The cliff. 13x the median, and the number a heavy user hits on nearly every page load." },
+    { "label": "p99.9", "value": 2000, "display": "2 s", "note": "200x the median. Rare per request, constant for your largest accounts." }
+  ],
+  "caption": "A log scale is the honest way to draw this: the tail is not a slightly worse average, it is a different order of magnitude. Reporting the mean (about 30 ms here) describes no real user."
+}
+\`\`\`
+
+That shape is why an SLO is written against a percentile and a threshold together ("p99 under 300 ms")
+rather than against an average. An average can improve while the tail gets worse.
+
 ### Fan-out makes the tail common
 
 Tail latency gets worse, not better, as you scale, because of **fan-out**. If one API request fans
