@@ -2214,6 +2214,25 @@ with open("data.txt") as fh:
 
 \`open\` returns a context manager: the \`with\` statement calls its setup on entry and its cleanup (\`fh.close()\`) on exit. This is the idiom for anything that needs releasing (files, sockets, locks, DB connections). The raw data in these exercises is already handed to you as a string, so you go straight to parsing.
 
+
+The second argument to \`open\` is the mode, and picking the wrong one is how files get erased:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Mode", "If the file exists", "If it does not", "Writes go"],
+  "rows": [
+    ["r (the default)", "opened for reading", "FileNotFoundError", "nowhere; reading only"],
+    ["w", "TRUNCATED to empty immediately", "created", "from the start"],
+    ["a", "opened, contents kept", "created", "always appended to the end"],
+    ["x", "FileExistsError", "created", "from the start"],
+    ["r+", "opened for read and write", "FileNotFoundError", "from the start, overwriting in place"]
+  ],
+  "highlightCols": ["If the file exists"],
+  "caption": "The w row is the one to remember: opening for write destroys the contents before you have written anything, so a crash straight after open still loses the file. Use a when you mean to add, and x when creating something that must not already exist."
+}
+\`\`\`
+
 ### JSON: text to Python objects and back
 
 \`json.loads\` parses a JSON **string** into Python values; \`json.dumps\` serializes back to a string. The type mapping is fixed: JSON object to \`dict\`, array to \`list\`, string to \`str\`, number to \`int\` or \`float\`, \`true\`/\`false\` to \`bool\`, \`null\` to \`None\`.
