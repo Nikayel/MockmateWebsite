@@ -2369,6 +2369,21 @@ sqrt(9)                         # 3.0
 from collections import Counter # a name from the stdlib collections module
 \`\`\`
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Import form", "What lands in your namespace", "How you call it", "Trade-off"],
+  "rows": [
+    ["import math", "the name math", "math.sqrt(9)", "clear origin, slightly longer to type"],
+    ["from math import sqrt", "the name sqrt", "sqrt(9)", "short, but the reader cannot see where it came from"],
+    ["import numpy as np", "the name np", "np.array(...)", "a community alias; only use well-known ones"],
+    ["from math import *", "every public name in math", "sqrt(9)", "avoid: it can silently shadow your own names"]
+  ],
+  "highlightCols": ["What lands in your namespace"],
+  "caption": "Every form binds exactly what the highlighted column says and nothing more. That is why the star import is discouraged: you cannot tell by reading the line which names it just claimed, so a later stdlib addition can quietly shadow a variable of yours."
+}
+\`\`\`
+
 \`import math\` keeps names namespaced (\`math.gcd\`), which is safest. \`from math import sqrt\` copies just \`sqrt\` into your file, which is shorter but risks a name clash. Avoid \`from math import *\`: it dumps every name in and makes it impossible to tell where a function came from.
 
 ### Batteries included: \`Counter\` and \`math\`
