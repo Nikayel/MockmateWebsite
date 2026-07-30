@@ -1,5 +1,6 @@
 import { SCORING } from "@/lib/constants"
 import type { ConversationValidation, ExtendedScoreResult, ScoreResult } from "../types"
+import { assessCommunicationEvidence, isSilentSolution } from "./communication-gate"
 
 /**
  * Apply score floors for correct solutions while preserving interview communication penalties.
@@ -8,7 +9,8 @@ export function applyScoreFloors(
   scores: ScoreResult,
   passRate: number,
   efficiencyScore: number | undefined,
-  aiValidation: ConversationValidation
+  aiValidation: ConversationValidation,
+  candidateMessageCount: number
 ): ExtendedScoreResult {
   const isOptimal = (efficiencyScore || 0) >= 80
   const explainedApproach =
@@ -17,7 +19,18 @@ export function applyScoreFloors(
     aiValidation.approachQuality !== "none" &&
     aiValidation.approachQuality !== "poor"
   const hasGoodComm = aiValidation.communicationScore >= 60 && explainedApproach
-  const isSilentSolution = passRate >= 80 && !explainedApproach
+  // Shared definition, so the "Silent Solution" banner means the same thing here as
+  // on the Edge route. The old local rule (passRate >= 80 && !explainedApproach)
+  // fired on chatty sessions the communication gate never capped, which made the
+  // banner's "your Communication score was capped" claim untrue.
+  const silentSolution = isSilentSolution(
+    assessCommunicationEvidence({
+      candidateMessageCount,
+      approachExplained: aiValidation.approachExplained,
+      complexityDiscussed: aiValidation.complexityDiscussed,
+    }),
+    passRate
+  )
 
   let overall = scores.overall
   let communication = scores.communication
@@ -86,6 +99,6 @@ export function applyScoreFloors(
     codeQuality,
     communication,
     overall,
-    silentSolution: isSilentSolution,
+    silentSolution,
   }
 }

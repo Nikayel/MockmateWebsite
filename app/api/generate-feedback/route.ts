@@ -541,7 +541,8 @@ export async function POST(request: NextRequest) {
       validatedScores,
       passRate,
       efficiencyMetrics?.efficiencyScore,
-      aiValidation
+      aiValidation,
+      preScreen.candidateMessageCount
     )
 
     // ============================================================================

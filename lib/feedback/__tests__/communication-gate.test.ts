@@ -8,10 +8,7 @@
  * scored U70 / PS80 / CQ100 / Comm30 = 74 overall (B-). Silence must gate it.
  */
 import { describe, expect, it } from "vitest"
-import {
-  assessCommunicationEvidence,
-  COMMUNICATION_GATE_CAPS,
-} from "../scoring/communication-gate"
+import { assessCommunicationEvidence, COMMUNICATION_GATE_CAPS } from "../scoring/communication-gate"
 import { calculateInstantScores, type ScoreSignals } from "../score-accumulator"
 import {
   calculateValidatedScores as calculateValidatedScoresEdge,
@@ -180,7 +177,7 @@ describe("Node DSA path gates silent sessions", () => {
       "dsa",
       "def solve(nums):\n    seen = {}\n    for i, n in enumerate(nums):\n        if n in seen:\n            return [seen[n], i]\n        seen[n] = i\n    return []"
     )
-    const floored = applyScoreFloorsNode(scores, 100, 100, validation)
+    const floored = applyScoreFloorsNode(scores, 100, 100, validation, 0)
     const caps = COMMUNICATION_GATE_CAPS.none
     expect(floored.understanding).toBeLessThanOrEqual(caps.understanding)
     expect(floored.problemSolving).toBeLessThanOrEqual(caps.problemSolving)
@@ -209,7 +206,7 @@ describe("Node DSA path gates silent sessions", () => {
       "dsa",
       "def solve(nums):\n    seen = {}\n    for i, n in enumerate(nums):\n        if n in seen:\n            return [seen[n], i]\n        seen[n] = i\n    return []"
     )
-    const floored = applyScoreFloorsNode(scores, 100, 100, validation)
+    const floored = applyScoreFloorsNode(scores, 100, 100, validation, 6)
     expect(floored.understanding).toBeGreaterThanOrEqual(70)
     expect(floored.problemSolving).toBeGreaterThanOrEqual(75)
     expect(floored.overall).toBeGreaterThanOrEqual(78)

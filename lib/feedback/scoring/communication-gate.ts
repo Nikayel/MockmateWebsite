@@ -36,8 +36,15 @@ export function assessCommunicationEvidence(
 ): CommunicationEvidenceLevel {
   const spokeSubstantively = signals.approachExplained || signals.complexityDiscussed
   if (spokeSubstantively) return "adequate"
-  if (signals.candidateMessageCount < 2) return "none"
-  if (signals.candidateMessageCount < 4) return "minimal"
+  // Fail safe on a missing count. Test files are excluded from typecheck, so a
+  // caller can omit it and reach here with undefined; every `undefined < n`
+  // comparison is false, which would fall through to "adequate" and hand a
+  // silent session the most permissive level. Absent evidence is not evidence.
+  const messageCount = Number.isFinite(signals.candidateMessageCount)
+    ? signals.candidateMessageCount
+    : 0
+  if (messageCount < 2) return "none"
+  if (messageCount < 4) return "minimal"
   return "adequate"
 }
 
@@ -64,4 +71,26 @@ export function capOverallForCommunicationEvidence(
 ): number {
   if (level === "adequate") return overall
   return Math.min(overall, COMMUNICATION_GATE_CAPS[level].overall)
+}
+
+/** Pass rate at which working code counts as "solved" for the silent-solution flag. */
+export const SILENT_SOLUTION_MIN_PASS_RATE = 70
+
+/**
+ * The "Silent Solution Detected" flag surfaced to the candidate.
+ *
+ * It is deliberately co-extensive with the gate above actually capping, because
+ * the banner tells the candidate their communication score WAS capped. Any
+ * non-"adequate" level caps; "adequate" does not. Defining the flag any other way
+ * makes the banner claim a penalty that was never applied, or hide one that was.
+ *
+ * This predicate is the single definition. Three had drifted apart before it:
+ * edge-utils used `level === "none" && passRate >= 70` (missed "minimal", where a
+ * cap did fire), score-floors used `passRate >= 80 && !explainedApproach` (fired
+ * on chatty sessions the gate never capped), and score-accumulator used
+ * `passRate >= 70 && !approachExplained && candidateMessageCount < 3`. The same
+ * session could therefore show the banner on one route and not the other.
+ */
+export function isSilentSolution(level: CommunicationEvidenceLevel, passRate: number): boolean {
+  return level !== "adequate" && passRate >= SILENT_SOLUTION_MIN_PASS_RATE
 }

@@ -13,6 +13,7 @@ import {
   assessCommunicationEvidence,
   capSubscoresForCommunicationEvidence,
   capOverallForCommunicationEvidence,
+  isSilentSolution,
 } from "./scoring/communication-gate"
 
 // ============================================================================
@@ -320,7 +321,7 @@ export function calculateValidatedScores(
     codeQuality: Math.round(codeQuality),
     communication: Math.round(communication),
     overall: Math.round(overall),
-    silentSolution: commEvidenceLevel === "none" && passRate >= 70,
+    silentSolution: isSilentSolution(commEvidenceLevel, passRate),
   }
 }
 

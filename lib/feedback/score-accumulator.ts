@@ -15,6 +15,7 @@
 import { SCORING } from "@/lib/constants"
 import {
   assessCommunicationEvidence,
+  isSilentSolution,
   capSubscoresForCommunicationEvidence,
   capOverallForCommunicationEvidence,
 } from "./scoring/communication-gate"
@@ -84,9 +85,17 @@ export function calculateInstantScores(signals: ScoreSignals): AccumulatedScores
   const incompleteSolution = !signals.hasActualLogic && signals.codeLength < 200
   if (incompleteSolution) signalsUsed.push("incomplete")
 
-  // Detect silent solution (solved but didn't explain)
-  const silentSolution =
-    passRate >= 70 && !signals.approachExplained && signals.candidateMessageCount < 3
+  // Communication evidence drives both the silent-solution flag here and the
+  // subscore gate further down, so assess it once.
+  const commEvidenceLevel = assessCommunicationEvidence({
+    candidateMessageCount: signals.candidateMessageCount,
+    approachExplained: signals.approachExplained,
+    complexityDiscussed: signals.complexityDiscussed,
+  })
+
+  // Detect silent solution (solved but didn't explain). Shared predicate so the
+  // instant score agrees with the Edge and Node scorers on when to show the banner.
+  const silentSolution = isSilentSolution(commEvidenceLevel, passRate)
   if (silentSolution) signalsUsed.push("silent")
 
   // Detect AI copying
@@ -217,13 +226,11 @@ export function calculateInstantScores(signals: ScoreSignals): AccumulatedScores
   // evidence (no approach, no complexity, near-zero messages) they cannot be
   // earned from pass rate alone, no matter how clean the code is.
   // ============================================
-  const commEvidenceLevel = assessCommunicationEvidence({
-    candidateMessageCount: signals.candidateMessageCount,
-    approachExplained: signals.approachExplained,
-    complexityDiscussed: signals.complexityDiscussed,
-  })
   if (commEvidenceLevel !== "adequate") {
-    const capped = capSubscoresForCommunicationEvidence({ understanding, problemSolving }, commEvidenceLevel)
+    const capped = capSubscoresForCommunicationEvidence(
+      { understanding, problemSolving },
+      commEvidenceLevel
+    )
     understanding = capped.understanding
     problemSolving = capped.problemSolving
     signalsUsed.push(`commGate:${commEvidenceLevel}`)
