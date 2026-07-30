@@ -66,12 +66,16 @@ export async function recordReviewEvent(params: {
     stability?: number
     predictedRetention: number
     masteryLevel: SpacedRepetitionMasteryLevel
+    /** Serialized FSRSCard before the review (learner-model amendment source). */
+    fsrsCard?: string
   }
   postReviewState: {
     newIntervalDays: number
     newEaseFactor?: number
     newStability?: number
     masteryLevel: SpacedRepetitionMasteryLevel
+    /** Serialized FSRSCard after the review. */
+    fsrsCard?: string
   }
   isEarlyReview: boolean
   isFirstReview: boolean
@@ -102,6 +106,9 @@ export async function recordReviewEvent(params: {
   if (params.preReviewState.stability !== undefined) {
     preReview.stability = params.preReviewState.stability
   }
+  if (params.preReviewState.fsrsCard !== undefined) {
+    preReview.fsrs_card = params.preReviewState.fsrsCard
+  }
 
   // Build post_review object, filtering out undefined values to prevent Firestore errors
   const postReview: Record<string, any> = {
@@ -114,6 +121,9 @@ export async function recordReviewEvent(params: {
   }
   if (params.postReviewState.newStability !== undefined) {
     postReview.new_stability = params.postReviewState.newStability
+  }
+  if (params.postReviewState.fsrsCard !== undefined) {
+    postReview.fsrs_card = params.postReviewState.fsrsCard
   }
 
   const event: AlgorithmResearchEvent = {

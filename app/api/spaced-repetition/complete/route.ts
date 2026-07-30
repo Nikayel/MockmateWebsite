@@ -277,12 +277,16 @@ export async function POST(request: NextRequest) {
             stability: currentState.fsrs_state?.stability,
             predictedRetention,
             masteryLevel: existingMastery.mastery_level as SpacedRepetitionMasteryLevel,
+            // Full pre-review card so a challenge can replay this review with
+            // a corrected rating (learner-model amendment).
+            fsrsCard: currentState.fsrs_state ? JSON.stringify(currentState.fsrs_state) : undefined,
           },
           postReviewState: {
             newIntervalDays: reviewResult.next_interval_days,
             newEaseFactor: reviewResult.ease_factor,
             newStability: reviewResult.fsrs_state?.stability,
             masteryLevel: reviewResult.mastery_level,
+            fsrsCard: reviewResult.fsrs_state ? JSON.stringify(reviewResult.fsrs_state) : undefined,
           },
           isEarlyReview,
           isFirstReview: false,
@@ -339,7 +343,9 @@ export async function POST(request: NextRequest) {
           postReviewState: {
             newIntervalDays: updatedMastery.interval_days,
             newEaseFactor: updatedMastery.ease_factor,
+            newStability: updatedMastery.fsrs_stability,
             masteryLevel: updatedMastery.mastery_level as SpacedRepetitionMasteryLevel,
+            fsrsCard: updatedMastery.fsrs_state,
           },
           isEarlyReview: false,
           isFirstReview: true,

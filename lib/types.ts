@@ -835,6 +835,11 @@ export interface AlgorithmResearchEvent {
     ease_factor?: number // SM-2
     stability?: number // FSRS
     predicted_retention: number
+    // Full serialized FSRSCard BEFORE this review (added for the learner
+    // model's challenge amendment: re-running FSRS from the exact pre-review
+    // state needs difficulty/reps/state, not just stability). Optional —
+    // events written before this field existed lack it.
+    fsrs_card?: string
   }
 
   // Post-review State
@@ -844,6 +849,8 @@ export interface AlgorithmResearchEvent {
     new_stability?: number // FSRS
     mastery_level: SpacedRepetitionMasteryLevel
     mastery_level_changed: boolean
+    /** Full serialized FSRSCard AFTER this review (see pre_review.fsrs_card). */
+    fsrs_card?: string
   }
 
   // Retention Analysis

@@ -180,14 +180,19 @@ export function calculateRetrievability(
 
 /**
  * Main FSRS scheduling function.
+ *
+ * `now` is the review time; it defaults to the wall clock but can be set
+ * explicitly to replay a past review (the learner-model challenge amendment
+ * re-runs a review from its original timestamp with a corrected rating).
  */
 export function scheduleFSRS(
   card: FSRSCard,
   rating: FSRSRating,
-  config: FSRSConfig = DEFAULT_FSRS_CONFIG
+  config: FSRSConfig = DEFAULT_FSRS_CONFIG,
+  now: Date = new Date()
 ): FSRSCard {
   const scheduler = buildScheduler(config)
-  const result = scheduler.next(toTsCard(card), new Date(), toTsRating(rating))
+  const result = scheduler.next(toTsCard(card), now, toTsRating(rating))
   return fromTsCard(result.card)
 }
 
