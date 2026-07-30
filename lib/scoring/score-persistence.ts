@@ -29,9 +29,18 @@ export async function getUserScoreStats(userId: string): Promise<{
   const data = doc.data()
   const totalSessions = data?.totalSessions ?? 0
 
-  const sumOverall = data?.sumOverallScore ?? 0
-  const sumTechnical = data?.sumTechnicalScore ?? sumOverall // Fallback
-  const sumMastery = data?.sumMasteryScore ?? sumOverall // Fallback
+  // The user_stats writer (updateUserStats in lib/session-metrics.ts) stores these
+  // running totals as `totalScore` / `totalTechnicalScore`. This reader asked for
+  // `sumOverallScore` / `sumTechnicalScore` / `sumMasteryScore`, which no code path
+  // has ever written, so every average returned here was 0 and /api/user/metrics
+  // reported zeroed averages for every user. The sum* names are still read first
+  // in case any document carries them.
+  //
+  // Mastery and technical are the same number by design; the writer sets
+  // `technicalScore = summary.masteryScore`.
+  const sumOverall = data?.sumOverallScore ?? data?.totalScore ?? 0
+  const sumTechnical = data?.sumTechnicalScore ?? data?.totalTechnicalScore ?? sumOverall
+  const sumMastery = data?.sumMasteryScore ?? data?.totalTechnicalScore ?? sumTechnical
 
   return {
     totalSessions,
