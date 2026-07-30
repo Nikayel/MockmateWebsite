@@ -2664,41 +2664,23 @@ L7 terminates TLS at the edge so backends speak plain HTTP inside the trusted ne
 for zero-trust); L4 passes TLS straight through, so the backend does the handshake and the LB never
 sees plaintext.
 
-Where TLS ends is the whole difference, and it decides what the balancer is even capable of:
+Where TLS ends is the whole difference, and every other row follows from it:
 
 \`\`\`csdiagram
 {
-  "type": "topology",
-  "title": "Where the TLS connection terminates",
-  "layout": "lr",
-  "nodes": [
-    { "id": "client", "label": "Client", "kind": "client" },
-    { "id": "l7", "label": "L7 LB (ALB, Envoy, Nginx)", "kind": "lb" },
-    { "id": "backend_plain", "label": "Backend speaks plain HTTP", "kind": "service" },
-    { "id": "l4", "label": "L4 LB (NLB, IPVS)", "kind": "lb" },
-    { "id": "backend_tls", "label": "Backend terminates TLS itself", "kind": "service" }
+  "type": "table",
+  "columns": ["Property", "L4 (transport)", "L7 (application)"],
+  "rows": [
+    ["TLS", "passes straight through; the LB never sees plaintext", "terminates at the edge"],
+    ["Can see", "IP and port only", "host, path, headers, cookies, body"],
+    ["Route /api/* to its own pool", "no", "yes"],
+    ["Retries, sticky sessions, header injection", "no", "yes"],
+    ["Cost per request", "minimal; it forwards packets", "real CPU; it parses every request"],
+    ["Protocols", "any TCP or UDP", "HTTP and HTTPS"],
+    ["Examples", "AWS NLB, IPVS", "AWS ALB, Nginx, Envoy, HAProxy"]
   ],
-  "edges": [
-    { "from": "client", "to": "l7", "kind": "sync", "label": "TLS ends here" },
-    { "from": "l7", "to": "backend_plain", "kind": "sync", "label": "decrypted: can route on path, header, cookie" },
-    { "from": "client", "to": "l4", "kind": "sync", "label": "TLS passes straight through" },
-    { "from": "l4", "to": "backend_tls", "kind": "sync", "label": "still encrypted: LB sees only IP and port" }
-  ],
-  "stages": [
-    {
-      "adds": ["client"],
-      "note": "One client, one HTTPS request. The only question is which box decrypts it."
-    },
-    {
-      "adds": ["l7", "backend_plain"],
-      "note": "L7 terminates TLS at the edge. Now it can read the request, so path routing, header routing, retries, and sticky sessions all become possible. It pays CPU per request for that."
-    },
-    {
-      "adds": ["l4", "backend_tls"],
-      "note": "L4 forwards packets without decrypting. It cannot route on /api/* because it never sees the path, but it is fast, cheap per connection, and works for any protocol."
-    }
-  ],
-  "caption": "Every L7 capability follows from decrypting, and every L4 limitation follows from not decrypting. Answer the TLS question and the L4-or-L7 answer falls out of it."
+  "highlightCols": ["Property"],
+  "caption": "Read the first row and the rest is derivable. Every L7 capability follows from decrypting at the edge, and every L4 limitation follows from not decrypting. Answer the TLS question and the L4-or-L7 answer falls out of it."
 }
 \`\`\`
 
@@ -3324,16 +3306,17 @@ almost vertical:
 
 \`\`\`csdiagram
 {
-  "type": "ladder",
-  "title": "The same endpoint, read at four percentiles",
-  "scale": "log",
-  "bands": [
-    { "label": "p50 (median)", "value": 10, "display": "10 ms", "note": "The typical request. This is the number that makes a dashboard look healthy." },
-    { "label": "p90", "value": 15, "display": "15 ms", "note": "Still flat. Nine in ten users cannot tell the difference from the median." },
-    { "label": "p99", "value": 200, "display": "200 ms", "note": "The cliff. 13x the median, and the number a heavy user hits on nearly every page load." },
-    { "label": "p99.9", "value": 2000, "display": "2 s", "note": "200x the median. Rare per request, constant for your largest accounts." }
+  "type": "table",
+  "columns": ["Reading", "Latency", "Multiple of median", "Who feels it"],
+  "rows": [
+    ["p50 (median)", "10 ms", "1x", "The typical request. This is what makes a dashboard look healthy."],
+    ["p90", "15 ms", "1.5x", "Still flat. Nine in ten users cannot tell this from the median."],
+    ["p99", "200 ms", "20x", "The cliff. A user making 100 requests per page hits this on nearly every page load."],
+    ["p99.9", "2 s", "200x", "Rare per request, constant for your largest and most active accounts."],
+    ["mean", "30 ms", "3x", "Nobody. No real request took 30 ms."]
   ],
-  "caption": "A log scale is the honest way to draw this: the tail is not a slightly worse average, it is a different order of magnitude. Reporting the mean (about 30 ms here) describes no real user."
+  "highlightCols": ["Multiple of median"],
+  "caption": "The tail is not a slightly worse average, it is a different order of magnitude. The mean row is the point of the lesson: it sits between p50 and p99 and describes neither."
 }
 \`\`\`
 
