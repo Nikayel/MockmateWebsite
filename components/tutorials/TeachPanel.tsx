@@ -1,9 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { ArrowRight } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { ArrowDown, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
+import { segmentTeachMarkdown, teachSegmentStorageKey } from "@/lib/tutorials/teach-segments"
+import { usePersistentState } from "./usePersistentState"
 import { isSqlRuntimeWarm, runSqlInWorker } from "@/lib/workspace-execution"
 import { ColdStartNote } from "./ColdStartNote"
 import { ReadOnlyCodeBlock } from "./ReadOnlyCodeBlock"
@@ -24,6 +26,15 @@ export interface TeachPanelProps {
   continueLabel?: string
   /** Syntax-highlighting language for the demo block. Defaults to "python" (Python call sites unchanged). */
   demoLanguage?: string
+  /**
+   * Opt in to progressive disclosure, the same pacing the System Design player uses.
+   * When set, a teach over ~500 words arrives as 2-4 segments revealed one Continue at
+   * a time, with the position persisted per lesson. Omit it and the panel renders
+   * exactly as before, so call sites that have not opted in are unaffected.
+   */
+  lessonId?: string
+  /** A completed teach renders fully revealed: revisits must never re-gate. */
+  teachCompleted?: boolean
 }
 
 type DemoStatus = "running" | "done" | "error"
@@ -33,9 +44,44 @@ export function TeachPanel({
   onContinue,
   continueLabel = "I've got it — let me try",
   demoLanguage = "python",
+  lessonId,
+  teachCompleted = false,
 }: TeachPanelProps) {
   const { demoCode, demoSeedSql, showDemoInput } = teach
   const canRunDemo = demoLanguage === "sql" && !!demoCode && !!demoSeedSql
+
+  // One segment unless the caller opted in AND the teach is long enough to warrant
+  // pacing, so short lessons and non-opted-in callers keep the original single render.
+  const segments = useMemo(
+    () => (lessonId ? segmentTeachMarkdown(teach.markdown) : [teach.markdown]),
+    [lessonId, teach.markdown]
+  )
+
+  const [revealedRaw, setRevealedRaw] = usePersistentState(
+    teachSegmentStorageKey(lessonId ?? "unsegmented"),
+    "1"
+  )
+  const storedRevealed = Number.parseInt(revealedRaw, 10)
+  const revealed = teachCompleted
+    ? segments.length
+    : Math.min(Math.max(Number.isNaN(storedRevealed) ? 1 : storedRevealed, 1), segments.length)
+  const allRevealed = revealed >= segments.length
+
+  // Focus the newly revealed segment ONLY after a click, never on a hydration restore,
+  // so keyboard users land on the fresh chunk without focus being stolen on page load.
+  const [focusTarget, setFocusTarget] = useState<number | null>(null)
+  const segmentRefs = useRef<Array<HTMLDivElement | null>>([])
+  useEffect(() => {
+    if (focusTarget === null) return
+    segmentRefs.current[focusTarget]?.focus()
+    setFocusTarget(null)
+  }, [focusTarget])
+
+  const revealNext = () => {
+    const next = Math.min(revealed + 1, segments.length)
+    setRevealedRaw(String(next))
+    setFocusTarget(next - 1)
+  }
 
   const [status, setStatus] = useState<DemoStatus>("running")
   const [output, setOutput] = useState<SqlResultSet | null>(null)
@@ -72,15 +118,24 @@ export function TeachPanel({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="prose prose-sm dark:prose-invert max-w-none">
-        <MarkdownRenderer content={teach.markdown} />
-      </div>
+      {segments.slice(0, revealed).map((segment, i) => (
+        <div
+          key={i}
+          ref={(el) => {
+            segmentRefs.current[i] = el
+          }}
+          tabIndex={-1}
+          className="prose prose-sm dark:prose-invert max-w-none outline-none"
+        >
+          <MarkdownRenderer content={segment} />
+        </div>
+      ))}
 
-      {canRunDemo && showDemoInput && (
+      {canRunDemo && allRevealed && showDemoInput && (
         <SqlDataPreview seedSql={demoSeedSql} title="Tables in this example" />
       )}
 
-      {demoCode && (
+      {demoCode && allRevealed && (
         <ReadOnlyCodeBlock
           code={demoCode}
           language={demoLanguage}
@@ -88,7 +143,7 @@ export function TeachPanel({
         />
       )}
 
-      {canRunDemo && (
+      {canRunDemo && allRevealed && (
         <div className="flex flex-col gap-1.5">
           {status === "running" &&
             (warming ? (
@@ -107,12 +162,24 @@ export function TeachPanel({
         </div>
       )}
 
-      <div>
-        <Button onClick={onContinue} className="gap-2">
-          {continueLabel}
-          <ArrowRight className="h-4 w-4" />
-        </Button>
-      </div>
+      {allRevealed ? (
+        <div>
+          <Button onClick={onContinue} className="gap-2">
+            {continueLabel}
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3">
+          <Button onClick={revealNext} variant="outline" className="gap-2">
+            Continue
+            <ArrowDown className="h-4 w-4" />
+          </Button>
+          <span className="text-muted-foreground text-xs">
+            Part {revealed} of {segments.length}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

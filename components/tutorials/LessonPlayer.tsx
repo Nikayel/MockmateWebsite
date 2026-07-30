@@ -273,7 +273,9 @@ export function LessonPlayer({ lesson, level, nav, onSectionComplete }: LessonPl
 
               {!isLoading && active === "teach" && (
                 <TeachPanel
+                  lessonId={lesson.id}
                   teach={lesson.teach}
+                  teachCompleted={sections.teach === "completed"}
                   onContinue={() => {
                     markComplete("teach")
                     goToSection("apply")
