@@ -313,10 +313,21 @@ else:
 
 Each comparison evaluates to \`True\` or \`False\`:
 
-\`\`\`text
-==  equal        !=  not equal
-<   less than    >   greater than
-<=  at most      >=  at least
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["You type", "It means", "A true example"],
+  "rows": [
+    ["==", "equal to", "3 == 3"],
+    ["!=", "not equal to (≠)", "3 != 4"],
+    ["<", "less than", "2 < 3"],
+    [">", "greater than", "4 > 3"],
+    ["<=", "at most (≤)", "3 <= 3"],
+    [">=", "at least (≥)", "3 >= 3"]
+  ],
+  "highlightCols": ["You type"],
+  "caption": "The first column is what you type; the symbols in the middle are what the operators mean in ordinary maths notation. Note the last two are true for EQUAL values as well, which is the difference between at most and less than."
+}
 \`\`\`
 
 Use \`==\` to compare and a single \`=\` to assign. Swapping them is a classic bug. Python also allows chained comparisons, so \`0 < x < 10\` means "x is between 0 and 10" and reads exactly like math.
