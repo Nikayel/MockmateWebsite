@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
+import { useAuthedFetch } from "@/lib/hooks/useAuthedFetch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -47,6 +48,7 @@ export function LearningRecommendations({
   onSelectProblem,
 }: LearningRecommendationsProps) {
   const { firebaseUser } = useAuth()
+  const { send } = useAuthedFetch()
   const [learningPath, setLearningPath] = useState<LearningStep[]>([])
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [message, setMessage] = useState<string>("")
@@ -61,39 +63,38 @@ export function LearningRecommendations({
       setError(null)
 
       try {
-        const token = await firebaseUser.getIdToken()
-        const response = await fetch("/api/rag", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            action: "get-learning-path",
-            userId,
-            targetSkills: currentProblemType ? [currentProblemType] : [],
-          }),
+        const result = await send<{
+          learningPath?: LearningStep[]
+          profile?: UserProfile | null
+          message?: string
+        }>("/api/rag", "POST", {
+          action: "get-learning-path",
+          userId,
+          targetSkills: currentProblemType ? [currentProblemType] : [],
         })
 
-        if (!response.ok) {
-          const data = await response.json().catch(() => null)
-          throw new Error(data?.error || "Failed to fetch recommendations")
+        if (!result.ok) {
+          // An expired token has already been retried with a fresh one; if it is
+          // still rejected the session is genuinely gone, so say so rather than
+          // showing the generic failure.
+          setError(
+            result.needsReauth
+              ? "Your session expired. Sign in again to see recommendations."
+              : "Unable to load recommendations"
+          )
+          return
         }
 
-        const data = await response.json()
-        setLearningPath(data.learningPath || [])
-        setProfile(data.profile || null)
-        setMessage(data.message || "")
-      } catch (err) {
-        console.error("Error fetching learning recommendations:", err)
-        setError("Unable to load recommendations")
+        setLearningPath(result.data?.learningPath || [])
+        setProfile(result.data?.profile || null)
+        setMessage(result.data?.message || "")
       } finally {
         setLoading(false)
       }
     }
 
     fetchRecommendations()
-  }, [userId, currentProblemType, firebaseUser])
+  }, [userId, currentProblemType, firebaseUser, send])
 
   const getTrendIcon = (trend?: string) => {
     switch (trend) {
