@@ -139,6 +139,9 @@ export const AUDIT_ACTIONS = {
 
   // Algorithm research
   END_AB_SWITCH_FSRS: "end_ab_switch_fsrs",
+
+  // Open learner model (co-regulation study)
+  VIEW_LEARNER_MODEL_STATS: "view_learner_model_stats",
 } as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS]
