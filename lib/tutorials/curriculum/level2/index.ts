@@ -2596,7 +2596,9 @@ When you tally, group, or queue, a plain \`dict\` or \`list\` works, but it forc
   "highlightCols": ["What the upgrade removes"],
   "caption": "The first two remove boilerplate that hides bugs. The third removes an actual complexity class: list.pop(0) shifts every remaining element, so a queue built on a list is O(n²) overall while the same loop on a deque is O(n)."
 }
-\`\`\` In interviews and in real data pipelines, reaching for the right one signals you know the standard library, and it usually cuts genuine complexity, not just line count.
+\`\`\`
+
+In interviews and in real data pipelines, reaching for the right one signals you know the standard library, and it usually cuts genuine complexity, not just line count.
 
 ### \`Counter\`: build on the intro
 

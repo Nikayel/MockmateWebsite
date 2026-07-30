@@ -920,13 +920,13 @@ In a condition, every value is either **truthy** or **falsy**. Memorise the fals
     ["None", "NoneType", "there is no truthy None"],
     ["0", "int", "any non-zero int, including negatives"],
     ["0.0", "float", "any non-zero float"],
-    ["\"\"", "str", "any string with a character in it, even \" \""],
+    ["'' (empty string)", "str", "any string with a character in it, even a single space"],
     ["[]", "list", "any list with an item, even [0]"],
     ["{}", "dict", "any dict with a pair"],
     ["()", "tuple", "any tuple with an item"]
   ],
   "highlightCols": ["The truthy version"],
-  "caption": "Every falsy value is empty or zero. Two traps live in the right column: \" \" is a space and therefore truthy, and [0] is a list containing a falsy item and is itself truthy. Emptiness is about the container, never its contents."
+  "caption": "Every falsy value is empty or zero. Two traps live in the right column: a single space is a non-empty string and therefore truthy, and [0] is a list containing a falsy item and is itself truthy. Emptiness is about the container, never its contents."
 }
 \`\`\`
 
@@ -1416,7 +1416,7 @@ Braces and parentheses are overloaded in Python, and the literal you write is no
     ["(3)", "the int 3, not a tuple", "a one-element tuple needs the comma: (3,)"],
     ["{1, 2}", "set", "unordered; my_set[0] raises TypeError"],
     ["{}", "an empty dict, not a set", "use set() when you want an empty set"],
-    ["{\"a\": 1}", "dict", "braces mean dict the moment a colon appears"]
+    ["{a: 1} with real quotes on the key", "dict", "braces mean dict the moment a colon appears"]
   ],
   "highlightCols": ["You get"],
   "caption": "Two of these six produce a different type than the shape suggests. Both are ordinary beginner bugs that fail late, because (3) and {} are perfectly valid values and only misbehave once something tries to iterate or add to them."
