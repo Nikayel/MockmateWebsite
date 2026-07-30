@@ -539,6 +539,20 @@ Half of real Python data code is "sort these records by the right field," "trans
 
 In Python a function is an ordinary value, like an \`int\` or a \`list\`. You can store it in a variable, put it in a list, and pass it into another function to call later. A function that takes or returns a function is a **higher-order function**. \`sorted\`, \`map\`, and \`filter\` are all higher-order: they do the looping, you supply the rule.
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Tool", "What your function returns", "What comes back", "Length of the result"],
+  "rows": [
+    ["sorted(xs, key=f)", "a sort key for one item", "a new list", "same as the input"],
+    ["map(f, xs)", "the replacement for one item", "a lazy iterator", "same as the input"],
+    ["filter(f, xs)", "True to keep, False to drop", "a lazy iterator", "same or shorter"]
+  ],
+  "highlightCols": ["What your function returns"],
+  "caption": "All three take a rule and do the looping, and the highlighted column is what distinguishes them: sorted wants a key, map wants a replacement, filter wants a verdict. Mixing them up is why filter(lambda x: x * 2, xs) silently keeps everything, since every non-zero number is truthy."
+}
+\`\`\`
+
 ### Lambdas: a rule with no name
 
 A \`lambda\` is a one-expression function you write inline, without a \`def\` and without a name:
