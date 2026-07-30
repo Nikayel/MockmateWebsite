@@ -18,9 +18,10 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/lib/auth-context"
-import type { ConceptBelief, LearnerModelPayload } from "@/lib/learner-model/types"
+import type { CardBelief, ConceptBelief, LearnerModelPayload } from "@/lib/learner-model/types"
 import { ConceptCard } from "./_components/ConceptCard"
 import { BlackBoxNotice } from "./_components/BlackBoxNotice"
+import { EvidenceList, type EvidenceRowView } from "./_components/EvidenceList"
 
 interface ModelResponse {
   enabled: boolean
@@ -35,6 +36,10 @@ export default function KnowledgePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isPro, setIsPro] = useState<boolean | null>(null)
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
+  const [evidence, setEvidence] = useState<EvidenceRowView[]>([])
+  const [evidenceLoading, setEvidenceLoading] = useState(false)
+  const [evidenceError, setEvidenceError] = useState<string | null>(null)
 
   const getAuthToken = useCallback(async () => {
     const { auth } = await import("@/lib/firebase")
@@ -123,6 +128,41 @@ export default function KnowledgePage() {
       })
     },
     [reportEvent]
+  )
+
+  /** Toggle a card's evidence panel; lazily fetch its review history. */
+  const handleExpandEvidence = useCallback(
+    async (card: CardBelief) => {
+      if (expandedCardId === card.problem_id) {
+        setExpandedCardId(null)
+        return
+      }
+      setExpandedCardId(card.problem_id)
+      setEvidence([])
+      setEvidenceError(null)
+      setEvidenceLoading(true)
+      void reportEvent("olm_card_evidence_viewed", { problem_id: card.problem_id })
+      try {
+        const token = await getAuthToken()
+        if (!token) return
+        const res = await fetch(
+          `/api/learner-model/history?problem_id=${encodeURIComponent(card.problem_id)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        if (!res.ok) throw new Error(`Request failed (${res.status})`)
+        const data = await res.json()
+        setEvidence(data.evidence ?? [])
+      } catch {
+        setEvidenceError("Couldn't load the review history for this problem.")
+      } finally {
+        setEvidenceLoading(false)
+      }
+    },
+    [expandedCardId, getAuthToken, reportEvent]
+  )
+
+  const evidenceSlot = (
+    <EvidenceList loading={evidenceLoading} error={evidenceError} rows={evidence} />
   )
 
   if (!initialized || authLoading || (user && isPro === null)) {
@@ -234,6 +274,9 @@ export default function KnowledgePage() {
                   concept={concept}
                   challengesEnabled={model.challenges_enabled}
                   onExpand={handleConceptExpand}
+                  onExpandEvidence={blackBox ? undefined : handleExpandEvidence}
+                  expandedCardId={expandedCardId}
+                  evidenceSlot={evidenceSlot}
                 />
               ))}
 
@@ -246,6 +289,9 @@ export default function KnowledgePage() {
                       concept={concept}
                       challengesEnabled={model.challenges_enabled}
                       onExpand={handleConceptExpand}
+                      onExpandEvidence={blackBox ? undefined : handleExpandEvidence}
+                      expandedCardId={expandedCardId}
+                      evidenceSlot={evidenceSlot}
                     />
                   ))}
                 </>
