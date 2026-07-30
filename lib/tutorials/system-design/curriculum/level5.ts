@@ -989,10 +989,18 @@ higher timestamp, giving Spanner **external consistency (linearizability) global
 couple of milliseconds of added commit latency on every write, plus GPS and atomic clocks in every
 datacenter.
 
-\`\`\`
-LWW wall clock: highest ts wins  ->  under skew, older write can win -> DATA LOSS
-HLC:  physical(~NTP) + logical counter  ->  causal + monotonic, no special HW
-TrueTime: [earliest, latest] + commit-wait epsilon -> external consistency, needs GPS/atomic clocks
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Approach", "How it orders writes", "What it guarantees", "What it costs"],
+  "rows": [
+    ["LWW on wall clock", "highest timestamp wins", "Nothing under skew: an older write can beat a newer one", "Silent data loss, with no error to alert on"],
+    ["HLC", "physical time (NTP) plus a logical counter", "Causal and monotonic ordering", "No special hardware"],
+    ["TrueTime", "an [earliest, latest] interval plus commit-wait ε", "External consistency, that is, global linearizability", "GPS and atomic clocks in every datacenter, plus a few ms on every commit"]
+  ],
+  "highlightCols": ["What it guarantees"],
+  "caption": "The middle row is why HLC is the default answer: it buys real causal ordering for the price of a counter. The top row is the one to name as a hazard, because its failure mode is silent."
+}
 \`\`\`
 
 **Interview nuance:** the choice is HLC versus TrueTime, and it is a hardware-versus-guarantee trade.
