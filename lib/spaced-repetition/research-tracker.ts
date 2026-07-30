@@ -18,6 +18,7 @@ import type {
   AlgorithmCohortStats,
 } from "../types"
 import { getUserAlgorithm } from "./algorithm-router"
+import { clampPracticeMinutesValue } from "../session-duration"
 
 // ============================================
 // Helper Functions
@@ -85,6 +86,15 @@ export async function recordReviewEvent(params: {
   const now = new Date()
   const dateStr = getDateString(now)
 
+  // timeSpentMinutes originates from a client-side elapsed timer and arrives as
+  // request input, so it is untrusted and unbounded. It is accumulated below with
+  // FieldValue.increment into total_time_spent_minutes and total_review_time_minutes,
+  // which admin/research surfaces render as lifetime hours. Without a ceiling a
+  // single left-open tab inflates those totals permanently, the same failure the
+  // started_at/completed_at path already guards against. Clamp once here so every
+  // downstream accumulator in this function inherits the bounded value.
+  const timeSpentMinutes = clampPracticeMinutesValue(params.timeSpentMinutes)
+
   // Create the research event
   const eventId = `${params.userId}_${params.problemId}_${now.getTime()}`
   const masteryChanged = params.preReviewState.masteryLevel !== params.postReviewState.masteryLevel
@@ -138,7 +148,7 @@ export async function recordReviewEvent(params: {
     score: params.score,
     mastery_score: params.masteryScore,
     quality_rating: params.qualityRating,
-    time_spent_minutes: params.timeSpentMinutes,
+    time_spent_minutes: timeSpentMinutes,
     hints_used: params.hintsUsed,
     pre_review: preReview as any,
     post_review: postReview as any,
@@ -156,7 +166,7 @@ export async function recordReviewEvent(params: {
   await updateDailyMetrics(params.userId, algorithm, dateStr, {
     score: params.score,
     qualityRating: params.qualityRating,
-    timeSpentMinutes: params.timeSpentMinutes,
+    timeSpentMinutes: timeSpentMinutes,
     hintsUsed: params.hintsUsed,
     difficulty: params.difficulty,
     intervalScheduled: params.postReviewState.newIntervalDays,
@@ -173,7 +183,7 @@ export async function recordReviewEvent(params: {
   // Update user summary
   await updateResearchSummary(params.userId, algorithm, {
     score: params.score,
-    timeSpentMinutes: params.timeSpentMinutes,
+    timeSpentMinutes: timeSpentMinutes,
     retained: actualRetention,
     lapsed: params.score < 40,
     intervalScheduled: params.postReviewState.newIntervalDays,

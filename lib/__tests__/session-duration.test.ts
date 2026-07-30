@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest"
 import {
   clampPracticeMinutes,
+  clampPracticeMinutesValue,
+  clampPracticeMinutesFromSeconds,
   isTruncatedDuration,
   MAX_SESSION_PRACTICE_MINUTES,
 } from "../session-duration"
@@ -101,5 +103,80 @@ describe("isTruncatedDuration", () => {
   it("is false for degenerate input, so no '+' is shown on an unknown duration", () => {
     expect(isTruncatedDuration(null, after(30))).toBe(false)
     expect(isTruncatedDuration(after(30), START)).toBe(false)
+  })
+})
+
+/**
+ * The client-timer path. `timeSpentMinutes` comes from the interview workspace's
+ * elapsed timer and reaches the server as request input, then gets accumulated
+ * with FieldValue.increment into lifetime totals that admin/research renders as
+ * hours. It never touches started_at/completed_at, so it needs its own ceiling.
+ */
+describe("clampPracticeMinutesValue", () => {
+  it("passes an ordinary session through unchanged", () => {
+    expect(clampPracticeMinutesValue(42)).toBe(42)
+  })
+
+  it("truncates a left-open tab at the ceiling", () => {
+    expect(clampPracticeMinutesValue(60 * 26)).toBe(MAX_SESSION_PRACTICE_MINUTES)
+  })
+
+  it("allows exactly the ceiling", () => {
+    expect(clampPracticeMinutesValue(MAX_SESSION_PRACTICE_MINUTES)).toBe(
+      MAX_SESSION_PRACTICE_MINUTES
+    )
+  })
+
+  it("collapses values that would corrupt a running total", () => {
+    // A negative would subtract from a lifetime total via FieldValue.increment.
+    expect(clampPracticeMinutesValue(-30)).toBe(0)
+    expect(clampPracticeMinutesValue(0)).toBe(0)
+    expect(clampPracticeMinutesValue(Number.NaN)).toBe(0)
+    expect(clampPracticeMinutesValue(Number.POSITIVE_INFINITY)).toBe(0)
+  })
+
+  it("rejects non-numbers a client could send in a JSON body", () => {
+    expect(clampPracticeMinutesValue("90" as unknown)).toBe(0)
+    expect(clampPracticeMinutesValue(null)).toBe(0)
+    expect(clampPracticeMinutesValue(undefined)).toBe(0)
+    expect(clampPracticeMinutesValue({} as unknown)).toBe(0)
+  })
+
+  it("returns whole minutes", () => {
+    expect(clampPracticeMinutesValue(12.4)).toBe(12)
+    expect(clampPracticeMinutesValue(12.6)).toBe(13)
+  })
+
+  it("is always finite and within [0, MAX]", () => {
+    const inputs = [-1e9, -1, 0, 0.4, 1, 44, 90, 91, 1e9, Number.NaN, Number.POSITIVE_INFINITY]
+    for (const input of inputs) {
+      const result = clampPracticeMinutesValue(input)
+      expect(Number.isFinite(result)).toBe(true)
+      expect(result).toBeGreaterThanOrEqual(0)
+      expect(result).toBeLessThanOrEqual(MAX_SESSION_PRACTICE_MINUTES)
+    }
+  })
+})
+
+describe("clampPracticeMinutesFromSeconds", () => {
+  it("converts an elapsed timer to minutes", () => {
+    expect(clampPracticeMinutesFromSeconds(1800)).toBe(30)
+  })
+
+  it("truncates an overnight timer at the ceiling", () => {
+    expect(clampPracticeMinutesFromSeconds(60 * 60 * 14)).toBe(MAX_SESSION_PRACTICE_MINUTES)
+  })
+
+  it("collapses degenerate input", () => {
+    expect(clampPracticeMinutesFromSeconds(-60)).toBe(0)
+    expect(clampPracticeMinutesFromSeconds(Number.NaN)).toBe(0)
+    expect(clampPracticeMinutesFromSeconds(undefined)).toBe(0)
+  })
+
+  it("agrees with the timestamp path for the same elapsed time", () => {
+    const minutes = 37
+    expect(clampPracticeMinutesFromSeconds(minutes * 60)).toBe(
+      clampPracticeMinutes(START, after(minutes))
+    )
   })
 })

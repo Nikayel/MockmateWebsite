@@ -62,6 +62,30 @@ export function clampPracticeMinutes(
 }
 
 /**
+ * Apply the same ceiling to a duration that was already measured in minutes.
+ *
+ * The timestamp pair above is not the only source of practice time: the interview
+ * workspace also reports a client-side elapsed timer (`timeSpentMinutes`), which
+ * reaches the server as request input and is accumulated with `FieldValue.increment`
+ * into running totals. That path never touches `started_at`/`completed_at`, so
+ * without this it bypassed the ceiling entirely and could inflate a lifetime total
+ * from a single left-open tab, exactly the way the timestamp path once did.
+ *
+ * Untrusted input, so every degenerate value collapses to 0: negatives, NaN,
+ * Infinity, and non-numbers a client could put in a JSON body.
+ */
+export function clampPracticeMinutesValue(minutes: unknown): number {
+  if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes <= 0) return 0
+  return Math.min(Math.round(minutes), MAX_SESSION_PRACTICE_MINUTES)
+}
+
+/** Clamped practice minutes for an elapsed timer measured in seconds. */
+export function clampPracticeMinutesFromSeconds(seconds: unknown): number {
+  if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds <= 0) return 0
+  return clampPracticeMinutesValue(seconds / 60)
+}
+
+/**
  * Whether a stored duration was inflated past what one sitting can plausibly hold.
  *
  * Lets a surface label a truncated number ("90+ min") instead of quietly reporting a
