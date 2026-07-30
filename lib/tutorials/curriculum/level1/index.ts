@@ -1288,6 +1288,26 @@ nums.remove(20)     # [5, 10, 30, 40]        remove the first 20
 
 The demo below starts from \`[10, 20, 30]\`, calls \`append(40)\`, and prints \`[10, 20, 30, 40]\`, so \`nums[-1]\` is \`40\` and \`len(nums)\` is \`4\`. Notice \`append\` returns \`None\`: it mutates the list and hands nothing back, which is exactly why the Apply task asks you to \`append\` and then \`return items\` on a separate step.
 
+That split, mutate here and return there, applies to every list operation:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["You call", "Effect on the original list", "What it hands back"],
+  "rows": [
+    ["lst.append(x)", "x is added to the end", "None"],
+    ["lst.sort()", "lst is reordered in place", "None"],
+    ["lst.reverse()", "lst is reversed in place", "None"],
+    ["lst.pop()", "the last item is removed", "the removed item"],
+    ["sorted(lst)", "untouched", "a new sorted list"],
+    ["reversed(lst)", "untouched", "a lazy iterator"],
+    ["lst + [x]", "untouched", "a new list"]
+  ],
+  "highlightCols": ["What it hands back"],
+  "caption": "Read the highlighted column before you assign. nums = nums.sort() is the classic beginner bug: sort works perfectly, returns None, and you overwrite your list with None. Use nums.sort() alone to reorder, or nums = sorted(nums) to rebind."
+}
+\`\`\`
+
 ### Pitfall: aliasing shares one object
 
 Assignment copies the reference, not the list. Both names then point at the same object:
