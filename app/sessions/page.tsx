@@ -21,6 +21,7 @@ import {
 import { InterviewSession } from "@/lib/types"
 import Link from "next/link"
 import { getScenarioById } from "@/lib/scenarios/index"
+import { clampPracticeMinutes, isTruncatedDuration } from "@/lib/session-duration"
 
 export default function SessionsPage() {
   const router = useRouter()
@@ -129,11 +130,11 @@ export default function SessionsPage() {
 
   if (loading || authLoading || !initialized) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background">
+      <main className="bg-background flex min-h-screen items-center justify-center">
         <div className="flex items-center gap-3">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-muted" />
-          <div className="h-2 w-2 animate-pulse rounded-full bg-muted delay-75" />
-          <div className="h-2 w-2 animate-pulse rounded-full bg-muted delay-150" />
+          <div className="bg-muted h-2 w-2 animate-pulse rounded-full" />
+          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-75" />
+          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-150" />
         </div>
       </main>
     )
@@ -159,7 +160,7 @@ export default function SessionsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="bg-background min-h-screen">
       <Header />
 
       <div className="pt-24 pb-16">
@@ -167,11 +168,11 @@ export default function SessionsPage() {
           {/* Header */}
           <div className="mb-8 flex items-center justify-between">
             <div>
-              <h1 className="mb-1 text-2xl font-semibold text-foreground">Sessions</h1>
-              <p className="text-sm text-muted-foreground">Your practice history</p>
+              <h1 className="text-foreground mb-1 text-2xl font-semibold">Sessions</h1>
+              <p className="text-muted-foreground text-sm">Your practice history</p>
             </div>
             <Link href="/interview">
-              <Button className="bg-card font-medium text-foreground hover:bg-muted">
+              <Button className="bg-card text-foreground hover:bg-muted font-medium">
                 <Terminal className="mr-2 h-4 w-4" />
                 New Session
               </Button>
@@ -181,23 +182,23 @@ export default function SessionsPage() {
           {/* Sessions List */}
           {sessions.length === 0 ? (
             <div className="py-20 text-center">
-              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card">
-                <Clock className="h-7 w-7 text-muted-foreground" />
+              <div className="border-border bg-card mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border">
+                <Clock className="text-muted-foreground h-7 w-7" />
               </div>
-              <h3 className="mb-2 text-lg font-medium text-foreground">No sessions yet</h3>
-              <p className="mb-6 text-sm text-muted-foreground">
+              <h3 className="text-foreground mb-2 text-lg font-medium">No sessions yet</h3>
+              <p className="text-muted-foreground mb-6 text-sm">
                 Start practicing to see your history here
               </p>
               <Link href="/interview">
-                <Button className="bg-card font-medium text-foreground hover:bg-muted">
+                <Button className="bg-card text-foreground hover:bg-muted font-medium">
                   <Terminal className="mr-2 h-4 w-4" />
                   Start First Session
                 </Button>
               </Link>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
-              <div className="divide-y divide-border">
+            <div className="border-border/50 bg-card/50 overflow-hidden rounded-2xl border">
+              <div className="divide-border divide-y">
                 {sessions.map((session) => {
                   const isInProgress = !session.completed_at
                   const scenarioExists = session.scenario_id
@@ -235,7 +236,7 @@ export default function SessionsPage() {
                   return (
                     <div
                       key={session.id}
-                      className="group flex items-center gap-4 p-4 transition-colors hover:bg-muted/30"
+                      className="group hover:bg-muted/30 flex items-center gap-4 p-4 transition-colors"
                     >
                       {/* Score/Status indicator */}
                       <div
@@ -257,7 +258,9 @@ export default function SessionsPage() {
                       {/* Content */}
                       <div className="min-w-0 flex-1">
                         <div className="mb-1 flex items-center gap-2">
-                          <span className="truncate font-medium text-foreground">{session.topic}</span>
+                          <span className="text-foreground truncate font-medium">
+                            {session.topic}
+                          </span>
                           <span
                             className={`text-[10px] tracking-wider uppercase ${getDifficultyStyle(session.difficulty)}`}
                           >
@@ -285,7 +288,7 @@ export default function SessionsPage() {
                           )}
                           {hasFeedback && <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />}
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <div className="text-muted-foreground flex items-center gap-3 text-xs">
                           <span className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
                             {new Date(session.started_at).toLocaleDateString("en-US", {
@@ -296,11 +299,10 @@ export default function SessionsPage() {
                           {session.completed_at && (
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {Math.round(
-                                (new Date(session.completed_at).getTime() -
-                                  new Date(session.started_at).getTime()) /
-                                  60000
-                              )}{" "}
+                              {clampPracticeMinutes(session.started_at, session.completed_at)}
+                              {isTruncatedDuration(session.started_at, session.completed_at)
+                                ? "+"
+                                : ""}{" "}
                               min
                             </span>
                           )}
@@ -331,7 +333,7 @@ export default function SessionsPage() {
                               )
                             }
                             size="sm"
-                            className="h-8 bg-card text-xs text-foreground hover:bg-muted"
+                            className="bg-card text-foreground hover:bg-muted h-8 text-xs"
                           >
                             <Play className="mr-1.5 h-3 w-3" />
                             Continue
@@ -353,7 +355,7 @@ export default function SessionsPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                              className="text-muted-foreground hover:text-foreground h-8 text-xs"
                             >
                               <FileText className="mr-1.5 h-3 w-3" />
                               Details
@@ -373,7 +375,7 @@ export default function SessionsPage() {
                           </Link>
                         ) : (
                           <Link href={`/sessions/${session.id}`}>
-                            <ChevronRight className="h-4 w-4 text-muted-foreground hover:text-muted-foreground" />
+                            <ChevronRight className="text-muted-foreground hover:text-muted-foreground h-4 w-4" />
                           </Link>
                         )}
                       </div>

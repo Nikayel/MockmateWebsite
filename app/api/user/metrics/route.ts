@@ -14,6 +14,7 @@ import { getUserStats, getRecentSessions, getPerformanceTrends } from "@/lib/ses
 import { getUserUsageSummary } from "@/lib/usage-tracking"
 import { getMasteryStatistics, getUserScoreStats } from "@/lib/scoring/index"
 import { calculateTechnicalScoreFromBreakdown } from "@/lib/constants"
+import { clampPracticeMinutes } from "@/lib/session-duration"
 import { logger } from "@/lib/logger"
 
 /**
@@ -95,12 +96,10 @@ async function getStatsFromInterviewSessions(userId: string): Promise<{
     > = {}
 
     for (const session of sessions) {
-      // Calculate duration
-      if (session.started_at && session.completed_at) {
-        const start = new Date(session.started_at).getTime()
-        const end = new Date(session.completed_at).getTime()
-        totalPracticeMinutes += Math.round((end - start) / 60000)
-      }
+      // Calculate duration. Shares the clamp with lib/session-metrics.ts so this
+      // fallback and the stored `user_stats` aggregate can never report different
+      // totals for the same history.
+      totalPracticeMinutes += clampPracticeMinutes(session.started_at, session.completed_at)
 
       // Track score if available
       if (session.performance_score !== undefined && session.performance_score !== null) {

@@ -23,6 +23,7 @@ import { analyzeMessage } from "./scoring/keyword-detection"
 import { getTodayInTimezone, DEFAULT_TIMEZONE } from "./email/timezone"
 import { learningStateMeta } from "./learning-state"
 import { advanceStreak } from "./spaced-repetition/streak"
+import { clampPracticeMinutes } from "./session-duration"
 import type { Profile } from "./types"
 import {
   calculateInstantScores,
@@ -639,9 +640,11 @@ export async function completeSessionMetrics(params: {
   }
 
   const now = new Date().toISOString()
-  const startTime = new Date(state.startedAt).getTime()
-  const endTime = new Date(now).getTime()
-  const durationMinutes = Math.round((endTime - startTime) / 60000)
+  // Clamped, not raw wall clock: `startedAt` is stamped when the workspace loads, so a
+  // tab left open overnight or a session resumed from autosave days later would
+  // otherwise book its whole idle gap as practice (and, via `timeSpent` below, zero out
+  // the time-efficiency component of the mastery score). See lib/session-duration.ts.
+  const durationMinutes = clampPracticeMinutes(state.startedAt, now)
 
   // Update final state
   state.completedAt = now

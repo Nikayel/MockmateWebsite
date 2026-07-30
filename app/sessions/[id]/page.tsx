@@ -12,6 +12,7 @@ import { doc, getDoc } from "firebase/firestore"
 import { ArrowLeft, Clock, Calendar, Terminal, Loader2 } from "lucide-react"
 import { InterviewSession } from "@/lib/types"
 import Link from "next/link"
+import { clampPracticeMinutes, isTruncatedDuration } from "@/lib/session-duration"
 
 export default function SessionDetailPage() {
   const router = useRouter()
@@ -117,11 +118,11 @@ export default function SessionDetailPage() {
 
   if (loading || authLoading || !initialized) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background">
+      <main className="bg-background flex min-h-screen items-center justify-center">
         <div className="flex items-center gap-3">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-muted" />
-          <div className="h-2 w-2 animate-pulse rounded-full bg-muted delay-75" />
-          <div className="h-2 w-2 animate-pulse rounded-full bg-muted delay-150" />
+          <div className="bg-muted h-2 w-2 animate-pulse rounded-full" />
+          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-75" />
+          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-150" />
         </div>
       </main>
     )
@@ -129,16 +130,16 @@ export default function SessionDetailPage() {
 
   if (!session) {
     return (
-      <main className="min-h-screen bg-background">
+      <main className="bg-background min-h-screen">
         <Header />
         <div className="pt-24 pb-16">
           <div className="container mx-auto max-w-5xl px-4">
             <div className="py-20 text-center">
-              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card">
-                <Clock className="h-7 w-7 text-muted-foreground" />
+              <div className="border-border bg-card mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border">
+                <Clock className="text-muted-foreground h-7 w-7" />
               </div>
-              <h3 className="mb-2 text-lg font-medium text-foreground">Session not found</h3>
-              <p className="mb-6 text-sm text-muted-foreground">
+              <h3 className="text-foreground mb-2 text-lg font-medium">Session not found</h3>
+              <p className="text-muted-foreground mb-6 text-sm">
                 The session you're looking for doesn't exist
               </p>
               <Link href="/sessions">
@@ -172,7 +173,7 @@ export default function SessionDetailPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="bg-background min-h-screen">
       <Header />
 
       <div className="pt-24 pb-16">
@@ -183,7 +184,7 @@ export default function SessionDetailPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="mb-4 -ml-2 h-8 text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground mb-4 -ml-2 h-8"
               >
                 <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
                 Sessions
@@ -193,14 +194,14 @@ export default function SessionDetailPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="mb-2 flex items-center gap-2">
-                  <h1 className="text-xl font-semibold text-foreground">{session.topic}</h1>
+                  <h1 className="text-foreground text-xl font-semibold">{session.topic}</h1>
                   <span
                     className={`rounded px-2 py-0.5 text-[10px] tracking-wider uppercase ${getDifficultyStyle(session.difficulty)}`}
                   >
                     {session.difficulty}
                   </span>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <div className="text-muted-foreground flex items-center gap-4 text-xs">
                   <span className="flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5" />
                     {new Date(session.started_at).toLocaleDateString("en-US", {
@@ -212,12 +213,8 @@ export default function SessionDetailPage() {
                   {session.completed_at && (
                     <span className="flex items-center gap-1.5">
                       <Clock className="h-3.5 w-3.5" />
-                      {Math.round(
-                        (new Date(session.completed_at).getTime() -
-                          new Date(session.started_at).getTime()) /
-                          60000
-                      )}{" "}
-                      min
+                      {clampPracticeMinutes(session.started_at, session.completed_at)}
+                      {isTruncatedDuration(session.started_at, session.completed_at) ? "+" : ""} min
                     </span>
                   )}
                 </div>
@@ -236,7 +233,9 @@ export default function SessionDetailPage() {
                   >
                     {Math.round(session.performance_score)}%
                   </div>
-                  <div className="text-[10px] tracking-wider text-muted-foreground uppercase">Score</div>
+                  <div className="text-muted-foreground text-[10px] tracking-wider uppercase">
+                    Score
+                  </div>
                 </div>
               )}
             </div>
@@ -285,17 +284,19 @@ export default function SessionDetailPage() {
               <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10">
                 <Loader2 className="h-7 w-7 animate-spin text-blue-400" />
               </div>
-              <h3 className="mb-2 text-lg font-medium text-foreground">Evaluating your submission</h3>
-              <p className="mb-4 text-sm text-muted-foreground">
+              <h3 className="text-foreground mb-2 text-lg font-medium">
+                Evaluating your submission
+              </h3>
+              <p className="text-muted-foreground mb-4 text-sm">
                 Your solution is being reviewed by our AI. This usually takes 30-60 seconds.
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 You can leave this page - we'll have your feedback ready when you return.
               </p>
               <Button
                 onClick={() => router.push("/dashboard")}
                 variant="outline"
-                className="mt-6 border-border text-muted-foreground hover:bg-muted"
+                className="border-border text-muted-foreground hover:bg-muted mt-6"
               >
                 Go to Dashboard
               </Button>
@@ -306,8 +307,8 @@ export default function SessionDetailPage() {
               <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10">
                 <Terminal className="h-7 w-7 text-red-400" />
               </div>
-              <h3 className="mb-2 text-lg font-medium text-foreground">Evaluation failed</h3>
-              <p className="mb-6 text-sm text-muted-foreground">
+              <h3 className="text-foreground mb-2 text-lg font-medium">Evaluation failed</h3>
+              <p className="text-muted-foreground mb-6 text-sm">
                 We encountered an issue while evaluating your submission. Please try again.
               </p>
               {session.scenario_id && (
@@ -324,12 +325,14 @@ export default function SessionDetailPage() {
             </div>
           ) : (
             // Session truly in progress - allow continuing
-            <div className="rounded-2xl border border-border/50 bg-card/50 p-12 text-center">
-              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
-                <Terminal className="h-7 w-7 text-muted-foreground" />
+            <div className="border-border/50 bg-card/50 rounded-2xl border p-12 text-center">
+              <div className="bg-muted mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl">
+                <Terminal className="text-muted-foreground h-7 w-7" />
               </div>
-              <h3 className="mb-2 text-lg font-medium text-foreground">Session in progress</h3>
-              <p className="mb-6 text-sm text-muted-foreground">This session hasn't been completed yet</p>
+              <h3 className="text-foreground mb-2 text-lg font-medium">Session in progress</h3>
+              <p className="text-muted-foreground mb-6 text-sm">
+                This session hasn't been completed yet
+              </p>
               {session.scenario_id && (
                 <Button
                   onClick={() =>

@@ -22,6 +22,7 @@ import { adminDb, adminAuth } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
 import { DEFAULT_TIMEZONE } from "@/lib/email/timezone"
 import { reconcileStreak } from "@/lib/spaced-repetition/streak"
+import { clampPracticeMinutes } from "@/lib/session-duration"
 import type { Profile } from "@/lib/types"
 
 export async function GET(request: NextRequest) {
@@ -114,13 +115,12 @@ export async function GET(request: NextRequest) {
     // from it; they are plain fields on the returned object, so calling
     // getUserInsights / getInterviewReadiness separately would trigger two more
     // full profile builds for the same user.
-    const [enhancedProfile, misconceptionData, accurateBehavior, dataQuality] =
-      await Promise.all([
-        getEnhancedUserProfile(userId),
-        getMisconceptionsSummary(userId),
-        getAccurateBehavioralProfile(userId), // NEW: Production-grade behavioral analysis
-        getUserDataQuality(userId), // NEW: Data quality assessment
-      ])
+    const [enhancedProfile, misconceptionData, accurateBehavior, dataQuality] = await Promise.all([
+      getEnhancedUserProfile(userId),
+      getMisconceptionsSummary(userId),
+      getAccurateBehavioralProfile(userId), // NEW: Production-grade behavioral analysis
+      getUserDataQuality(userId), // NEW: Data quality assessment
+    ])
 
     const insights = enhancedProfile.insights
     const interviewReadiness = enhancedProfile.interviewReadiness
@@ -276,11 +276,7 @@ async function getRecentSessionsForUser(userId: string) {
           difficulty: data.difficulty,
           performance: data.performance_score, // Use snake_case field from interview_sessions
           duration:
-            completedAt && startedAt
-              ? Math.round(
-                  (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 60000
-                )
-              : undefined,
+            completedAt && startedAt ? clampPracticeMinutes(startedAt, completedAt) : undefined,
           completed: true,
           timestamp: completedAt,
         }
