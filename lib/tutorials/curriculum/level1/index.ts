@@ -2304,6 +2304,21 @@ const loopIdiomsLesson: PythonLesson = {
 
 Reaching for \`range(len(items))\` and indexing back with \`items[i]\` is the beginner tell. It reads noisily, breaks the moment you rename or reorder things, and is the classic home of off-by-one bugs. Python hands you iterators that give you exactly what you need, so you loop over the data itself instead of bookkeeping positions.
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Instead of", "Write", "Each turn gives you"],
+  "rows": [
+    ["for i in range(len(xs)): xs[i]", "for x in xs", "the value"],
+    ["for i in range(len(xs)): i, xs[i]", "for i, x in enumerate(xs)", "the position and the value"],
+    ["for i in range(len(a)): a[i], b[i]", "for x, y in zip(a, b)", "one item from each, in lockstep"],
+    ["for k in d: k, d[k]", "for k, v in d.items()", "the key and its value"]
+  ],
+  "highlightCols": ["Write"],
+  "caption": "Every left-hand form works and every one re-derives something Python already had. zip is also the safer choice for the third row: it stops at the SHORTER sequence instead of raising IndexError when the lengths differ."
+}
+\`\`\`
+
 ### \`enumerate\`: the value plus its position
 
 \`enumerate(iterable)\` wraps any iterable and yields \`(index, value)\` pairs, lazily, one at a time.
