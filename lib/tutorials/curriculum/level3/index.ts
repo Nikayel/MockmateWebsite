@@ -815,6 +815,20 @@ A **type hint** is a note you attach to a name saying what kind of value belongs
 
 Python records annotations but never acts on them at runtime. \`average(["a", "b"])\` will happily start executing and only blow up inside \`sum\` (a \`TypeError\` from \`0 + "a"\`), not at the call site. The payoff comes from tools that read the annotations: your editor's autocomplete, and static checkers run as a build step.
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["When", "Hints plus a checker in CI", "Hints but no checker", "No hints at all"],
+  "rows": [
+    ["As you type", "the editor flags it immediately", "the editor may flag it", "nothing"],
+    ["In CI", "the build fails before merge", "passes", "passes"],
+    ["At runtime", "never reached", "TypeError deep inside sum()", "TypeError deep inside sum()"]
+  ],
+  "highlightCols": ["Hints plus a checker in CI"],
+  "caption": "Compare the middle column with the right one: at RUNTIME they are identical, because the hint changes nothing Python does. Only the highlighted column moves the failure earlier, which is why hints without a checker in CI buy editor help and documentation, but no safety."
+}
+\`\`\`
+
 \`\`\`python
 def average(values: list[float]) -> float:
     if not values:
