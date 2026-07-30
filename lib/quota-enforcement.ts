@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb, adminAuth } from "./firebase-admin"
 import { logger } from "./logger"
-import { getSessionsLimitForTier } from "./pricing"
+import { getSessionsLimitForTier, isPaidTier } from "./pricing"
 import { CIRCUIT_BREAKER } from "./constants"
 import { PRICING_CONFIG } from "./config"
 import { isGlobalCeilingExceeded } from "./global-spend-guard"
@@ -469,8 +469,13 @@ export async function checkQuota(
     // P0 FIX: Block access when subscription is in a degraded state
     // This prevents users from continuing to use Pro features after payment failure,
     // cancellation, or expiration — even mid-session.
+    //
+    // Applies to every paid tier, not just "pro". This used to read
+    // `tier === "pro"`, which let an enterprise account in past_due keep working
+    // here while requireTierForUser (same file) blocked it, so the same degraded
+    // account was allowed on one route and 403'd on the next.
     if (
-      tier === "pro" &&
+      isPaidTier(tier) &&
       subscriptionStatus &&
       INACTIVE_SUBSCRIPTION_STATUSES.has(subscriptionStatus)
     ) {
