@@ -439,6 +439,60 @@ service cloud.firestore {
     }
 
     // ============================================================================
+    // OPEN LEARNER MODEL & SPACED-REPETITION STATE (server-only — Admin SDK)
+    // ============================================================================
+    // The learner model exposes the system's beliefs for inspection, challenge,
+    // and correction. Every one of these collections is written exclusively by
+    // API routes via the Admin SDK (which bypasses these rules), and read back
+    // through those same routes. Client access must stay closed because:
+    //
+    //  - learner_model_challenges holds the research record of every dispute AND
+    //    its verification outcome. A client write could fabricate "my challenge
+    //    was right", corrupting both the user's schedule and the study data.
+    //  - learner_model_events are the study's dependent variables; forged events
+    //    would silently poison any analysis.
+    //  - problem_mastery is the scheduler's memory state (stability, difficulty,
+    //    lapses, due dates). A client write is a self-grading vector: a user
+    //    could mark everything mastered and defeat spaced repetition entirely.
+    //  - algorithm_research_events carry the pre/post FSRS card snapshots the
+    //    challenge amendment replays from. Tampering there would let a client
+    //    steer the corrected schedule.
+    //  - research_config is the GLOBAL scheduler switch (ab_ended /
+    //    default_algorithm). A client write would change algorithm routing for
+    //    every user on the platform.
+    //
+    // Explicit here (rather than relying on the default-deny below) so the
+    // posture is auditable.
+
+    match /learner_model_challenges/{challengeId} {
+      allow read, write: if false;
+    }
+
+    match /learner_model_events/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /problem_mastery/{userId}/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /algorithm_research_events/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /algorithm_research_metrics/{userId}/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /algorithm_research_aggregate/{docId} {
+      allow read, write: if false;
+    }
+
+    match /research_config/{docId} {
+      allow read, write: if false;
+    }
+
+    // ============================================================================
     // DEFAULT DENY ALL
     // ============================================================================
 
