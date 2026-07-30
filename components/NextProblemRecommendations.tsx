@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Sparkles, ArrowRight, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
+import { useAuthedFetch } from "@/lib/hooks/useAuthedFetch"
 
 interface Recommendation {
   problemId: string
@@ -31,6 +32,7 @@ export function NextProblemRecommendations({
   onSelectProblem,
 }: NextProblemRecommendationsProps) {
   const { firebaseUser } = useAuth()
+  const { send } = useAuthedFetch()
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -45,38 +47,30 @@ export function NextProblemRecommendations({
     const fetchRecommendations = async () => {
       try {
         setLoading(true)
-        const token = await firebaseUser.getIdToken()
-        const response = await fetch("/api/rag", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            action: "get-next-problems",
-            userId,
-            currentProblemText,
-            currentProblemId,
-          }),
+        const result = await send<{ recommendations?: Recommendation[] }>("/api/rag", "POST", {
+          action: "get-next-problems",
+          userId,
+          currentProblemText,
+          currentProblemId,
         })
 
-        const data = await response.json()
-
-        if (data.recommendations) {
-          setRecommendations(data.recommendations)
-        } else if (data.error) {
-          setError(data.error)
+        if (!result.ok) {
+          setError(
+            result.needsReauth
+              ? "Your session expired. Sign in again to see recommendations."
+              : (result.error ?? "Failed to load recommendations")
+          )
+          return
         }
-      } catch (err) {
-        console.error("Error fetching recommendations:", err)
-        setError("Failed to load recommendations")
+
+        setRecommendations(result.data?.recommendations ?? [])
       } finally {
         setLoading(false)
       }
     }
 
     fetchRecommendations()
-  }, [userId, currentProblemText, currentProblemId, firebaseUser])
+  }, [userId, currentProblemText, currentProblemId, firebaseUser, send])
 
   const handleSelectProblem = (problemId: string) => {
     if (onSelectProblem) {
@@ -92,9 +86,9 @@ export function NextProblemRecommendations({
 
   if (loading) {
     return (
-      <Card className="glass-effect mb-8 border-border bg-card/50">
+      <Card className="glass-effect border-border bg-card/50 mb-8">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-foreground">
+          <CardTitle className="text-foreground flex items-center space-x-2">
             <Sparkles className="h-5 w-5 text-[#c4703f]" />
             <span>Similar Problems You Haven't Solved</span>
           </CardTitle>
@@ -102,7 +96,7 @@ export function NextProblemRecommendations({
         <CardContent>
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-[#c4703f]" />
-            <span className="ml-2 text-muted-foreground">Finding similar problems...</span>
+            <span className="text-muted-foreground ml-2">Finding similar problems...</span>
           </div>
         </CardContent>
       </Card>
@@ -111,15 +105,15 @@ export function NextProblemRecommendations({
 
   if (error) {
     return (
-      <Card className="glass-effect mb-8 border-border bg-card/50">
+      <Card className="glass-effect border-border bg-card/50 mb-8">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-foreground">
+          <CardTitle className="text-foreground flex items-center space-x-2">
             <Sparkles className="h-5 w-5 text-[#c4703f]" />
             <span>Similar Problems You Haven't Solved</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">{error}</p>
+          <p className="text-muted-foreground text-sm">{error}</p>
         </CardContent>
       </Card>
     )
@@ -127,15 +121,15 @@ export function NextProblemRecommendations({
 
   if (recommendations.length === 0) {
     return (
-      <Card className="glass-effect mb-8 border-border bg-card/50">
+      <Card className="glass-effect border-border bg-card/50 mb-8">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-foreground">
+          <CardTitle className="text-foreground flex items-center space-x-2">
             <Sparkles className="h-5 w-5 text-[#c4703f]" />
             <span>Similar Problems You Haven't Solved</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             No similar unsolved problems found. Try exploring new problem types!
           </p>
         </CardContent>
@@ -144,13 +138,13 @@ export function NextProblemRecommendations({
   }
 
   return (
-    <Card className="glass-effect mb-8 border-border bg-card/50">
+    <Card className="glass-effect border-border bg-card/50 mb-8">
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2 text-foreground">
+        <CardTitle className="text-foreground flex items-center space-x-2">
           <Sparkles className="h-5 w-5 text-[#c4703f]" />
           <span>Similar Problems You Haven't Solved</span>
         </CardTitle>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-xs">
           Powered by RAG - These problems are similar to what you just solved
         </p>
       </CardHeader>
@@ -159,12 +153,12 @@ export function NextProblemRecommendations({
           {recommendations.map((rec, index) => (
             <div
               key={rec.problemId || index}
-              className="rounded-lg border border-border bg-muted/50 p-4 transition-colors hover:border-[#c4703f]/50"
+              className="border-border bg-muted/50 rounded-lg border p-4 transition-colors hover:border-[#c4703f]/50"
             >
               <div className="mb-2 flex items-start justify-between">
                 <div className="flex-1">
-                  <h4 className="mb-1 font-medium text-foreground">{rec.title}</h4>
-                  <p className="mb-2 line-clamp-2 text-sm text-muted-foreground">{rec.text}</p>
+                  <h4 className="text-foreground mb-1 font-medium">{rec.title}</h4>
+                  <p className="text-muted-foreground mb-2 line-clamp-2 text-sm">{rec.text}</p>
                   <div className="flex items-center gap-2">
                     <Badge className="border-[#c4703f]/30 bg-[#c4703f]/20 text-[#c4703f]">
                       {rec.difficulty}
@@ -172,7 +166,7 @@ export function NextProblemRecommendations({
                     <Badge variant="outline" className="border-border text-muted-foreground">
                       {rec.type}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">{rec.similarity}% similar</span>
+                    <span className="text-muted-foreground text-xs">{rec.similarity}% similar</span>
                   </div>
                 </div>
               </div>
