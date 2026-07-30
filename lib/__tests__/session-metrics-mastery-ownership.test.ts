@@ -105,3 +105,52 @@ describe("updateUserProblemMastery scheduler-field ownership", () => {
     expect(payload).toHaveProperty("mastery_level")
   })
 })
+
+/**
+ * The review timestamp must be spelled `last_reviewed_at`, the name every
+ * problem_mastery reader uses. This writer used to spell it `last_review_at`
+ * (which belongs to the research doc). That is not a cosmetic mismatch: the
+ * daily-progress query in mastery-calculator is
+ * `.where("last_reviewed_at", ">=", ...)`, and a Firestore inequality filter
+ * does not return documents that lack the field, so every review recorded only
+ * by this path was silently missing from daily progress and streak counts.
+ */
+describe("updateUserProblemMastery review timestamp field name", () => {
+  it("writes last_reviewed_at on create, not last_review_at", async () => {
+    h.txGet.mockResolvedValue({ exists: false, data: () => null })
+
+    await updateUserProblemMastery(summary)
+
+    const payload = h.txSet.mock.calls[0][1] as Record<string, unknown>
+    expect(payload.last_reviewed_at).toBe(summary.completedAt)
+    expect(payload).not.toHaveProperty("last_review_at")
+  })
+
+  it("writes last_reviewed_at on update, not last_review_at", async () => {
+    h.txGet.mockResolvedValue({
+      exists: true,
+      data: () => ({ review_count: 2, total_score: 150, best_score: 80 }),
+    })
+
+    await updateUserProblemMastery(summary)
+
+    const payload = h.txUpdate.mock.calls[0][1] as Record<string, unknown>
+    expect(payload.last_reviewed_at).toBe(summary.completedAt)
+    expect(payload).not.toHaveProperty("last_review_at")
+  })
+
+  it("keeps the doc visible to an inequality filter on last_reviewed_at", async () => {
+    // Mirrors the mastery-calculator daily-progress query: the field must be
+    // present AND an ISO string, since it is compared against an ISO bound.
+    h.txGet.mockResolvedValue({ exists: false, data: () => null })
+
+    await updateUserProblemMastery(summary)
+
+    const payload = h.txSet.mock.calls[0][1] as Record<string, unknown>
+    const reviewedAt = payload.last_reviewed_at
+    expect(typeof reviewedAt).toBe("string")
+    expect(reviewedAt as string).toBe(new Date(reviewedAt as string).toISOString())
+    const twoDaysAgo = new Date(Date.parse(summary.completedAt) - 2 * 86_400_000).toISOString()
+    expect((reviewedAt as string) >= twoDaysAgo).toBe(true)
+  })
+})

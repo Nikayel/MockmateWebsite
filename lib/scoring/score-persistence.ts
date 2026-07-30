@@ -115,7 +115,10 @@ export async function getMasteredProblems(userId: string): Promise<
       title: data.title || data.scenario_title || doc.id,
       pattern: data.pattern || "unknown",
       difficulty: data.difficulty || "medium",
-      masteredAt: data.last_review_at || data.updated_at || new Date().toISOString(),
+      // last_reviewed_at is canonical for problem_mastery; last_review_at is read
+      // only for documents written before that spelling was corrected.
+      masteredAt:
+        data.last_reviewed_at || data.last_review_at || data.updated_at || new Date().toISOString(),
     }
   })
 }

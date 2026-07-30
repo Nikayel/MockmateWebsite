@@ -1118,7 +1118,14 @@ export async function updateUserProblemMastery(summary: SessionSummary): Promise
           total_score: summary.performanceScore,
           average_score: summary.performanceScore,
           first_review_at: summary.completedAt,
-          last_review_at: summary.completedAt,
+          // `last_reviewed_at` is the field name every problem_mastery reader uses
+          // (ProblemMastery in scheduler.ts, ProblemMasteryRecord in lib/types.ts).
+          // This writer used to spell it `last_review_at`, which belongs to the
+          // research doc, not this collection. Because a Firestore inequality
+          // filter skips documents missing the field, the daily-progress query in
+          // mastery-calculator (.where("last_reviewed_at", ">=", ...)) never
+          // returned docs this path created, so those reviews went uncounted.
+          last_reviewed_at: summary.completedAt,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         })
@@ -1138,7 +1145,7 @@ export async function updateUserProblemMastery(summary: SessionSummary): Promise
           best_score: bestScore,
           total_score: totalScore,
           average_score: averageScore,
-          last_review_at: summary.completedAt,
+          last_reviewed_at: summary.completedAt,
           updatedAt: FieldValue.serverTimestamp(),
           ...(isSchedulerOwned
             ? {}
