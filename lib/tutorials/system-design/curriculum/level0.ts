@@ -824,13 +824,19 @@ can require merging many sources. This is the fan-out-on-write versus fan-out-on
 }
 \`\`\`
 
-\`\`\`
-Fan-out on WRITE (precompute):        Fan-out on READ (merge at query time):
-user posts -> push into each              user opens feed -> pull recent posts
-follower's feed cache                     from each followee -> merge/sort
-- read is cheap (one cache GET)           - write is cheap (one append)
-- write is expensive (N inserts)          - read is expensive (N fetches + merge)
-- great when reads >> writes              - great for celebrities / huge fan-out
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Dimension", "Fan-out on write (precompute)", "Fan-out on read (merge at query time)"],
+  "rows": [
+    ["What happens", "user posts → push into every follower's feed cache", "user opens feed → pull recent posts from each followee → merge and sort"],
+    ["Read cost", "cheap: one cache GET", "expensive: N fetches plus a merge"],
+    ["Write cost", "expensive: N inserts", "cheap: one append"],
+    ["Good when", "reads far outnumber writes", "a few accounts have enormous fan-out"],
+    ["Breaks on", "a celebrity with 10M followers: one post becomes 10M inserts", "a user following thousands of accounts: one read becomes thousands of fetches"]
+  ],
+  "caption": "The two failure modes are mirror images, which is why production feeds do both: push for ordinary accounts, pull for the handful of celebrities, and merge the two at read time."
+}
 \`\`\`
 
 Worked example: a feed with 50M DAU, each user reads their feed 20 times/day and posts 0.5 times/day,
