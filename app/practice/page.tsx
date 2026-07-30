@@ -7,6 +7,10 @@ import { useAuth } from "@/lib/auth-context"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { type DueItem } from "@/components/practice"
+import {
+  CorrectionTraceBanner,
+  type CorrectionTrace,
+} from "@/components/practice/CorrectionTraceBanner"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Loader2, Lock, ArrowRight, HelpCircle, List, CalendarDays } from "lucide-react"
@@ -100,6 +104,7 @@ export default function PracticePage() {
   const [isPro, setIsPro] = useState<boolean | null>(null)
   const [isDeferring, setIsDeferring] = useState(false)
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list")
+  const [corrections, setCorrections] = useState<CorrectionTrace[]>([])
 
   const getAuthToken = useCallback(async () => {
     const { auth } = await import("@/lib/firebase")
@@ -118,9 +123,10 @@ export default function PracticePage() {
         "Content-Type": "application/json",
       }
 
-      const [statsRes, dueRes] = await Promise.all([
+      const [statsRes, dueRes, correctionsRes] = await Promise.all([
         fetch("/api/spaced-repetition/stats", { headers }),
         fetch("/api/spaced-repetition/due", { headers }),
+        fetch("/api/learner-model/corrections", { headers }),
       ])
 
       if (!statsRes.ok || !dueRes.ok) {
@@ -131,6 +137,24 @@ export default function PracticePage() {
 
       setStats(statsData)
       setDue(dueData)
+
+      // Learner-model correction traces are best-effort: the banner is an
+      // enhancement, never a reason for the page to fail.
+      if (correctionsRes.ok) {
+        const correctionsData = await correctionsRes.json()
+        const traces: CorrectionTrace[] = correctionsData.corrections ?? []
+        setCorrections(traces)
+        if (traces.length > 0) {
+          void fetch("/api/learner-model/events", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              event_type: "olm_trace_shown",
+              payload: { count: traces.length },
+            }),
+          }).catch(() => {})
+        }
+      }
     } catch (err) {
       // Error logged via monitoring; user sees friendly message
       setError("Failed to load practice data. Please try refreshing the page.")
@@ -407,6 +431,9 @@ export default function PracticePage() {
                 </button>
               </div>
             </div>
+
+            {/* Learner-model correction traces: the model responds visibly */}
+            <CorrectionTraceBanner corrections={corrections} />
 
             {/* Due for Review - List View */}
             {viewMode === "list" && (
