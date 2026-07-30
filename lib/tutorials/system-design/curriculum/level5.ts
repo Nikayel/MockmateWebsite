@@ -760,18 +760,18 @@ const logicalClocksTeach = `
 In a distributed system you cannot trust wall clocks to order events, and there is no shared clock at
 all. Yet you constantly need to answer "did A happen before B, or were they concurrent?" **Logical
 clocks** answer that using only message passing, via Lamport's **happens-before** relation (written
-A -> B):
+A → B):
 
-- If A and B are on the same node and A came first, then A -> B.
-- If A is a *send* and B is the matching *receive*, then A -> B.
-- Transitivity: if A -> B and B -> C then A -> C.
-- If neither A -> B nor B -> A, the events are **concurrent** (A || B). Concurrency is the
+- If A and B are on the same node and A came first, then A → B.
+- If A is a *send* and B is the matching *receive*, then A → B.
+- Transitivity: if A → B and B → C then A → C.
+- If neither A → B nor B → A, the events are **concurrent**, written A ∥ B. Concurrency is the
   interesting case: it is where two clients may have independently updated the same thing.
 
 ### Lamport clocks
 
 Each node keeps an integer counter. Increment it on every local event; stamp outgoing messages; on
-receive, set your counter to \`max(local, received) + 1\`. The guarantee: if A -> B then
+receive, set your counter to \`max(local, received) + 1\`. The guarantee: if A → B then
 \`L(A) < L(B)\`. This gives a **total order** (break ties by node id) that never contradicts
 causality: enough to agree on a single order for a replicated log.
 
@@ -799,7 +799,7 @@ causality: enough to agree on a single order for a replicated log.
 \`\`\`
 
 The catch, and the single most-probed point here: the implication only goes one way. \`L(A) < L(B)\`
-does **not** imply A -> B. Two concurrent events on different nodes can have any Lamport values, so a
+does **not** imply A → B. Two concurrent events on different nodes can have any Lamport values, so a
 smaller timestamp tells you nothing about causation. **Lamport clocks cannot detect concurrency.**
 They can order everything; they cannot tell you *which orderings were forced by causality and which
 were arbitrary*.
@@ -810,9 +810,9 @@ Each node keeps a vector with one counter per node. On a local event, increment 
 send, attach your whole vector. On receive, take the element-wise max, then increment your own slot.
 Compare two vectors:
 
-- V(A) < V(B) (every element <=, at least one <) means **A -> B**.
-- V(B) < V(A) means B -> A.
-- Neither dominates means **A || B, concurrent**, and if they touched the same key, a **conflict**.
+- V(A) < V(B) (every element ≤, at least one <) means **A → B**.
+- V(B) < V(A) means B → A.
+- Neither dominates means **A ∥ B, concurrent**, and if they touched the same key, a **conflict**.
 
 \`\`\`cswidget
 {
@@ -943,7 +943,7 @@ An HLC timestamp combines a **physical component** (kept close to NTP wall time)
 counter** that breaks ties and preserves causality. On an event, HLC takes
 \`max(local physical clock, physical part of last seen timestamp)\` and, if the physical part did not
 advance, bumps the logical counter. The result: timestamps stay within a bounded distance of real NTP
-time (human-meaningful, roughly sortable), and they *also* guarantee that if A -> B then
+time (human-meaningful, roughly sortable), and they *also* guarantee that if A → B then
 HLC(A) < HLC(B), which pure wall clocks do not. HLC needs **no special hardware**, just NTP, which is
 why **CockroachDB and MongoDB use it**. Its limit: HLC gives causal ordering and monotonicity, but it
 cannot by itself give *external* (linearizable) consistency across nodes.
@@ -3103,7 +3103,7 @@ export const systemDesignLevel5: DesignLevel = {
             ],
             modelAnswerOutline: [
               "Assumptions: a Dynamo-style leaderless store, N replicas per key, writes accepted on any replica, clients that may write the same key from different replicas concurrently.",
-              "**Why not Lamport:** a Lamport timestamp puts all writes in one total order, but it forces an order even between genuinely concurrent writes, and picking the 'later' value silently discards the other write. Since L(A) < L(B) does not imply A -> B, Lamport cannot even tell that two writes were concurrent, so the conflict cannot be detected, let alone resolved. The need is to distinguish 'B is an update built on A' from 'A and B are rival updates.'",
+              "**Why not Lamport:** a Lamport timestamp puts all writes in one total order, but it forces an order even between genuinely concurrent writes, and picking the 'later' value silently discards the other write. Since L(A) < L(B) does not imply A → B, Lamport cannot even tell that two writes were concurrent, so the conflict cannot be detected, let alone resolved. The need is to distinguish 'B is an update built on A' from 'A and B are rival updates.'",
               "**Design with version vectors** keyed on the replica nodes (a small fixed set, not clients, to bound size). Every write bumps its replica's slot and carries the vector it derived from. When a write W with V_w arrives against stored V_s: if V_w dominates V_s, W is a strict successor: overwrite. If V_s dominates V_w, W is stale: drop. If neither dominates, W is concurrent: keep **both** as siblings under the same key.",
               "**Read path surfacing siblings:** on a read with multiple concurrent versions, return all siblings plus a context (the combined causal metadata). The application resolves (a merge function, an OR-Set CRDT for a cart, or LWW if truly acceptable) and writes back the merged value carrying the context, which dominates the siblings and collapses the conflict. Read-repair and hinted handoff propagate the resolution. Amazon's cart is the canonical example: concurrent add/remove become siblings merged by union so an item is never silently lost.",
               "**Costs acknowledged:** the vector is O(replica count) per key. The dangerous version keys the vector on clients, which grows unbounded as devices churn and cannot be safely garbage-collected (an actor might return), so key on the fixed replica set and prune with care.",
