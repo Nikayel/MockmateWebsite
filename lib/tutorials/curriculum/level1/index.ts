@@ -585,6 +585,23 @@ print(power(2, 3))   # 8    exp is given as 3, so 2 ** 3
 
 \`power(5)\` binds \`base\` to \`5\` and lets \`exp\` default to \`2\`. \`power(2, 3)\` binds \`base\` to \`2\` and \`exp\` to \`3\`. You can also pass by name in any order: \`power(exp=3, base=2)\` also returns \`8\`.
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["The call", "base becomes", "exp becomes", "Result"],
+  "rows": [
+    ["power(5)", "5", "2, the default", "25"],
+    ["power(2, 3)", "2", "3", "8"],
+    ["power(2, exp=3)", "2", "3", "8"],
+    ["power(exp=3, base=2)", "2", "3", "8, since names free you from order"],
+    ["power()", "nothing to bind", "2, the default", "TypeError: missing a required argument"],
+    ["power(exp=3)", "nothing to bind", "3", "TypeError, because a default cannot fill base"]
+  ],
+  "highlightCols": ["Result"],
+  "caption": "The last two rows are the same error, and they show what a default does NOT do. Giving exp a fallback never makes base optional; a parameter without its own default must always receive a value from somewhere."
+}
+\`\`\`
+
 A function can \`return\` any value, not just numbers. Your Practice builds and returns a string, so keep in mind that the result of a function is whatever object you hand to \`return\`.
 
 ### Reading a traceback
