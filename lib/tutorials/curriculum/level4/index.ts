@@ -1630,6 +1630,24 @@ coro = fetch_one(1)   # nothing has run yet; coro is a coroutine object
 
 \`await\` is the only place a coroutine gives up control. Between awaits it runs straight through like ordinary code.
 
+\`\`\`csdiagram
+{
+  "type": "call-stack",
+  "title": "One thread, three coroutines, control moving only at await",
+  "steps": [
+    { "stack": ["event loop"], "note": "A single thread. The loop holds three ready coroutines." },
+    { "stack": ["event loop", "fetch_one(1)"], "note": "Task 1 runs straight through, like ordinary code, until it hits an await." },
+    { "stack": ["event loop"], "note": "await hands control back. Task 1 is now WAITING on I/O, not blocking the thread." },
+    { "stack": ["event loop", "fetch_one(2)"], "note": "The loop starts task 2 while task 1's I/O is still in flight." },
+    { "stack": ["event loop"], "note": "Task 2 awaits as well. Two waits now overlap on one thread." },
+    { "stack": ["event loop", "fetch_one(3)"], "note": "And task 3. All three waits are in flight together." },
+    { "stack": ["event loop"], "note": "The loop has nothing runnable and simply waits for whichever I/O finishes first." },
+    { "stack": ["event loop", "fetch_one(1)"], "returning": "result 1", "note": "Task 1's I/O completed. The loop resumes it exactly where it paused, and it returns." }
+  ],
+  "caption": "The stack is never deeper than one task, because only one coroutine runs at a time. What overlaps is the WAITING, not the executing. That is also why a blocking call inside a coroutine is fatal: the loop cannot take control back until an await, so nothing else on this thread can progress."
+}
+\`\`\`
+
 ### Overlapping the waiting with gather
 
 \`asyncio.gather\` schedules many coroutines at once and waits for all of them, returning results in **argument order** (not finish order):
