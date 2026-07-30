@@ -59,7 +59,7 @@ describe("analytics-server token fields", () => {
       userId: "user-1",
       scenarioType: "dsa",
       performanceScore: 80,
-      durationMinutes: 3,
+      generationDurationMs: 1800,
       tokensIn: 900,
       tokensOut: 250,
     })
@@ -77,7 +77,7 @@ describe("analytics-server token fields", () => {
       sessionId: "session-1",
       scenarioType: "dsa",
       performanceScore: 80,
-      durationMinutes: 3,
+      generationDurationMs: 1800,
     })
 
     const payload = add.mock.calls[0][0] as unknown as { properties: Record<string, unknown> }

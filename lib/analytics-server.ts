@@ -12,10 +12,7 @@ import { adminDb } from "./firebase-admin"
 /**
  * Track event server-side (for API routes)
  */
-export async function trackEventServer(
-  eventName: string,
-  params: Record<string, any>
-) {
+export async function trackEventServer(eventName: string, params: Record<string, any>) {
   try {
     await adminDb.collection("analytics_events").add({
       event_name: eventName,
@@ -92,7 +89,15 @@ export async function trackFeedbackGenerationServer(params: {
   userId?: string
   scenarioType: string
   performanceScore: number
-  durationMinutes: number
+  /**
+   * Wall-clock time the feedback request itself took, in MILLISECONDS.
+   *
+   * Previously `durationMinutes`, which read as the length of the interview
+   * session but was measured from route-handler entry. Feedback generation
+   * finishes well inside a minute, so rounding it to minutes reported 0 on
+   * essentially every event.
+   */
+  generationDurationMs: number
   /** Provider-REPORTED token usage of the narrative feedback call. Omitted when unavailable — never estimated. */
   tokensIn?: number
   tokensOut?: number

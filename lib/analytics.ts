@@ -149,11 +149,7 @@ export function trackPurchase(params: {
 /**
  * Track subscription cancellation
  */
-export function trackCancellation(params: {
-  userId: string
-  tier: string
-  reason?: string
-}) {
+export function trackCancellation(params: { userId: string; tier: string; reason?: string }) {
   trackEvent("subscription_cancel", params)
 }
 
@@ -167,18 +163,6 @@ export function trackError(params: {
   userId?: string
 }) {
   trackEvent("error", params)
-}
-
-/**
- * Track feedback generation
- */
-export function trackFeedbackGeneration(params: {
-  sessionId: string
-  scenarioType: string
-  performanceScore: number
-  durationMinutes: number
-}) {
-  trackEvent("feedback_generated", params)
 }
 
 /**

@@ -1038,15 +1038,17 @@ CRITICAL INSTRUCTIONS:
       }
     )
 
-    // Track feedback generation
-    const durationMinutes = Math.round((Date.now() - startTime) / 60000)
+    // Track feedback generation. startTime is route-handler entry, so this is how
+    // long the request took, not how long the interview lasted. Reported in ms:
+    // as `durationMinutes` it rounded to 0 on effectively every event.
+    const generationDurationMs = Date.now() - startTime
     if (sessionId) {
       trackFeedbackGenerationServer({
         sessionId,
         userId,
         scenarioType: scenarioType || "unknown",
         performanceScore: scores.overall,
-        durationMinutes,
+        generationDurationMs,
         // Measured provider-reported usage of the narrative feedback call
         // (auxiliary critique/validation calls are tracked via usage events);
         // omitted when the provider gave none.
