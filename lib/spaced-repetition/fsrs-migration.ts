@@ -11,6 +11,9 @@
  * math is side-effect free and unit-tested.
  */
 
+import { FieldPath, type DocumentReference } from "firebase-admin/firestore"
+
+import { adminDb } from "../firebase-admin"
 import { createFSRSCard, type FSRSCard } from "./fsrs-algorithm"
 
 /** Minimum stability we will seed; FSRS misbehaves at 0. */
@@ -132,4 +135,186 @@ export function buildFsrsCardUpdate(card: FSRSCard): Record<string, unknown> {
     fsrs_stability: card.stability,
     fsrs_lapses: card.lapses,
   }
+}
+
+// ============================================
+// Batch orchestrator
+// ============================================
+
+export interface MigrateAllOptions {
+  /** Count everything but write nothing. */
+  dryRun?: boolean
+  /** Profiles fetched per Firestore page. */
+  pageSize?: number
+  /** Max users processed in this invocation (serverless-budget bound). */
+  maxUsers?: number
+  /** Resume after this profile doc id (from a prior result's nextCursor). */
+  cursor?: string
+}
+
+export interface MigrateAllResult {
+  usersScanned: number
+  usersFlippedToFsrs: number
+  usersAlreadyFsrs: number
+  usersOverriddenSkipped: number
+  cardsConverted: number
+  cardsSkipped: number
+  errors: Array<{ userId: string; message: string }>
+  /** Non-null when more users remain: pass back as options.cursor. */
+  nextCursor: string | null
+  dryRun: boolean
+}
+
+/** Firestore hard-caps batches at 500 ops; stay under with headroom. */
+const MAX_BATCH_OPS = 400
+
+/**
+ * Accumulates update ops and commits in chunks of MAX_BATCH_OPS.
+ * In dry-run mode it only counts and never touches Firestore.
+ */
+class BatchWriter {
+  private batch: FirebaseFirestore.WriteBatch | null = null
+  private pendingOps = 0
+
+  constructor(private readonly dryRun: boolean) {}
+
+  async update(ref: DocumentReference, data: Record<string, unknown>): Promise<void> {
+    if (this.dryRun) return
+    if (!this.batch) this.batch = adminDb.batch()
+    this.batch.update(ref, data)
+    this.pendingOps++
+    if (this.pendingOps >= MAX_BATCH_OPS) await this.flush()
+  }
+
+  async flush(): Promise<void> {
+    if (this.batch && this.pendingOps > 0) {
+      await this.batch.commit()
+    }
+    this.batch = null
+    this.pendingOps = 0
+  }
+}
+
+/**
+ * Sweep all profiles: convert every blob-less card to FSRS and flip
+ * non-overridden users' arm to fsrs.
+ *
+ * Properties:
+ * - Resumable: pages profiles by document id; returns nextCursor when the
+ *   maxUsers budget is exhausted before the collection is.
+ * - Idempotent: converted cards are skipped via hasValidFsrsState, already-
+ *   fsrs users via the arm check — a re-run converges to all-zero counts,
+ *   which doubles as the completion check.
+ * - Card conversion also applies to fsrs-arm users' blob-less legacy cards
+ *   (upgrades read-time-fallback seeds), and to overridden sm2 users (adding
+ *   fsrs_* fields is additive; SM-2 scheduling ignores them).
+ * - Per-user failures are recorded and do not abort the sweep.
+ *
+ * Deliberately does NOT write the global config doc — the admin route
+ * finalizes via markAbTestEnded only after the last page completes.
+ */
+export async function migrateAllUsersToFsrs(
+  options: MigrateAllOptions = {}
+): Promise<MigrateAllResult> {
+  const { dryRun = false, pageSize = 100, maxUsers = 100, cursor } = options
+
+  const result: MigrateAllResult = {
+    usersScanned: 0,
+    usersFlippedToFsrs: 0,
+    usersAlreadyFsrs: 0,
+    usersOverriddenSkipped: 0,
+    cardsConverted: 0,
+    cardsSkipped: 0,
+    errors: [],
+    nextCursor: null,
+    dryRun,
+  }
+
+  const writer = new BatchWriter(dryRun)
+  let lastProcessedId: string | undefined = cursor
+  let exhausted = false
+
+  while (result.usersScanned < maxUsers && !exhausted) {
+    const pageLimit = Math.min(pageSize, maxUsers - result.usersScanned)
+    let query = adminDb.collection("profiles").orderBy(FieldPath.documentId()).limit(pageLimit)
+    if (lastProcessedId) query = query.startAfter(lastProcessedId)
+
+    const page = await query.get()
+    if (page.empty) {
+      exhausted = true
+      break
+    }
+
+    for (const profileDoc of page.docs) {
+      result.usersScanned++
+      lastProcessedId = profileDoc.id
+      try {
+        await migrateSingleUser(profileDoc, writer, result)
+      } catch (error) {
+        result.errors.push({
+          userId: profileDoc.id,
+          message: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
+    if (page.docs.length < pageLimit) exhausted = true
+  }
+
+  await writer.flush()
+  result.nextCursor = exhausted ? null : (lastProcessedId ?? null)
+  return result
+}
+
+async function migrateSingleUser(
+  profileDoc: FirebaseFirestore.QueryDocumentSnapshot,
+  writer: BatchWriter,
+  result: MigrateAllResult
+): Promise<void> {
+  const userId = profileDoc.id
+  const profile = profileDoc.data() as {
+    spaced_repetition_algorithm?: string
+    algorithm_user_overridden?: boolean
+  }
+
+  // 1) Convert this user's blob-less cards (all arms — additive for sm2).
+  const cardsSnap = await adminDb
+    .collection("problem_mastery")
+    .doc(userId)
+    .collection("problems")
+    .get()
+
+  for (const cardDoc of cardsSnap.docs) {
+    const data = cardDoc.data() as Partial<Sm2CardFields>
+    // Docs without SR scheduling state (e.g. legacy session-metrics-shaped
+    // records lacking next_review_at) cannot be converted meaningfully.
+    if (typeof data.next_review_at !== "string") {
+      result.cardsSkipped++
+      continue
+    }
+    const converted = convertSm2CardToFsrs(data as Sm2CardFields)
+    if (converted) {
+      await writer.update(cardDoc.ref, buildFsrsCardUpdate(converted))
+      result.cardsConverted++
+    } else {
+      result.cardsSkipped++
+    }
+  }
+
+  // 2) Flip the arm unless the user explicitly chose theirs.
+  if (profile.spaced_repetition_algorithm === "fsrs") {
+    result.usersAlreadyFsrs++
+    return
+  }
+  if (profile.algorithm_user_overridden === true) {
+    result.usersOverriddenSkipped++
+    return
+  }
+
+  await writer.update(profileDoc.ref, {
+    spaced_repetition_algorithm: "fsrs",
+    algorithm_migrated_at: new Date().toISOString(),
+    algorithm_migrated_from: profile.spaced_repetition_algorithm ?? "unassigned",
+  })
+  result.usersFlippedToFsrs++
 }
