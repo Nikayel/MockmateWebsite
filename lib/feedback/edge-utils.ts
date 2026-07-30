@@ -294,17 +294,23 @@ export function calculateValidatedScores(
   understanding = gated.understanding
   problemSolving = gated.problemSolving
 
-  // Calculate overall based on scenario type
-  let overall: number
-  if (scenarioType === "system-design") {
-    overall = understanding * 0.2 + problemSolving * 0.2 + codeQuality * 0.1 + communication * 0.5
-  } else if (scenarioType === "bugfix") {
-    overall =
-      understanding * 0.25 + problemSolving * 0.35 + codeQuality * 0.25 + communication * 0.15
-  } else {
-    // DSA
-    overall = understanding * 0.25 + problemSolving * 0.25 + codeQuality * 0.3 + communication * 0.2
-  }
+  // Calculate overall based on scenario type. Weights come from SCORING in lib/constants.ts,
+  // the same source every other scoring module reads, so the Edge route cannot drift from the
+  // Node route. These were previously hard-coded here and had drifted on all three scenario
+  // types: DSA transposed CODE_QUALITY/COMMUNICATION (0.3/0.2 vs 0.2/0.3), bugfix transposed
+  // UNDERSTANDING/PROBLEM_SOLVING (0.25/0.35 vs 0.35/0.25), and system-design used
+  // 0.2/0.2/0.1/0.5 against a canonical 0.2/0.3/0.2/0.3.
+  const w =
+    scenarioType === "system-design"
+      ? SCORING.SYSTEM_DESIGN_WEIGHTS
+      : scenarioType === "bugfix"
+        ? SCORING.BUG_FIX_WEIGHTS
+        : SCORING.PERFORMANCE_WEIGHTS
+  let overall =
+    understanding * w.UNDERSTANDING +
+    problemSolving * w.PROBLEM_SOLVING +
+    codeQuality * w.CODE_QUALITY +
+    communication * w.COMMUNICATION
 
   overall = capOverallForCommunicationEvidence(overall, commEvidenceLevel)
 
