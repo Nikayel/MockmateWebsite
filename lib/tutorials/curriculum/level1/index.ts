@@ -995,6 +995,19 @@ word[-1]   # "n"   last character
 len(word)  # 6     number of characters
 \`\`\`
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Counting", "p", "y", "t", "h", "o", "n"],
+  "rows": [
+    ["From the left", 0, 1, 2, 3, 4, 5],
+    ["From the right", -6, -5, -4, -3, -2, -1]
+  ],
+  "highlightCols": ["Counting"],
+  "caption": "Two rulers over the same six characters. Left-counting starts at 0, which is why the last index is 5 and not 6; right-counting starts at -1, because -0 and 0 would be the same number."
+}
+\`\`\`
+
 To build the first-and-last string you will need in the Apply, you combine two indexed characters with \`+\`: \`word[0] + word[-1]\` gives \`"pn"\`. For a one-character string like \`"a"\`, both \`word[0]\` and \`word[-1]\` point at the same character, so you get \`"aa"\`.
 
 ## Slicing: half-open ranges
