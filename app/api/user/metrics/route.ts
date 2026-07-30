@@ -15,6 +15,7 @@ import { getUserUsageSummary } from "@/lib/usage-tracking"
 import { getMasteryStatistics, getUserScoreStats } from "@/lib/scoring/index"
 import { calculateTechnicalScoreFromBreakdown } from "@/lib/constants"
 import { clampPracticeMinutes } from "@/lib/session-duration"
+import { isScoredCompletedSession } from "@/lib/firestore-helpers"
 import { logger } from "@/lib/logger"
 
 /**
@@ -40,6 +41,12 @@ function calculateTechScoreFallback(
 /**
  * Fallback: Get stats directly from interview_sessions if user_stats is empty
  * This handles cases where sessions were completed but user_stats wasn't populated
+ *
+ * Counts only rounds that completed AND scored. `completed_at` alone is not enough:
+ * markSessionEvaluating() stamps it the moment evaluation STARTS, so abandoned and
+ * failed rounds carry the field but never produced a score. Without this gate the
+ * fallback reported more sessions (and more practice time) than the primary
+ * `user_stats` aggregate, which only ever increments on a real completion.
  */
 async function getStatsFromInterviewSessions(userId: string): Promise<{
   totalSessions: number
@@ -65,7 +72,8 @@ async function getStatsFromInterviewSessions(userId: string): Promise<{
 
     if (snapshot.empty) return null
 
-    const sessions = snapshot.docs.map((doc) => doc.data())
+    const sessions = snapshot.docs.map((doc) => doc.data()).filter(isScoredCompletedSession)
+    if (sessions.length === 0) return null
 
     // Aggregate stats
     let totalPracticeMinutes = 0
