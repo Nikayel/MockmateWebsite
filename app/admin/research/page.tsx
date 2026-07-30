@@ -33,7 +33,9 @@ import {
   QualityScorePanel,
   RecommendationsPanel,
   UserAlgorithmBreakdown,
+  LearnerModelPanel,
 } from "@/components/admin/research"
+import { useLearnerModelStats } from "@/lib/hooks/useLearnerModelStats"
 import {
   FlaskConical,
   Database,
@@ -157,6 +159,14 @@ export default function ResearchDashboard() {
     setParams: setUsersParams,
     params: usersParams,
   } = useResearchUsers(firebaseUser)
+
+  // Open learner model — challenge/correction/verification aggregates
+  const {
+    data: learnerModelData,
+    loading: learnerModelLoading,
+    error: learnerModelError,
+    loadData: loadLearnerModel,
+  } = useLearnerModelStats(firebaseUser)
 
   const { distribution, comparison, insights, recentEvents } = data || {}
   const sm2Stats = comparison?.sm2
@@ -593,7 +603,7 @@ export default function ResearchDashboard() {
       {/* Tabbed Advanced Analysis Section */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="-mx-1 overflow-x-auto px-1 pb-2">
-          <TabsList className="inline-flex w-full min-w-max bg-gray-800/50 md:grid md:grid-cols-5">
+          <TabsList className="inline-flex w-full min-w-max bg-gray-800/50 md:grid md:grid-cols-6">
             <TabsTrigger
               value="overview"
               className="flex-1 whitespace-nowrap data-[state=active]:bg-gray-700"
@@ -624,6 +634,13 @@ export default function ResearchDashboard() {
               className="flex-1 whitespace-nowrap data-[state=active]:bg-gray-700"
             >
               Events
+            </TabsTrigger>
+            <TabsTrigger
+              value="knowledge"
+              className="flex-1 whitespace-nowrap data-[state=active]:bg-gray-700"
+            >
+              <Brain className="mr-1 h-4 w-4" />
+              Knowledge
             </TabsTrigger>
           </TabsList>
         </div>
@@ -1084,6 +1101,16 @@ export default function ResearchDashboard() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* Knowledge Tab - open learner model (co-regulation study read-out) */}
+        <TabsContent value="knowledge" className="space-y-4">
+          <LearnerModelPanel
+            data={learnerModelData}
+            loading={learnerModelLoading}
+            error={learnerModelError}
+            onRefresh={loadLearnerModel}
+          />
         </TabsContent>
       </Tabs>
 
