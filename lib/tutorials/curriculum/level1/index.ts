@@ -828,6 +828,22 @@ That is the entire trick behind \`minutes_to_hm(total_minutes)\`: return \`[tota
 
 **\`//\` is not truncation.** \`//\` floors toward negative infinity, so \`-7 // 2\` is \`-4\`, not \`-3\`. And \`%\` takes the sign of the divisor: \`-7 % 2\` is \`1\` in Python. This surprises people coming from C or Java. For your minute problems the inputs are non-negative, so \`//\` and \`%\` line up with everyday intuition, but know the edge case exists.
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Expression", "Python", "C and Java", "What differs"],
+  "rows": [
+    ["7 // 3", "2", "2", "nothing: both agree on positives"],
+    ["7 % 3", "1", "1", "nothing"],
+    ["-7 // 3", "-3", "-2", "Python floors toward negative infinity, C truncates toward zero"],
+    ["-7 % 3", "2", "-1", "in Python the remainder takes the DIVISOR's sign"],
+    ["7 % -3", "-2", "1", "same rule, mirrored"]
+  ],
+  "highlightCols": ["Python"],
+  "caption": "Both languages preserve a == (a // b) * b + a % b; they just split the pair differently once a sign is negative. Python's choice keeps % non-negative whenever the divisor is positive, which is exactly what makes i % len(xs) safe as a wraparound index."
+}
+\`\`\`
+
 **Interview nuance:** the identity \`a == (a // b) * b + (a % b)\` always holds in Python, and because \`//\` floors (rather than truncating toward zero like C, Java, and Go), Python's \`%\` result always carries the sign of the divisor \`b\`, never the sign of \`a\`. Interviewers use this to test whether you actually know your language's division semantics: \`-7 % 3\` is \`2\` in Python but \`-1\` in C. When you need clock-style wraparound (an index that stays in range), Python's flooring \`%\` is the behavior you want.
 `,
     demoCode: `total = 125
