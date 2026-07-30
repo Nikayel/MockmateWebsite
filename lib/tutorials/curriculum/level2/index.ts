@@ -1505,6 +1505,242 @@ def run(item):
   },
 }
 
+const containerProtocolsLesson: PythonLesson = {
+  id: "py-l2-container-context-protocols",
+  title: "Container & context protocols",
+  summary:
+    "Make your class work with len(), for, in, and with by implementing the dunders they call.",
+  estimatedMinutes: 13,
+  difficulty: "medium",
+  skills: ["dunder-methods", "iteration", "context-manager", "classes"],
+  teach: {
+    estimatedMinutes: 6,
+    markdown: `## Syntax is a call in disguise
+
+Python's built-in syntax does not check what type you are. It calls a method and trusts the answer. \`len(x)\` is \`x.__len__()\`. \`for v in x\` is driven by \`x.__iter__()\`. \`v in x\` tries \`x.__contains__(v)\`. Implement the method and the syntax starts working on your class, with no inheritance and no registration.
+
+| You write | Python calls | Must return |
+| --- | --- | --- |
+| \`len(x)\` | \`x.__len__()\` | a non-negative \`int\` |
+| \`for v in x\` | \`x.__iter__()\` | an iterator (usually via \`yield\`) |
+| \`v in x\` | \`x.__contains__(v)\` | a \`bool\` |
+| \`x[k]\` | \`x.__getitem__(k)\` | the element |
+| \`x(...)\` | \`x.__call__(...)\` | anything |
+| \`with x as y\` | \`x.__enter__()\` then \`x.__exit__(...)\` | the \`as\` value, then a falsy value |
+
+\`\`\`python
+class Deck:
+    def __init__(self, cards):
+        self._cards = cards
+
+    def __len__(self):
+        return len(self._cards)
+
+    def __iter__(self):
+        yield from self._cards
+
+    def __contains__(self, card):
+        return card in self._cards
+
+deck = Deck(["A", "K", "Q"])
+print(len(deck))            # 3
+print("K" in deck)          # True
+print([c for c in deck])    # ['A', 'K', 'Q']
+\`\`\`
+
+Three small methods and \`Deck\` now behaves like a built-in collection everywhere: comprehensions, \`sorted()\`, \`max()\`, tuple unpacking, and \`if deck:\` all work, because they are all written against these same protocols.
+
+## Truthiness comes free, and that is a trap
+
+\`if deck:\` has no dunder of its own by default. Python falls back to \`__len__\` and treats zero as false. That is convenient until it is not:
+
+\`\`\`python
+empty = Deck([])
+if empty:
+    print("has cards")      # never runs, because len(empty) == 0
+\`\`\`
+
+If your object should always be truthy regardless of size, say so explicitly with \`__bool__\`. Otherwise an empty-but-valid object silently behaves like \`None\` at every \`if\`.
+
+## Context managers: guaranteeing the cleanup
+
+\`with\` exists so that cleanup runs even when the body raises. \`__enter__\` sets up and returns the value bound by \`as\`; \`__exit__\` tears down and receives the exception, if any.
+
+\`\`\`python
+class Timer:
+    def __enter__(self):
+        self.calls = []
+        return self                 # this is what "as t" binds
+
+    def __exit__(self, exc_type, exc, tb):
+        self.calls.append("closed")
+        return False                # do not swallow exceptions
+
+with Timer() as t:
+    t.calls.append("working")
+print(t.calls)                      # ['working', 'closed']
+\`\`\`
+
+\`__exit__\` receives three arguments describing the exception (or three \`None\` values on a clean exit). Its **return value is a decision**: falsy lets the exception propagate, truthy swallows it.
+
+\`\`\`csdiagram
+{
+  "type": "call-stack",
+  "title": "with Timer() as t:  (body raises)",
+  "steps": [
+    { "stack": ["main"], "note": "About to enter the with statement." },
+    { "stack": ["main", "Timer.__enter__"], "note": "Setup runs; its return value is bound to t." },
+    { "stack": ["main", "with body"], "note": "The body runs and raises ValueError." },
+    { "stack": ["main", "Timer.__exit__"], "note": "Called anyway, with the exception details." },
+    { "stack": ["main"], "returning": "False", "note": "Falsy return: the ValueError keeps propagating." }
+  ],
+  "caption": "__exit__ runs whether the body succeeds or raises. Returning False re-raises; returning True would silently swallow the error."
+}
+\`\`\`
+
+### Pitfalls
+
+- **Returning \`True\` from \`__exit__\` by accident.** A bare \`return True\`, or ending with a value that happens to be truthy, silently swallows every exception in the block. Return \`False\` (or nothing at all, since \`None\` is falsy) unless suppressing is the explicit intent.
+- **\`__len__\` returning a non-integer.** \`len()\` raises \`TypeError\` if you hand back a float or a string, even when the number is right.
+- **Forgetting that \`__len__\` drives truthiness.** An object with \`__len__\` returning \`0\` is falsy. Add \`__bool__\` if that is wrong for your type.
+- **Building a list just to iterate.** \`__iter__\` should \`yield\` rather than \`return list(...)\` when the source is large: yielding streams one item at a time instead of materialising the whole collection.
+
+**Interview nuance:** this is what "duck typing" concretely means. Python never asks whether \`Deck\` inherits from a collection base class; it asks whether \`Deck\` answers \`__len__\`. That is why \`collections.abc\` classes are mostly optional conveniences rather than requirements, and why a mock object that implements the same three dunders is indistinguishable from the real collection at every call site.`,
+    demoCode: `class Deck:
+    def __init__(self, cards):
+        self._cards = cards
+
+    def __len__(self):
+        return len(self._cards)
+
+    def __iter__(self):
+        yield from self._cards
+
+
+deck = Deck(["A", "K", "Q"])
+print(len(deck))            # 3
+print([c for c in deck])    # ['A', 'K', 'Q']`,
+  },
+  apply: {
+    id: "py-l2-container-context-protocols-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`__len__\` and \`__contains__\` on \`Deck\` so \`len(deck)\` counts the cards and \`card in deck\` works.
+
+\`run(["A", "K"], "K")\` should return \`[2, True]\`.`,
+    starterCode: `class Deck:
+    def __init__(self, cards):
+        self._cards = cards
+
+    def __len__(self):
+        # Return how many cards the deck holds.
+        pass
+
+    def __contains__(self, card):
+        # Return True when the card is in the deck.
+        pass
+
+
+def run(cards, card):
+    deck = Deck(cards)
+    return [len(deck), card in deck]`,
+    hints: [
+      "`self._cards` is a plain list, so the built-ins already work on it.",
+      "`__len__` can delegate: `return len(self._cards)`.",
+      "`__contains__` can delegate too: `return card in self._cards`.",
+    ],
+    referenceSolution: `class Deck:
+    def __init__(self, cards):
+        self._cards = cards
+
+    def __len__(self):
+        return len(self._cards)
+
+    def __contains__(self, card):
+        return card in self._cards
+
+
+def run(cards, card):
+    deck = Deck(cards)
+    return [len(deck), card in deck]`,
+    testCases: [
+      { input: { cards: ["A", "K"], card: "K" }, expected: [2, true], description: "card present" },
+      { input: { cards: ["A", "K"], card: "Q" }, expected: [2, false], description: "card absent" },
+      { input: { cards: [], card: "A" }, expected: [0, false], description: "empty deck" },
+      {
+        input: { cards: ["A", "A", "A"], card: "A" },
+        expected: [3, true],
+        description: "duplicates counted",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l2-container-context-protocols-practice",
+    executionMode: "single-file",
+    prompt: `Write a \`Session\` context manager whose \`__enter__\` returns the object and whose \`__exit__\` appends \`"closed"\` to \`self.log\`.
+
+\`run("query")\` should return \`["opened", "query", "closed"]\`, with \`"closed"\` appended even though the body runs first.`,
+    starterCode: `class Session:
+    def __init__(self):
+        self.log = []
+
+    def __enter__(self):
+        self.log.append("opened")
+        # Return the object so "as s" binds to it.
+        pass
+
+    def __exit__(self, exc_type, exc, tb):
+        # Append "closed", then let any exception propagate.
+        pass
+
+
+def run(action):
+    session = Session()
+    with session as s:
+        s.log.append(action)
+    return session.log`,
+    hints: [
+      "`__enter__` must return whatever `as s` should bind to. Here that is the session itself.",
+      "`return self` at the end of `__enter__`.",
+      'In `__exit__`, `self.log.append("closed")` then `return False` so exceptions still propagate.',
+    ],
+    referenceSolution: `class Session:
+    def __init__(self):
+        self.log = []
+
+    def __enter__(self):
+        self.log.append("opened")
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.log.append("closed")
+        return False
+
+
+def run(action):
+    session = Session()
+    with session as s:
+        s.log.append(action)
+    return session.log`,
+    testCases: [
+      {
+        input: { action: "query" },
+        expected: ["opened", "query", "closed"],
+        description: "cleanup runs after the body",
+      },
+      {
+        input: { action: "write" },
+        expected: ["opened", "write", "closed"],
+        description: "any action, same ordering",
+      },
+      {
+        input: { action: "" },
+        expected: ["opened", "", "closed"],
+        description: "empty action still logged",
+      },
+    ],
+  },
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // L2-M4: Data Modeling
 // ───────────────────────────────────────────────────────────────────────────
@@ -2366,6 +2602,7 @@ export const level2: PythonLevel = {
         inheritanceCompositionLesson,
         dunderPropertiesLesson,
         classmethodStaticmethodLesson,
+        containerProtocolsLesson,
       ],
     },
     {
