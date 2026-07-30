@@ -11,16 +11,31 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { adminDb } from "@/lib/firebase-admin"
 import { verifyAdminAccess } from "@/lib/admin/middleware"
+import { logAdminAction, AUDIT_ACTIONS } from "@/lib/admin/audit"
 import {
   getAlgorithmDistribution,
   migrateExistingUsers,
   getAggregateComparison,
   generateAggregateComparison,
   getRecentEvents,
+  getAlgorithmConfig,
+  markAbTestEnded,
 } from "@/lib/spaced-repetition"
+import { migrateAllUsersToFsrs } from "@/lib/spaced-repetition/fsrs-migration"
 import type { AlgorithmComparisonAggregate } from "@/lib/types"
+
+// The end-ab-switch-fsrs sweep does per-user subcollection reads; give the
+// route headroom beyond the default function timeout.
+export const maxDuration = 300
+
+const endAbSchema = z.object({
+  action: z.literal("end-ab-switch-fsrs"),
+  dryRun: z.boolean().optional().default(false),
+  cursor: z.string().min(1).optional(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -71,9 +86,13 @@ export async function GET(request: NextRequest) {
     // Calculate additional insights
     const insights = calculateInsights(comparison)
 
+    // A/B lifecycle status (drives the "ended" banner + button visibility)
+    const abStatus = await getAlgorithmConfig()
+
     return NextResponse.json({
       success: true,
       data: {
+        abStatus,
         distribution,
         comparison,
         recentEvents: recentEvents.map((event) => ({
@@ -181,6 +200,62 @@ export async function POST(request: NextRequest) {
           success: true,
           message: `Added notification preferences to ${migrated} users`,
           data: { migrated },
+        })
+      }
+
+      case "end-ab-switch-fsrs": {
+        const parsed = endAbSchema.safeParse(body)
+        if (!parsed.success) {
+          return NextResponse.json(
+            { success: false, error: "Invalid request", details: parsed.error.flatten() },
+            { status: 400 }
+          )
+        }
+        const { dryRun, cursor } = parsed.data
+        const adminId = authResult.context!.userId
+
+        const result = await migrateAllUsersToFsrs({ dryRun, cursor, maxUsers: 100 })
+
+        // Finalize only when the whole sweep is done and this wasn't a dry run:
+        // the coin flip must not stop while sm2 users still hold unconverted cards.
+        const finalized = !dryRun && result.nextCursor === null
+        if (finalized) {
+          await markAbTestEnded(adminId)
+        }
+
+        // Audit every page (dry runs included) — this is an irreversible,
+        // all-users action and the trail should show the full sequence.
+        await logAdminAction(
+          adminId,
+          AUDIT_ACTIONS.END_AB_SWITCH_FSRS,
+          {
+            dryRun,
+            cursor: cursor ?? null,
+            nextCursor: result.nextCursor,
+            finalized,
+            usersScanned: result.usersScanned,
+            usersFlippedToFsrs: result.usersFlippedToFsrs,
+            usersAlreadyFsrs: result.usersAlreadyFsrs,
+            usersOverriddenSkipped: result.usersOverriddenSkipped,
+            cardsConverted: result.cardsConverted,
+            cardsSkipped: result.cardsSkipped,
+            errorCount: result.errors.length,
+          },
+          request
+        )
+
+        const overriddenNote =
+          result.usersOverriddenSkipped > 0
+            ? ` (${result.usersOverriddenSkipped} user-overridden sm2 users kept their choice)`
+            : ""
+        return NextResponse.json({
+          success: true,
+          message: dryRun
+            ? `Dry run: would flip ${result.usersFlippedToFsrs} users and convert ${result.cardsConverted} cards${overriddenNote}`
+            : finalized
+              ? `A/B ended: flipped ${result.usersFlippedToFsrs} users, converted ${result.cardsConverted} cards${overriddenNote}. New users now always get FSRS.`
+              : `Page done: flipped ${result.usersFlippedToFsrs} users, converted ${result.cardsConverted} cards${overriddenNote}. Continue with cursor.`,
+          data: result,
         })
       }
 
