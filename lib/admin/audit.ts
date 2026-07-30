@@ -136,6 +136,9 @@ export const AUDIT_ACTIONS = {
 
   // Settings
   UPDATE_SETTINGS: "update_settings",
+
+  // Algorithm research
+  END_AB_SWITCH_FSRS: "end_ab_switch_fsrs",
 } as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS]
