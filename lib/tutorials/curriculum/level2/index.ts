@@ -1008,6 +1008,67 @@ print(LoudGreeter("Ada").greet())   # Hi, Ada!!!
 
 Notice \`LoudGreeter\` never redefines \`__init__\`. Because it inherits the parent's, \`LoudGreeter("Ada")\` still stores \`self.name = "Ada"\`. That is exactly the Apply exercise: override \`greet\`, call \`super().greet()\`, and append \`"!!!"\`.
 
+## What super() actually resolves to
+
+\`super()\` does not mean "my parent class". It means "the next class after me in the **method
+resolution order**", and that distinction only shows up once more than one base is involved. Every
+class carries its MRO as a list you can read:
+
+\`\`\`python
+class A:
+    def who(self):
+        return "A"
+
+class B(A):
+    def who(self):
+        return "B -> " + super().who()
+
+class C(A):
+    def who(self):
+        return "C -> " + super().who()
+
+class D(B, C):
+    pass
+
+print(D().who())                        # B -> C -> A
+print([cls.__name__ for cls in D.__mro__])   # ['D', 'B', 'C', 'A', 'object']
+\`\`\`
+
+Read that output carefully: inside \`B.who\`, \`super()\` reached **C**, not \`A\`. \`B\` does not inherit from
+\`C\` at all. The MRO is a property of \`D\`, the object the call started from, so \`B\`'s \`super()\` resolves
+against \`D\`'s ordering:
+
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "class D(B, C) and the order super() walks",
+  "layout": "tb",
+  "nodes": [
+    { "id": "D", "label": "D(B, C)", "kind": "client" },
+    { "id": "B", "label": "B(A)", "kind": "service" },
+    { "id": "C", "label": "C(A)", "kind": "service" },
+    { "id": "A", "label": "A", "kind": "db" }
+  ],
+  "edges": [
+    { "from": "D", "to": "B", "kind": "sync", "label": "1st" },
+    { "from": "D", "to": "C", "kind": "sync", "label": "3rd, reached via B's super()" },
+    { "from": "B", "to": "A", "kind": "sync", "label": "inherits from" },
+    { "from": "C", "to": "A", "kind": "sync", "label": "4th and last" }
+  ],
+  "stages": [
+    { "adds": ["D"], "note": "The call starts here, and D's MRO is what every super() in the chain will follow." },
+    { "adds": ["B"], "note": "First match wins: D has no who(), so B's runs." },
+    { "adds": ["C"], "note": "B's super() lands on C, its sibling. This is the step that surprises people, because B does not inherit from C." },
+    { "adds": ["A"], "note": "Only after every class that inherits from A has had a turn does A finally run. A appears once, not twice." }
+  ],
+  "caption": "The MRO is computed by C3 linearization, whose rule is: a class always comes before its own bases, and A cannot run until both B and C have. That is what makes the shared base run exactly once."
+}
+\`\`\`
+
+This is the **diamond problem**, and cooperative \`super()\` is how Python solves it: the shared base \`A\`
+executes once rather than once per path. It also explains why every class in a cooperative hierarchy
+should call \`super()\`. One class that skips the call silently truncates the chain for everyone below it.
+
 ## Composition: an object *has* another object
 
 Composition means an object holds other objects as attributes instead of inheriting from them. A \`Person\` is not a kind of \`Wallet\`, so inheritance is wrong here. A \`Person\` **has a** \`Wallet\`:
