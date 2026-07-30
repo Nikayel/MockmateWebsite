@@ -2467,7 +2467,7 @@ with no hand-tuning.
 
 ### SWIM: membership at scale
 
-All-to-all heartbeats are O(n^2): 500 nodes each pinging 499 others is ~250k messages per interval.
+All-to-all heartbeats are O(n²): 500 nodes each pinging 499 others is ~250k messages per interval.
 **SWIM** makes per-node load **O(1)**. Each period, a node **directly probes one random peer**. If
 that peer does not ack, the node asks **k other random members to probe it indirectly** (the target
 might be fine but the direct path congested; indirect probes distinguish a path problem from a dead
@@ -2478,7 +2478,7 @@ blips. Membership changes **piggyback on probe messages** and spread infection-s
 cluster learns in O(log n) rounds. This is what HashiCorp memberlist (Consul, Serf) implements.
 
 \`\`\`
-  all-to-all heartbeat:  n=500 -> ~250,000 msgs/interval  (O(n^2))
+  all-to-all heartbeat:  n=500 -> ~250,000 msgs/interval  (O(n²))
   SWIM per node/interval: 1 direct probe + k indirect on miss (O(1))
   suspect -> (refute window) -> confirm dead, gossiped on probe traffic
 \`\`\`
@@ -2785,11 +2785,11 @@ purely to survive lies rather than silence.
 \`\`\`
 
 The other cost is **messages**. Because a node cannot trust a single report, classic BFT makes
-everyone cross-check everyone: **O(n^2)** messages per decision, versus Raft's near-linear cost.
+everyone cross-check everyone: **O(n²)** messages per decision, versus Raft's near-linear cost.
 Protocols to name:
 
 - **PBFT** (Castro-Liskov 1999): the classic. Three phases (pre-prepare, prepare, commit), a primary
-  that proposes, and a **view-change** protocol to depose a faulty primary. O(n^2) messages.
+  that proposes, and a **view-change** protocol to depose a faulty primary. O(n²) messages.
 - **Tendermint** (Cosmos): BFT with a rotating proposer, suited to proof-of-stake chains.
 - **HotStuff** (Meta's former Diem): reduces message complexity to **linear O(n)** via threshold
   signatures and adds **pipelining**. The modern reference.
@@ -2809,7 +2809,7 @@ BFT (name HotStuff for scale). If one trusted operator, say so and pick Raft plu
 checksums/TLS/auth.
 
 Recap: crash-stop consensus (2f+1) assumes nodes may halt but never lie; the Byzantine model allows
-lying, equivocation, and collusion, forcing 3f+1 nodes and often O(n^2) messages (PBFT, or linear
+lying, equivocation, and collusion, forcing 3f+1 nodes and often O(n²) messages (PBFT, or linear
 HotStuff); use BFT only across real trust boundaries and Raft plus checksums/TLS/auth inside one
 trusted operator.
 
@@ -2831,7 +2831,7 @@ trusted operator.
     {
       "label": "A 500-node cluster in one datacenter under one operator",
       "bucket": "Raft plus checksums, TLS, auth",
-      "feedback": "The realistic failures are crashes, disk faults, and partitions. Paying 3f+1 nodes and O(n^2) messages to defend against your own insiders is over-engineering."
+      "feedback": "The realistic failures are crashes, disk faults, and partitions. Paying 3f+1 nodes and O(n²) messages to defend against your own insiders is over-engineering."
     },
     {
       "label": "Public blockchain validators run by anonymous strangers",
@@ -3749,9 +3749,9 @@ export const systemDesignLevel5: DesignLevel = {
             modelAnswerOutline: [
               "Assumptions: a replicated state machine agreeing on an ordered log of operations. The design question is entirely about who the participants are and whether any could be adversarial or compromised.",
               "**The two models:** crash-stop means a node follows the protocol or halts, never lies: Raft/Paxos tolerate f failures with 2f+1 nodes because any two majority quorums overlap in a node carrying the committed value. Byzantine means a faulty node can lie, equivocate (different values to different peers in the same round), forge messages, or collude. The difference that matters: a crash is passive and detectable by absence; a Byzantine fault is active deception: the node keeps talking, so you cannot wait it out and cannot trust any single report.",
-              "**How BFT tolerates lies, the 3f+1 math:** honest nodes must cross-check and vote. To tolerate f liars you need 3f+1 total and quorums of 2f+1: every quorum contains at least f+1 honest nodes, so (a) a quorum still forms if the liars withhold votes, and (b) any two quorums overlap in at least one honest node, so honest nodes always outvote the liars and the system cannot split into two inconsistent decisions. Tolerating 1 Byzantine fault needs 4 nodes, not Raft's 3, and classically O(n^2) messages. PBFT implements this with pre-prepare/prepare/commit and a view-change to depose a faulty primary; HotStuff cuts messaging to linear with threshold signatures and pipelines decisions.",
+              "**How BFT tolerates lies, the 3f+1 math:** honest nodes must cross-check and vote. To tolerate f liars you need 3f+1 total and quorums of 2f+1: every quorum contains at least f+1 honest nodes, so (a) a quorum still forms if the liars withhold votes, and (b) any two quorums overlap in at least one honest node, so honest nodes always outvote the liars and the system cannot split into two inconsistent decisions. Tolerating 1 Byzantine fault needs 4 nodes, not Raft's 3, and classically O(n²) messages. PBFT implements this with pre-prepare/prepare/commit and a view-change to depose a faulty primary; HotStuff cuts messaging to linear with threshold signatures and pipelines decisions.",
               "**The decision is a threat-model call:** participants spanning a trust boundary (mutually distrusting orgs, a public network, hardware domains with undetectable corruption) justify BFT (HotStuff for scale). All nodes inside one datacenter under one operator face crashes, disk faults, and partitions, not malice: Raft plus checksums (bit rot), TLS (tampering in transit), and authentication covers the actual threats far more cheaply.",
-              "Common wrong turn: reaching for BFT or a blockchain inside a single trusted org: paying f extra nodes and O(n^2) messaging to defend against malicious insiders the trust boundary already excludes.",
+              "Common wrong turn: reaching for BFT or a blockchain inside a single trusted org: paying f extra nodes and O(n²) messaging to defend against malicious insiders the trust boundary already excludes.",
             ],
           },
           practice: {

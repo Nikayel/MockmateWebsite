@@ -1887,7 +1887,7 @@ const performanceLesson: PythonLesson = {
     estimatedMinutes: 7,
     markdown: `## Make it fast: measure, then fix the right thing
 
-Slow code costs money and latency in production, and the human instinct for *where* it is slow is almost always wrong. Engineers waste hours micro-optimizing a loop that runs once while an accidental \`O(n^2)\` scan buried three functions away eats the request budget. The discipline is: measure first, fix algorithmic complexity, then cache repeated work. Only after that do you tune lines.
+Slow code costs money and latency in production, and the human instinct for *where* it is slow is almost always wrong. Engineers waste hours micro-optimizing a loop that runs once while an accidental \`O(n²)\` scan buried three functions away eats the request budget. The discipline is: measure first, fix algorithmic complexity, then cache repeated work. Only after that do you tune lines.
 
 ### Profile before you touch anything
 

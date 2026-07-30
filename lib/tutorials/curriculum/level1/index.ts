@@ -1464,7 +1464,7 @@ That is the \`merge_two\` exercise in one line. Python 3.9+ also offers \`a | b\
 
 \`.get\` with no default returns \`None\`, not an error, when the key is missing, so \`prices.get("banana")\` gives \`None\` rather than \`0\`. Always pass the fallback you actually want. Watch the direction too: \`key in d\` tests keys, not values, so \`"apple" in prices\` is \`True\` but \`3 in prices\` is \`False\`. And bracket assignment overwrites silently, so \`d[key] = value\` replaces any existing value with no warning. That same rule is why the right operand wins in a merge.
 
-**Interview nuance:** interviewers probe why dict lookup is \`O(1)\` while list membership (\`x in some_list\`) is \`O(n)\`. The dict hashes the key and jumps to a slot; the list compares element by element. When a solution repeatedly asks "have I seen this before?", swapping a list for a dict or \`set\` is often the entire optimization, turning an \`O(n^2)\` loop into \`O(n)\`.`,
+**Interview nuance:** interviewers probe why dict lookup is \`O(1)\` while list membership (\`x in some_list\`) is \`O(n)\`. The dict hashes the key and jumps to a slot; the list compares element by element. When a solution repeatedly asks "have I seen this before?", swapping a list for a dict or \`set\` is often the entire optimization, turning an \`O(n²)\` loop into \`O(n)\`.`,
     demoCode: `prices = {"apple": 3, "pear": 2}
 print(prices["apple"])          # 3
 print(prices.get("banana", 0))  # 0
@@ -1986,7 +1986,7 @@ const complexityChoiceLesson: PythonLesson = {
     estimatedMinutes: 4,
     markdown: `## Why membership cost decides your data structure
 
-Reach for the wrong container and a fast function turns slow without a single line looking "wrong." The trap is \`x in collection\`. It reads the same for a list, a set, and a dict, but it does very different amounts of work. On a list, Python compares \`x\` against elements one at a time until it finds a match or runs out. On a million-element list that is up to a million comparisons for one lookup. Do that inside a loop and you have an \`O(n^2)\` function that crawls on real data. Interviewers hand you exactly this shape and watch whether you notice.
+Reach for the wrong container and a fast function turns slow without a single line looking "wrong." The trap is \`x in collection\`. It reads the same for a list, a set, and a dict, but it does very different amounts of work. On a list, Python compares \`x\` against elements one at a time until it finds a match or runs out. On a million-element list that is up to a million comparisons for one lookup. Do that inside a loop and you have an \`O(n²)\` function that crawls on real data. Interviewers hand you exactly this shape and watch whether you notice.
 
 ### The mental model
 
@@ -2012,7 +2012,7 @@ for x in nums:
     seen.add(x)
 \`\`\`
 
-That loop is \`O(n)\`: one pass, each check flat. The list version, \`if x in seen\` against a growing list, would be \`O(n^2)\`.
+That loop is \`O(n)\`: one pass, each check flat. The list version, \`if x in seen\` against a growing list, would be \`O(n²)\`.
 
 ### Pitfalls
 

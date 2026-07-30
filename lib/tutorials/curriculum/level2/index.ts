@@ -2558,7 +2558,7 @@ q.popleft()       # 0
 - \`defaultdict([])\` raises \`TypeError\`. The factory must be callable, so pass \`list\`, \`set\`, or \`int\`, never an instance.
 - \`Counter\` never raises on a missing key, which is handy but hides typos: \`c["speling"]\` quietly returns \`0\`.
 
-**Interview nuance:** using a \`list\` as a queue is a classic trap. \`list.pop(0)\` and \`list.insert(0, x)\` are \`O(n)\` because every remaining element shifts one slot, so a BFS built on \`list.pop(0)\` is secretly \`O(n^2)\`. \`deque.popleft()\` and \`deque.appendleft()\` are \`O(1)\`, which is why a \`deque\` is the standard queue for BFS and sliding-window problems. The tradeoff is that a \`deque\` has no \`O(1)\` random indexing into its middle, unlike a \`list\`.`,
+**Interview nuance:** using a \`list\` as a queue is a classic trap. \`list.pop(0)\` and \`list.insert(0, x)\` are \`O(n)\` because every remaining element shifts one slot, so a BFS built on \`list.pop(0)\` is secretly \`O(n²)\`. \`deque.popleft()\` and \`deque.appendleft()\` are \`O(1)\`, which is why a \`deque\` is the standard queue for BFS and sliding-window problems. The tradeoff is that a \`deque\` has no \`O(1)\` random indexing into its middle, unlike a \`list\`.`,
     demoCode: `from collections import Counter, defaultdict
 print(Counter(["a", "b", "a", "c", "a"]))   # Counter({'a': 3, 'b': 1, 'c': 1})
 
