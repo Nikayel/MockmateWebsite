@@ -23,6 +23,7 @@ export type ScoreInfoType =
   | "problemSolving"
   | "codeQuality"
   | "communication"
+  | "retrievability"
 
 interface ScoreExplanation {
   title: string
@@ -63,6 +64,11 @@ const SCORE_EXPLANATIONS: Record<ScoreInfoType, ScoreExplanation> = {
   new: {
     title: "New",
     description: "You haven't practiced this problem yet. Start here to begin building mastery!",
+  },
+  retrievability: {
+    title: "Retrievability",
+    description:
+      "The system's estimate of the chance you could solve this cold right now, from the FSRS forgetting curve. It decays over time and resets when you review. If it looks wrong to you, you can challenge it on the Knowledge page.",
   },
   testPassRate: {
     title: "Test Pass Rate",
