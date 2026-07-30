@@ -476,6 +476,24 @@ Almost every service has a spot where behavior branches by a key: pick a discoun
 - **S**ingle responsibility: each function or class has one reason to change.
 - **O**pen/closed: code is open to extension but closed to modification. You add a case by adding code, not by editing code that already passed its tests.
 
+The other three matter less here but come up in review, so it is worth being able to name all five:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Principle", "In one line", "The smell it names"],
+  "rows": [
+    ["S: single responsibility", "one reason to change", "a class that both parses and saves, so two teams edit it"],
+    ["O: open/closed", "extend by adding, not by editing", "the forty-branch if/elif nobody dares touch"],
+    ["L: Liskov substitution", "a subtype must work anywhere its base does", "a subclass that raises NotImplementedError on an inherited method"],
+    ["I: interface segregation", "many small interfaces beat one fat one", "implementers stubbing methods they never needed"],
+    ["D: dependency inversion", "depend on the abstraction, not the concrete type", "a service that builds its own DB client, so tests cannot swap it"]
+  ],
+  "highlightCols": ["The smell it names"],
+  "caption": "The highlighted column is the useful half. Almost nobody recalls the five letters under pressure, but everyone recognises the smells, and each smell is what the principle was written to describe."
+}
+\`\`\`
+
 A long \`if/elif\` chain violates open/closed: every new tier reopens \`price_for\` and puts a tested function back on the table. Two patterns remove the chain.
 
 ### Strategy: behavior as a value
