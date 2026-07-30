@@ -27,7 +27,6 @@ import {
   scheduleFSRS,
   DEFAULT_FSRS_CONFIG,
   type FSRSCard,
-  type FSRSRating,
 } from "../spaced-repetition/fsrs-algorithm"
 import { reconstructState } from "../spaced-repetition/algorithm-router"
 import { buildFsrsCardUpdate } from "../spaced-repetition/fsrs-migration"

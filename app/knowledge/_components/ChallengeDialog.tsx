@@ -97,31 +97,47 @@ export function ChallengeDialog({ card, onClose, submitChallenge }: ChallengeDia
 
         {!result && (
           <div className="space-y-3">
-            {REASONS.map((r) => (
-              <button
-                key={r.value}
-                onClick={() => setReason(r.value)}
-                className={`w-full rounded-lg border p-3 text-left transition-colors ${
-                  reason === r.value
-                    ? "border-foreground/40 bg-card"
-                    : "border-border bg-card/30 hover:bg-card/60"
-                }`}
-                aria-pressed={reason === r.value}
-              >
-                <p className="text-foreground text-sm font-medium">{r.label}</p>
-                <p className="text-muted-foreground mt-0.5 text-xs">{r.description}</p>
-              </button>
-            ))}
+            {/* Mutually exclusive choices: a radiogroup, so assistive tech
+                announces "radio, 1 of 3" rather than three pressed buttons. */}
+            <div
+              role="radiogroup"
+              aria-label="Why does this belief seem wrong?"
+              className="space-y-3"
+            >
+              {REASONS.map((r) => (
+                <button
+                  key={r.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={reason === r.value}
+                  onClick={() => setReason(r.value)}
+                  className={`focus-visible:ring-ring w-full rounded-lg border p-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none ${
+                    reason === r.value
+                      ? "border-foreground/40 bg-card"
+                      : "border-border bg-card/30 hover:bg-card/60"
+                  }`}
+                >
+                  <p className="text-foreground text-sm font-medium">{r.label}</p>
+                  <p className="text-muted-foreground mt-0.5 text-xs">{r.description}</p>
+                </button>
+              ))}
+            </div>
 
             <Textarea
               value={details}
               onChange={(e) => setDetails(e.target.value)}
               maxLength={500}
+              // Placeholder alone is not an accessible name.
+              aria-label="Additional details about your challenge (optional)"
               placeholder="Anything else? (optional)"
               className="min-h-16 text-sm"
             />
 
-            {error && <p className="text-xs text-rose-400">{error}</p>}
+            {error && (
+              <p role="alert" className="text-xs text-rose-700 dark:text-rose-400">
+                {error}
+              </p>
+            )}
 
             <Button
               onClick={handleSubmit}
@@ -137,7 +153,7 @@ export function ChallengeDialog({ card, onClose, submitChallenge }: ChallengeDia
         {result && (
           <div className="space-y-3">
             <div className="flex items-start gap-2">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-400" />
               <div className="text-sm">
                 <p className="text-foreground font-medium">The model updated</p>
                 <p className="text-muted-foreground mt-1">
