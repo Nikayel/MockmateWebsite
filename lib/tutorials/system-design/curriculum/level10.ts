@@ -121,9 +121,19 @@ Because the timestamp is in the high bits, if a node's clock jumps backward (NTP
 
 Worker-id assignment is the other operational detail. Each node needs a unique 10-bit id. Assign it via a coordination service (ZooKeeper or etcd) that leases ids, or from a config/orchestrator on startup. Exhaustion (more than 1,024 live nodes) means you rebudget bits or recycle ids from dead nodes.
 
-\`\`\`
- 0 | 41 bits timestamp (ms since epoch) | 10 bits worker id | 12 bits sequence
-   |<------------- high bits: sortable ------------->|<-- uniqueness within ms -->
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Field", "Bits", "What it buys", "Runs out at"],
+  "rows": [
+    ["Sign", "1", "Always 0, so the id stays a positive signed 64-bit integer", "Reserved, never used"],
+    ["Timestamp (ms since a custom epoch)", "41", "Rough sortability by creation time, because it occupies the high bits", "≈ 69 years after the epoch you pick"],
+    ["Worker id", "10", "Uniqueness across nodes with no coordination per id", "1,024 simultaneously live nodes"],
+    ["Sequence", "12", "Uniqueness within one millisecond on one node", "4,096 ids per node per millisecond"]
+  ],
+  "highlightCols": ["Runs out at"],
+  "caption": "64 bits total, and the field ORDER is the design: timestamp sits highest so a plain integer sort is roughly a time sort. Move it lower and you keep uniqueness but lose sortability, which is the whole reason to prefer this over a random UUID."
+}
 \`\`\`
 
 There is a real tension: sortability leaks information. A time-sortable ID reveals creation time and, worse, sequential-ish IDs let an attacker enumerate or estimate volume ("how many orders did they get today"). If unpredictability matters (public-facing resource ids), do not expose the raw sortable id; use a random UUID externally and keep the Snowflake id internal, or add a non-sequential public slug.
