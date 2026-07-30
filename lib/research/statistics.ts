@@ -590,6 +590,11 @@ export interface SampleSizeAnalysis {
 
 /**
  * Analyze sample size sufficiency for the research
+ *
+ * NOTE: the SM-2/FSRS A/B (and its 50/50-split assumption below) applies to
+ * the HISTORICAL experiment period only — the A/B was ended via the admin
+ * end-ab-switch-fsrs action and all users now run FSRS. This analysis stays
+ * for interpreting the archived comparison data.
  */
 export function analyzeSampleSize(
   sm2Count: number,
