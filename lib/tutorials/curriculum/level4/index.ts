@@ -757,6 +757,20 @@ add = multiply_by(3)(add)
 # step 2: decorator(add) runs and returns \`wrapper\`, rebound to the name \`add\`
 \`\`\`
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Layer", "Takes", "Returns", "Runs"],
+  "rows": [
+    ["multiply_by(factor)", "the config, 3", "the decorator", "once, at the @ line"],
+    ["decorator(fn)", "the function being decorated", "the wrapper", "once, at the @ line"],
+    ["wrapper(*args, **kwargs)", "the call arguments", "fn's result, times factor", "on every call"]
+  ],
+  "highlightCols": ["Runs"],
+  "caption": "The highlighted column explains the classic mistake. Two layers run once when the module loads and only the third runs per call, so writing @multiply_by without the parentheses skips the factory entirely and hands your function in as factor."
+}
+\`\`\`
+
 \`factor\` stays reachable inside \`wrapper\` because \`wrapper\` is a closure over the factory's scope. \`*args, **kwargs\` in \`wrapper\` forwards any call signature through untouched, so \`multiply_by\` works on \`add\`, on a one-argument function, or on anything else.
 
 ### functools.wraps
