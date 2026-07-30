@@ -570,6 +570,31 @@ print(cart_total(["apple", "bread"]))   # 5
 
 **Circular imports.** If \`catalog\` imports from \`cart\` while \`cart\` imports from \`catalog\`, whichever module loads second sees the first one only half-built, and you get an \`ImportError\` or \`AttributeError\`. The fix is to point dependencies one way. Here \`cart\` depends on \`catalog\`, never the reverse.
 
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Dependencies point one way",
+  "layout": "lr",
+  "nodes": [
+    { "id": "runner", "label": "app.py (what you run)", "kind": "client" },
+    { "id": "cart", "label": "store/cart.py", "kind": "service" },
+    { "id": "catalog", "label": "store/catalog.py", "kind": "db" }
+  ],
+  "edges": [
+    { "from": "runner", "to": "cart", "kind": "sync", "label": "from store.cart import cart_total" },
+    { "from": "cart", "to": "catalog", "kind": "sync", "label": "from store.catalog import price_of" }
+  ],
+  "stages": [
+    { "adds": ["runner"], "note": "The script or test you actually run, started from the project root so 'store' is importable." },
+    { "adds": ["cart"], "note": "cart owns the totalling logic and imports what it needs to do that job." },
+    { "adds": ["catalog"], "note": "catalog owns prices and imports nothing from cart. It is a leaf, so it can always finish loading." }
+  ],
+  "caption": "Add one edge back from catalog to cart and this becomes a cycle. Whichever module Python happens to load second then sees the other half-built, which is why the error is an AttributeError on a name that plainly exists in the file."
+}
+\`\`\`
+
+Read the arrows as "imports from". A healthy package is a graph you can walk in one direction and always reach a leaf.
+
 **Running a package file directly.** \`python store/cart.py\` fails with \`ModuleNotFoundError: No module named 'store'\`, because running a file puts its own folder (\`store/\`) on the import path instead of the project root, so \`store\` is not importable. Run it as a module from the project root with \`python -m store.cart\`, or import it from a top-level script instead. (Had \`cart.py\` used the relative \`from .catalog import price_of\`, the same command would fail differently, with \`attempted relative import with no known parent package\`.)
 
 **Interview nuance:** a module is a singleton. The first import runs the file body and caches the resulting module object in \`sys.modules\`; every later \`import\` returns that same cached object without re-running the file. So top-level code (a \`PRICES\` dict, a database connection) executes exactly once per process, and any module-level state is shared everywhere it is imported. Interviewers probe this when they ask why an import side effect runs only once, or how two modules end up mutating the same object.`,
