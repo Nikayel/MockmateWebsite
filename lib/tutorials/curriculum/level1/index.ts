@@ -1465,6 +1465,22 @@ prices["apple"] = 5        # the same syntax updates an existing key
 
 That \`.get(name, 0)\` pattern is exactly what the \`lookup\` exercise needs.
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["You write", "Key is present", "Key is missing"],
+  "rows": [
+    ["d[key]", "the value", "raises KeyError"],
+    ["d.get(key)", "the value", "None, silently"],
+    ["d.get(key, 0)", "the value", "0, the fallback you chose"],
+    ["d.setdefault(key, 0)", "the value", "inserts 0 into d and returns it"],
+    ["key in d", "True", "False, and it tests KEYS, never values"]
+  ],
+  "highlightCols": ["Key is missing"],
+  "caption": "Only the missing-key column differs, and only one row there raises. Two of the others return something falsy without complaint, which is why a bare .get(key) so often turns a typo into a silent None instead of an error."
+}
+\`\`\`
+
 Merge two dicts into a brand new one with \`{**a, **b}\`. The demo below spreads \`{"fig": 6}\` into \`prices\` and leaves both originals untouched. When both sides share a key, the right-hand dict wins:
 
 \`\`\`python
