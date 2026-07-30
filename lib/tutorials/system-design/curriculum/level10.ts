@@ -32,9 +32,19 @@ Because reads outnumber writes 100:1 and the mapping is immutable once created, 
 
 A 301 (permanent) is cacheable by browsers and proxies, so the follow-up request may never reach your servers, which is great for load but blinds you to click analytics. A 302 (found/temporary) is not cached the same way, so every click hits you, which is what you want if analytics or per-click logic (expiry, A/B) is the product. Pick 302 when clicks are the business, 301 when raw redirect throughput is.
 
-\`\`\`
-GET /aX9k2Bq  ->  Redis GET aX9k2Bq  (hit ~99%)  ->  302 Location: https://long...
-                       miss  ->  KV GET (sharded by key)  ->  fill Redis  ->  302
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "stages": [
+    { "label": "GET /aX9k2Bq", "note": "the short code is the cache key, so no lookup is needed to build it" },
+    { "label": "Redis GET", "note": "hits roughly 99% of the time: the working set is tiny and links are read-heavy" },
+    { "label": "KV GET on miss", "note": "sharded by the same key, so a miss is one hop, not a scan" },
+    { "label": "Fill Redis", "note": "cache-aside, so the second reader for a link never reaches the store" },
+    { "label": "302 Location", "note": "temporary redirect, so every click comes back to you and analytics stay intact" }
+  ],
+  "highlight": ["Redis GET", "302 Location"],
+  "caption": "The two highlighted stages carry the design. A ~99% cache hit rate is what makes 116K reads/sec affordable, and choosing 302 over 301 deliberately gives up that caching at the browser so clicks remain measurable."
+}
 \`\`\`
 
 **Recap:** estimate first (~1.2K writes/sec, ~116K reads/sec, ~20 TB/yr), generate keys with base62 of a counter/Snowflake to avoid collisions and hotspots, serve reads from Redis in front of a sharded KV store, and choose 301 vs 302 by whether you need click analytics.
