@@ -209,21 +209,15 @@ async function checkGuestQuota(guestId: string): Promise<{ allowed: boolean; rea
       }
     }
 
-    // Check if they have an active (non-expired) session already
-    const hasActiveSession = completedSessionsQuery.docs.some(
-      (doc: FirebaseFirestore.QueryDocumentSnapshot) => {
-        const data = doc.data()
-        if (data.completed_at || data.feedback) return false
-
-        // Check if session is expired (48 hours)
-        const expiresAt = data.expires_at ? new Date(data.expires_at) : null
-        if (expiresAt && expiresAt < new Date()) return false
-
-        return true
-      }
-    )
-
-    // Allow if no completed session and either no active session or has one active
+    // A guest with no completed session is allowed, whether or not an unfinished
+    // session already exists.
+    //
+    // There used to be a hasActiveSession scan here checking a 48-hour expiry. It
+    // was dead: its own comment ("either no active session or has one active")
+    // covers both branches, and the result was never read before the unconditional
+    // allow below. It was also the only place asserting 48 hours, against the 7-day
+    // guest expiry in lib/constants.ts and app/api/guest-session/route.ts, so
+    // deleting it removes a contradictory rule rather than a real one.
     recordCircuitSuccess()
     return { allowed: true }
   } catch (error) {
