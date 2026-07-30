@@ -425,13 +425,19 @@ is 20ms and we serve from three regions, so I cannot afford a cross-region quoru
 choose EL (nearest-replica reads) and layer session guarantees for the cases that need
 read-your-writes."
 
-\`\`\`
-   PACELC:  if P -> (A or C)   |   else E -> (L or C)
-   ------------------------------------------------
-   DynamoDB    PA / EL     nearest-copy read, may be stale
-   Cassandra   PA / EL     tunable: ONE=EL, QUORUM=EC
-   Spanner     PC / EC     quorum + commit-wait on every commit
-   CockroachDB PC / EC     Raft quorum per range
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["System", "If partitioned", "Else (no partition)", "What that costs in practice"],
+  "rows": [
+    ["DynamoDB", "PA: stay available", "EL: favour latency", "Nearest-copy read, which may be stale"],
+    ["Cassandra", "PA: stay available", "EL or EC, per query", "Tunable at the call site: ONE is EL, QUORUM is EC"],
+    ["Spanner", "PC: keep consistency", "EC: favour consistency", "Quorum plus commit-wait on every commit"],
+    ["CockroachDB", "PC: keep consistency", "EC: favour consistency", "A Raft quorum per range, on every write"]
+  ],
+  "highlightCols": ["Else (no partition)"],
+  "caption": "PACELC reads: if P → (A or C), else E → (L or C). The highlighted column is the half CAP leaves out and the half you pay for constantly, because partitions are rare while the else-case is every single request."
+}
 \`\`\`
 
 Recap: PACELC extends CAP with the else-case, the latency-vs-consistency tax paid on every request
