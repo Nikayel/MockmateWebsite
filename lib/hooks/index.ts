@@ -35,3 +35,5 @@ export type {
   UserSummary,
   SmartRecommendationsResponse,
 } from "./useSkillInsights"
+
+export { useAuthedFetch } from "./useAuthedFetch"
