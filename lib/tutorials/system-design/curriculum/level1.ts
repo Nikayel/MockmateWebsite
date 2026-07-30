@@ -1309,13 +1309,71 @@ loading a dynamic page. Everything from the previous five lessons appears as one
 The skill is naming every hop, the RTT it adds, the cache that can short-circuit it, and how it can
 fail.
 
-The path, top to bottom:
+The path, hop by hop. Each stage below adds the next hop and says what it buys you:
 
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "One signed-in request, browser to database",
+  "layout": "lr",
+  "nodes": [
+    { "id": "browser", "label": "Browser cache / service worker", "kind": "client" },
+    { "id": "dns", "label": "DNS resolver", "kind": "external" },
+    { "id": "cdn", "label": "CDN / anycast POP", "kind": "cdn" },
+    { "id": "waf", "label": "WAF", "kind": "service" },
+    { "id": "lb", "label": "Load balancer (L4)", "kind": "lb" },
+    { "id": "gateway", "label": "Reverse proxy / API gateway (L7)", "kind": "lb" },
+    { "id": "app", "label": "App server + auth", "kind": "service" },
+    { "id": "redis", "label": "App cache (Redis)", "kind": "cache" },
+    { "id": "db", "label": "Database", "kind": "db" },
+    { "id": "downstream", "label": "Downstream services", "kind": "service" }
+  ],
+  "edges": [
+    { "from": "browser", "to": "dns", "kind": "sync", "label": "resolve hostname" },
+    { "from": "browser", "to": "cdn", "kind": "sync", "label": "TCP + TLS, ~2 RTT cold" },
+    { "from": "cdn", "to": "waf", "kind": "sync", "label": "on cache miss only" },
+    { "from": "waf", "to": "lb", "kind": "sync" },
+    { "from": "lb", "to": "gateway", "kind": "sync" },
+    { "from": "gateway", "to": "app", "kind": "sync", "label": "routing, rate limit" },
+    { "from": "app", "to": "redis", "kind": "sync", "label": "hit: ~1 ms, done" },
+    { "from": "redis", "to": "db", "kind": "sync", "label": "miss: cache-aside" },
+    { "from": "app", "to": "downstream", "kind": "sync", "label": "fan-out, own timeout" }
+  ],
+  "stages": [
+    {
+      "adds": ["browser"],
+      "note": "Before any network at all. A fresh cached response ends the chain here at 0 RTT, the cheapest possible outcome."
+    },
+    {
+      "adds": ["dns"],
+      "note": "Resolve the hostname. Cached at browser, OS, and resolver, so usually 0 RTT; a cold miss adds a resolver walk."
+    },
+    {
+      "adds": ["cdn"],
+      "note": "Anycast routes to the nearest POP, which terminates TLS close to the user. Cacheable content returns from here without touching origin."
+    },
+    {
+      "adds": ["waf", "lb", "gateway"],
+      "note": "The edge tier: attack filtering, then L4 balancing, then L7 routing, auth offload, and rate limiting."
+    },
+    {
+      "adds": ["app"],
+      "note": "First hop doing real work. Validate the session or JWT, then run business logic."
+    },
+    {
+      "adds": ["redis"],
+      "note": "Check the cache before the database. This is the short-circuit that matters for a signed-in user, because the CDN could not cache their HTML."
+    },
+    {
+      "adds": ["db", "downstream"],
+      "note": "The authoritative read, plus any service fan-out. Every one of these is a network hop needing its own timeout."
+    }
+  ],
+  "caption": "Two caches can end the request early: the browser at 0 RTT, and Redis at ~1 ms. Everything between them is setup cost you pay only when both miss."
+}
 \`\`\`
-Browser cache/SW  ->  DNS  ->  TCP  ->  TLS  ->  [CDN/anycast POP -> WAF -> LB -> reverse proxy/API gateway]
-   ->  app server  ->  auth  ->  app cache (Redis)  ->  database / downstream services
-   ->  response: serialize -> compress -> cache headers -> CDN fill -> client render
-\`\`\`
+
+The response then travels back out: serialize (JSON or Protobuf), compress (gzip or brotli), set cache headers (\`Cache-Control\`, \`ETag\`) that decide what the browser and CDN may keep next time, CDN fills its cache on the way past, client renders.
 
 Walk it:
 
