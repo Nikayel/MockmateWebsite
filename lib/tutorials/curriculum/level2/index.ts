@@ -1311,6 +1311,200 @@ def run(radius):
   },
 }
 
+const classmethodStaticmethodLesson: PythonLesson = {
+  id: "py-l2-classmethod-staticmethod",
+  title: "Class methods, static methods & class attributes",
+  summary:
+    "Build alternative constructors with @classmethod, and know which state every instance shares.",
+  estimatedMinutes: 12,
+  difficulty: "medium",
+  skills: ["classmethod", "staticmethod", "class-attributes", "classes"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Three kinds of method, three kinds of first argument
+
+Every function in a class body is one of three things, and the decorator on it decides what Python passes as the first argument.
+
+| Written as | First argument | Reads or writes |
+| --- | --- | --- |
+| \`def m(self)\` | the instance | that one object's data |
+| \`@classmethod def m(cls)\` | the class | data shared by every instance |
+| \`@staticmethod def m()\` | nothing | only its own arguments |
+
+\`\`\`python
+class User:
+    role = "member"                 # class attribute: one copy, shared
+
+    def __init__(self, name):
+        self.name = name            # instance attribute: one per object
+
+    def greet(self):                # instance method
+        return f"{self.name} ({self.role})"
+
+    @classmethod
+    def from_csv(cls, line):        # alternative constructor
+        return cls(line.split(",")[0])
+
+    @staticmethod
+    def is_valid(name):             # plain helper, namespaced on the class
+        return len(name) > 0
+
+print(User.from_csv("ada,42").greet())   # ada (member)
+print(User.is_valid(""))                 # False
+\`\`\`
+
+## Why @classmethod is the alternative constructor
+
+\`__init__\` can only have one signature. Real data arrives in several shapes: a CSV line, a dict from JSON, a database row. A class method builds the object from each shape and hands the work to the single \`__init__\`.
+
+The first argument is \`cls\`, not the literal class name, and that difference matters. \`cls(...)\` builds whatever class the call was made on, so a subclass inherits the constructor for free:
+
+\`\`\`python
+class Admin(User):
+    role = "admin"
+
+print(type(Admin.from_csv("grace,7")))   # <class '__main__.Admin'>
+\`\`\`
+
+Hard-coding \`User(...)\` inside \`from_csv\` would have returned a \`User\` even when called on \`Admin\`, silently discarding the subclass.
+
+## The class attribute that everyone shares
+
+A class attribute lives on the class, so every instance sees the same object. Read that as a shared default and it is useful. Mutate it and every instance changes at once.
+
+\`\`\`csdiagram
+{
+  "type": "python-memory",
+  "steps": [
+    {
+      "code": "class Cart:\\n    items = []",
+      "names": { "Cart.items": "L1" },
+      "objects": { "L1": { "kind": "list", "value": "[]" } },
+      "note": "One list object, created once when the class body runs."
+    },
+    {
+      "code": "a = Cart()\\nb = Cart()",
+      "names": { "Cart.items": "L1", "a.items": "L1", "b.items": "L1" },
+      "objects": { "L1": { "kind": "list", "value": "[]" } },
+      "note": "Neither instance has its own list. Both names resolve to the class attribute."
+    },
+    {
+      "code": "a.items.append(\\"apple\\")",
+      "names": { "Cart.items": "L1", "a.items": "L1", "b.items": "L1" },
+      "objects": { "L1": { "kind": "list", "value": "['apple']" } },
+      "mutated": "L1",
+      "note": "b.items is now ['apple'] too. There was only ever one list."
+    }
+  ],
+  "caption": "A mutable class attribute is shared state: appending through one instance is visible from every other."
+}
+\`\`\`
+
+The fix is to create the list per instance, inside \`__init__\`:
+
+\`\`\`python
+class Cart:
+    def __init__(self):
+        self.items = []     # a fresh list for every Cart
+\`\`\`
+
+### Pitfalls
+
+- **Mutable class attributes.** \`items = []\` in the class body makes one list for the whole program. Use it for genuine constants (\`role = "member"\`, \`MAX_RETRIES = 3\`) and build mutable state in \`__init__\`.
+- **Assignment does not mutate.** \`a.items = ["x"]\` creates a new *instance* attribute that shadows the class one, so \`b.items\` is unaffected. Only mutation (\`append\`, \`+=\` on a list) leaks across instances, which is why the bug is so easy to miss.
+- **Hard-coding the class inside a classmethod.** Return \`cls(...)\`, never \`User(...)\`, or subclasses get the wrong type back.
+- **Reaching for @staticmethod too often.** If it touches neither \`self\` nor \`cls\`, ask whether it wants to be a module-level function. Keep it a static method only when the class is the natural place a reader would look for it.
+
+**Interview nuance:** "why is \`cls\` better than the class name" tests whether you understand that Python resolves attributes at call time through the instance's own class. \`cls\` is polymorphic; the literal name is not. The same reasoning explains why \`super().__init__()\` beats \`ParentClass.__init__(self)\`: both keep the inheritance chain intact instead of pinning one link in it.`,
+    demoCode: `class Cart:
+    items = []          # shared by every instance
+
+a = Cart()
+b = Cart()
+a.items.append("apple")
+print(b.items)          # ['apple'] - one list, not two`,
+  },
+  apply: {
+    id: "py-l2-classmethod-staticmethod-apply",
+    executionMode: "single-file",
+    prompt: `Write a \`@classmethod\` named \`from_csv\` that builds a \`User\` from a \`"name,age"\` string and returns the user's name.
+
+\`run("ada,36")\` should return \`"ada"\`. Build the object with \`cls\`, not \`User\`.`,
+    starterCode: `class User:
+    def __init__(self, name):
+        self.name = name
+
+    @classmethod
+    def from_csv(cls, line):
+        # Split on the comma and build a User from the first field.
+        pass
+
+
+def run(line):
+    return User.from_csv(line).name`,
+    hints: [
+      '`line.split(",")` gives you a list of fields.',
+      'The name is the first field: `line.split(",")[0]`.',
+      'Build and return the object with `cls(...)`: `return cls(line.split(",")[0])`.',
+    ],
+    referenceSolution: `class User:
+    def __init__(self, name):
+        self.name = name
+
+    @classmethod
+    def from_csv(cls, line):
+        return cls(line.split(",")[0])
+
+
+def run(line):
+    return User.from_csv(line).name`,
+    testCases: [
+      { input: { line: "ada,36" }, expected: "ada", description: "name and age" },
+      { input: { line: "grace,7" }, expected: "grace", description: "another row" },
+      { input: { line: "solo," }, expected: "solo", description: "empty age field" },
+      { input: { line: "linus,1,extra" }, expected: "linus", description: "extra fields ignored" },
+    ],
+  },
+  practice: {
+    id: "py-l2-classmethod-staticmethod-practice",
+    executionMode: "single-file",
+    prompt: `Fix \`Cart\` so each cart has its own item list, then return the number of items in the second cart.
+
+\`run("apple")\` should return \`0\`: adding to the first cart must not touch the second.`,
+    starterCode: `class Cart:
+    items = []      # BUG: one list shared by every cart
+
+    # Give each cart its own list instead.
+
+
+def run(item):
+    first = Cart()
+    second = Cart()
+    first.items.append(item)
+    return len(second.items)`,
+    hints: [
+      "A name assigned in the class body belongs to the class, so every instance shares it.",
+      "Create the list per object instead, inside `__init__`.",
+      "Delete the `items = []` line and add `def __init__(self): self.items = []`.",
+    ],
+    referenceSolution: `class Cart:
+    def __init__(self):
+        self.items = []
+
+
+def run(item):
+    first = Cart()
+    second = Cart()
+    first.items.append(item)
+    return len(second.items)`,
+    testCases: [
+      { input: { item: "apple" }, expected: 0, description: "second cart stays empty" },
+      { input: { item: "pear" }, expected: 0, description: "any item, still isolated" },
+      { input: { item: "" }, expected: 0, description: "empty string is still one item" },
+    ],
+  },
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // L2-M4: Data Modeling
 // ───────────────────────────────────────────────────────────────────────────
@@ -2146,7 +2340,8 @@ export const level2: PythonLevel = {
   id: 2,
   slug: "intermediate",
   title: "Level 2: Idioms",
-  tagline: "Comprehensions, generators, classes, dataclasses, decorators, and standard-library idioms.",
+  tagline:
+    "Comprehensions, generators, classes, dataclasses, decorators, and standard-library idioms.",
   defaultExecutionMode: "single-file",
   estimatedHours: 3,
   modules: [
@@ -2166,7 +2361,12 @@ export const level2: PythonLevel = {
       id: "py-l2-oop-foundations",
       title: "OOP Foundations",
       description: "Model state and behaviour with classes, inheritance, composition, and dunders.",
-      lessons: [classesLesson, inheritanceCompositionLesson, dunderPropertiesLesson],
+      lessons: [
+        classesLesson,
+        inheritanceCompositionLesson,
+        dunderPropertiesLesson,
+        classmethodStaticmethodLesson,
+      ],
     },
     {
       id: "py-l2-data-modeling",
