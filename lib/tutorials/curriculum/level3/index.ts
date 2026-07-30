@@ -1546,6 +1546,37 @@ def test_restock_adds_item(base_stock):        # pytest passes base_stock in
 
 By default a fixture has function scope: \`pytest\` calls it fresh for every test, so \`base_stock\` is a brand-new dict each time and tests cannot leak state into one another. A fixture that uses \`yield\` instead of \`return\` runs the code after \`yield\` as teardown once the test finishes.
 
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "stages": [
+    { "label": "Fixture setup", "note": "everything above the yield runs" },
+    { "label": "yield", "note": "hands the value to the test as its argument" },
+    { "label": "Test body", "note": "runs with that value" },
+    { "label": "Teardown", "note": "everything below the yield, even if the test FAILED" }
+  ],
+  "highlight": ["Teardown"],
+  "caption": "The highlighted stage is the reason to prefer yield over return: teardown runs whether the test passed, failed, or raised, so a fixture can safely own a temp file, a database transaction, or an open connection."
+}
+\`\`\`
+
+Scope decides how often that whole cycle repeats:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["scope=", "Set up once per", "Reach for it when"],
+  "rows": [
+    ["function (default)", "every test", "the value is mutable and tests must not leak into each other"],
+    ["class", "test class", "a group of tests shares expensive but read-only setup"],
+    ["module", "test file", "one connection or server serves every test in the file"],
+    ["session", "whole test run", "the setup is very expensive and genuinely immutable"]
+  ],
+  "highlightCols": ["scope="],
+  "caption": "Widening the scope trades isolation for speed, and the trade goes wrong in one specific way: a mutable value at session scope lets one test's mutation reach every later test, producing failures that depend on test ORDER."
+}
+\`\`\`
+
 ### Parametrize: one body, many cases
 
 \`@pytest.mark.parametrize\` takes a string of parameter names and a list of value rows. \`pytest\` runs the test once per row and reports each as its own case.
