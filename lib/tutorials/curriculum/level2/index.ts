@@ -2582,7 +2582,21 @@ const collectionsToolkitLesson: PythonLesson = {
     estimatedMinutes: 5,
     markdown: `## Reach for the right container, not a hand-rolled dict
 
-When you tally, group, or queue, a plain \`dict\` or \`list\` works, but it forces you to write boilerplate that hides bugs. The \`collections\` module ships three focused upgrades that name your intent and delete that boilerplate: \`Counter\` for frequencies, \`defaultdict\` for grouping, and \`deque\` for queues. In interviews and in real data pipelines, reaching for the right one signals you know the standard library, and it usually cuts genuine complexity, not just line count.
+When you tally, group, or queue, a plain \`dict\` or \`list\` works, but it forces you to write boilerplate that hides bugs. The \`collections\` module ships three focused upgrades that name your intent and delete that boilerplate: \`Counter\` for frequencies, \`defaultdict\` for grouping, and \`deque\` for queues.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Job", "The manual version", "The upgrade", "What the upgrade removes"],
+  "rows": [
+    ["Tally frequencies", "d[k] = d.get(k, 0) + 1", "Counter(items)", "the get-with-default dance on every increment"],
+    ["Group into buckets", "if k not in d: d[k] = []", "defaultdict(list)", "the existence check before every append"],
+    ["Pop from the front", "lst.pop(0), which is O(n)", "deque.popleft(), O(1)", "a hidden quadratic in any queue loop"]
+  ],
+  "highlightCols": ["What the upgrade removes"],
+  "caption": "The first two remove boilerplate that hides bugs. The third removes an actual complexity class: list.pop(0) shifts every remaining element, so a queue built on a list is O(n²) overall while the same loop on a deque is O(n)."
+}
+\`\`\` In interviews and in real data pipelines, reaching for the right one signals you know the standard library, and it usually cuts genuine complexity, not just line count.
 
 ### \`Counter\`: build on the intro
 
