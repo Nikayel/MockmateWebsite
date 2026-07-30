@@ -258,22 +258,29 @@ export async function POST(request: NextRequest) {
 
     const userId = authResult.userId
 
-    // Check subscription tier - roadmap is a Pro-only feature
-    const profileDoc = await adminDb.collection("profiles").doc(userId).get()
-    const profile = profileDoc.data()
-    const subscriptionTier = profile?.subscription_tier || "free"
-
-    if (subscriptionTier === "free") {
-      return NextResponse.json(
-        {
-          error: "Pro feature required",
-          message:
-            "Personalized study roadmaps are available with Pro. Upgrade to unlock custom prep plans tailored to your target company and interview date.",
-          code: "PRO_REQUIRED",
-          upgradeUrl: "/upgrade",
-        },
-        { status: 403 }
-      )
+    // Check subscription tier - roadmap is a Pro-only feature.
+    // Uses requireTierForUser like the GET and PATCH handlers below. This used to
+    // hand-roll `subscription_tier === "free"`, which ignored subscription_status
+    // entirely, so a pro account in past_due could still create roadmaps here
+    // while being blocked from reading or updating them.
+    const tierCheck = await requireTierForUser(userId, "pro")
+    if (!tierCheck.allowed) {
+      // Genuine free users keep the roadmap-specific upsell; a degraded paid
+      // subscription gets the standard inactive-subscription response instead,
+      // since telling them to "upgrade to Pro" would be wrong.
+      if (tierCheck.tier === "free") {
+        return NextResponse.json(
+          {
+            error: "Pro feature required",
+            message:
+              "Personalized study roadmaps are available with Pro. Upgrade to unlock custom prep plans tailored to your target company and interview date.",
+            code: "PRO_REQUIRED",
+            upgradeUrl: "/upgrade",
+          },
+          { status: 403 }
+        )
+      }
+      return tierCheck.response!
     }
 
     const body = (await request.json()) as CreateRoadmapRequestBody
