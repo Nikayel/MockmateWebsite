@@ -18,6 +18,7 @@ import { adminDb } from "./firebase-admin"
 import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { countTokens } from "./token-counter"
 import { logger } from "./logger"
+import { AI_BUDGET_CAPS } from "./pricing"
 
 // Cost per 1K tokens for each provider (input + output averaged) - Dec 2025
 export const PROVIDER_COSTS = {
@@ -47,12 +48,16 @@ export const EMBEDDING_COSTS = {
   "text-embedding-ada-002": 0.0001, // OpenAI: $0.10/1M tokens (legacy)
 } as const
 
-// Budget caps per subscription tier (per billing cycle)
-export const BUDGET_CAPS = {
-  free: 0.5, // $0.50 - enough for ~50 sessions with Gemini
-  pro: 25.0, // $25/month
-  enterprise: 100.0, // $100/month
-} as const
+/**
+ * Budget caps per subscription tier (per billing cycle).
+ *
+ * Re-exported from lib/pricing.ts rather than redeclared. This table previously
+ * existed in four places (here, pricing.ts, quota-enforcement.ts and
+ * rate-limiter.ts) with different names, and different consumers read different
+ * copies: the admin UI read AI_BUDGET_CAPS while enforcement read its own, so a
+ * change to one would have shown the user a cap the server never applied.
+ */
+export const BUDGET_CAPS = AI_BUDGET_CAPS
 
 export type UsageEventType =
   | "chat_message"

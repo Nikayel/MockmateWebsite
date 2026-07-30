@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb, adminAuth } from "./firebase-admin"
 import { logger } from "./logger"
-import { getSessionsLimitForTier, isPaidTier } from "./pricing"
+import { getSessionsLimitForTier, isPaidTier, AI_BUDGET_CAPS } from "./pricing"
 import { CIRCUIT_BREAKER } from "./constants"
 import { PRICING_CONFIG } from "./config"
 import { isGlobalCeilingExceeded } from "./global-spend-guard"
@@ -141,12 +141,9 @@ interface UserQuota {
   periodEnd: string
 }
 
-// Budget limits per tier (in dollars)
-const BUDGET_LIMITS = {
-  free: 0.5,
-  pro: 25.0,
-  enterprise: 100.0,
-} as const
+// Budget limits per tier (in dollars). Canonical table lives in lib/pricing.ts;
+// this used to be a third redeclaration of the same values.
+const BUDGET_LIMITS = AI_BUDGET_CAPS
 
 /**
  * Get user ID from request (from Authorization header)

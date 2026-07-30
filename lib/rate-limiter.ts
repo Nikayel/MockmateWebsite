@@ -16,26 +16,29 @@
 import { adminDb } from "./firebase-admin"
 import { getUserUsageSummary } from "./usage-tracking"
 import { logger } from "./logger"
+import { AI_BUDGET_CAPS } from "./pricing"
 
-// Rate limit configuration by tier
+// Rate limit configuration by tier. budgetPerCycle comes from the canonical
+// AI_BUDGET_CAPS table in lib/pricing.ts rather than repeating the dollar values,
+// which previously appeared in four files under four different names.
 export const RATE_LIMITS = {
   free: {
     requestsPerMinute: 10,
     tokensPerMinute: 5000,
     maxConcurrentRequests: 2,
-    budgetPerCycle: 0.5, // $0.50
+    budgetPerCycle: AI_BUDGET_CAPS.free,
   },
   pro: {
     requestsPerMinute: 30,
     tokensPerMinute: 20000,
     maxConcurrentRequests: 5,
-    budgetPerCycle: 25.0, // $25
+    budgetPerCycle: AI_BUDGET_CAPS.pro,
   },
   enterprise: {
     requestsPerMinute: 100,
     tokensPerMinute: 100000,
     maxConcurrentRequests: 20,
-    budgetPerCycle: 100.0, // $100
+    budgetPerCycle: AI_BUDGET_CAPS.enterprise,
   },
 } as const
 
