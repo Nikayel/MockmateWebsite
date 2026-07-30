@@ -32,6 +32,8 @@ import {
 import { SubscriptionStatusBanner } from "@/components/ui/subscription-status-banner"
 import Link from "next/link"
 import { toast } from "sonner"
+import { isPaidTier } from "@/lib/pricing"
+import type { SubscriptionTier } from "@/lib/config"
 
 const OnboardingModal = dynamic(
   () => import("@/components/OnboardingModal").then((mod) => mod.OnboardingModal),
@@ -286,7 +288,11 @@ export default function DashboardPage() {
     return null
   }
 
-  const isPro = profile?.subscription_tier === "pro"
+  // isPaidTier, not tier === "pro": enterprise is a paid tier and must not be
+  // shown the Free plan label or the upgrade CTA.
+  const isPro = isPaidTier((profile?.subscription_tier ?? "free") as SubscriptionTier)
+  const planLabel =
+    profile?.subscription_tier === "enterprise" ? "Enterprise" : isPro ? "Pro" : "Free"
   const usagePercentage = usage ? (usage.used / usage.limit) * 100 : 0
   const userName =
     user?.user_metadata?.full_name?.split(" ")[0] || firebaseUser?.displayName?.split(" ")[0]
@@ -442,7 +448,7 @@ export default function DashboardPage() {
                 <span
                   className={`text-lg font-medium ${isPro ? "text-amber-400" : "text-muted-foreground"}`}
                 >
-                  {isPro ? "Pro" : "Free"}
+                  {planLabel}
                 </span>
                 {isPro && <Crown className="h-4 w-4 text-amber-400" />}
               </div>

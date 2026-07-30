@@ -20,6 +20,8 @@ import { Profile } from "@/lib/types"
 import { toast } from "sonner"
 import { ErrorBoundary } from "@/components/error-boundary"
 import Link from "next/link"
+import { isPaidTier } from "@/lib/pricing"
+import type { SubscriptionTier } from "@/lib/config"
 
 function UpgradePageContent() {
   const searchParams = useSearchParams()
@@ -37,7 +39,8 @@ function UpgradePageContent() {
     setMounted(true)
   }, [])
 
-  const isProUser = profile?.subscription_tier === "pro"
+  // isPaidTier, not tier === "pro": an enterprise user must not be pitched an upgrade.
+  const isProUser = isPaidTier((profile?.subscription_tier ?? "free") as SubscriptionTier)
 
   // Fire a single view_pricing funnel event once the page is interactive.
   const viewPricingTracked = useRef(false)
@@ -212,14 +215,14 @@ function UpgradePageContent() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="bg-background min-h-screen">
       <Header />
 
       <div className="pt-20 pb-6">
         <div className="container mx-auto max-w-4xl px-4">
           {/* Minimal Header */}
           <div className="mb-4 text-center">
-            <h1 className="text-2xl font-bold text-foreground md:text-3xl">Choose Your Plan</h1>
+            <h1 className="text-foreground text-2xl font-bold md:text-3xl">Choose Your Plan</h1>
           </div>
 
           {/* Billing Toggle - Inline */}
@@ -258,7 +261,7 @@ function UpgradePageContent() {
             <div className="mx-auto mb-4 grid max-w-xl grid-cols-1 gap-4">
               {/* Pro Plan */}
               <div className="from-accent/5 border-accent/50 rounded-xl border-2 bg-gradient-to-br to-transparent p-5">
-                <h3 className="mb-3 text-base font-semibold text-foreground">Pro</h3>
+                <h3 className="text-foreground mb-3 text-base font-semibold">Pro</h3>
 
                 <div className="mb-2 flex items-baseline gap-1">
                   <span className="text-accent text-4xl font-bold">
@@ -268,7 +271,7 @@ function UpgradePageContent() {
                       ? currentPrice.totalDisplay
                       : currentPrice.priceDisplay}
                   </span>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-muted-foreground text-sm">
                     {billingPeriod === "yearly" ? "/year" : currentPrice.period}
                   </span>
                 </div>
@@ -276,15 +279,17 @@ function UpgradePageContent() {
                 <Button
                   onClick={() => handleUpgrade(billingPeriod)}
                   disabled={loading === billingPeriod}
-                  className="bg-accent hover:bg-accent/90 mb-4 w-full font-semibold text-foreground"
+                  className="bg-accent hover:bg-accent/90 text-foreground mb-4 w-full font-semibold"
                 >
                   {loading === billingPeriod ? "Processing..." : "Subscribe"}
                 </Button>
 
-                <p className="mb-2 text-xs text-muted-foreground">Everything you need to get hired.</p>
+                <p className="text-muted-foreground mb-2 text-xs">
+                  Everything you need to get hired.
+                </p>
 
-                <p className="mb-2 text-xs text-muted-foreground">Everything in Free, plus...</p>
-                <ul className="space-y-1.5 text-sm text-muted-foreground">
+                <p className="text-muted-foreground mb-2 text-xs">Everything in Free, plus...</p>
+                <ul className="text-muted-foreground space-y-1.5 text-sm">
                   <li className="flex items-center gap-2">
                     <Check className="text-accent h-3.5 w-3.5" />
                     35 sessions/month
@@ -308,7 +313,7 @@ function UpgradePageContent() {
 
           {/* Trust - Single line */}
           {!isProUser && (
-            <p className="text-center text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-center text-xs">
               30-day money-back guarantee · Cancel anytime · Used by engineers at Google, Meta,
               Amazon
             </p>
@@ -325,12 +330,14 @@ function UpgradePageContent() {
                 <Button
                   onClick={() => router.push("/account")}
                   size="lg"
-                  className="bg-muted px-8 font-semibold text-foreground hover:bg-card"
+                  className="bg-muted text-foreground hover:bg-card px-8 font-semibold"
                 >
                   Manage subscription
                 </Button>
               </div>
-              <p className="text-sm text-muted-foreground">Need help? Contact support@codesparring.dev</p>
+              <p className="text-muted-foreground text-sm">
+                Need help? Contact support@codesparring.dev
+              </p>
             </div>
           )}
         </div>
@@ -346,7 +353,7 @@ export default function UpgradePage() {
     <ErrorBoundary>
       <Suspense
         fallback={
-          <main className="flex min-h-screen items-center justify-center bg-background">
+          <main className="bg-background flex min-h-screen items-center justify-center">
             <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
           </main>
         }
