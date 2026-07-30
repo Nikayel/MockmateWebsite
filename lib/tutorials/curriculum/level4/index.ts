@@ -1343,6 +1343,26 @@ const concurrencyLesson: PythonLesson = {
 
 Every real service waits: on a database, an HTTP API, a file, a message queue. If you fetch 100 URLs one at a time, your program spends nearly all its wall-clock time blocked, doing nothing. Concurrency lets those waits overlap, so 100 slow calls finish in roughly the time of the slowest one instead of the sum of all of them. Choosing the right model (threads, processes, or \`async\`) is a classic interview question because the wrong choice makes code either no faster or outright wrong.
 
+The reason overlapping waits pays off so enormously is that the costs are not close to each other. Each rung below is roughly ten times the one before it:
+
+\`\`\`csdiagram
+{
+  "type": "ladder",
+  "title": "What a Python program is actually waiting on",
+  "scale": "log",
+  "bands": [
+    { "label": "CPU instruction", "value": 1, "display": "~1 ns", "note": "One bytecode step. The GIL serialises these across threads." },
+    { "label": "Main memory read", "value": 100, "display": "~100 ns", "note": "A dict lookup or attribute access lands here." },
+    { "label": "SSD read", "value": 100000, "display": "~100 μs", "note": "1,000x slower than RAM. The GIL is released while you wait." },
+    { "label": "Datacenter round trip", "value": 500000, "display": "~500 μs", "note": "Service to service inside one region." },
+    { "label": "Internet API call", "value": 100000000, "display": "~100 ms", "note": "100 million CPU instructions' worth of doing nothing." }
+  ],
+  "caption": "One HTTP call costs about as much time as 100 million CPU instructions. Overlapping those waits is where nearly all the win comes from, which is why I/O-bound work is the case threads help."
+}
+\`\`\`
+
+Read the gap between the bottom rung and the top one and the decision rule below almost writes itself: if your program is sitting on the top rung, giving it more cores changes nothing, but letting the waits overlap changes everything.
+
 ### The GIL: one bytecode at a time
 
 CPython protects its internal memory with a **Global Interpreter Lock**. Only one thread executes Python bytecode at any instant, so pure-Python threads never run *in parallel* across cores. What rescues threading is that the GIL is **released during blocking I/O** (and inside many C extensions like \`numpy\`). While one thread waits on a socket, it drops the lock and another thread runs. That gives you the decision rule:
