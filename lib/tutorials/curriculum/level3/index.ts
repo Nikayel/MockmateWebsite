@@ -1072,6 +1072,23 @@ const typingModuleLesson: PythonLevel["modules"][number]["lessons"][number] = {
 
 In a shared codebase, a function signature is the contract your teammates read before they read your code. \`def find_user(user_id): ...\` tells a caller nothing about what comes back. A precise return type like \`dict | None\` says "you might get nothing, handle it" before anyone runs the code. On a data team that is the difference between a null check you wrote on purpose and a \`NoneType\` crash in a nightly pipeline at 3am.
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Annotation", "Reads as", "Modern equivalent"],
+  "rows": [
+    ["list[int]", "a list whose items are ints", "same; built-in generics since 3.9"],
+    ["dict[str, int]", "a dict from str keys to int values", "same"],
+    ["tuple[int, str]", "exactly two items, an int then a str", "tuple[int, ...] for any number of ints"],
+    ["int | None", "an int, or nothing", "replaces Optional[int]"],
+    ["int | str", "either an int or a str", "replaces Union[int, str]"],
+    ["Callable[[int], str]", "a function taking one int, returning a str", "same"]
+  ],
+  "highlightCols": ["Modern equivalent"],
+  "caption": "The right column is why two spellings appear in real codebases. Optional[int] and Union[int, str] came from the typing module and still work, but the | forms read closer to how you would say them aloud and need no import."
+}
+\`\`\`
+
 ### Optional and Union
 
 A value that might be missing is \`Optional\`, written \`X | None\` (older code writes \`Optional[X]\`; they mean the same type). A value that can be one of several types is a \`Union\`: \`int | str\`.
