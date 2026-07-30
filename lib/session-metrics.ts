@@ -1071,8 +1071,14 @@ async function updateUserLearningState(summary: SessionSummary): Promise<void> {
  * This powers the detailed Learning Progress stats
  *
  * NOTE: Uses unified `problem_mastery` collection (consolidates with spaced repetition)
+ *
+ * OWNERSHIP: the spaced-repetition schedulers own `mastery_level` and
+ * `review_count` on docs that carry scheduling state (`next_review_at`).
+ * This writer used to race them with its own heuristic on every session
+ * completion, clobbering scheduler output; it now only writes those fields
+ * on docs the SR system has never scheduled. Exported for tests.
  */
-async function updateUserProblemMastery(summary: SessionSummary): Promise<void> {
+export async function updateUserProblemMastery(summary: SessionSummary): Promise<void> {
   try {
     // Use problem_mastery (unified collection) instead of user_problem_mastery
     const masteryRef = adminDb
@@ -1120,15 +1126,23 @@ async function updateUserProblemMastery(summary: SessionSummary): Promise<void> 
         const averageScore = Math.round(totalScore / reviewCount)
         const bestScore = Math.max(data.best_score || 0, summary.performanceScore)
 
+        // Scheduler-owned doc: never overwrite mastery_level/review_count —
+        // the SR write paths compute both from actual scheduling state.
+        const isSchedulerOwned = typeof data.next_review_at === "string"
+
         transaction.update(masteryRef, {
-          mastery_level: getMasteryLevel(averageScore, reviewCount),
           last_score: summary.performanceScore,
           best_score: bestScore,
-          review_count: reviewCount,
           total_score: totalScore,
           average_score: averageScore,
           last_review_at: summary.completedAt,
           updatedAt: FieldValue.serverTimestamp(),
+          ...(isSchedulerOwned
+            ? {}
+            : {
+                mastery_level: getMasteryLevel(averageScore, reviewCount),
+                review_count: reviewCount,
+              }),
         })
       }
     })
