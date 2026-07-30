@@ -2537,6 +2537,25 @@ sender.call_args_list        # [call('a'), call('b')]
 
 This is why the Apply and Practice steps keep \`sender\` as a parameter: the driver passes in a recorder (Apply) or a real \`Mock\` (Practice), then asserts how you called it.
 
+The recorder answers a handful of different questions, and mixing them up is why mock assertions pass when they should not:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["You inspect", "It tells you", "Careful"],
+  "rows": [
+    ["m.call_count", "how many times it was called", "counts calls, not distinct arguments"],
+    ["m.called", "whether it was called at all", "True even for a single call with wrong arguments"],
+    ["m.assert_any_call(x)", "x appears somewhere in the history", "says nothing about order or count"],
+    ["m.assert_called_once_with(x)", "exactly one call, and it was x", "the strictest of these, and usually the one you want"],
+    ["m.call_args_list", "the full ordered history", "compare against [call(a), call(b)] to pin order"],
+    ["m.return_value", "what the mock hands back", "defaults to another Mock, never to None"]
+  ],
+  "highlightCols": ["Careful"],
+  "caption": "The last row causes the quietest bugs: an unconfigured mock returns another Mock, which is truthy, so a test asserting 'if result:' passes no matter what your code did. Any assert_called* method you misspell is also silently a no-op, because Mock happily invents attributes."
+}
+\`\`\`
+
 ## Pitfalls
 
 A plain \`Mock\` answers to anything. Call a method that does not exist and it silently hands back another \`Mock\` instead of failing:
