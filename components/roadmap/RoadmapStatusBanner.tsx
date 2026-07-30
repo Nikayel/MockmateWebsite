@@ -24,6 +24,7 @@ import {
 import { cn } from "@/lib/utils"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { roadmapProgressPercent } from "@/lib/roadmap/progress"
+import { calendarDaysUntil } from "@/lib/roadmap/calendar-days"
 
 export type RoadmapStatusType = "expired" | "archived" | "completed" | "abandoned"
 
@@ -98,8 +99,8 @@ export function RoadmapStatusBanner({
 
   const progress = roadmapProgressPercent(roadmap.questionsCompleted, roadmap.totalQuestions)
   const interviewDate = new Date(roadmap.interviewDate)
-  const now = new Date()
-  const daysUntil = Math.ceil((interviewDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  // Unclamped on purpose: isExpired below reads the negative value.
+  const daysUntil = calendarDaysUntil(roadmap.interviewDate) ?? 0
   const isExpired = daysUntil < 0
   const canReactivate = (type === "archived" || type === "abandoned") && !isExpired
 

@@ -17,6 +17,7 @@ import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { getCompanyById } from "@/lib/data/company-questions"
 import { UserRoadmapAssessment } from "@/lib/data/company-questions/types"
 import { useAuth } from "@/lib/auth-context"
+import { calendarDaysUntil } from "@/lib/roadmap/calendar-days"
 
 type Step = "company" | "date" | "assessment" | "generating"
 
@@ -69,11 +70,9 @@ export default function NewRoadmapPage() {
       const idToken = await firebaseUser.getIdToken()
 
       // Calculate days remaining
-      const now = new Date()
-      const daysRemaining = Math.max(
-        1,
-        Math.ceil((selectedDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-      )
+      // At least 1: an assessment generated for a same-day interview still needs a
+      // day of plan to divide work across.
+      const daysRemaining = Math.max(1, calendarDaysUntil(selectedDate) ?? 1)
 
       // Build assessment object
       const assessment: UserRoadmapAssessment = {

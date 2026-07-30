@@ -55,6 +55,7 @@ import { cn, getStoredDateComponents, getLocalDateComponents } from "@/lib/utils
 import { selectDeferTargetIndex } from "@/lib/roadmap/defer-question"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/auth-context"
+import { calendarDaysUntil } from "@/lib/roadmap/calendar-days"
 import {
   EmptyState,
   QuickStat,
@@ -640,8 +641,8 @@ export default function RoadmapPage() {
 
   // Check for edge cases
   const interviewDate = new Date(roadmap.interviewDate)
-  const now = new Date()
-  const daysRemaining = Math.ceil((interviewDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  // Unclamped on purpose: isExpired below reads the negative value.
+  const daysRemaining = calendarDaysUntil(roadmap.interviewDate) ?? 0
   const isExpired = daysRemaining < 0
   const isCompleted =
     roadmap.questionsCompleted === roadmap.totalQuestions && roadmap.totalQuestions > 0
