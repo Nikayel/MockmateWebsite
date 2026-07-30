@@ -147,15 +147,21 @@ You parse each source document (PDF, HTML, Confluence, tickets) into clean text,
 
 ## Query path (online)
 
-\`\`\`
-query
-  -> embed query
-  -> hybrid retrieve: dense (vector top-100) + sparse (BM25 top-100)
-  -> reranker (cross-encoder) scores query x chunk, keep top-8
-  -> ACL filter (drop chunks the user cannot see)
-  -> assemble context (dedup, budget to window, add citation markers)
-  -> LLM with "answer only from context, cite sources, else say I don't know"
-  -> post-check: verify each cited claim maps to a retrieved chunk
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "stages": [
+    { "label": "Embed query", "note": "one embedding call, and part of your latency budget" },
+    { "label": "Hybrid retrieve", "note": "dense vector top-100 unioned with sparse BM25 top-100" },
+    { "label": "Rerank", "note": "cross-encoder reads query and chunk together, keep top-8" },
+    { "label": "ACL filter", "note": "drop chunks this user may not see" },
+    { "label": "Assemble context", "note": "dedup, budget to the window, add citation markers" },
+    { "label": "Generate", "note": "answer only from context, cite sources, else say I do not know" },
+    { "label": "Post-check", "note": "verify each cited claim maps to a retrieved chunk" }
+  ],
+  "highlight": ["Rerank", "ACL filter"],
+  "caption": "The two highlighted stages are the ones teams skip. Dropping the reranker is why a demo RAG feels dumb in production; moving the ACL filter any later means the model has already read text the user cannot see."
+}
 \`\`\`
 
 **Why a reranker and hybrid retrieval are mandatory, not optional.** Dense vector search captures meaning but misses exact terms, error codes, product names, and rare acronyms. BM25 nails exact matches but misses paraphrase. Hybrid runs both and unions the candidates. Then the reranker matters because embedding similarity is a coarse first-stage filter: the vector top-20 is full of plausible-but-wrong chunks. A cross-encoder reranker reads the query and each chunk together and produces a far sharper relevance score, so the 8 chunks you actually put in the prompt are the right 8. Skipping the reranker is the single most common reason a demo RAG feels dumb in production.
