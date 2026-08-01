@@ -192,7 +192,6 @@ export async function POST(request: NextRequest) {
         ? true
         : preScreen.hasContent &&
           !preScreen.suspiciousPatterns.possibleGibberish &&
-          !preScreen.suspiciousPatterns.keywordStuffing &&
           preScreen.candidateMessageCount >= 1
 
     // Prepare transcript messages once (reused by multiple operations)
@@ -538,11 +537,9 @@ export async function POST(request: NextRequest) {
       // flipping routing.
       const integrityCeiling = !aiValidation.isCoherent
         ? 25
-        : preScreen.suspiciousPatterns.keywordStuffing
-          ? 35
-          : !aiValidation.responsesRelevant
-            ? 45
-            : 100
+        : !aiValidation.responsesRelevant
+          ? 45
+          : 100
       const cqScore = clarifyingQuestionsResult.score
       if (cqScore >= 70) {
         // Good clarifying questions = bonus to communication
@@ -580,8 +577,7 @@ export async function POST(request: NextRequest) {
       efficiencyMetrics?.efficiencyScore,
       aiValidation,
       preScreen.candidateMessageCount,
-      scenarioType,
-      preScreen.suspiciousPatterns.keywordStuffing
+      scenarioType
     )
 
     // ============================================================================
@@ -611,7 +607,6 @@ export async function POST(request: NextRequest) {
         passRate,
         scenarioType: scenarioType || "dsa",
         aiValidation,
-        keywordStuffing: preScreen.suspiciousPatterns.keywordStuffing,
         codeCompleteness,
         hasBlindCopying,
         extractedEvidence,
