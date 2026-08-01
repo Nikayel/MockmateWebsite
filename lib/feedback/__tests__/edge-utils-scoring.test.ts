@@ -164,11 +164,25 @@ describe("edge calculateValidatedScores + applyScoreFloors (stream-route order)"
       expect(Number.isFinite(calc[key])).toBe(true)
       expect(Number.isFinite(floored[key])).toBe(true)
     }
-    // NaN efficiency zeroes the test-derived subscores via clampScore, then the
-    // pass-rate floors recover problemSolving/codeQuality/overall.
+    // Since commit 17594ec5 a Number.isFinite guard normalizes a NaN
+    // efficiencyScore to the neutral 50 before the base arithmetic, so the
+    // subscores stay finite; the pass-rate floors then hold their usual levels.
     expect(floored.problemSolving).toBe(70)
     expect(floored.codeQuality).toBe(75)
     expect(floored.overall).toBe(70)
+  })
+
+  it("non-finite and out-of-range efficiencyScore normalizes to the neutral/clamped value", () => {
+    const talked = validation({ approachExplained: true, approachQuality: "good" })
+    const call = (efficiencyMetrics: { efficiencyScore?: number } | undefined) =>
+      calculateValidatedScores(80, efficiencyMetrics, preScreen(), talked, "dsa", null)
+
+    // NaN is treated exactly like the neutral 50, and like missing metrics.
+    expect(call({ efficiencyScore: Number.NaN })).toEqual(call({ efficiencyScore: 50 }))
+    expect(call({ efficiencyScore: Number.NaN })).toEqual(call(undefined))
+
+    // Out-of-range values clamp to the 0..100 band.
+    expect(call({ efficiencyScore: 150 })).toEqual(call({ efficiencyScore: 100 }))
   })
 
   it("scenario type selects the matching weight set from SCORING", () => {
