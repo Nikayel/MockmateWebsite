@@ -133,16 +133,21 @@ export function calculateValidatedScores(
     codeQuality = Math.min(maxScoreForIncomplete, codeQuality)
   }
 
-  let communication = aiValidation.communicationScore || 10
+  // A 0 from AI validation is a real "no communication" verdict and must not
+  // be rewritten by || fallbacks; only non-finite values get a default.
+  const validatedCommunicationScore = Number.isFinite(aiValidation.communicationScore)
+    ? aiValidation.communicationScore
+    : 10
+  let communication = validatedCommunicationScore
 
   if (!aiValidation.isCoherent) {
-    communication = Math.min(25, aiValidation.communicationScore)
+    communication = Math.min(25, validatedCommunicationScore)
   } else if (!aiValidation.responsesRelevant) {
-    communication = Math.min(45, aiValidation.communicationScore)
+    communication = Math.min(45, validatedCommunicationScore)
   } else if (preScreen.suspiciousPatterns.keywordStuffing) {
-    communication = Math.min(35, aiValidation.communicationScore)
+    communication = Math.min(35, validatedCommunicationScore)
   } else {
-    communication = aiValidation.communicationScore
+    communication = validatedCommunicationScore
 
     if (aiValidation.questionsAsked > 0) {
       const answerRate = aiValidation.questionsAnswered / aiValidation.questionsAsked
@@ -183,10 +188,12 @@ export function calculateValidatedScores(
     }
   } else {
     if (isCorrectSolution) {
-      const aiScore = aiValidation.communicationScore || 10
-      communication = aiScore <= 15 ? aiScore : 15
+      communication =
+        validatedCommunicationScore <= 15 ? validatedCommunicationScore : 15
     } else {
-      const aiScore = aiValidation.communicationScore || 5
+      const aiScore = Number.isFinite(aiValidation.communicationScore)
+        ? aiValidation.communicationScore
+        : 5
       communication = aiScore <= 10 ? aiScore : 10
     }
   }

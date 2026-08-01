@@ -378,9 +378,12 @@ export function getPerformanceLevel(score: number): PerformanceLevel {
 
 /**
  * Clamp a score to valid bounds (0-100)
- * Ensures all scores are within the expected range
+ * Ensures all scores are within the expected range.
+ * Non-finite input (NaN/Infinity from bad request bodies or failed parses)
+ * falls back to 0 instead of propagating through averages and serialization.
  */
 export function clampScore(score: number): number {
+  if (!Number.isFinite(score)) return 0
   return Math.min(100, Math.max(0, Math.round(score)))
 }
 
@@ -394,6 +397,35 @@ export function clampScore(score: number): number {
 export function calculatePerformanceScore(components: PerformanceScoreComponents): number {
   const w = SCORING.PERFORMANCE_WEIGHTS
   // Clamp inputs to valid range
+  const u = clampScore(components.understanding)
+  const ps = clampScore(components.problemSolving)
+  const cq = clampScore(components.codeQuality)
+  const c = clampScore(components.communication)
+
+  const score =
+    u * w.UNDERSTANDING + ps * w.PROBLEM_SOLVING + cq * w.CODE_QUALITY + c * w.COMMUNICATION
+
+  return clampScore(score)
+}
+
+/**
+ * Scenario-aware variant of calculatePerformanceScore. System design and bug
+ * fix interviews weight the four components differently (SYSTEM_DESIGN_WEIGHTS
+ * / BUG_FIX_WEIGHTS); recomputing an overall with DSA weights for those
+ * scenario types silently shifts user-facing scores. Any code that recomputes
+ * an overall for an arbitrary session must use this, not the DSA-only default.
+ */
+export function calculatePerformanceScoreForScenario(
+  components: PerformanceScoreComponents,
+  scenarioType: string | undefined
+): number {
+  const w =
+    scenarioType === "system-design" || scenarioType === "system_design"
+      ? SCORING.SYSTEM_DESIGN_WEIGHTS
+      : scenarioType === "bugfix" || scenarioType === "bug_fix" || scenarioType === "bug-fix"
+        ? SCORING.BUG_FIX_WEIGHTS
+        : SCORING.PERFORMANCE_WEIGHTS
+
   const u = clampScore(components.understanding)
   const ps = clampScore(components.problemSolving)
   const cq = clampScore(components.codeQuality)

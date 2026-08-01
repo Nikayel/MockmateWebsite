@@ -192,7 +192,11 @@ Return ONLY the JSON object, nothing else.`
         alternativesDiscussed: parsed.alternativesDiscussed,
       })
 
-      const exactCandidateMessages = transcript.filter((m) => m.role === "candidate")
+      // Transcripts arrive with either "candidate" or the normalized "user"
+      // role (request-schema maps type "user"/"candidate" to role "user").
+      const exactCandidateMessages = transcript.filter(
+        (m) => m.role === "candidate" || m.role === "user"
+      )
       const totalCandidateChars = exactCandidateMessages.reduce(
         (sum, m) => sum + m.content.length,
         0
@@ -220,7 +224,17 @@ Return ONLY the JSON object, nothing else.`
 
       let approachExplained = Boolean(parsed.approachExplained)
       let approachQuality = parsed.approachQuality || "none"
-      let communicationScore = Math.min(100, Math.max(0, Number(parsed.communicationScore) || 50))
+      // A legitimate 0 ("no communication" per the rubric) must survive; only
+      // a missing/non-numeric value falls back to the neutral 50. Number(null)
+      // and Number("") are 0, so those are excluded before coercion.
+      const rawCommunicationScore =
+        typeof parsed.communicationScore === "number" ||
+        (typeof parsed.communicationScore === "string" && parsed.communicationScore.trim() !== "")
+          ? Number(parsed.communicationScore)
+          : NaN
+      let communicationScore = Number.isFinite(rawCommunicationScore)
+        ? Math.min(100, Math.max(0, rawCommunicationScore))
+        : 50
       let edgeCasesConsidered = Boolean(parsed.edgeCasesConsidered)
       let complexityDiscussed = Boolean(parsed.complexityDiscussed)
 

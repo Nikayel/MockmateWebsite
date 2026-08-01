@@ -17,7 +17,7 @@ import { generateAIResponse } from "@/lib/ai-providers"
 import { logger } from "@/lib/logger"
 import type { ExtractedEvidence } from "./structured-extraction"
 import { buildEvidenceSummary } from "./structured-extraction"
-import { calculatePerformanceScore } from "@/lib/constants"
+import { calculatePerformanceScoreForScenario, clampScore } from "@/lib/constants"
 import { persistConstitutionalAIIntervention } from "@/lib/scoring/analytics-persistence"
 import type {
   ConstitutionalAIIntervention,
@@ -350,17 +350,46 @@ If no issues found, return:
     if (jsonMatch) {
       const result = JSON.parse(jsonMatch[0]) as ScoreCritiqueAdjustment
 
+      // The model's adjustedScores arrive as untyped JSON. Coerce and clamp
+      // every component before any of them can reach the user or Firestore;
+      // if any component is non-numeric, discard the adjustment entirely.
+      if (result.adjustedScores) {
+        const components = [
+          "understanding",
+          "problemSolving",
+          "codeQuality",
+          "communication",
+          "overall",
+        ] as const
+        const coerced = components.map((key) => Number(result.adjustedScores?.[key]))
+        if (coerced.every((value) => Number.isFinite(value))) {
+          components.forEach((key, index) => {
+            result.adjustedScores![key] = clampScore(coerced[index])
+          })
+        } else {
+          logger.warn("[Constitutional AI] Discarding non-numeric adjustedScores", {
+            adjustedScores: result.adjustedScores,
+          })
+          result.adjustedScores = undefined
+          result.madeChanges = false
+        }
+      }
+
       // Validate and fix adjusted scores if present
       if (result.madeChanges && result.adjustedScores) {
         // Recalculate overall from components to ensure consistency
-        // Don't trust AI to do the math correctly
-        // Uses centralized calculatePerformanceScore from lib/constants.ts
-        const recalculatedOverall = calculatePerformanceScore({
-          understanding: result.adjustedScores.understanding,
-          problemSolving: result.adjustedScores.problemSolving,
-          codeQuality: result.adjustedScores.codeQuality,
-          communication: result.adjustedScores.communication,
-        })
+        // Don't trust AI to do the math correctly. Weights must match the
+        // scenario type: bugfix/system-design sessions are critiqued here too,
+        // and recomputing with DSA weights would overwrite a correct overall.
+        const recalculatedOverall = calculatePerformanceScoreForScenario(
+          {
+            understanding: result.adjustedScores.understanding,
+            problemSolving: result.adjustedScores.problemSolving,
+            codeQuality: result.adjustedScores.codeQuality,
+            communication: result.adjustedScores.communication,
+          },
+          context.scenarioType
+        )
 
         // If AI's overall differs significantly from recalculated, use recalculated
         const aiOverall = result.adjustedScores.overall
@@ -421,7 +450,10 @@ If no issues found, return:
           // If result has adjusted scores, update them
           if (result.adjustedScores) {
             result.adjustedScores.communication = evidenceCheck.minScore
-            result.adjustedScores.overall = calculatePerformanceScore(result.adjustedScores)
+            result.adjustedScores.overall = calculatePerformanceScoreForScenario(
+              result.adjustedScores,
+              context.scenarioType
+            )
           } else {
             // Create adjusted scores with the floor
             result.adjustedScores = {
@@ -431,7 +463,10 @@ If no issues found, return:
               communication: evidenceCheck.minScore,
               overall: 0, // Will be recalculated
             }
-            result.adjustedScores.overall = calculatePerformanceScore(result.adjustedScores)
+            result.adjustedScores.overall = calculatePerformanceScoreForScenario(
+              result.adjustedScores,
+              context.scenarioType
+            )
             result.madeChanges = true
             result.reasoning = `${result.reasoning || ""} Evidence-based floor applied: ${evidenceCheck.reason}.`
           }
