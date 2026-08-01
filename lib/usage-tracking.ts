@@ -20,10 +20,22 @@ import { countTokens } from "./token-counter"
 import { logger } from "./logger"
 import { AI_BUDGET_CAPS } from "./pricing"
 
-// Cost per 1K tokens for each provider (input + output averaged) - Dec 2025
+// Cost per 1K tokens for each provider (input + output averaged).
+// Gemini rows verified against ai.google.dev/gemini-api/docs/pricing on
+// 2026-08-01 and match the live pins in lib/ai/model-ids.ts. The others are
+// older figures for providers we either do not call or call rarely; treat them
+// as unverified.
+//
+// IMPORTANT: the keys here are PROVIDER names (see AIProvider in
+// lib/ai-providers.ts), not model ids. A provider missing from this table
+// falls back to the gemini rate, which is why gemini-lite and deepseek-chat
+// are listed explicitly: without them, flash-lite traffic was billed at 3.2x
+// its real rate and DeepSeek traffic at the Gemini rate.
 export const PROVIDER_COSTS = {
-  gemini: 0.000188, // Gemini 2.5 Flash: $0.075 in + $0.30 out per 1M
-  "gemini-pro": 0.003125, // Gemini 2.5 Pro: $1.25 in + $5.00 out per 1M
+  gemini: 0.0045, // Gemini 3.6 Flash: $1.50 in + $7.50 out per 1M
+  "gemini-lite": 0.0014, // Gemini 3.5 Flash-Lite: $0.30 in + $2.50 out per 1M
+  "deepseek-chat": 0.00021, // Deepseek: $0.14 in + $0.28 out per 1M
+  "gemini-pro": 0.003125, // Gemini 2.5 Pro (unverified, not currently called)
   deepseek: 0.00021, // Deepseek: $0.14 in + $0.28 out per 1M
   claude: 0.0024, // Claude 3.5 Haiku: $0.80 in + $4.00 out per 1M
   "claude-sonnet": 0.009, // Claude Sonnet 4: $3 in + $15 out per 1M
