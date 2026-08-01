@@ -320,7 +320,11 @@ export const COST_PROTECTION = {
    * surge (or many free accounts) cannot run an unbounded bill. Override at
    * runtime with GLOBAL_DAILY_SPEND_CEILING_USD. Set to 0 to disable the gate.
    */
-  GLOBAL_DAILY_SPEND_CEILING_USD: 50,
+  // Re-set 2026-08-01: this counter is fed by calculateCost(), so while
+  // PROVIDER_COSTS understated spend ~23x this $50 brake was really a ~$1,150
+  // brake. Now that the rates are correct, $250 is a real ceiling covering
+  // roughly 600 sessions/day, well above a 300-user launch.
+  GLOBAL_DAILY_SPEND_CEILING_USD: 250,
 } as const
 
 // =============================================================================
