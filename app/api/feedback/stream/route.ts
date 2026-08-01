@@ -406,7 +406,6 @@ export async function POST(request: NextRequest) {
             integrity: {
               isCoherent: aiValidation.isCoherent,
               responsesRelevant: aiValidation.responsesRelevant,
-              keywordStuffing: preScreen.suspiciousPatterns.keywordStuffing,
             },
           })
         : null
@@ -429,8 +428,7 @@ export async function POST(request: NextRequest) {
         validatedScores,
         passRate,
         sanitizeEfficiencyScore(efficiencyMetrics?.efficiencyScore),
-        aiValidation,
-        preScreen.suspiciousPatterns.keywordStuffing
+        aiValidation
       )
 
       if (bugfixScoreBreakdown) {
