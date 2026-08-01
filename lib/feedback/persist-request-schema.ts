@@ -34,6 +34,7 @@ const persistSilentNoteSchema = z.object({
   userSaid: z.string().catch(""),
   correct: z.string().optional(),
   context: z.string().optional(),
+  timestamp: z.number().optional(),
 })
 
 export const persistRequestSchema = z
@@ -55,25 +56,28 @@ export const persistRequestSchema = z
 
     // Malformed silent notes are dropped rather than failing the whole persist:
     // they are supplementary display data, not score inputs.
-    silentNotes: z.array(persistSilentNoteSchema.catch(null as never)).optional(),
-    bugfixEvidenceSummary: z.record(z.unknown()).optional(),
-    bugfixScoreBreakdown: z.record(z.unknown()).optional(),
-    bugfixPostSessionReport: z.record(z.unknown()).optional(),
+    silentNotes: z.array(persistSilentNoteSchema.catch(null as never)).nullish(),
+    // The streaming client sends explicit null for these on every non-bugfix
+    // session (stream route emits `?? null`), so they must be nullish, not
+    // just optional — .optional() alone rejects null and 400s the persist.
+    bugfixEvidenceSummary: z.record(z.unknown()).nullish(),
+    bugfixScoreBreakdown: z.record(z.unknown()).nullish(),
+    bugfixPostSessionReport: z.record(z.unknown()).nullish(),
 
     isGuidedLab: z.boolean().optional(),
     guidedLabMastery: z
       .object({
-        quizAccuracy: z.number().finite().optional(),
+        quizAccuracy: z.number().finite().min(0).max(100).optional(),
         quizzesCorrect: z.number().int().min(0).optional(),
         quizzesTotal: z.number().int().min(0).optional(),
         milestonesCompleted: z.number().int().min(0).optional(),
         milestonesTotal: z.number().int().min(0).optional(),
       })
-      .optional(),
+      .nullish(),
 
     conversationTranscript: z
       .array(z.object({ role: z.string(), content: z.string() }).catch(null as never))
-      .optional(),
+      .nullish(),
     efficiencyMetrics: z
       .object({
         optimalTimeComplexity: z.string().optional(),
@@ -129,8 +133,10 @@ export function validatePersistRequestBody(rawBody: unknown): PersistRequestVali
       scores,
       testsPassed,
       testsTotal,
-      silentNotes: data.silentNotes?.filter((note) => note !== null),
-      conversationTranscript: data.conversationTranscript?.filter((entry) => entry !== null),
+      silentNotes: data.silentNotes?.filter((note) => note !== null) ?? undefined,
+      conversationTranscript:
+        data.conversationTranscript?.filter((entry) => entry !== null) ?? undefined,
+      guidedLabMastery: data.guidedLabMastery ?? undefined,
     },
   }
 }

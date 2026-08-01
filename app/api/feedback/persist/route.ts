@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     const masteryInput: MasteryScoreInput = {
       testCasesPassed: testsPassed,
       testCasesTotal: testsTotal,
-      timeSpentMinutes: timeSpentMinutes || 30, // Default 30 min if not provided
+      timeSpentMinutes: timeSpentMinutes ?? 30, // Default 30 min ONLY when absent; a real 0 stays 0 (EDGE-15)
       hintsUsed: hintsUsed || 0,
       hintsTotal: 5, // Default assumption
       problemDifficulty: difficulty || "medium",

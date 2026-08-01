@@ -131,4 +131,49 @@ describe("validatePersistRequestBody", () => {
     const result = validatePersistRequestBody(validBody({ feedback: { tldr: "x" } }))
     expect(result.success).toBe(false)
   })
+
+  // REGRESSION: the streaming client sends explicit null for the bugfix fields
+  // on every non-bugfix session (stream route emits `?? null` and JSON keeps
+  // nulls). A schema built with .optional() alone rejects that body and 400s
+  // the persist, silently dropping scores/mastery/history for the main DSA
+  // flow. This replicates the real client body from use-streaming-feedback.
+  it("accepts the real non-bugfix streaming body with explicit nulls", () => {
+    const result = validatePersistRequestBody(
+      validBody({
+        bugfixEvidenceSummary: null,
+        bugfixScoreBreakdown: null,
+        bugfixPostSessionReport: null,
+        silentNotes: [
+          { type: "wrong_complexity", userSaid: "O(1)", correct: "O(n)", timestamp: 1722400000 },
+        ],
+      })
+    )
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.silentNotes).toHaveLength(1)
+      expect(result.data.silentNotes?.[0].timestamp).toBe(1722400000)
+    }
+  })
+
+  it("accepts null silentNotes, transcript, and guidedLabMastery", () => {
+    const result = validatePersistRequestBody(
+      validBody({ silentNotes: null, conversationTranscript: null, guidedLabMastery: null })
+    )
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.silentNotes).toBeUndefined()
+      expect(result.data.conversationTranscript).toBeUndefined()
+      expect(result.data.guidedLabMastery).toBeUndefined()
+    }
+  })
+
+  it("preserves silent-note timestamps through validation", () => {
+    const result = validatePersistRequestBody(
+      validBody({ silentNotes: [{ type: "missed_edge_case", userSaid: "", timestamp: 42 }] })
+    )
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.silentNotes?.[0].timestamp).toBe(42)
+    }
+  })
 })
