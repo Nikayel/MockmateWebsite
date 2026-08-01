@@ -256,6 +256,15 @@ export function calculateValidatedScores(
   let codeQuality = passRate * 0.5 + efficiencyScore * 0.4
   let communication = 30 // Base communication score
 
+  // NOTE: these bonuses are deliberately NOT gated on isCoherent, even though
+  // the Node DSA scorer gates its equivalents. Measured 2026-08-01: gating
+  // them here drops an incoherent session's understanding to 67 while Node
+  // lands on 90 (Node's pass-rate floors lift it back up), so "match Node"
+  // reasoning actually widens the gap from 7 points to 23. Whether an
+  // incoherent session should keep pass-rate-derived understanding credit is
+  // a product decision, not a parity cleanup. Communication is capped for
+  // incoherence below, which is the defensible part.
+
   // Approach explanation bonus
   if (aiValidation.approachExplained) {
     understanding += 20
