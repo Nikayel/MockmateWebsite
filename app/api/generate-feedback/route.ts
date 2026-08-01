@@ -598,6 +598,7 @@ export async function POST(request: NextRequest) {
         passRate,
         scenarioType: scenarioType || "dsa",
         aiValidation,
+        keywordStuffing: preScreen.suspiciousPatterns.keywordStuffing,
         codeCompleteness,
         hasBlindCopying,
         extractedEvidence,
