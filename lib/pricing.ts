@@ -95,9 +95,16 @@ export function isPaidTier(tier: SubscriptionTier): boolean {
  * These control how much AI API cost a user can consume
  */
 export const AI_BUDGET_CAPS = {
-  free: 0.50,        // $0.50 - enough for ~50 sessions with Gemini
-  pro: 25.00,        // $25/month
-  enterprise: 100.00, // $100/month
+  // Re-set 2026-08-01 alongside the ~23x cost-constant correction below. These
+  // are deliberately set NOT to bind: the server-authoritative session quota
+  // (lib/config.ts: free 8/mo, pro 35/mo) is the real limit, and these are the
+  // runaway backstop. At the corrected rates a session costs roughly $0.40
+  // pathological / $0.15 typical, so free covers ~16 sessions against a quota
+  // of 8. Leaving the old $0.50 here after the correction would have started
+  // blocking free users partway through their SECOND session.
+  free: 6.50,        // ~16 sessions, quota is 8
+  pro: 28.00,        // ~70 sessions, quota is 35
+  enterprise: 112.00, // 4x pro
 } as const
 
 /**
@@ -167,7 +174,9 @@ export function getAllPricingTiers(): Array<{
  * Updated Dec 2025
  */
 export const AI_PROVIDER_COSTS = {
-  gemini: 0.000188,         // Gemini 2.5 Flash
+  gemini: 0.0045,           // Gemini 3.6 Flash: $1.50 in + $7.50 out per 1M
+  'gemini-lite': 0.0014,    // Gemini 3.5 Flash-Lite: $0.30 in + $2.50 out per 1M
+  'deepseek-chat': 0.00021, // Deepseek (provider key, was falling back to gemini)
   'gemini-pro': 0.003125,   // Gemini 2.5 Pro
   deepseek: 0.00021,        // Deepseek
   claude: 0.0024,           // Claude 3.5 Haiku
