@@ -250,79 +250,55 @@ describe("calculateValidatedScores (DSA)", () => {
     expect(withoutBonus.communication).toBe(72)
   })
 
-  it("keyword stuffing caps communication at 35", () => {
-    // complexityDiscussed alone does not count as an approach indicator, so
-    // the later branches cannot lift the stuffing cap back up.
-    const stuffedValidation = validation({
-      approachExplained: false,
-      approachQuality: "none",
+  it("keywordStuffing does not affect the score at all", () => {
+    // The detector requires under 30 words across the whole transcript, so it
+    // fires on concise honest candidates and never on the long keyword-salad
+    // transcripts it is named for. It is no longer consulted here: a flagged
+    // session must score identically to an unflagged one.
+    const val = validation({
+      approachExplained: true,
+      approachQuality: "good",
+      communicationScore: 80,
       questionsAsked: 0,
       questionsAnswered: 0,
-      communicationScore: 80,
     })
-    const stuffed = calculateValidatedScores(
-      100,
-      undefined,
-      preScreen({ suspiciousPatterns: { tooShort: false, possibleGibberish: false, keywordStuffing: true } }),
-      stuffedValidation,
-      "dsa",
-      WORKING_CODE
-    )
-    const clean = calculateValidatedScores(
-      100,
-      undefined,
-      preScreen(),
-      stuffedValidation,
-      "dsa",
-      WORKING_CODE
-    )
-    expect(stuffed.communication).toBe(35)
-    expect(clean.communication).toBe(60)
+    const stuffedFlag = preScreen({
+      suspiciousPatterns: { tooShort: false, possibleGibberish: false, keywordStuffing: true },
+    })
+    const flagged = calculateValidatedScores(100, undefined, stuffedFlag, val, "dsa", WORKING_CODE)
+    const unflagged = calculateValidatedScores(100, undefined, preScreen(), val, "dsa", WORKING_CODE)
+    expect(flagged).toEqual(unflagged)
   })
 
-  it("stuffing cap holds against the approach-bonus lift path", () => {
-    // Stuffed keywords can convince the AI validator an approach was
-    // explained; the qualityBonus branch then ran after the original cap and
-    // lifted communication back to 55.
-    const result = calculateValidatedScores(
+  it("keywordStuffing does not affect the score with extracted evidence either", () => {
+    const val = validation({
+      approachExplained: false,
+      approachQuality: "none",
+      communicationScore: 80,
+      questionsAsked: 0,
+      questionsAnswered: 0,
+    })
+    const flagged = calculateValidatedScores(
       100,
       undefined,
       preScreen({
         suspiciousPatterns: { tooShort: false, possibleGibberish: false, keywordStuffing: true },
       }),
-      validation({
-        approachExplained: true,
-        approachQuality: "good",
-        communicationScore: 80,
-        questionsAsked: 0,
-        questionsAnswered: 0,
-      }),
-      "dsa",
-      WORKING_CODE
-    )
-    expect(result.communication).toBeLessThanOrEqual(35)
-  })
-
-  it("stuffing cap holds against the extracted-evidence floor", () => {
-    const result = calculateValidatedScores(
-      100,
-      undefined,
-      preScreen({
-        suspiciousPatterns: { tooShort: false, possibleGibberish: false, keywordStuffing: true },
-      }),
-      validation({
-        approachExplained: false,
-        approachQuality: "none",
-        communicationScore: 80,
-        questionsAsked: 0,
-        questionsAnswered: 0,
-      }),
+      val,
       "dsa",
       WORKING_CODE,
       evidence()
     )
-    // The evidence floor sets 50 for sessions with quotes; stuffing must win.
-    expect(result.communication).toBeLessThanOrEqual(35)
+    const unflagged = calculateValidatedScores(
+      100,
+      undefined,
+      preScreen(),
+      val,
+      "dsa",
+      WORKING_CODE,
+      evidence()
+    )
+    expect(flagged).toEqual(unflagged)
   })
 
   it("relevance cap holds against the approach-bonus lift path", () => {
