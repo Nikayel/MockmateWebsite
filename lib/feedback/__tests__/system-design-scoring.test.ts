@@ -167,6 +167,21 @@ describe("calculateSystemDesignScores", () => {
     })
   })
 
+  it("relevance cap survives a perfect answer rate", () => {
+    const result = calculateSystemDesignScores(
+      preScreen({ candidateMessageCount: 8 }),
+      validation({
+        responsesRelevant: false,
+        communicationScore: 90,
+        questionsAsked: 3,
+        questionsAnswered: 3,
+      }),
+      FILLED_DESIGN_NOTES
+    )
+    // Answering every question off-topic previously bought +10 back on the 35 cap.
+    expect(result.communication).toBe(35)
+  })
+
   it("irrelevant responses take the penalty path while coherence bonuses still apply", () => {
     const result = calculateSystemDesignScores(
       preScreen({ candidateMessageCount: 8 }),
