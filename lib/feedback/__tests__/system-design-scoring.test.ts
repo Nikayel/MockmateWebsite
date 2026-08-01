@@ -86,6 +86,19 @@ describe("calculateSystemDesignScores", () => {
     })
   })
 
+  it("blank-notes overall tracks ungranted flags instead of assuming 18s", () => {
+    const result = calculateSystemDesignScores(
+      preScreen({ candidateMessageCount: 6, avgMessageLength: 80 }),
+      validation({ approachExplained: false, alternativesDiscussed: false }),
+      undefined
+    )
+    expect(result.understanding).toBe(12)
+    expect(result.problemSolving).toBe(12)
+    // (12 + 12 + 10 + 20) / 5 = 11. The old branch hardcoded the 18s and
+    // reported 13, crediting flags this session never earned.
+    expect(result.overall).toBe(11)
+  })
+
   it("filled design notes with zero conversation returns the fixed 22-overall tier", () => {
     const result = calculateSystemDesignScores(
       preScreen({ hasContent: false, candidateMessageCount: 0, avgMessageLength: 0 }),
