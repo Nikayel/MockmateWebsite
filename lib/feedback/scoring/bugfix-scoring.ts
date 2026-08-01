@@ -56,17 +56,12 @@ export function calculateBugFixScores(
     }
   }
 
-  // Relevance and keyword-stuffing caps. This scorer previously capped on
-  // incoherence alone, so an irrelevant or stuffed session kept the raw
-  // aiValidation.communicationScore (measured: 90, overall 95, identical to a
-  // clean session). Applied after the answer-rate bonus, and as min-of-all
-  // rather than first-match, so a session tripping several rules takes the
-  // harshest.
+  // Relevance cap. This scorer previously capped on incoherence alone, so an
+  // irrelevant session kept the raw aiValidation.communicationScore (measured:
+  // 90, overall 95, identical to a clean session). Applied after the
+  // answer-rate bonus so the bonus cannot lift it back over.
   if (!aiValidation.responsesRelevant) {
     communication = Math.min(45, communication)
-  }
-  if (preScreen.suspiciousPatterns.keywordStuffing) {
-    communication = Math.min(35, communication)
   }
 
   // Communication-evidence gate: a bugfix round scored without the evidence
