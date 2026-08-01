@@ -146,9 +146,11 @@ describe("DEFECT: keywordStuffing measures brevity, not stuffing", () => {
     expect(honest.suspiciousPatterns.keywordStuffing).toBe(true)
   })
 
-  it("fires on transcripts that are not close to silent", () => {
-    // Ten turns is a real conversation, not silence. An earlier version of
-    // this test claimed the flag only caught near-silent sessions; it does not.
+  it("message count alone does not save a transcript from the flag", () => {
+    // Ten turns, but only 15 words: this fixture is still terse (tooShort is
+    // true for it), so it proves turn COUNT is not what the rule looks at,
+    // not that the rule catches verbose sessions. The honest-terse test
+    // above is the load-bearing false-positive evidence.
     const tenTurns = preScreenConversation(
       turns(
         "hash map",
