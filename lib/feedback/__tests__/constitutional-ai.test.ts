@@ -19,6 +19,7 @@ vi.mock("@/lib/scoring/analytics-persistence", () => ({
 import { critiqueScores } from "../constitutional-ai"
 import { generateAIResponse } from "@/lib/ai-providers"
 import { SCORING } from "@/lib/constants"
+import type { ExtractedEvidence } from "../structured-extraction"
 import type { ConversationValidation, ScoreResult } from "../types"
 
 const mockGenerateAIResponse = vi.mocked(generateAIResponse)
@@ -161,6 +162,104 @@ describe("critiqueScores adjustedScores handling", () => {
     const result = await critiqueScores(originalScores, critiqueContext("dsa"))
     expect(result.madeChanges).toBe(false)
     expect(result.adjustedScores).toBeUndefined()
+  })
+})
+
+
+/**
+ * The evidence floor hard-sets communication to 50-80 whenever the transcript
+ * yields any communication / approach / complexity quote. A keyword-stuffed or
+ * incoherent transcript produces exactly those quotes, so it must be withheld
+ * when an integrity signal fires. This was the one live-in-production fix of
+ * the wave and shipped without a test.
+ */
+function evidenceWithQuotes(): ExtractedEvidence {
+  return {
+    approach: {
+      explained: true,
+      type: "optimized",
+      quote: "I will use a hash map for lookups",
+      messageIndex: 1,
+    },
+    timeComplexity: {
+      mentioned: true,
+      value: "O(n)",
+      explanationGiven: true,
+      quote: "that gives O(n) time",
+      messageIndex: 2,
+      isCorrect: true,
+    },
+    spaceComplexity: {
+      mentioned: false,
+      value: null,
+      quote: null,
+      messageIndex: null,
+      isCorrect: null,
+    },
+    edgeCases: { mentionedByCandidate: [], mentionedAfterPrompt: [], missedCritical: [] },
+    progression: {
+      startedWithBruteForce: false,
+      improvedAfterPrompt: false,
+      selfCorrectedBugs: false,
+      bugQuotes: [],
+    },
+    interviewerQuestions: [],
+    communication: {
+      explainedWhileCoding: true,
+      askedClarifyingQuestions: false,
+      respondedToFeedback: false,
+      quotes: ["I will use a hash map for lookups"],
+    },
+    hints: { totalGiven: 0, usedEffectively: false, copiedBlindly: false },
+  }
+}
+
+// A low starting communication so the floor has something to lift.
+const LOW_COMM_SCORES: ScoreResult = { ...originalScores, communication: 20 }
+
+describe("critiqueScores evidence floor integrity guard", () => {
+  beforeEach(() => {
+    mockGenerateAIResponse.mockReset()
+    // No adjustment from the model: isolate the evidence-floor path.
+    mockCritiqueResponse({ critiques: [], reasoning: "fine", madeChanges: false })
+  })
+
+  function contextWith(
+    overrides: Partial<ConversationValidation>,
+    keywordStuffing = false
+  ) {
+    return {
+      passRate: 100,
+      scenarioType: "dsa",
+      aiValidation: aiValidation(overrides),
+      keywordStuffing,
+      extractedEvidence: evidenceWithQuotes(),
+    }
+  }
+
+  it("applies the floor for a clean session with quotes", () => {
+    return critiqueScores(LOW_COMM_SCORES, contextWith({})).then((result) => {
+      expect(result.madeChanges).toBe(true)
+      expect(result.adjustedScores?.communication).toBeGreaterThanOrEqual(50)
+    })
+  })
+
+  it("withholds the floor when the transcript is incoherent", async () => {
+    const result = await critiqueScores(LOW_COMM_SCORES, contextWith({ isCoherent: false }))
+    expect(result.adjustedScores?.communication).toBeUndefined()
+    expect(result.madeChanges).toBe(false)
+  })
+
+  it("withholds the floor when responses are irrelevant", async () => {
+    const result = await critiqueScores(LOW_COMM_SCORES, contextWith({ responsesRelevant: false }))
+    expect(result.adjustedScores?.communication).toBeUndefined()
+    expect(result.madeChanges).toBe(false)
+  })
+
+  it("withholds the floor when the transcript is keyword-stuffed", async () => {
+    const result = await critiqueScores(LOW_COMM_SCORES, contextWith({}, true))
+    expect(result.adjustedScores?.communication).toBeUndefined()
+    expect(result.madeChanges).toBe(false)
   })
 })
 
