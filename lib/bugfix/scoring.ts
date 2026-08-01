@@ -83,6 +83,23 @@ function ratioScore(count: number, target: number): number {
   return clampScore((count / target) * 100)
 }
 
+/**
+ * Apply the transcript-integrity caps to a communication score. Uses the
+ * min of every applicable cap rather than first-match, so a session that is
+ * both stuffed and irrelevant takes the harsher of the two.
+ */
+function capCommunicationForIntegrity(
+  score: number,
+  integrity?: { isCoherent?: boolean; responsesRelevant?: boolean; keywordStuffing?: boolean }
+): number {
+  if (!integrity) return score
+  let capped = score
+  if (integrity.isCoherent === false) capped = Math.min(25, capped)
+  if (integrity.responsesRelevant === false) capped = Math.min(45, capped)
+  if (integrity.keywordStuffing === true) capped = Math.min(35, capped)
+  return capped
+}
+
 export function calculateBugfixEvidenceScore(
   evidence: BugfixEvidenceSummary,
   options: {
@@ -93,6 +110,21 @@ export function calculateBugfixEvidenceScore(
       rootCauseAccuracy?: number
       preventionQuality?: number
       communicationScore?: number
+    }
+    /**
+     * Transcript-integrity signals. The communication dimension is otherwise an
+     * LLM judgment (semanticOverrides.communicationScore), which is exactly the
+     * signal a keyword-stuffed or incoherent transcript is built to fool. These
+     * caps are the deterministic backstop, matching the DSA scorers.
+     *
+     * This matters because the stream route REPLACES the capped scorer output
+     * wholesale with this breakdown for bugfix sessions, so without it the
+     * Edge integrity caps never reach bugfix at all.
+     */
+    integrity?: {
+      isCoherent?: boolean
+      responsesRelevant?: boolean
+      keywordStuffing?: boolean
     }
   } = {}
 ): BugfixScoreBreakdown {
@@ -126,7 +158,10 @@ export function calculateBugfixEvidenceScore(
     aiCollaborationQuality: clampScore(
       70 + evidence.aiPartnerUseCount * 10 - evidence.aiShortcutCount * 35
     ),
-    communication: overrides.communicationScore ?? 50,
+    communication: capCommunicationForIntegrity(
+      overrides.communicationScore ?? 50,
+      options.integrity
+    ),
   }
 
   const overall = Object.entries(DEFAULT_WEIGHTS).reduce((sum, [key, weight]) => {
