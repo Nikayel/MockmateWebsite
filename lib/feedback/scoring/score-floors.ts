@@ -18,9 +18,14 @@ export function applyScoreFloors(
   scenarioType?: string
 ): ExtendedScoreResult {
   const isOptimal = (efficiencyScore || 0) >= 80
+  // responsesRelevant belongs here for the same reason isCoherent does: an
+  // approach "explained" in answers that do not address the questions is not
+  // interview credit, and without it these floors raise communication back
+  // over the relevance cap the scorer just applied.
   const explainedApproach =
     aiValidation.approachExplained &&
     aiValidation.isCoherent &&
+    aiValidation.responsesRelevant &&
     aiValidation.approachQuality !== "none" &&
     aiValidation.approachQuality !== "poor"
   const hasGoodComm = aiValidation.communicationScore >= 60 && explainedApproach
