@@ -1,6 +1,10 @@
-import { SCORING } from "@/lib/constants"
+import { calculatePerformanceScoreForScenario } from "@/lib/constants"
 import type { ConversationValidation, ExtendedScoreResult, ScoreResult } from "../types"
-import { assessCommunicationEvidence, isSilentSolution } from "./communication-gate"
+import {
+  assessCommunicationEvidence,
+  capOverallForCommunicationEvidence,
+  isSilentSolution,
+} from "./communication-gate"
 
 /**
  * Apply score floors for correct solutions while preserving interview communication penalties.
@@ -10,7 +14,8 @@ export function applyScoreFloors(
   passRate: number,
   efficiencyScore: number | undefined,
   aiValidation: ConversationValidation,
-  candidateMessageCount: number
+  candidateMessageCount: number,
+  scenarioType?: string
 ): ExtendedScoreResult {
   const isOptimal = (efficiencyScore || 0) >= 80
   const explainedApproach =
@@ -23,14 +28,12 @@ export function applyScoreFloors(
   // on the Edge route. The old local rule (passRate >= 80 && !explainedApproach)
   // fired on chatty sessions the communication gate never capped, which made the
   // banner's "your Communication score was capped" claim untrue.
-  const silentSolution = isSilentSolution(
-    assessCommunicationEvidence({
-      candidateMessageCount,
-      approachExplained: aiValidation.approachExplained,
-      complexityDiscussed: aiValidation.complexityDiscussed,
-    }),
-    passRate
-  )
+  const commEvidenceLevel = assessCommunicationEvidence({
+    candidateMessageCount,
+    approachExplained: aiValidation.approachExplained,
+    complexityDiscussed: aiValidation.complexityDiscussed,
+  })
+  const silentSolution = isSilentSolution(commEvidenceLevel, passRate)
 
   let overall = scores.overall
   let communication = scores.communication
@@ -76,12 +79,12 @@ export function applyScoreFloors(
       codeQuality = Math.max(80, codeQuality)
     }
 
-    const pw = SCORING.PERFORMANCE_WEIGHTS
-    const newOverall = Math.round(
-      understanding * pw.UNDERSTANDING +
-        problemSolving * pw.PROBLEM_SOLVING +
-        codeQuality * pw.CODE_QUALITY +
-        communication * pw.COMMUNICATION
+    // Weights must match the scenario type: this runs for bugfix and
+    // system-design sessions too, and a DSA-weighted recompute would raise
+    // their overall with the wrong formula.
+    const newOverall = calculatePerformanceScoreForScenario(
+      { understanding, problemSolving, codeQuality, communication },
+      scenarioType
     )
     overall = Math.max(overall, newOverall)
   } else if (passRate >= 80) {
@@ -91,6 +94,11 @@ export function applyScoreFloors(
     }
     codeQuality = Math.max(55, codeQuality)
   }
+
+  // Structural pin: floors run after the silent-session gate, so their
+  // Math.max must never out-raise the gate's overall cap. With the shipped cap
+  // values this is a no-op, but re-applying makes the invariant unbreakable.
+  overall = capOverallForCommunicationEvidence(overall, commEvidenceLevel)
 
   return {
     ...scores,

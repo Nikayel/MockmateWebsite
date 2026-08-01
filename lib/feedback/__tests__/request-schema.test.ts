@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 import {
   MAX_FEEDBACK_CODE_LENGTH,
   MAX_FEEDBACK_TRANSCRIPT_LENGTH,
+  sanitizeEfficiencyScore,
+  sanitizeTestCount,
   validateFeedbackRequestBody,
 } from "../request-schema"
 
@@ -71,5 +73,45 @@ describe("validateFeedbackRequestBody", () => {
         }),
       })
     )
+  })
+})
+
+describe("sanitizeTestCount", () => {
+  it("passes through valid counts and floors decimals", () => {
+    expect(sanitizeTestCount(5)).toBe(5)
+    expect(sanitizeTestCount(4.9)).toBe(4)
+    expect(sanitizeTestCount(0)).toBe(0)
+  })
+
+  it("coerces numeric strings", () => {
+    expect(sanitizeTestCount("7")).toBe(7)
+  })
+
+  it("returns 0 for garbage, negatives, and non-finite input", () => {
+    expect(sanitizeTestCount("abc")).toBe(0)
+    expect(sanitizeTestCount(-3)).toBe(0)
+    expect(sanitizeTestCount(NaN)).toBe(0)
+    expect(sanitizeTestCount(Infinity)).toBe(0)
+    expect(sanitizeTestCount(null)).toBe(0)
+    expect(sanitizeTestCount(undefined)).toBe(0)
+    expect(sanitizeTestCount("")).toBe(0)
+    expect(sanitizeTestCount({})).toBe(0)
+  })
+})
+
+describe("sanitizeEfficiencyScore", () => {
+  it("clamps into 0-100", () => {
+    expect(sanitizeEfficiencyScore(85)).toBe(85)
+    expect(sanitizeEfficiencyScore(150)).toBe(100)
+    expect(sanitizeEfficiencyScore(-10)).toBe(0)
+    expect(sanitizeEfficiencyScore(0)).toBe(0)
+  })
+
+  it("defaults to neutral 50 when missing or non-numeric", () => {
+    expect(sanitizeEfficiencyScore(undefined)).toBe(50)
+    expect(sanitizeEfficiencyScore(null)).toBe(50)
+    expect(sanitizeEfficiencyScore("garbage")).toBe(50)
+    expect(sanitizeEfficiencyScore(NaN)).toBe(50)
+    expect(sanitizeEfficiencyScore("")).toBe(50)
   })
 })

@@ -366,7 +366,37 @@ Return JSON only:
 
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0])
+      // The model's JSON is untrusted: the stream route dereferences
+      // evidence.edgeCases.mentionedByCandidate, so a response missing a key
+      // would crash the whole feedback stream. Normalize into the declared
+      // shape with safe defaults; return null only if nothing is usable.
+      const parsed: unknown = JSON.parse(jsonMatch[0])
+      if (typeof parsed !== "object" || parsed === null) return null
+      const record = parsed as Record<string, unknown>
+      const asRecord = (value: unknown): Record<string, unknown> =>
+        typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {}
+      const approach = asRecord(record.approach)
+      const timeComplexity = asRecord(record.timeComplexity)
+      const edgeCases = asRecord(record.edgeCases)
+      return {
+        approach: {
+          explained: approach.explained === true,
+          quote: typeof approach.quote === "string" ? approach.quote : undefined,
+        },
+        timeComplexity: {
+          mentioned: timeComplexity.mentioned === true,
+          value: typeof timeComplexity.value === "string" ? timeComplexity.value : undefined,
+          isCorrect:
+            typeof timeComplexity.isCorrect === "boolean" ? timeComplexity.isCorrect : undefined,
+        },
+        edgeCases: {
+          mentionedByCandidate: Array.isArray(edgeCases.mentionedByCandidate)
+            ? edgeCases.mentionedByCandidate.filter(
+                (item): item is string => typeof item === "string"
+              )
+            : [],
+        },
+      }
     }
   } catch {
     // Fall through to null

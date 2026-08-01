@@ -542,7 +542,8 @@ export async function POST(request: NextRequest) {
       passRate,
       efficiencyMetrics?.efficiencyScore,
       aiValidation,
-      preScreen.candidateMessageCount
+      preScreen.candidateMessageCount,
+      scenarioType
     )
 
     // ============================================================================
@@ -1090,13 +1091,14 @@ CRITICAL INSTRUCTIONS:
     // This prevents confusing situations where you get 100% tests but mastery < overall
     if (testsTotal > 0 && testsPassed === testsTotal) {
       if (masteryScoreForResponse.masteryScore < scores.overall) {
+        const originalMastery = masteryScoreForResponse.masteryScore
         // Boost mastery to match overall when all tests pass
         masteryScoreForResponse = {
           ...masteryScoreForResponse,
           masteryScore: scores.overall,
         }
         logger.info("Mastery score boosted to match overall (100% pass rate)", {
-          originalMastery: masteryScoreForResponse.masteryScore,
+          originalMastery,
           boostedTo: scores.overall,
         })
       }

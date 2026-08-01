@@ -28,6 +28,38 @@ export const feedbackRequestSchema = z
   })
   .passthrough()
 
+/**
+ * Coerce an untrusted test count into a safe non-negative integer.
+ * Non-numeric, negative, or non-finite input becomes 0. Used by the Edge
+ * streaming route, where a bad count would otherwise become a NaN or >100%
+ * pass rate and flow into every downstream score.
+ */
+export function sanitizeTestCount(value: unknown): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim() !== ""
+        ? Number(value)
+        : NaN
+  if (!Number.isFinite(parsed) || parsed < 0) return 0
+  return Math.floor(parsed)
+}
+
+/**
+ * Coerce an untrusted efficiency score into 0-100, defaulting to the neutral
+ * 50 when missing or non-numeric.
+ */
+export function sanitizeEfficiencyScore(value: unknown): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim() !== ""
+        ? Number(value)
+        : NaN
+  if (!Number.isFinite(parsed)) return 50
+  return Math.min(100, Math.max(0, parsed))
+}
+
 export interface FeedbackTranscriptMessage {
   type?: string
   role: string

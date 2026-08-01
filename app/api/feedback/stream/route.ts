@@ -21,6 +21,7 @@ import {
   extractConversationEvidenceEdge,
 } from "@/lib/ai-providers-edge"
 // Direct imports to avoid pulling in Node.js dependencies via barrel exports
+import { sanitizeTestCount, sanitizeEfficiencyScore } from "@/lib/feedback/request-schema"
 import { preScreenConversation } from "@/lib/feedback/pre-screening"
 import { analyzeCodeCompleteness } from "@/lib/feedback/completeness-analysis"
 import { parseFeedbackSections, buildSilentNotesContext } from "@/lib/feedback/parsers"
@@ -90,8 +91,8 @@ export async function POST(request: NextRequest) {
         userId,
         code,
         language,
-        testsPassed,
-        testsTotal,
+        testsPassed: rawTestsPassed,
+        testsTotal: rawTestsTotal,
         scenarioType,
         scenarioTitle,
         scenarioId,
@@ -120,6 +121,12 @@ export async function POST(request: NextRequest) {
         return
       }
 
+      // Untrusted numeric inputs: a non-numeric count would make passRate NaN
+      // (which survives clamping into the scores event), and testsPassed >
+      // testsTotal would make it >100% and trip every perfect-pass floor.
+      const testsTotal = sanitizeTestCount(rawTestsTotal)
+      const testsPassed = Math.min(sanitizeTestCount(rawTestsPassed), testsTotal)
+
       // ========================================
       // PHASE 1: Instant Scores (< 100ms, no AI)
       // ========================================
@@ -146,7 +153,7 @@ export async function POST(request: NextRequest) {
       const signals = buildSignalsFromMetrics({
         testsPassed,
         testsTotal,
-        efficiencyScore: efficiencyMetrics?.efficiencyScore ?? 50,
+        efficiencyScore: sanitizeEfficiencyScore(efficiencyMetrics?.efficiencyScore),
         codeLength: code?.length || 0,
         hasActualLogic: codeAnalysis.hasActualLogic,
         approachExplained: phaseTracking?.conversationTracker?.approachExplained || false,
@@ -402,7 +409,7 @@ export async function POST(request: NextRequest) {
       let finalScores = applyScoreFloors(
         validatedScores,
         passRate,
-        efficiencyMetrics?.efficiencyScore,
+        sanitizeEfficiencyScore(efficiencyMetrics?.efficiencyScore),
         aiValidation
       )
 
