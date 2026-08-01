@@ -33,6 +33,9 @@ export function calculateSystemDesignScores(
     const maxScore = 20
 
     if (hasMinimalConversation || hasMinimalContent) {
+      // The 11 is an intentional flat floor, not a composition of the four
+      // subscores: three of them are fixed here, so there is nothing to
+      // compose. It deliberately does not track communication.
       return {
         understanding: 10,
         problemSolving: 10,
