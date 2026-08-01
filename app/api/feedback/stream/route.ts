@@ -400,6 +400,14 @@ export async function POST(request: NextRequest) {
         ? calculateBugfixEvidenceScore(bugfixEvidenceSummary, {
             difficulty: scenarioDifficulty || "medium",
             semanticOverrides: bugfixSemanticScores,
+            // This breakdown REPLACES the capped scorer output below, so the
+            // integrity signals have to be applied here too or bugfix sessions
+            // escape them entirely.
+            integrity: {
+              isCoherent: aiValidation.isCoherent,
+              responsesRelevant: aiValidation.responsesRelevant,
+              keywordStuffing: preScreen.suspiciousPatterns.keywordStuffing,
+            },
           })
         : null
 
