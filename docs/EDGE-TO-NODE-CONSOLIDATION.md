@@ -82,11 +82,11 @@ Rather than wait for the migration, the Edge scorer received the integrity caps 
 
 Clean sessions are deliberately unchanged, so this carried no legitimate-user impact.
 
-A follow-up review found the caps did not reach **bugfix** sessions at all: the stream route replaces the capped scorer output wholesale with `mapBugfixScoreToFeedbackScores(breakdown)`, and that breakdown's communication dimension was an unguarded LLM judgment. Fixed in `443ff050` / `c4ce2af9` by capping inside `calculateBugfixEvidenceScore`, which also covers the streaming-failure fallback path since it calls the same function.
+A follow-up review found the caps did not reach **bugfix** sessions at all: the stream route replaces the capped scorer output wholesale with `mapBugfixScoreToFeedbackScores(breakdown)`, and that breakdown's communication dimension was an unguarded LLM judgment. Fixed in `443ff050` / `c4ce2af9` by capping inside `calculateBugfixEvidenceScore`. (That commit's message also claimed the streaming-failure fallback inherits the fix because it calls the same function. It does not: the fallback passes no `integrity` option. Corrected in `f9787d07`.)
 
 Follow-up review then found three further leaks, all now closed: the Node bugfix scorer capped on incoherence only (an irrelevant or stuffed session scored 90/95, identical to clean), the clarifying-questions +10 landed above every cap, and the Constitutional-AI evidence floor hard-set communication to 50-80 on exactly the quotes a stuffed transcript produces.
 
-Three residues remain, all deliberate:
+Four residues remain, all deliberate:
 
 - **The `keywordStuffing` detector is defective in both directions and needs a product decision.** `pre-screening.ts` requires `wordCount < 30` across the entire transcript, so it is really measuring brevity. It cannot fire on a long stuffed transcript however dense the salad, and it *does* fire on a genuine terse candidate ("I'll use a hash map." / "That's O(n) time." / "Edge case: empty array." / "Brute force would be slower." is flagged, with `tooShort` and `possibleGibberish` both false). Four scoring paths now consume this flag, so the false positives are the live risk. Both directions are pinned in `pre-screening.test.ts`.
 - **The bugfix caps move overall by at most about 3 points.** `communication` carries weight 0.05 in `DEFAULT_WEIGHTS`, and the user-facing value is averaged with `aiCollaborationQuality`, so a cap of 25 displays as 48. A fraudulent bugfix transcript with clean evidence still scores around 91. Closing that gap means reweighting, which is a product decision.
