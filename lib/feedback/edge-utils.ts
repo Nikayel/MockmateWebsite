@@ -285,6 +285,20 @@ export function calculateValidatedScores(
   codeQuality = clampScore(codeQuality)
   communication = clampScore(communication)
 
+  // Integrity caps, mirroring the Node DSA scorer. Without these the Edge
+  // route returned byte-identical scores for a clean session and for one that
+  // was keyword-stuffed, incoherent, or answering off-topic: the bonuses above
+  // key off approachExplained/complexityDiscussed, which stuffed keywords can
+  // trip. This is the route DSA and bugfix sessions actually use, so it is
+  // where the caps matter most. Communication only, matching Node DSA.
+  if (!aiValidation.isCoherent) {
+    communication = Math.min(25, communication)
+  } else if (!aiValidation.responsesRelevant) {
+    communication = Math.min(45, communication)
+  } else if (preScreen.suspiciousPatterns.keywordStuffing) {
+    communication = Math.min(35, communication)
+  }
+
   // Communication-evidence gate: pass rate alone cannot earn Understanding or
   // Problem-Solving when the candidate said (nearly) nothing. Same rule as the
   // instant accumulator and the Node scorers, so instant and refined agree.
