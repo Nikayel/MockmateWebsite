@@ -42,7 +42,7 @@ describe("calculateBugfixEvidenceScore transcript-integrity caps", () => {
     const clean = calculateBugfixEvidenceScore(evidence(), {
       difficulty: "medium",
       semanticOverrides: STRONG_SEMANTICS,
-      integrity: { isCoherent: true, responsesRelevant: true, keywordStuffing: false },
+      integrity: { isCoherent: true, responsesRelevant: true },
     })
     expect(clean.communication).toBe(85)
   })
@@ -59,7 +59,7 @@ describe("calculateBugfixEvidenceScore transcript-integrity caps", () => {
     const result = calculateBugfixEvidenceScore(evidence(), {
       difficulty: "medium",
       semanticOverrides: STRONG_SEMANTICS,
-      integrity: { isCoherent: false, responsesRelevant: true, keywordStuffing: false },
+      integrity: { isCoherent: false, responsesRelevant: true },
     })
     expect(result.communication).toBe(25)
   })
@@ -68,49 +68,52 @@ describe("calculateBugfixEvidenceScore transcript-integrity caps", () => {
     const result = calculateBugfixEvidenceScore(evidence(), {
       difficulty: "medium",
       semanticOverrides: STRONG_SEMANTICS,
-      integrity: { isCoherent: true, responsesRelevant: false, keywordStuffing: false },
+      integrity: { isCoherent: true, responsesRelevant: false },
     })
     expect(result.communication).toBe(45)
   })
 
-  it("keyword stuffing caps communication at 35", () => {
+  it("keyword stuffing is no longer an integrity signal", () => {
+    // The detector measured brevity, not stuffing, and penalised concise
+    // honest candidates. It no longer reaches scoring at all.
     const result = calculateBugfixEvidenceScore(evidence(), {
       difficulty: "medium",
       semanticOverrides: STRONG_SEMANTICS,
-      integrity: { isCoherent: true, responsesRelevant: true, keywordStuffing: true },
+      integrity: { isCoherent: true, responsesRelevant: true },
     })
-    expect(result.communication).toBe(35)
+    expect(result.communication).toBe(85)
   })
 
   it("takes the min of every applicable cap, not the first match", () => {
-    // Stuffed AND irrelevant: an if/else-if chain would stop at 45.
+    // Incoherent AND irrelevant: an if/else-if chain would stop at whichever
+    // came first. Both apply, so the harsher 25 wins.
     const result = calculateBugfixEvidenceScore(evidence(), {
       difficulty: "medium",
       semanticOverrides: STRONG_SEMANTICS,
-      integrity: { isCoherent: true, responsesRelevant: false, keywordStuffing: true },
+      integrity: { isCoherent: false, responsesRelevant: false },
     })
-    expect(result.communication).toBe(35)
+    expect(result.communication).toBe(25)
   })
 
   it("caps drag the weighted overall down", () => {
     const clean = calculateBugfixEvidenceScore(evidence(), {
       difficulty: "medium",
       semanticOverrides: STRONG_SEMANTICS,
-      integrity: { isCoherent: true, responsesRelevant: true, keywordStuffing: false },
+      integrity: { isCoherent: true, responsesRelevant: true },
     })
-    const stuffed = calculateBugfixEvidenceScore(evidence(), {
+    const flagged = calculateBugfixEvidenceScore(evidence(), {
       difficulty: "medium",
       semanticOverrides: STRONG_SEMANTICS,
-      integrity: { isCoherent: true, responsesRelevant: true, keywordStuffing: true },
+      integrity: { isCoherent: true, responsesRelevant: false },
     })
-    expect(stuffed.overall).toBeLessThan(clean.overall)
+    expect(flagged.overall).toBeLessThan(clean.overall)
   })
 
   it("never raises a communication score that was already below the cap", () => {
     const result = calculateBugfixEvidenceScore(evidence(), {
       difficulty: "medium",
       semanticOverrides: { ...STRONG_SEMANTICS, communicationScore: 12 },
-      integrity: { isCoherent: false, responsesRelevant: false, keywordStuffing: true },
+      integrity: { isCoherent: false, responsesRelevant: false },
     })
     expect(result.communication).toBe(12)
   })
@@ -119,7 +122,7 @@ describe("calculateBugfixEvidenceScore transcript-integrity caps", () => {
     const stuffed = calculateBugfixEvidenceScore(evidence(), {
       difficulty: "medium",
       semanticOverrides: STRONG_SEMANTICS,
-      integrity: { isCoherent: false, responsesRelevant: false, keywordStuffing: true },
+      integrity: { isCoherent: false, responsesRelevant: false },
     })
     // Reproduction and verification are observed behaviour, not transcript
     // claims, so no transcript signal should touch them.
