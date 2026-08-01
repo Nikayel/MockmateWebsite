@@ -410,7 +410,8 @@ export async function POST(request: NextRequest) {
         validatedScores,
         passRate,
         sanitizeEfficiencyScore(efficiencyMetrics?.efficiencyScore),
-        aiValidation
+        aiValidation,
+        preScreen.suspiciousPatterns.keywordStuffing
       )
 
       if (bugfixScoreBreakdown) {
