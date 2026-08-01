@@ -113,7 +113,10 @@ export function calculateSystemDesignScores(
     communication = Math.min(35, communication)
   }
 
-  if (aiValidation.isCoherent && aiValidation.questionsAsked > 0) {
+  // The bonus must not undo the relevance cap above: answering every question
+  // with off-topic content is not communication credit. The Node DSA scorer
+  // already nests its equivalent bonus inside the relevant-and-coherent branch.
+  if (aiValidation.isCoherent && aiValidation.responsesRelevant && aiValidation.questionsAsked > 0) {
     const answerRate = aiValidation.questionsAnswered / aiValidation.questionsAsked
     if (answerRate >= 0.8) communication = Math.min(95, communication + 10)
     else if (answerRate >= 0.5) communication = Math.min(90, communication + 5)
