@@ -4,7 +4,7 @@ Written 2026-08-01, after discovering that the Edge route serves nearly all traf
 
 ## The routing reality
 
-`app/interview/_hooks/useInterviewFeedback.ts:298` calls `startStreaming()` with `scenarioType` passed through as data. There is no branch on it. So:
+`app/interview/_hooks/useInterviewFeedback.ts:299` calls `startStreaming()` with `scenarioType` passed through as data. There is no branch on it. So:
 
 | Scenario type | Route | Runtime |
 |---|---|---|
@@ -19,19 +19,20 @@ This is easy to get wrong, and it was gotten wrong: several rounds of scoring ha
 
 The route header claimed Edge was needed to escape Vercel's 10s Hobby serverless timeout by streaming. That is no longer true:
 
-- `vercel.json` already sets `maxDuration: 30` for `app/api/**/*.ts`.
-- Vercel's default function timeout is now far higher than 10s on all plans.
-- Vercel no longer recommends Edge Functions. Fluid Compute runs regular Node.js in the same regions at the same price.
+- `vercel.json` already sets `maxDuration: 30` for `app/api/**/*.ts`. Verified in-repo.
+- Vercel's default function timeout is reported to be far higher than 10s on current plans, and Vercel is reported to no longer recommend Edge Functions now that Fluid Compute runs regular Node.js in the same regions at the same price. **Both of these are from general platform knowledge, not verified against current Vercel docs. Check them before planning around them.**
+
+One caveat the first bullet does not cover: `app/api/feedback/persist/route.ts` still carries its own `export const maxDuration = 10` with a header citing the Hobby limit. A per-route export overrides `vercel.json`, so that endpoint is self-limited to 10s on the same stale premise.
 
 What remains is a secondary consequence, not a justification: Edge cannot use the Firebase Admin SDK, which is why `/api/feedback/persist` exists as a separate endpoint that the browser calls after streaming finishes.
 
 ## What consolidating would win
 
-**Roughly 2,500 lines of duplicated, cruder code deleted:**
+**About 1,830 lines of duplicated, cruder code deleted** (counts verified 2026-08-01):
 
 | Edge module | Lines | Node counterpart |
 |---|---|---|
-| `lib/feedback/edge-utils.ts` | 503 | `scoring/dsa-scoring.ts` + `score-floors.ts` + siblings |
+| `lib/feedback/edge-utils.ts` | 541 | `scoring/dsa-scoring.ts` + `score-floors.ts` + siblings |
 | `lib/feedback/transcript-analysis-edge.ts` | 556 | `lib/feedback/transcript-analysis.ts` |
 | `lib/ai-providers-edge.ts` | 406 | `lib/ai-providers.ts` |
 | `lib/auth-edge.ts` | 65 | `lib/auth-helpers.ts` |
@@ -80,3 +81,10 @@ Rather than wait for the migration, the Edge scorer received the integrity caps 
 | irrelevant | 87 | 76 | 79 |
 
 Clean sessions are deliberately unchanged, so this carried no legitimate-user impact.
+
+A follow-up review found the caps did not reach **bugfix** sessions at all: the stream route replaces the capped scorer output wholesale with `mapBugfixScoreToFeedbackScores(breakdown)`, and that breakdown's communication dimension was an unguarded LLM judgment. Fixed in `443ff050` / `c4ce2af9` by capping inside `calculateBugfixEvidenceScore`, which also covers the streaming-failure fallback path since it calls the same function.
+
+Two known residues, both deliberate:
+
+- **The `keywordStuffing` detector is near-unreachable in production.** `pre-screening.ts` requires `wordCount < 30` across the entire transcript, so a stuffed session of any realistic length never trips it. The cap is correct but mostly inert until that detector is recalibrated, and `pre-screening.test.ts` is currently skipped, so nothing tests its thresholds.
+- **Edge does not gate its scoring bonuses on `isCoherent` where Node does.** Gating them was measured and rejected: it drops an incoherent session's understanding to 67 against Node's 90, widening the divergence rather than closing it. See the comment in `edge-utils.ts`.
