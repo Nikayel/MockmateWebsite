@@ -243,7 +243,12 @@ export function calculateValidatedScores(
   code: string | null | undefined,
   extractedEvidence?: ExtractedEvidence | null
 ): ExtendedScoreResult {
-  const efficiencyScore = efficiencyMetrics?.efficiencyScore ?? 50
+  // ?? alone misses NaN: a garbage efficiencyScore propagated into the base
+  // arithmetic and clampScore zeroed understanding for the whole session.
+  const rawEfficiencyScore = efficiencyMetrics?.efficiencyScore
+  const efficiencyScore = Number.isFinite(rawEfficiencyScore)
+    ? Math.min(100, Math.max(0, rawEfficiencyScore as number))
+    : 50
 
   // Base scores from test performance
   let understanding = passRate * 0.4 + efficiencyScore * 0.3
