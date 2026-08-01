@@ -549,7 +549,8 @@ export async function POST(request: NextRequest) {
       efficiencyMetrics?.efficiencyScore,
       aiValidation,
       preScreen.candidateMessageCount,
-      scenarioType
+      scenarioType,
+      preScreen.suspiciousPatterns.keywordStuffing
     )
 
     // ============================================================================
