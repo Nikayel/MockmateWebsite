@@ -9,8 +9,9 @@
  * - mastery_score (for spaced repetition)
  * - technical_score (the mastery score; Technical = Mastery unification)
  *
- * NOTE: Silent notes should be passed from client (generated in Edge streaming
- * endpoint). We don't generate them here to avoid Vercel Hobby 10s timeout.
+ * NOTE: Silent notes are passed from the client (generated in the Edge
+ * streaming endpoint) rather than regenerated here, so this route does no AI
+ * work and stays fast.
  */
 
 import { NextRequest, NextResponse } from "next/server"
@@ -26,10 +27,12 @@ import { completeFeedbackSections } from "@/lib/feedback/structured-feedback-sch
 import { getScenarioById } from "@/lib/scenarios"
 import { validatePersistRequestBody } from "@/lib/feedback/persist-request-schema"
 
-// Vercel Hobby plan has 10 second timeout for serverless functions
-// We skip AI calls here to stay within limits - silent notes should be
-// passed from the client (generated in Edge streaming endpoint)
-export const maxDuration = 10
+// This route does Firestore writes only, no AI calls, so it does not need a
+// large budget. The previous `export const maxDuration = 10` cited a Vercel
+// Hobby 10s serverless limit that no longer applies (vercel.json already
+// grants 30s to every app/api function, and a per-route export OVERRIDES
+// that). Dropping the export inherits the vercel.json value rather than
+// keeping a tighter ceiling nobody currently intends.
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
