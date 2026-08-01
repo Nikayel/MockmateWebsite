@@ -84,7 +84,15 @@ Clean sessions are deliberately unchanged, so this carried no legitimate-user im
 
 A follow-up review found the caps did not reach **bugfix** sessions at all: the stream route replaces the capped scorer output wholesale with `mapBugfixScoreToFeedbackScores(breakdown)`, and that breakdown's communication dimension was an unguarded LLM judgment. Fixed in `443ff050` / `c4ce2af9` by capping inside `calculateBugfixEvidenceScore`. (That commit's message also claimed the streaming-failure fallback inherits the fix because it calls the same function. It does not: the fallback passes no `integrity` option. Corrected in `f9787d07`.)
 
-Follow-up review then found three further leaks, all now closed: the Node bugfix scorer capped on incoherence only (an irrelevant or stuffed session scored 90/95, identical to clean), the clarifying-questions +10 landed above every cap, and the Constitutional-AI evidence floor hard-set communication to 50-80 on exactly the quotes a stuffed transcript produces.
+Follow-up review then found three further leaks, all now closed. Their **reach differs**, and the distinction matters given this document's whole premise:
+
+| Leak | Closed in | Was it live? |
+|---|---|---|
+| Constitutional-AI evidence floor hard-set communication to 50-80 on exactly the quotes a stuffed transcript produces | `1d46f865` | **Yes**, for system design |
+| Node bugfix scorer capped on incoherence only (irrelevant or stuffed scored 90/95, identical to clean) | `475f3797` | No. `calculateBugFixScores` is reachable only via the Node route, which serves system design, which uses the SD scorer. Prerequisite for the consolidation |
+| Clarifying-questions +10 landed above every cap | `0e743e7b` | No. Needs a Node-route scenario carrying `clarifyingQuestions`, and only DSA scenarios define them |
+
+The measurements behind the two unreachable ones are measurements of the functions, not of live user scores.
 
 Four residues remain, all deliberate:
 
