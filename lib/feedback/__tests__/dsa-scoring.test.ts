@@ -325,6 +325,25 @@ describe("calculateValidatedScores (DSA)", () => {
     expect(result.communication).toBeLessThanOrEqual(35)
   })
 
+  it("relevance cap holds against the approach-bonus lift path", () => {
+    // The approach-quality bonus runs after the if/else chain and breached
+    // the 45 cap from inside this function (45 + 12 = 57).
+    const result = calculateValidatedScores(
+      100,
+      { efficiencyScore: 90 },
+      preScreen(),
+      validation({
+        responsesRelevant: false,
+        approachExplained: true,
+        approachQuality: "good",
+        communicationScore: 80,
+      }),
+      "dsa",
+      WORKING_CODE
+    )
+    expect(result.communication).toBeLessThanOrEqual(45)
+  })
+
   it("incoherent session caps communication at 25", () => {
     const result = calculateValidatedScores(
       50,
