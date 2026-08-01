@@ -167,6 +167,23 @@ describe("applyScoreFloors", () => {
     expect(minimal.overall).toBe(COMMUNICATION_GATE_CAPS.minimal.overall)
   })
 
+  it("floors do not raise communication for an irrelevant-responses session", () => {
+    // A perfect optimal solution whose answers never addressed the questions:
+    // the scorer caps communication at 45, and the floors must not hand back
+    // the 70 that hasGoodComm would otherwise grant. Without the
+    // responsesRelevant guard this returns 70; with it the session takes the
+    // no-approach branch and lands at 35.
+    const result = applyScoreFloors(
+      scores({ communication: 45, overall: 60 }),
+      100,
+      95,
+      validation({ responsesRelevant: false, communicationScore: 80 }),
+      8,
+      "dsa"
+    )
+    expect(result.communication).toBeLessThanOrEqual(45)
+  })
+
   it("caps a low-evidence system-design session even though no floor fires", () => {
     // SD sessions have passRate 0, so no floor branch runs; the re-applied
     // gate cap is the first place the Node SD path enforces the silence caps.
