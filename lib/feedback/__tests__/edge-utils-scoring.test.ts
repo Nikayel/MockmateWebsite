@@ -239,3 +239,60 @@ describe("edge calculateValidatedScores + applyScoreFloors (stream-route order)"
     expect(two.understanding).toBe(COMMUNICATION_GATE_CAPS.minimal.understanding)
   })
 })
+
+describe("edge integrity caps (the route DSA and bugfix actually use)", () => {
+  const eff = { efficiencyScore: 90 }
+  const engaged = (o: Partial<ConversationValidation> = {}) =>
+    validation({
+      approachExplained: true,
+      complexityDiscussed: true,
+      complexityAccurate: true,
+      communicationScore: 80,
+      ...o,
+    })
+
+  function chain(pre: PreScreenResult, val: ConversationValidation) {
+    const scored = calculateValidatedScores(100, eff, pre, val, "dsa", "def f():\n    return 1")
+    return applyScoreFloors(scored, 100, 90, val, pre.suspiciousPatterns.keywordStuffing)
+  }
+
+  it("a clean session is unaffected by the caps", () => {
+    const clean = chain(preScreen(), engaged())
+    expect(clean.communication).toBe(80)
+    expect(clean.overall).toBe(87)
+  })
+
+  it("keyword stuffing caps communication and survives the floors", () => {
+    const stuffed = chain(
+      preScreen({
+        suspiciousPatterns: { tooShort: false, possibleGibberish: false, keywordStuffing: true },
+      }),
+      engaged()
+    )
+    // Before the fix this returned 80/87, byte-identical to the clean session.
+    expect(stuffed.communication).toBe(35)
+    expect(stuffed.overall).toBeLessThan(87)
+  })
+
+  it("an incoherent session caps at 25 and survives the floors", () => {
+    const incoherent = chain(preScreen(), engaged({ isCoherent: false }))
+    expect(incoherent.communication).toBe(25)
+    expect(incoherent.overall).toBeLessThan(87)
+  })
+
+  it("irrelevant responses cap at 45 and survive the floors", () => {
+    const irrelevant = chain(preScreen(), engaged({ responsesRelevant: false }))
+    expect(irrelevant.communication).toBeLessThanOrEqual(45)
+    expect(irrelevant.overall).toBeLessThan(87)
+  })
+
+  it("codeQuality still floors for a flagged session: passing tests are real evidence", () => {
+    const stuffed = chain(
+      preScreen({
+        suspiciousPatterns: { tooShort: false, possibleGibberish: false, keywordStuffing: true },
+      }),
+      engaged()
+    )
+    expect(stuffed.codeQuality).toBeGreaterThanOrEqual(75)
+  })
+})
