@@ -109,21 +109,19 @@ function generateScoreChanges(
 function validateEvidenceAgainstScores(
   evidence: ExtractedEvidence | undefined,
   currentCommunicationScore: number,
-  integrity?: { isCoherent?: boolean; responsesRelevant?: boolean; keywordStuffing?: boolean }
+  integrity?: { isCoherent?: boolean; responsesRelevant?: boolean }
 ): { shouldEnforceFloor: boolean; minScore: number; reason: string } {
   if (!evidence) {
     return { shouldEnforceFloor: false, minScore: 10, reason: "No evidence" }
   }
 
-  // A keyword-stuffed or incoherent transcript produces exactly the quotes this
+  // An incoherent or off-topic transcript produces exactly the quotes this
   // floor keys on, so without this guard the floor would hard-set communication
   // to 50-80 for the sessions the integrity caps just pushed down to 25-45.
   // Quotes are evidence that words were said, not that they were honest.
   if (
     integrity &&
-    (integrity.isCoherent === false ||
-      integrity.responsesRelevant === false ||
-      integrity.keywordStuffing === true)
+    (integrity.isCoherent === false || integrity.responsesRelevant === false)
   ) {
     return {
       shouldEnforceFloor: false,
@@ -159,8 +157,6 @@ export async function critiqueScores(
     passRate: number
     scenarioType: string
     aiValidation: ConversationValidation
-    /** From preScreen.suspiciousPatterns; withholds the evidence floor below. */
-    keywordStuffing?: boolean
     codeCompleteness?: { isIncomplete: boolean; reason: string }
     hasBlindCopying?: boolean
     // NEW: Structured evidence from transcript extraction
@@ -434,7 +430,6 @@ If no issues found, return:
         {
           isCoherent: context.aiValidation.isCoherent,
           responsesRelevant: context.aiValidation.responsesRelevant,
-          keywordStuffing: context.keywordStuffing,
         }
       )
 
