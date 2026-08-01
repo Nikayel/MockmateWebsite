@@ -351,21 +351,28 @@ If no issues found, return:
       const result = JSON.parse(jsonMatch[0]) as ScoreCritiqueAdjustment
 
       // The model's adjustedScores arrive as untyped JSON. Coerce and clamp
-      // every component before any of them can reach the user or Firestore;
-      // if any component is non-numeric, discard the adjustment entirely.
+      // the four component scores; the adjustment is discarded only if a
+      // COMPONENT is non-numeric. The model's overall is never trusted at
+      // all — it is always recomputed from the components with the weight
+      // set matching the scenario type (bugfix/system-design sessions are
+      // critiqued here too, and a DSA-weighted or hallucinated overall would
+      // silently shift user-facing scores).
       if (result.adjustedScores) {
-        const components = [
+        const componentKeys = [
           "understanding",
           "problemSolving",
           "codeQuality",
           "communication",
-          "overall",
         ] as const
-        const coerced = components.map((key) => Number(result.adjustedScores?.[key]))
+        const coerced = componentKeys.map((key) => Number(result.adjustedScores?.[key]))
         if (coerced.every((value) => Number.isFinite(value))) {
-          components.forEach((key, index) => {
+          componentKeys.forEach((key, index) => {
             result.adjustedScores![key] = clampScore(coerced[index])
           })
+          result.adjustedScores.overall = calculatePerformanceScoreForScenario(
+            result.adjustedScores,
+            context.scenarioType
+          )
         } else {
           logger.warn("[Constitutional AI] Discarding non-numeric adjustedScores", {
             adjustedScores: result.adjustedScores,
@@ -375,38 +382,7 @@ If no issues found, return:
         }
       }
 
-      // Validate and fix adjusted scores if present
       if (result.madeChanges && result.adjustedScores) {
-        // Recalculate overall from components to ensure consistency
-        // Don't trust AI to do the math correctly. Weights must match the
-        // scenario type: bugfix/system-design sessions are critiqued here too,
-        // and recomputing with DSA weights would overwrite a correct overall.
-        const recalculatedOverall = calculatePerformanceScoreForScenario(
-          {
-            understanding: result.adjustedScores.understanding,
-            problemSolving: result.adjustedScores.problemSolving,
-            codeQuality: result.adjustedScores.codeQuality,
-            communication: result.adjustedScores.communication,
-          },
-          context.scenarioType
-        )
-
-        // If AI's overall differs significantly from recalculated, use recalculated
-        const aiOverall = result.adjustedScores.overall
-        if (Math.abs(aiOverall - recalculatedOverall) > 5) {
-          logger.warn("[Constitutional AI] Overall score mismatch - recalculating", {
-            aiProvidedOverall: aiOverall,
-            recalculatedOverall,
-            components: {
-              understanding: result.adjustedScores.understanding,
-              problemSolving: result.adjustedScores.problemSolving,
-              codeQuality: result.adjustedScores.codeQuality,
-              communication: result.adjustedScores.communication,
-            },
-          })
-          result.adjustedScores.overall = recalculatedOverall
-        }
-
         // Generate scoreChanges if AI didn't provide them (backwards compatibility)
         if (!result.scoreChanges && result.adjustedScores) {
           result.scoreChanges = generateScoreChanges(scores, result.adjustedScores)

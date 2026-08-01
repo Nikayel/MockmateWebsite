@@ -54,6 +54,12 @@ import {
 } from "@/lib/interview/clarifying-questions-checker"
 import { validateFeedbackRequestBody } from "@/lib/feedback/request-schema"
 import {
+  assessCommunicationEvidence,
+  capOverallForCommunicationEvidence,
+  capSubscoresForCommunicationEvidence,
+} from "@/lib/feedback/scoring/communication-gate"
+import { calculatePerformanceScoreForScenario } from "@/lib/constants"
+import {
   buildFeedbackEfficiencyInfo,
   buildFeedbackTestResultsSummary,
   buildFeedbackTimeInfo,
@@ -585,11 +591,34 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Use adjusted scores if critique made changes
-    const finalScores =
+    // Use adjusted scores if critique made changes. The silent-session gate is
+    // the outer invariant: whatever the critique returns (model adjustments or
+    // its evidence floor), the caps are re-applied here so no adjustment can
+    // raise a low-evidence session past them — score floors enforce the same
+    // invariant one step earlier, and this closes the last uncapped write.
+    let finalScores =
       scoreCritique.madeChanges && scoreCritique.adjustedScores
         ? scoreCritique.adjustedScores
         : algorithmicScores
+    if (scoreCritique.madeChanges && scoreCritique.adjustedScores) {
+      const critiqueCommEvidenceLevel = assessCommunicationEvidence({
+        candidateMessageCount: preScreen.candidateMessageCount,
+        approachExplained: aiValidation.approachExplained,
+        complexityDiscussed: aiValidation.complexityDiscussed,
+      })
+      const cappedSubscores = capSubscoresForCommunicationEvidence(
+        finalScores,
+        critiqueCommEvidenceLevel
+      )
+      const cappedOverall = capOverallForCommunicationEvidence(
+        calculatePerformanceScoreForScenario(
+          { ...finalScores, ...cappedSubscores },
+          scenarioType
+        ),
+        critiqueCommEvidenceLevel
+      )
+      finalScores = { ...finalScores, ...cappedSubscores, overall: cappedOverall }
+    }
 
     // Step 5.5: Post-interview transcript analysis for "What You Missed"
     // SKIP if low on time - this is nice-to-have, not essential

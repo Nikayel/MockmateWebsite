@@ -63,6 +63,8 @@ export const persistRequestSchema = z
     bugfixEvidenceSummary: z.record(z.unknown()).nullish(),
     bugfixScoreBreakdown: z.record(z.unknown()).nullish(),
     bugfixPostSessionReport: z.record(z.unknown()).nullish(),
+    // (bugfixScoreBreakdown is additionally normalized in the validator below:
+    // the dashboard averages breakdown.overall, so its numbers must be clamped.)
 
     isGuidedLab: z.boolean().optional(),
     guidedLabMastery: z
@@ -94,6 +96,43 @@ export type PersistRequest = z.infer<typeof persistRequestSchema> & {
 export type PersistRequestValidationResult =
   | { success: true; data: PersistRequest }
   | { success: false; error: string; logContext?: Record<string, unknown> }
+
+const BUGFIX_BREAKDOWN_SCORE_KEYS = [
+  "reproductionDiscipline",
+  "codebaseNavigation",
+  "evidenceGathering",
+  "hypothesisQuality",
+  "minimalFixQuality",
+  "verificationDiscipline",
+  "overEditControl",
+  "rootCauseUnderstanding",
+  "regressionPrevention",
+  "aiCollaborationQuality",
+  "communication",
+  "overall",
+] as const
+
+/**
+ * Clamp every numeric field of a client-supplied bugfix score breakdown.
+ * The dashboard displays and averages breakdown.overall, so a crafted persist
+ * could otherwise plant e.g. overall: 99999 into readiness analytics. If
+ * `overall` is missing or non-numeric the whole breakdown is dropped (null),
+ * which makes the dashboard fall back to performance_score. Normalize, never
+ * reject: this data is display-side, not worth failing the persist over.
+ */
+function normalizeBugfixScoreBreakdown(
+  breakdown: Record<string, unknown> | null | undefined
+): Record<string, unknown> | null | undefined {
+  if (breakdown === null || breakdown === undefined) return breakdown
+  if (!Number.isFinite(Number(breakdown.overall))) return null
+  const normalized: Record<string, unknown> = { ...breakdown }
+  for (const key of BUGFIX_BREAKDOWN_SCORE_KEYS) {
+    if (key in normalized) {
+      normalized[key] = clampScore(Number(normalized[key]))
+    }
+  }
+  return normalized
+}
 
 export function validatePersistRequestBody(rawBody: unknown): PersistRequestValidationResult {
   const parsed = persistRequestSchema.safeParse(rawBody)
@@ -137,6 +176,7 @@ export function validatePersistRequestBody(rawBody: unknown): PersistRequestVali
       conversationTranscript:
         data.conversationTranscript?.filter((entry) => entry !== null) ?? undefined,
       guidedLabMastery: data.guidedLabMastery ?? undefined,
+      bugfixScoreBreakdown: normalizeBugfixScoreBreakdown(data.bugfixScoreBreakdown),
     },
   }
 }

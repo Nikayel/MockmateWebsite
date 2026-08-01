@@ -339,6 +339,12 @@ export function applyScoreFloors(
   // All tests passing = minimum 70 overall — but ONLY when the candidate actually
   // interviewed. Silent perfect solutions keep the communication-gate caps; the
   // code itself is still credited via the codeQuality floor below.
+  // INVARIANT: this overall floor must stay gated on exactly
+  // (approachExplained || complexityDiscussed) — the same disjunction that
+  // forces assessCommunicationEvidence to "adequate". That coincidence is the
+  // only thing preventing the floor from out-raising the gate's overall cap
+  // (which calculateValidatedScores applied before this function runs).
+  // Widening this condition reopens the silent-session bypass.
   if (passRate >= 100) {
     if (aiValidation.approachExplained || aiValidation.complexityDiscussed) {
       result.overall = Math.max(result.overall, 70)

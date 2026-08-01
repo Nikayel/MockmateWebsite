@@ -118,6 +118,10 @@ export function calculateSystemDesignScores(
     communication = Math.min(40, communication)
   }
 
+  // NOTE: this function does not apply the communication-evidence gate itself.
+  // Since 2026-07-31 the gate's overall cap is enforced downstream in
+  // applyScoreFloors (score-floors.ts), which generate-feedback runs for every
+  // scenario type — the first place Node SD scores meet the silence caps.
   const sdw = SCORING.SYSTEM_DESIGN_WEIGHTS
   const overall = Math.round(
     understanding * sdw.UNDERSTANDING +

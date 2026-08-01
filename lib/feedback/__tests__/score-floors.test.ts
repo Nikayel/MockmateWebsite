@@ -116,9 +116,19 @@ describe("applyScoreFloors", () => {
   })
 
   it("floors never out-raise the silent-session gate cap (none level)", () => {
-    // Perfect optimal solution, zero communication: gate level "none".
+    // Deliberately UNCAPPED upstream components: if an earlier path failed to
+    // cap the subscores, the floors' weighted recompute would yield ~81 and
+    // the incoming overall 100 would survive Math.max. Only the re-applied
+    // gate cap at the end of applyScoreFloors forces this to 55 — this test
+    // fails if that line is removed.
     const silent = applyScoreFloors(
-      scores({ understanding: 40, problemSolving: 45, codeQuality: 90, communication: 10, overall: 50 }),
+      scores({
+        understanding: 100,
+        problemSolving: 100,
+        codeQuality: 100,
+        communication: 100,
+        overall: 100,
+      }),
       100,
       95,
       validation({
@@ -130,13 +140,19 @@ describe("applyScoreFloors", () => {
       0,
       "dsa"
     )
-    expect(silent.overall).toBeLessThanOrEqual(COMMUNICATION_GATE_CAPS.none.overall)
+    expect(silent.overall).toBe(COMMUNICATION_GATE_CAPS.none.overall)
     expect(silent.silentSolution).toBe(true)
   })
 
   it("floors never out-raise the gate cap (minimal level)", () => {
     const minimal = applyScoreFloors(
-      scores({ understanding: 55, problemSolving: 60, codeQuality: 90, communication: 30, overall: 60 }),
+      scores({
+        understanding: 100,
+        problemSolving: 100,
+        codeQuality: 100,
+        communication: 100,
+        overall: 100,
+      }),
       100,
       95,
       validation({
@@ -148,7 +164,28 @@ describe("applyScoreFloors", () => {
       3,
       "dsa"
     )
-    expect(minimal.overall).toBeLessThanOrEqual(COMMUNICATION_GATE_CAPS.minimal.overall)
+    expect(minimal.overall).toBe(COMMUNICATION_GATE_CAPS.minimal.overall)
+  })
+
+  it("caps a low-evidence system-design session even though no floor fires", () => {
+    // SD sessions have passRate 0, so no floor branch runs; the re-applied
+    // gate cap is the first place the Node SD path enforces the silence caps.
+    // This is a deliberate behavior change (2026-07-31): the gate doc says
+    // every scoring path applies the caps, and SD previously did not.
+    const sd = applyScoreFloors(
+      scores({ understanding: 70, problemSolving: 70, codeQuality: 70, communication: 80, overall: 75 }),
+      0,
+      undefined,
+      validation({
+        approachExplained: false,
+        complexityDiscussed: false,
+        approachQuality: "none",
+        communicationScore: 80,
+      }),
+      3,
+      "system-design"
+    )
+    expect(sd.overall).toBe(COMMUNICATION_GATE_CAPS.minimal.overall)
   })
 
   it("still grants the full floor to a communicative perfect session", () => {

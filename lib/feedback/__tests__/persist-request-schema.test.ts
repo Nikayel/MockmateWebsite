@@ -176,4 +176,49 @@ describe("validatePersistRequestBody", () => {
       expect(result.data.silentNotes?.[0].timestamp).toBe(42)
     }
   })
+
+  it("clamps bugfixScoreBreakdown numeric fields (dashboard averages breakdown.overall)", () => {
+    const result = validatePersistRequestBody(
+      validBody({
+        scenarioType: "bugfix",
+        bugfixScoreBreakdown: {
+          reproductionDiscipline: 80,
+          overall: 99999,
+          communication: -50,
+          hypothesisText: "kept as-is",
+        },
+      })
+    )
+    expect(result.success).toBe(true)
+    if (result.success) {
+      const breakdown = result.data.bugfixScoreBreakdown as Record<string, unknown>
+      expect(breakdown.overall).toBe(100)
+      expect(breakdown.communication).toBe(0)
+      expect(breakdown.reproductionDiscipline).toBe(80)
+      expect(breakdown.hypothesisText).toBe("kept as-is")
+    }
+  })
+
+  it("drops a bugfixScoreBreakdown whose overall is non-numeric", () => {
+    const result = validatePersistRequestBody(
+      validBody({
+        scenarioType: "bugfix",
+        bugfixScoreBreakdown: { overall: "great", communication: 70 },
+      })
+    )
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.bugfixScoreBreakdown).toBeNull()
+    }
+  })
+
+  it("passes null and absent bugfixScoreBreakdown through untouched", () => {
+    const withNull = validatePersistRequestBody(validBody({ bugfixScoreBreakdown: null }))
+    expect(withNull.success).toBe(true)
+    if (withNull.success) expect(withNull.data.bugfixScoreBreakdown).toBeNull()
+
+    const absent = validatePersistRequestBody(validBody())
+    expect(absent.success).toBe(true)
+    if (absent.success) expect(absent.data.bugfixScoreBreakdown).toBeUndefined()
+  })
 })
