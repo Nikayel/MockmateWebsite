@@ -158,3 +158,36 @@ describe("Feedback Parsers", () => {
     })
   })
 })
+
+describe("parseFeedback score clamping and null-miss sentinel (P2-9)", () => {
+  const wrap = (lines: string) => `**TL;DR** – Session summary.
+
+**Score Snapshot**
+${lines}
+
+**What Worked**
+- Something`
+
+  it("clamps a /10 score above 10 instead of emitting 150", () => {
+    const result = parseFeedback(wrap("- Understanding: 15/10 – overshot the scale\n- Problem-Solving: 60/100 – ok"))
+    expect(result.scores.understanding).toBe(100)
+    expect(result.scores.problemSolving).toBe(60)
+  })
+
+  it("clamps a /100 score above 100", () => {
+    const result = parseFeedback(wrap("- Understanding: 150/100 – inflated\n- Communication: 70/100 – fine"))
+    expect(result.scores.understanding).toBe(100)
+    expect(result.scores.communication).toBe(70)
+  })
+
+  it("keeps a genuine 0/100 as 0 without retrying the /10 format", () => {
+    const result = parseFeedback(wrap("- Code Quality: 0/100 – no code submitted\n- Communication: 40/100 – limited"))
+    expect(result.scores.codeQuality).toBe(0)
+    expect(result.scores.communication).toBe(40)
+  })
+
+  it("still falls back to the /10 format when /100 is absent", () => {
+    const result = parseFeedback(wrap("- Understanding: 8/10 – decent grasp"))
+    expect(result.scores.understanding).toBe(80)
+  })
+})

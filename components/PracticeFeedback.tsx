@@ -122,7 +122,7 @@ export default function PracticeFeedback({
     if (score === undefined || score === null || isNaN(score)) return 0
     // Normalize: if score is <= 10, assume it's on a 0-10 scale and multiply by 10
     // Otherwise, assume it's already on a 0-100 scale
-    return score <= 10 ? score * 10 : score
+    return Math.min(100, score <= 10 ? score * 10 : score)
   }
 
   // Priority for scores:

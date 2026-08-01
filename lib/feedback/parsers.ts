@@ -5,7 +5,7 @@
  */
 
 import type { FeedbackScores } from "./types"
-import { calculatePerformanceScore } from "@/lib/constants"
+import { calculatePerformanceScore, clampScore } from "@/lib/constants"
 
 export interface FeedbackSection {
   tldr: string
@@ -45,7 +45,9 @@ function parseScoreWithJustification(label: string, scoreText: string, is100: bo
   if (matchWithJustification && matchWithJustification[2]?.trim()) {
     const score = parseInt(matchWithJustification[1], 10)
     const justification = matchWithJustification[2].trim()
-    return { score: is100 ? score : score * 10, justification }
+    // Clamp: the AI can write "15/10" or "150/100"; unclamped values flowed
+    // straight into the score displays, which have no upper cap of their own.
+    return { score: clampScore(is100 ? score : score * 10), justification }
   }
   const regexWithoutJustification = new RegExp(
     `[-•]?\\s*${label}[:\\s–-]*(\\d+)\\s*\\/\\s*${is100 ? "100" : "10"}`,
@@ -54,13 +56,17 @@ function parseScoreWithJustification(label: string, scoreText: string, is100: bo
   const matchWithoutJustification = scoreText.match(regexWithoutJustification)
   if (matchWithoutJustification) {
     return {
-      score: is100
-        ? parseInt(matchWithoutJustification[1], 10)
-        : parseInt(matchWithoutJustification[1], 10) * 10,
+      score: clampScore(
+        is100
+          ? parseInt(matchWithoutJustification[1], 10)
+          : parseInt(matchWithoutJustification[1], 10) * 10
+      ),
       justification: "",
     }
   }
-  return { score: 0, justification: "" }
+  // null = "no score found in the text", so a parse miss is distinguishable
+  // from a genuine 0/100 at the call sites.
+  return { score: null as number | null, justification: "" }
 }
 
 /**
@@ -283,10 +289,13 @@ export function parseFeedback(feedback: string): FeedbackSection {
   if (scoreSection) {
     const scoreText = scoreSection[1]
 
+    // null = label not found in the /100 format, so retry the /10 format.
+    // A parsed 0 is a real score and no longer triggers the retry (which
+    // could misread "0/100" text) or a default.
     const understanding = parseScoreWithJustification("Understanding", scoreText, true)
-    if (understanding.score === 0) {
+    if (understanding.score === null) {
       const alt = parseScoreWithJustification("Understanding", scoreText, false)
-      sections.scores.understanding = alt.score
+      sections.scores.understanding = alt.score ?? 0
       if (alt.justification) sections.scoreJustifications.understanding = alt.justification
     } else {
       sections.scores.understanding = understanding.score
@@ -295,40 +304,40 @@ export function parseFeedback(feedback: string): FeedbackSection {
     }
 
     const problemSolving = parseScoreWithJustification("Problem[-\\s]?Solving", scoreText, true)
-    if (problemSolving.score === 0) {
+    if (problemSolving.score === null) {
       const alt = parseScoreWithJustification("Problem[-\\s]?Solving", scoreText, false)
-      sections.scores.problemSolving = alt.score
+      sections.scores.problemSolving = alt.score ?? 0
     } else {
       sections.scores.problemSolving = problemSolving.score
     }
 
     const codeQuality = parseScoreWithJustification("Code\\s+Quality", scoreText, true)
-    if (codeQuality.score === 0) {
+    if (codeQuality.score === null) {
       const alt = parseScoreWithJustification("Code\\s+Quality", scoreText, false)
-      sections.scores.codeQuality = alt.score
+      sections.scores.codeQuality = alt.score ?? 0
     } else {
       sections.scores.codeQuality = codeQuality.score
     }
 
     const communication = parseScoreWithJustification("Communication", scoreText, true)
-    if (communication.score === 0) {
+    if (communication.score === null) {
       const alt = parseScoreWithJustification("Communication", scoreText, false)
-      sections.scores.communication = alt.score
+      sections.scores.communication = alt.score ?? 0
     } else {
       sections.scores.communication = communication.score
     }
 
     const correctness = parseScoreWithJustification("Correctness", scoreText, true)
     sections.scores.correctness =
-      correctness.score === 0
-        ? parseScoreWithJustification("Correctness", scoreText, false).score
-        : correctness.score
+      correctness.score ??
+      parseScoreWithJustification("Correctness", scoreText, false).score ??
+      0
 
     const efficiency = parseScoreWithJustification("Efficiency", scoreText, true)
     sections.scores.efficiency =
-      efficiency.score === 0
-        ? parseScoreWithJustification("Efficiency", scoreText, false).score
-        : efficiency.score
+      efficiency.score ??
+      parseScoreWithJustification("Efficiency", scoreText, false).score ??
+      0
 
     const reasoning = parseScoreWithJustification(
       "Reasoning(?:\\s+&\\s+Explanation)?",
@@ -336,9 +345,9 @@ export function parseFeedback(feedback: string): FeedbackSection {
       true
     )
     sections.scores.reasoning =
-      reasoning.score === 0
-        ? parseScoreWithJustification("Reasoning(?:\\s+&\\s+Explanation)?", scoreText, false).score
-        : reasoning.score
+      reasoning.score ??
+      parseScoreWithJustification("Reasoning(?:\\s+&\\s+Explanation)?", scoreText, false).score ??
+      0
     sections.scores.reasoningExplanation = sections.scores.reasoning
 
     if (sections.scores.communication === 0 && sections.scores.reasoning > 0) {
@@ -347,9 +356,9 @@ export function parseFeedback(feedback: string): FeedbackSection {
 
     const aiCollaboration = parseScoreWithJustification("AI\\s+Collaboration", scoreText, true)
     sections.scores.aiCollaboration =
-      aiCollaboration.score === 0
-        ? parseScoreWithJustification("AI\\s+Collaboration", scoreText, false).score
-        : aiCollaboration.score
+      aiCollaboration.score ??
+      parseScoreWithJustification("AI\\s+Collaboration", scoreText, false).score ??
+      0
 
     if (sections.scores.understanding === 0 && sections.scores.correctness > 0) {
       sections.scores.understanding = Math.round(

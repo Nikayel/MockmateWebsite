@@ -124,7 +124,10 @@ function normalizeBugfixScoreBreakdown(
   breakdown: Record<string, unknown> | null | undefined
 ): Record<string, unknown> | null | undefined {
   if (breakdown === null || breakdown === undefined) return breakdown
-  if (!Number.isFinite(Number(breakdown.overall))) return null
+  // Strict number check: Number("")/Number(null)/Number(true) coerce to 0/1,
+  // which would keep a garbage breakdown alive with overall 0 instead of
+  // dropping it to the performance_score fallback.
+  if (typeof breakdown.overall !== "number" || !Number.isFinite(breakdown.overall)) return null
   const normalized: Record<string, unknown> = { ...breakdown }
   for (const key of BUGFIX_BREAKDOWN_SCORE_KEYS) {
     if (key in normalized) {

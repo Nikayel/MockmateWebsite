@@ -618,6 +618,17 @@ export async function POST(request: NextRequest) {
         critiqueCommEvidenceLevel
       )
       finalScores = { ...finalScores, ...cappedSubscores, overall: cappedOverall }
+      // The response and analytics ship scoreCritique.adjustedScores; sync it
+      // to the capped values so the Score Review panel can never display an
+      // adjusted overall that contradicts the actual (capped) score.
+      scoreCritique = {
+        ...scoreCritique,
+        adjustedScores: {
+          ...scoreCritique.adjustedScores,
+          ...cappedSubscores,
+          overall: cappedOverall,
+        },
+      }
     }
 
     // Step 5.5: Post-interview transcript analysis for "What You Missed"
