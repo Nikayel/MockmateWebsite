@@ -15,17 +15,23 @@ export function applyScoreFloors(
   efficiencyScore: number | undefined,
   aiValidation: ConversationValidation,
   candidateMessageCount: number,
-  scenarioType?: string
+  scenarioType?: string,
+  keywordStuffing = false
 ): ExtendedScoreResult {
   const isOptimal = (efficiencyScore || 0) >= 80
   // responsesRelevant belongs here for the same reason isCoherent does: an
   // approach "explained" in answers that do not address the questions is not
   // interview credit, and without it these floors raise communication back
   // over the relevance cap the scorer just applied.
+  // A keyword-stuffed transcript can convince the AI validator an approach was
+  // explained, which would let these floors hand back the communication the
+  // scorer capped at 35. Such a session falls through to the no-approach
+  // branch, whose Math.min(35) matches that cap.
   const explainedApproach =
     aiValidation.approachExplained &&
     aiValidation.isCoherent &&
     aiValidation.responsesRelevant &&
+    !keywordStuffing &&
     aiValidation.approachQuality !== "none" &&
     aiValidation.approachQuality !== "poor"
   const hasGoodComm = aiValidation.communicationScore >= 60 && explainedApproach
