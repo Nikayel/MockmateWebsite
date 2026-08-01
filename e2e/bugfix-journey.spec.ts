@@ -1,9 +1,26 @@
 import { test, expect } from "@playwright/test"
 
+/**
+ * NOT IN CI. `.github/workflows/ci.yml` runs lint, typecheck, vitest and build
+ * only, so this spec has never executed. Two assertions were factually wrong
+ * as a result and are corrected below:
+ *
+ *   - it navigated to `/interview/bugfix-onboarding`, but there is no [id]
+ *     route under app/interview. Scenarios are selected by query param
+ *     (`/interview?scenario=<id>`), per app/roadmap/page.tsx:317.
+ *   - it asserted a redirect to `/feedback/<id>`, but no app/feedback route
+ *     exists. Feedback lands on `/sessions/<id>`
+ *     (app/interview/_hooks/useSessionRestore.ts:87).
+ *
+ * It still requires an authenticated session and a live AI backend, so wiring
+ * it into CI needs a seeded test user and a mocked provider first. Until then
+ * there is NO automated proof that a user can complete a scored round, which
+ * is the product's core loop.
+ */
 test.describe("Evidence-driven Bugfix Journey", () => {
   test("completes the bugfix flow for the onboarding scenario", async ({ page }) => {
     // 1. Select Incident
-    await page.goto("/interview/bugfix-onboarding")
+    await page.goto("/interview?scenario=bugfix-onboarding")
 
     // Check that we're on the interview page and problem panel loaded
     await expect(page.locator("text=Onboarding: Cart Discount Bug")).toBeVisible()
@@ -56,8 +73,8 @@ test.describe("Evidence-driven Bugfix Journey", () => {
     await confirmButton.click()
 
     // 7. View Evidence-based feedback
-    // It should redirect to feedback page
-    await expect(page).toHaveURL(/\/feedback\/.+/)
+    // Feedback renders on the session page, not a /feedback route.
+    await expect(page).toHaveURL(/\/sessions\/.+/)
     await expect(page.locator("text=Feedback")).toBeVisible({ timeout: 20000 })
   })
 })
