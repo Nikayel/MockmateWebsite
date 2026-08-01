@@ -262,16 +262,16 @@ describe("edge integrity caps (the route DSA and bugfix actually use)", () => {
     expect(clean.overall).toBe(87)
   })
 
-  it("keyword stuffing caps communication and survives the floors", () => {
-    const stuffed = chain(
+  it("keywordStuffing changes nothing: a flagged session scores like a clean one", () => {
+    // The detector measures brevity, not stuffing, so it is no longer consulted.
+    const flagged = chain(
       preScreen({
         suspiciousPatterns: { tooShort: false, possibleGibberish: false, keywordStuffing: true },
       }),
       engaged()
     )
-    // Before the fix this returned 80/87, byte-identical to the clean session.
-    expect(stuffed.communication).toBe(35)
-    expect(stuffed.overall).toBeLessThan(87)
+    const unflagged = chain(preScreen(), engaged())
+    expect(flagged).toEqual(unflagged)
   })
 
   it("an incoherent session caps at 25 and survives the floors", () => {
@@ -287,24 +287,14 @@ describe("edge integrity caps (the route DSA and bugfix actually use)", () => {
   })
 
   it("takes the min of all applicable caps, not the first match", () => {
-    // Stuffed AND irrelevant: an if/else-if chain stops at the relevance cap
-    // of 45. Node reaches both rules and lands on 35.
-    const both = chain(
-      preScreen({
-        suspiciousPatterns: { tooShort: false, possibleGibberish: false, keywordStuffing: true },
-      }),
-      engaged({ responsesRelevant: false })
-    )
-    expect(both.communication).toBe(35)
+    // Incoherent AND irrelevant: an if/else-if chain would stop at whichever
+    // branch came first. Both rules apply, so the harsher 25 wins.
+    const both = chain(preScreen(), engaged({ isCoherent: false, responsesRelevant: false }))
+    expect(both.communication).toBe(25)
   })
 
   it("codeQuality still floors for a flagged session: passing tests are real evidence", () => {
-    const stuffed = chain(
-      preScreen({
-        suspiciousPatterns: { tooShort: false, possibleGibberish: false, keywordStuffing: true },
-      }),
-      engaged()
-    )
-    expect(stuffed.codeQuality).toBeGreaterThanOrEqual(75)
+    const flagged = chain(preScreen(), engaged({ isCoherent: false }))
+    expect(flagged.codeQuality).toBeGreaterThanOrEqual(75)
   })
 })
