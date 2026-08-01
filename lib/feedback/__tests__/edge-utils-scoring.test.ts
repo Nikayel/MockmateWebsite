@@ -286,6 +286,18 @@ describe("edge integrity caps (the route DSA and bugfix actually use)", () => {
     expect(irrelevant.overall).toBeLessThan(87)
   })
 
+  it("takes the min of all applicable caps, not the first match", () => {
+    // Stuffed AND irrelevant: an if/else-if chain stops at the relevance cap
+    // of 45. Node reaches both rules and lands on 35.
+    const both = chain(
+      preScreen({
+        suspiciousPatterns: { tooShort: false, possibleGibberish: false, keywordStuffing: true },
+      }),
+      engaged({ responsesRelevant: false })
+    )
+    expect(both.communication).toBe(35)
+  })
+
   it("codeQuality still floors for a flagged session: passing tests are real evidence", () => {
     const stuffed = chain(
       preScreen({
