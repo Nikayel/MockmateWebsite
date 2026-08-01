@@ -270,6 +270,14 @@ export function calculateValidatedScores(
     }
   }
 
+  // Re-apply the keyword-stuffing cap: the approach-quality bonus branch and
+  // the evidence floor above both run after the earlier cap and can lift a
+  // stuffed session back over it (stuffed keywords produce quotes and can
+  // convince the AI validator an approach was explained).
+  if (preScreen.suspiciousPatterns.keywordStuffing) {
+    communication = Math.min(35, communication)
+  }
+
   // Communication-evidence gate: a silent (or nearly silent) session cannot earn
   // Understanding/Problem-Solving from pass rate alone — the interviewer never saw
   // the thinking. codeQuality stays earned; the code is real evidence.
