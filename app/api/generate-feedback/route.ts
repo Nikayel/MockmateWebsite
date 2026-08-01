@@ -519,19 +519,37 @@ export async function POST(request: NextRequest) {
         latencyMs: clarifyingQuestionsResult.latencyMs,
       })
 
-      // Apply clarifying questions bonus/penalty to communication score
+      // Apply clarifying questions bonus/penalty to communication score.
+      // The bonus runs AFTER the scorer's integrity caps, so it is bounded by
+      // them: without this ceiling it lifted an incoherent session's capped 25
+      // to 35 and a stuffed session's 35 to 45, above the caps entirely.
+      const integrityCeiling = !aiValidation.isCoherent
+        ? 25
+        : preScreen.suspiciousPatterns.keywordStuffing
+          ? 35
+          : !aiValidation.responsesRelevant
+            ? 45
+            : 100
       const cqScore = clarifyingQuestionsResult.score
       if (cqScore >= 70) {
         // Good clarifying questions = bonus to communication
-        validatedScores.communication = Math.min(100, validatedScores.communication + 10)
+        validatedScores.communication = Math.min(
+          integrityCeiling,
+          Math.min(100, validatedScores.communication + 10)
+        )
         logger.info("[Feedback API] Clarifying questions bonus applied", {
           sessionId,
           cqScore,
           bonus: 10,
+          integrityCeiling,
         })
       } else if (cqScore < 30 && clarifyingQuestionsResult.requiredTotal > 0) {
-        // Missed required clarifying questions = penalty
-        validatedScores.communication = Math.max(30, validatedScores.communication - 10)
+        // Missed required clarifying questions = penalty. The Math.max floor
+        // must not raise a session the caps put below 30.
+        validatedScores.communication = Math.min(
+          validatedScores.communication,
+          Math.max(30, validatedScores.communication - 10)
+        )
         logger.info("[Feedback API] Clarifying questions penalty applied", {
           sessionId,
           cqScore,
