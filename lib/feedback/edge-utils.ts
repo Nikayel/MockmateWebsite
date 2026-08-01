@@ -291,11 +291,16 @@ export function calculateValidatedScores(
   // key off approachExplained/complexityDiscussed, which stuffed keywords can
   // trip. This is the route DSA and bugfix sessions actually use, so it is
   // where the caps matter most. Communication only, matching Node DSA.
+  // Min of every applicable cap, not first-match: a session that is both
+  // stuffed and irrelevant takes the harsher 35, matching the net effect of
+  // the Node scorer's two cap passes. An if/else-if chain would stop at 45.
   if (!aiValidation.isCoherent) {
     communication = Math.min(25, communication)
-  } else if (!aiValidation.responsesRelevant) {
+  }
+  if (!aiValidation.responsesRelevant) {
     communication = Math.min(45, communication)
-  } else if (preScreen.suspiciousPatterns.keywordStuffing) {
+  }
+  if (preScreen.suspiciousPatterns.keywordStuffing) {
     communication = Math.min(35, communication)
   }
 
