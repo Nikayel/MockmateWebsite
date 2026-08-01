@@ -1,7 +1,51 @@
 import { describe, it, expect } from "vitest"
 import { calculateValidatedScores } from "../scoring/dsa-scoring"
 import { COMMUNICATION_GATE_CAPS } from "../scoring/communication-gate"
+import type { ExtractedEvidence } from "../structured-extraction"
 import type { ConversationValidation, PreScreenResult } from "../types"
+
+// Evidence that a stuffed transcript could plausibly produce: real quotes for
+// approach and complexity, which is what trips the evidence floor.
+function evidence(): ExtractedEvidence {
+  return {
+    approach: {
+      explained: true,
+      type: "optimized",
+      quote: "I will use a hash map for lookups",
+      messageIndex: 1,
+    },
+    timeComplexity: {
+      mentioned: true,
+      value: "O(n)",
+      explanationGiven: true,
+      quote: "that gives O(n) time",
+      messageIndex: 2,
+      isCorrect: true,
+    },
+    spaceComplexity: {
+      mentioned: false,
+      value: null,
+      quote: null,
+      messageIndex: null,
+      isCorrect: null,
+    },
+    edgeCases: { mentionedByCandidate: [], mentionedAfterPrompt: [], missedCritical: [] },
+    progression: {
+      startedWithBruteForce: false,
+      improvedAfterPrompt: false,
+      selfCorrectedBugs: false,
+      bugQuotes: [],
+    },
+    interviewerQuestions: [],
+    communication: {
+      explainedWhileCoding: true,
+      askedClarifyingQuestions: false,
+      respondedToFeedback: false,
+      quotes: ["I will use a hash map for lookups"],
+    },
+    hints: { totalGiven: 0, usedEffectively: false, copiedBlindly: false },
+  }
+}
 
 // Real logic (for-in loop) so completeness analysis never flags it.
 const WORKING_CODE =
@@ -234,6 +278,51 @@ describe("calculateValidatedScores (DSA)", () => {
     )
     expect(stuffed.communication).toBe(35)
     expect(clean.communication).toBe(60)
+  })
+
+  it("stuffing cap holds against the approach-bonus lift path", () => {
+    // Stuffed keywords can convince the AI validator an approach was
+    // explained; the qualityBonus branch then ran after the original cap and
+    // lifted communication back to 55.
+    const result = calculateValidatedScores(
+      100,
+      undefined,
+      preScreen({
+        suspiciousPatterns: { tooShort: false, possibleGibberish: false, keywordStuffing: true },
+      }),
+      validation({
+        approachExplained: true,
+        approachQuality: "good",
+        communicationScore: 80,
+        questionsAsked: 0,
+        questionsAnswered: 0,
+      }),
+      "dsa",
+      WORKING_CODE
+    )
+    expect(result.communication).toBeLessThanOrEqual(35)
+  })
+
+  it("stuffing cap holds against the extracted-evidence floor", () => {
+    const result = calculateValidatedScores(
+      100,
+      undefined,
+      preScreen({
+        suspiciousPatterns: { tooShort: false, possibleGibberish: false, keywordStuffing: true },
+      }),
+      validation({
+        approachExplained: false,
+        approachQuality: "none",
+        communicationScore: 80,
+        questionsAsked: 0,
+        questionsAnswered: 0,
+      }),
+      "dsa",
+      WORKING_CODE,
+      evidence()
+    )
+    // The evidence floor sets 50 for sessions with quotes; stuffing must win.
+    expect(result.communication).toBeLessThanOrEqual(35)
   })
 
   it("incoherent session caps communication at 25", () => {
