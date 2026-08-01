@@ -256,10 +256,11 @@ describe("critiqueScores evidence floor integrity guard", () => {
     expect(result.madeChanges).toBe(false)
   })
 
-  it("withholds the floor when the transcript is keyword-stuffed", async () => {
+  it("keyword stuffing no longer withholds the floor", async () => {
+    // The brevity detector no longer reaches scoring, so a flagged-but-clean
+    // session keeps the floor it earned.
     const result = await critiqueScores(LOW_COMM_SCORES, contextWith({}, true))
-    expect(result.adjustedScores?.communication).toBeUndefined()
-    expect(result.madeChanges).toBe(false)
+    expect(result.adjustedScores?.communication).toBeGreaterThanOrEqual(50)
   })
 })
 
