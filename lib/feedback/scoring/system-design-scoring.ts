@@ -43,12 +43,17 @@ export function calculateSystemDesignScores(
     }
 
     const commScore = Math.min(maxScore, aiValidation.communicationScore)
+    const understanding = Math.min(maxScore, aiValidation.approachExplained ? 18 : 12)
+    const problemSolving = Math.min(maxScore, aiValidation.alternativesDiscussed ? 18 : 12)
+    const codeQuality = 10
     return {
-      understanding: Math.min(maxScore, aiValidation.approachExplained ? 18 : 12),
-      problemSolving: Math.min(maxScore, aiValidation.alternativesDiscussed ? 18 : 12),
-      codeQuality: 10,
+      understanding,
+      problemSolving,
+      codeQuality,
       communication: commScore,
-      overall: Math.round((18 + 18 + 10 + commScore) / 5),
+      // Compose from the actual grants: an ungranted flag must not contribute
+      // its 18-point value to the overall.
+      overall: Math.round((understanding + problemSolving + codeQuality + commScore) / 5),
     }
   }
 
