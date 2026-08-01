@@ -1,9 +1,20 @@
 /**
- * Streaming Feedback API - Edge Function with NO TIMEOUT
+ * Streaming Feedback API - Edge Function
  *
- * Edge functions don't timeout when streaming responses.
- * This allows us to run all AI operations and stream the result
- * without hitting Vercel's 10s hobby plan limit.
+ * This route serves EVERY scenario type except system design: DSA, bugfix,
+ * optimization, security, and add-functionality all reach it via
+ * useInterviewFeedback -> useStreamingFeedback. System design alone goes to
+ * the Node route (/api/generate-feedback). Anything that changes user-visible
+ * DSA or bugfix scores has to change HERE, not only in lib/feedback/scoring/*.
+ *
+ * HISTORICAL NOTE: this was originally an Edge function to escape Vercel's
+ * 10s Hobby serverless timeout by streaming. That constraint is gone:
+ * vercel.json already grants maxDuration 30 to every app/api function, the
+ * platform default is now far higher, and Vercel no longer recommends Edge
+ * (Fluid Compute runs Node in the same regions at the same price). The
+ * remaining reason this is separate is inertia plus the Firebase-Admin split
+ * (Edge cannot use it, hence /api/feedback/persist). See
+ * docs/EDGE-TO-NODE-CONSOLIDATION.md for the migration assessment.
  *
  * Flow:
  * 1. Receive session data
