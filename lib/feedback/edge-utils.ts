@@ -351,9 +351,17 @@ export function applyScoreFloors(
   scores: ExtendedScoreResult,
   passRate: number,
   efficiencyScore: number | undefined,
-  aiValidation: ConversationValidation
+  aiValidation: ConversationValidation,
+  keywordStuffing = false
 ): ExtendedScoreResult {
   const result = { ...scores }
+
+  // A session the scorer capped for incoherence, irrelevance, or keyword
+  // stuffing must not have that cap handed back by these floors. The floors
+  // key off approachExplained/complexityDiscussed, which are exactly the
+  // signals a stuffed transcript can fake.
+  const integrityFlagged =
+    !aiValidation.isCoherent || !aiValidation.responsesRelevant || keywordStuffing
 
   // All tests passing = minimum 70 overall — but ONLY when the candidate actually
   // interviewed. Silent perfect solutions keep the communication-gate caps; the
@@ -365,10 +373,12 @@ export function applyScoreFloors(
   // (which calculateValidatedScores applied before this function runs).
   // Widening this condition reopens the silent-session bypass.
   if (passRate >= 100) {
-    if (aiValidation.approachExplained || aiValidation.complexityDiscussed) {
+    if ((aiValidation.approachExplained || aiValidation.complexityDiscussed) && !integrityFlagged) {
       result.overall = Math.max(result.overall, 70)
       result.problemSolving = Math.max(result.problemSolving, 70)
     }
+    // codeQuality floors regardless: the code passing its tests is real
+    // evidence no transcript signal can undermine.
     result.codeQuality = Math.max(result.codeQuality, 75)
   }
 
@@ -378,7 +388,7 @@ export function applyScoreFloors(
   }
 
   // Good communication = minimum communication score
-  if (aiValidation.approachExplained && aiValidation.complexityDiscussed) {
+  if (aiValidation.approachExplained && aiValidation.complexityDiscussed && !integrityFlagged) {
     result.communication = Math.max(result.communication, 65)
   }
 
