@@ -4,7 +4,7 @@ Written 2026-08-01, after discovering that the Edge route serves nearly all traf
 
 ## The routing reality
 
-`app/interview/_hooks/useInterviewFeedback.ts:299` calls `startStreaming()` with `scenarioType` passed through as data. There is no branch on it. So:
+`app/interview/_hooks/useInterviewFeedback.ts:298` calls `startStreaming()` with `scenarioType` passed through as data. There is no branch on it. So:
 
 | Scenario type | Route | Runtime |
 |---|---|---|
@@ -22,7 +22,7 @@ The route header claimed Edge was needed to escape Vercel's 10s Hobby serverless
 - `vercel.json` already sets `maxDuration: 30` for `app/api/**/*.ts`. Verified in-repo.
 - Vercel's default function timeout is reported to be far higher than 10s on current plans, and Vercel is reported to no longer recommend Edge Functions now that Fluid Compute runs regular Node.js in the same regions at the same price. **Both of these are from general platform knowledge, not verified against current Vercel docs. Check them before planning around them.**
 
-One caveat the first bullet does not cover: `app/api/feedback/persist/route.ts` still carries its own `export const maxDuration = 10` with a header citing the Hobby limit. A per-route export overrides `vercel.json`, so that endpoint is self-limited to 10s on the same stale premise.
+(`app/api/feedback/persist/route.ts` also carried its own `export const maxDuration = 10` on the same stale premise, which a per-route export uses to override `vercel.json`. Removed in `f01fa675`.)
 
 What remains is a secondary consequence, not a justification: Edge cannot use the Firebase Admin SDK, which is why `/api/feedback/persist` exists as a separate endpoint that the browser calls after streaming finishes.
 
@@ -36,7 +36,7 @@ What remains is a secondary consequence, not a justification: Edge cannot use th
 | `lib/feedback/transcript-analysis-edge.ts` | 556 | `lib/feedback/transcript-analysis.ts` |
 | `lib/ai-providers-edge.ts` | 406 | `lib/ai-providers.ts` |
 | `lib/auth-edge.ts` | 65 | `lib/auth-helpers.ts` |
-| `app/api/feedback/persist/route.ts` | 260 | unnecessary on Node |
+| `app/api/feedback/persist/route.ts` | 263 | unnecessary on Node |
 
 **It resolves several standing problems by deletion rather than by reconciliation:**
 
@@ -84,7 +84,11 @@ Clean sessions are deliberately unchanged, so this carried no legitimate-user im
 
 A follow-up review found the caps did not reach **bugfix** sessions at all: the stream route replaces the capped scorer output wholesale with `mapBugfixScoreToFeedbackScores(breakdown)`, and that breakdown's communication dimension was an unguarded LLM judgment. Fixed in `443ff050` / `c4ce2af9` by capping inside `calculateBugfixEvidenceScore`, which also covers the streaming-failure fallback path since it calls the same function.
 
-Two known residues, both deliberate:
+Follow-up review then found three further leaks, all now closed: the Node bugfix scorer capped on incoherence only (an irrelevant or stuffed session scored 90/95, identical to clean), the clarifying-questions +10 landed above every cap, and the Constitutional-AI evidence floor hard-set communication to 50-80 on exactly the quotes a stuffed transcript produces.
 
-- **The `keywordStuffing` detector is near-unreachable in production.** `pre-screening.ts` requires `wordCount < 30` across the entire transcript, so a stuffed session of any realistic length never trips it. The cap is correct but mostly inert until that detector is recalibrated, and `pre-screening.test.ts` is currently skipped, so nothing tests its thresholds.
+Three residues remain, all deliberate:
+
+- **The `keywordStuffing` detector is defective in both directions and needs a product decision.** `pre-screening.ts` requires `wordCount < 30` across the entire transcript, so it is really measuring brevity. It cannot fire on a long stuffed transcript however dense the salad, and it *does* fire on a genuine terse candidate ("I'll use a hash map." / "That's O(n) time." / "Edge case: empty array." / "Brute force would be slower." is flagged, with `tooShort` and `possibleGibberish` both false). Four scoring paths now consume this flag, so the false positives are the live risk. Both directions are pinned in `pre-screening.test.ts`.
+- **The bugfix caps move overall by at most about 3 points.** `communication` carries weight 0.05 in `DEFAULT_WEIGHTS`, and the user-facing value is averaged with `aiCollaborationQuality`, so a cap of 25 displays as 48. A fraudulent bugfix transcript with clean evidence still scores around 91. Closing that gap means reweighting, which is a product decision.
 - **Edge does not gate its scoring bonuses on `isCoherent` where Node does.** Gating them was measured and rejected: it drops an incoherent session's understanding to 67 against Node's 90, widening the divergence rather than closing it. See the comment in `edge-utils.ts`.
+- **The streaming-failure fallback path is uncapped.** `computeFallbackScores` runs client-side after the Edge route has failed, so the integrity signals do not exist there, and its scores are persisted verbatim. Documented in `lib/interview/fallback-feedback.ts`.
