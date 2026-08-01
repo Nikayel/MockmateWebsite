@@ -270,12 +270,20 @@ export function calculateValidatedScores(
     }
   }
 
-  // Re-apply the keyword-stuffing cap: the approach-quality bonus branch and
-  // the evidence floor above both run after the earlier cap and can lift a
-  // stuffed session back over it (stuffed keywords produce quotes and can
-  // convince the AI validator an approach was explained).
+  // Re-apply the integrity caps: the approach-quality bonus branch and the
+  // evidence floor above both run after the earlier if/else chain and can lift
+  // a capped session back over its ceiling (stuffed keywords produce quotes and
+  // can convince the AI validator an approach was explained). The earlier chain
+  // is still load-bearing, so this supplements it rather than replacing it:
+  // where the bonuses would land BELOW the ceiling, the earlier cap is what
+  // holds the score down.
   if (preScreen.suspiciousPatterns.keywordStuffing) {
     communication = Math.min(35, communication)
+  }
+  if (!aiValidation.isCoherent) {
+    communication = Math.min(25, communication)
+  } else if (!aiValidation.responsesRelevant) {
+    communication = Math.min(45, communication)
   }
 
   // Communication-evidence gate: a silent (or nearly silent) session cannot earn
