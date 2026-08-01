@@ -143,12 +143,17 @@ export function calculateValidatedScores(
     : 10
   let communication = validatedCommunicationScore
 
+  // NOTE: preScreen.suspiciousPatterns.keywordStuffing is deliberately NOT
+  // consulted. That detector requires under 30 words across the whole
+  // transcript, so it fires on concise honest candidates and never on the
+  // long keyword-salad transcripts it is named for. It cost a measured 55
+  // communication points for concision while catching no actual stuffing.
+  // isCoherent and responsesRelevant are LLM judgments over the real
+  // transcript and do the actual work here.
   if (!aiValidation.isCoherent) {
     communication = Math.min(25, validatedCommunicationScore)
   } else if (!aiValidation.responsesRelevant) {
     communication = Math.min(45, validatedCommunicationScore)
-  } else if (preScreen.suspiciousPatterns.keywordStuffing) {
-    communication = Math.min(35, validatedCommunicationScore)
   } else {
     communication = validatedCommunicationScore
 
@@ -272,14 +277,10 @@ export function calculateValidatedScores(
 
   // Re-apply the integrity caps: the approach-quality bonus branch and the
   // evidence floor above both run after the earlier if/else chain and can lift
-  // a capped session back over its ceiling (stuffed keywords produce quotes and
-  // can convince the AI validator an approach was explained). The earlier chain
-  // is still load-bearing, so this supplements it rather than replacing it:
-  // where the bonuses would land BELOW the ceiling, the earlier cap is what
-  // holds the score down.
-  if (preScreen.suspiciousPatterns.keywordStuffing) {
-    communication = Math.min(35, communication)
-  }
+  // a capped session back over its ceiling. The earlier chain is still
+  // load-bearing, so this supplements it rather than replacing it: where the
+  // bonuses would land BELOW the ceiling, the earlier cap is what holds the
+  // score down.
   if (!aiValidation.isCoherent) {
     communication = Math.min(25, communication)
   } else if (!aiValidation.responsesRelevant) {
