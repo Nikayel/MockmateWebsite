@@ -1,0 +1,34 @@
+# Design Write-up: An Open Learner Model with Inspect, Challenge, and Correct
+
+## What it is
+
+I built an open learner model into CodeSparring, my AI interview-practice platform. The `/knowledge` page ("What CodeSparring Thinks You Know") exposes the system's beliefs about a learner, derived from FSRS spaced-repetition state, and lets the learner inspect the evidence behind each belief, challenge beliefs they think are wrong, and have the model visibly correct itself, with the disagreement settled by a scheduled verification review. It shipped in July 2026, including an event-logging harness and a masked control condition built for a future study.
+
+## The three interactions
+
+**Inspect.** The page shows concept-level rollups (sorted most-at-risk first) and, per problem, the model's belief: retrievability as a 0 to 100 percent chance of solving it cold, FSRS stability in days, difficulty, lapse count, and a forecast of when recall drops below a solid-recall threshold (`lib/learner-model/model-builder.ts`). Two decisions mattered here. First, every number carries an explanation: a hover tooltip answers "Why this number?" with the underlying FSRS inputs, and each belief is translated into one plain-language sentence ("The system estimates a ~72% chance you could solve this cold today, and that your recall drops below solid in ~4 days"). The premise, written into `lib/learner-model/translate.ts`, is that a mastery score alone is a black box with a number on it; score plus evidence plus an actionable sentence is an explanation. Second, expanding a card reveals its evidence: the per-review log the scheduler already wrote (score, hints, interval movement, and the model's predicted retention next to whether the learner actually recalled). The model's past prediction errors are deliberately not hidden. Third, cards with zero reviews show "no evidence yet" rather than a fabricated estimate; I rejected showing a prior because a confident number with no evidence behind it is the failure mode the page exists to avoid.
+
+**Challenge.** Each belief row has a "This seems wrong" affordance opening a dialog with three structured reasons: I made a typo or misread, I knew it but was rushing, or I have learned this since elsewhere, plus optional free text (`app/knowledge/_components/ChallengeDialog.tsx`). I chose structured reasons over a free-text dispute because each reason maps to a principled, auditable model amendment, and the reason distribution is itself study data. Every challenge is stored as a first-class document with a snapshot of the belief at challenge time (`lib/learner-model/challenges.ts`), so "when do learners dispute the model, and were they right" is answerable later without reconstruction.
+
+**Correct.** The model responds immediately and says exactly what it changed, including before and after stability, and a trace banner on the practice page later shows that the correction propagated. Crucially, the learner never edits the belief directly. I rejected "set your own mastery level" because it collapses the model into a self-report instrument; instead, a correction is a counterfactual replay through the normal algorithm.
+
+## How corrections propagate
+
+The mechanics live in `lib/learner-model/amendment.ts`. A "typo" challenge replays the learner's last review from the exact pre-review FSRS card snapshot stored on the review event, with the rating corrected to Good(3): precisely the state FSRS would have produced had the slip not happened, so no lapse increment and no stability penalty. "Rushed" is the same replay with Hard(2). "Learned elsewhere" changes no memory state at all. Two guards constrain this. Corrections apply only when they improve on the recorded rating, so challenging a review already rated Easy cannot backfire on the learner. And for older events without a full snapshot, a conservative fallback restores pre-review stability and removes a lapse only if one was actually added, but deliberately leaves the difficulty penalty, because pre-review difficulty cannot be reconstructed and guessing would be dishonest.
+
+Every challenge, regardless of reason, also pulls a verification review to the next day. The pull changes the due date only, never stability, difficulty, or lapses. The verification flows through the normal review path; when it completes, the challenge is resolved as passed or failed using the same retention threshold as the rest of the research data (`lib/learner-model/verification.ts`). So disagreement between learner and model is not adjudicated by either party: it is settled by evidence within a day, and the correction "sticks" or gets naturally revised by ordinary scheduling. This is also the abuse guard: a gamed challenge just buys the learner a next-day exam.
+
+For a planned study there is a black-box control condition: concepts stay listed but every number, forecast, and explanation is masked and challenges are disabled, enforced in both the UI and the API. All interactions log to a dedicated event stream with a server-side allowlist for client-reportable events.
+
+## Open questions this surfaced
+
+1. What transparency granularity supports calibration rather than false precision? Does a per-problem percentage invite over-trust compared to coarser bands or the sentence-level translation alone?
+2. Does showing the model's own prediction errors (predicted retention versus actual recall, per review) improve calibrated reliance on its beliefs, or simply lower trust uniformly?
+3. Is next-day verification the right contestability contract? Does it deter frivolous challenges without discouraging legitimate ones, and how do challenge pass rates relate to metacognitive calibration?
+4. Where should the boundary sit on what a correction may change? Mine can re-rate one review and move one due date, never difficulty. Is more learner authority helpful or harmful to long-run scheduling accuracy?
+5. Do three structured dispute reasons cover the real space of learner-model disagreement, or does forcing a category distort what learners report?
+6. Does inspection alone (open versus black-box) change study behavior, for example practicing a concept when its forgetting forecast is visible, independent of any challenges?
+
+## Limitations
+
+I want to be honest about scope. My users are self-directed interview preparers, not enrolled students in a course context, so co-regulation with an instructor is absent. The control condition and event harness exist, but no controlled study has been run; everything above is design rationale, not evidence of learning gains. The model covers one domain family (coding-interview problems plus a systems bucket), and its beliefs are memory-based FSRS estimates, which conflate retention with understanding. These are exactly the gaps I would want to work on as a researcher rather than a builder.
