@@ -32,13 +32,16 @@ export function calculateValidatedScores(
     return calculateBugFixScores(passRate, preScreen, aiValidation)
   }
 
-  const codeCompleteness = code
+  // An empty or whitespace-only submission is an incomplete solution; the
+  // old `code ?` ternary let "" skip the analyzer and read as complete code
+  // (while "   " was correctly flagged) because "" is falsy.
+  const codeCompleteness = code?.trim()
     ? analyzeCodeCompleteness(code, "python")
     : {
-        isIncomplete: false,
-        reason: "",
+        isIncomplete: true,
+        reason: "No code submitted",
         hasBaseCase: false,
-        hasActualLogic: true,
+        hasActualLogic: false,
         stubPatterns: [],
       }
 
