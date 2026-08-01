@@ -309,9 +309,9 @@ export function calculateValidatedScores(
   if (!aiValidation.responsesRelevant) {
     communication = Math.min(45, communication)
   }
-  if (preScreen.suspiciousPatterns.keywordStuffing) {
-    communication = Math.min(35, communication)
-  }
+  // preScreen.suspiciousPatterns.keywordStuffing is deliberately NOT consulted:
+  // it requires under 30 words across the whole transcript, so it penalises
+  // concise honest candidates and cannot catch a long keyword salad.
 
   // Communication-evidence gate: pass rate alone cannot earn Understanding or
   // Problem-Solving when the candidate said (nearly) nothing. Same rule as the
@@ -365,17 +365,14 @@ export function applyScoreFloors(
   scores: ExtendedScoreResult,
   passRate: number,
   efficiencyScore: number | undefined,
-  aiValidation: ConversationValidation,
-  keywordStuffing = false
+  aiValidation: ConversationValidation
 ): ExtendedScoreResult {
   const result = { ...scores }
 
-  // A session the scorer capped for incoherence, irrelevance, or keyword
-  // stuffing must not have that cap handed back by these floors. The floors
-  // key off approachExplained/complexityDiscussed, which are exactly the
-  // signals a stuffed transcript can fake.
-  const integrityFlagged =
-    !aiValidation.isCoherent || !aiValidation.responsesRelevant || keywordStuffing
+  // A session the scorer capped for incoherence or irrelevance must not have
+  // that cap handed back by these floors, which key off approachExplained and
+  // complexityDiscussed.
+  const integrityFlagged = !aiValidation.isCoherent || !aiValidation.responsesRelevant
 
   // All tests passing = minimum 70 overall — but ONLY when the candidate actually
   // interviewed. Silent perfect solutions keep the communication-gate caps; the
