@@ -88,7 +88,45 @@ Follow-up review then found three further leaks, all now closed: the Node bugfix
 
 Four residues remain, all deliberate:
 
-- **The `keywordStuffing` detector is defective in both directions and needs a product decision.** `pre-screening.ts` requires `wordCount < 30` across the entire transcript, so it is really measuring brevity. It cannot fire on a long stuffed transcript however dense the salad, and it *does* fire on a genuine terse candidate ("I'll use a hash map." / "That's O(n) time." / "Edge case: empty array." / "Brute force would be slower." is flagged, with `tooShort` and `possibleGibberish` both false). Four scoring paths now consume this flag, so the false positives are the live risk. Both directions are pinned in `pre-screening.test.ts`.
+- **The `keywordStuffing` detector is defective in both directions and needs a product decision.** `pre-screening.ts` requires `wordCount < 30` across the entire transcript, so it is really measuring brevity. It cannot fire on a long stuffed transcript however dense the salad, and it *does* fire on a genuine terse candidate ("I'll use a hash map." / "That's O(n) time." / "Edge case: empty array." / "Brute force would be slower." is flagged, with `tooShort` and `possibleGibberish` both false). Both directions are pinned in `pre-screening.test.ts`. See the dedicated section below.
 - **The bugfix caps move overall by at most about 3 points.** `communication` carries weight 0.05 in `DEFAULT_WEIGHTS`, and the user-facing value is averaged with `aiCollaborationQuality`, so a cap of 25 displays as 48. A fraudulent bugfix transcript with clean evidence still scores around 91. Closing that gap means reweighting, which is a product decision.
 - **Edge does not gate its scoring bonuses on `isCoherent` where Node does.** Gating them was measured and rejected: it drops an incoherent session's understanding to 67 against Node's 90, widening the divergence rather than closing it. See the comment in `edge-utils.ts`.
 - **The streaming-failure fallback path is uncapped.** `computeFallbackScores` runs client-side after the Edge route has failed, so the integrity signals do not exist there, and its scores are persisted verbatim. Documented in `lib/interview/fallback-feedback.ts`.
+
+## The `keywordStuffing` flag: eleven consumers, and it measures the wrong thing
+
+This is the largest single open decision in the scoring subsystem, so it gets its own section.
+
+**The rule** (`lib/feedback/pre-screening.ts:65`) is `keywordCount >= 3 && avgLength < 50 && wordCount < 30`, where `wordCount` spans the entire candidate transcript. That third conjunct means it is measuring brevity, not stuffing.
+
+**Measured harm on the live Edge route.** An honest, concise candidate with a perfect optimal solution, real AI validation confirming they explained their approach and discussed complexity accurately, loses **55 points of communication and 16 points of overall** purely because the flag fires. That is a live production penalty for concision.
+
+**It is not four consumers, it is eleven behavioural sites** across six modules:
+
+| Site | Effect when flagged |
+|---|---|
+| `lib/feedback/edge-utils.ts:312` | communication capped at 35 |
+| `lib/feedback/edge-utils.ts:378` | withholds the 100%-pass overall and problemSolving floors |
+| `lib/feedback/scoring/dsa-scoring.ts:150` | communication capped at 35 |
+| `lib/feedback/scoring/dsa-scoring.ts:280` | cap re-applied after bonuses |
+| `lib/feedback/scoring/bugfix-scoring.ts:68` | communication capped at 35 |
+| `lib/feedback/scoring/score-floors.ts:34` | denies `explainedApproach`, dropping to the `min(35)` branch |
+| `lib/bugfix/scoring.ts:99` | evidence-breakdown communication capped at 35 |
+| `lib/feedback/constitutional-ai.ts:126` | withholds the 50-80 evidence floor |
+| `app/api/generate-feedback/route.ts:195` | **skips AI conversation validation entirely**, falling back to defaults |
+| `app/api/generate-feedback/route.ts:528` | ceilings the clarifying-questions bonus |
+| `app/api/feedback/stream/route.ts:409,433` | pass-throughs into the scorer and floors |
+
+The `route.ts:195` site is the largest score effect of all and is easy to miss: a flagged session gets `getDefaultValidation()` (communicationScore 25, `approachExplained: false`, `approachQuality: "none"`), which then cascades into the `explainedApproach` floors and the communication-evidence gate. It is dead today only because system design short-circuits that check and the Edge route does not gate on the flag. **It comes alive the moment DSA and bugfix move to Node**, which is this document's entire subject.
+
+**A tempting fix that does not work.** Adding a low-unique-word-ratio conjunct looks strictly narrowing and therefore safe. It is safe, and it is still wrong: keyword stuffing is *high* lexical diversity of jargon, so the ratio is anti-correlated with the phenomenon. Measured, a distinct-token keyword salad scores `uniqueRatio` 1.0 and would be exempted, while an honest "the"-heavy three-sentence answer scores 0.591 and stays flagged. No threshold separates them, because the ordering is not monotone in honesty.
+
+**What deleting the flag would actually cost.** Little. Repetitive or low-substance transcripts are already caught by `possibleGibberish` (which, unlike this flag, catches the *long* ones). Near-silent sessions are caught by the communication-evidence gate on all four paths. Off-topic and incoherent answers are caught by `responsesRelevant` and `isCoherent`, which are LLM judgments over the real transcript and are the caps doing the actual work. The only genuine loss is the `route.ts:195` cost saving, which is unreachable today.
+
+**Options, in the order I would rank them:**
+
+1. **Delete the flag and its eleven consumers.** The cap machinery for `isCoherent` and `responsesRelevant` stays and keeps working.
+2. **Keep the detector, disconnect the consumers.** Same effect on scores, keeps the signal available for analytics.
+3. **Retune it** into a real density measure (jargon tokens per 100 words, with no word-count ceiling). Most work, and it needs a false-positive budget decided up front.
+
+Doing nothing keeps penalising concise candidates 16 points on the live route.
