@@ -162,6 +162,23 @@ describe("calculateValidatedScores (DSA)", () => {
     expect(result.overall).toBe(28)
   })
 
+  it("empty-string and undefined code count as incomplete even with a perfect pass rate", () => {
+    for (const code of ["", undefined] as const) {
+      const result = calculateValidatedScores(
+        100,
+        { efficiencyScore: 90 },
+        preScreen(),
+        validation(),
+        "dsa",
+        code
+      )
+      expect(result.understanding).toBeLessThanOrEqual(25)
+      expect(result.problemSolving).toBeLessThanOrEqual(25)
+      expect(result.codeQuality).toBeLessThanOrEqual(25)
+      expect(result.overall).toBeLessThanOrEqual(28)
+    }
+  })
+
   it("answer rate >= 0.8 grants the +5 communication bonus", () => {
     const base = validation({
       complexityDiscussed: false,
