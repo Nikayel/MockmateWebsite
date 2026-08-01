@@ -52,6 +52,21 @@ export function computeFallbackScores(request: FallbackFeedbackRequest): Fallbac
     })
     // Pass the difficulty through (the stream path does): calculateBugfixEvidenceScore scales
     // codebaseNavigation's target by it, so dropping it scored every fallback bugfix as medium.
+    //
+    // KNOWN GAP: no `integrity` option is passed, so the transcript-integrity
+    // caps (incoherent 25 / irrelevant 45 / stuffed 35) do NOT apply on this
+    // path, and these scores are persisted verbatim. This is not an oversight
+    // that a one-line change fixes: computeFallbackScores runs CLIENT-side
+    // (app/interview/_hooks/useFeedbackStreaming.ts) after the Edge route has
+    // already failed, and aiValidation / preScreen are produced server-side
+    // inside that failed route, so the signals do not exist here.
+    //
+    // Blast radius is small but real: without semanticOverrides the
+    // communication dimension is the fixed UNJUDGED_LANGUAGE_SCORE rather than
+    // an LLM judgment, and it carries weight 0.05, so an uncapped fallback
+    // moves overall by roughly a point. Closing it properly means having the
+    // server hand the client its integrity verdict before the stream dies, or
+    // recomputing server-side in the persist route.
     const bugfixScores = calculateBugfixEvidenceScore(evidenceSummary, {
       difficulty:
         request.scenarioDifficulty === "easy" ||
