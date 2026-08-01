@@ -90,13 +90,12 @@ function ratioScore(count: number, target: number): number {
  */
 function capCommunicationForIntegrity(
   score: number,
-  integrity?: { isCoherent?: boolean; responsesRelevant?: boolean; keywordStuffing?: boolean }
+  integrity?: { isCoherent?: boolean; responsesRelevant?: boolean }
 ): number {
   if (!integrity) return score
   let capped = score
   if (integrity.isCoherent === false) capped = Math.min(25, capped)
   if (integrity.responsesRelevant === false) capped = Math.min(45, capped)
-  if (integrity.keywordStuffing === true) capped = Math.min(35, capped)
   return capped
 }
 
@@ -124,7 +123,6 @@ export function calculateBugfixEvidenceScore(
     integrity?: {
       isCoherent?: boolean
       responsesRelevant?: boolean
-      keywordStuffing?: boolean
     }
   } = {}
 ): BugfixScoreBreakdown {
