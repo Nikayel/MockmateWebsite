@@ -2,13 +2,21 @@ import { describe, it, expect } from "vitest"
 import { preScreenConversation } from "../pre-screening"
 
 /**
- * These pin CURRENT behaviour, including a known weakness: the keywordStuffing
+ * These pin CURRENT behaviour, including a serious defect: the keywordStuffing
  * detector requires fewer than 30 words across the ENTIRE candidate transcript,
- * so it cannot fire on a stuffed session of any realistic length. The scoring
- * caps that consume this flag are therefore mostly inert in production. The
- * inertness is pinned deliberately (see the last describe block) so that a
- * future recalibration has to confront it rather than silently change who
- * gets flagged.
+ * so it is really measuring BREVITY, not stuffing. It is inverted in both
+ * directions:
+ *
+ *   - it CANNOT fire on a long stuffed transcript, however dense the keyword
+ *     salad, because the word-count conjunct is hard, so it offers no real
+ *     protection; and
+ *   - it DOES fire on a genuine, honest, terse candidate, capping their
+ *     communication score for fraud they did not commit.
+ *
+ * Four scoring paths now consume this flag, so the false positives are the
+ * live risk. Both directions are pinned in the last describe block so a
+ * recalibration has to confront them rather than silently change who is
+ * flagged.
  */
 function turns(...contents: string[]) {
   return contents.map((content) => ({ role: "candidate", content }))
@@ -104,7 +112,7 @@ describe("preScreenConversation suspicious patterns", () => {
   })
 })
 
-describe("KNOWN WEAKNESS: keywordStuffing is unreachable on realistic transcripts", () => {
+describe("DEFECT: keywordStuffing measures brevity, not stuffing", () => {
   it("does not fire on a long stuffed transcript because of the wordCount < 30 conjunct", () => {
     // Keyword salad with no substance across all four families, but the
     // transcript exceeds 30 words in total.
@@ -122,10 +130,40 @@ describe("KNOWN WEAKNESS: keywordStuffing is unreachable on realistic transcript
     expect(stuffed.suspiciousPatterns.keywordStuffing).toBe(false)
   })
 
-  it("only fires on a transcript so short it is close to silent anyway", () => {
-    const contents = ["O(n) hash map", "empty edge case", "brute force"]
-    const result = preScreenConversation(turns(...contents))
-    expect(contents.join(" ").split(/\s+/).length).toBeLessThan(30)
-    expect(result.suspiciousPatterns.keywordStuffing).toBe(true)
+  it("FALSE POSITIVE: flags a genuine, honest, terse candidate", () => {
+    // Nothing dishonest here. A concise candidate who says the right things
+    // briefly trips the flag, because the rule is really measuring brevity.
+    const honest = preScreenConversation(
+      turns(
+        "I'll use a hash map.",
+        "That's O(n) time.",
+        "Edge case: empty array.",
+        "Brute force would be slower."
+      )
+    )
+    expect(honest.suspiciousPatterns.tooShort).toBe(false)
+    expect(honest.suspiciousPatterns.possibleGibberish).toBe(false)
+    expect(honest.suspiciousPatterns.keywordStuffing).toBe(true)
+  })
+
+  it("fires on transcripts that are not close to silent", () => {
+    // Ten turns is a real conversation, not silence. An earlier version of
+    // this test claimed the flag only caught near-silent sessions; it does not.
+    const tenTurns = preScreenConversation(
+      turns(
+        "hash map",
+        "O(n) time",
+        "edge case",
+        "empty input",
+        "brute force",
+        "iterate",
+        "linear",
+        "duplicate",
+        "trade-off",
+        "boundary"
+      )
+    )
+    expect(tenTurns.candidateMessageCount).toBe(10)
+    expect(tenTurns.suspiciousPatterns.keywordStuffing).toBe(true)
   })
 })
