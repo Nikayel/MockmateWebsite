@@ -621,6 +621,9 @@ export async function POST(request: NextRequest) {
       // The response and analytics ship scoreCritique.adjustedScores; sync it
       // to the capped values so the Score Review panel can never display an
       // adjusted overall that contradicts the actual (capped) score.
+      // CAUTION: scoreCritique.scoreChanges and userSummary still hold the
+      // PRE-cap per-category values (currently unshipped; analytics uses only
+      // the reason strings). Do not ship either to the UI without re-syncing.
       scoreCritique = {
         ...scoreCritique,
         adjustedScores: {

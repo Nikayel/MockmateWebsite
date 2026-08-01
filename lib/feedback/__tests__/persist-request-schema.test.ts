@@ -212,6 +212,20 @@ describe("validatePersistRequestBody", () => {
     }
   })
 
+  it("drops breakdowns whose overall merely coerces to a number", () => {
+    // Number("68")/Number("")/Number(null)/Number(true) all coerce, but only
+    // a real number type is a legit server-produced breakdown.
+    for (const overall of ["68", "", null, true]) {
+      const result = validatePersistRequestBody(
+        validBody({ scenarioType: "bugfix", bugfixScoreBreakdown: { overall } })
+      )
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.bugfixScoreBreakdown).toBeNull()
+      }
+    }
+  })
+
   it("passes null and absent bugfixScoreBreakdown through untouched", () => {
     const withNull = validatePersistRequestBody(validBody({ bugfixScoreBreakdown: null }))
     expect(withNull.success).toBe(true)
