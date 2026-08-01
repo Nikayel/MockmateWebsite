@@ -523,6 +523,19 @@ export async function POST(request: NextRequest) {
       // The bonus runs AFTER the scorer's integrity caps, so it is bounded by
       // them: without this ceiling it lifted an incoherent session's capped 25
       // to 35 and a stuffed session's 35 to 45, above the caps entirely.
+      //
+      // Ordering note: the branches are strictest-cap-first (25, 35, 45), so
+      // this first-match ternary is provably identical to min-of-all.
+      //
+      // LANDMINE for the Edge-to-Node consolidation: these ceilings are the
+      // DSA ladder, but this branch only ever executes on THIS route, which
+      // today serves system-design alone. calculateSystemDesignScores caps
+      // !responsesRelevant at 35, not 45, and has no stuffing rule at all, so
+      // if this branch ever fires for an SD session the 45 ceiling sits 10
+      // points above SD's own cap. It is unreachable today because the branch
+      // needs scenarioClarifyingQuestions, which only DSA scenarios define and
+      // DSA routes to Edge. Re-derive these ceilings per scenario type before
+      // flipping routing.
       const integrityCeiling = !aiValidation.isCoherent
         ? 25
         : preScreen.suspiciousPatterns.keywordStuffing
