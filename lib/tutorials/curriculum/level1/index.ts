@@ -1305,8 +1305,6 @@ hours = total // 60   # 2   whole hours
 mins  = total % 60    # 5   leftover minutes
 \`\`\`
 
-That is the entire trick behind \`minutes_to_hm(total_minutes)\`: return \`[total_minutes // 60, total_minutes % 60]\`, which is \`[2, 5]\` for \`125\`. Reach for \`//\` and \`%\` whenever you mean "how many whole groups" and "what is left".
-
 \`\`\`cswidget
 {
   "type": "check",
@@ -1343,6 +1341,8 @@ That is the entire trick behind \`minutes_to_hm(total_minutes)\`: return \`[tota
   ]
 }
 \`\`\`
+
+That is the entire trick behind \`minutes_to_hm(total_minutes)\`: return \`[total_minutes // 60, total_minutes % 60]\`, which is \`[2, 5]\` for \`125\`. Reach for \`//\` and \`%\` whenever you mean "how many whole groups" and "what is left".
 
 ### Pitfalls
 
