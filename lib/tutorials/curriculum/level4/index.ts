@@ -186,6 +186,34 @@ class Rectangle(Shape):
         return self.width * self.height
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "abstractmethod-fires-at-instantiation",
+  "prompt": "A teammate writes class Circle(Shape) but forgets to define area(). When does Python complain?",
+  "options": [
+    {
+      "label": "At class definition time, as soon as the module is imported",
+      "feedback": "Tempting, because that is when the interpreter reads the class body and could compare it against the base. But ABCs only record which abstract names are still missing at definition time; nothing is rejected yet."
+    },
+    {
+      "label": "At instantiation, when someone calls Circle(2)",
+      "correct": true,
+      "feedback": "Right. The gate lives in object construction, so a class with a missing abstract method imports cleanly and looks fine until the first Circle(2) raises TypeError."
+    },
+    {
+      "label": "The first time something calls circle.area()",
+      "feedback": "Close, and that is exactly what happens if the base raises NotImplementedError from an ordinary method instead of using @abstractmethod. The decorator moves the failure earlier, to construction, which is the whole reason to prefer it."
+    },
+    {
+      "label": "Never, because Python does not enforce abstract methods",
+      "feedback": "True of a bare base class whose method body is just pass, and true of Protocols. But abc.ABC installs a real runtime gate: ABCMeta refuses to build an instance while any abstract name is unimplemented."
+    }
+  ]
+}
+\`\`\`
+
 \`Shape()\` raises \`TypeError\` because you cannot instantiate a class that still has unimplemented abstract methods. \`Rectangle(3, 4)\` works and \`.area()\` returns \`12\`, as the demo below shows. This is nominal typing: \`Rectangle\` conforms because it explicitly declares \`class Rectangle(Shape)\`. Reach for an ABC when you own the hierarchy and want to share concrete helper code on the base or force implementers to fill in the blanks.
 
 ### Protocols: conform by shape
@@ -221,12 +249,97 @@ This is structural (duck) typing made checkable. A third-party \`Circle\` you ca
 }
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "abc-or-protocol",
+  "prompt": "Sort each situation into the tool that fits it.",
+  "buckets": ["Reach for an ABC", "Reach for a Protocol"],
+  "items": [
+    {
+      "label": "You own every implementer and want to ship a concrete helper method they all inherit",
+      "bucket": "Reach for an ABC",
+      "feedback": "Shared code can only live on a base class. A Protocol describes a shape and carries no implementation to inherit."
+    },
+    {
+      "label": "You want to accept a class from a library you cannot edit, as long as it has the right method",
+      "bucket": "Reach for a Protocol",
+      "feedback": "Structural typing is the only option here. You cannot make a third-party class inherit from a base you wrote."
+    },
+    {
+      "label": "You want the interpreter itself to refuse a half-finished implementation",
+      "bucket": "Reach for an ABC",
+      "feedback": "@abstractmethod is the only one of the two with a runtime gate. Protocol conformance is checked by mypy, never by the interpreter."
+    },
+    {
+      "label": "You want mypy to verify that two unrelated classes both satisfy one contract",
+      "bucket": "Reach for a Protocol",
+      "feedback": "Neither class needs to know the other exists, or that the contract exists. Having the right members is the whole requirement."
+    }
+  ]
+}
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "protocol-isinstance-runtime",
+  "prompt": "You want a runtime guard, so you write: if isinstance(circle, HasArea). The Circle instance does define area(). What happens?",
+  "options": [
+    {
+      "label": "It returns True, since Circle has the method the protocol lists",
+      "feedback": "Tempting, because that is exactly what the protocol means and what mypy concludes. But a plain Protocol cannot be used with isinstance at all, so the call never gets as far as inspecting Circle."
+    },
+    {
+      "label": "It returns False, since Circle never inherits from HasArea",
+      "feedback": "That is how an ABC would answer, because ABCs are nominal. Protocols never ask about inheritance, and the real problem here is one step earlier: the isinstance call itself is rejected."
+    },
+    {
+      "label": "It raises TypeError unless HasArea is decorated with @runtime_checkable",
+      "correct": true,
+      "feedback": "Right. And even with the decorator the check only confirms that the method names exist, never their signatures or return types."
+    },
+    {
+      "label": "It raises TypeError no matter what, since protocols exist only for static checkers",
+      "feedback": "Almost. That is the default behavior, but @runtime_checkable exists precisely to opt a protocol into isinstance, so the gate is opt-in rather than impossible."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfalls
 
 - A subclass that forgets even one abstract method stays abstract itself. Remove \`area\` from \`Rectangle\` and \`Rectangle(3, 4)\` raises \`TypeError\`. The failure comes at construction time, not when the class is defined, so a broken subclass can look fine until someone builds one.
 - A \`Protocol\` is not enforced at runtime by default. \`isinstance(obj, HasArea)\` raises \`TypeError\` unless you decorate the protocol with \`@runtime_checkable\`, and even then the check only confirms the method name exists, never its signature or return type.
 
-**Interview nuance:** ABCs use nominal subtyping (you conform by declaring the parent) while Protocols use structural subtyping (you conform by having the right members). Protocol conformance is verified by a static type checker such as \`mypy\` or \`pyright\`, not by the interpreter. At runtime \`total_area\` runs on anything with an \`area()\` method regardless of annotations, because Python is already duck-typed. The Protocol does not add a runtime gate; it makes the contract explicit and machine-checkable before you ship.`,
+**Interview nuance:** ABCs use nominal subtyping (you conform by declaring the parent) while Protocols use structural subtyping (you conform by having the right members). Protocol conformance is verified by a static type checker such as \`mypy\` or \`pyright\`, not by the interpreter. At runtime \`total_area\` runs on anything with an \`area()\` method regardless of annotations, because Python is already duck-typed. The Protocol does not add a runtime gate; it makes the contract explicit and machine-checkable before you ship.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "which-failure-is-real-at-runtime",
+  "prompt": "Three things go wrong in one afternoon. Which one does the interpreter itself reject, with no type checker involved?",
+  "options": [
+    {
+      "label": "A Circle that defines area() but subclasses nothing is passed to total_area(shapes: list[HasArea])",
+      "feedback": "Tempting, because it looks like a contract being violated. But annotations are inert at runtime, and structurally the Circle fits anyway, so this runs and returns the right number."
+    },
+    {
+      "label": "Rectangle subclasses Shape, its area() was dropped in a bad merge, and someone calls Rectangle(3, 4)",
+      "correct": true,
+      "feedback": "Right. @abstractmethod is the one runtime gate of the three: ABCMeta refuses to construct an instance while an abstract name is unimplemented, so this raises TypeError."
+    },
+    {
+      "label": "A Square with area() subclasses object instead of Shape and is passed to a function annotated list[Shape]",
+      "feedback": "Close, and mypy flags this one loudly because list[Shape] is nominal. At runtime the annotation is never consulted, so the call succeeds and sums correctly."
+    }
+  ],
+  "reveal": "Exactly one of the three is enforced by the interpreter, and it is the ABC construction gate. Everything else here is caught by mypy before you ship, or not at all. That gap is the practical difference between nominal and structural typing."
+}
+\`\`\``,
     demoCode: `from abc import ABC, abstractmethod
 
 
@@ -494,6 +607,34 @@ The other three matter less here but come up in review, so it is worth being abl
 }
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "which-principle-blocks-the-test",
+  "prompt": "OrderService builds its own Postgres client inside __init__, so a unit test has no way to swap in a fake. Which principle does that break first?",
+  "options": [
+    {
+      "label": "Single responsibility, because the class both connects to the database and processes orders",
+      "feedback": "Tempting, and it is the answer most people reach for because SRP is the one principle everyone remembers. Constructing a dependency is not really a second responsibility, though. The blocker is that the caller cannot supply a different one."
+    },
+    {
+      "label": "Dependency inversion, because the service depends on the concrete client instead of an abstraction it is handed",
+      "correct": true,
+      "feedback": "Right. Take the client as a constructor argument and the test passes a fake, the production code passes the real one, and OrderService stops caring which it got."
+    },
+    {
+      "label": "Open/closed, because you have to edit OrderService to test it",
+      "feedback": "Close, and the two often travel together, since inverted dependencies are what make extension cheap. But open/closed is about adding new behavior without editing, and here the problem is that the dependency is hard-wired at all."
+    },
+    {
+      "label": "Interface segregation, because the client exposes more methods than OrderService uses",
+      "feedback": "That is a real smell and worth naming in review, but it is not what stops the test. Even a one-method client would still be unswappable while the service constructs it itself."
+    }
+  ]
+}
+\`\`\`
+
 A long \`if/elif\` chain violates open/closed: every new tier reopens \`price_for\` and puts a tested function back on the table. Two patterns remove the chain.
 
 ### Strategy: behavior as a value
@@ -506,6 +647,34 @@ def regular(a):
 
 def member(a):
     return round(a * 0.9, 2)   # 10% off
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "strategy-signature-is-the-contract",
+  "prompt": "A teammate adds a bulk tier whose discount depends on the item count, so they write def bulk(amount, count) and register it next to the others. The caller still does strategy(amount). What happens for a bulk customer?",
+  "options": [
+    {
+      "label": "It works. A dict can hold any callable, so bulk is a perfectly good value to store",
+      "feedback": "Half right, and that is why the bug ships: the dict genuinely accepts it and the registration line looks fine. The mismatch only surfaces at the call, where one argument is passed and two are required."
+    },
+    {
+      "label": "TypeError, because bulk is missing a required positional argument",
+      "correct": true,
+      "feedback": "Right. The shared signature is the real interface here, not the dict. A strategy that needs extra data has to get it another way, for example by being a closure that already captured the count."
+    },
+    {
+      "label": "count silently defaults to None and the price comes back wrong",
+      "feedback": "That would happen if the parameter had been written as count=None, which is a real and worse failure mode because it is silent. As written there is no default, so Python refuses the call outright."
+    },
+    {
+      "label": "Only the type checker complains, since Python does not enforce arity at runtime",
+      "feedback": "Python is loose about types but strict about arity: the call itself is rejected before the body runs. Annotations are unenforced at runtime, argument counts are not."
+    }
+  ]
+}
 \`\`\`
 
 Each strategy has the same shape (\`amount\` in, price out), so a caller can swap one for another without knowing which one it holds.
@@ -526,11 +695,68 @@ print(price_for("member", 100))   # 90.0
 
 Adding a \`vip\` tier is one new function plus one dict entry. \`price_for\` itself never changes. That is open/closed in three lines, and it is exactly what you will build: first inline, then behind a \`pricing\` package.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "dispatch-table-raises-or-prices",
+  "prompt": "Four versions of the same dispatch, all with price_for(kind, amount) calling strategy(amount). Sort each by what the customer sees.",
+  "buckets": ["Blows up", "Returns a price"],
+  "items": [
+    {
+      "label": "STRATEGIES = {'member': member}, then STRATEGIES.get('member', regular)(100)",
+      "bucket": "Returns a price",
+      "feedback": "The dict stores the function object itself, so the lookup hands back something callable and calling it with 100 gives 90.0."
+    },
+    {
+      "label": "STRATEGIES = {'member': member(100)}, then STRATEGIES.get('member', regular)(100)",
+      "bucket": "Blows up",
+      "feedback": "member(100) ran while the dict was being built, so the value stored is the float 90.0. Calling it raises TypeError: 'float' object is not callable."
+    },
+    {
+      "label": "STRATEGIES['student'](100), where no student key was ever registered",
+      "bucket": "Blows up",
+      "feedback": "Square-bracket lookup on a missing key raises KeyError, and a new tier reaching checkout before someone registers it is exactly how that ships."
+    },
+    {
+      "label": "STRATEGIES.get('student', regular)(100), where no student key was ever registered",
+      "bucket": "Returns a price",
+      "feedback": "The default argument to get is the safety net: an unregistered tier falls back to regular and pays full price instead of crashing checkout."
+    }
+  ]
+}
+\`\`\`
+
 ### Two traps interns hit
 
 Store the function, not its result. \`{"member": member}\` stores the callable; \`{"member": member(100)}\` calls it immediately and stores the number \`90.0\`, so a later \`strategy(amount)\` raises \`TypeError: 'float' object is not callable\`.
 
 Handle the unknown key. \`STRATEGIES[kind]\` raises \`KeyError\` for a tier you have not registered. Use \`STRATEGIES.get(kind, regular)\` so an unknown \`kind\` falls back to full price, which is what the exercises require.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "why-the-table-beats-the-chain",
+  "prompt": "You are in review defending the dispatch table over the if/elif chain, and there are only five tiers. What is the strongest argument?",
+  "options": [
+    {
+      "label": "One hash lookup instead of up to five comparisons, so pricing gets faster",
+      "feedback": "True on paper and the first thing most candidates say, but five string comparisons are nanoseconds and nobody profiled this. Leading with speed signals that you reach for micro-optimisation before design."
+    },
+    {
+      "label": "Adding a tier touches zero existing lines, so nothing that already passes can regress",
+      "correct": true,
+      "feedback": "Right. Open/closed is a blast-radius argument, not a speed one. That is also why routers, command handlers, and plugin registries all end up as dispatch tables."
+    },
+    {
+      "label": "The dict version is shorter, so there is less code to read",
+      "feedback": "Often true, and brevity is worth something, but it is a weak defence: someone can always rewrite the chain into a compact ternary and your argument evaporates. Blast radius survives that rewrite."
+    }
+  ],
+  "reveal": "Both answers are correct facts. Only one of them is a reason. The dispatch table wins because adding behavior stops being an edit to code that already works, which is the entire point of open/closed."
+}
+\`\`\`
 
 **Interview nuance:** an \`if/elif\` chain does up to \`k\` comparisons for \`k\` branches, while the dict dispatch is one average-case \`O(1)\` hash lookup no matter how many strategies exist. But interviewers care more about the design consequence than the constant factor: with the table, adding a strategy touches zero existing lines, so nothing that already passed can regress. Named dispatch tables like this are how real routers, command handlers, and plugin registries stay open for extension as they grow.`,
     demoCode: `def regular(a):
