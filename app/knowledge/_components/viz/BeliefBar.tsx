@@ -55,7 +55,10 @@ export function BeliefBar({ value, reviewCount, ariaLabel, className }: BeliefBa
         }.`)
 
   const p = value === null ? 0 : (Math.min(100, Math.max(0, value)) / 100) * BAR_W
-  const featherWidth = featherFor(reviewCount) * BAR_W
+  // Clamped by the value, mirroring the dial's half-clamp: a 3%-value 1-review card
+  // otherwise rendered as the forced 2px nub plus fog out to ~10.6px — a mark three
+  // times its own value, made mostly of uncertainty.
+  const featherWidth = Math.min(featherFor(reviewCount) * BAR_W, p)
   const fadeStart = p - featherWidth / 2
 
   return (
