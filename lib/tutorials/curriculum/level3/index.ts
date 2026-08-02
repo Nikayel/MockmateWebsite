@@ -164,6 +164,30 @@ A script that does everything in one file is easy to start and painful to grow. 
 
 ## What \`import\` actually does
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "import-runs-file-once",
+  "prompt": "Two different modules in your project both run 'from app.coerce import coerce'. app/coerce.py has a print() at the top of the file, outside any function. How many times does that line print in one run of the program?",
+  "options": [
+    {
+      "label": "Twice, once for each import statement",
+      "feedback": "Tempting, because both import statements really do execute, and an import reads a lot like a function call. But only the first one runs the file. After that Python has the module cached and the second import just binds a name."
+    },
+    {
+      "label": "Once, the first import runs the file and later imports reuse it",
+      "correct": true,
+      "feedback": "Right. A module is executed once per process and stored in sys.modules, so top-level work (reading a config, opening a connection, building a dict) happens exactly once no matter how many files import it."
+    },
+    {
+      "label": "Zero times, importing one name only pulls in that one function",
+      "feedback": "Tempting, because the 'from X import y' form looks surgical, as if it lifted a single function out of the file. But Python has to execute the whole file before the name y exists at all, so every top-level statement runs."
+    }
+  ]
+}
+\`\`\`
+
 \`import\` is not a copy-paste of code into your file. When Python first runs \`from app.coerce import coerce\`, it does three things:
 
 1. Finds \`app/coerce.py\`, creates a module object, and registers it in \`sys.modules\` so a repeat import reuses it instead of re-running the file.
@@ -180,6 +204,30 @@ from app.coerce import coerce  # call it as coerce(...)
 Here \`parse_config\` imports the read-only \`coerce\` helper and calls it. The type rule lives in exactly one place, so fixing it fixes every caller.
 
 ## Coercing a raw string to a type
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "isdigit-rejects-minus",
+  "prompt": "coerce has to decide whether text is integer-looking. What does '-3'.isdigit() return?",
+  "options": [
+    {
+      "label": "True, because -3 is an integer",
+      "feedback": "Tempting, because -3 is obviously an integer to a human reader. But isdigit answers a narrower question: is every single character in this string a digit? The minus sign is not, so you get False."
+    },
+    {
+      "label": "False, because the minus sign is not a digit",
+      "correct": true,
+      "feedback": "Right. isdigit is a character-by-character test, so a sign, a decimal point, or a stray space all make it False. That is exactly why coerce strips a leading minus before testing."
+    },
+    {
+      "label": "It raises a ValueError, since -3 needs int() to parse",
+      "feedback": "Close in spirit: int('-3x') really would raise. But isdigit is a predicate on a string, not a parser. It never raises for ordinary text, it just answers True or False."
+    }
+  ]
+}
+\`\`\`
 
 Config values arrive as strings, so \`coerce\` has to decide whether a value is really an integer:
 
@@ -211,12 +259,79 @@ for line in text.splitlines():
 
 Given \`"# db\\nhost = localhost\\nport = 8080"\`, this produces \`{"host": "localhost", "port": 8080}\`.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "split-without-maxsplit",
+  "prompt": "A config file contains the line 'url = http://x/?a=1'. Your loop does key, value = stripped.split('=') with no maxsplit argument. What happens on that line?",
+  "options": [
+    {
+      "label": "It works: split hands back the key and everything after the first =",
+      "feedback": "Tempting, because that is the behaviour you want, and it is what split('=', 1) gives you. Plain split has no such limit though: it cuts at every = in the line, so this one produces three pieces, not two."
+    },
+    {
+      "label": "It raises ValueError: too many values to unpack (expected 2)",
+      "correct": true,
+      "feedback": "Right. split('=') returns three parts here and a two-name assignment cannot absorb three. Passing a maxsplit of 1 cuts on the first = only and leaves any = inside the value intact."
+    },
+    {
+      "label": "It quietly drops everything after the second =, storing url as http://x/?a",
+      "feedback": "Close, and that is a real bug you will meet: it is what split('=')[0] and [1] would do, truncating in silence. Tuple unpacking is the louder version. It refuses to guess and raises instead."
+    }
+  ]
+}
+\`\`\`
+
 ## Pitfalls
 
 - **Splitting without \`maxsplit\`.** \`"url = a=b".split("=")\` returns three parts, so \`key, value = ...\` raises \`ValueError: too many values to unpack (expected 2)\`. Passing \`1\` splits on the first \`=\` only and keeps any \`=\` inside the value intact.
 - **Forgetting to trim the key.** \`"host = localhost".split("=", 1)\` gives \`["host ", " localhost"]\`. The value passes through \`coerce\`, which trims it, but the key does not. Store \`"host "\` (with the trailing space) as the key and a later \`config["host"]\` lookup raises \`KeyError\` instead of returning the value. Call \`.strip()\` on the key before storing it.
 
-**Interview nuance:** bounded splitting is the detail interviewers probe when you parse text. \`stripped.split("=", 1)\` splits on the first \`=\` only, so a value that itself contains \`=\` (a URL like \`url = a=b\`, a base64 token, a connection string) stays intact, while a bare \`split("=")\` raises \`ValueError\` the instant a value holds a second delimiter. Pair that with deciding a value's type from the raw string (trim it, strip a leading sign, then test \`isdigit\`) and you are doing real boundary parsing: turning loose text into typed data without trusting its shape.`,
+**Interview nuance:** bounded splitting is the detail interviewers probe when you parse text. \`stripped.split("=", 1)\` splits on the first \`=\` only, so a value that itself contains \`=\` (a URL like \`url = a=b\`, a base64 token, a connection string) stays intact, while a bare \`split("=")\` raises \`ValueError\` the instant a value holds a second delimiter. Pair that with deciding a value's type from the raw string (trim it, strip a leading sign, then test \`isdigit\`) and you are doing real boundary parsing: turning loose text into typed data without trusting its shape.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "which-lines-survive",
+  "prompt": "Sort each config line by what parse_config does with it.",
+  "buckets": ["Becomes an entry", "Skipped"],
+  "items": [
+    {
+      "label": "name = Ada",
+      "bucket": "Becomes an entry",
+      "feedback": "The ordinary case. Key 'name' mapped to the string 'Ada', with whitespace trimmed off both sides."
+    },
+    {
+      "label": "# retries = 5",
+      "bucket": "Skipped",
+      "feedback": "After stripping, the line starts with #, so the comment guard drops it before any splitting happens. Note that it would have parsed cleanly otherwise, which is the point of the guard."
+    },
+    {
+      "label": "a line containing only spaces",
+      "bucket": "Skipped",
+      "feedback": "stripped is the empty string, which is falsy, so the blank guard catches it first."
+    },
+    {
+      "label": "DEBUG",
+      "bucket": "Skipped",
+      "feedback": "There is no = anywhere in the line, so unpacking would raise. The 'if = not in stripped' guard is what keeps one malformed line from killing the whole parse."
+    },
+    {
+      "label": "url = a=b",
+      "bucket": "Becomes an entry",
+      "feedback": "Splitting on the first = only gives key 'url' and value 'a=b'. This is the line that punishes a bare split('=')."
+    },
+    {
+      "label": "port =   8080  ",
+      "bucket": "Becomes an entry",
+      "feedback": "Key 'port' mapped to the int 8080. coerce trims the value and converts integer-looking text, so the caller gets a number rather than a padded string."
+    }
+  ],
+  "reveal": "Every guard in that loop exists because some real config file broke a parser that lacked it. Your Practice implementation has to survive all six of these lines, and the hidden tests check the awkward ones."
+}
+\`\`\``,
   },
   apply: {
     id: "py-l3-parse-config-apply",
