@@ -1435,6 +1435,30 @@ In a shared codebase, a function signature is the contract your teammates read b
 
 ### Optional and Union
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "optional-vs-pipe-none",
+  "prompt": "You are reading a codebase where one module writes Optional[int] and another writes int | None. What is the difference between them?",
+  "options": [
+    {
+      "label": "Optional[int] means the argument may be left out; int | None means the value may be None.",
+      "feedback": "Tempting, because the word Optional strongly suggests 'you can skip this'. They are the same type though, and neither one says anything about whether a caller may omit the argument."
+    },
+    {
+      "label": "None. They are the same type, spelled two ways.",
+      "correct": true,
+      "feedback": "Right. Optional[int] needs an import from typing and predates the | syntax. New code writes int | None because it reads the way you would say it out loud and needs no import."
+    },
+    {
+      "label": "Optional[int] also treats 0 and other falsy values as missing; int | None accepts only None.",
+      "feedback": "Tempting, because 'if not x' is how a lot of code tests for missing values, so falsy and missing blur together. The type system only ever means None here. 0 is an ordinary int, fully valid for both spellings."
+    }
+  ]
+}
+\`\`\`
+
 A value that might be missing is \`Optional\`, written \`X | None\` (older code writes \`Optional[X]\`; they mean the same type). A value that can be one of several types is a \`Union\`: \`int | str\`.
 
 Returning \`None\` from a function you annotated \`-> dict\` is a lie a checker will flag. Annotate the honest contract \`-> dict | None\`, and every caller is told to handle the missing case. Once a value is \`dict | None\`, a checker will not let you subscript it until you narrow it:
@@ -1446,6 +1470,30 @@ if u is not None:
 \`\`\`
 
 ### Generics with TypeVar
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "loose-return-type-loses-info",
+  "prompt": "A helper is declared: def first(items: list) -> object | None. You write n = first([10, 20]) and then n + 1, and run mypy. What does mypy report?",
+  "options": [
+    {
+      "label": "Nothing. The list holds ints, so n is an int.",
+      "feedback": "Tempting, because the ints are right there in the call and at runtime n really will be 10. But a checker believes the annotation over the call site, and the annotation promises only object | None."
+    },
+    {
+      "label": "An error: you cannot add 1 to a value typed object | None.",
+      "correct": true,
+      "feedback": "Right. A loose annotation throws away exactly the information the caller needed. A TypeVar keeps the link, so list[T] -> T | None makes first([10, 20]) come back as int | None instead."
+    },
+    {
+      "label": "An error about None only, since object supports + already.",
+      "feedback": "Half right: the None arm really is a problem and would need a narrowing check. But object is the bare base type, so it defines no + at all. Both arms of the union fail here."
+    }
+  ]
+}
+\`\`\`
 
 The demo below returns \`object | None\`, so the caller loses the element type. A generic keeps the link between the input type and the output type. \`TypeVar\` is the placeholder that stands in for "whatever type came in":
 
@@ -1463,6 +1511,30 @@ Python 3.12 and later write the same thing as \`def first[T](items: list[T]) -> 
 
 ### Protocols (structural typing)
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "protocol-needs-no-inheritance",
+  "prompt": "greet is typed to take a Named protocol, which requires a name: str attribute. You pass it a User object from a third-party library. User has a name attribute but knows nothing about your Named class. Does the checker accept the call?",
+  "options": [
+    {
+      "label": "No. Named is a class, so User has to subclass it.",
+      "feedback": "Tempting, because that is how typing works in Java or C#, and it is how Python's own abstract base classes behave. Protocol exists precisely to drop that requirement: it matches on shape, not on ancestry."
+    },
+    {
+      "label": "Yes. Having a name: str attribute is the entire requirement.",
+      "correct": true,
+      "feedback": "Right. This is structural typing, sometimes called static duck typing. It is what lets you type third-party objects you cannot edit without dragging their class hierarchy into your code."
+    },
+    {
+      "label": "Yes at runtime, but a static checker would still reject it.",
+      "feedback": "Backwards, though it is a fair guess given how little Python verifies at runtime. Protocols are a static feature: the checker is the thing that verifies the shape, and at runtime nothing is verified at all."
+    }
+  ]
+}
+\`\`\`
+
 A \`Protocol\` describes the shape an object must have. Any object with the right attributes or methods satisfies it, with no base class and no inheritance:
 
 \`\`\`python
@@ -1476,6 +1548,31 @@ def greet(who: Named) -> str:
 \`\`\`
 
 ### Pitfall: Optional is not an optional argument
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "optional-is-not-a-default",
+  "prompt": "A function is declared: def find_user(user_id: int | None) -> dict | None. A caller writes find_user() with no arguments at all. What happens?",
+  "options": [
+    {
+      "label": "It runs with user_id set to None, because None is one of the allowed values.",
+      "feedback": "Tempting, because 'Optional' sounds like 'you may leave it out', and int | None really does permit None as a value. But permitting a value is not the same as supplying one when the caller sends nothing."
+    },
+    {
+      "label": "TypeError: find_user() missing 1 required positional argument: 'user_id'",
+      "correct": true,
+      "feedback": "Right. The annotation says which values are legal, the default says whether the caller can skip the argument. To make it skippable you have to write user_id: int | None = None."
+    },
+    {
+      "label": "A checker complaint, but a clean run, since hints do nothing at runtime.",
+      "feedback": "Half right, and the second half is a rule worth trusting: hints really do nothing at runtime. But this failure has nothing to do with types. Python's own argument binding raises before your function body starts."
+    }
+  ],
+  "reveal": "Two independent dials. The annotation controls which values are legal; the default controls whether the caller may leave the argument out. int | None = None turns both on, and that pair is what most real APIs want."
+}
+\`\`\`
 
 A common intern misread: \`X | None\` describes the allowed values, not whether the argument can be omitted. \`def find_user(user_id: int | None)\` still requires \`user_id\`; calling \`find_user()\` raises \`TypeError: find_user() missing 1 required positional argument: 'user_id'\`. Adding \`None\` to the type does not add a default. To make a parameter skippable you give it one: \`user_id: int | None = None\`. Keep the two ideas separate: the type says what values are legal, the default says whether the caller can leave it out.
 
