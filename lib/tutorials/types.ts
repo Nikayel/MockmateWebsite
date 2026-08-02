@@ -390,6 +390,12 @@ export interface LearnItemResponse {
   section: LessonSection
   /** The lesson's authored knowledge-component tags, denormalized so analysis needs one read. */
   skills: string[]
+  /**
+   * Whether the learner had consented to research use AT THE TIME THIS ROW WAS WRITTEN.
+   * Stamped, never joined at export: a later opt-in does not retroactively consent past
+   * rows, and a withdrawal does not un-consent rows already agreed to.
+   */
+  research_consent: boolean
 
   // ---- exercise_run ----
   /** 1-based index of this run within the session. */

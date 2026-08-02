@@ -21,6 +21,7 @@
  */
 import { z } from "zod"
 import { adminDb } from "@/lib/firebase-admin"
+import { getResearchConsent, isResearchUsable } from "./research-consent"
 import type { CourseId, LearnItemResponse } from "./types"
 
 const COLLECTION = "learn_item_responses"
@@ -123,7 +124,8 @@ function truncate(value: string | undefined): string | undefined {
 export function composeItemResponse(
   userId: string,
   input: LearnItemResponseInput,
-  now: Date
+  now: Date,
+  researchConsent = false
 ): LearnItemResponse {
   const id = `${sanitizeIdPart(userId)}_${sanitizeIdPart(input.itemId)}_${now.getTime()}`
 
@@ -178,6 +180,9 @@ export function composeItemResponse(
     item_id: input.itemId,
     section: input.section,
     skills: input.skills ?? [],
+    // The learner's consent state AT THE MOMENT OF OBSERVATION. See research-consent.ts
+    // for why this is stamped rather than joined at export.
+    research_consent: researchConsent,
     ...optional,
   }
 }
@@ -198,16 +203,20 @@ export async function recordItemResponses(
   const capped = inputs.slice(0, MAX_ITEM_RESPONSES_PER_REQUEST)
 
   try {
+    // One read per batch, not per row. Resolved here rather than at export because
+    // consent is a fact about when the observation happened.
+    const researchConsent = isResearchUsable(await getResearchConsent(userId))
+
     const batch = adminDb.batch()
     const seen = new Set<string>()
     let stamp = Date.now()
 
     for (const input of capped) {
-      let row = composeItemResponse(userId, input, new Date(stamp))
+      let row = composeItemResponse(userId, input, new Date(stamp), researchConsent)
       // Same user + same item + same millisecond would collide; advance until unique.
       while (seen.has(row.id)) {
         stamp += 1
-        row = composeItemResponse(userId, input, new Date(stamp))
+        row = composeItemResponse(userId, input, new Date(stamp), researchConsent)
       }
       seen.add(row.id)
       batch.set(adminDb.collection(COLLECTION).doc(row.id), row)

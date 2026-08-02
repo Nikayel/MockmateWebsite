@@ -388,6 +388,14 @@ service cloud.firestore {
                     && resource.data.userId == request.auth.uid;
     }
 
+    // Research-participation consent. Authoritative writes go through the Admin SDK in
+    // app/api/research-consent (token + ownership verified). Reads are owner-only so a
+    // learner can always see the choice on record for them.
+    match /user_research_consent/{userId} {
+      allow read: if isAuthenticated() && userId == request.auth.uid;
+      allow create, update, delete: if false;
+    }
+
     // Item-level Learn research telemetry (one append-only row per exercise run, check
     // answer, and hint reveal). Writes are Admin-SDK-only through
     // app/api/tutorials/item-responses — there is deliberately NO client create/update
