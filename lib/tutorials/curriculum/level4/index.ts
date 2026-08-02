@@ -1856,12 +1856,82 @@ The reason overlapping waits pays off so enormously is that the costs are not cl
 
 Read the gap between the bottom rung and the top one and the decision rule below almost writes itself: if your program is sitting on the top rung, giving it more cores changes nothing, but letting the waits overlap changes everything.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "threads-on-cpu-bound-work",
+  "prompt": "A report takes 80 seconds, all of it a pure-Python scoring loop over records already in memory. The box has 8 cores. You wrap the work in a ThreadPoolExecutor with 8 workers. What happens to the wall clock?",
+  "options": [
+    {
+      "label": "About 8 times faster, one chunk of records per core",
+      "feedback": "Tempting, and this is exactly what threads do in Java or Go. CPython holds a Global Interpreter Lock while executing bytecode, so only one of those eight threads is ever running Python at a given instant."
+    },
+    {
+      "label": "Roughly unchanged, and often a few percent worse",
+      "correct": true,
+      "feedback": "Right. The threads take turns holding one lock, so you got the same total work plus the cost of switching between them. For CPU-bound work the lever is processes, not threads."
+    },
+    {
+      "label": "About 8 times faster, because the records are independent and nothing is shared",
+      "feedback": "Independence is necessary but it is not the thing standing in your way. Even with zero shared state, the interpreter lock still lets only one thread run bytecode, so perfectly parallel-looking work stays serial."
+    },
+    {
+      "label": "About 2 times faster, since the interpreter hands the lock off every few milliseconds",
+      "feedback": "The switch interval is real, and it is why threads feel responsive rather than frozen. Handing the lock around does not create parallelism though: it just splits the same single lane into turns."
+    }
+  ]
+}
+\`\`\`
+
 ### The GIL: one bytecode at a time
 
 CPython protects its internal memory with a **Global Interpreter Lock**. Only one thread executes Python bytecode at any instant, so pure-Python threads never run *in parallel* across cores. What rescues threading is that the GIL is **released during blocking I/O** (and inside many C extensions like \`numpy\`). While one thread waits on a socket, it drops the lock and another thread runs. That gives you the decision rule:
 
 - **I/O-bound** work (network, disk, waiting): threads help, because the waits overlap.
 - **CPU-bound** work (hashing, parsing, pure-Python math): threads do not help. Use \`ProcessPoolExecutor\` (separate processes, each with its own GIL) or push the work into a native library.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "threads-help-or-not",
+  "prompt": "Each of these jobs takes too long. Sort them by whether a thread pool speeds them up.",
+  "buckets": ["A thread pool helps", "You need processes"],
+  "items": [
+    {
+      "label": "Fetching 200 product records from a slow vendor API",
+      "bucket": "A thread pool helps",
+      "feedback": "Almost all of that time is a socket wait, and the interpreter lock is released while a thread waits, so 200 waits collapse into roughly one."
+    },
+    {
+      "label": "Scoring 2 million rows with a pure-Python loop",
+      "bucket": "You need processes",
+      "feedback": "This is bytecode from start to finish, so the lock is never released and eight threads take turns in one lane. Separate processes each get their own interpreter and their own lock."
+    },
+    {
+      "label": "Reading 500 small config files off the local SSD",
+      "bucket": "A thread pool helps",
+      "feedback": "Disk reads are I/O too, and the lock is dropped for the duration of each one. Slower per call than a memory read by a factor of about a thousand, which is exactly the gap threads exist to hide."
+    },
+    {
+      "label": "Multiplying two large NumPy matrices",
+      "bucket": "A thread pool helps",
+      "feedback": "The surprising one. NumPy drops the interpreter lock inside its C loops, so the heavy work really does run on several cores at once even though the calling code is Python."
+    },
+    {
+      "label": "Resizing 500 photos with a hand-written pixel loop in Python",
+      "bucket": "You need processes",
+      "feedback": "Pure-Python arithmetic holds the lock the whole way through. Rewriting the loop with a library that releases it, such as Pillow or NumPy, is the other way out."
+    },
+    {
+      "label": "Waiting on 40 database queries that each take about half a second server-side",
+      "bucket": "A thread pool helps",
+      "feedback": "Your process is blocked on a socket while the database does the work, so overlapping the waits turns 20 seconds into roughly half a second."
+    }
+  ]
+}
+\`\`\`
 
 ### concurrent.futures: one API for both
 
@@ -1879,6 +1949,34 @@ with ThreadPoolExecutor(max_workers=4) as executor:
 
 \`executor.map\` returns results in **input order**, not completion order, even though the tasks finish out of order. Swap in \`ProcessPoolExecutor\` and the code is identical. For finer control, \`executor.submit(fn, x)\` returns a \`Future\`, and \`as_completed(futures)\` yields them as they finish. Two things to remember about \`map\`: it returns a **lazy iterator**, so wrap it in \`list(...)\` when you need a real list (the exercise does), and it re-raises a worker's exception when you iterate to that result, not when you call \`map\`.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "gil-does-not-mean-thread-safe",
+  "prompt": "Two threads each do counter += 1 five hundred thousand times against one shared global. What is the final value?",
+  "options": [
+    {
+      "label": "Exactly 1000000, because the interpreter lock lets only one thread run at a time anyway",
+      "feedback": "The single most common wrong turn on this topic, and it is a fair inference from everything above. The lock is held for a bytecode, not for a statement, and counter += 1 is three bytecodes: read, add, store."
+    },
+    {
+      "label": "Somewhere under 1000000, and a different number on each run",
+      "correct": true,
+      "feedback": "Right. A thread can be suspended between the read and the store, so both threads read the same value and one increment vanishes. The interpreter lock protects the interpreter's own memory, never your invariants."
+    },
+    {
+      "label": "Exactly 500000, since the second thread overwrites everything the first one did",
+      "feedback": "Too pessimistic. The lost updates are occasional, not total: most increments interleave cleanly and only the unlucky ones collide, which is why this bug survives testing and shows up in production."
+    },
+    {
+      "label": "A RuntimeError, because Python detects the concurrent modification",
+      "feedback": "Some containers do raise on concurrent mutation while being iterated, which is probably what this is recalling. A plain integer rebind has no such guard, so the corruption is silent."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfall: threads sharing state
 
 Independent tasks are safe to parallelize. Shared mutable state is not. \`count += 1\` is read, add, write: three steps, and the interpreter can switch threads between them, so two threads read the same value and one increment is lost. The GIL does not make your code thread-safe. Fix it with a \`Lock\`, or better, design the work so tasks never touch shared state (as \`double\` does here).
@@ -1895,7 +1993,36 @@ except RuntimeError:
     return [double(n) for n in numbers]
 \`\`\`
 
-**Interview nuance:** Interviewers often follow up with "what is the difference between concurrency and parallelism?" Concurrency is structuring work so tasks make progress by interleaving, which is what a thread pool and \`async\` give you under the GIL. Parallelism is tasks running at the same instant on different cores, which is what a process pool gives you (or the experimental free-threaded no-GIL build added in Python 3.13). So a \`ThreadPoolExecutor\` buys you concurrency and overlaps I/O waits, but only processes buy you CPU parallelism. Naming that distinction, and tying it to the GIL, is exactly the signal they are listening for.`,
+**Interview nuance:** Interviewers often follow up with "what is the difference between concurrency and parallelism?" Concurrency is structuring work so tasks make progress by interleaving, which is what a thread pool and \`async\` give you under the GIL. Parallelism is tasks running at the same instant on different cores, which is what a process pool gives you (or the experimental free-threaded no-GIL build added in Python 3.13). So a \`ThreadPoolExecutor\` buys you concurrency and overlaps I/O waits, but only processes buy you CPU parallelism. Naming that distinction, and tying it to the GIL, is exactly the signal they are listening for.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "mixed-workload-executor-choice",
+  "prompt": "A nightly job pulls 500 documents over HTTP (about 100 ms of waiting each) and then runs a pure-Python scoring pass over each one (about 200 ms of CPU each). Sequentially that is 50 seconds of waiting plus 100 seconds of computing. The box has 4 cores. What is the best structure?",
+  "options": [
+    {
+      "label": "A ThreadPoolExecutor around the whole job, since the network is the slow part",
+      "feedback": "The instinct is right for the first half, but check the arithmetic: the scoring is 100 seconds against the download's 50. Threads collapse the waiting to about a second and leave the larger half untouched."
+    },
+    {
+      "label": "Threads for the downloads, then a ProcessPoolExecutor for the scoring",
+      "correct": true,
+      "feedback": "Right. Each half is bounded by something different, so each half gets the tool for that bound: overlap the waits with threads, then spread the bytecode across cores with processes."
+    },
+    {
+      "label": "A ProcessPoolExecutor around the whole job, since each process gets its own interpreter lock",
+      "feedback": "Genuinely close, and often the pragmatic answer because it does speed up both halves. You pay pickling and process startup for work that only ever needed a thread, and the downloads end up limited by your 4 cores rather than by the network."
+    },
+    {
+      "label": "asyncio for both, so the event loop can interleave everything",
+      "feedback": "The loop handles the download half beautifully. The scoring pass is the problem: 200 ms of uninterrupted bytecode blocks the loop, so every other task waits behind it and the CPU half is no faster."
+    }
+  ],
+  "reveal": "The useful habit is to ask what each stage is waiting on before picking a tool. Waiting on someone else means threads or async, waiting on your own CPU means processes, and a job that does both usually wants a different answer per stage."
+}
+\`\`\``,
     demoCode: `from concurrent.futures import ThreadPoolExecutor
 
 
