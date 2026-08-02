@@ -2461,6 +2461,34 @@ Three small methods and \`Deck\` now behaves like a built-in collection everywhe
 
 ## Truthiness comes free, and that is a trap
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "len-drives-truthiness",
+  "prompt": "Deck implements __len__ and nothing else. You build empty = Deck([]) and write if empty: print('ready'). What happens?",
+  "options": [
+    {
+      "label": "It prints ready, because empty is a real object rather than None",
+      "feedback": "Tempting, and it is the rule for a plain class: any instance with no relevant dunders is truthy. Adding __len__ changed that silently, because Python consults it when no __bool__ exists."
+    },
+    {
+      "label": "Nothing prints, because Python falls back to __len__ and 0 counts as false",
+      "correct": true,
+      "feedback": "Right. An empty-but-perfectly-valid object now behaves like None at every if, which is why a deliberate __bool__ is worth writing when size should not decide truthiness."
+    },
+    {
+      "label": "TypeError, since Deck defines no __bool__",
+      "feedback": "Truthiness never fails: Python tries __bool__, then __len__, then defaults to true. The chain always produces an answer, which is exactly what makes a wrong answer easy to miss."
+    },
+    {
+      "label": "It prints ready, and only adding __bool__ would change that",
+      "feedback": "You have the fix backwards, which is a useful thing to catch now. __bool__ is what you add to OVERRIDE the length-based answer, not what turns the behaviour on."
+    }
+  ]
+}
+\`\`\`
+
 \`if deck:\` has no dunder of its own by default. Python falls back to \`__len__\` and treats zero as false. That is convenient until it is not:
 
 \`\`\`python
@@ -2490,6 +2518,34 @@ with Timer() as t:
 print(t.calls)                      # ['working', 'closed']
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "exit-runs-when-the-body-raises",
+  "prompt": "The body of with Timer() as t: raises ValueError on its second line. Does __exit__ run, and what does the caller of this code see?",
+  "options": [
+    {
+      "label": "__exit__ is skipped, because the block never finished normally",
+      "feedback": "Tempting, since the remaining lines of the body really are skipped. Cleanup is the one thing that is not: guaranteeing it on the failure path is the entire reason with exists."
+    },
+    {
+      "label": "__exit__ runs, and the ValueError still reaches the caller",
+      "correct": true,
+      "feedback": "Right. Cleanup happens first, with the exception details handed in as arguments, and then the falsy return lets the error keep travelling. Cleanup and error handling stay separate jobs."
+    },
+    {
+      "label": "__exit__ runs and the ValueError is swallowed, since handling errors is what with is for",
+      "feedback": "A natural reading of the name, but with promises cleanup, not rescue. Swallowing only happens if __exit__ deliberately returns something truthy, and doing that by accident hides real bugs."
+    },
+    {
+      "label": "__exit__ runs only when the with statement is itself wrapped in a try block",
+      "feedback": "No outer try is needed: the context manager protocol handles the exception path on its own. That independence is why with is safer than a hand-written try/finally you might forget to add."
+    }
+  ]
+}
+\`\`\`
+
 \`__exit__\` receives three arguments describing the exception (or three \`None\` values on a clean exit). Its **return value is a decision**: falsy lets the exception propagate, truthy swallows it.
 
 \`\`\`csdiagram
@@ -2507,12 +2563,69 @@ print(t.calls)                      # ['working', 'closed']
 }
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "exit-return-true-swallows",
+  "prompt": "A teammate's __exit__ closes the connection and then ends with return True. A ValueError is raised inside the with body. What does the surrounding code observe?",
+  "options": [
+    {
+      "label": "The ValueError, because __exit__ cannot change what propagates",
+      "feedback": "Tempting, because nothing in the with body looks like an except clause and the code reads as pure cleanup. The return value of __exit__ is a genuine decision though, and truthy means suppress."
+    },
+    {
+      "label": "Nothing. Execution resumes after the with block as if the body had succeeded",
+      "correct": true,
+      "feedback": "Right, and this is the ugliest failure mode in the protocol: the error vanishes, the block appears to pass, and downstream code runs on half-finished state. Return False, or nothing at all."
+    },
+    {
+      "label": "A RuntimeError explaining that an exception was suppressed",
+      "feedback": "Suppression is a supported feature, not an anomaly, so Python raises nothing to flag it. contextlib.suppress is built on exactly this mechanism, just made explicit at the call site."
+    },
+    {
+      "label": "The ValueError, but only after the cleanup has finished",
+      "feedback": "That is the correct sequence for a normal __exit__ that returns False, so your model of the ordering is sound. The truthy return is what changes the outcome at the end of that sequence."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfalls
 
 - **Returning \`True\` from \`__exit__\` by accident.** A bare \`return True\`, or ending with a value that happens to be truthy, silently swallows every exception in the block. Return \`False\` (or nothing at all, since \`None\` is falsy) unless suppressing is the explicit intent.
 - **\`__len__\` returning a non-integer.** \`len()\` raises \`TypeError\` if you hand back a float or a string, even when the number is right.
 - **Forgetting that \`__len__\` drives truthiness.** An object with \`__len__\` returning \`0\` is falsy. Add \`__bool__\` if that is wrong for your type.
 - **Building a list just to iterate.** \`__iter__\` should \`yield\` rather than \`return list(...)\` when the source is large: yielding streams one item at a time instead of materialising the whole collection.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "duck-typing-needs-no-base-class",
+  "prompt": "A test swaps the real Deck for a stub that defines __len__, __iter__, and __contains__ and inherits from nothing but object. Do len(stub), sorted(stub), and 'K' in stub work?",
+  "options": [
+    {
+      "label": "No. The stub has to subclass collections.abc.Collection before the built-ins accept it",
+      "feedback": "Tempting, because that is how a statically typed language would enforce it and the abc module clearly exists for something. Those base classes are conveniences that supply mixin methods, never an entry requirement."
+    },
+    {
+      "label": "Yes. Each of those built-ins asks for the method and never inspects the class hierarchy",
+      "correct": true,
+      "feedback": "Right. That is duck typing in one sentence, and it is why a hand-written stub is indistinguishable from the real collection at every call site."
+    },
+    {
+      "label": "Only len works. sorted and in need a real sequence type underneath",
+      "feedback": "sorted and in are written against the same protocols: sorted just iterates whatever __iter__ gives it, and in consults __contains__. None of the three looks past the method."
+    },
+    {
+      "label": "Yes, but only after registering the stub with collections.abc first",
+      "feedback": "Registration exists so that isinstance checks answer the way you want, which matters if your own code branches on them. The built-ins never ask, so nothing about len, sorted, or in depends on it."
+    }
+  ],
+  "reveal": "Implement the dunder and the syntax starts working. That is the whole contract, and it is why protocols beat inheritance for making a class feel built in."
+}
+\`\`\`
 
 **Interview nuance:** this is what "duck typing" concretely means. Python never asks whether \`Deck\` inherits from a collection base class; it asks whether \`Deck\` answers \`__len__\`. That is why \`collections.abc\` classes are mostly optional conveniences rather than requirements, and why a mock object that implements the same three dunders is indistinguishable from the real collection at every call site.`,
     demoCode: `class Deck:
