@@ -108,6 +108,14 @@ export const SCORING = {
   MASTERY_THRESHOLD: 80,
   /** Good performance threshold */
   GOOD_THRESHOLD: 60,
+  /**
+   * Mastery score at or above which a scheduled review counts as "recalled".
+   *
+   * Drives `actual_retention` on every research event, so it is the ground truth the
+   * whole FSRS-vs-SM2 comparison is scored against. It was an unnamed 56 in two
+   * places in research-tracker.ts before /knowledge needed to draw the same line.
+   */
+  RETAINED_SCORE_THRESHOLD: 56,
 
   /**
    * PERFORMANCE SCORE WEIGHTS (Full interview simulation)
