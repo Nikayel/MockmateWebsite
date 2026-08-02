@@ -80,7 +80,10 @@ export function EvidenceList({ loading, error, rows }: EvidenceListProps) {
     // expanded row inside a bordered group container.
     <div className="border-border mt-2 border-l-2 pl-3 sm:pl-4">
       {/* Keyboard-scrollable region: a bare overflow-x-auto div cannot take focus in
-          Safari/Firefox, so the wide table was mouse-only. */}
+          Safari/Firefox, so the wide table was mouse-only. tabIndex on a
+          non-interactive element is exactly the W3C scrollable-region pattern here —
+          role="region" + a label make it a legitimate stop, not a tab trap. */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
       <div
         className="focus-visible:ring-accent overflow-x-auto rounded focus-visible:ring-2 focus-visible:outline-none"
         tabIndex={0}
