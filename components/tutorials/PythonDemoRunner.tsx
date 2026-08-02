@@ -89,7 +89,7 @@ export function PythonDemoRunner({
         <div className="border-border bg-muted/40 flex items-center gap-2 border-b px-3 py-1.5">
           <FileCode2 className="text-muted-foreground h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span className="text-muted-foreground font-mono text-xs">{label}</span>
-          <span className="text-muted-foreground/80 ml-auto text-xs">
+          <span className="text-muted-foreground ml-auto text-xs">
             Editable. Nothing here is graded.
           </span>
         </div>
