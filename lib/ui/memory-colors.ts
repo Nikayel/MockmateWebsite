@@ -27,10 +27,13 @@ import type { MemoryUrgency } from "@/lib/spaced-repetition/memory-bands"
  */
 export type MemoryColorVariant = "chip" | "bar" | "ink"
 
+// Full-opacity fallbacks: the ghosted versions measured 1.74:1 (bar) and 2.05:1
+// (ink) in light mode — invisible exactly where a legible "unknown" is the honest
+// claim. The neutral hue already says "no verdict"; fading it only adds a violation.
 const FALLBACK: Record<MemoryColorVariant, string> = {
   chip: "border-border bg-muted text-muted-foreground",
-  bar: "bg-muted-foreground/40",
-  ink: "text-muted-foreground/50",
+  bar: "bg-muted-foreground",
+  ink: "text-muted-foreground",
 }
 
 const TABLE: Record<MemoryColorVariant, Record<MemoryUrgency, string>> = {
@@ -42,11 +45,18 @@ const TABLE: Record<MemoryColorVariant, Record<MemoryUrgency, string>> = {
     urgent:
       "border-rose-600/20 bg-rose-100 text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-400",
   },
+  // -600 light / -500 dark. The -500 light fills failed WCAG 1.4.11 as UI-component
+  // marks (amber-500 measured 1.96:1 on the strip track) and the -400 dark fills at
+  // ~9.5:1 were the brightest objects on the page, blooming in dark screenshots.
+  //
+  // NOTE (validator-measured): amber-vs-orange is never distinguishable by hue alone
+  // (deutan ΔE ~6-7, normal-vision ΔE ~10 — under every re-step tried). Position or
+  // a word must always co-encode the band; never let hue carry it unaccompanied.
   bar: {
-    safe: "bg-emerald-500 dark:bg-emerald-400",
-    ok: "bg-amber-500 dark:bg-amber-400",
-    warning: "bg-orange-500 dark:bg-orange-400",
-    urgent: "bg-rose-500 dark:bg-rose-400",
+    safe: "bg-emerald-600 dark:bg-emerald-500",
+    ok: "bg-amber-600 dark:bg-amber-500",
+    warning: "bg-orange-600 dark:bg-orange-500",
+    urgent: "bg-rose-600 dark:bg-rose-500",
   },
   // -600 rather than -700 in light mode: these drive SVG strokes, which are graphics
   // and answer to the 3:1 non-text contrast bar, not the 4.5:1 text one.
