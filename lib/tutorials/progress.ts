@@ -20,12 +20,14 @@ export function progressDocId(userId: string, lessonId: string): string {
 }
 
 /**
- * Which course a lesson belongs to, from its id prefix (`sd-` → system-design, `sql-` → sql, else
- * python). Persisted on every progress doc so dashboards can group by course without a backfill.
+ * Which course a lesson belongs to, from its id prefix (`sd-` → system-design, `sql-`/`de-` → the
+ * data-engineering track, else python). Persisted on every progress doc so dashboards can group by
+ * course without a backfill. `de-` is the prefix for the Data Engineering levels (L7+); the frozen
+ * `sql-` ids share the same course.
  */
 function courseIdFromLessonId(lessonId: string): CourseId {
   if (lessonId.startsWith("sd-")) return "system-design"
-  if (lessonId.startsWith("sql-")) return "sql"
+  if (lessonId.startsWith("sql-") || lessonId.startsWith("de-")) return "sql"
   return "python"
 }
 
