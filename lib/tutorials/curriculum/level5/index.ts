@@ -4167,6 +4167,344 @@ def first_invalid_index(responses):
   },
 }
 
+const hallucinatedApiLesson: PythonLesson = {
+  id: "py-l5-hallucinated-api",
+  title: "The API that does not exist, and the one that does something else",
+  summary:
+    "An invented method fails loudly. The dangerous case is the method that is real, spelled right, and does not mean what the name suggests.",
+  estimatedMinutes: 24,
+  difficulty: "medium",
+  skills: ["stdlib semantics", "api verification", "code review", "debugging"],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## Two different problems wearing one name
+
+"Hallucinated API" usually gets described as a model inventing a method that was never in the library. That happens, and it is the easy version: \`AttributeError: 'str' object has no attribute 'rreplace'\` on the first run, fixed in a minute, no harm done.
+
+The expensive version is the call that is real. The method exists, it is spelled correctly, it accepts the arguments given, and it does something other than what the surrounding code assumes. Nothing raises. The tests the author ran happen not to distinguish the two behaviors.
+
+\`\`\`python
+def strip_prefix(url):
+    return url.strip("https://")     # real method, wrong meaning
+\`\`\`
+
+\`str.strip\` does not remove a prefix. It removes any character in the string you gave it, from both ends, repeatedly, until it hits a character that is not in the set. So the argument \`"https://"\` is really the set \`{h, t, p, s, :, /}\`.
+
+\`\`\`python
+"https://shop.example.com".strip("https://")   # 'op.example.com'
+"shop.example.com".strip("https://")           # 'op.example.com'
+\`\`\`
+
+The leading \`s\` and \`h\` of \`shop\` are in the set, so they go too. On a URL like \`https://api.example.com\` the result looks close enough to right that a quick glance passes it.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "strip-is-a-charset",
+  "prompt": "What does 'https://status.example.com'.strip('https://') return?",
+  "options": [
+    {
+      "label": "'status.example.com'",
+      "feedback": "That is what the code intends and what removeprefix would give you. strip treats its argument as a set of characters, so it keeps eating from the left after the prefix is gone."
+    },
+    {
+      "label": "'atus.example.com'",
+      "correct": true,
+      "feedback": "Right. After the prefix, s and t are both in the character set, so they are stripped too, and it stops at the a. Nothing raises and the value is quietly wrong."
+    },
+    {
+      "label": "'https://status.example.com', unchanged",
+      "feedback": "That would be the behavior if strip only removed exact prefixes it found in full. It removes any leading character that appears in the set, so it always removes something here."
+    },
+    {
+      "label": "A ValueError, because the argument is not a single character",
+      "feedback": "A multi-character argument is completely valid and is exactly how strip is meant to be used, for example to trim whitespace and punctuation together. The surprise is that it is a set rather than a prefix."
+    }
+  ]
+}
+\`\`\`
+
+## The stdlib calls most often used with the wrong meaning
+
+| The call | What people assume | What it does |
+| --- | --- | --- |
+| \`text.strip("abc")\` | removes the prefix \`"abc"\` | removes any of \`a\`, \`b\`, \`c\` from both ends |
+| \`text.replace(old, new)\` | replaces the first occurrence | replaces **every** occurrence |
+| \`items.remove(x)\` | removes every \`x\` | removes only the first one, and raises if absent |
+| \`sorted(items, reverse=True)\` | reverses the sorted list | sorts descending, and **keeps** the original order of ties |
+| \`sorted(items)[::-1]\` | the same as \`reverse=True\` | also flips the order of tied elements |
+| \`dict.get(key)\` | raises when missing | returns \`None\` when missing |
+| \`round(2.5)\` | rounds up to 3 | rounds to even, giving 2 |
+| \`datetime.utcnow()\` | a UTC-aware timestamp | a naive datetime with no timezone attached |
+
+Nothing on that list is exotic and every row is a bug somebody shipped this month. The pattern is always the same: the name suggests one behavior, the implementation has another, and the difference only shows on inputs the author did not try.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "api-failure-mode",
+  "prompt": "Sort each generated line by how it will fail.",
+  "buckets": ["Fails loudly on the first run", "Runs and is quietly wrong"],
+  "items": [
+    {
+      "label": "sorted(items, cmp=my_compare)",
+      "bucket": "Fails loudly on the first run",
+      "feedback": "The cmp parameter was removed in Python 3, so this raises TypeError about an unexpected keyword argument immediately."
+    },
+    {
+      "label": "url.strip('https://')",
+      "bucket": "Runs and is quietly wrong",
+      "feedback": "Every argument is valid and a string comes back. It just contains fewer characters than intended whenever the next character is also in the set."
+    },
+    {
+      "label": "text.rreplace('a', 'b')",
+      "bucket": "Fails loudly on the first run",
+      "feedback": "There is no rreplace on str, so this raises AttributeError before doing anything. Invented methods are the harmless kind."
+    },
+    {
+      "label": "path.replace('.tmp', '')",
+      "bucket": "Runs and is quietly wrong",
+      "feedback": "It removes every occurrence anywhere in the string, so a path containing .tmp in a directory name loses that too."
+    },
+    {
+      "label": "config.get('retries').upper()",
+      "bucket": "Runs and is quietly wrong",
+      "feedback": "It runs cleanly whenever the key exists, and raises AttributeError on None only for the configurations that omit it, which is usually not the one you tested."
+    }
+  ]
+}
+\`\`\`
+
+## Verifying in ten seconds
+
+You do not need to memorise the table. You need the habit of checking, and Python makes it cheap.
+
+\`\`\`python
+help(str.strip)          # the docstring says "characters to be removed", not "prefix"
+dir(str)                 # every real method on str, so an invented one is absent
+"abcabc".replace("a", "")   # try it on an input where the two readings differ
+\`\`\`
+
+The last line is the one that matters, and it is the same technique as the whole level: pick an input on which the two candidate meanings give different answers, and run it. If \`strip\` removed a prefix, \`"shop".strip("https://")\` would be \`"shop"\`. It is \`"op"\`. Question settled, no documentation required.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "verify-in-ten-seconds",
+  "prompt": "You are unsure whether sorted(items, reverse=True) and sorted(items)[::-1] behave identically. What is the fastest way to find out?",
+  "options": [
+    {
+      "label": "Read the sorting documentation carefully",
+      "feedback": "It does answer the question, in a note about stability that is easy to skim past. It is also slower than running one line and less memorable than seeing the difference."
+    },
+    {
+      "label": "Run both on a list with tied keys and compare the results",
+      "correct": true,
+      "feedback": "Right. Ties are the only inputs where the two differ, so one list with two equal keys settles it instantly and shows you exactly what stability means."
+    },
+    {
+      "label": "Check the type of what each returns",
+      "feedback": "Both return a list, so the types match perfectly and tell you nothing. Type checks pass in almost every case where the value is wrong."
+    },
+    {
+      "label": "Time both and pick the faster one",
+      "feedback": "Performance is a real consideration and entirely beside the point here. Two functions that produce different answers cannot be chosen on speed."
+    }
+  ]
+}
+\`\`\`
+
+## Version drift
+
+The other half of this problem is code that was correct, for a different version. \`str.removeprefix\` arrived in Python 3.9, so it is exactly right today and an \`AttributeError\` on an old runtime. The \`cmp\` argument to \`sorted\` was correct in Python 2 and has been gone for over a decade, which does not stop it appearing in generated code, because a great deal of Python 2 was written.
+
+The check is the same either way. Know which version you actually run, and when a call looks unfamiliar, confirm it exists there rather than assuming the code was written for your environment.
+
+**Interview nuance:** if you use an API in an interview and you are not certain of its behavior, say so and test it: "I think strip takes a character set rather than a prefix, let me check with a quick example." That is not a confession of ignorance, it is the exact habit that prevents this bug class, and interviewers read it as maturity. Guessing confidently and being wrong reads as the opposite.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "hallucinated-api-cumulative",
+  "prompt": "Which of these generated lines is most dangerous to merge?",
+  "options": [
+    {
+      "label": "A call to a method that does not exist on the object",
+      "feedback": "It raises AttributeError the first time it runs, so it cannot reach production through any pipeline that executes the code once. Loud failures are cheap failures."
+    },
+    {
+      "label": "A real method whose behavior differs from what the surrounding code assumes",
+      "correct": true,
+      "feedback": "Right. It runs, it returns the right type, and it passes any test built from the same misunderstanding. Only an input where the two readings diverge exposes it."
+    },
+    {
+      "label": "A keyword argument that was removed in Python 3",
+      "feedback": "It raises TypeError on the first call, which makes it annoying rather than dangerous. It does signal that the code came from an older idiom, which is worth a second look at the rest."
+    },
+    {
+      "label": "An import of a module that is not in the dependency list",
+      "feedback": "It fails at import time, before a single line of logic runs, so nothing subtle can happen. It is usually caught by the build rather than by a reviewer."
+    }
+  ],
+  "reveal": "The invented API is the safe failure. The real API used with the wrong meaning is the one that ships. When two readings of a call are possible, find the input where they disagree and run it."
+}
+\`\`\``,
+    demoCode: `print("https://shop.example.com".strip("https://"))   # op.example.com
+print("shop.example.com".strip("https://"))           # op.example.com
+print("https://shop.example.com".removeprefix("https://"))   # shop.example.com`,
+  },
+  apply: {
+    id: "py-l5-hallucinated-api-apply",
+    executionMode: "single-file",
+    prompt: `Write a function \`check(name)\` that returns \`True\` only when the candidate stored under
+\`name\` is a correct \`strip_prefix\`, and \`False\` otherwise.
+
+The contract: \`strip_prefix(url)\` returns \`url\` with a **leading** \`"https://"\` removed when it is
+there, and returns \`url\` unchanged when it is not. Only the leading occurrence is removed, so an
+\`https://\` appearing later inside the string stays exactly where it is.
+
+The starter holds four candidates in \`CANDIDATES\`. Two are correct, and the two that are not use
+real string methods that mean something other than what their names suggest here. Keep \`check\` as
+the last function in the file.`,
+    starterCode: `def a(url):
+    return url.strip("https://")
+
+
+def b(url):
+    return url.removeprefix("https://")
+
+
+def c(url):
+    if url.startswith("https://"):
+        return url[len("https://") :]
+    return url
+
+
+def d(url):
+    return url.replace("https://", "")
+
+
+CANDIDATES = {"a": a, "b": b, "c": c, "d": d}
+
+
+def check(name):
+    # Probe CANDIDATES[name] and return True only if it satisfies the contract.
+    pass`,
+    hints: [
+      "Include a URL that does not start with the prefix at all, and assert it comes back unchanged.",
+      "Include a URL with a second `https://` later in the query string, so only the leading one may go.",
+      "A URL whose host starts with `s`, `h`, `t` or `p` separates a prefix removal from a character-set strip.",
+    ],
+    referenceSolution: `def a(url):
+    return url.strip("https://")
+
+
+def b(url):
+    return url.removeprefix("https://")
+
+
+def c(url):
+    if url.startswith("https://"):
+        return url[len("https://") :]
+    return url
+
+
+def d(url):
+    return url.replace("https://", "")
+
+
+CANDIDATES = {"a": a, "b": b, "c": c, "d": d}
+
+
+def check(name):
+    fn = CANDIDATES[name]
+    cases = [
+        ("https://shop.example.com", "shop.example.com"),
+        ("shop.example.com", "shop.example.com"),
+        ("https://a.com/?next=https://b.com", "a.com/?next=https://b.com"),
+        ("http://plain.example.com", "http://plain.example.com"),
+        ("", ""),
+    ]
+    for url, expected in cases:
+        if fn(url) != expected:
+            return False
+    return True`,
+    testCases: [
+      { input: { name: "a" }, expected: false, description: "candidate a" },
+      { input: { name: "b" }, expected: true, description: "candidate b" },
+      { input: { name: "c" }, expected: true, description: "candidate c" },
+      { input: { name: "d" }, expected: false, description: "candidate d" },
+    ],
+  },
+  practice: {
+    id: "py-l5-hallucinated-api-practice",
+    executionMode: "single-file",
+    prompt: `An activity feed on your product shows records newest first, and an assistant produced the
+\`newest_first\` function in the starter. It crashes immediately, which is the good news. The less
+obvious problem is that the first repair most people reach for changes the order of records that
+share a timestamp, and the feed is expected to keep those in the order they arrived.
+
+Repair \`newest_first\` so it satisfies its contract.
+
+The contract: \`newest_first(records)\` returns the records sorted by their \`"created"\` value with the
+largest first. Records that share a \`"created"\` value keep their original order relative to each
+other. The list that comes back holds the same record dictionaries, and the caller's list is not
+reordered in place.`,
+    starterCode: `def newest_first(records):
+    # Generated code. The cmp argument was removed in Python 3.
+    return sorted(records, cmp=lambda first, second: second["created"] - first["created"])`,
+    hints: [
+      "Python 3 sorts with `key=`, a function of one record, rather than a two-argument comparison.",
+      "`sorted(..., reverse=True)` keeps tied records in their original order. Sorting then slicing with `[::-1]` does not.",
+      "`sorted` already returns a new list, so the caller's list is left alone.",
+    ],
+    referenceSolution: `def newest_first(records):
+    return sorted(records, key=lambda record: record["created"], reverse=True)`,
+    testCases: [
+      {
+        input: {
+          records: [
+            { name: "a", created: 3 },
+            { name: "b", created: 1 },
+            { name: "c", created: 2 },
+          ],
+        },
+        expected: [
+          { name: "a", created: 3 },
+          { name: "c", created: 2 },
+          { name: "b", created: 1 },
+        ],
+        description: "distinct timestamps, newest first",
+      },
+      {
+        input: {
+          records: [
+            { name: "a", created: 5 },
+            { name: "b", created: 5 },
+            { name: "c", created: 1 },
+          ],
+        },
+        expected: [
+          { name: "a", created: 5 },
+          { name: "b", created: 5 },
+          { name: "c", created: 1 },
+        ],
+        description: "tied timestamps keep their original order",
+      },
+      { input: { records: [] }, expected: [], description: "an empty feed" },
+      {
+        input: { records: [{ name: "only", created: 7 }] },
+        expected: [{ name: "only", created: 7 }],
+        description: "a single record",
+      },
+    ],
+  },
+}
+
 export const level5: PythonLevel = {
   id: 5,
   slug: "verification",
@@ -4201,7 +4539,7 @@ export const level5: PythonLevel = {
       title: "Calling a Model Like Any Other Unreliable Dependency",
       description:
         "Wrap the call, validate what comes back, and check the API it used actually exists before any of it reaches production.",
-      lessons: [modelDependencyLesson, validateOutputLesson],
+      lessons: [modelDependencyLesson, validateOutputLesson, hallucinatedApiLesson],
     },
   ],
 }
