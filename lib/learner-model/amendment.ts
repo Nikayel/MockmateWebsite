@@ -23,6 +23,7 @@
  */
 
 import { adminDb } from "../firebase-admin"
+import { fetchCardResearchEvents } from "./evidence"
 import {
   scheduleFSRS,
   DEFAULT_FSRS_CONFIG,
@@ -165,16 +166,12 @@ export async function amendForChallenge(
   reason: ChallengeReason,
   now: Date = new Date()
 ): Promise<AmendmentOutcome> {
-  // Latest review event for this card (needs the composite index
-  // algorithm_research_events (user_id, problem_id, timestamp DESC)).
-  const eventSnap = await adminDb
-    .collection("algorithm_research_events")
-    .where("user_id", "==", userId)
-    .where("problem_id", "==", problemId)
-    .orderBy("timestamp", "desc")
-    .limit(1)
-    .get()
-  const latestEvent = eventSnap.empty ? null : (eventSnap.docs[0].data() as AlgorithmResearchEvent)
+  // Latest review event for this card. Shares the evidence panel's reader because it
+  // is the same query, and because that reader survives the composite index
+  // algorithm_research_events (user_id, problem_id, timestamp DESC) being undeployed.
+  // Issuing it raw here meant a challenge — the one action this whole feature exists
+  // to offer — failed with a 500 in production.
+  const [latestEvent = null] = await fetchCardResearchEvents(userId, problemId, 1)
 
   const currentState = reconstructState("fsrs", mastery)
   const currentCard = currentState.fsrs_state as FSRSCard
