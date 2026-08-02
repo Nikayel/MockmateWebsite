@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, ChevronRight } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 import { memoryBandFor } from "@/lib/spaced-repetition/memory-bands"
+import { cn } from "@/lib/utils"
 import type { CardBelief, ConceptBelief } from "@/lib/learner-model/types"
 import { CardBeliefRow } from "./CardBeliefRow"
 import { ConceptRiskStrip } from "./viz/ConceptRiskStrip"
@@ -27,6 +28,12 @@ interface ConceptCardProps {
   onExpandEvidence?: (card: CardBelief) => void
   expandedCardId?: string | null
   evidenceSlot?: React.ReactNode
+  /**
+   * The page opens the first at-risk concept so its natural state is never a wall
+   * of closed bars — the evidence IS the product, and a screenshot of the default
+   * view has to show some.
+   */
+  defaultOpen?: boolean
 }
 
 export function ConceptCard({
@@ -37,8 +44,9 @@ export function ConceptCard({
   onExpandEvidence,
   expandedCardId,
   evidenceSlot,
+  defaultOpen,
 }: ConceptCardProps) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen ?? false)
 
   const atRisk = concept.cards.filter((c) => {
     if (c.retrievability === null) return false
@@ -64,18 +72,24 @@ export function ConceptCard({
   }
 
   return (
-    <div className="border-border bg-card/30 rounded-xl border p-6">
+    // No card chrome of its own: the page stacks concepts inside one divided group
+    // container, so the risk strips read as small multiples on a single shared
+    // 0-100 axis instead of severed boxes.
+    <div className="p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <button
           onClick={toggle}
           aria-expanded={open}
-          className="focus-visible:ring-accent/50 flex min-w-0 flex-1 items-center gap-2 rounded text-left focus-visible:ring-2 focus-visible:outline-none"
+          aria-controls={`concept-rows-${concept.pattern}`}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded text-left"
         >
-          {open ? (
-            <ChevronDown className="text-muted-foreground h-4 w-4 shrink-0" />
-          ) : (
-            <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
-          )}
+          {/* One chevron that rotates, not two icons that swap. */}
+          <ChevronRight
+            className={cn(
+              "text-muted-foreground h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none",
+              open && "rotate-90"
+            )}
+          />
           <h3 className="text-foreground truncate font-medium">{concept.label}</h3>
           <span className="text-muted-foreground shrink-0 text-xs">
             {concept.card_count} problem{concept.card_count === 1 ? "" : "s"}
@@ -105,7 +119,7 @@ export function ConceptCard({
       />
 
       {open && (
-        <div className="divide-border mt-4 ml-6 divide-y">
+        <div id={`concept-rows-${concept.pattern}`} className="divide-border mt-4 ml-6 divide-y">
           {concept.cards.map((card) => (
             <CardBeliefRow
               key={card.problem_id}
