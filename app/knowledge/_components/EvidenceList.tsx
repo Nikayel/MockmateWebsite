@@ -83,9 +83,9 @@ export function EvidenceList({ loading, error, rows }: EvidenceListProps) {
           Safari/Firefox, so the wide table was mouse-only. tabIndex on a
           non-interactive element is exactly the W3C scrollable-region pattern here —
           role="region" + a label make it a legitimate stop, not a tab trap. */}
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
       <div
         className="focus-visible:ring-accent overflow-x-auto rounded focus-visible:ring-2 focus-visible:outline-none"
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={0}
         role="region"
         aria-label="Review history"
