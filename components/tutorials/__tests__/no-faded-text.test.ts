@@ -21,7 +21,9 @@ import { describe, expect, it } from "vitest"
 import { readFileSync, readdirSync, statSync } from "fs"
 import { join } from "path"
 
-const ROOTS = ["components/tutorials", "app/learn"]
+// app/knowledge is in scope for the same reason the learn surface is: it is a dense
+// page of small secondary text, which is exactly where the alpha reaches for.
+const ROOTS = ["components/tutorials", "app/learn", "app/knowledge"]
 
 function walk(dir: string): string[] {
   const out: string[] = []
@@ -69,7 +71,7 @@ function isNonTextUtility(classString: string, match: string): boolean {
   ).test(classString)
 }
 
-describe("no alpha-faded text in the learn surface", () => {
+describe("no alpha-faded text in the learn and knowledge surfaces", () => {
   it("scanned a real number of files", () => {
     // Guards the guard: a broken walk() would make every assertion below vacuously pass.
     expect(FILES.length).toBeGreaterThan(30)
