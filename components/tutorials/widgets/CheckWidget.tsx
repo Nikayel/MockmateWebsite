@@ -4,14 +4,22 @@ import { useEffect, useId, useRef, useState } from "react"
 import { Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import type { CheckSpec } from "@/lib/tutorials/widgets/schema"
+import { checkItemId, type CheckSpec } from "@/lib/tutorials/widgets/schema"
+import { useLessonTelemetry } from "../LessonTelemetryProvider"
 import { useWidgetA11y, WidgetFrame } from "./WidgetFrame"
 
 /**
  * The `check` family: zero-stakes predict-then-reveal retrieval practice inside the
  * teach markdown. The learner COMMITS an answer (deliberate act, not hover), gets
  * immediate explanatory feedback that names why the tempting answer is wrong, and can
- * retry freely. Nothing is graded, persisted, or gated.
+ * retry freely. Nothing is graded or gated.
+ *
+ * Answers ARE recorded (append-only, `learn_item_responses`), and that is deliberately
+ * invisible to the learner: the zero-stakes feel is what makes retrieval practice work,
+ * so nothing here shows a score, blocks progress, or changes based on being logged.
+ * What the log buys is the reason these checks are worth authoring at all — each one
+ * carries hand-written per-distractor rationale, so a wrong answer identifies WHICH
+ * misconception fired, not merely that one did.
  *
  * Structure note: each kind is a thin wrapper (renders the WidgetFrame, owns only a
  * reset counter) around an inner body that owns the interaction state and consumes
@@ -58,10 +66,15 @@ function PredictBody({ spec }: { spec: CheckSpec }) {
   const options = spec.options ?? []
   const groupName = useId()
   const { announce } = useWidgetA11y()
+  const { lessonId, record } = useLessonTelemetry()
 
   const [selected, setSelected] = useState<number | null>(null)
   const [committed, setCommitted] = useState<number | null>(null)
   const feedbackRef = useRef<HTMLDivElement>(null)
+  // Retries are the signal: a learner who lands it second try knows something different
+  // from one who lands it first try, and both differ from one who never lands it.
+  const retryIndex = useRef(0)
+  const shownAt = useRef(Date.now())
 
   // Focus lands on the feedback box the moment an answer is committed, so keyboard and
   // screen-reader learners read the verdict next instead of hunting for it.
@@ -71,8 +84,21 @@ function PredictBody({ spec }: { spec: CheckSpec }) {
 
   const commit = () => {
     if (selected === null) return
+    const option = options[selected]
     setCommitted(selected)
-    announce(options[selected]?.correct ? "Correct." : "Not quite.")
+    announce(option?.correct ? "Correct." : "Not quite.")
+    record({
+      kind: "check_answer",
+      section: "teach",
+      itemId: checkItemId(spec, lessonId),
+      checkKind: "predict",
+      selectedIndex: selected,
+      selectedLabel: option?.label,
+      correct: option?.correct === true,
+      itemsTotal: options.length,
+      retryIndex: retryIndex.current,
+      latencyMs: Date.now() - shownAt.current,
+    })
   }
 
   const committedOption = committed !== null ? options[committed] : null
@@ -140,7 +166,11 @@ function PredictBody({ spec }: { spec: CheckSpec }) {
               size="sm"
               variant="outline"
               className="mt-2.5"
-              onClick={() => setCommitted(null)}
+              onClick={() => {
+                retryIndex.current += 1
+                shownAt.current = Date.now()
+                setCommitted(null)
+              }}
             >
               Try again
             </Button>
@@ -157,10 +187,13 @@ function ClassifyBody({ spec }: { spec: CheckSpec }) {
   const buckets = spec.buckets ?? []
   const items = spec.items ?? []
   const { announce } = useWidgetA11y()
+  const { lessonId, record } = useLessonTelemetry()
 
   const [assignments, setAssignments] = useState<(string | null)[]>(() => items.map(() => null))
   const [committed, setCommitted] = useState(false)
   const resultsRef = useRef<HTMLDivElement>(null)
+  const retryIndex = useRef(0)
+  const shownAt = useRef(Date.now())
 
   useEffect(() => {
     if (committed) resultsRef.current?.focus()
@@ -180,6 +213,20 @@ function ClassifyBody({ spec }: { spec: CheckSpec }) {
     setCommitted(true)
     const right = items.filter((item, i) => assignments[i] === item.bucket).length
     announce(`${right} of ${items.length} sorted correctly.`)
+    record({
+      kind: "check_answer",
+      section: "teach",
+      itemId: checkItemId(spec, lessonId),
+      checkKind: "classify",
+      // Per-item choices in authored order, so a misgrouping is recoverable from the row
+      // itself: which item went where is the misconception, not the total right count.
+      selectedBuckets: assignments.map((bucket) => bucket ?? ""),
+      correct: right === items.length,
+      correctCount: right,
+      itemsTotal: items.length,
+      retryIndex: retryIndex.current,
+      latencyMs: Date.now() - shownAt.current,
+    })
   }
 
   return (
@@ -263,7 +310,11 @@ function ClassifyBody({ spec }: { spec: CheckSpec }) {
               size="sm"
               variant="outline"
               className="mt-2.5"
-              onClick={() => setCommitted(false)}
+              onClick={() => {
+                retryIndex.current += 1
+                shownAt.current = Date.now()
+                setCommitted(false)
+              }}
             >
               Try again
             </Button>
