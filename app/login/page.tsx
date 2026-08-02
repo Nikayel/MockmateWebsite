@@ -2,7 +2,13 @@
 
 import { Button } from "@/components/ui/button"
 import { Github, Terminal } from "lucide-react"
-import { signInWithGitHub, signInWithGoogle } from "@/lib/auth"
+import {
+  getStoredRedirectPath,
+  resolveSafeRedirect,
+  signInWithGitHub,
+  signInWithGoogle,
+  storeRedirectPath,
+} from "@/lib/auth"
 import { createOrUpdateProfile } from "@/lib/firestore-helpers"
 import { getAttribution } from "@/lib/attribution"
 import { useState, useEffect, Suspense } from "react"
@@ -37,6 +43,14 @@ function LoginPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const redirect = searchParams.get("redirect")
+  // `?redirect=` is fully attacker-controlled and arrives in two shapes: the
+  // slash-prefixed pathname that proxy.ts writes ("/learn/python/...") and the
+  // legacy slash-less segment ("sessions/abc"). resolveSafeRedirect normalizes
+  // both to a single-leading-slash same-origin path and falls back to the
+  // dashboard, so nothing below may ever prepend a slash to it again. Prefixing
+  // the raw value was what turned "/learn/..." into the protocol-relative
+  // "//learn/..." and let "/evil.example" navigate a visitor off-site.
+  const safeRedirect = resolveSafeRedirect(redirect)
   const referralCode = searchParams.get("ref")
   // Sent by useSessionReopen when a guest's free trial is exhausted
   const isTrialUsed = searchParams.get("message") === "trial-used"
@@ -56,25 +70,20 @@ function LoginPageContent() {
     // Only redirect if auth is initialized and user exists
     if (!initialized || !firebaseUser) return
 
-    // User is already logged in, redirect them
-    const savedRedirect = localStorage.getItem("auth_redirect")
-    if (savedRedirect) {
-      localStorage.removeItem("auth_redirect")
-      router.push(`/${savedRedirect}`)
-    } else if (redirect) {
-      router.push(`/${redirect}`)
-    } else {
-      router.push("/dashboard")
-    }
-  }, [router, redirect, firebaseUser, initialized])
+    // User is already logged in, redirect them. getStoredRedirectPath validates,
+    // normalizes, and clears the stored destination in one step.
+    router.push(getStoredRedirectPath() ?? safeRedirect)
+  }, [router, safeRedirect, firebaseUser, initialized])
 
   useEffect(() => {
     if (redirect) {
       toast.info("Please sign in to continue", {
-        description: `You'll be redirected to ${redirect} after login`,
+        // Show the resolved destination, never the raw parameter, so a hostile
+        // link cannot render arbitrary text inside our own toast.
+        description: `You'll be redirected to ${safeRedirect} after login`,
       })
     }
-  }, [redirect])
+  }, [redirect, safeRedirect])
 
   // Listen for auth state changes to redirect after successful login
   // Use the auth context instead of duplicate listener
@@ -143,7 +152,7 @@ function LoginPageContent() {
                   // If there was a specific session, redirect to it
                   const guestSessionData = getGuestSessionData()
                   if (guestSessionData?.sessionId) {
-                    localStorage.setItem("auth_redirect", `sessions/${guestSessionData.sessionId}`)
+                    storeRedirectPath(`/sessions/${guestSessionData.sessionId}`)
                   }
                 }
               }
@@ -207,15 +216,7 @@ function LoginPageContent() {
           setAuthStatus("complete")
 
           // User is authenticated, redirect them
-          const savedRedirect = localStorage.getItem("auth_redirect")
-          if (savedRedirect) {
-            localStorage.removeItem("auth_redirect")
-            router.push(`/${savedRedirect}`)
-          } else if (redirect) {
-            router.push(`/${redirect}`)
-          } else {
-            router.push("/dashboard")
-          }
+          router.push(getStoredRedirectPath() ?? safeRedirect)
         } catch (profileError: any) {
           // Only show error toast for critical errors, not for permission issues
           // Permission issues might be temporary and the user can still use the app
@@ -231,21 +232,13 @@ function LoginPageContent() {
           // Mark as complete and redirect anyway - don't block user from using the app
           setAuthStatus("complete")
 
-          const savedRedirect = localStorage.getItem("auth_redirect")
-          if (savedRedirect) {
-            localStorage.removeItem("auth_redirect")
-            router.push(`/${savedRedirect}`)
-          } else if (redirect) {
-            router.push(`/${redirect}`)
-          } else {
-            router.push("/dashboard")
-          }
+          router.push(getStoredRedirectPath() ?? safeRedirect)
         }
       }
 
       handleProfileCreation()
     }
-  }, [router, redirect, authStatus, firebaseUser])
+  }, [router, safeRedirect, authStatus, firebaseUser])
 
   const handleGitHubLogin = async () => {
     try {
@@ -253,13 +246,10 @@ function LoginPageContent() {
       setAuthStatus("authenticating")
       setAuthProvider("github")
 
-      // Store redirect in localStorage for callback to use
-      if (redirect) {
-        localStorage.setItem("auth_redirect", redirect)
-      } else {
-        // Default to dashboard if no redirect specified
-        localStorage.setItem("auth_redirect", "dashboard")
-      }
+      // Store the already-resolved destination for the redirect-based callback
+      // at /auth/callback to pick up. storeRedirectPath re-validates and keeps
+      // the leading-slash form, so the callback pushes it verbatim.
+      storeRedirectPath(safeRedirect)
       await signInWithGitHub()
       // After popup closes, onAuthStateChanged will handle the redirect
     } catch (error) {
@@ -279,13 +269,9 @@ function LoginPageContent() {
       setAuthStatus("authenticating")
       setAuthProvider("google")
 
-      // Store redirect in localStorage for callback to use
-      if (redirect) {
-        localStorage.setItem("auth_redirect", redirect)
-      } else {
-        // Default to dashboard if no redirect specified
-        localStorage.setItem("auth_redirect", "dashboard")
-      }
+      // Same as the GitHub path: persist the resolved destination, never the raw
+      // `?redirect=` value.
+      storeRedirectPath(safeRedirect)
       await signInWithGoogle()
       // After popup closes, onAuthStateChanged will handle the redirect
     } catch (error) {

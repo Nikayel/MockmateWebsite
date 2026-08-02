@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
-import { generateVSCodeDeepLink, getStoredRedirectPath } from "@/lib/auth"
+import { generateVSCodeDeepLink, getStoredRedirectPath, resolveSafeRedirect } from "@/lib/auth"
 import { createOrUpdateProfile } from "@/lib/firestore-helpers"
 import { createInAppNotification } from "@/lib/notification-helpers"
 import { Button } from "@/components/ui/button"
@@ -25,7 +25,7 @@ export function AuthCallbackClient() {
       try {
         if (firebaseUser && user) {
           setStatus("success")
-          
+
           // Create/update profile in Firestore immediately
           // This MUST complete before redirecting to ensure profile is saved
           let shouldSendWelcome = false
@@ -48,15 +48,15 @@ export function AuthCallbackClient() {
             try {
               await createInAppNotification({
                 userId: firebaseUser.uid,
-                type: 'welcome',
-                title: 'Welcome to CodeSparring! 🎉',
-                body: `Hey${firebaseUser.displayName ? ` ${firebaseUser.displayName.split(' ')[0]}` : ''}! Ready to ace your next tech interview? Start with a practice problem to see how it works.`,
+                type: "welcome",
+                title: "Welcome to CodeSparring! 🎉",
+                body: `Hey${firebaseUser.displayName ? ` ${firebaseUser.displayName.split(" ")[0]}` : ""}! Ready to ace your next tech interview? Start with a practice problem to see how it works.`,
                 read: false,
-                link: '/interview',
+                link: "/interview",
               })
-              console.log('[Auth] Welcome in-app notification created')
+              console.log("[Auth] Welcome in-app notification created")
             } catch (notifError) {
-              console.error('[Auth] Failed to create welcome notification:', notifError)
+              console.error("[Auth] Failed to create welcome notification:", notifError)
               // Non-blocking - continue with the flow
             }
           }
@@ -72,13 +72,13 @@ export function AuthCallbackClient() {
               existingLogs.push({ time: new Date().toISOString(), message: logMessage })
               localStorage.setItem("auth_logs", JSON.stringify(existingLogs.slice(-10))) // Keep last 10
             } catch {}
-            
+
             const idToken = await firebaseUser.getIdToken()
             fetch("/api/email/welcome", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${idToken}`,
+                Authorization: `Bearer ${idToken}`,
               },
               body: JSON.stringify({
                 userId: firebaseUser.uid,
@@ -93,7 +93,11 @@ export function AuthCallbackClient() {
                   console.error(errorMsg)
                   try {
                     const existingLogs = JSON.parse(localStorage.getItem("auth_logs") || "[]")
-                    existingLogs.push({ time: new Date().toISOString(), message: errorMsg, error: true })
+                    existingLogs.push({
+                      time: new Date().toISOString(),
+                      message: errorMsg,
+                      error: true,
+                    })
                     localStorage.setItem("auth_logs", JSON.stringify(existingLogs.slice(-10)))
                   } catch {}
                   return { success: false, error: `HTTP ${res.status}: ${errorText}` }
@@ -114,7 +118,11 @@ export function AuthCallbackClient() {
                   console.error(errorMsg)
                   try {
                     const existingLogs = JSON.parse(localStorage.getItem("auth_logs") || "[]")
-                    existingLogs.push({ time: new Date().toISOString(), message: errorMsg, error: true })
+                    existingLogs.push({
+                      time: new Date().toISOString(),
+                      message: errorMsg,
+                      error: true,
+                    })
                     localStorage.setItem("auth_logs", JSON.stringify(existingLogs.slice(-10)))
                   } catch {}
                 }
@@ -124,7 +132,11 @@ export function AuthCallbackClient() {
                 console.error(errorMsg)
                 try {
                   const existingLogs = JSON.parse(localStorage.getItem("auth_logs") || "[]")
-                  existingLogs.push({ time: new Date().toISOString(), message: errorMsg, error: true })
+                  existingLogs.push({
+                    time: new Date().toISOString(),
+                    message: errorMsg,
+                    error: true,
+                  })
                   localStorage.setItem("auth_logs", JSON.stringify(existingLogs.slice(-10)))
                 } catch {}
               })
@@ -136,17 +148,20 @@ export function AuthCallbackClient() {
               console.log("[Auth] No email address, skipping welcome email")
             }
           }
-          
+
           // Get ID token for VS Code deep link
           const token = await firebaseUser.getIdToken()
           const vscodeLink = generateVSCodeDeepLink(token)
           setDeepLink(vscodeLink)
 
-          // Check for validated redirect path (security: only allows whitelisted paths)
+          // Check for validated redirect path (security: only allows whitelisted paths).
+          // getStoredRedirectPath already returns the normalized leading-slash form,
+          // so it is pushed verbatim. Prepending a slash here is what produced the
+          // protocol-relative "//learn/..." that browsers resolved as a remote host.
           const validatedRedirect = getStoredRedirectPath()
           if (validatedRedirect) {
             // Auto-redirect immediately for frictionless flow
-            router.push(`/${validatedRedirect}`)
+            router.push(resolveSafeRedirect(validatedRedirect))
             return
           }
 
@@ -169,9 +184,9 @@ export function AuthCallbackClient() {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="bg-background flex min-h-screen items-center justify-center">
         <div className="text-foreground text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c4703f] mx-auto mb-4"></div>
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
           <p>Completing sign in...</p>
         </div>
       </div>
@@ -180,10 +195,10 @@ export function AuthCallbackClient() {
 
   if (status === "error") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="bg-background flex min-h-screen items-center justify-center">
         <Card className="bg-card/50 border-border max-w-md">
           <CardContent className="p-6 text-center">
-            <p className="text-red-400 mb-4">Authentication failed</p>
+            <p className="mb-4 text-red-400">Authentication failed</p>
             <Button onClick={() => (window.location.href = "/login")}>Try Again</Button>
           </CardContent>
         </Card>
@@ -192,14 +207,16 @@ export function AuthCallbackClient() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="bg-background flex min-h-screen items-center justify-center">
       <Card className="bg-card/50 border-border max-w-md">
         <CardHeader className="text-center">
-          <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-4" />
+          <CheckCircle className="mx-auto mb-4 h-12 w-12 text-green-400" />
           <CardTitle className="text-foreground">Successfully Signed In!</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-muted-foreground text-center">Welcome {user?.user_metadata?.full_name || user?.email}!</p>
+          <p className="text-muted-foreground text-center">
+            Welcome {user?.user_metadata?.full_name || user?.email}!
+          </p>
 
           <div className="space-y-3">
             {redirectUrl ? (
@@ -210,7 +227,10 @@ export function AuthCallbackClient() {
                 Continue to {redirectUrl.replace("/", "")}
               </Button>
             ) : (
-              <Button onClick={handleOpenVSCode} className="w-full bg-[#c4703f] hover:bg-[#c4703f]/80">
+              <Button
+                onClick={handleOpenVSCode}
+                className="w-full bg-[#c4703f] hover:bg-[#c4703f]/80"
+              >
                 <ExternalLink className="mr-2 h-4 w-4" />
                 Go to Dashboard
               </Button>
@@ -219,15 +239,19 @@ export function AuthCallbackClient() {
             <Button
               onClick={() => (window.location.href = "/dashboard")}
               variant="outline"
-              className="w-full border-border text-foreground hover:bg-muted"
+              className="border-border text-foreground hover:bg-muted w-full"
             >
               Go to Dashboard
             </Button>
           </div>
 
-          <div className="text-center text-sm text-muted-foreground">
+          <div className="text-muted-foreground text-center text-sm">
             <p>Don't have the extension installed?</p>
-            <Button variant="link" className="text-[#c4703f] p-0" onClick={() => (window.location.href = "/install")}>
+            <Button
+              variant="link"
+              className="p-0 text-[#c4703f]"
+              onClick={() => (window.location.href = "/install")}
+            >
               <Download className="mr-1 h-3 w-3" />
               VS Code Extension (Coming Soon)
             </Button>
