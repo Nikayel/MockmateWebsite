@@ -19,6 +19,7 @@ import type {
 } from "../types"
 import { getUserAlgorithm } from "./algorithm-router"
 import { clampPracticeMinutesValue } from "../session-duration"
+import { SCORING } from "../constants"
 
 // ============================================
 // Helper Functions
@@ -100,7 +101,7 @@ export async function recordReviewEvent(params: {
   const masteryChanged = params.preReviewState.masteryLevel !== params.postReviewState.masteryLevel
   // Use masteryScore for retention calculation - this measures CODE CORRECTNESS
   // Interview score includes communication, which doesn't indicate pattern mastery
-  const actualRetention = params.masteryScore >= 56
+  const actualRetention = params.masteryScore >= SCORING.RETAINED_SCORE_THRESHOLD
   const retentionAsPredicted = params.preReviewState.predictedRetention >= 50 === actualRetention
 
   // Build pre_review object, filtering out undefined values to prevent Firestore errors
@@ -282,7 +283,7 @@ async function updateDailyMetrics(
 
       const newScores = [...existing.scores, data.score]
       const newIntervals = [...existing.intervals_scheduled, data.intervalScheduled]
-      const retained = newScores.filter((s) => s >= 56).length
+      const retained = newScores.filter((s) => s >= SCORING.RETAINED_SCORE_THRESHOLD).length
       const newQualityDist = { ...existing.quality_distribution }
       newQualityDist[data.qualityRating] = (newQualityDist[data.qualityRating] || 0) + 1
 
