@@ -1785,6 +1785,30 @@ When you change \`balance_after\` six months from now, the only thing standing b
 
 \`pytest\` has almost no ceremony. You write a normal function whose name starts with \`test_\`, put a plain \`assert\` inside it, and run \`pytest\`. Discovery is convention-based: \`pytest\` walks the directory, imports files named \`test_*.py\` (or \`*_test.py\`), and runs every \`test_\`-prefixed function it finds. No base class, no registration, no \`main\`.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "plain-assert-is-enough",
+  "prompt": "A test contains one line: assert balance_after(100, [10, -30, 5]) == 85. The function is buggy and returns 90. What does pytest print when the test fails?",
+  "options": [
+    {
+      "label": "Just AssertionError, so you have to add a message to every assert to learn anything.",
+      "feedback": "Tempting, because that is precisely what a bare assert does in ordinary Python, and it is the reason other frameworks ship assertEqual style helpers. pytest rewrites the asserts in your test files as it imports them, so it can show both sides."
+    },
+    {
+      "label": "The failing line plus the value it actually got and the value you expected.",
+      "correct": true,
+      "feedback": "Right. That rewriting is why a plain assert is enough in pytest and why you almost never need a custom message. You get output along the lines of 'assert 90 == 85' for free."
+    },
+    {
+      "label": "Nothing useful unless you rerun it with pytest -v.",
+      "feedback": "Close, in that -v does change the output: it lists each test by name instead of printing dots. But the detail inside a failure is on by default. -v changes the summary, not the assertion report."
+    }
+  ]
+}
+\`\`\`
+
 The magic is in the \`assert\`. \`pytest\` rewrites the \`assert\` statements in your test files as it imports them, so a failing \`assert\` reports the actual and expected values instead of a bare \`AssertionError\`. That is why \`assert balance_after(100, [10, -30, 5]) == 85\` is enough: on failure you see the number it actually got.
 
 ### Arrange, act, assert
@@ -1805,7 +1829,56 @@ Test-driven development runs this loop backwards: write the failing test first (
 
 ## Pitfall: a test that never runs still "passes"
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "discovery-is-convention",
+  "prompt": "You add a function named check_deposits to tests/test_account.py. It contains an assert that would definitely fail. You run pytest. What do you see?",
+  "options": [
+    {
+      "label": "A failure. pytest imports the file, so everything in it runs.",
+      "feedback": "Tempting, because pytest really does import the whole file, so the function is certainly loaded into memory. Importing is not calling though: pytest only invokes functions whose names begin with test_."
+    },
+    {
+      "label": "A green suite. pytest never calls it, so the assert never executes.",
+      "correct": true,
+      "feedback": "Right, and this is the dangerous outcome, because a green suite that tested nothing is worse than a red one. Watch the collected count in pytest -v output whenever a number looks suspiciously low."
+    },
+    {
+      "label": "A collection error, since pytest cannot tell whether it was meant to be a test.",
+      "feedback": "Tempting, because a strict tool would flag an ambiguous name, and you would want it to. pytest's discovery is pure convention with no warning attached: a name that does not match is simply not a test."
+    }
+  ]
+}
+\`\`\`
+
 If you misspell the prefix and name a function \`check_deposits\` instead of \`test_deposits\`, \`pytest\` silently skips it. The suite goes green while testing nothing, which is worse than a red suite because it hands you false confidence. The same trap hits a file named \`account_tests.py\` (wrong pattern) or a helper that raises but is never called. The fix: keep the \`test_\` prefix, name files \`test_*.py\`, and run \`pytest -v\` to read the count of collected tests. If the number looks low, something is not being discovered.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "float-equality-in-tests",
+  "prompt": "Money becomes float in your model, and a test now asserts: balance_after(0.0, [0.1, 0.2]) == 0.3. Does that test pass?",
+  "options": [
+    {
+      "label": "Yes. 0.1 plus 0.2 is 0.3.",
+      "feedback": "Tempting, because it is true in decimal arithmetic and it is obviously what the code means. Binary floats cannot store 0.1 or 0.2 exactly, so the sum lands on 0.30000000000000004 and the comparison comes out False."
+    },
+    {
+      "label": "No. The sum is 0.30000000000000004, so == is False.",
+      "correct": true,
+      "feedback": "Right. Write assert result == pytest.approx(0.3) instead, which compares within a small relative tolerance. Exact float equality is one of the main ways a test suite turns flaky."
+    },
+    {
+      "label": "It depends on the machine and the Python build.",
+      "feedback": "Reasonable-sounding, and there really are platform differences in some corners of floating point. This is not one of them: IEEE 754 pins the result down, so every mainstream Python gives the same 0.30000000000000004."
+    }
+  ],
+  "reveal": "Real money systems usually store cents as an int, or use Decimal, precisely so this never comes up. When you genuinely do hold floats, compare with a tolerance and never with ==."
+}
+\`\`\`
 
 **Interview nuance:** never compare floats with \`==\` in a test. \`balance_after(0.0, [0.1, 0.2]) == 0.3\` is \`False\`, because IEEE 754 stores \`0.1 + 0.2\` as \`0.30000000000000004\`. An interviewer asking "how would you test a function that returns a float" wants to hear about tolerance, not exact equality. In \`pytest\` you write \`assert result == pytest.approx(0.3)\`, which passes if the values are within a small relative tolerance. Integer transactions dodge this, but the moment money becomes \`float\`, exact-equality tests get flaky and the real bug hides behind the noise.`,
     demoCode: `def balance_after(start, transactions):
@@ -2016,7 +2089,55 @@ def test_restock_adds_item(base_stock):        # pytest passes base_stock in
     assert result["plum"] == 3
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "fixture-fresh-per-test",
+  "prompt": "base_stock is a plain @pytest.fixture that returns {'apple': 5, 'pear': 2}. Ten tests in the file take base_stock as a parameter. How many dicts get built over the run?",
+  "options": [
+    {
+      "label": "One. The fixture body runs once and all ten tests receive that same dict.",
+      "feedback": "Tempting, because a fixture reads like a shared resource you set up once, and that is exactly how setup works in some other frameworks. pytest defaults to function scope, so the body runs again for every test that asks."
+    },
+    {
+      "label": "Ten. Function scope is the default, so it is rebuilt for each test.",
+      "correct": true,
+      "feedback": "Right, and the freshness is the entire point: each test gets its own mutable dict, so nothing one test does can reach another. You give that up the moment you widen the scope."
+    },
+    {
+      "label": "One, plus a copy for each test that mutates it. pytest copies lazily.",
+      "feedback": "Tempting, because copy-on-write is a real technique elsewhere and it would be a clever design. pytest does nothing that subtle. It simply calls your fixture function again, and whatever you return is what the test gets."
+    }
+  ]
+}
+\`\`\`
+
 By default a fixture has function scope: \`pytest\` calls it fresh for every test, so \`base_stock\` is a brand-new dict each time and tests cannot leak state into one another. A fixture that uses \`yield\` instead of \`return\` runs the code after \`yield\` as teardown once the test finishes.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "yield-teardown-on-failure",
+  "prompt": "A fixture creates a temp file, yields the path, and deletes the file on the line after the yield. During one test an assert fails and the test errors out. Does the delete run?",
+  "options": [
+    {
+      "label": "No. The failure aborts the test, so the code after the yield never resumes.",
+      "feedback": "Tempting, because an exception really does abort the test body, and code after a raise normally never runs. pytest finalizes fixtures in a separate teardown phase that happens no matter how the test ended."
+    },
+    {
+      "label": "Yes. Teardown runs whether the test passed, failed, or raised.",
+      "correct": true,
+      "feedback": "Right, and that guarantee is the whole reason to prefer yield over return. It lets a fixture safely own a temp file, an open connection, or a database transaction it must roll back."
+    },
+    {
+      "label": "Only if you wrap the yield in your own try/finally.",
+      "feedback": "A sound instinct, since try/finally is how you would guarantee cleanup in ordinary code. pytest already does it for you: the finalizer is registered the moment the fixture yields, so a plain yield is enough."
+    }
+  ]
+}
+\`\`\`
 
 \`\`\`csdiagram
 {
@@ -2068,6 +2189,30 @@ The demo below shows the \`restock\` you will build. It copies \`stock\` with \`
 
 ### Pitfall: shared mutable fixtures
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "scope-and-mutable-state",
+  "prompt": "A fixture is declared @pytest.fixture(scope='module') and returns {'apple': 5}. restock has a bug: it does result = stock instead of result = dict(stock), so it mutates the dict it was handed. You run the file. What do you see?",
+  "options": [
+    {
+      "label": "Every test in the file fails, since they all share the corrupted dict.",
+      "feedback": "Tempting, because the corruption really is shared, so it feels like it should take everything down. Only the tests that run after the mutation see it, and several of those may not touch the mutated key at all."
+    },
+    {
+      "label": "Some tests fail, and which ones depends on the order pytest happens to run them in.",
+      "correct": true,
+      "feedback": "Right. Order dependence is the signature of shared mutable state: green on your laptop, red in CI, then green again when you rerun the failing test by itself."
+    },
+    {
+      "label": "Nothing fails. pytest hands each test its own copy of a fixture value.",
+      "feedback": "True at the default function scope, which is exactly where the habit comes from. Writing scope='module' opts out of that: the body runs once for the whole file and every test receives the same object."
+    }
+  ]
+}
+\`\`\`
+
 A fixture that returns a mutable object at function scope is safe, but widen the scope and that object is shared:
 
 \`\`\`python
@@ -2077,6 +2222,31 @@ def base_stock():
 \`\`\`
 
 Now every test in the module gets the same dict. If \`restock\` mutates its input (for example \`result = stock\` instead of \`result = dict(stock)\`, which makes \`result\` and \`stock\` the same object), one test's change bleeds into the next, and tests pass or fail depending on order. The Practice suite checks exactly this: return a new dict and never touch \`stock\`.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "parametrize-vs-loop",
+  "prompt": "You have six cases to cover. Option A is one test with a for loop over six tuples. Option B is @pytest.mark.parametrize with six rows. Case three is broken and case five is broken too. What is the difference in what you learn?",
+  "options": [
+    {
+      "label": "No real difference. Either way you find out that case three failed.",
+      "feedback": "Tempting, because the loop's assert output does name the values it compared, so case three is identifiable. What you never learn is that case five is broken as well: the loop stopped at the first failing assert."
+    },
+    {
+      "label": "The loop reports one failure and skips the rest. Parametrize runs all six and names each one.",
+      "correct": true,
+      "feedback": "Right. Six independent tests give six independent results, so one bug can never mask another, and you can skip or xfail a single row with pytest.param."
+    },
+    {
+      "label": "Parametrize is shorthand: pytest expands it into one test that loops internally.",
+      "feedback": "Tempting, because it is written in one place and reads like sugar for a loop. pytest actually generates N separate test items during collection, which is why the collected count rises by six rather than by one."
+    }
+  ],
+  "reveal": "Independence is the theme running through this whole lesson. Function-scope fixtures stop tests leaking state into each other, and parametrize stops one broken case hiding the next five."
+}
+\`\`\`
 
 **Interview nuance:** \`parametrize\` is not a loop inside one test. A \`for\` loop stops at the first failing \`assert\` and hides every case after it. \`parametrize\` generates N separate tests, so all N run, each gets its own id in the report, and you can \`xfail\` or \`skip\` a single case with \`pytest.param\`. That independence, together with function-scope fixture isolation, is what makes a suite deterministic no matter what order it runs in.`,
     demoCode: `def restock(stock, additions):
