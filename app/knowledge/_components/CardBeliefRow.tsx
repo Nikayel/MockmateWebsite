@@ -5,6 +5,7 @@ import { ArrowRight, Flag } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import type { CardBelief } from "@/lib/learner-model/types"
+import { ForgettingCurve } from "./viz/ForgettingCurve"
 import { RecallDial } from "./viz/RecallDial"
 import { ScoreTrack } from "./viz/ScoreTrack"
 
@@ -39,6 +40,12 @@ export function CardBeliefRow({
 }: CardBeliefRowProps) {
   const masked = card.retrievability === null && card.belief_text === null
   const scores = card.scores_history ?? []
+
+  // Days since the last review, recomputed here rather than shipped, so an open tab
+  // keeps moving the "now" marker as the estimate it sits next to goes stale.
+  const elapsedDays = card.last_reviewed_at
+    ? Math.max(0, (Date.now() - new Date(card.last_reviewed_at).getTime()) / 86_400_000)
+    : 0
 
   const dial = (
     <RecallDial
@@ -137,7 +144,20 @@ export function CardBeliefRow({
         </div>
       </div>
 
-      {expanded && evidenceSlot}
+      {expanded && (
+        <div className="mt-2 ml-[52px]">
+          {card.recall_curve && card.recall_curve.length > 1 && (
+            <ForgettingCurve
+              points={card.recall_curve}
+              elapsedDays={elapsedDays}
+              crossingDays={card.days_until_forgetting}
+              urgency={card.memory?.urgency ?? null}
+              variant="full"
+            />
+          )}
+          {evidenceSlot}
+        </div>
+      )}
     </div>
   )
 }
