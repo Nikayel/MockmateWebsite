@@ -36,8 +36,13 @@ interface ConceptRiskStripProps {
   className?: string
 }
 
-/** Vertical offsets (px) cycled through a run of coincident dots. */
-const CLUSTER_LANES = [0, -4, 4]
+/**
+ * Vertical offsets (px) cycled through a run of coincident dots. Five lanes, not
+ * three: with three, the 4th member of a cluster landed exactly on the 1st —
+ * invisible, and its hit target fully occluded. All lanes keep the 10px mark inside
+ * the 24px box (12±8 centers span 3-21px).
+ */
+const CLUSTER_LANES = [0, -4, 4, -8, 8]
 /** Dots closer than this (in retrievability points) count as one cluster. */
 const CLUSTER_EPSILON = 3
 
