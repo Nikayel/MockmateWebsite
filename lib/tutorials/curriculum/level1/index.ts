@@ -905,6 +905,255 @@ less than 0, and \`"zero"\` when it's exactly 0.`,
   },
 }
 
+// Authored into L1-M5 directly after `py-l1-conditionals`: everything here is a shorter spelling of
+// a branch that lesson already taught, so it must not re-teach if/elif from scratch. `match` needs
+// Python 3.10+; the browser sandbox is Pyodide 0.26 (CPython 3.12), so it runs.
+const syntaxShorthandsLesson: PythonLesson = {
+  id: "py-l1-syntax-shorthands",
+  title: "Small syntax that shows up everywhere: ternary, swap & match",
+  summary: "Write a conditional expression, swap and unpack tuples, and branch with match/case.",
+  estimatedMinutes: 11,
+  difficulty: "easy",
+  skills: ["conditionals", "control-flow", "unpacking", "tuples"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## Three shorthands you will read before you write
+
+Nothing in this lesson is a new idea. Each piece is a shorter way to say something you can already say with \`if\`. That is exactly why it matters: all three turn up in the first real codebase you open, and code you cannot read is code you cannot safely change. The judgement worth learning is when the short form is genuinely clearer and when it is merely shorter.
+
+## A conditional expression: \`a if cond else b\`
+
+An \`if\` block is a **statement**: it does something. \`a if cond else b\` is an **expression**: it evaluates to a value, so it fits where a statement cannot go, such as inside a \`return\`, an f-string, or a list.
+
+\`\`\`python
+status = "adult" if age >= 18 else "minor"
+
+# exactly the same decision, written as a statement
+if age >= 18:
+    status = "adult"
+else:
+    status = "minor"
+\`\`\`
+
+Read it from the middle outwards: check the condition, then take the value on the left or the one on the right. Reach for it when both branches produce a value for the same thing and the whole line still reads comfortably. Stop the moment you want three outcomes: \`"a" if x else "b" if y else "c"\` is legal, is unreadable, and is a reliable way to lose a code review.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "ternary-evaluates-one-side",
+  "prompt": "You write value = fetch() if cached else compute(), where both functions are slow. How many of them actually run?",
+  "options": [
+    {
+      "label": "Both, since Python evaluates the whole expression before it assigns anything",
+      "feedback": "Tempting, and that really is how arguments behave: f(fetch(), compute()) evaluates both before the call. A conditional expression is a branch, not a call, so it commits to one side and never touches the other."
+    },
+    {
+      "label": "Exactly one, whichever side the condition selected",
+      "correct": true,
+      "feedback": "Right. The condition is evaluated first, then only the chosen branch runs, exactly like the if/else block it replaces. That is what makes it safe to put an expensive call on each side."
+    },
+    {
+      "label": "Neither, until something reads value later on",
+      "feedback": "Close to how a generator or a lazily evaluated language behaves, and Python does have laziness in places like generator expressions. Plain assignment is eager: the right-hand side is finished before the name is bound."
+    }
+  ]
+}
+\`\`\`
+
+## Swapping, and tuple unpacking underneath it
+
+\`\`\`python
+a, b = b, a
+\`\`\`
+
+One line, no temporary variable. It works because of the order Python does things: the right-hand side is evaluated **first** into the tuple \`(b, a)\`, and only then is that tuple unpacked into the names on the left. Nothing is ever half-assigned in between.
+
+Swapping is just the most famous use of **tuple unpacking**, which works on any sequence of the right length:
+
+\`\`\`python
+point = (3, 4)
+x, y = point            # x is 3, y is 4
+
+first, second = "ab"    # any sequence, not just tuples
+\`\`\`
+
+The counts have to match. \`x, y = (1, 2, 3)\` raises \`ValueError: too many values to unpack (expected 2)\` and \`x, y, z = (1, 2)\` raises \`ValueError: not enough values to unpack\`. That strictness is a feature: when the shape of your data changes, you hear about it immediately instead of silently binding the wrong piece to the wrong name.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "swap-without-a-temp",
+  "prompt": "a is 1 and b is 2. After the single line a, b = b, a, what does a hold?",
+  "options": [
+    {
+      "label": "2",
+      "correct": true,
+      "feedback": "Right. The right-hand side is packed into the tuple (2, 1) before any name on the left is touched, so both values are safely captured and then handed out."
+    },
+    {
+      "label": "1, because a is overwritten with b first and then b gets that same new value",
+      "feedback": "Tempting, and that is precisely what happens if you write a = b and b = a on two separate lines, which is why the temp-variable version exists at all. One tuple assignment has no in-between state to corrupt."
+    },
+    {
+      "label": "It raises, because you cannot assign to two names in one statement",
+      "feedback": "Close, in that many languages really do need a helper or a library call for this. Python treats the comma form as one assignment of one tuple, so it is ordinary syntax rather than a special swap operator."
+    }
+  ]
+}
+\`\`\`
+
+## \`match\` / \`case\`
+
+Python 3.10 added \`match\`. It takes one value and tries \`case\` patterns top to bottom, running the first that matches:
+
+\`\`\`python
+match code:
+    case 200:
+        return "ok"
+    case 301 | 302:
+        return "redirect"
+    case 404:
+        return "not found"
+    case _:
+        return "unknown"
+\`\`\`
+
+\`|\` means "either of these". \`case _\` is the wildcard that matches anything, playing the part \`else\` plays in an \`if\` chain. There is no fall-through: exactly one body runs and you never write \`break\`.
+
+Used only that way it is a tidier \`elif\` chain, and an \`elif\` chain would have been fine. \`match\` earns its keep when the patterns describe **shape** rather than equality:
+
+\`\`\`python
+match event:
+    case {"type": "click", "x": x, "y": y}:
+        return f"click at {x},{y}"
+    case {"type": "key", "key": key}:
+        return f"key {key}"
+    case _:
+        return "unknown event"
+\`\`\`
+
+Each case checks the structure of the data and binds the pieces it names in the same step. Written with \`if\`, that is a pile of key checks and lookups repeated in every branch. This is why the feature is called **structural pattern matching** and not "switch".
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "case-name-captures",
+  "prompt": "OK = 200 sits at the top of your file. Inside a match you write case OK:, then case 404:, then case _:. What happens?",
+  "options": [
+    {
+      "label": "The 404 branch runs whenever the code is 404, since OK holds 200",
+      "feedback": "Tempting, because the name reads as a constant and a switch statement in almost any other language would compare against its value. A bare name in a case is a capture pattern, so it matches every value instead of comparing against 200."
+    },
+    {
+      "label": "Python refuses the file with a SyntaxError saying the name capture makes the remaining patterns unreachable",
+      "correct": true,
+      "feedback": "Right. The bare name captures rather than compares, and Python can see it swallows every case below it, so it rejects the file outright. Compare against a literal like case 200, or a dotted name like case Status.OK."
+    },
+    {
+      "label": "It works, but every code comes back as ok, because case OK matches anything",
+      "feedback": "Close, and that really is what a capture pattern does: it matches anything and binds it to the name. Python only lets that pass when nothing follows it, so here you get a compile error instead of a very quiet bug."
+    }
+  ],
+  "reveal": "The rule is short: literals and dotted names compare, bare names capture. It is the one piece of match syntax that does not behave the way its own spelling suggests."
+}
+\`\`\`
+
+## The shape of the exercises
+
+Apply is the swap: return two values in ascending order, exchanging them in one line when they arrive backwards. Practice is a \`match\`: turn an HTTP status code into a label, with \`|\` for the two redirect codes and \`case _\` for everything else.
+
+**Interview nuance:** nobody asks you to recite \`match\` syntax, but everybody reads your code while you write it. A conditional expression inside a \`return\` reads as fluent, and a nested one reads as showing off. The tuple swap is the small tell that you think about what Python evaluates first rather than about assignment statements in sequence. And knowing that \`match\` binds shape rather than just comparing equality is what keeps you from describing it as "Python finally got a switch statement", which is the answer that says you read the release notes and never used it.`,
+    demoCode: `a, b = 9, 4
+a, b = b, a
+print(a, b)                          # 4 9
+
+age = 20
+print("adult" if age >= 18 else "minor")
+
+def label(code):
+    match code:
+        case 200:
+            return "ok"
+        case 301 | 302:
+            return "redirect"
+        case _:
+            return "unknown"
+
+print(label(302))                    # redirect`,
+  },
+  apply: {
+    id: "py-l1-syntax-shorthands-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`ascending(a, b)\`: return the two values as a list in order, \`[smaller, larger]\`.
+
+Do it with a swap. When \`a\` is greater than \`b\`, exchange them in one line with \`a, b = b, a\`, then
+return \`[a, b]\`. Equal values come back unchanged.`,
+    starterCode: `def ascending(a, b):
+    # Swap a and b when they arrive backwards, then return [a, b].
+    pass`,
+    hints: [
+      "One `if` is enough: `if a > b:` is the only case that needs fixing.",
+      "Inside it, `a, b = b, a` exchanges them without a temporary variable.",
+      "Return the list `[a, b]` after the `if`, so both paths share one return.",
+    ],
+    referenceSolution: `def ascending(a, b):
+    if a > b:
+        a, b = b, a
+    return [a, b]`,
+    testCases: [
+      { input: { a: 3, b: 1 }, expected: [1, 3], description: "arrives backwards, so it swaps" },
+      { input: { a: 1, b: 3 }, expected: [1, 3], description: "already in order" },
+      { input: { a: 2, b: 2 }, expected: [2, 2], description: "equal values stay put" },
+      { input: { a: -5, b: -9 }, expected: [-9, -5], description: "negatives order the same way" },
+    ],
+  },
+  practice: {
+    id: "py-l1-syntax-shorthands-practice",
+    executionMode: "single-file",
+    prompt: `Your status dashboard shows raw HTTP codes and on-call keeps having to look them up, so you
+are adding the human labels.
+
+Implement \`status_label(code)\`: return \`"ok"\` for \`200\`, \`"redirect"\` for both \`301\` and \`302\`,
+\`"not found"\` for \`404\`, and \`"unknown"\` for anything else. Write it with \`match\`/\`case\`, using
+\`|\` for the two redirect codes and \`case _\` for the catch-all.`,
+    starterCode: `def status_label(code):
+    # match code, with one case per label and case _ for the rest.
+    pass`,
+    hints: [
+      "Open with `match code:` and give each label its own `case`.",
+      "Two codes can share one branch: `case 301 | 302:`.",
+      '`case _:` is the wildcard, so put it last and return `"unknown"` there.',
+    ],
+    referenceSolution: `def status_label(code):
+    match code:
+        case 200:
+            return "ok"
+        case 301 | 302:
+            return "redirect"
+        case 404:
+            return "not found"
+        case _:
+            return "unknown"`,
+    testCases: [
+      { input: { code: 200 }, expected: "ok", description: "the happy path" },
+      {
+        input: { code: 302 },
+        expected: "redirect",
+        description: "the second of the two redirects",
+      },
+      { input: { code: 404 }, expected: "not found", description: "the one everybody knows" },
+      {
+        input: { code: 503 },
+        expected: "unknown",
+        description: "anything unlisted hits the wildcard",
+      },
+    ],
+  },
+}
+
 const loopsLesson: PythonLesson = {
   id: "py-l1-loops",
   title: "for, while, range & break/continue",
@@ -4645,6 +4894,7 @@ export const level1: PythonLevel = {
       description: "Branch with if/else, repeat with loops, and package logic into functions.",
       lessons: [
         conditionalsLesson,
+        syntaxShorthandsLesson,
         loopsLesson,
         loopIdiomsLesson,
         functionsLesson,
