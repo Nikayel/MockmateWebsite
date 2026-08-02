@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { memoryBandFor } from "@/lib/spaced-repetition/memory-bands"
+import { MIN_REVIEWS_FOR_VERDICT_HUE } from "@/lib/ui/memory-colors"
 import type { CardBelief, LearnerModelPayload } from "@/lib/learner-model/types"
 import { RecallDial } from "./viz/RecallDial"
 
@@ -178,6 +179,7 @@ export function KnowledgeSummary({ model, now = Date.now() }: KnowledgeSummaryPr
                   value={card.retrievability}
                   reviewCount={card.review_count}
                   urgency={card.memory?.urgency ?? null}
+                  suppressed={(card.review_count ?? 0) < MIN_REVIEWS_FOR_VERDICT_HUE}
                   size="md"
                   ariaLabel={card.belief_text ?? undefined}
                 />

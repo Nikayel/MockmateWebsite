@@ -60,6 +60,8 @@ interface RecallDialProps {
   /** Drives the feather width. Fewer reviews, fuzzier end. */
   reviewCount?: number | null
   urgency?: MemoryUrgency | null
+  /** VSUP-lite: mute the verdict hue while the evidence is thin (see memory-colors). */
+  suppressed?: boolean
   size?: keyof typeof SIZE_CLASS
   /** Print the rounded value in the middle. Off for dense rows that label separately. */
   showLabel?: boolean
@@ -75,6 +77,7 @@ export function RecallDial({
   value,
   reviewCount,
   urgency,
+  suppressed,
   size = "md",
   showLabel = true,
   ariaLabel,
@@ -105,7 +108,7 @@ export function RecallDial({
       className={cn(
         "relative shrink-0",
         SIZE_CLASS[size],
-        memoryColorClass(urgency, "ink"),
+        memoryColorClass(urgency, "ink", { suppressed }),
         className
       )}
     >
