@@ -34,3 +34,20 @@ export function memoryBandFor(retention: number): { label: string; urgency: Memo
     MEMORY_STRENGTH_BANDS[MEMORY_STRENGTH_BANDS.length - 1]
   return { label: band.label, urgency: band.urgency }
 }
+
+/**
+ * The ~5-rounded display value, rounded TOWARD its own band.
+ *
+ * Plain nearest-5 rounding lets a card at 68% print "~70%" beside the label
+ * "Weakening" — the shown number sits ON the Good-band floor while the word says it
+ * dropped out, and "why is ~70% weakening?" is the first question an audience asks.
+ * When nearest-5 crosses a band boundary, we round the other way so the number and
+ * the word always tell the same story.
+ */
+export function displayRetention(v: number): number {
+  let shown = Math.round(v / 5) * 5
+  if (memoryBandFor(shown).urgency !== memoryBandFor(v).urgency) {
+    shown = v < shown ? shown - 5 : shown + 5
+  }
+  return shown
+}
