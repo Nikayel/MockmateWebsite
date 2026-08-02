@@ -38,8 +38,11 @@ const LABEL_CLASS = {
  * How much of the arc's end is feathered, as a fraction of the full sweep. Wider
  * means less evidence. Tuned so the difference between 2 reviews and 8 is obvious at
  * the 40px size without the feather swallowing a short arc.
+ *
+ * Exported for testing: "more evidence never looks fuzzier" is the encoding's
+ * contract, and it is far cheaper to assert here than by measuring rendered SVG.
  */
-function featherFor(reviewCount: number | null | undefined): number {
+export function featherFor(reviewCount: number | null | undefined): number {
   const n = reviewCount ?? 0
   if (n <= 1) return 0.11
   if (n <= 2) return 0.085
