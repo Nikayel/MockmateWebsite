@@ -12,8 +12,6 @@ import {
   Map,
   Brain,
   GraduationCap,
-  Database,
-  Network,
   FlaskConical,
   ChevronDown,
   type LucideIcon,
@@ -22,6 +20,8 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut } from "@/lib/auth"
 import { useAuth } from "@/lib/auth-context"
+import { isLearnPath } from "@/components/learn/learn-tracks"
+import { LearnTrackDialog } from "@/components/learn/LearnTrackPicker"
 import { NotificationBell } from "@/components/notification-bell"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { Button } from "@/components/ui/button"
@@ -92,26 +92,15 @@ const APP_NAV: AppNavItem[] = [
   },
 ]
 
-// "Learn" is a three-track hub (Python + SQL + System Design) rather than a single
-// destination, so it renders as a labelled group: a dropdown on desktop, an inline
-// sub-list on mobile. All tracks live under /learn/*, so the parent's active state
-// covers every child.
-type LearnNavChild = { label: string; href: string; icon: LucideIcon }
-
-const LEARN_NAV: {
-  label: string
-  icon: LucideIcon
-  isActive: (pathname: string) => boolean
-  children: LearnNavChild[]
-} = {
+// "Learn" is a multi-track hub (Python + SQL + System Design) rather than a single
+// destination, so the nav entry opens a picker window showing each track's logo
+// instead of navigating. The tracks themselves live in the Learn registry so the
+// header, the window, and /learn can never drift apart. All tracks live under
+// /learn/*, so one prefix covers the active state.
+const LEARN_NAV = {
   label: "Learn",
   icon: GraduationCap,
-  isActive: (pathname) => pathname.startsWith("/learn"),
-  children: [
-    { label: "Python", href: "/learn/python", icon: GraduationCap },
-    { label: "SQL", href: "/learn/sql", icon: Database },
-    { label: "System Design", href: "/learn/system-design", icon: Network },
-  ],
+  isActive: isLearnPath,
 }
 
 // Single source of truth for the marketing (logged-out) nav. Desktop and mobile
@@ -140,6 +129,8 @@ const MARKETING_NAV: MarketingNavItem[] = [
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  // One picker window drives both the desktop nav button and the mobile menu row.
+  const [isLearnPickerOpen, setIsLearnPickerOpen] = useState(false)
   const { user, initialized } = useAuth()
   const pathname = usePathname()
   const userDisplayName = user?.user_metadata?.full_name || user?.email || "Account"
@@ -232,47 +223,21 @@ export function Header() {
                         </Link>
                       )
                     })}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          aria-current={LEARN_NAV.isActive(pathname) ? "page" : undefined}
-                          className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
-                            LEARN_NAV.isActive(pathname)
-                              ? "bg-foreground/10 text-foreground"
-                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                          }`}
-                        >
-                          {LEARN_NAV.label}
-                          <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="start"
-                        className="border-border bg-popover text-popover-foreground w-44 shadow-xl shadow-black/20"
-                      >
-                        {LEARN_NAV.children.map((child) => {
-                          const ChildIcon = child.icon
-                          const childActive = pathname.startsWith(child.href)
-                          return (
-                            <DropdownMenuItem
-                              key={child.href}
-                              asChild
-                              className="focus:bg-foreground/10 cursor-pointer"
-                            >
-                              <Link
-                                href={child.href}
-                                aria-current={childActive ? "page" : undefined}
-                                className="flex items-center gap-2"
-                              >
-                                <ChildIcon className="h-4 w-4" />
-                                {child.label}
-                              </Link>
-                            </DropdownMenuItem>
-                          )
-                        })}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <button
+                      type="button"
+                      onClick={() => setIsLearnPickerOpen(true)}
+                      aria-haspopup="dialog"
+                      aria-expanded={isLearnPickerOpen}
+                      aria-current={LEARN_NAV.isActive(pathname) ? "page" : undefined}
+                      className={`inline-flex cursor-pointer items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
+                        LEARN_NAV.isActive(pathname)
+                          ? "bg-foreground/10 text-foreground"
+                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                      }`}
+                    >
+                      {LEARN_NAV.label}
+                      <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                    </button>
                   </div>
                   <div className="border-border flex items-center space-x-3 border-l pl-4">
                     <ThemeToggle />
@@ -380,30 +345,25 @@ export function Header() {
                         </Link>
                       )
                     })}
-                    <div className="flex flex-col gap-3">
-                      <span className="text-muted-foreground/70 flex items-center gap-2 text-xs font-semibold tracking-wide uppercase">
-                        <LEARN_NAV.icon className="h-3.5 w-3.5" />
-                        {LEARN_NAV.label}
-                      </span>
-                      {LEARN_NAV.children.map((child) => {
-                        const ChildIcon = child.icon
-                        const childActive = pathname.startsWith(child.href)
-                        return (
-                          <Link
-                            key={child.href}
-                            href={child.href}
-                            aria-current={childActive ? "page" : undefined}
-                            className={`ml-1.5 flex items-center space-x-2 transition-colors duration-300 ${
-                              childActive ? "text-accent" : "hover:text-accent text-foreground/90"
-                            }`}
-                            onClick={() => setIsMobileMenuOpen(false)}
-                          >
-                            <ChildIcon className="h-4 w-4" />
-                            <span>{child.label}</span>
-                          </Link>
-                        )
-                      })}
-                    </div>
+                    <button
+                      type="button"
+                      aria-haspopup="dialog"
+                      aria-expanded={isLearnPickerOpen}
+                      aria-current={LEARN_NAV.isActive(pathname) ? "page" : undefined}
+                      className={`flex cursor-pointer items-center space-x-2 transition-colors duration-300 ${
+                        LEARN_NAV.isActive(pathname)
+                          ? "text-accent"
+                          : "hover:text-accent text-foreground/90"
+                      }`}
+                      onClick={() => {
+                        setIsMobileMenuOpen(false)
+                        setIsLearnPickerOpen(true)
+                      }}
+                    >
+                      <LEARN_NAV.icon className="h-4 w-4" />
+                      <span>{LEARN_NAV.label}</span>
+                      <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                    </button>
                     <Link
                       href="/account"
                       className="hover:text-accent text-foreground/90 flex items-center space-x-2 transition-colors duration-300"
@@ -468,6 +428,8 @@ export function Header() {
           )}
         </div>
       </div>
+
+      <LearnTrackDialog open={isLearnPickerOpen} onOpenChange={setIsLearnPickerOpen} />
     </header>
   )
 }
