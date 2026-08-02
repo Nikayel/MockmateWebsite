@@ -1773,6 +1773,30 @@ To build the first-and-last string you will need in the Apply, you combine two i
 
 ## Slicing: half-open ranges
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "slice-stop-is-excluded",
+  "prompt": "word is the string python. What does word[0:3] give you?",
+  "options": [
+    {
+      "label": "pyth, the characters at positions 0 through 3",
+      "feedback": "Tempting, and it is how a range reads in ordinary English: zero through three, four characters. Python slices are half open, so the stop index is where you stop rather than the last character you keep."
+    },
+    {
+      "label": "pyt",
+      "correct": true,
+      "feedback": "Right. The slice runs from start up to but not including stop, so with in-range positive bounds the length is exactly stop minus start."
+    },
+    {
+      "label": "yt, starting just after position 0",
+      "feedback": "Close if you read the start as exclusive too. Only the stop end is excluded; the start index is always included."
+    }
+  ]
+}
+\`\`\`
+
 \`text[start:stop]\` returns a **slice**, a new string running from \`start\` up to *but not including* \`stop\`:
 
 \`\`\`python
@@ -1798,11 +1822,59 @@ word[::-1]   # "nohtyp"  the whole string, reversed
 
 Reversing with \`[::-1]\` is the idiomatic way to test a palindrome: \`text == text[::-1]\`.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "string-item-assignment",
+  "prompt": "word is the string python. You write word[0] = 'P'. What happens?",
+  "options": [
+    {
+      "label": "word becomes Python",
+      "feedback": "Tempting, because that exact syntax works on a list, and a string looks like a sequence of characters you should be able to poke at by position. Strings are immutable: no character can be replaced in place."
+    },
+    {
+      "label": "It raises a TypeError",
+      "correct": true,
+      "feedback": "Right. Strings do not support item assignment. Build a new string instead, for example 'P' + word[1:]."
+    },
+    {
+      "label": "Nothing happens, the line is quietly ignored",
+      "feedback": "Close to what beginners really do experience with strings, since a call like word.upper() genuinely is discarded when nobody captures it. But assigning to an index is an error, not a silent no-op."
+    }
+  ]
+}
+\`\`\`
+
 ## Strings are immutable
 
 You cannot change a character in place. \`word[0] = "P"\` raises \`TypeError\`. Every operation that "modifies" a string actually builds a **new** string and leaves the original untouched. That is why slicing returns a fresh value instead of editing \`word\`.
 
 ### Pitfalls
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "index-raises-slice-clamps",
+  "prompt": "text is the two-character string hi. Compare what text[5] does with what text[0:5] does.",
+  "options": [
+    {
+      "label": "Both raise an IndexError",
+      "feedback": "Tempting, because both ask for positions the string does not have, and consistency would be the kinder design. Slicing is deliberately forgiving in a way indexing is not."
+    },
+    {
+      "label": "text[5] raises an IndexError, text[0:5] returns hi",
+      "correct": true,
+      "feedback": "Right. Indexing has to produce one specific character, so out of range is an error. Slicing clamps to whatever exists and hands that back."
+    },
+    {
+      "label": "text[5] returns an empty string, text[0:5] raises",
+      "feedback": "This is the rule backwards, which is worth noticing: indexing is the strict one. That is why an out-of-bounds index fails loudly while an over-long slice fails silently."
+    }
+  ]
+}
+\`\`\`
 
 - **Indexing out of range raises, slicing does not.** \`"hi"[5]\` raises \`IndexError\`, but \`"hi"[0:5]\` quietly clamps and returns \`"hi"\`. Slicing never errors on out-of-range bounds; single-character indexing does.
 - **The empty string has no characters.** \`""[0]\` raises \`IndexError\`, so \`first_and_last("")\` would blow up. Both exercises assume at least one character, but in real code you check for empty input first.
@@ -1905,6 +1977,30 @@ Common methods. Most return a new string; \`.split()\` returns a list. None of t
 }
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "find-returns-minus-one",
+  "prompt": "'Hello'.find('z') does not raise. It returns -1. Why is that return value worth being careful with?",
+  "options": [
+    {
+      "label": "It is not, since -1 is obviously not a real position",
+      "feedback": "Tempting, because -1 does look like an error code at a glance. In Python -1 is a perfectly ordinary index: it means the last character."
+    },
+    {
+      "label": "text[text.find('z')] quietly returns the last character instead of failing",
+      "correct": true,
+      "feedback": "Right. A miss looks like a valid index, so the bug shows up as wrong data rather than an exception. Compare against -1 first, or use index(), which raises on a miss."
+    },
+    {
+      "label": "It is a string, so comparing it to a number fails",
+      "feedback": "Close, in that a type surprise would be one way this could bite. find returns an int, and that is exactly the problem: it blends in with the real positions it returns on a hit."
+    }
+  ]
+}
+\`\`\`
+
 Because \`.strip()\` and \`.lower()\` each return a string, you can **chain** them left to right. The demo below runs \`messy.strip().lower()\` on \`"  PyThOn  "\`: \`.strip()\` yields \`"PyThOn"\`, then \`.lower()\` turns that into \`"python"\`.
 
 ### f-strings build text from values
@@ -1919,6 +2015,30 @@ f"{name} has {count} messages"   # "Ada has 3 messages"
 
 You can run expressions inside the braces, including method calls. The demo uses \`f"Hi {name.upper()}!"\`, which evaluates \`name.upper()\` to \`"ADA"\` and produces \`"Hi ADA!"\`.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "strip-does-not-mutate",
+  "prompt": "text holds Hello with two spaces on each side. You put text.strip() on a line by itself, then print(text). What prints?",
+  "options": [
+    {
+      "label": "Hello, with the spaces gone",
+      "feedback": "Tempting, because the call clearly did the work, and list methods like append really do change the object in place. Strings are immutable, so strip built a new string and nobody kept it."
+    },
+    {
+      "label": "The original text, spaces and all",
+      "correct": true,
+      "feedback": "Right. The cleaned string was returned and immediately thrown away. Capture it with text = text.strip(), or return the chained expression directly."
+    },
+    {
+      "label": "It raises an error, because the result was never used",
+      "feedback": "Close, in that some linters will warn you about a value going nowhere. Python itself is fine with it: an expression whose result is discarded is ordinary, legal code."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfall: methods do not mutate
 
 Because strings are immutable, this looks like it cleans \`text\` but does nothing:
@@ -1930,6 +2050,31 @@ print(text)         # "  Hello  "   still unchanged
 \`\`\`
 
 You have to **capture** the return value: \`text = text.strip().lower()\`, or \`return\` the chained expression directly. That is exactly the move \`normalize\` needs. Forgetting it is the single most common string bug interns ship.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "plus-equals-in-a-loop",
+  "prompt": "You assemble one long string by writing out += piece inside a loop over n pieces. How much total work is that?",
+  "options": [
+    {
+      "label": "O(n), one step per piece",
+      "feedback": "Tempting, because the loop body is a single line that runs exactly n times, and counting iterations is the usual way to read a loop. Each += builds a whole new string and copies everything gathered so far into it."
+    },
+    {
+      "label": "O(n squared)",
+      "correct": true,
+      "feedback": "Right. You copy 1 character, then 2, then 3, and those copies add up quadratically. Collect the pieces in a list and finish with a single join for linear work."
+    },
+    {
+      "label": "O(n) while the string is short, O(n squared) only once it gets long",
+      "feedback": "Close, and the slowdown really does only become visible at size. But the repeated copying is there from the first iteration: it is the constant factor that hides it early, not a change in shape."
+    }
+  ],
+  "reveal": "Immutability is the thread running through this whole lesson. Nothing edits a string in place, which is why you must capture what a method returns, and why assembling text with join beats assembling it with +=."
+}
+\`\`\`
 
 **Interview nuance:** immutability carries a cost interviewers probe. Building a string with repeated \`+=\` in a loop is O(n squared), because each concatenation copies the entire string so far into a fresh one. For \`n\` pieces that is quadratic work. The fix is \`"".join(parts)\`, which walks the pieces once for O(n). Reach for \`str.join\` over \`+=\` whenever you assemble text from many parts.
 
