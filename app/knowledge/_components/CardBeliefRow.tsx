@@ -137,7 +137,7 @@ export function CardBeliefRow({
               // focusable no-op with aria-expanded=false was a lie to assistive tech.
               <span className="text-foreground truncate text-sm font-medium">{card.title}</span>
             )}
-            <span className={`text-xs ${difficultyColorClass(card.difficulty, "text")}`}>
+            <span className={`text-xs ${difficultyColorClass(card.difficulty, "textOnLight")}`}>
               {card.difficulty}
             </span>
           </div>
