@@ -3118,6 +3118,43 @@ def doubled(nums):
 
 The comprehension allocates a new list, so the caller's data is safe. Prefer this over looping and calling \`nums.append(...)\`, which would edit the caller's list in place.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "shares-or-copies",
+  "prompt": "For each line, does the new name end up on the same object, or is a second object created?",
+  "buckets": ["Both names land on one object", "A second object is created"],
+  "items": [
+    {
+      "label": "b = a",
+      "bucket": "Both names land on one object",
+      "feedback": "Assignment binds another name to the same object. Nothing is copied, ever."
+    },
+    {
+      "label": "b = a[:]",
+      "bucket": "A second object is created",
+      "feedback": "A full slice builds a new outer list. It is shallow, so the items inside are still shared."
+    },
+    {
+      "label": "b = list(a)",
+      "bucket": "A second object is created",
+      "feedback": "Same result as a[:]: a new list built from the same items."
+    },
+    {
+      "label": "b = a.copy()",
+      "bucket": "A second object is created",
+      "feedback": "The explicit shallow copy, and the clearest of the three to read."
+    },
+    {
+      "label": "Passing a to a function whose parameter is named items",
+      "bucket": "Both names land on one object",
+      "feedback": "An argument binds the parameter to the caller's object. That is why a helper can mutate your list out from under you."
+    }
+  ]
+}
+\`\`\`
+
 ### Copy on purpose: shallow vs deep
 
 When you genuinely need a separate copy, do it deliberately. A slice \`a[:]\` or \`list(a)\` makes a shallow copy: a new outer list holding the *same* inner objects.
@@ -3128,11 +3165,59 @@ c.append(99)
 print(a is c)    # False, independent outer lists
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "shallow-copy-shares-inner-lists",
+  "prompt": "grid = [[1, 2], [3, 4]]. You take copy = grid[:] and then set copy[0][0] = 99. What is grid[0][0] now?",
+  "options": [
+    {
+      "label": "1, because grid[:] made a copy",
+      "feedback": "Tempting, and grid[:] really did make a new outer list, so appending a row to copy would leave grid alone. The slice copied the arrows, not the inner lists they point at."
+    },
+    {
+      "label": "99",
+      "correct": true,
+      "feedback": "Right. A slice is a shallow copy: the new outer list holds the very same inner list objects. Use copy.deepcopy when you need the nesting copied too."
+    },
+    {
+      "label": "It raises an error, since copy is a separate list",
+      "feedback": "Close, in that you expect the copy to be sealed off from the original. It is an ordinary list, and the sharing stays invisible right up until something mutates an inner item."
+    }
+  ]
+}
+\`\`\`
+
 For nested structures, a shallow copy still shares the inner objects, so editing \`grid[0][0]\` through the copy changes the original. Use \`copy.deepcopy\` when you need full independence:
 
 \`\`\`python
 import copy
 deep = copy.deepcopy(grid)   # inner lists copied too
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "default-list-shared-across-calls",
+  "prompt": "A logging helper is defined as def record(event, seen=[]). It appends the event to seen and returns it. Two unrelated parts of your program call record(...) without passing seen. What do those two callers share?",
+  "options": [
+    {
+      "label": "Nothing, each call gets its own empty list",
+      "feedback": "Tempting, because the signature reads like a promise of a fresh list per call, and that is what almost everyone assumes on first reading. The default list is created once, when def runs."
+    },
+    {
+      "label": "One list, so each caller sees the other's events",
+      "correct": true,
+      "feedback": "Right. The default object is built at definition time and stored on the function, so every call that omits the argument mutates that same list."
+    },
+    {
+      "label": "One list, but Python resets it each time the function returns",
+      "feedback": "Close, in that a reset is exactly what you would need for the intuitive behaviour. Nothing resets it: the list lives as long as the function object does."
+    }
+  ]
+}
 \`\`\`
 
 ### The mutable-default trap
@@ -3155,6 +3240,31 @@ def append_new(value, bucket=None):   # the safe pattern
 \`\`\`
 
 \`append_new\` is the Practice exercise: use \`None\` as the sentinel and create the list inside.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "why-the-none-sentinel-works",
+  "prompt": "Why does bucket=None, plus an if that assigns bucket = [] inside the body, actually fix the trap?",
+  "options": [
+    {
+      "label": "Because None is immutable, so nothing can accumulate in it",
+      "feedback": "Half the story, and it is true that the default itself can no longer be mutated. What produces a fresh list on each call is that the [] now sits in the body, and the body runs every call."
+    },
+    {
+      "label": "Because the [] now runs inside the body, once per call",
+      "correct": true,
+      "feedback": "Right. Default expressions are evaluated once at def time; body expressions are evaluated on every call. Moving the [] into the body is the entire fix."
+    },
+    {
+      "label": "Because Python special-cases a None default and rebuilds it for you",
+      "feedback": "Tempting, since the pattern is so standard that it feels like a language feature. Python has no special case here: None is just an ordinary sentinel value that your own code checks for."
+    }
+  ],
+  "reveal": "The general rule is worth more than the pattern: a default argument is evaluated once, at definition time, so anything mutable in a signature is shared state. Same reasoning applies to a default dict, set, or object."
+}
+\`\`\`
 
 **Interview nuance:** default arguments are evaluated exactly once at function-definition time and stored on the function object (you can inspect \`bad.__defaults__\`, a tuple holding that one shared list). That is why \`bucket=[]\` accumulates across calls and \`bucket=None\` plus an inside-the-body \`[]\` does not. Interviewers use this to check whether you understand *when* Python evaluates expressions, not just what the syntax looks like.
 
