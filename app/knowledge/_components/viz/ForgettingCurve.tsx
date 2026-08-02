@@ -63,6 +63,13 @@ export function ForgettingCurve({
   // and a history in the same ink.
   const past = points.filter((p) => p.t <= elapsedDays)
   const future = points.filter((p) => p.t >= elapsedDays)
+  // elapsedDays is fractional wall-clock and the curve has 16 samples, so unless it
+  // lands exactly on one, the segment between the flanking samples belonged to
+  // NEITHER path — a visible hole directly under the now-line, the very point the
+  // demo narrates. Re-attaching the last past sample also rescues the case where
+  // only one sample remains ahead, which otherwise dropped the whole forecast tail.
+  const lastPast = past[past.length - 1]
+  const futurePath = lastPast && future[0] !== lastPast ? [lastPast, ...future] : future
   const toPath = (pts: CurvePoint[]) =>
     pts.map((p, i) => `${i === 0 ? "M" : "L"} ${x(p.t).toFixed(2)} ${y(p.r).toFixed(2)}`).join(" ")
 
@@ -127,9 +134,9 @@ export function ForgettingCurve({
             />
           )}
 
-          {future.length >= 2 && (
+          {futurePath.length >= 2 && (
             <path
-              d={toPath(future)}
+              d={toPath(futurePath)}
               fill="none"
               stroke="currentColor"
               strokeWidth={1.75}
