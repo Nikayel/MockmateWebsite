@@ -397,6 +397,382 @@ def first_failing_case(cases):
   },
 }
 
+const happyPathLesson: PythonLesson = {
+  id: "py-l5-happy-path",
+  title: "The happy path is not the test",
+  summary:
+    "Generated code is fitted to the example you gave it, so the example proves nothing. Learn the boundary catalogue and write a probe that separates correct candidates from plausible ones.",
+  estimatedMinutes: 24,
+  difficulty: "medium",
+  skills: ["edge cases", "test design", "code review", "verification"],
+  teach: {
+    estimatedMinutes: 10,
+    markdown: `## Why the example always passes
+
+When you ask for a function and give an example, you have handed over the test. Whatever produced the code, human or model, optimized for that example. So the example passing tells you almost nothing, and the confident tone of the response tells you less.
+
+Here is the shape you will see constantly. The task: "return the second largest distinct value in a list, or None if there is not one." The example: \`[3, 1, 4]\` should give \`3\`.
+
+\`\`\`python
+def second_largest(nums):
+    ordered = sorted(set(nums))
+    return ordered[1] if len(ordered) >= 2 else None
+\`\`\`
+
+Run the example. \`sorted(set([3, 1, 4]))\` is \`[1, 3, 4]\`, and index \`1\` is \`3\`. Correct. It even handles the empty list and the single-value list, which looks like careful work.
+
+It is wrong. \`ordered[1]\` is the second **smallest**. With three distinct values the second smallest and the second largest are the same element, so the example cannot tell them apart. Feed it \`[1, 2, 3, 4]\` and it returns \`2\` where the answer is \`3\`.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "second-largest-index-bug",
+  "prompt": "Which single input proves that second_largest above uses the wrong index?",
+  "options": [
+    {
+      "label": "[] , the empty list",
+      "feedback": "A good habit and the wrong tool here. The guard returns None for an empty list, which is exactly what the contract asks for, so this input passes."
+    },
+    {
+      "label": "[7, 7], two copies of the same value",
+      "feedback": "This is a real boundary and worth testing, but set() collapses it to one value and the guard returns None, which is correct. It catches a different bug than the one in this body."
+    },
+    {
+      "label": "[1, 2, 3, 4], four distinct values",
+      "correct": true,
+      "feedback": "Right. With four distinct values the second smallest is 2 and the second largest is 3, so the two readings finally disagree. Three distinct values would still pass."
+    },
+    {
+      "label": "[-5, -1], two negative values",
+      "feedback": "Negatives are a boundary worth keeping on your list, but sorting handles them correctly. With only two distinct values the second smallest is also the second largest, so the bug stays hidden."
+    }
+  ]
+}
+\`\`\`
+
+## The boundary catalogue
+
+Reviewing well is mostly recall. Keep a short list and walk it against the contract every time.
+
+| Boundary | The input to try | What it catches |
+| --- | --- | --- |
+| Empty | \`[]\`, \`""\`, \`{}\` | indexing, division by length, \`max\` on nothing |
+| One | \`[x]\` | anything that compares neighbours or takes a pair |
+| Two versus many | \`[a, b]\` versus \`[a, b, c, d]\` | index confusion that a short example hides |
+| Duplicates | \`[5, 5]\` | uniqueness assumptions, tie-breaking |
+| All equal | \`[3, 3, 3]\` | ranges, spreads, second-place logic |
+| Zero | \`0\` in the data | division, truthiness, seeded accumulators |
+| Negative | \`-4\` | accumulators seeded at 0, absolute values, clamps |
+| Missing | \`None\` in the data | arithmetic and comparison against None |
+| Order | already sorted, reverse sorted | code that assumes it can stop early |
+
+Nothing on that list is clever. It is a checklist, and a checklist is what makes the review repeatable when you are tired.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "pick-the-boundary",
+  "prompt": "You are reviewing a function that returns the largest gap between consecutive elements of a sorted list of prices. Sort each input by whether it is the happy path or a real boundary for this contract.",
+  "buckets": ["Happy path, proves little", "Boundary worth trying"],
+  "items": [
+    {
+      "label": "[10, 14, 15, 30]",
+      "bucket": "Happy path, proves little",
+      "feedback": "Four increasing prices with distinct gaps is the shape the author had in mind, so it is the input most likely to pass."
+    },
+    {
+      "label": "[12]",
+      "bucket": "Boundary worth trying",
+      "feedback": "One element means zero consecutive pairs, so the function has to decide what a largest gap even means here rather than crash."
+    },
+    {
+      "label": "[8, 8, 8]",
+      "bucket": "Boundary worth trying",
+      "feedback": "All-equal makes every gap zero, which exposes any code that seeded its running maximum with a value it never revisits."
+    },
+    {
+      "label": "[3, 9, 20, 41]",
+      "bucket": "Happy path, proves little",
+      "feedback": "Another well-behaved increasing list. Adding a second happy-path example feels like more coverage and adds none."
+    },
+    {
+      "label": "[]",
+      "bucket": "Boundary worth trying",
+      "feedback": "No elements means no pairs and usually an IndexError or a max() over an empty sequence."
+    }
+  ]
+}
+\`\`\`
+
+## Turning the catalogue into a probe
+
+Reading a boundary list is one thing. The skill that gets you hired is turning it into code that answers a yes or no question about someone else's function.
+
+A **probe** is a function that takes a candidate implementation and returns whether it is correct, by calling it on inputs you chose. It is a test, written from the outside, with no view of the body.
+
+\`\`\`python
+def is_correct(fn):
+    cases = [
+        ([3, 1, 4], 3),        # the happy path, so a broken probe is obvious
+        ([1, 2, 3, 4], 3),     # four distinct values: catches the index confusion
+        ([7, 7], None),        # duplicates collapse to one distinct value
+        ([], None),            # empty
+        ([9], None),           # single
+    ]
+    for nums, expected in cases:
+        if fn(list(nums)) != expected:
+            return False
+    return True
+\`\`\`
+
+Three details in there are worth stealing.
+
+First, \`fn(list(nums))\` passes a **copy**. If the candidate sorts its argument in place, the original case data is corrupted for every later assertion and your probe starts lying.
+
+Second, every case is a pair of input and expected value, so the probe reads as a specification rather than a pile of calls.
+
+Third, the happy path is still in the list. It is not there to catch anything. It is there so that a probe which is itself broken fails loudly on the easy case instead of silently rejecting everything.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "probe-that-never-fails",
+  "prompt": "A colleague's probe is: def is_correct(fn): return fn([3, 1, 4]) == 3. It reports that all six candidate implementations are correct. What has it actually established?",
+  "options": [
+    {
+      "label": "All six are correct, since they agree on the same input",
+      "feedback": "Agreement on one input is not correctness. Six implementations that were all written against the same example will all pass that example, including the broken ones."
+    },
+    {
+      "label": "That all six handle the one input the example already covered",
+      "correct": true,
+      "feedback": "Right. A probe with one happy-path case can only ever confirm the happy path, so a unanimous pass is evidence about the probe, not about the candidates."
+    },
+    {
+      "label": "Nothing at all, because a single assertion is never a test",
+      "feedback": "Too strong. One assertion does establish something real, just something small: these six do not fall over on the ordinary case. The mistake is treating that as a verdict."
+    },
+    {
+      "label": "That the candidates share a bug the probe cannot see",
+      "feedback": "It might be true, and it is the right suspicion to hold, but the probe gives you no evidence either way. You would need a case that separates them before you could claim it."
+    }
+  ]
+}
+\`\`\`
+
+## The probe has to be able to fail
+
+The last rule is the one people skip. Before you trust a probe, run it against an implementation you **know** is broken and confirm it says no. A probe that returns \`True\` for everything is worse than no probe, because it converts an unknown into a false reassurance.
+
+That is exactly how the exercises below are graded: your probe is run against correct candidates and against broken ones, so a probe that always agrees fails immediately.
+
+**Interview nuance:** "how would you test this?" is now a more common interview question than "how would you write this?", and the answer that lands is not a list of frameworks. It is naming two concrete inputs that distinguish a correct implementation from a plausible one, and saying what each is for. That is a thirty second answer and almost nobody gives it.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "happy-path-cumulative",
+  "prompt": "You are asked to verify four candidate implementations of one function. You have time to pick three test inputs. What should they be?",
+  "options": [
+    {
+      "label": "Three realistic inputs drawn from production data",
+      "feedback": "Realistic data is valuable for confidence and terrible for discrimination, because production is mostly ordinary. Three ordinary inputs will usually pass all four candidates."
+    },
+    {
+      "label": "The happy path, plus two boundaries the contract implies",
+      "correct": true,
+      "feedback": "Right. The happy path keeps a broken probe honest, and the boundaries do the separating. The contract tells you which boundaries matter: division, indexing, emptiness, duplicates."
+    },
+    {
+      "label": "Three boundaries, since the happy path is known to pass",
+      "feedback": "Close, and the instinct to spend your budget on boundaries is correct. Dropping the happy path costs you the one case that tells you your own probe still works."
+    },
+    {
+      "label": "One input per candidate, chosen after reading each body",
+      "feedback": "Reading the bodies is useful, but tailoring an input to each one tests your reading rather than the contract. A probe built from the contract catches bugs you did not spot while reading."
+    }
+  ],
+  "reveal": "A probe is a specification you can run. Build it from the contract, include the happy path so it can pass, and prove it can fail before you believe it."
+}
+\`\`\``,
+    demoCode: `def second_largest(nums):
+    ordered = sorted(set(nums))
+    return ordered[1] if len(ordered) >= 2 else None
+
+
+# The example from the ticket, and the input that separates the readings.
+print(second_largest([3, 1, 4]))       # 3, looks right
+print(second_largest([1, 2, 3, 4]))    # 2, and the answer is 3`,
+  },
+  apply: {
+    id: "py-l5-happy-path-apply",
+    executionMode: "single-file",
+    prompt: `Write a function \`check(name)\` that returns \`True\` only when the candidate implementation
+stored under \`name\` is a correct \`second_largest\`, and \`False\` otherwise.
+
+The contract: \`second_largest(nums)\` returns the second largest **distinct** value in \`nums\`, or
+\`None\` when \`nums\` has fewer than two distinct values.
+
+The starter holds four candidates in the \`CANDIDATES\` dictionary. Look up the function with
+\`CANDIDATES[name]\`, call it on inputs you choose, and decide. Two of the four are correct. Your
+answer is graded by running it against correct candidates and broken ones, so \`return True\` fails.
+Keep \`check\` as the last function in the file.`,
+    starterCode: `def alpha(nums):
+    ordered = sorted(set(nums), reverse=True)
+    return ordered[1] if len(ordered) >= 2 else None
+
+
+def beta(nums):
+    if len(nums) < 2:
+        return None
+    return sorted(nums, reverse=True)[1]
+
+
+def gamma(nums):
+    best = None
+    second = None
+    for n in nums:
+        if best is None or n > best:
+            second = best
+            best = n
+        elif n != best and (second is None or n > second):
+            second = n
+    return second
+
+
+def delta(nums):
+    ordered = sorted(set(nums))
+    return ordered[1] if len(ordered) >= 2 else None
+
+
+CANDIDATES = {"alpha": alpha, "beta": beta, "gamma": gamma, "delta": delta}
+
+
+def check(name):
+    # Probe CANDIDATES[name] and return True only if it satisfies the contract.
+    pass`,
+    hints: [
+      "Build a list of `(nums, expected)` pairs from the contract, then call the candidate on each.",
+      "Duplicates separate one broken candidate: `[7, 7]` has only one distinct value, so the answer is None.",
+      "Four distinct values separate the other: with `[1, 2, 3, 4]` the second smallest is 2 and the answer is 3.",
+    ],
+    referenceSolution: `def alpha(nums):
+    ordered = sorted(set(nums), reverse=True)
+    return ordered[1] if len(ordered) >= 2 else None
+
+
+def beta(nums):
+    if len(nums) < 2:
+        return None
+    return sorted(nums, reverse=True)[1]
+
+
+def gamma(nums):
+    best = None
+    second = None
+    for n in nums:
+        if best is None or n > best:
+            second = best
+            best = n
+        elif n != best and (second is None or n > second):
+            second = n
+    return second
+
+
+def delta(nums):
+    ordered = sorted(set(nums))
+    return ordered[1] if len(ordered) >= 2 else None
+
+
+CANDIDATES = {"alpha": alpha, "beta": beta, "gamma": gamma, "delta": delta}
+
+
+def check(name):
+    fn = CANDIDATES[name]
+    cases = [
+        ([3, 1, 4], 3),
+        ([1, 2, 3, 4], 3),
+        ([7, 7], None),
+        ([], None),
+        ([9], None),
+        ([-5, -1, -9], -5),
+    ]
+    for nums, expected in cases:
+        if fn(list(nums)) != expected:
+            return False
+    return True`,
+    testCases: [
+      { input: { name: "alpha" }, expected: true, description: "candidate alpha" },
+      { input: { name: "beta" }, expected: false, description: "candidate beta" },
+      { input: { name: "gamma" }, expected: true, description: "candidate gamma" },
+      { input: { name: "delta" }, expected: false, description: "candidate delta" },
+    ],
+  },
+  practice: {
+    id: "py-l5-happy-path-practice",
+    executionMode: "single-file",
+    prompt: `A marketplace shows a rating summary under every listing. An assistant produced the
+\`summarize_ratings\` function in the starter, it matched the screenshot in the ticket, and it
+shipped. Overnight, every listing with no reviews yet started returning a 500.
+
+Repair \`summarize_ratings\` so it satisfies its contract on the inputs the happy-path example
+never covered.
+
+The contract: \`scores\` is a list where a customer who left a review has an integer rating and a
+customer who did not is recorded as \`None\`. Return a dictionary with \`"count"\` (how many real
+ratings there are), \`"average"\` (their mean, rounded to one decimal place), and \`"top"\` (the
+highest real rating). When there is no real rating at all, return
+\`{"count": 0, "average": 0.0, "top": None}\`.`,
+    starterCode: `def summarize_ratings(scores):
+    # Generated code. It matched the example in the ticket and nothing else.
+    return {
+        "count": len(scores),
+        "average": round(sum(scores) / len(scores), 1),
+        "top": max(scores),
+    }`,
+    hints: [
+      "Filter first: build the list of real ratings with `[s for s in scores if s is not None]`.",
+      "Handle the no-ratings case before any division, indexing, or `max` call.",
+      "`round(sum(real) / len(real), 1)` only runs once you know `real` is non-empty.",
+    ],
+    referenceSolution: `def summarize_ratings(scores):
+    real = [s for s in scores if s is not None]
+    if not real:
+        return {"count": 0, "average": 0.0, "top": None}
+    return {
+        "count": len(real),
+        "average": round(sum(real) / len(real), 1),
+        "top": max(real),
+    }`,
+    testCases: [
+      {
+        input: { scores: [5, 4, 3] },
+        expected: { count: 3, average: 4.0, top: 5 },
+        description: "the example from the ticket still passes",
+      },
+      {
+        input: { scores: [] },
+        expected: { count: 0, average: 0.0, top: null },
+        description: "a listing with no reviews yet",
+      },
+      {
+        input: { scores: [null, null] },
+        expected: { count: 0, average: 0.0, top: null },
+        description: "customers who left no rating",
+      },
+      {
+        input: { scores: [4, null, 5] },
+        expected: { count: 2, average: 4.5, top: 5 },
+        description: "real ratings mixed with blanks",
+      },
+    ],
+  },
+}
+
 export const level5: PythonLevel = {
   id: 5,
   slug: "verification",
@@ -410,7 +786,7 @@ export const level5: PythonLevel = {
       title: "Read It Before You Run It",
       description:
         "Recover the contract, trace the boundary, and find the input that exposes plausible-looking code.",
-      lessons: [traceFirstLesson],
+      lessons: [traceFirstLesson, happyPathLesson],
     },
   ],
 }
