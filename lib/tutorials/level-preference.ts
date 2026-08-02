@@ -17,5 +17,5 @@ export function rememberLevel(levelId: PythonLevelId): void {
 export function recallLevel(): PythonLevelId | null {
   if (typeof window === "undefined") return null
   const value = Number(window.localStorage.getItem(LEVEL_STORAGE_KEY))
-  return value >= 1 && value <= 4 ? (value as PythonLevelId) : null
+  return value >= 1 && value <= 5 ? (value as PythonLevelId) : null
 }

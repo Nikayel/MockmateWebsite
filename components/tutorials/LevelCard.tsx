@@ -14,6 +14,7 @@ const LEVEL_PHASES: Record<PythonLevelId, string[]> = {
   2: ["Read", "Apply", "Practice"],
   3: ["Read", "Apply", "Practice", "Files"],
   4: ["Read", "Apply", "Practice", "Files"],
+  5: ["Read", "Apply", "Practice", "Review"],
 }
 
 export function LevelCard({

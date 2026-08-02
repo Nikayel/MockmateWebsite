@@ -91,4 +91,19 @@ export const LEVEL_PREVIEWS: Record<PythonLevelId, LevelPreview> = {
       [k("assert "), fn("checkout"), p("(cart, "), s('"SAVE10"'), p(") == "), num("45.0")],
     ],
   },
+  5: {
+    filename: "review/refund.py",
+    audience: "Can write Python, now proving you can judge code you did not write",
+    sample: [
+      [c("# an assistant wrote this. it passes the happy path.")],
+      [k("def "), fn("refund"), p("(order, amount):")],
+      [p("    if amount > order.total:")],
+      [p("        return "), k("None")],
+      [p("    order.total -= amount")],
+      [p("    return order.total")],
+      [],
+      [c("# what does it do when amount is negative?")],
+      [k("assert "), fn("refund"), p("(order, "), num("-50"), p(") == ??")],
+    ],
+  },
 }

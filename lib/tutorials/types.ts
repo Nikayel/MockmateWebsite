@@ -33,7 +33,7 @@ export type CourseId = "python" | "sql" | "system-design"
  * serialized shape is unaffected and the progress Zod schema widens in lockstep.
  */
 export type TutorialLevelId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11
-export type PythonLevelId = 1 | 2 | 3 | 4
+export type PythonLevelId = 1 | 2 | 3 | 4 | 5
 
 /** The three phases of every lesson — the spine of the learning loop. */
 export type LessonSection = "teach" | "apply" | "practice"

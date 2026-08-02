@@ -12,7 +12,7 @@ import type { PathLevelSummary } from "@/lib/tutorials/level-path"
  */
 const ALL_PHASES = ["Read", "Apply", "Practice", "Files"] as const
 
-const LEVEL_PHASE_COUNT: Record<PythonLevelId, number> = { 1: 3, 2: 3, 3: 4, 4: 4 }
+const LEVEL_PHASE_COUNT: Record<PythonLevelId, number> = { 1: 3, 2: 3, 3: 4, 4: 4, 5: 4 }
 
 const MAX_CHIPS = 7
 
