@@ -87,11 +87,18 @@ export function ForgettingCurve({
     `Forgetting curve: recall decays from the last review.` +
     (crossingLabel && !full ? ` Currently ${crossingLabel}.` : "")
 
-  // Where the learner is right now. Falls back to the LAST sample when the elapsed
-  // time has outrun the sampled window (a tab left open for days): "at or below the
-  // window's edge" is the honest claim there — the old `?? 0` asserted certain
-  // failure with no data behind it.
-  const nowR = points.find((p) => p.t >= elapsedDays)?.r ?? points[points.length - 1].r
+  // Where the learner is right now, INTERPOLATED between the flanking samples —
+  // taking the next sample's value floated the dot off the curve at now's x, which
+  // is the one place the two must coincide. Still falls back to the last sample when
+  // elapsed has outrun the sampled window (a tab left open for days): "at or below
+  // the window's edge" is the honest claim there, where the old `?? 0` asserted
+  // certain failure with no data behind it.
+  const after = points.find((p) => p.t >= elapsedDays)
+  const before = [...points].reverse().find((p) => p.t <= elapsedDays)
+  const nowR =
+    before && after && after.t !== before.t
+      ? before.r + ((after.r - before.r) * (elapsedDays - before.t)) / (after.t - before.t)
+      : (after ?? points[points.length - 1]).r
 
   return (
     <figure className={cn("m-0", memoryColorClass(urgency, "ink"), className)}>
