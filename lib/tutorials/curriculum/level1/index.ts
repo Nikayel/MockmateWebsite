@@ -1508,11 +1508,91 @@ float("3.5")  # 3.5    text -> float
 str(42)       # "42"   number -> text
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "int-of-empty-string",
+  "prompt": "A form field arrives empty and your code calls int(text) on it. What happens?",
+  "options": [
+    {
+      "label": "It returns 0, treating an empty field as nothing",
+      "feedback": "Tempting, because an empty quantity field really does mean zero in the business sense, and that is usually the behaviour you want. int() will not guess: it needs digits to parse."
+    },
+    {
+      "label": "It raises a ValueError",
+      "correct": true,
+      "feedback": "Right. There is nothing there to parse, so it raises. Check for the empty string before you convert, which is exactly the order parse_or_zero needs."
+    },
+    {
+      "label": "It returns None",
+      "feedback": "Close, in that you are expecting some quiet stand-in for missing data. Python's converters do not return None on bad input; they raise, so the problem cannot travel further into your program."
+    },
+    {
+      "label": "It returns the empty string unchanged",
+      "feedback": "Tempting if you picture int() as leaving alone anything it cannot handle. Conversion functions either produce the new type or raise; they never pass the original value through."
+    }
+  ]
+}
+\`\`\`
+
 \`int()\` is strict. It parses \`"42"\` but raises \`ValueError\` on \`""\`, \`"3.5"\`, or \`"12a"\`. That strictness is why a function like \`parse_or_zero\` has to check for the empty string *before* it calls \`int()\`, not after.
 
 ### Truthiness
 
 In a condition, every value is either **truthy** or **falsy**. Memorise the falsy ones: \`False\`, \`None\`, \`0\`, \`0.0\`, \`""\`, \`[]\`, \`{}\`, and \`()\`. Everything else is truthy.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "falsy-or-truthy",
+  "prompt": "Each of these sits alone in an if. Sort them by whether the block runs.",
+  "buckets": ["Falsy, the block is skipped", "Truthy, the block runs"],
+  "items": [
+    {
+      "label": "0",
+      "bucket": "Falsy, the block is skipped",
+      "feedback": "Zero is the falsy int. Every other number is truthy, including negatives."
+    },
+    {
+      "label": "0.0",
+      "bucket": "Falsy, the block is skipped",
+      "feedback": "The float zero is falsy for the same reason the int zero is."
+    },
+    {
+      "label": "An empty string",
+      "bucket": "Falsy, the block is skipped",
+      "feedback": "No characters means empty, and empty means falsy."
+    },
+    {
+      "label": "A string holding a single space",
+      "bucket": "Truthy, the block runs",
+      "feedback": "A space is a character, so the string is not empty. Whitespace-only input is a classic source of this bug: strip it before you test it."
+    },
+    {
+      "label": "The string '0'",
+      "bucket": "Truthy, the block runs",
+      "feedback": "It spells zero, but truthiness asks whether the string holds characters, not what the text says."
+    },
+    {
+      "label": "An empty list",
+      "bucket": "Falsy, the block is skipped",
+      "feedback": "This is why if items: reads as 'if the list has anything in it'."
+    },
+    {
+      "label": "The list [0]",
+      "bucket": "Truthy, the block runs",
+      "feedback": "The list holds one item, so it is non-empty and truthy, even though that item is itself falsy. Emptiness is about the container, never its contents."
+    },
+    {
+      "label": "None",
+      "bucket": "Falsy, the block is skipped",
+      "feedback": "None is falsy in the same way 0 and the empty string are, which is exactly why if value: cannot tell missing apart from zero."
+    }
+  ]
+}
+\`\`\`
 
 \`\`\`csdiagram
 {
@@ -1540,7 +1620,55 @@ In a condition, every value is either **truthy** or **falsy**. Memorise the fals
 
 That \`A if condition else B\` shape is a **conditional expression**: it evaluates to \`A\` when the condition is truthy, otherwise \`B\`. It is the whole answer to a \`yes_no\`-style helper.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "bool-of-the-word-false",
+  "prompt": "A config file hands you the text False as a string. What does bool('False') return?",
+  "options": [
+    {
+      "label": "False, since that is what the text says",
+      "feedback": "Tempting, because the word is right there and plenty of config libraries do interpret it for you. Plain bool() never reads the text; it only asks whether the string is empty."
+    },
+    {
+      "label": "True",
+      "correct": true,
+      "feedback": "Right. The string has five characters, so it is non-empty and therefore truthy. The same goes for '0'. Compare the text yourself when the word is what matters."
+    },
+    {
+      "label": "It raises a ValueError, since the string is not a boolean",
+      "feedback": "Close to how int('abc') behaves, which is where the instinct comes from. bool() accepts absolutely any object and never raises; it just reports truthiness."
+    }
+  ]
+}
+\`\`\`
+
 One trap: \`bool("False")\` is \`True\` and \`bool("0")\` is \`True\`, because both are non-empty strings. Truthiness asks whether the container is empty, not what the text spells. If you ever need to interpret the *word* \`"false"\`, you must compare the string yourself.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "booleans-are-ints",
+  "prompt": "What does sum([True, False, True]) return?",
+  "options": [
+    {
+      "label": "A TypeError, since you cannot add booleans together",
+      "feedback": "Tempting, because adding true to false has no obvious meaning and most types would refuse. bool is a subclass of int in Python, so booleans already are numbers as far as arithmetic is concerned."
+    },
+    {
+      "label": "2",
+      "correct": true,
+      "feedback": "Right. True is 1 and False is 0, so summing a list of test results counts how many passed. It is a useful one-liner and an easy accident."
+    },
+    {
+      "label": "True, since at least one of the values is True",
+      "feedback": "Close to how any() behaves, and any() really does report whether at least one item is truthy. sum() does arithmetic, not a logical or."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** \`bool\` is a subclass of \`int\` in Python, so \`True\` equals \`1\` and \`False\` equals \`0\`. That means \`sum([True, False, True])\` is \`2\`, a common one-liner for counting how many items pass a test. Interviewers probe this to see if you know \`isinstance(True, int)\` is \`True\`, and that a stray boolean can quietly do arithmetic instead of raising.`,
     demoCode: `print(int("42") + 8)   # 50
