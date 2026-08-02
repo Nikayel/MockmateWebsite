@@ -659,6 +659,30 @@ store/
     cart.py         # depends on catalog
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "init-py-body-runs",
+  "prompt": "store/__init__.py is an empty file. When does Python execute it?",
+  "options": [
+    {
+      "label": "Never. There is nothing in it to run, and its only job is to mark the folder.",
+      "feedback": "Tempting, because an empty file has no visible effect and most projects leave it empty forever. But Python really does execute it, which is why dropping an import or a print in there changes behaviour for every consumer of the package."
+    },
+    {
+      "label": "The first time anything imports store, including a submodule like store.catalog.",
+      "correct": true,
+      "feedback": "Right. The package body runs before any module inside it does. That is why teams put package-wide setup there (re-exports, a version string), and why heavy work in __init__.py taxes every single import."
+    },
+    {
+      "label": "Every time a module inside store is imported.",
+      "feedback": "Close, and it is the natural reading of 'runs when the package is imported'. But a package is cached in sys.modules exactly like a module, so its body runs on the first import and never again."
+    }
+  ]
+}
+\`\`\`
+
 ### Importing across modules
 
 Inside \`cart.py\`, reach a sibling module by its package-qualified path:
@@ -682,6 +706,30 @@ print(cart_total(["apple", "bread"]))   # 5
 \`from store.catalog import price_of\` is an **absolute import**, spelled from the project root. Inside a package you can also write the **relative** form \`from .catalog import price_of\`, where the leading dot means "this package". Relative imports only work inside a package, not in a file you run directly as a script.
 
 ### Pitfalls
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "cycle-error-shape",
+  "prompt": "catalog.py imports from cart.py while cart.py imports from catalog.py. You run the program. What do you actually see?",
+  "options": [
+    {
+      "label": "A clear error naming the cycle, something like 'circular import detected'",
+      "feedback": "Tempting, because that is what a helpful error would say, and linters really do report cycles by that name. Python reports the symptom instead, so the message you get names a missing attribute and says nothing about a cycle."
+    },
+    {
+      "label": "An ImportError or AttributeError about a name that is plainly defined in the file",
+      "correct": true,
+      "feedback": "Right. Whichever module loads second gets the other one half-executed, so the name it wants has not been defined yet. Chasing the missing name is a dead end. The fix is to make the dependency point one way."
+    },
+    {
+      "label": "Nothing. sys.modules caching turns the second import into a no-op, so it works.",
+      "feedback": "Half right, and this is exactly what makes cycles so disorienting. The partly-built module IS handed back from the cache instead of re-running, but 'partly built' is the whole problem: everything defined below the import line is still missing."
+    }
+  ]
+}
+\`\`\`
 
 **Circular imports.** If \`catalog\` imports from \`cart\` while \`cart\` imports from \`catalog\`, whichever module loads second sees the first one only half-built, and you get an \`ImportError\` or \`AttributeError\`. The fix is to point dependencies one way. Here \`cart\` depends on \`catalog\`, never the reverse.
 
@@ -710,9 +758,71 @@ print(cart_total(["apple", "bread"]))   # 5
 
 Read the arrows as "imports from". A healthy package is a graph you can walk in one direction and always reach a leaf.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "run-package-file-directly",
+  "prompt": "You are sitting in the project root, the folder that contains store/. cart.py opens with 'from store.catalog import price_of'. You run: python store/cart.py. What happens?",
+  "options": [
+    {
+      "label": "It runs fine. Your working directory is the project root, so store is importable.",
+      "feedback": "Tempting, because your shell really is in the project root and that is where store lives. But running a file does not put your working directory on the import path, it puts the script's own folder there, and that folder is store/."
+    },
+    {
+      "label": "ModuleNotFoundError: No module named 'store'",
+      "correct": true,
+      "feedback": "Right. sys.path gets store/ (the script's directory), so cart.py and catalog.py are visible as top-level names but the package store is not. Run it as python -m store.cart from the root instead."
+    },
+    {
+      "label": "An ImportError from the cycle between cart and catalog",
+      "feedback": "A real failure mode for packages, and a fair guess right after reading about cycles. But there is no cycle here: catalog imports nothing from cart. This breaks earlier than that, while Python is still trying to locate the package."
+    }
+  ]
+}
+\`\`\`
+
 **Running a package file directly.** \`python store/cart.py\` fails with \`ModuleNotFoundError: No module named 'store'\`, because running a file puts its own folder (\`store/\`) on the import path instead of the project root, so \`store\` is not importable. Run it as a module from the project root with \`python -m store.cart\`, or import it from a top-level script instead. (Had \`cart.py\` used the relative \`from .catalog import price_of\`, the same command would fail differently, with \`attempted relative import with no known parent package\`.)
 
-**Interview nuance:** a module is a singleton. The first import runs the file body and caches the resulting module object in \`sys.modules\`; every later \`import\` returns that same cached object without re-running the file. So top-level code (a \`PRICES\` dict, a database connection) executes exactly once per process, and any module-level state is shared everywhere it is imported. Interviewers probe this when they ask why an import side effect runs only once, or how two modules end up mutating the same object.`,
+**Interview nuance:** a module is a singleton. The first import runs the file body and caches the resulting module object in \`sys.modules\`; every later \`import\` returns that same cached object without re-running the file. So top-level code (a \`PRICES\` dict, a database connection) executes exactly once per process, and any module-level state is shared everywhere it is imported. Interviewers probe this when they ask why an import side effect runs only once, or how two modules end up mutating the same object.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "sibling-import-forms",
+  "prompt": "You are editing store/cart.py and you need price_of from store/catalog.py. The program is started from the project root with: python -m store.cart. Sort each import line by whether it resolves.",
+  "buckets": ["Resolves", "Fails"],
+  "items": [
+    {
+      "label": "from store.catalog import price_of",
+      "bucket": "Resolves",
+      "feedback": "The absolute form, spelled from the project root. It is the safest default because the line reads identically no matter which module you paste it into."
+    },
+    {
+      "label": "from .catalog import price_of",
+      "bucket": "Resolves",
+      "feedback": "The relative form. The single dot means 'this package', and running with -m means the parent package is known, so it resolves."
+    },
+    {
+      "label": "from catalog import price_of",
+      "bucket": "Fails",
+      "feedback": "This asks for a top-level module named catalog. Being a sibling file does not put catalog on the import path, so you get ModuleNotFoundError. It is the most common packaging mistake there is."
+    },
+    {
+      "label": "import store.catalog, then call store.catalog.price_of(name)",
+      "bucket": "Resolves",
+      "feedback": "The other import form. You get the module object bound under its full dotted path, so every call stays qualified. Wordier at the call site, but unambiguous."
+    },
+    {
+      "label": "from ..store.catalog import price_of",
+      "bucket": "Fails",
+      "feedback": "Two dots means the parent of store, which is above the top-level package. Python stops you with 'attempted relative import beyond top-level package'."
+    }
+  ],
+  "reveal": "One rule covers all five: an import is resolved against the import path and the current package, never against the folder your file happens to sit in. In the Practice workspace, cart.py reaches catalog with the absolute form."
+}
+\`\`\``,
     demoCode: `# one file now; a package next
 PRICES = {"apple": 3, "bread": 2}
 
