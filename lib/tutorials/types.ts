@@ -330,3 +330,90 @@ export interface TutorialLessonProgress {
   /** ISO timestamp; omitted while not completed (Firestore rejects `undefined`). */
   completedAt?: string
 }
+
+// ---- item-level research telemetry (append-only — 100% shared across courses) ----
+
+/**
+ * What kind of learner action a `LearnItemResponse` records.
+ *
+ *  - `exercise_run`      one graded run of an apply/practice exercise
+ *  - `check_answer`      one commit of an inline `check` widget
+ *  - `hint_reveal`       the learner opened hint N of M
+ *  - `reference_reveal`  the learner opened the reference solution
+ */
+export type LearnItemResponseKind =
+  | "exercise_run"
+  | "check_answer"
+  | "hint_reveal"
+  | "reference_reveal"
+
+/** One failing assertion, captured for error-taxonomy work. Truncated before write. */
+export interface LearnFailedTest {
+  name?: string
+  expected?: string
+  actual?: string
+  error?: string
+}
+
+/**
+ * One append-only row per learner action inside a lesson, at
+ * `learn_item_responses/${uid}_${itemId}_${epochMs}`.
+ *
+ * Deliberately snake_case: this collection is designed to JOIN with
+ * `algorithm_research_events` (the spaced-repetition research log), which is the
+ * platform's existing research convention. `user_tutorial_progress` stays camelCase
+ * because it is product state, not research data.
+ *
+ * Never overwritten and never deleted on progress reset — a corrected answer is a NEW
+ * row, so the full attempt trajectory survives. `user_id` and `timestamp` are
+ * server-owned.
+ */
+export interface LearnItemResponse {
+  id: string
+  user_id: string
+  /** ISO timestamp, server-stamped. */
+  timestamp: string
+  kind: LearnItemResponseKind
+  course_id: CourseId
+  lesson_id: string
+  level_id: TutorialLevelId
+  /** Stable id of the thing responded to: an exercise id, or a check widget's authored `id`. */
+  item_id: string
+  /** Which phase of the lesson the item lives in. */
+  section: LessonSection
+  /** The lesson's authored knowledge-component tags, denormalized so analysis needs one read. */
+  skills: string[]
+
+  // ---- exercise_run ----
+  /** 1-based index of this run within the session. */
+  attempt_index?: number
+  passed?: boolean
+  tests_total?: number
+  tests_passed?: number
+  /** Up to 3 failing assertions; each field truncated. */
+  failed_tests?: LearnFailedTest[]
+  /** Coarse failure bucket for taxonomy work (e.g. `syntax`, `assertion`, `timeout`, `runtime`). */
+  error_kind?: string
+
+  // ---- check_answer ----
+  check_kind?: "predict" | "classify"
+  /** predict: the chosen option's index. */
+  selected_index?: number
+  /** predict: the chosen option's label, so a re-authored option order stays interpretable. */
+  selected_label?: string
+  /** classify: per-item bucket choices, in authored item order. */
+  selected_buckets?: string[]
+  correct?: boolean
+  /** classify: how many items landed in the right bucket. */
+  correct_count?: number
+  items_total?: number
+  /** 0 on the first commit, incremented on each retry of the same check. */
+  retry_index?: number
+
+  // ---- hint_reveal ----
+  hint_index?: number
+  hints_total?: number
+
+  /** Milliseconds from the item becoming interactive to this action. Client-measured, clamped. */
+  latency_ms?: number
+}
