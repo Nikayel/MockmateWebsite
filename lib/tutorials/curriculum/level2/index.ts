@@ -5160,6 +5160,319 @@ def safe_minutes_between(started, finished):
   },
 }
 
+const itertoolsLesson: PythonLesson = {
+  id: "py-l2-itertools",
+  title: "itertools: chain, islice, groupby & product",
+  summary:
+    "Name the loops you keep rewriting, keep them lazy, and never call groupby on unsorted rows.",
+  estimatedMinutes: 12,
+  difficulty: "medium",
+  skills: ["iteration", "iterators", "laziness", "standard-library"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## The loops you keep rewriting already have names
+
+Most loops are one of a dozen shapes. Flatten a list of lists. Take the first ten of something. Walk runs of equal keys. Pair every item with every other item. \`itertools\` gives each of those shapes a name, and the name is worth more than the saved lines: a reader sees the intent immediately instead of reconstructing it from an accumulator and an index.
+
+Everything in the module returns a lazy iterator, so nothing intermediate is built and the pipeline works just as well on a stream you could never fit in memory.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["What you want", "The hand-written loop", "The itertools name"],
+  "rows": [
+    ["Every item from several lists", "a nested for loop and an append", "chain.from_iterable(chunks)"],
+    ["The first n of something unsliceable", "a counter and a break", "islice(stream, n)"],
+    ["Runs of equal keys", "a previous-key variable and a buffer", "groupby(rows, key=...) over SORTED rows"],
+    ["Every ordered pair", "two nested for loops", "product(items, repeat=2)"],
+    ["Every unordered pair", "a nested loop starting at i + 1", "combinations(items, 2)"]
+  ],
+  "highlightCols": ["The itertools name"],
+  "caption": "Each of these is a loop you could write by hand in four lines. The value is not the line count: a named function says what the loop is FOR, and it hands back a lazy iterator, so nothing intermediate is ever materialised."
+}
+\`\`\`
+
+### \`chain\`: one flat pass over several sources
+
+\`\`\`python
+from itertools import chain
+
+pages = [[1, 2], [3], [], [4, 5]]
+list(chain.from_iterable(pages))     # [1, 2, 3, 4, 5]
+list(chain([1, 2], [3]))             # same idea, sources passed separately
+\`\`\`
+
+\`chain(a, b)\` takes the iterables as arguments; \`chain.from_iterable(pages)\` takes one iterable OF iterables, which is the form you want whenever the sources arrive as a list. Neither builds a combined list, so chaining a hundred files costs one file's worth of memory.
+
+### \`islice\`: slicing something you cannot subscript
+
+A generator has no \`[0:3]\`, because it has no index. \`islice\` gives it one:
+
+\`\`\`python
+from itertools import count, islice
+
+list(islice(count(1), 5))        # [1, 2, 3, 4, 5] out of an infinite counter
+list(islice(rows, 10, 20))       # start and stop, like a slice
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "islice-consumes-the-source",
+  "prompt": "stream is a generator. You call list(islice(stream, 3)) and then call list(islice(stream, 3)) again. What does the second call return?",
+  "options": [
+    {
+      "label": "The same first three items, since islice always starts at the beginning",
+      "feedback": "Tempting, because a list slice really does start from the beginning every time and the syntax is deliberately similar. A generator has no beginning to return to: all it remembers is where it stopped."
+    },
+    {
+      "label": "Items four, five and six, because the first call already consumed three",
+      "correct": true,
+      "feedback": "Right, and it is genuinely useful once you expect it: repeated islice calls are how you read a stream in fixed-size batches without ever holding all of it."
+    },
+    {
+      "label": "An empty list, because the first call closed the generator",
+      "feedback": "Exhausting a generator does finish it for good, but taking three items from a longer one does not exhaust it. It is simply paused at the point where it stopped."
+    },
+    {
+      "label": "It raises StopIteration, since the generator has already been advanced",
+      "feedback": "StopIteration is what the iterator protocol raises internally when a source runs out, and list() catches it and stops building. It is not something that surfaces from a call like this."
+    }
+  ]
+}
+\`\`\`
+
+### \`groupby\`: runs, not groups
+
+This is the one that surprises people, because the name is borrowed from SQL and the behaviour is not. \`groupby\` walks the input once and starts a new group every time the key CHANGES. It is closer to Unix \`uniq\` than to \`GROUP BY\`.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "groupby-only-groups-adjacent-runs",
+  "prompt": "Rows arrive in the order core, web, core, web. You call groupby(rows, key=get_team) without sorting first. How many groups come out?",
+  "options": [
+    {
+      "label": "Two, one per distinct team",
+      "feedback": "Tempting, because that is exactly what SQL GROUP BY and pandas groupby both do, and the name is identical. This one behaves like Unix uniq instead: it opens a new group every time the key changes as it walks."
+    },
+    {
+      "label": "Four, because a new group opens every time the key changes",
+      "correct": true,
+      "feedback": "Right, and nothing warns you. Sort by the same key first so the runs become the groups, which is why sorted(...) and groupby(...) almost always appear together."
+    },
+    {
+      "label": "One, since all the rows share a key eventually",
+      "feedback": "Grouping never reorders anything, so rows that arrive far apart stay far apart. A single group only happens when every row already carries the same key."
+    },
+    {
+      "label": "It raises, because the input is not sorted",
+      "feedback": "A raise would turn this bug into a five second fix. groupby has no way to know your intent, so unsorted input is a perfectly legal request that returns a perfectly useless answer."
+    }
+  ]
+}
+\`\`\`
+
+\`\`\`python
+from itertools import groupby
+
+rows = [{"team": "core"}, {"team": "web"}, {"team": "core"}]
+ordered = sorted(rows, key=lambda row: row["team"])
+{team: len(list(group)) for team, group in groupby(ordered, key=lambda row: row["team"])}
+# {'core': 2, 'web': 1}
+\`\`\`
+
+Sort by the same key you group by, every time. The Practice exercise is exactly this pairing, and skipping the sort is how it fails.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "groupby-groups-expire",
+  "prompt": "You write groups = list(groupby(ordered, key=get_team)) and then loop over groups to count each one. Every count comes out as zero. Why?",
+  "options": [
+    {
+      "label": "The rows were empty to begin with",
+      "feedback": "Always worth ruling out first, and it is not the cause here: the group KEYS all arrived correctly, which could not have happened with no rows at all."
+    },
+    {
+      "label": "Every group is a view over the same underlying iterator, so moving to the next group exhausts the previous one",
+      "correct": true,
+      "feedback": "Right. Consume each group before you advance, which is precisely what the list(group) inside a comprehension does while the group is still live."
+    },
+    {
+      "label": "list() cannot store tuples, so the group halves were dropped",
+      "feedback": "A list stores tuples perfectly well, and the keys really do survive the call. What does not survive is the second half of each pair, because it was a live view rather than a container."
+    },
+    {
+      "label": "groupby requires a key function that returns a hashable value",
+      "feedback": "It does compare keys, so an exotic key type is genuinely awkward. That is a different failure though, and it would show up as wrong grouping rather than as groups that are all empty."
+    }
+  ],
+  "reveal": "Two rules cover every groupby bug: sort by the key first, and consume each group before you move to the next one. A dict comprehension with list(group) inside it satisfies both at once."
+}
+\`\`\`
+
+### \`product\` and \`combinations\`: nested loops with names
+
+\`\`\`python
+from itertools import combinations, permutations, product
+
+list(product("ab", repeat=2))       # [('a','a'), ('a','b'), ('b','a'), ('b','b')]
+list(permutations("abc", 2))        # order matters, no reuse: 6 pairs
+list(combinations("abc", 2))        # order does not matter, no reuse: 3 pairs
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "product-versus-combinations",
+  "prompt": "letters = ['a', 'b', 'c']. How many items are in list(product(letters, repeat=2)), and how many in list(combinations(letters, 2))?",
+  "options": [
+    {
+      "label": "9 and 9, since both of them pair the letters up",
+      "feedback": "They do both produce pairs, which is why the two get mixed up constantly. product allows a letter with itself and counts both orderings while combinations does neither, so the counts cannot possibly match."
+    },
+    {
+      "label": "9 and 3, because product counts every ordered pair including repeats and combinations counts unordered pairs without them",
+      "correct": true,
+      "feedback": "Right: product is your nested for loops with a name, and combinations is choose-two. Decide whether order and reuse matter and the correct function names itself."
+    },
+    {
+      "label": "6 and 3, since product refuses to pair a letter with itself",
+      "feedback": "6 is permutations, which counts order but forbids reuse. product with repeat=2 is the full grid, so aa, bb and cc are all in it."
+    },
+    {
+      "label": "3 and 6, with combinations producing the larger set",
+      "feedback": "Those are the right two numbers in the wrong order. combinations is always the smallest member of the family, because it discards both the repeats and the reorderings."
+    }
+  ]
+}
+\`\`\`
+
+### Pitfalls
+
+- **An iterator is single use.** Anything from \`itertools\` is consumed as you read it, so calling \`list()\` twice on the same object gives you the contents and then an empty list. Materialise once if you need it twice.
+- **\`chain(pages)\` is not \`chain.from_iterable(pages)\`.** The first treats the outer list as a single source and yields the inner lists themselves; the second flattens. It is a silent shape bug rather than an error.
+- **\`groupby\` compares keys with \`==\` on adjacent items only.** It never sorts, hashes, or reorders, so the correctness of your grouping rests entirely on the ordering you handed it.
+
+**Interview nuance:** knowing \`groupby\` groups runs rather than values is a small fact that signals you have actually used the module rather than skimmed the docs. The wider point is worth saying out loud too: \`itertools\` pipelines are lazy, so \`islice(chain.from_iterable(files), 100)\` reads only as much of the first file as it needs and never materialises anything. That is the same streaming argument that makes generators worth reaching for at all.`,
+    demoCode: `from itertools import chain, groupby, islice, product
+
+print(list(chain.from_iterable([[1, 2], [3], [], [4, 5]])))   # [1, 2, 3, 4, 5]
+print(list(islice(range(100), 5)))                            # [0, 1, 2, 3, 4]
+
+rows = [{"team": "core"}, {"team": "web"}, {"team": "core"}]
+ordered = sorted(rows, key=lambda row: row["team"])
+print({t: len(list(g)) for t, g in groupby(ordered, key=lambda row: row["team"])})
+
+unsorted_counts = {t: len(list(g)) for t, g in groupby(rows, key=lambda row: row["team"])}
+print(unsorted_counts)   # {'core': 1, 'web': 1}: the second core run overwrote the first
+
+print(len(list(product("abc", repeat=2))))   # 9`,
+  },
+  apply: {
+    id: "py-l2-itertools-apply",
+    executionMode: "single-file",
+    prompt: `Write a function \`flatten(chunks)\` that returns one flat list holding every item from every list
+in \`chunks\`, in order.
+
+For \`[[1, 2], [3]]\` return \`[1, 2, 3]\`. Empty inner lists contribute nothing. Use
+\`chain.from_iterable\`.`,
+    starterCode: `from itertools import chain
+
+
+def flatten(chunks):
+    # Chain the inner lists into one sequence, then materialise it.
+    pass`,
+    hints: [
+      "`chunks` is one iterable OF iterables, which is the shape `chain.from_iterable` expects.",
+      "`chain.from_iterable(chunks)` is lazy, so it yields items rather than returning a list.",
+      "`return list(chain.from_iterable(chunks))`.",
+    ],
+    referenceSolution: `from itertools import chain
+
+
+def flatten(chunks):
+    return list(chain.from_iterable(chunks))`,
+    testCases: [
+      {
+        input: { chunks: [[1, 2], [3]] },
+        expected: [1, 2, 3],
+        description: "two chunks, flattened in order",
+      },
+      { input: { chunks: [] }, expected: [], description: "no chunks at all" },
+      {
+        input: { chunks: [[], [1], []] },
+        expected: [1],
+        description: "empty chunks contribute nothing",
+      },
+      {
+        input: { chunks: [["a"], ["b", "c"]] },
+        expected: ["a", "b", "c"],
+        description: "strings flatten the same way",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l2-itertools-practice",
+    executionMode: "single-file",
+    prompt: `A daily report counts support tickets per team. The rows come back from the database in arrival
+order, someone reached straight for \`groupby\`, and the report showed eleven teams where there are
+four, because \`groupby\` starts a new group every time the key changes rather than gathering equal
+keys from across the list.
+
+Implement \`count_by_team(tickets)\`: each ticket is a dict with a \`"team"\` key. Return a dict mapping
+each team name to how many tickets it has. Sort by team first, then group, so every team appears
+exactly once.
+
+For \`[{"team": "core"}, {"team": "web"}, {"team": "core"}]\` return \`{"core": 2, "web": 1}\`.`,
+    starterCode: `from itertools import groupby
+
+
+def count_by_team(tickets):
+    # Sort by team, then group by the same key, then count each group.
+    pass`,
+    hints: [
+      "Use one key function for both steps: `sorted(tickets, key=lambda ticket: ticket['team'])`.",
+      "`groupby(ordered, key=...)` yields `(team, group)` pairs, where `group` is a live iterator.",
+      "Count a group while it is still live: `{team: len(list(group)) for team, group in ...}`.",
+    ],
+    referenceSolution: `from itertools import groupby
+
+
+def count_by_team(tickets):
+    ordered = sorted(tickets, key=lambda ticket: ticket["team"])
+    return {
+        team: len(list(group))
+        for team, group in groupby(ordered, key=lambda ticket: ticket["team"])
+    }`,
+    testCases: [
+      {
+        input: { tickets: [{ team: "core" }, { team: "web" }, { team: "core" }] },
+        expected: { core: 2, web: 1 },
+        description: "the same team on non-adjacent rows still counts once",
+      },
+      { input: { tickets: [] }, expected: {}, description: "no tickets" },
+      {
+        input: { tickets: [{ team: "core" }] },
+        expected: { core: 1 },
+        description: "a single ticket",
+      },
+      {
+        input: {
+          tickets: [{ team: "web" }, { team: "core" }, { team: "web" }, { team: "core" }],
+        },
+        expected: { core: 2, web: 2 },
+        description: "fully interleaved rows",
+      },
+    ],
+  },
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // L2-M7: Talking to Services
 // ───────────────────────────────────────────────────────────────────────────
@@ -5506,7 +5819,7 @@ export const level2: PythonLevel = {
       title: "Standard Library Toolkit",
       description:
         "Reach for the batteries: regular expressions, specialized collections, and dates.",
-      lessons: [regexLesson, collectionsToolkitLesson, datetimesLesson],
+      lessons: [regexLesson, collectionsToolkitLesson, datetimesLesson, itertoolsLesson],
     },
     {
       id: "py-l2-services-and-apis",
