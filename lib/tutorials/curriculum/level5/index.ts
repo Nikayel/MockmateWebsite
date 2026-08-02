@@ -1,5 +1,10 @@
 /**
- * Level 5: Judging Code You Did Not Write (single-file).
+ * Level 5: Judging Code You Did Not Write.
+ *
+ * Mostly single-file, plus one workspace module. The four lessons of `py-l5-real-codebases` take the
+ * same skills to repository scale and live in sibling files (`where-the-rule-lives.ts` and friends),
+ * because a multi-file exercise carries its entire repo inline as string constants and would bury
+ * this file.
  *
  * Levels 1-4 all ask the same thing: write a small function from scratch until hidden tests pass.
  * That is the task a 2026 model performs instantly. This level grades the inverse skill, the one
@@ -33,6 +38,10 @@
  *  - The returned value is JSON round-tripped, so tuples arrive as lists and dicts compare key-wise.
  */
 import type { PythonLesson, PythonLevel } from "../../types"
+import { whereTheRuleLivesLesson } from "./where-the-rule-lives"
+import { theOtherCallerLesson } from "./the-other-caller"
+import { pinTheSeamLesson } from "./pin-the-seam"
+import { unsafeSinkLesson } from "./unsafe-sink"
 
 // ───────────────────────────────────────────────────────────────────────────
 // L5-M1: Read It Before You Run It
@@ -4968,8 +4977,12 @@ export const level5: PythonLevel = {
   slug: "verification",
   title: "Level 5: Judging Code You Did Not Write",
   tagline: "Read it, break it, test it, repair it. The review skills that decide what ships.",
+  // Thirteen of the seventeen lessons are single-file, so that stays the level default; the four
+  // real-codebase lessons set `executionMode: "workspace"` on each exercise explicitly.
   defaultExecutionMode: "single-file",
-  estimatedHours: 5,
+  // Sum of the seventeen lessons' estimatedMinutes is 434, so 7 rather than the 5 this carried when
+  // the level ended at the model-calls module.
+  estimatedHours: 7,
   modules: [
     {
       id: "py-l5-read-first",
@@ -4991,6 +5004,23 @@ export const level5: PythonLevel = {
       description:
         "Shrink the failing input, repair without rewriting, and read a solution for the cost it will have in production.",
       lessons: [shrinkLesson, repairLesson, costLesson],
+    },
+    {
+      // Deliberately placed BEFORE the model-calls module, not appended after it. Two reasons.
+      // `reviewPassLesson` closes the level with "everything in this level is a technique, this
+      // lesson is the order you apply them in", so it has to stay last or that framing becomes
+      // false. And this module's first lesson opens with "up to now every exercise in this level fit
+      // in one file", which is only true while every preceding module is single-file. Both of its
+      // backward references (py-l5-shrink in the repair module, py-l5-happy-path in the first) still
+      // resolve from here.
+      //
+      // These four are the only workspace-mode lessons in the level; each lives in its own sibling
+      // file because a multi-file exercise carries its whole repo inline as string constants.
+      id: "py-l5-real-codebases",
+      title: "Judging a Real Codebase",
+      description:
+        "The same verification skills at repository scale: trace the symptom to the layer that owns it, protect the other callers of shared code, pin the bug with a regression test at the right seam, and catch the unsafe change that passes every test.",
+      lessons: [whereTheRuleLivesLesson, theOtherCallerLesson, pinTheSeamLesson, unsafeSinkLesson],
     },
     {
       id: "py-l5-model-calls",
