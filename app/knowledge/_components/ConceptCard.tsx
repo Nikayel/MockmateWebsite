@@ -58,6 +58,15 @@ export function ConceptCard({
             <h3 className="text-foreground font-medium">{concept.label}</h3>
             <span className="text-muted-foreground text-xs">
               {concept.card_count} problem{concept.card_count === 1 ? "" : "s"}
+              {/*
+                Every statistic on this card — the mean, the bar, the belief sentence —
+                is computed over reviewed cards only. Printing just card_count next to a
+                sentence that opens "Across 2 problems" made the header contradict the
+                line directly beneath it.
+              */}
+              {concept.reviewed_count < concept.card_count
+                ? ` · ${concept.reviewed_count} reviewed`
+                : ""}
               {concept.mastered > 0 ? ` · ${concept.mastered} mastered` : ""}
             </span>
           </div>
@@ -87,7 +96,7 @@ export function ConceptCard({
       </button>
 
       {open && (
-        <div className="mt-4 ml-6 divide-y divide-white/5">
+        <div className="divide-border mt-4 ml-6 divide-y">
           {concept.cards.map((card) => (
             <CardBeliefRow
               key={card.problem_id}
