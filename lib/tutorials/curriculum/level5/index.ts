@@ -3792,6 +3792,381 @@ def process_batch(scripts, call_budget):
   },
 }
 
+const validateOutputLesson: PythonLesson = {
+  id: "py-l5-validate-output",
+  title: "Validate the output, always",
+  summary:
+    "A model returns text, not data. Parse it at the boundary, check every field you are about to use, and decide what happens when it does not match.",
+  estimatedMinutes: 24,
+  difficulty: "medium",
+  skills: ["input validation", "json parsing", "defensive programming", "api integration"],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## Text that looks like data is still text
+
+You asked for JSON. You got JSON, in your ten manual tests. On the eleventh call you get this:
+
+\`\`\`text
+Sure! Here is the analysis you asked for:
+
+{"sentiment": "positive", "score": 8}
+
+Let me know if you would like me to adjust anything.
+\`\`\`
+
+\`json.loads\` on that raises \`JSONDecodeError\` on the very first character. The model did nothing wrong by any definition it was given: it produced a helpful message that contains the object. Your code assumed the string **is** the object.
+
+This is the same class of problem as parsing a user-uploaded CSV, and it deserves the same treatment. The boundary between "text from outside" and "data my code relies on" needs one function, and everything past that function is trusted because it was checked.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "prose-wrapped-json",
+  "prompt": "Your code does data = json.loads(response) and the response begins with 'Sure! Here is the analysis:'. What happens?",
+  "options": [
+    {
+      "label": "json.loads skips the leading text and parses the object it finds",
+      "feedback": "That would be convenient and no JSON parser behaves this way. Parsing starts at the first character, and the letter S is not a valid start for any JSON value."
+    },
+    {
+      "label": "It raises JSONDecodeError on the first character",
+      "correct": true,
+      "feedback": "Right, and it raises before any field is looked at, so the failure surfaces as a crash in the handler rather than as a bad value further downstream."
+    },
+    {
+      "label": "It returns the whole response as a string, since a string is valid JSON",
+      "feedback": "A JSON document really can be a bare string, so the instinct is not baseless. That would require the response to be quoted, and unquoted prose is not valid JSON at all."
+    },
+    {
+      "label": "It returns None because the parse failed",
+      "feedback": "Returning None on failure is what a wrapper you write would do, and it is a reasonable design. The standard library signals failure by raising, so unwrapped calls propagate the exception."
+    }
+  ]
+}
+\`\`\`
+
+## The validation boundary
+
+One function. It takes raw text and returns either the value your code wants, or a clear signal that it did not get one.
+
+\`\`\`python
+import json
+
+
+def parse_review(raw):
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        return None
+    try:
+        data = json.loads(raw[start : end + 1])
+    except ValueError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    sentiment = data.get("sentiment")
+    score = data.get("score")
+    if not isinstance(sentiment, str) or not sentiment:
+        return None
+    if isinstance(score, bool) or not isinstance(score, (int, float)):
+        return None
+    return {"sentiment": sentiment, "score": score}
+\`\`\`
+
+Every line is answering a question you would otherwise be answering at 3am.
+
+**Locate the object.** Take everything from the first \`{\` to the last \`}\`. Crude, and it handles the overwhelmingly common case of an object wrapped in friendly prose or a code fence.
+
+**Parse defensively.** \`json.loads\` raises on bad input, so the \`try\` is how failure becomes a return value instead of an escape.
+
+**Check the shape.** Valid JSON can be a list, a number, or the string \`"null"\`. \`data.get(...)\` on a list raises \`AttributeError\`, so the type of the top-level value is checked before anything is read out of it.
+
+**Check every field you will use.** Presence, type, and range are three separate questions. A key can be present and \`None\`. A score can be a string \`"8"\`. A rating meant to be 0 to 10 can be 47.
+
+**Return one normalized shape.** Callers get either the dictionary they expect or \`None\`. They never get a half-validated dictionary with two good fields and one surprise.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "bool-is-an-int",
+  "prompt": "A validator checks the score field with isinstance(score, (int, float)). The model returns {'sentiment': 'positive', 'score': true}. What happens?",
+  "options": [
+    {
+      "label": "The check rejects it, since true is not a number",
+      "feedback": "That is the intent of the line and not what Python does. bool is a subclass of int, so a boolean satisfies an isinstance check against int."
+    },
+    {
+      "label": "The check accepts it, and True is used as a score of 1",
+      "correct": true,
+      "feedback": "Right. bool subclasses int in Python, so True passes the type check and then behaves as 1 in every arithmetic operation downstream. Rule out bool explicitly first."
+    },
+    {
+      "label": "It raises a TypeError when the score is compared to a range",
+      "feedback": "You would want a loud failure and Python gives you a quiet one. True compares to numbers happily, so True < 10 is fine and nothing raises."
+    },
+    {
+      "label": "json.loads rejects it before the check runs",
+      "feedback": "JSON has true and false as first class values, so the document is entirely valid. The parser hands back a Python bool without complaint."
+    }
+  ]
+}
+\`\`\`
+
+## Deciding what a failure means
+
+Returning \`None\` is a decision, not a default. The alternatives are real and the right one depends on what the caller does next.
+
+| Situation | Reasonable response |
+| --- | --- |
+| One item in a batch of a thousand | Skip it, count it, log the raw text |
+| The user is waiting on this one answer | Retry once, then show an honest failure message |
+| The value feeds a payment or a permission | Fail closed, refuse, never guess |
+| The field is decorative, like a suggested title | Fall back to a default and carry on |
+
+What is not acceptable is silently substituting a plausible value. A missing score that becomes \`0\` will be averaged into a dashboard and nobody will ever know the difference between "rated zero" and "never rated". That is the same shape as the swallowed exception from earlier in this level, wearing different clothes.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "validate-or-trust",
+  "prompt": "Sort each field of a parsed model response by whether it needs checking before use.",
+  "buckets": ["Check before using", "Safe to use as parsed"],
+  "items": [
+    {
+      "label": "A score you are about to average into a dashboard",
+      "bucket": "Check before using",
+      "feedback": "Presence, type, and range all matter, because a missing value quietly becoming zero corrupts the average with no visible error."
+    },
+    {
+      "label": "A category name you look up in a dictionary of handlers",
+      "bucket": "Check before using",
+      "feedback": "An unexpected category raises a KeyError at best, and at worst selects a handler you did not intend to expose."
+    },
+    {
+      "label": "The result of json.dumps on a value you built yourself",
+      "bucket": "Safe to use as parsed",
+      "feedback": "This value never left your process, so there is no untrusted boundary between building it and reading it back."
+    },
+    {
+      "label": "A row identifier you are about to write into a database query",
+      "bucket": "Check before using",
+      "feedback": "It arrived as text from outside your system, so it needs the same type and range checking as anything a user typed."
+    },
+    {
+      "label": "A constant defined at the top of your own module",
+      "bucket": "Safe to use as parsed",
+      "feedback": "It is code you wrote and it is checked by review and by the type checker, so no runtime validation is required."
+    }
+  ]
+}
+\`\`\`
+
+## Ask for a shape that is easy to check
+
+There is a design lever here that is worth more than any parsing cleverness. The narrower the shape you ask for, the cheaper validation is. \`{"score": 8}\` is a stronger request than "tell me how positive this is", because you can check the former in three lines and the latter needs a judgment call. A short fixed vocabulary beats free text, and one flat object beats a nested structure whose depth you have to walk.
+
+**Interview nuance:** if you say "the model returns text, so I would validate it at the boundary and decide what a failure means before I wire it into anything", you have described the same architecture you would use for a webhook, a file upload, or a partner API. Interviewers are checking that you treat the model as a normal untrusted input source, because the candidates who do not are the ones who ship a handler that crashes on the first friendly preamble.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "validate-output-cumulative",
+  "prompt": "Your validator finds a response where score is present but is the string '8'. What is the right move?",
+  "options": [
+    {
+      "label": "Call int(score), since the intent is obvious",
+      "feedback": "It works for '8' and quietly extends to '8.5' raising, and to ' 8 ' succeeding. Coercion at the boundary is a decision worth making deliberately rather than by reflex."
+    },
+    {
+      "label": "Treat it as invalid, unless the contract you wrote says a numeric string is acceptable",
+      "correct": true,
+      "feedback": "Right. Either the contract allows a numeric string and the validator converts it deliberately, or it does not and this is a rejection. What matters is that the rule is written down."
+    },
+    {
+      "label": "Accept it as is, since Python will compare it to numbers anyway",
+      "feedback": "Python will not: comparing a string to an int raises TypeError. The failure surfaces far from the boundary, in whatever code does the comparison."
+    },
+    {
+      "label": "Retry the call until the model returns a number",
+      "feedback": "A reasonable step for a genuinely malformed response, and it costs a call every time. Here the response is well formed and the only question is whether your contract accepts this type."
+    }
+  ],
+  "reveal": "Locate, parse, check the shape, check every field you will use, return one normalized value. And decide what a failure means before you need the answer."
+}
+\`\`\``,
+    demoCode: `import json
+
+raw = 'Sure! Here is the analysis:\\n\\n{"sentiment": "positive", "score": 8}\\n\\nHope that helps.'
+
+try:
+    print(json.loads(raw))
+except ValueError as exc:
+    print("raw parse failed:", exc)
+
+start = raw.find("{")
+end = raw.rfind("}")
+print(json.loads(raw[start : end + 1]))`,
+  },
+  apply: {
+    id: "py-l5-validate-output-apply",
+    executionMode: "single-file",
+    prompt: `Write a function \`parse_review(raw)\` that turns the text a model returned into a validated
+dictionary, or returns \`None\` when it cannot.
+
+The contract: \`raw\` should contain a JSON object somewhere in it, possibly wrapped in prose. That
+object must have a \`"sentiment"\` key holding a non-empty string and a \`"score"\` key holding a
+number. On success return \`{"sentiment": <the string>, "score": <the number>}\`. On any failure,
+including text that contains no object, text that is not valid JSON, a top-level value that is not
+an object, a missing key, or a field of the wrong type, return \`None\`.
+
+A boolean counts as a number in Python, so rule it out explicitly. \`json\` is already imported in the
+starter.`,
+    starterCode: `import json
+
+
+def parse_review(raw):
+    # Locate the object, parse it, check every field, and return None on any failure.
+    pass`,
+    hints: [
+      "Slice from `raw.find('{')` to `raw.rfind('}') + 1` before parsing, so surrounding prose is dropped.",
+      "Wrap `json.loads` in `try` / `except ValueError` and return `None` from the except block.",
+      "`isinstance(True, int)` is `True`, so check `isinstance(score, bool)` first and reject it.",
+    ],
+    referenceSolution: `import json
+
+
+def parse_review(raw):
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        return None
+    try:
+        data = json.loads(raw[start : end + 1])
+    except ValueError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    sentiment = data.get("sentiment")
+    score = data.get("score")
+    if not isinstance(sentiment, str) or not sentiment:
+        return None
+    if isinstance(score, bool) or not isinstance(score, (int, float)):
+        return None
+    return {"sentiment": sentiment, "score": score}`,
+    testCases: [
+      {
+        input: { raw: '{"sentiment": "positive", "score": 8}' },
+        expected: { sentiment: "positive", score: 8 },
+        description: "a bare object with both fields",
+      },
+      {
+        input: {
+          raw: 'Here is the result:\n{"sentiment": "negative", "score": 2}\nHope that helps.',
+        },
+        expected: { sentiment: "negative", score: 2 },
+        description: "the object is wrapped in friendly prose",
+      },
+      {
+        input: { raw: '{"sentiment": "neutral", "score": "high"}' },
+        expected: null,
+        description: "the score is a string rather than a number",
+      },
+      {
+        input: { raw: "I was unable to analyse that ticket." },
+        expected: null,
+        description: "no object in the response at all",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l5-validate-output-practice",
+    executionMode: "single-file",
+    prompt: `A nightly job asks a model to tag every support ticket, and the tags feed a dashboard the
+support lead reads each morning. Last week one malformed response reached the dashboard and a whole
+category of tickets vanished from it for three days. Before the pipeline runs, you now want to know
+whether every response in the batch is usable, and which one is not.
+
+Write a function \`first_invalid_index(responses)\` that returns the index of the first response in
+the list that fails validation, or \`-1\` when every response is valid.
+
+A response is valid when it contains a JSON object, possibly wrapped in prose, with an \`"id"\` key
+holding a positive integer and a \`"tags"\` key holding a list in which every element is a string. An
+empty tag list is valid. A boolean counts as an integer in Python, so an \`"id"\` of \`true\` is not
+valid. Keep \`first_invalid_index\` as the last function in the file.`,
+    starterCode: `import json
+
+
+def first_invalid_index(responses):
+    # Return the index of the first response that fails validation, or -1.
+    pass`,
+    hints: [
+      "Write a helper that validates one response and returns True or False, then loop with `enumerate`.",
+      "Check the top-level value is a dict before calling `.get` on it, since valid JSON can be a list.",
+      "`all(isinstance(tag, str) for tag in tags)` checks every element, and is `True` for an empty list.",
+    ],
+    referenceSolution: `import json
+
+
+def is_valid_response(raw):
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        return False
+    try:
+        data = json.loads(raw[start : end + 1])
+    except ValueError:
+        return False
+    if not isinstance(data, dict):
+        return False
+    ticket_id = data.get("id")
+    tags = data.get("tags")
+    if isinstance(ticket_id, bool) or not isinstance(ticket_id, int) or ticket_id <= 0:
+        return False
+    if not isinstance(tags, list):
+        return False
+    return all(isinstance(tag, str) for tag in tags)
+
+
+def first_invalid_index(responses):
+    for index, raw in enumerate(responses):
+        if not is_valid_response(raw):
+            return index
+    return -1`,
+    testCases: [
+      {
+        input: {
+          responses: ['{"id": 1, "tags": ["billing"]}', '{"id": 2, "tags": []}'],
+        },
+        expected: -1,
+        description: "every response is usable",
+      },
+      {
+        input: {
+          responses: ['{"id": 1, "tags": ["a"]}', '{"id": 0, "tags": []}'],
+        },
+        expected: 1,
+        description: "an id that is not positive",
+      },
+      {
+        input: { responses: ['{"id": 3, "tags": "billing"}'] },
+        expected: 0,
+        description: "tags arrived as a string rather than a list",
+      },
+      {
+        input: {
+          responses: ['{"id": 4, "tags": ["a", 5]}', '{"id": 5, "tags": []}'],
+        },
+        expected: 0,
+        description: "one element of the tag list is not a string",
+      },
+    ],
+  },
+}
+
 export const level5: PythonLevel = {
   id: 5,
   slug: "verification",
@@ -3826,7 +4201,7 @@ export const level5: PythonLevel = {
       title: "Calling a Model Like Any Other Unreliable Dependency",
       description:
         "Wrap the call, validate what comes back, and check the API it used actually exists before any of it reaches production.",
-      lessons: [modelDependencyLesson],
+      lessons: [modelDependencyLesson, validateOutputLesson],
     },
   ],
 }
