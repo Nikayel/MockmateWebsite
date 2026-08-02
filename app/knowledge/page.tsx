@@ -298,9 +298,22 @@ export default function KnowledgePage() {
           {error && (
             <div
               role="alert"
-              className="mb-6 rounded-lg border border-rose-600/20 bg-rose-100 p-4 text-sm text-rose-700 dark:border-rose-500/10 dark:bg-rose-500/5 dark:text-rose-400"
+              className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-600/20 bg-rose-100 p-4 text-sm text-rose-700 dark:border-rose-500/10 dark:bg-rose-500/5 dark:text-rose-400"
             >
-              {error}
+              <span>{error}</span>
+              {/* The failure is usually a lapsed token or a blip; a dead end here
+                  forced a full page reload to find out which. */}
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null)
+                  setIsLoading(true)
+                  void fetchModel()
+                }}
+                className="shrink-0 rounded-md border border-rose-600/30 px-3 py-1 font-medium transition-colors hover:bg-rose-200/60 focus-visible:ring-2 focus-visible:ring-rose-600/40 focus-visible:outline-none dark:border-rose-500/30 dark:hover:bg-rose-500/10"
+              >
+                Try again
+              </button>
             </div>
           )}
 
@@ -317,9 +330,20 @@ export default function KnowledgePage() {
 
           {!isLoading && response && !response.enabled && (
             <div className="border-border bg-card/30 rounded-xl border p-6">
-              <p className="text-muted-foreground">
+              <p className="text-foreground mb-2 font-medium">
                 The learner model view isn&apos;t available right now.
               </p>
+              {/* Was a single flat sentence with no route out of the page. */}
+              <p className="text-muted-foreground mb-4 text-sm">
+                Your practice history is still being recorded — nothing is lost. Keep practising and
+                this will fill in.
+              </p>
+              <Link href="/practice">
+                <Button className="bg-card text-foreground hover:bg-muted">
+                  Go to Practice
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
             </div>
           )}
 
