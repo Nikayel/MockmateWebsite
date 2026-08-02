@@ -1928,6 +1928,34 @@ print(Point(1, 2) == Point(1, 2))  # True
 print(Point(1, 2) == Point(3, 4))  # False
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "default-eq-compares-identity",
+  "prompt": "Suppose Point defines __init__ and __repr__ but no __eq__ at all. What is Point(1, 2) == Point(1, 2)?",
+  "options": [
+    {
+      "label": "True, since both objects hold the same x and y",
+      "feedback": "Tempting, because those coordinates are the only thing that distinguishes one point from another, and every test you would write cares about them. Without __eq__ though, Python never looks inside: it compares whether the two names point at the same object."
+    },
+    {
+      "label": "False",
+      "correct": true,
+      "feedback": "Right. The inherited __eq__ is an identity check, and these are two separately built objects. Value equality is something you opt into by writing __eq__."
+    },
+    {
+      "label": "TypeError, because Point does not support the == operator",
+      "feedback": "Every object supports ==, because object itself provides a default. Comparison operators that genuinely can be missing are the ordering ones, so it is < that raises TypeError on a class with no __lt__."
+    },
+    {
+      "label": "NotImplemented, the sentinel a comparison falls back to",
+      "feedback": "NotImplemented is real and it is worth knowing, but it is an internal signal a comparison method returns to say try the other operand. Python turns that into an ordinary identity comparison, and here that answer is False."
+    }
+  ]
+}
+\`\`\`
+
 By default \`==\` compares identity (the same check as \`is\`), so two freshly built points are unequal. Defining \`__eq__\` replaces that with value equality: compare the coordinates that actually matter.
 
 ## Computed attributes with @property
@@ -1946,6 +1974,34 @@ class Circle:
 print(Circle(2).area)   # 12.56636
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "property-is-read-never-called",
+  "prompt": "Circle exposes area as an @property. A caller who is used to methods writes Circle(2).area(). What happens?",
+  "options": [
+    {
+      "label": "It returns 12.56636. The parentheses are harmless either way",
+      "feedback": "Tempting, because area was written with def and looks like a method in the source. The decorator changes what attribute access does: reading .area has already called it, so the value is a float by the time your parentheses are applied."
+    },
+    {
+      "label": "TypeError: 'float' object is not callable",
+      "correct": true,
+      "feedback": "Right, and the error message names the culprit precisely. Read the returned type in that message and you can usually see which property you called by mistake."
+    },
+    {
+      "label": "It returns the bound method, which you then have to call again",
+      "feedback": "That is exactly what happens WITHOUT the @property line, and it is the mirror-image bug: printing circle.area then shows something like a bound method object instead of a number."
+    },
+    {
+      "label": "AttributeError, because area is not really an attribute",
+      "feedback": "It is a genuine attribute, just a computed one: the descriptor protocol runs your function on every read. The lookup succeeds, so the failure is about calling the result, not about finding it."
+    }
+  ]
+}
+\`\`\`
+
 \`Circle(2).area\` runs the method and hands back the number. Writing \`Circle(2).area()\` would raise \`TypeError: 'float' object is not callable\`, because \`area\` already returned a \`float\`.
 
 ### Pitfalls
@@ -1953,6 +2009,34 @@ print(Circle(2).area)   # 12.56636
 - **\`__eq__\` that crashes on foreign types.** \`self.x == other.x\` raises \`AttributeError\` when \`other\` has no \`.x\` (for example \`Point(1, 2) == "hi"\`). Guard with \`isinstance\` and \`return NotImplemented\` so Python falls back to a safe \`False\` instead of blowing up.
 - **Calling a property.** A \`@property\` is read like data (\`circle.area\`), never called (\`circle.area()\`).
 - **Unhashable objects.** Defining \`__eq__\` sets \`__hash__\` to \`None\`, so instances can no longer be dict keys or set members. Add a matching \`__hash__\` (equal objects must hash equal) or use \`@dataclass(frozen=True)\`.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "defining-eq-drops-hash",
+  "prompt": "Your Point class worked fine as a dict key. You add an __eq__ that compares x and y. What else changes?",
+  "options": [
+    {
+      "label": "Nothing else. == simply gets smarter about equal points",
+      "feedback": "Tempting, because adding one method feels like a purely additive change and the equality behaviour is all you asked for. Python quietly sets __hash__ to None at the same time, so the class stops being hashable."
+    },
+    {
+      "label": "Points can no longer be dict keys or set members, because __hash__ is now None",
+      "correct": true,
+      "feedback": "Right, and it fails loudly with TypeError: unhashable type. Define a matching __hash__ over the same fields, or reach for @dataclass(frozen=True), which generates both together."
+    },
+    {
+      "label": "Points become unsortable, because __lt__ is removed at the same time",
+      "feedback": "Ordering and equality are separate protocols, and object never gave you __lt__ to lose. Sorting a list of Points fails for a different reason: no comparison method was ever defined."
+    },
+    {
+      "label": "Comparing a Point to a non-Point now raises TypeError",
+      "feedback": "You are pointing at a real hazard from this lesson, just the wrong one and the wrong exception. An unguarded __eq__ raises AttributeError on a foreign object, which is why you check isinstance and return NotImplemented."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** the hash invariant says objects that compare equal must return the same \`hash()\`. That is exactly why Python drops \`__hash__\` the moment you define \`__eq__\`: keeping the old identity-based hash would let two equal points land in different buckets and quietly break \`set\` and \`dict\` lookups. If you do make a value type hashable, base both \`__eq__\` and \`__hash__\` on the same fields (here, \`(self.x, self.y)\`).`,
     demoCode: `class Circle:
@@ -2098,6 +2182,34 @@ print(User.is_valid(""))                 # False
 
 \`__init__\` can only have one signature. Real data arrives in several shapes: a CSV line, a dict from JSON, a database row. A class method builds the object from each shape and hands the work to the single \`__init__\`.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "hardcoded-class-in-classmethod",
+  "prompt": "from_csv is a @classmethod, but its body hard-codes the class name and returns User(line.split(',')[0]). class Admin(User) inherits it unchanged. What is type(Admin.from_csv('grace,7'))?",
+  "options": [
+    {
+      "label": "Admin, because the call was made on Admin",
+      "feedback": "Tempting, because the call site says Admin and a classmethod really is dispatched on the class you call it from. What comes back is decided by the constructor the body invokes, and that body names User outright."
+    },
+    {
+      "label": "User, and the subclass is silently discarded",
+      "correct": true,
+      "feedback": "Right. cls exists so the alternative constructor builds whatever class it was called on. Hard-coding the name pins the result to the base and every subclass loses its own type."
+    },
+    {
+      "label": "TypeError, because Admin was never passed as cls",
+      "feedback": "cls is passed just fine: Python binds it to Admin on this call. The body simply ignores it, which is worse than an error because there is nothing to notice."
+    },
+    {
+      "label": "AttributeError, since a method cannot refer to its own class by name",
+      "feedback": "It can, and by the time the method runs the class object certainly exists. That is precisely why this bug type-checks, imports cleanly, and ships."
+    }
+  ]
+}
+\`\`\`
+
 The first argument is \`cls\`, not the literal class name, and that difference matters. \`cls(...)\` builds whatever class the call was made on, so a subclass inherits the constructor for free:
 
 \`\`\`python
@@ -2110,6 +2222,34 @@ print(type(Admin.from_csv("grace,7")))   # <class '__main__.Admin'>
 Hard-coding \`User(...)\` inside \`from_csv\` would have returned a \`User\` even when called on \`Admin\`, silently discarding the subclass.
 
 ## The class attribute that everyone shares
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "mutable-class-attribute-is-shared",
+  "prompt": "class Cart has items = [] written directly in the class body. You build a = Cart() and b = Cart(), then run a.items.append('apple'). What is b.items?",
+  "options": [
+    {
+      "label": "[], because each cart gets its own list",
+      "feedback": "Tempting, because the line sits inside the class and reads like a per-object field declaration. The class body runs ONCE, though, so exactly one list object was ever created and both carts see it."
+    },
+    {
+      "label": "['apple']",
+      "correct": true,
+      "feedback": "Right. There is one list, reached through two names. This is the classic shared-state bug, and it usually surfaces as data leaking between users or between test cases."
+    },
+    {
+      "label": "AttributeError, since items belongs to the class rather than the instance",
+      "feedback": "Attribute lookup falls back from the instance to its class, which is what makes a.items resolve at all. That fallback is the whole mechanism behind the surprise."
+    },
+    {
+      "label": "['apple'] when read as Cart.items, but [] when read as b.items",
+      "feedback": "You correctly spotted that the class attribute was mutated. Both spellings reach the same object though: b has no items of its own, so b.items IS Cart.items."
+    }
+  ]
+}
+\`\`\`
 
 A class attribute lives on the class, so every instance sees the same object. Read that as a shared default and it is useful. Mutate it and every instance changes at once.
 
@@ -2147,6 +2287,34 @@ The fix is to create the list per instance, inside \`__init__\`:
 class Cart:
     def __init__(self):
         self.items = []     # a fresh list for every Cart
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "assignment-shadows-instead-of-mutating",
+  "prompt": "Same Cart, still with the shared class-level items = []. This time you write a.items = ['x'] instead of appending. What is b.items now?",
+  "options": [
+    {
+      "label": "['x'], the same outcome as the append version",
+      "feedback": "Tempting, because the two lines look like they do the same job and the append version really did leak. Assignment behaves completely differently: it binds a NEW attribute on a and never touches the object the class holds."
+    },
+    {
+      "label": "[]",
+      "correct": true,
+      "feedback": "Right. a now has its own items that shadows the class one, while b still falls back to the untouched class list. Only mutation leaks, which is exactly why the bug is so hard to catch by reading."
+    },
+    {
+      "label": "['x'] for Cart.items, but [] for b.items",
+      "feedback": "You have b right, and for the right reason. Cart.items is unchanged too though: assigning through an instance creates an instance attribute rather than reaching up and rebinding the class one."
+    },
+    {
+      "label": "AttributeError, because an instance cannot shadow a class attribute",
+      "feedback": "Shadowing is not only allowed, it is the ordinary mechanism: instance attributes always win over class attributes on lookup. That is what makes the fix in __init__ work."
+    }
+  ]
+}
 \`\`\`
 
 ### Pitfalls
