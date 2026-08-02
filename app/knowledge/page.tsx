@@ -18,6 +18,7 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/lib/auth-context"
+import { memoryBandFor } from "@/lib/spaced-repetition/memory-bands"
 import type {
   CardBelief,
   ChallengeReason,
@@ -291,6 +292,19 @@ export default function KnowledgePage() {
   const model = response?.model
   const blackBox = response?.condition === "black_box"
 
+  // The first concept holding an at-risk card opens by default: the evidence IS the
+  // product, and the page's natural state must never present as a wall of closed
+  // bars. Concepts already arrive most-at-risk-first, so this is usually the top one.
+  const defaultOpenPattern = model
+    ? ([...model.concepts, ...model.systems].find((c) =>
+        c.cards.some(
+          (card) =>
+            card.retrievability !== null &&
+            ["warning", "urgent"].includes(memoryBandFor(card.retrievability).urgency)
+        )
+      )?.pattern ?? null)
+    : null
+
   return (
     <div className="bg-background min-h-screen">
       <Header />
@@ -343,7 +357,7 @@ export default function KnowledgePage() {
           )}
 
           {!isLoading && response && !response.enabled && (
-            <div className="border-border bg-card/30 rounded-xl border p-6">
+            <div className="border-border bg-card rounded-xl border p-6">
               <p className="text-foreground mb-2 font-medium">
                 The learner model view isn&apos;t available right now.
               </p>
@@ -366,7 +380,7 @@ export default function KnowledgePage() {
           {!isLoading && model && model.total_cards > 0 && <KnowledgeSummary model={model} />}
 
           {!isLoading && model && model.total_cards === 0 && (
-            <div className="border-border bg-card/30 rounded-xl border p-6 text-center">
+            <div className="border-border bg-card rounded-xl border p-6 text-center">
               <p className="text-foreground mb-2 font-medium">Nothing here yet</p>
               <p className="text-muted-foreground mb-4 text-sm">
                 The system forms beliefs from your practice sessions. Solve a few problems and come
@@ -383,34 +397,46 @@ export default function KnowledgePage() {
 
           {!isLoading && model && model.total_cards > 0 && (
             <div className="space-y-4">
-              {model.concepts.map((concept) => (
-                <ConceptCard
-                  key={concept.pattern}
-                  concept={concept}
-                  challengesEnabled={model.challenges_enabled}
-                  onChallenge={model.challenges_enabled ? setChallengeCard : undefined}
-                  onExpand={handleConceptExpand}
-                  onExpandEvidence={blackBox ? undefined : handleExpandEvidence}
-                  expandedCardId={expandedCardId}
-                  evidenceSlot={evidenceSlot}
-                />
-              ))}
+              {/*
+                One solid group container, concepts divided inside it: each concept
+                as its own translucent card severed the risk strips from each other
+                even though they share one 0-100 axis, and bg-card/30 composited to
+                ~1.03:1 — borders around nothing, the wireframe look.
+              */}
+              <div className="divide-border border-border bg-card divide-y overflow-hidden rounded-xl border shadow-sm">
+                {model.concepts.map((concept) => (
+                  <ConceptCard
+                    key={concept.pattern}
+                    concept={concept}
+                    challengesEnabled={model.challenges_enabled}
+                    onChallenge={model.challenges_enabled ? setChallengeCard : undefined}
+                    onExpand={handleConceptExpand}
+                    onExpandEvidence={blackBox ? undefined : handleExpandEvidence}
+                    expandedCardId={expandedCardId}
+                    evidenceSlot={evidenceSlot}
+                    defaultOpen={concept.pattern === defaultOpenPattern}
+                  />
+                ))}
+              </div>
 
               {model.systems.length > 0 && (
                 <>
                   <h2 className="text-foreground pt-4 text-lg font-medium">Systems</h2>
-                  {model.systems.map((concept) => (
-                    <ConceptCard
-                      key={concept.pattern}
-                      concept={concept}
-                      challengesEnabled={model.challenges_enabled}
-                      onChallenge={model.challenges_enabled ? setChallengeCard : undefined}
-                      onExpand={handleConceptExpand}
-                      onExpandEvidence={blackBox ? undefined : handleExpandEvidence}
-                      expandedCardId={expandedCardId}
-                      evidenceSlot={evidenceSlot}
-                    />
-                  ))}
+                  <div className="divide-border border-border bg-card divide-y overflow-hidden rounded-xl border shadow-sm">
+                    {model.systems.map((concept) => (
+                      <ConceptCard
+                        key={concept.pattern}
+                        concept={concept}
+                        challengesEnabled={model.challenges_enabled}
+                        onChallenge={model.challenges_enabled ? setChallengeCard : undefined}
+                        onExpand={handleConceptExpand}
+                        onExpandEvidence={blackBox ? undefined : handleExpandEvidence}
+                        expandedCardId={expandedCardId}
+                        evidenceSlot={evidenceSlot}
+                        defaultOpen={concept.pattern === defaultOpenPattern}
+                      />
+                    ))}
+                  </div>
                 </>
               )}
 
