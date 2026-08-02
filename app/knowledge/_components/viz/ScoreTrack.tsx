@@ -70,28 +70,52 @@ export function ScoreTrack({
       aria-label={label}
       className={cn("shrink-0 overflow-visible", className)}
     >
+      {/*
+        The retained-score line, drawn. Without it, whether a bar cleared the bar was
+        carried by hue alone (emerald vs rose) — meaningless to red-green colorblind
+        readers and thin for everyone. With the line, pass/fail is position (bar top
+        vs line) and the hue becomes the redundant channel it should be.
+      */}
+      <line
+        x1={0}
+        y1={CHART_HEIGHT - (passingScore / 100) * CHART_HEIGHT}
+        x2={width}
+        y2={CHART_HEIGHT - (passingScore / 100) * CHART_HEIGHT}
+        strokeWidth={0.75}
+        strokeDasharray="1.5 1.5"
+        className="stroke-muted-foreground/60"
+      />
       {scores.map((score, i) => {
         const clamped = Math.min(100, Math.max(0, score))
         const barHeight = Math.max(MIN_BAR_HEIGHT, (clamped / 100) * CHART_HEIGHT)
         const passed = score >= passingScore
         return (
-          <rect
-            key={i}
-            x={i * (BAR_WIDTH + BAR_GAP)}
-            y={CHART_HEIGHT - barHeight}
-            width={BAR_WIDTH}
-            height={barHeight}
-            rx={1}
-            className={cn(
-              passed
-                ? "fill-emerald-500/70 dark:fill-emerald-400/70"
-                : "fill-rose-500/70 dark:fill-rose-400/70",
-              i === lastIndex && "stroke-foreground/40"
-            )}
-            strokeWidth={i === lastIndex ? 0.6 : 0}
-          >
-            <title>{`Review ${i + 1}: ${score}`}</title>
-          </rect>
+          <g key={i}>
+            <title>{`Review ${i + 1}: ${score}${passed ? "" : " (below the retained bar)"}`}</title>
+            <rect
+              x={i * (BAR_WIDTH + BAR_GAP)}
+              y={CHART_HEIGHT - barHeight}
+              width={BAR_WIDTH}
+              height={barHeight}
+              rx={1}
+              className={cn(
+                passed
+                  ? "fill-emerald-500/70 dark:fill-emerald-400/70"
+                  : "fill-rose-500/70 dark:fill-rose-400/70",
+                i === lastIndex && "stroke-foreground/40"
+              )}
+              strokeWidth={i === lastIndex ? 0.6 : 0}
+            />
+            {/* Full-column hit area: the hover/tooltip target is the 6px column, not
+                the 4px mark, per the hit-target-bigger-than-the-mark rule. */}
+            <rect
+              x={i * (BAR_WIDTH + BAR_GAP)}
+              y={0}
+              width={BAR_WIDTH + BAR_GAP}
+              height={CHART_HEIGHT}
+              fill="transparent"
+            />
+          </g>
         )
       })}
     </svg>
