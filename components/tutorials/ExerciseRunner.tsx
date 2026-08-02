@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { CheckCircle2, Eye, FileCode2, Lightbulb, Play, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
@@ -11,7 +11,8 @@ import { ExerciseLayout } from "./ExerciseLayout"
 import { HintList } from "./HintList"
 import { ReadOnlyCodeBlock } from "./ReadOnlyCodeBlock"
 import { useExerciseRun } from "./useExerciseRun"
-import type { PythonExercise } from "@/lib/tutorials/types"
+import { useLessonTelemetry } from "./LessonTelemetryProvider"
+import type { LessonSection, PythonExercise } from "@/lib/tutorials/types"
 import { LessonNotice } from "./LessonNotice"
 
 /**
@@ -27,10 +28,14 @@ export interface ExerciseRunnerProps {
   onPass?: () => void
   /** Fires after each graded run with its pass/fail (drives Sable). */
   onRunResult?: (passed: boolean) => void
+  /** Fires after each graded run with the % of tests passed — the real `lastExerciseScore`. */
+  onScore?: (score: number) => void
   /** Fires when the learner reveals a hint (1-based index, total available). */
   onHintReveal?: (index: number, total: number) => void
   /** Fires when the gated reference solution is revealed. */
   onReferenceReveal?: () => void
+  /** Which lesson phase this runner is mounted in. Tags telemetry; defaults to `"apply"`. */
+  section?: LessonSection
   /** Guided steps (apply) reveal the reference after a few attempts; challenges (practice) never do. */
   canRevealReference?: boolean
   /** Failed attempts before the reference becomes revealable. */
@@ -45,22 +50,35 @@ export function ExerciseRunner({
   onCodeChange,
   onPass,
   onRunResult,
+  onScore,
   onHintReveal,
   onReferenceReveal,
   canRevealReference = false,
   revealReferenceAfter = 2,
+  section = "apply",
   brief,
 }: ExerciseRunnerProps) {
-  const { running, warming, results, runError, attempts, lastRunPassed, run } = useExerciseRun(
-    exercise,
-    {
+  const { record } = useLessonTelemetry()
+  const { running, warming, results, runError, attempts, lastRunPassed, lastScore, run } =
+    useExerciseRun(exercise, {
       onPass,
       onResult: onRunResult,
-    }
-  )
+      section,
+    })
   const [emptyWarning, setEmptyWarning] = useState(false)
   const [hintsShown, setHintsShown] = useState(0)
   const [showReference, setShowReference] = useState(false)
+
+  // Report the graded score upward whenever it changes, so the player can persist the real
+  // pass rate. Reading it off the hook's state (rather than adding another callback into
+  // `useExerciseRun`) keeps the run path single-purpose.
+  const reportedScore = useRef<number | null>(null)
+  useEffect(() => {
+    if (lastScore !== null && lastScore !== reportedScore.current) {
+      reportedScore.current = lastScore
+      onScore?.(lastScore)
+    }
+  }, [lastScore, onScore])
 
   const handleRun = () => {
     if (!code.trim()) {
@@ -121,7 +139,19 @@ export function ExerciseRunner({
             onClick={() =>
               setHintsShown((n) => {
                 const next = Math.min(n + 1, hints.length)
-                if (next > n) onHintReveal?.(next, hints.length)
+                if (next > n) {
+                  onHintReveal?.(next, hints.length)
+                  // How much scaffolding a learner needed before solving is a first-class
+                  // outcome, not UI trivia: two learners who both pass are not equivalent
+                  // if one took three hints.
+                  record({
+                    kind: "hint_reveal",
+                    section,
+                    itemId: exercise.id,
+                    hintIndex: next,
+                    hintsTotal: hints.length,
+                  })
+                }
                 return next
               })
             }
@@ -138,6 +168,12 @@ export function ExerciseRunner({
             onClick={() => {
               setShowReference(true)
               onReferenceReveal?.()
+              record({
+                kind: "reference_reveal",
+                section,
+                itemId: exercise.id,
+                attemptIndex: attempts,
+              })
             }}
             className="gap-2"
           >

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { CheckCircle2, Lock, Play, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
@@ -12,7 +12,7 @@ import { SqlDataPreview } from "./SqlDataPreview"
 import { SqlWorkspaceResult } from "./SqlWorkspaceResult"
 import { useExerciseRun } from "./useExerciseRun"
 import type { WorkspaceScenarioFile } from "@/lib/scenarios/types"
-import type { PythonExercise } from "@/lib/tutorials/types"
+import type { LessonSection, PythonExercise } from "@/lib/tutorials/types"
 import { LessonNotice } from "./LessonNotice"
 
 /**
@@ -36,6 +36,10 @@ export interface WorkspaceExerciseRunnerProps {
   onPass?: () => void
   /** Fires after each graded run with its pass/fail (drives Sable). */
   onRunResult?: (passed: boolean) => void
+  /** Fires after each graded run with the % of tests passed — the real `lastExerciseScore`. */
+  onScore?: (score: number) => void
+  /** Which lesson phase this runner is mounted in. Tags telemetry; defaults to `"practice"`. */
+  section?: LessonSection
   /** Which browser engine warms — drives the cold-start copy. Defaults to "python" (call sites unchanged). */
   engine?: "python" | "sql"
   /**
@@ -61,6 +65,8 @@ export function WorkspaceExerciseRunner({
   workspace,
   onPass,
   onRunResult,
+  onScore,
+  section = "practice",
   engine = "python",
   seedSql,
   brief,
@@ -115,10 +121,24 @@ export function WorkspaceExerciseRunner({
     [edits, starterEdits]
   )
 
-  const { running, warming, results, runError, lastRunPassed, run } = useExerciseRun(exercise, {
-    onPass,
-    onResult: onRunResult,
-  })
+  const { running, warming, results, runError, lastRunPassed, lastScore, run } = useExerciseRun(
+    exercise,
+    {
+      onPass,
+      onResult: onRunResult,
+      section,
+    }
+  )
+
+  // Report the graded score upward whenever it changes, so the player persists the real pass
+  // rate rather than a constant.
+  const reportedScore = useRef<number | null>(null)
+  useEffect(() => {
+    if (lastScore !== null && lastScore !== reportedScore.current) {
+      reportedScore.current = lastScore
+      onScore?.(lastScore)
+    }
+  }, [lastScore, onScore])
 
   const activeFile =
     visibleFiles.find((file) => file.path === activePath) ?? visibleFiles[0] ?? null
