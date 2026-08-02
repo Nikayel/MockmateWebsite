@@ -275,6 +275,30 @@ width = 10             # reassign width only
 print(width * height)  # 30
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "area-is-not-a-live-formula",
+  "prompt": "area = width * height ran while width was 4 and height was 3. You then set width = 10. What does area hold now?",
+  "options": [
+    {
+      "label": "30, because area was defined as width times height",
+      "feedback": "Tempting, because that is exactly how a spreadsheet cell behaves: the formula stays live and recalculates when an input changes. Python is not a spreadsheet."
+    },
+    {
+      "label": "12",
+      "correct": true,
+      "feedback": "Right. area holds the number the multiplication produced at that instant, not a rule for recomputing it. If you want the new area, run the multiplication again."
+    },
+    {
+      "label": "It raises an error, because area is now out of date",
+      "feedback": "Close in spirit, since the value really is stale and probably wrong. Python has no notion of a stale variable, which is precisely what makes this bug quiet enough to ship."
+    }
+  ]
+}
+\`\`\`
+
 Notice that \`area\` is computed once and stays \`12\`. Rebinding \`width\` to \`10\` does not reach back and update \`area\`, because \`area\` holds the number that \`width * height\` produced at that instant, not a live formula.
 
 ### Name things clearly
@@ -297,10 +321,58 @@ def rectangle_area(width, height):
     return width * height   # return the expression directly
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "name-used-before-assignment",
+  "prompt": "The very first line of a script is score = score + 5. What happens?",
+  "options": [
+    {
+      "label": "score becomes 5, since an unset name starts at 0",
+      "feedback": "Tempting, because every counter you have ever written starts at zero and some languages do default a fresh name that way. Python never invents a starting value."
+    },
+    {
+      "label": "It raises a NameError",
+      "correct": true,
+      "feedback": "Right. The right-hand side is evaluated first, so Python tries to read score before anything has been bound to it. Give it a starting value on an earlier line."
+    },
+    {
+      "label": "score becomes None",
+      "feedback": "Close, in that Python does have a value that means nothing here. But an unassigned name is not bound to None, it is not bound at all, so reading it raises instead of returning something."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfalls
 
 - **Reassignment does not recompute earlier results.** As above, \`area\` stays \`12\` after \`width\` changes. If you need the updated area, recompute it: \`area = width * height\`.
 - **Using a name before it is assigned** raises \`NameError\`. The name must be bound on some line that actually runs before you read it, so \`score = score + 5\` fails if \`score\` was never given a starting value.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "assignment-shares-the-object",
+  "prompt": "You run a = [1, 2, 3], then b = a, then b.append(4). What does a hold now?",
+  "options": [
+    {
+      "label": "[1, 2, 3], because b got its own copy",
+      "feedback": "Tempting, and it is indistinguishable from the truth for numbers and strings, where nothing can be changed in place anyway. Assignment never copies an object; it points a second name at the same one."
+    },
+    {
+      "label": "[1, 2, 3, 4]",
+      "correct": true,
+      "feedback": "Right. One list, two names on it, so a change made through b is visible through a. Copy on purpose with list(a) or a[:] when you want independence."
+    },
+    {
+      "label": "It raises an error, because b is not a list",
+      "feedback": "Tempting if you read b = a as storing something other than the list itself. b is the very same list a names, so it accepts every list operation."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** in Python a variable is a name bound to an object, not a box that stores the value. Assignment never copies the object; it just points a name at it. For numbers and strings this is invisible, but the same rule means two names can refer to the *same* list, so mutating through one name is visible through the other. Remembering that "assignment rebinds, it does not copy" is what saves you from aliasing bugs later.`,
     demoCode: `width = 4
@@ -812,6 +884,34 @@ print(square(9))   # 81
 
 \`square\` takes a number rather than a string, but the contract is identical: one value in, one returned value out. The grader still reads what you \`return\`, so a function that prints its answer and returns nothing still fails.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "floor-division-drops-the-decimal",
+  "prompt": "Converting 100 degrees Fahrenheit should give 37.77 and a bit. What does (f - 32) * 5 // 9 give you when f is 100?",
+  "options": [
+    {
+      "label": "37.77 and a bit, the same as with a single slash",
+      "feedback": "Tempting, because both operators look like division and the same numbers go in. But // is floor division: it throws away everything after the decimal point."
+    },
+    {
+      "label": "37.0",
+      "correct": true,
+      "feedback": "Right. // floors the result, and since a float went in a float comes back, so you get 37.0 rather than 37.78. Use a single / in this formula."
+    },
+    {
+      "label": "38.0, because 37.77 rounds up",
+      "feedback": "Close, and this is the most common wrong instinct. Floor division does not round to nearest; it always goes down to the next whole number."
+    },
+    {
+      "label": "A SyntaxError, because // starts a comment",
+      "feedback": "That is true in JavaScript, Java, and C, where // begins a comment, so the instinct travels with you. In Python the comment character is #, and // is an arithmetic operator."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfall: float vs floor division
 
 Both of your exercises divide, so watch the division operator. In Python 3, \`/\` is float division and always yields a \`float\`, even when it divides evenly.
@@ -822,6 +922,31 @@ print(9 // 4)    # 2      floor division, throws away the remainder
 \`\`\`
 
 Two traps in your formulas. First, use \`/\`, not \`//\`. Floor division like \`(f - 32) * 5 // 9\` rounds down (\`//\` floors toward negative infinity), so a result that should be \`37.777...\` comes back as \`37\`. Second, keep the parentheses. \`f - 32 * 5 / 9\` evaluates \`32 * 5 / 9\` first, because \`*\` and \`/\` bind tighter than \`-\`, which is not the conversion you want. Write \`(f - 32)\` so the subtraction happens before the multiply.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "precedence-without-parentheses",
+  "prompt": "You drop the parentheses and write f - 32 * 5 / 9 with f = 212. What comes out?",
+  "options": [
+    {
+      "label": "100.0, the same as the correct formula",
+      "feedback": "Tempting, because the line reads left to right and the pieces are all there. Python does not evaluate left to right: * and / bind tighter than -, so the subtraction happens last."
+    },
+    {
+      "label": "About 194.2",
+      "correct": true,
+      "feedback": "Right. 32 * 5 / 9 runs first and gives about 17.8, which is then subtracted from 212. The parentheses are what force the subtraction to happen first."
+    },
+    {
+      "label": "180.0",
+      "feedback": "Close if you assumed the multiply and the divide cancel out and leave you subtracting 32. They do not: 32 * 5 / 9 is about 17.8, so you never actually compute f - 32."
+    }
+  ],
+  "reveal": "Both traps in this lesson are silent. Neither a stray // nor a missing pair of parentheses raises anything; you just get a number that is quietly wrong, which is why the test cases pin exact values."
+}
+\`\`\`
 
 **Interview nuance:** interviewers favor pure functions, ones whose output depends only on their arguments and that cause no side effects (no printing, no mutating globals). \`to_celsius(212)\` returns \`100.0\` every time, so it is trivial to test, cache, and compose, as in \`to_fahrenheit(to_celsius(212))\`. A function that prints instead of returning cannot be reused or asserted on, which is exactly why "return, do not print" is the first thing a reviewer checks.`,
     demoCode: `def square(n):
