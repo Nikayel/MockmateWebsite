@@ -2384,6 +2384,352 @@ def check(name):
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L5-M3: Debugging Code You Did Not Author
+// ───────────────────────────────────────────────────────────────────────────
+
+const shrinkLesson: PythonLesson = {
+  id: "py-l5-shrink",
+  title: "Shrink the failing input",
+  summary:
+    "A bug report with a 400 row file is not a diagnosis. Cut the input down until removing anything else makes the failure disappear, and the answer is usually visible.",
+  estimatedMinutes: 22,
+  difficulty: "medium",
+  skills: ["debugging", "minimal reproduction", "bisection", "verification"],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## "It fails on the production file"
+
+That sentence is where most debugging sessions start and it contains almost no information. The file has forty thousand rows, the failure is somewhere in the interaction between them, and reading the function again for the fourth time is not going to reveal which.
+
+The move is not to read harder. It is to make the input smaller until it is small enough to understand.
+
+**A minimal reproduction is an input that still fails, where removing any part of it makes the failure go away.** Getting there is mechanical, it needs no insight, and it usually hands you the diagnosis for free, because by the end the input has been reduced to precisely the thing that matters.
+
+## Bisect when the input is a sequence
+
+Halve it. Test the half. Whichever half still fails is your new input. Repeat.
+
+\`\`\`python
+rows = load("production.csv")        # 40000 rows, fails
+first_half = rows[:20000]            # fails    -> keep going here
+first_quarter = rows[:10000]         # passes   -> the trigger is in 10000..20000
+\`\`\`
+
+Sixteen halvings take forty thousand rows down to one. Sixteen. That is the entire reason this technique is worth learning: the cost is logarithmic in the size of the thing you are afraid of.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "bisect-cost",
+  "prompt": "A 40000 row file makes an import crash. Roughly how many runs does halving need to reach a single triggering row?",
+  "options": [
+    {
+      "label": "About 16",
+      "correct": true,
+      "feedback": "Right. Each run halves what is left, and 2 to the 16th is about 65000, so sixteen runs is enough to isolate one row out of forty thousand."
+    },
+    {
+      "label": "About 200, the square root of the row count",
+      "feedback": "Square root is the right instinct for some search problems, and this is not one of them. Halving discards half the remaining candidates every time, which is logarithmic rather than square root."
+    },
+    {
+      "label": "About 40000, since every row has to be tried",
+      "feedback": "That is the cost of scanning one row at a time, which is the method halving replaces. It is also the method most people reach for, which is why the file feels unmanageable."
+    },
+    {
+      "label": "It depends entirely on where the bad row sits",
+      "feedback": "Position matters for a linear scan, where an early row is lucky and a late one is not. Halving is insensitive to it: the count depends on the size of the file, not the location."
+    }
+  ]
+}
+\`\`\`
+
+## Prefixes when the failure depends on history
+
+Halving assumes any subset can be tested on its own. Plenty of failures do not work that way, because the function carries state forward and the bug depends on what came before.
+
+\`\`\`python
+def apply_ops(ops):
+    balance = 100
+    for op in ops:
+        balance += op        # the contract says an op that would overdraw is skipped
+    return balance
+\`\`\`
+
+No single \`op\` is bad here. \`-80\` is fine when the balance is 200 and wrong when the balance is 50. So the unit to shrink is the **prefix**: try \`ops[:1]\`, \`ops[:2]\`, \`ops[:3]\`, and stop at the first length that misbehaves. The last operation in that prefix is the one that tipped it over, and the prefix before it is the state that made it possible.
+
+\`\`\`python
+def shortest_failing_length(ops):
+    for n in range(1, len(ops) + 1):
+        if apply_ops(ops[:n]) != correct_apply(ops[:n]):
+            return n
+    return -1
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "prefix-not-element",
+  "prompt": "For apply_ops above with ops = [10, 20, -500, 5], which shrinking strategy finds the trigger?",
+  "options": [
+    {
+      "label": "Test each operation on its own, since one of them must be the bad one",
+      "feedback": "Every operation is individually harmless: -500 on its own would be skipped by a correct implementation too. Testing them in isolation destroys the state that makes the bug possible."
+    },
+    {
+      "label": "Test growing prefixes and stop at the first length that misbehaves",
+      "correct": true,
+      "feedback": "Right. The balance is carried forward, so the trigger is a position in the sequence rather than a value. The third prefix is the first one where the running balance would go negative."
+    },
+    {
+      "label": "Remove the largest value and see whether the failure goes away",
+      "feedback": "A reasonable heuristic that often works on numeric data, and it does happen to point at -500 here. It gives you no evidence about why, and it fails whenever the trigger is not the extreme value."
+    },
+    {
+      "label": "Sort the operations first, so the shape of the input is normalised",
+      "feedback": "Reordering changes the very thing under test, since this function's behavior depends on the order. A shrunk input has to remain a valid input for the original question."
+    }
+  ]
+}
+\`\`\`
+
+## Shrink the value, not just the length
+
+Once the input is short, keep going on the contents. Replace long strings with short ones, big numbers with small ones, real names with \`"a"\`. Every simplification that preserves the failure removes a thing you would otherwise have to think about.
+
+A good stopping point looks like this:
+
+\`\`\`python
+assert apply_ops([-200]) == 100    # fails: returns -100
+\`\`\`
+
+One operation, round numbers, and the bug is now impossible to misread: the function applied an operation that should have been skipped. Compare that to "the balance is wrong after importing the March file".
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "good-minimal-repro",
+  "prompt": "Sort each reproduction by whether it is finished shrinking or still has work left.",
+  "buckets": ["Small enough to act on", "Still needs shrinking"],
+  "items": [
+    {
+      "label": "assert average([2, None]) == 2.0",
+      "bucket": "Small enough to act on",
+      "feedback": "Two elements, one of which is the suspicious one, and round numbers. Removing either element would change what is being tested."
+    },
+    {
+      "label": "The nightly job fails when run against the staging database",
+      "bucket": "Still needs shrinking",
+      "feedback": "No input is named at all, so nobody can reproduce it without recreating an entire environment first."
+    },
+    {
+      "label": "assert parse('2026-13-01') raises ValueError",
+      "bucket": "Small enough to act on",
+      "feedback": "A single string, and the part that matters, the impossible month, is visible in it without any explanation."
+    },
+    {
+      "label": "It crashes on customers.csv, attached, 12MB",
+      "bucket": "Still needs shrinking",
+      "feedback": "Reproducible, which is genuinely more than most reports offer, but the triggering row is still hidden among tens of thousands of others."
+    },
+    {
+      "label": "It returns the wrong total for orders where the discount is applied twice and the customer is in the EU and the currency is not USD",
+      "bucket": "Still needs shrinking",
+      "feedback": "Three conditions are named and it is unknown which of them matter. Dropping one at a time until the failure disappears is the next step."
+    }
+  ]
+}
+\`\`\`
+
+## Keep the shrunk input
+
+The minimal reproduction is not scaffolding you throw away when the fix lands. It is the regression test, already written, in the form that is easiest to read. Copy it into the suite and name it after what it proves.
+
+**Interview nuance:** given a failing test and a large input, the strongest opening move is out loud: "before I read the function, let me cut this input down." It shows you know that debugging is a search problem rather than a reading problem, and it converts a vague situation into a small one within a minute. Candidates who start by reading the function line by line are still reading it when the time runs out.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "shrink-cumulative",
+  "prompt": "You have shrunk a 40000 row failure down to two rows. Removing either row makes it pass. What have you got?",
+  "options": [
+    {
+      "label": "Two suspicious rows, which you now need to inspect for bad data",
+      "feedback": "Worth a glance, and often the rows turn out to be entirely ordinary. If each is fine on its own then the data is not the story, the interaction between them is."
+    },
+    {
+      "label": "A minimal reproduction, which points at the interaction between them as the bug",
+      "correct": true,
+      "feedback": "Right. Minimality is the finding: neither row triggers it alone, so the defect lives in how the function combines them, such as a duplicate key or an overlapping range."
+    },
+    {
+      "label": "Proof that the file was corrupt",
+      "feedback": "It is a possible explanation and the easiest one to check first. Nothing here supports it though, and blaming the input is how a real defect gets closed as not-a-bug."
+    },
+    {
+      "label": "An input too small to be representative, so you should scale it back up",
+      "feedback": "The worry that a small case is unrealistic is understandable and backwards here. The small input still fails, which makes it exactly as real as the large one and far easier to reason about."
+    }
+  ],
+  "reveal": "Halve when the parts are independent, take prefixes when state is carried forward, then shrink the values too. What you are left with is both the diagnosis and the regression test."
+}
+\`\`\``,
+    demoCode: `def apply_ops(ops):
+    balance = 100
+    for op in ops:
+        balance += op      # the contract says an overdrawing op is skipped
+    return balance
+
+
+for n in range(1, 5):
+    prefix = [10, 20, -500, 5][:n]
+    print(prefix, "->", apply_ops(prefix))`,
+  },
+  apply: {
+    id: "py-l5-shrink-apply",
+    executionMode: "single-file",
+    prompt: `Write a function \`shortest_failing_length(ops)\` that returns the length of the shortest
+prefix of \`ops\` on which \`apply_ops\` disagrees with its contract, or \`-1\` when no prefix does.
+
+The contract: \`apply_ops(ops)\` starts from a balance of \`100\` and applies each operation in order,
+**skipping** any operation that would take the balance below zero. It returns the final balance.
+
+The generated version in the starter never skips anything. No single operation is wrong on its own,
+so shrink by prefix rather than by element. Keep \`shortest_failing_length\` as the last function in
+the file.`,
+    starterCode: `def apply_ops(ops):
+    # Generated code under review. Leave it exactly as it is.
+    balance = 100
+    for op in ops:
+        balance += op
+    return balance
+
+
+def shortest_failing_length(ops):
+    # Return the length of the shortest failing prefix of ops, or -1.
+    pass`,
+    hints: [
+      "Write the correct version first: it is the same loop with an `if balance + op >= 0:` guard.",
+      "Loop `n` from 1 to `len(ops)` and compare the two functions on `ops[:n]`.",
+      "Return `n`, the length, rather than the index of the operation that tipped it over.",
+    ],
+    referenceSolution: `def apply_ops(ops):
+    balance = 100
+    for op in ops:
+        balance += op
+    return balance
+
+
+def correct_apply(ops):
+    balance = 100
+    for op in ops:
+        if balance + op >= 0:
+            balance += op
+    return balance
+
+
+def shortest_failing_length(ops):
+    for n in range(1, len(ops) + 1):
+        if apply_ops(ops[:n]) != correct_apply(ops[:n]):
+            return n
+    return -1`,
+    testCases: [
+      {
+        input: { ops: [-50, -30] },
+        expected: -1,
+        description: "the balance never goes below zero",
+      },
+      {
+        input: { ops: [-50, -80, 10] },
+        expected: 2,
+        description: "the second operation overdraws",
+      },
+      { input: { ops: [-200] }, expected: 1, description: "one operation is enough" },
+      {
+        input: { ops: [10, 20, -500, 5] },
+        expected: 3,
+        description: "two harmless operations first",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l5-shrink-practice",
+    executionMode: "single-file",
+    prompt: `Your latency dashboard went blank overnight and the on-call engineer pasted a list of two
+thousand recorded response times into the ticket with the note "it crashes on this". You need
+something a reviewer can read in one line before you can even start on the fix.
+
+Write a function \`smallest_failing_prefix(times)\` that returns the shortest prefix of \`times\`
+(as a list, with at least one element) on which \`average_response\` disagrees with its contract, or
+an empty list when no prefix does.
+
+The contract: \`average_response(times)\` returns the mean of the recorded times, ignoring any entry
+recorded as \`None\` because that request never completed, and returns \`0.0\` when there is nothing
+left to average. Keep \`smallest_failing_prefix\` as the last function in the file.`,
+    starterCode: `def average_response(times):
+    # Generated code under review. Leave it exactly as it is.
+    return sum(times) / len(times)
+
+
+def smallest_failing_prefix(times):
+    # Return the shortest failing prefix as a list, or [] if there is none.
+    pass`,
+    hints: [
+      "Write the correct version first: filter out the `None` entries, then guard the empty case.",
+      "Try prefixes of length 1, 2, 3 and so on, and return `times[:n]` for the first one that misbehaves.",
+      "A prefix can fail by raising rather than by returning a wrong number, so wrap the call in `try`.",
+    ],
+    referenceSolution: `def average_response(times):
+    return sum(times) / len(times)
+
+
+def correct_average(times):
+    real = [t for t in times if t is not None]
+    if not real:
+        return 0.0
+    return sum(real) / len(real)
+
+
+def smallest_failing_prefix(times):
+    for n in range(1, len(times) + 1):
+        prefix = times[:n]
+        try:
+            actual = average_response(prefix)
+        except Exception:
+            return prefix
+        if actual != correct_average(prefix):
+            return prefix
+    return []`,
+    testCases: [
+      {
+        input: { times: [100, 200, null, 300] },
+        expected: [100, 200, null],
+        description: "the third entry never completed",
+      },
+      {
+        input: { times: [50, 70] },
+        expected: [],
+        description: "every entry completed, so nothing fails",
+      },
+      {
+        input: { times: [null] },
+        expected: [null],
+        description: "the very first entry is the trigger",
+      },
+      {
+        input: { times: [5, null, 7] },
+        expected: [5, null],
+        description: "one good entry before the trigger",
+      },
+    ],
+  },
+}
+
 export const level5: PythonLevel = {
   id: 5,
   slug: "verification",
@@ -2405,6 +2751,13 @@ export const level5: PythonLevel = {
       description:
         "Turn a suspicion into an assertion that fails before the fix, using properties and a reference oracle when examples run out.",
       lessons: [failingTestLesson, propertiesLesson, oracleLesson],
+    },
+    {
+      id: "py-l5-repair",
+      title: "Debugging Code You Did Not Author",
+      description:
+        "Shrink the failing input, repair without rewriting, and read a solution for the cost it will have in production.",
+      lessons: [shrinkLesson],
     },
   ],
 }
