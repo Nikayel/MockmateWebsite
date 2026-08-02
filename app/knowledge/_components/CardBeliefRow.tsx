@@ -46,7 +46,13 @@ export function CardBeliefRow({
   evidenceSlot,
   expanded = false,
 }: CardBeliefRowProps) {
-  const masked = card.retrievability === null && card.belief_text === null
+  // "The model holds no belief about this card" — true in the black-box condition AND
+  // for a never-reviewed card. The old test also required belief_text === null, which
+  // an unreviewed OPEN-condition card fails (model-builder gives it the "No reviews
+  // yet" sentence). That made two things wrong at once: the explanation below was
+  // unreachable in both conditions, and "This seems wrong" appeared on cards with
+  // nothing to dispute — offering to re-grade an attempt that never happened.
+  const noBelief = card.retrievability === null
   const scores = card.scores_history ?? []
   const expandable = Boolean(onExpandEvidence)
 
@@ -78,14 +84,19 @@ export function CardBeliefRow({
     <div className="py-3">
       <div className="flex flex-wrap items-start gap-3">
         {/* The estimate leads: it is the only thing that decides whether to act. */}
-        {card.memory ? (
+        {card.memory && expandable ? (
           <Tooltip>
             <TooltipTrigger asChild>
               {/* Tap/Enter opens the evidence panel — the tooltip is unreachable on
-                  touch, so the trigger must DO something there, not just decorate. */}
+                  touch, so the trigger must DO something there, not just decorate.
+                  It therefore has to declare the same disclosure state as the title
+                  button, or a screen reader hears a control that changes nothing.
+                  aria-controls only while expanded: the id does not exist until then. */}
               <button
                 type="button"
                 onClick={() => onExpandEvidence?.(card)}
+                aria-expanded={expanded}
+                aria-controls={expanded ? `evidence-${card.problem_id}` : undefined}
                 className="mt-1 shrink-0 cursor-help rounded"
               >
                 {bar}
@@ -115,7 +126,7 @@ export function CardBeliefRow({
               <button
                 onClick={() => onExpandEvidence?.(card)}
                 aria-expanded={expanded}
-                aria-controls={`evidence-${card.problem_id}`}
+                aria-controls={expanded ? `evidence-${card.problem_id}` : undefined}
                 className="group text-foreground -my-0.5 flex min-w-0 items-center gap-1.5 rounded py-0.5 text-left text-sm font-medium"
               >
                 <span className="truncate">{card.title}</span>
@@ -131,7 +142,7 @@ export function CardBeliefRow({
             </span>
           </div>
 
-          {!masked && scores.length > 0 && (
+          {!noBelief && scores.length > 0 && (
             <div className="mt-1.5 flex items-center gap-2">
               <ScoreTrack scores={scores} />
               <span className="text-muted-foreground text-xs">
@@ -141,8 +152,9 @@ export function CardBeliefRow({
             </div>
           )}
 
-          {/* Masked rows keep whatever the black-box condition left behind. */}
-          {masked && card.belief_text && (
+          {/* The model's own explanation for having no belief: "No reviews yet" in the
+              open condition, nothing at all in black-box (belief_text is masked there). */}
+          {noBelief && card.belief_text && (
             <p className="text-muted-foreground mt-1 text-xs italic">{card.belief_text}</p>
           )}
         </div>
@@ -150,7 +162,7 @@ export function CardBeliefRow({
         {/* Below sm the actions wrap to their own full-width line instead of
             crushing the title column to a sliver at 360px. */}
         <div className="flex w-full shrink-0 items-center gap-1.5 sm:w-auto">
-          {challengesEnabled && onChallenge && !masked && (
+          {challengesEnabled && onChallenge && !noBelief && (
             <button
               type="button"
               onClick={() => onChallenge(card)}
