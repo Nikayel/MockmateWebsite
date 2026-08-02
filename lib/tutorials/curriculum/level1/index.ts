@@ -2175,6 +2175,30 @@ nums.remove(20)     # [5, 10, 30, 40]        remove the first 20
 
 The demo below starts from \`[10, 20, 30]\`, calls \`append(40)\`, and prints \`[10, 20, 30, 40]\`, so \`nums[-1]\` is \`40\` and \`len(nums)\` is \`4\`. Notice \`append\` returns \`None\`: it mutates the list and hands nothing back, which is exactly why the Apply task asks you to \`append\` and then \`return items\` on a separate step.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "sort-returns-none",
+  "prompt": "You write nums = nums.sort() and then print(nums). What prints?",
+  "options": [
+    {
+      "label": "The sorted list",
+      "feedback": "Tempting, because sort really did sort the list and the line reads like every other assignment you write. sort mutates in place and returns None, so the assignment overwrites your list with None."
+    },
+    {
+      "label": "None",
+      "correct": true,
+      "feedback": "Right. Call nums.sort() on its own line to reorder in place, or write nums = sorted(nums) when you want a new list to bind to."
+    },
+    {
+      "label": "The original list, still unsorted",
+      "feedback": "Close, in that the sorting feels wasted here. It did happen, in place, and then the assignment threw the sorted list away and stored None over it."
+    }
+  ]
+}
+\`\`\`
+
 That split, mutate here and return there, applies to every list operation:
 
 \`\`\`csdiagram
@@ -2195,6 +2219,30 @@ That split, mutate here and return there, applies to every list operation:
 }
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "helper-mutates-callers-list",
+  "prompt": "A helper is written as def add_zero(items): items.append(0) followed by return items. You call it with your list scores, then print scores. What do you see?",
+  "options": [
+    {
+      "label": "scores unchanged, since the helper worked on its own copy",
+      "feedback": "Tempting, because passing an argument feels like handing over a value for the function to keep. Python binds the parameter to the caller's object; no copy is made on the way in."
+    },
+    {
+      "label": "scores with a 0 on the end",
+      "correct": true,
+      "feedback": "Right. There is one list and append mutated it. A helper that should not touch its input has to build and return a new list instead."
+    },
+    {
+      "label": "An error, because a function cannot change a variable outside itself",
+      "feedback": "Close, and rebinding really is local: writing items = [] inside the function would leave scores alone. Mutating the object the name points at is a different act, and it is visible everywhere."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfall: aliasing shares one object
 
 Assignment copies the reference, not the list. Both names then point at the same object:
@@ -2209,6 +2257,30 @@ print(a)        # [1, 2, 3, 4]   a changed too
 If you wanted an independent copy, make one explicitly with \`a[:]\`, \`list(a)\`, or \`a.copy()\`. Interns lose hours to a helper that quietly mutates the caller's list.
 
 For the Practice task, the middle index is \`len(items) // 2\`. Integer division \`//\` floors the result, so a 5-item list gives index \`2\`, landing on the true center \`30\`. On an even-length list it picks the right-of-center item, which is the intended, deterministic rule.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "pop-front-is-linear",
+  "prompt": "You drain a queue by calling items.pop(0) over and over until the list is empty. Why does that crawl on a large list?",
+  "options": [
+    {
+      "label": "pop has to search the list for the item it should remove",
+      "feedback": "Tempting, because remove(value) really does search. pop takes a position, so no searching happens; the cost is somewhere else."
+    },
+    {
+      "label": "Every remaining element shifts one slot to the left on each pop",
+      "correct": true,
+      "feedback": "Right. A list is a contiguous array, so removing from the front is O(n), and doing it n times is O(n squared). Reach for collections.deque when you need a fast front."
+    },
+    {
+      "label": "The backing array is resized and copied on every pop",
+      "feedback": "Close, and resizing does happen now and then as a list shrinks. The dominant cost here is the shift of every later element, which happens on every single pop rather than occasionally."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** know the cost of each operation. Indexing and \`append\` are effectively O(1) (append is amortized O(1) because the backing array over-allocates), but \`insert(0, x)\`, \`remove\`, and \`pop(0)\` are O(n) because every later element shifts one slot. If a problem needs fast inserts or removes at the front, that is the signal to reach for \`collections.deque\` instead of a list.`,
     demoCode: `nums = [10, 20, 30]
