@@ -2827,6 +2827,30 @@ const loggingErrorsLesson: PythonLevel["modules"][number]["lessons"][number] = {
 
 A logger is a named channel. You grab one per module with \`logging.getLogger(__name__)\` and emit at a level: \`debug\`, \`info\`, \`warning\`, \`error\`, \`critical\`. Where those messages go (console, file, or both) and how verbose they are is configured once, at program start, not at each call site:
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "logger-info-invisible",
+  "prompt": "A fresh script does logger = logging.getLogger(__name__) and then logger.info('job started'). There is no other logging setup anywhere. What shows up on the console?",
+  "options": [
+    {
+      "label": "The line prints. info is a normal severity and logging is imported.",
+      "feedback": "Tempting, because info sounds like the everyday level and it is the one most people reach for first. A logger's effective level starts at WARNING, so info sits below the bar and never gets emitted."
+    },
+    {
+      "label": "Nothing, and no error either. The default effective level is WARNING.",
+      "correct": true,
+      "feedback": "Right. The record is discarded in silence, which is why 'my logs vanished' is almost always this. One call to logging.basicConfig(level=logging.INFO) at startup lowers the bar."
+    },
+    {
+      "label": "Nothing, plus a complaint that no handler was configured.",
+      "feedback": "Close, and that complaint genuinely existed in older Python: 'No handlers could be found for logger'. Modern Python ships a last-resort handler instead, so this call produces no output of any kind."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`csdiagram
 {
   "type": "table",
@@ -2853,6 +2877,30 @@ logger.info("processing %d records", len(records))
 logger.warning("skipping bad record: %r", raw)
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "percent-args-vs-fstring",
+  "prompt": "Library code writes logger.debug('row %r failed', raw) rather than logger.debug(f'row {raw!r} failed'). Debug logging is switched off in production. What does the first form buy you?",
+  "options": [
+    {
+      "label": "Nothing real. f-strings are the fastest formatting in Python, so this is just an old habit.",
+      "feedback": "Tempting, because f-strings genuinely are the fastest way to build a string, and for ordinary code they are the right default. The saving here is not building the string at all."
+    },
+    {
+      "label": "logging formats the message only if the record will be emitted, so with debug off nothing is formatted.",
+      "correct": true,
+      "feedback": "Right. logging checks isEnabledFor before doing any interpolation. The f-string version builds its string eagerly on every call, including the millions of calls that end up logging nothing."
+    },
+    {
+      "label": "It is required. logging cannot accept an already-formatted string.",
+      "feedback": "Not so: handing logging a finished string is perfectly legal and extremely common. It simply gives up the lazy formatting, which is the one and only reason to prefer the %-style call."
+    }
+  ]
+}
+\`\`\`
+
 Note the \`%d\` and \`%r\` with trailing args instead of an f-string. \`logging\` interpolates the message only if the record is actually emitted (more on that below).
 
 ### Error boundaries: raise low, catch high
@@ -2876,11 +2924,78 @@ print(safe_total(["1", "x", "3"]))   # 4
 
 ### Pitfalls
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "catch-narrow-not-broad",
+  "prompt": "Your batch loop must skip rows that fail to parse, so you write: except Exception: continue. Weeks later someone introduces a typo in the loop body that references a name which does not exist. What does the job do?",
+  "options": [
+    {
+      "label": "It crashes with NameError, so the typo is found on the very next run.",
+      "feedback": "That is what you want to happen, and it is exactly what a narrow except ValueError would have given you. except Exception catches NameError too, so the typo is swallowed once per row instead."
+    },
+    {
+      "label": "It skips every row and reports success with a total of zero.",
+      "correct": true,
+      "feedback": "Right. A broad except turns a real defect into silence, and silence is far more expensive to debug than a crash. Catch the specific type you expect so genuine bugs still surface."
+    },
+    {
+      "label": "Nothing changes, because NameError is not a subclass of Exception.",
+      "feedback": "Tempting, because a few exceptions really do sit outside it: KeyboardInterrupt and SystemExit inherit from BaseException, which is why a bare except: is even worse. NameError is an ordinary Exception."
+    }
+  ]
+}
+\`\`\`
+
 - **Catching too broadly.** \`except Exception:\` hides a typo'd name (\`NameError\`) alongside the errors you meant to skip; a bare \`except:\` is worse, also catching \`KeyboardInterrupt\` so you cannot even Ctrl-C out. Catch the specific type you expect (\`ValueError\`) and real bugs still surface.
 - **\`int\` is pickier than you think.** \`int("3.5")\` raises \`ValueError\` (it is not an integer literal), so \`safe_total(["3.5"])\` returns \`0\`, not \`3\`. And \`int(None)\` raises \`TypeError\`, which \`except ValueError\` will not catch at all.
 - **Silent logs.** A fresh logger's effective level defaults to \`WARNING\`, so \`logger.info(...)\` prints nothing until you call \`basicConfig(level=logging.INFO)\`. "My logs vanished" is almost always this.
 
-**Interview nuance:** prefer \`logger.info("n=%d", n)\` over \`logger.info(f"n={n}")\`. \`logging\` checks \`isEnabledFor(level)\` first and only formats the message if the record will actually be emitted, so the \`%\`-style call skips string building when that level is off. The f-string builds the string eagerly on every call, including calls that log nothing. On a hot path with expensive \`%r\` values, that difference is measurable.`,
+**Interview nuance:** prefer \`logger.info("n=%d", n)\` over \`logger.info(f"n={n}")\`. \`logging\` checks \`isEnabledFor(level)\` first and only formats the message if the record will actually be emitted, so the \`%\`-style call skips string building when that level is off. The f-string builds the string eagerly on every call, including calls that log nothing. On a hot path with expensive \`%r\` values, that difference is measurable.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "what-except-valueerror-covers",
+  "prompt": "safe_total loops over raw values, does total += int(raw), and guards it with except ValueError: continue. Sort each incoming value by what the loop does with it.",
+  "buckets": ["Counted", "Skipped by the guard", "Crashes the loop"],
+  "items": [
+    {
+      "label": "'12'",
+      "bucket": "Counted",
+      "feedback": "The ordinary path. int('12') is 12 and the guard never fires."
+    },
+    {
+      "label": "'  7  '",
+      "bucket": "Counted",
+      "feedback": "int strips surrounding whitespace before parsing, so this is 7. You do not need to strip it yourself."
+    },
+    {
+      "label": "'x'",
+      "bucket": "Skipped by the guard",
+      "feedback": "int('x') raises ValueError, which is precisely the case the guard was written for."
+    },
+    {
+      "label": "'3.5'",
+      "bucket": "Skipped by the guard",
+      "feedback": "This one surprises people. '3.5' is not an integer literal, so int() raises ValueError and the row contributes 0, not 3. If you wanted 3 you would have to go through float first."
+    },
+    {
+      "label": "an empty string",
+      "bucket": "Skipped by the guard",
+      "feedback": "int('') raises ValueError, so an empty field is skipped rather than quietly counted as zero. Same outcome here, different reason."
+    },
+    {
+      "label": "None",
+      "bucket": "Crashes the loop",
+      "feedback": "int(None) raises TypeError, and except ValueError does not catch it. One null in the source data takes down a job that handled every malformed string just fine."
+    }
+  ],
+  "reveal": "Two lessons in one table. int() is pickier than it looks, and a narrow except covers only the type you named. Either widen the guard on purpose to (ValueError, TypeError), or reject None before it reaches the parse."
+}
+\`\`\``,
     demoCode: `def safe_total(raws):
     total = 0
     for raw in raws:
