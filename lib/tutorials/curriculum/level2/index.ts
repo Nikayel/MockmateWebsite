@@ -4042,6 +4042,34 @@ A missing key returns \`0\` instead of raising, so you never guard a read. And b
 
 ### \`defaultdict\`: group without the missing-key dance
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "defaultdict-factory-must-be-callable",
+  "prompt": "Meaning for every new key to start as an empty list, you write groups = defaultdict([]). What happens?",
+  "options": [
+    {
+      "label": "It works. Each missing key gets an empty list",
+      "feedback": "Tempting, because you have literally handed it the empty list you want, and that reads like the most direct way to say it. defaultdict wants a FACTORY it can call once per new key, not one finished value to hand out."
+    },
+    {
+      "label": "TypeError: first argument must be callable or None",
+      "correct": true,
+      "feedback": "Right, and the failure is immediate rather than lurking. Pass the callable itself: defaultdict(list), defaultdict(set), defaultdict(int)."
+    },
+    {
+      "label": "It works, but every key ends up sharing the same list",
+      "feedback": "That is precisely the bug this design prevents, and it is the same trap as a mutable default argument, so the reasoning is excellent. Requiring a callable is how defaultdict guarantees a fresh object per key."
+    },
+    {
+      "label": "KeyError on the first missing key, because no valid factory was registered",
+      "feedback": "The construction fails before you ever reach a lookup, so no key access happens. A KeyError from a defaultdict does have one real cause: passing None as the factory turns it back into an ordinary dict."
+    }
+  ]
+}
+\`\`\`
+
 A plain \`dict\` raises \`KeyError\` on a missing key, so grouping needs an \`if key not in d: d[key] = []\` guard. \`defaultdict(list)\` calls the factory you pass (the callable \`list\`, not \`list()\`) the first time a key is touched:
 
 \`\`\`python
@@ -4069,9 +4097,66 @@ q.popleft()       # 0
 
 ### Pitfalls
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "defaultdict-read-inserts-the-key",
+  "prompt": "groups = defaultdict(list) currently holds one key, 'a'. To check whether 'b' has any entries you write if groups['b']: and the branch does not run. What is len(groups) now?",
+  "options": [
+    {
+      "label": "1, because reading a key never modifies a dict",
+      "feedback": "Tempting, and it is exactly true of a plain dict, where a missing key raises instead of appearing. defaultdict works by CREATING the value on a missing lookup, so the read is a write."
+    },
+    {
+      "label": "2. The lookup inserted 'b' with a fresh empty list",
+      "correct": true,
+      "feedback": "Right, and the branch still did not run because the new list is falsy, so nothing looks wrong until you iterate or serialise the dict later. Use groups.get('b') to peek without mutating."
+    },
+    {
+      "label": "1, because the empty list is falsy and therefore discarded",
+      "feedback": "Nothing cleans up after a falsy default: the key is stored the moment the factory runs, and its truthiness never comes into it. The falsiness is only why the if looked like it behaved."
+    },
+    {
+      "label": "It raises KeyError, which is what the if was guarding against",
+      "feedback": "Never raising on a missing key is the whole point of a defaultdict, and it is why the guard is unnecessary here. That convenience is exactly what makes the silent insertion easy to miss."
+    }
+  ]
+}
+\`\`\`
+
 - Merely reading a missing \`defaultdict\` key inserts it: touching \`d["x"]\` when \`x\` is absent leaves \`d["x"] == []\` behind. Use \`d.get("x")\` when you only want to peek without mutating.
 - \`defaultdict([])\` raises \`TypeError\`. The factory must be callable, so pass \`list\`, \`set\`, or \`int\`, never an instance.
 - \`Counter\` never raises on a missing key, which is handy but hides typos: \`c["speling"]\` quietly returns \`0\`.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "list-pop-zero-is-quadratic",
+  "prompt": "A BFS keeps its frontier in a plain list and takes the next node with queue.pop(0). Over a graph of n nodes, what does that dequeuing cost in total?",
+  "options": [
+    {
+      "label": "O(n): one pop per node, and a pop is a constant-time operation",
+      "feedback": "Tempting, because popping from the END of a list really is constant time, and the loop plainly runs once per node. Popping from the FRONT is different: every remaining element has to shift down one slot to close the gap."
+    },
+    {
+      "label": "O(n squared), because each pop(0) shifts every remaining element down one slot",
+      "correct": true,
+      "feedback": "Right, and nothing in the code looks slow, which is why this survives review. Swap in a deque and popleft() makes the same loop O(n) with a one-line change."
+    },
+    {
+      "label": "O(n log n), the usual cost of maintaining an ordered structure",
+      "feedback": "That is the shape of a heap or a balanced tree, where each operation pays a logarithmic price. A Python list is a contiguous array, so a front removal costs linear time, not logarithmic."
+    },
+    {
+      "label": "O(n), because a Python list is a linked list underneath",
+      "feedback": "This names the exact assumption that makes the bug invisible. Python's list is a dynamic array of pointers, so index access is O(1) but any insertion or removal near the front moves everything after it."
+    }
+  ],
+  "reveal": "Reach for deque whenever you take from one end and add to the other. It is the standard queue for BFS and sliding windows, and the only thing you give up is O(1) indexing into the middle."
+}
+\`\`\`
 
 **Interview nuance:** using a \`list\` as a queue is a classic trap. \`list.pop(0)\` and \`list.insert(0, x)\` are \`O(n)\` because every remaining element shifts one slot, so a BFS built on \`list.pop(0)\` is secretly \`O(n²)\`. \`deque.popleft()\` and \`deque.appendleft()\` are \`O(1)\`, which is why a \`deque\` is the standard queue for BFS and sliding-window problems. The tradeoff is that a \`deque\` has no \`O(1)\` random indexing into its middle, unlike a \`list\`.`,
     demoCode: `from collections import Counter, defaultdict
