@@ -25,6 +25,7 @@ import type {
   LearnerModelPayload,
 } from "@/lib/learner-model/types"
 import { ConceptCard } from "./_components/ConceptCard"
+import { KnowledgeSummary } from "./_components/KnowledgeSummary"
 import { BlackBoxNotice } from "./_components/BlackBoxNotice"
 import { EvidenceList, type EvidenceRowView } from "./_components/EvidenceList"
 import { ChallengeDialog } from "./_components/ChallengeDialog"
@@ -304,9 +305,12 @@ export default function KnowledgePage() {
           )}
 
           {isLoading && (
+            // Shaped like what actually arrives — a summary block then concept cards.
+            // Three identical h-28 blocks guaranteed a layout shift on every load.
             <div className="space-y-4">
+              <Skeleton className="h-40 w-full rounded-xl" />
               {[0, 1, 2].map((i) => (
-                <Skeleton key={i} className="h-28 w-full rounded-xl" />
+                <Skeleton key={i} className="h-24 w-full rounded-xl" />
               ))}
             </div>
           )}
@@ -320,6 +324,8 @@ export default function KnowledgePage() {
           )}
 
           {!isLoading && model && blackBox && <BlackBoxNotice />}
+
+          {!isLoading && model && model.total_cards > 0 && <KnowledgeSummary model={model} />}
 
           {!isLoading && model && model.total_cards === 0 && (
             <div className="border-border bg-card/30 rounded-xl border p-6 text-center">
