@@ -60,11 +60,18 @@ const TABLE: Record<MemoryColorVariant, Record<MemoryUrgency, string>> = {
   },
   // -600 rather than -700 in light mode: these drive SVG strokes, which are graphics
   // and answer to the 3:1 non-text contrast bar, not the 4.5:1 text one.
+  //
+  // Dark steps to -500 for the same anti-bloom reason as `bar` above, and more so:
+  // ink is consumed via currentColor as the FILL of the belief bar, the dial arc and
+  // the forecast path — far larger saturated areas than the 10px dots that motivated
+  // that decision, and a card was rendering a rose-500 dot above a rose-400 bar. All
+  // -500s clear 3:1 on #232220 (rose 4.33, orange 5.67, emerald 6.27, amber 7.40).
+  // Safe to step because `ink` never styles prose — only the three SVG marks.
   ink: {
-    safe: "text-emerald-600 dark:text-emerald-400",
-    ok: "text-amber-600 dark:text-amber-400",
-    warning: "text-orange-600 dark:text-orange-400",
-    urgent: "text-rose-600 dark:text-rose-400",
+    safe: "text-emerald-600 dark:text-emerald-500",
+    ok: "text-amber-600 dark:text-amber-500",
+    warning: "text-orange-600 dark:text-orange-500",
+    urgent: "text-rose-600 dark:text-rose-500",
   },
 }
 
@@ -81,8 +88,8 @@ export const MIN_REVIEWS_FOR_VERDICT_HUE = 3
 const SUPPRESSED_INK: Record<MemoryUrgency, string> = {
   safe: "text-muted-foreground",
   ok: "text-muted-foreground",
-  warning: "text-orange-600 dark:text-orange-400",
-  urgent: "text-orange-600 dark:text-orange-400",
+  warning: "text-orange-600 dark:text-orange-500",
+  urgent: "text-orange-600 dark:text-orange-500",
 }
 
 function isMemoryUrgency(value: string): value is MemoryUrgency {
