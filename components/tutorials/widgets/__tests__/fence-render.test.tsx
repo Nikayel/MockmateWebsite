@@ -5,8 +5,10 @@
  *
  *  1. Pipeline: the fence is intercepted (no code box, no leaked JSON), a parse
  *     failure soft-fails to the inline error, and the wrapper carries the spec-sized
- *     placeholder. The widget BODY is behind next/dynamic (ssr: false), so pipeline
- *     SSR renders the placeholder, not the body — by design.
+ *     placeholder. Sim/stepper bodies are behind next/dynamic (ssr: false), so pipeline
+ *     SSR renders the placeholder, not the body — by design. The `check` family is the
+ *     exception: it prerenders eagerly so its authored text is indexable and
+ *     screen-reader readable before hydration (see lib/markdown/widget-ssr.test.tsx).
  *  2. Components: WidgetBody/CheckWidget server-render directly without touching
  *     window, proving the family components are SSR-safe even though the app path
  *     hydrates them client-side (guards against a hook reading window at render).
@@ -59,10 +61,11 @@ const classifySpec = {
 }
 
 describe("cswidget fence through the markdown pipeline", () => {
-  it("intercepts the fence: no code box, no leaked JSON, spec-sized wrapper", () => {
+  it("intercepts the fence: no code box, no leaked JSON, body prerendered", () => {
     const html = render("Before the widget.\n\n" + fence(predictSpec) + "\n\nAfter the widget.")
     expect(html).toContain('data-cswidget="check"')
-    expect(html).toContain("min-height")
+    // Checks take the eager path, so the pipeline emits the real body, not a placeholder.
+    expect(html).toContain("A timeout fires. What does the caller know?")
     expect(html).not.toContain("language-cswidget")
     expect(html).not.toContain('"type"')
     expect(html).not.toContain('"prompt"')
