@@ -38,6 +38,14 @@ const classifyItemSchema = z.object({
 export const checkSpecSchema = z.object({
   type: z.literal("check"),
   kind: z.enum(["predict", "classify"]),
+  /**
+   * Stable item id for response telemetry. OPTIONAL for backward compatibility: the
+   * ~343 System Design checks authored before item-level logging existed carry none,
+   * and `checkItemId()` derives a stable fallback for them rather than forcing a
+   * re-authoring pass. Author it explicitly on new checks — an explicit id survives a
+   * prompt rewrite, and the derived fallback deliberately does not.
+   */
+  id: z.string().min(1).max(80).optional(),
   /** The question. For misconception checks, phrase it so a plausible wrong answer exists. */
   prompt: z.string().min(1),
   /** predict only. */
@@ -51,6 +59,26 @@ export const checkSpecSchema = z.object({
 })
 
 export type CheckSpec = z.infer<typeof checkSpecSchema>
+
+/**
+ * The stable item id a check reports its responses under.
+ *
+ * Prefers the authored `id`. Falls back to a short FNV-1a hash of the prompt, which is
+ * stable across re-renders, reorderings, and deploys, and unique within a lesson in
+ * practice (two checks in one lesson asking a character-identical question would be a
+ * content bug). The fallback CHANGES if the prompt is rewritten, which is the honest
+ * behavior: a reworded question is a different item and pooling its responses with the
+ * old wording's would corrupt any per-item difficulty estimate.
+ */
+export function checkItemId(spec: CheckSpec, lessonId: string): string {
+  if (spec.id) return `${lessonId}#${spec.id}`
+  let hash = 0x811c9dc5
+  for (let i = 0; i < spec.prompt.length; i++) {
+    hash ^= spec.prompt.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return `${lessonId}#check-${(hash >>> 0).toString(36)}`
+}
 
 /**
  * Cross-field integrity for a parsed check spec — called from the union wrapper's

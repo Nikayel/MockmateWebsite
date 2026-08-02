@@ -39,6 +39,7 @@ import { watermarkSimSpecSchema, addWatermarkSimIssues } from "./families/waterm
 import { stepsSpecSchema, addStepsIssues } from "./families/steps"
 
 export type { CheckSpec } from "./families/check"
+export { checkItemId } from "./families/check"
 export type { CalcSpec, CalcInput, CalcOutput } from "./families/calc"
 export type { HashRingSpec } from "./families/hash-ring"
 export type { SequenceSpec, SequenceStep } from "./families/sequence"

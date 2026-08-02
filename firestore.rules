@@ -388,6 +388,20 @@ service cloud.firestore {
                     && resource.data.userId == request.auth.uid;
     }
 
+    // Item-level Learn research telemetry (one append-only row per exercise run, check
+    // answer, and hint reveal). Writes are Admin-SDK-only through
+    // app/api/tutorials/item-responses — there is deliberately NO client create/update
+    // path, because a learner able to forge or amend their own response log would
+    // invalidate every research use this collection exists for. Owner-only reads keep
+    // per-user export working without exposing one learner's trajectory to another.
+    match /learn_item_responses/{docId} {
+      allow read: if isAuthenticated()
+                  && documentExists()
+                  && resource.data.user_id == request.auth.uid;
+
+      allow create, update, delete: if false;
+    }
+
     // Owner-only access for System-Design free-response answers (the learner's private work
     // product). Same discipline as user_tutorial_progress above: authoritative writes go through the
     // Firebase Admin SDK in app/api/tutorials/design-answers (token + ownership verified), so this
