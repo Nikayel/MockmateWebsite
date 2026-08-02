@@ -464,6 +464,30 @@ else:
     print("F")        # prints B
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "first-true-branch-wins",
+  "prompt": "Someone reorders those grade checks so that score >= 80 is tested first and score >= 90 second. What does a score of 95 print?",
+  "options": [
+    {
+      "label": "A, because 95 is in the 90s and that branch is the one meant for it",
+      "feedback": "Tempting, because you can see at a glance which branch a 95 belongs to. Python does not look for the best match, only the first condition that is True, and 95 >= 80 is already True."
+    },
+    {
+      "label": "B",
+      "correct": true,
+      "feedback": "Right. The first true branch wins and everything below it is skipped, so a loose condition placed first swallows every case underneath it. Put the tightest condition first."
+    },
+    {
+      "label": "Both A and B, since both conditions are true",
+      "feedback": "Close, and both conditions genuinely are true here. But an if/elif chain is one decision with several arms and exactly one arm runs. Two separate if statements would print both."
+    }
+  ]
+}
+\`\`\`
+
 \`score\` is \`85\`, so \`score >= 90\` is \`False\`, \`score >= 80\` is \`True\`, and Python stops there and prints \`B\`. Order matters. If you had checked \`score >= 80\` first, a \`95\` would also match it and wrongly print \`B\`. Put the tightest condition first.
 
 ### Comparisons produce booleans
@@ -499,9 +523,57 @@ not finished              # flips the boolean
 
 That first line is the shape of the \`can_vote\` exercise: return \`age >= 18 and citizen\`. For \`sign(n)\` you branch on three ranges. Check \`n > 0\`, then \`elif n < 0\`, then \`else\` for \`"zero"\`. Because the first true branch wins, \`else\` safely means "exactly 0" without you re-testing it.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "empty-list-in-a-condition",
+  "prompt": "items is an empty list. What does if items: do?",
+  "options": [
+    {
+      "label": "It runs the block, because items exists and is a real list",
+      "feedback": "Tempting, because the name is defined and the object is real, so there is nothing obviously false about it. Truthiness asks whether the container holds anything, not whether the name exists."
+    },
+    {
+      "label": "It skips the block",
+      "correct": true,
+      "feedback": "Right. An empty list is falsy, so if items: reads as 'if the list has something in it'. The same holds for the empty string, an empty dict, and 0."
+    },
+    {
+      "label": "It raises an error, because a list is not a boolean",
+      "feedback": "Close, in that if really does need a yes or a no. Python can answer that for any object at all through truthiness, so this can never raise."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfall: truthiness and short-circuiting
 
 \`if\`, \`and\`, and \`or\` do not require real booleans. Python treats \`0\`, \`0.0\`, \`""\`, \`[]\`, \`{}\`, and \`None\` as falsy and nearly everything else as truthy, so \`if items:\` means "if the list is non-empty". Watch the trap: writing \`if age == 18\` when you meant \`age >= 18\` rejects everyone older. And \`and\`/\`or\` short-circuit, stopping as soon as the answer is known, which is why \`user and user.name\` never crashes on a \`None\` user.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "or-returns-an-operand",
+  "prompt": "What does the expression '' or 'guest' evaluate to?",
+  "options": [
+    {
+      "label": "True",
+      "feedback": "Tempting, because or is a boolean operator and the right side is truthy, so a plain True feels like the natural output. Python's or hands back one of the operands themselves, not a coerced boolean."
+    },
+    {
+      "label": "The string guest",
+      "correct": true,
+      "feedback": "Right. or gives you the left operand when it is truthy and otherwise the right one, which is the classic one-liner for supplying a default value."
+    },
+    {
+      "label": "The empty string, since the left side comes first",
+      "feedback": "Close on the order of evaluation: Python really does look at the empty string first. It is falsy, so or keeps going and returns the right operand instead."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** \`and\` and \`or\` return one of their operands, not a coerced \`True\`/\`False\`. \`x and y\` gives \`x\` when \`x\` is falsy, otherwise \`y\`. \`x or y\` gives \`x\` when \`x\` is truthy, otherwise \`y\`. So \`"" or "guest"\` returns \`"guest"\` (a common default-value trick) and \`3 and 5\` returns \`5\`. In \`age >= 18 and citizen\`, both operands are booleans (\`age >= 18\` is a comparison result and \`citizen\` is \`True\` or \`False\`), so the expression evaluates to a clean \`True\`/\`False\`, which is exactly what \`can_vote\` should return.`,
     demoCode: `score = 85
@@ -589,6 +661,30 @@ The loop variable (\`name\`) is reassigned each pass. When the collection is exh
 
 ## \`range\`: count without building a list
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "range-stop-is-excluded",
+  "prompt": "How many numbers does range(1, 4) produce, and which ones?",
+  "options": [
+    {
+      "label": "Four numbers: 1, 2, 3, 4",
+      "feedback": "Tempting, because both endpoints are written down and reading it aloud as 'one to four' sounds inclusive. The stop value marks where the counting stops, so it is never produced."
+    },
+    {
+      "label": "Three numbers: 1, 2, 3",
+      "correct": true,
+      "feedback": "Right. stop is excluded, so the count is stop minus start. To include n you have to write range(1, n + 1)."
+    },
+    {
+      "label": "Three numbers: 0, 1, 2",
+      "feedback": "Close on the count, and that is exactly what range(3) would give you. With two arguments the first one is the start, so counting begins at 1."
+    }
+  ]
+}
+\`\`\`
+
 \`range(start, stop)\` produces the integers from \`start\` up to but not including \`stop\`:
 
 \`\`\`csdiagram
@@ -626,6 +722,30 @@ for i in range(1, 6):
 print(total)            # 15
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "empty-range-runs-zero-times",
+  "prompt": "sum_to is called with n = 0, so the loop header becomes for i in range(1, 1). What happens?",
+  "options": [
+    {
+      "label": "It raises a ValueError, since that range is empty",
+      "feedback": "Tempting, because an empty range usually means somebody miscalculated a bound and you would want to hear about it. Python treats it as a perfectly valid range that happens to contain nothing."
+    },
+    {
+      "label": "The body never runs and total stays at 0",
+      "correct": true,
+      "feedback": "Right. An empty range is silent, so this class of bug shows up as missing output rather than a traceback. It is also why starting the accumulator at 0 gets the n = 0 case correct for free."
+    },
+    {
+      "label": "The body runs once, with i equal to 1",
+      "feedback": "Close, in that 1 is indeed the start value. But the range never yields it: with start and stop equal there is no value that is both at or after start and before stop."
+    }
+  ]
+}
+\`\`\`
+
 The starting value matters. \`total = 0\` is the correct answer when nothing is added, so if the range is empty the loop body never runs and you get \`0\` back. That is exactly the \`n = 0\` case you will handle.
 
 To count instead of sum, keep a counter and bump it only when a condition holds. The even test uses the modulo operator \`%\`, which gives the remainder of a division:
@@ -660,10 +780,58 @@ for n in nums:
     process(n)
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "break-ends-the-whole-loop",
+  "prompt": "Run that loop over nums = [5, -1, 200, 7]. Which values reach process(n)?",
+  "options": [
+    {
+      "label": "5 and 7, since -1 and 200 are both skipped",
+      "feedback": "Tempting, because both guards read like filters and skipping is what the first one does. break is not a skip: it ends the loop outright, so 7 is never looked at."
+    },
+    {
+      "label": "Only 5",
+      "correct": true,
+      "feedback": "Right. -1 hits continue and is skipped, then 200 hits break and the loop stops there, leaving 7 unvisited. continue skips one pass, break abandons the rest."
+    },
+    {
+      "label": "5, 200 and 7",
+      "feedback": "Close if you read break as ending only the current pass. That is continue's job. break exits the loop entirely, and the value that triggered it is not processed either."
+    }
+  ]
+}
+\`\`\`
+
 ## Pitfalls
 
 - Off-by-one: \`range(1, n)\` stops at \`n - 1\`. Summing \`1\` to \`n\` needs \`range(1, n + 1)\`.
 - Infinite \`while\`: if you forget to update the variable in the condition, the loop never ends. Always change state that moves toward the exit.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "range-is-lazy",
+  "prompt": "A loop written as for i in range(1000000000) starts instantly and uses almost no memory. Why?",
+  "options": [
+    {
+      "label": "Python builds the list in the background while the loop runs",
+      "feedback": "Tempting, because something clearly has to produce all those numbers and a background build would explain the fast start. Nothing is stored at all: each value is computed at the moment the loop asks for it."
+    },
+    {
+      "label": "range keeps only start, stop and step, and computes each value on demand",
+      "correct": true,
+      "feedback": "Right. Looping with range(n) is O(n) time but O(1) extra space. It is list(range(n)) that would allocate all n values up front."
+    },
+    {
+      "label": "Python allocates the list but compresses it, since the numbers are sequential",
+      "feedback": "Close, and compressing a predictable sequence would be a reasonable design. Python's answer is simpler than that: there is no list to compress, only three numbers and a rule."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** \`range\` is a lazy sequence, not a list. \`range(1_000_000_000)\` costs constant memory because it stores only \`start\`, \`stop\`, and \`step\` and computes each value on demand, rather than materializing a billion integers. That is why looping with \`range(n)\` is O(n) time but O(1) extra space, while \`list(range(n))\` would allocate all \`n\` values up front. Interviewers use this to check whether you understand that iterating over data is not the same as storing it.`,
     demoCode: `total = 0
