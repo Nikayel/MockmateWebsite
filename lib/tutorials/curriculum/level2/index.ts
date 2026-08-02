@@ -2798,6 +2798,34 @@ print(Point(1, 2) == Point(1, 2))   # True
 
 The generated \`__eq__\` compares instances field by field, which is exactly what the Apply exercise leans on: two points built from the same coordinates are equal because their \`(x, y)\` tuples are equal.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "plain-dataclass-is-unhashable",
+  "prompt": "Point is a plain @dataclass with fields x and y. You write seen = {Point(1, 2)} to start a set of points. What happens?",
+  "options": [
+    {
+      "label": "You get a one-element set",
+      "feedback": "Tempting, because a dataclass feels like a tidy little value type and value types are exactly what you want in a set. Generating __eq__ has a side effect though: it sets __hash__ to None, and a set needs a hash."
+    },
+    {
+      "label": "TypeError: unhashable type: 'Point'",
+      "correct": true,
+      "feedback": "Right. Add frozen=True and you get __hash__ back along with immutability, which is why value objects meant for sets and dict keys are usually frozen."
+    },
+    {
+      "label": "It works, but two equal Points would count as two separate elements",
+      "feedback": "That is what you would get with eq=False, where instances fall back to identity for both equality and hashing. A plain dataclass has the opposite problem: equality works and hashing is gone."
+    },
+    {
+      "label": "TypeError, because a dataclass has no __eq__ to compare set members with",
+      "feedback": "The decorator generates __eq__ by default, so comparison is exactly the part that does work. The missing piece is the hash, which is what a set uses to find the right bucket before it ever compares."
+    }
+  ]
+}
+\`\`\`
+
 Which methods the decorator writes depends on the flags you pass it:
 
 \`\`\`csdiagram
@@ -2816,6 +2844,34 @@ Which methods the decorator writes depends on the flags you pass it:
 \`\`\`
 
 ### Type hints describe intent, they do not enforce it
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "annotations-are-not-checked",
+  "prompt": "Point is a @dataclass declaring x: int and y: int. Somebody calls Point('a', 'b'). What happens when that line runs?",
+  "options": [
+    {
+      "label": "TypeError, because 'a' is not an int",
+      "feedback": "Tempting, because the annotation is right there in the class and the decorator clearly read it to build __init__. It read the NAMES and their order, not the types: nothing in the generated code checks what you pass."
+    },
+    {
+      "label": "It builds Point(x='a', y='b') without a word of complaint",
+      "correct": true,
+      "feedback": "Right. Annotations are metadata for readers and for tools like mypy. If you need the guarantee at runtime, validate in __post_init__ or reach for a library like pydantic."
+    },
+    {
+      "label": "It builds the object but coerces each field to 0, since int is declared",
+      "feedback": "Nothing coerces anything: the generated __init__ assigns exactly the object you handed in. Silent coercion would arguably be worse, since it would destroy data rather than merely permit it."
+    },
+    {
+      "label": "It builds the object and emits a runtime warning about the mismatch",
+      "feedback": "There is no warning either, which is the part that surprises people coming from typed languages. The check happens only when you actually run a type checker over the code."
+    }
+  ]
+}
+\`\`\`
 
 Annotations like \`x: int\` are metadata. Python does not check them at runtime; passing \`Point("a", "b")\` still constructs an object. Their value is for readers and tools like \`mypy\` or your editor, which flag mismatches before you run.
 
@@ -2845,6 +2901,34 @@ print(Color["RED"])      # Color.RED   (look up by name)
 That name lookup is what the Practice driver does: \`Color[name].value\` turns \`"RED"\` into \`"red"\`.
 
 ### Pitfall: mutable default fields
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "dataclass-refuses-mutable-default",
+  "prompt": "You write items: list = [] as a field inside a @dataclass. What happens?",
+  "options": [
+    {
+      "label": "Every instance ends up sharing one list, the same trap as a mutable class attribute",
+      "feedback": "Tempting, and it is exactly the trap the rule exists to prevent, so the reasoning is sound. Dataclasses are stricter than plain classes here: rather than let the shared list happen, the decorator refuses to build the class."
+    },
+    {
+      "label": "ValueError while the class is being created: a mutable default is not allowed",
+      "correct": true,
+      "feedback": "Right, and it fails at import time rather than in production. Use field(default_factory=list) so the factory runs once per instance."
+    },
+    {
+      "label": "Each instance gets its own empty list, because the decorator copies defaults",
+      "feedback": "Nothing copies defaults anywhere in Python, which is the root of this whole family of bugs, mutable function defaults included. default_factory is how you ask for a fresh value per instance."
+    },
+    {
+      "label": "It works until a second instance exists, and then raises",
+      "feedback": "Errors do not wait for a second instance: the class body is evaluated once, at definition time, and that is where this one is caught. Immediate failure is the point of the restriction."
+    }
+  ]
+}
+\`\`\`
 
 You cannot give a dataclass field a mutable default like \`[]\` or \`{}\` directly. Python evaluates the default once, so every instance would share one list. The dataclass machinery blocks it outright:
 
@@ -2904,6 +2988,35 @@ class Doubled:
         object.__setattr__(self, "doubled", self.x * 2)   # frozen blocks self.doubled = ...
 
 print(Doubled(21))         # Doubled(x=21, doubled=42)
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "dataclass-eq-requires-same-type",
+  "prompt": "Point is a @dataclass with fields x and y. What is Point(1, 2) == (1, 2)?",
+  "options": [
+    {
+      "label": "True, since the field values match the tuple's items in order",
+      "feedback": "Tempting, because the repr looks tuple-shaped and the values line up perfectly. The generated __eq__ compares the field tuple only after confirming the other object is the same dataclass, so a real tuple never gets that far."
+    },
+    {
+      "label": "False",
+      "correct": true,
+      "feedback": "Right. Equality here means same type and same fields. The method returns NotImplemented against anything else, and Python resolves that to False."
+    },
+    {
+      "label": "TypeError: a Point and a tuple cannot be compared",
+      "feedback": "That is what ORDERING would do, since < between unrelated types raises. Equality is required to always produce an answer, so it falls back to False rather than raising."
+    },
+    {
+      "label": "True, but only when the dataclass is declared with order=True",
+      "feedback": "order=True adds <, <=, >, and >=, and those are just as type-strict as equality is. No flag makes a dataclass compare equal to a plain tuple."
+    }
+  ],
+  "reveal": "Two rules to carry: a dataclass equals only its own type with matching fields, and adding frozen=True is what makes such a value object usable as a dict key or set member."
+}
 \`\`\`
 
 **Interview nuance:** the generated \`__eq__\` compares field values only when the other object is the *same* dataclass type; against anything else it returns \`NotImplemented\`, so \`Point(1, 2) == (1, 2)\` is \`False\`, not \`True\`. Equality here means "same type and same fields," which is why dataclasses are safe to put in a \`set\` or use as dict keys once you add \`frozen=True\` (that also generates \`__hash__\`).`,
