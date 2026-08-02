@@ -3599,6 +3599,332 @@ def parse_csv(text):
   },
 }
 
+const writingFilesLesson: PythonLesson = {
+  id: "py-l2-writing-files",
+  title: "Writing files without losing them",
+  summary:
+    "Truncate or append on purpose, write real lines, and rename into place so a crash cannot corrupt a file.",
+  estimatedMinutes: 13,
+  difficulty: "medium",
+  skills: ["files", "file-io", "pathlib", "io"],
+  teach: {
+    estimatedMinutes: 6,
+    markdown: `## Reading a file is safe. Writing one is not
+
+Every tutorial teaches \`open\` for reading, and reading has one real failure mode: the file is not there. Writing has several, and they destroy data rather than raising. You can empty a file you meant to add to, produce a file with no line breaks in it, leave a half-written file behind when a process is killed, or write something that never reaches the disk at all because you never closed the handle.
+
+None of these are exotic. They are the ordinary results of the defaults, and each has a one-line fix.
+
+> The exercises here really do write files. The editor runs Python on an in-memory filesystem, so anything you create lives for the length of the run and then vanishes, which makes it a safe place to practise the real calls.
+
+### Pick the mode on purpose
+
+The Context managers, JSON and CSV lesson has the full mode table, and the row worth carrying here is the destructive one: \`open(path, "w")\` empties the file the instant it opens it, before your first \`write\`. \`open(path, "a")\` keeps what is there and puts every write at the end.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Way to write", "What it does", "Reach for it when"],
+  "rows": [
+    ["Path.write_text(s)", "opens, truncates, writes, closes, all in one call", "the whole content already fits in one string"],
+    ["open(p, 'w')", "truncates on open, then writes as you go", "you are streaming rows and cannot hold them all"],
+    ["open(p, 'a')", "keeps the file, every write lands at the end", "you are adding to a log or an audit trail"],
+    ["temp file, then os.replace", "readers see the old file until the instant it becomes the new one", "a half-written file would be worse than a stale one"]
+  ],
+  "highlightCols": ["Reach for it when"],
+  "caption": "The first three differ in what they destroy. The fourth differs in what a reader can ever observe, which is the property that matters once something else is reading the file while you write it."
+}
+\`\`\`
+
+### \`write\` adds nothing you did not ask for
+
+\`write\` puts exactly the characters you hand it into the file. No newline, no separator, no trailing anything:
+
+\`\`\`python
+from pathlib import Path
+
+path = Path("report.txt")
+with open(path, "w", encoding="utf-8") as out:
+    for line in ["alpha", "beta"]:
+        out.write(line + "\\n")     # the \\n is yours to add
+
+Path("small.txt").write_text("alpha\\nbeta\\n", encoding="utf-8")
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "writelines-adds-no-newlines",
+  "prompt": "out.writelines(['alpha', 'beta', 'gamma']) runs against a file opened in w mode. How many lines does the file have afterwards?",
+  "options": [
+    {
+      "label": "Three, one per item. The name says lines",
+      "feedback": "Tempting, and the name really does invite it: readlines() gives you a list with the newlines still attached, so writelines() reads like the exact inverse. It only inverts the round trip when the strings you pass already END in newlines."
+    },
+    {
+      "label": "One. writelines concatenates the strings and adds no separators at all",
+      "correct": true,
+      "feedback": "Right, the file holds alphabetagamma. writelines is a loop over write with no formatting of its own, so add the newline yourself or join with a newline first."
+    },
+    {
+      "label": "Zero, since nothing was flushed yet",
+      "feedback": "Buffering is a real hazard and is worth worrying about when there is no with block. It affects WHEN the bytes land rather than how they are separated, and closing the file settles it."
+    },
+    {
+      "label": "Three, but only if the file was opened in text mode",
+      "feedback": "Text mode does perform one translation, turning a newline into the platform line ending on write. It never invents a newline that your string did not already contain."
+    }
+  ]
+}
+\`\`\`
+
+\`Path.write_text\` is the shortest correct way to write a whole small file: it opens, truncates, writes, and closes in one call, and it takes the same \`encoding=\` argument you should always pass.
+
+### Writing CSV needs \`newline=""\`
+
+\`\`\`python
+import csv
+
+with open("out.csv", "w", newline="", encoding="utf-8") as fh:
+    writer = csv.writer(fh)
+    writer.writerow(["name", "age"])
+    writer.writerows([["Ada", 30], ["Alan", 41]])
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "csv-writer-needs-newline-empty",
+  "prompt": "A csv.writer writes to a file opened with open(path, 'w') on Windows, with no newline argument. What does the output look like?",
+  "options": [
+    {
+      "label": "Correct. csv handles line endings itself",
+      "feedback": "It does handle them itself, and that is exactly the problem: it emits a carriage return and a newline, then text mode translates the newline again. Two layers each doing the right thing produce one wrong file."
+    },
+    {
+      "label": "A blank line between every row, because the line ending is written twice",
+      "correct": true,
+      "feedback": "Right, and it is the single most common csv complaint. Pass newline='' so the file layer stops translating and the csv module owns the line endings alone."
+    },
+    {
+      "label": "Every row on one long line, since no newline was requested",
+      "feedback": "The writer always terminates a row, so rows never run together. The failure is one line ending too many rather than one too few."
+    },
+    {
+      "label": "It raises, because csv refuses a file opened without newline=''",
+      "feedback": "A raise would be far kinder than what actually happens. The docs ask for newline='' but nothing enforces it, so the damage is a subtly malformed file rather than an error."
+    }
+  ]
+}
+\`\`\`
+
+The \`csv\` module writes its own line endings. Opening in text mode without \`newline=""\` lets the file layer translate them a second time, and you get a blank line between every row. The same argument belongs on the read side for the same reason.
+
+### Write to a temp name, then rename
+
+A rename within one filesystem is atomic: a reader sees either the old file or the new one, never a half-written one. That single property is what makes a config or index file safe to regenerate while something else is reading it.
+
+\`\`\`python
+import os
+from pathlib import Path
+
+def write_atomically(path, text):
+    temp = Path(str(path) + ".tmp")
+    temp.write_text(text, encoding="utf-8")
+    os.replace(temp, path)      # atomic: readers see old or new, never partial
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "atomic-rename-keeps-the-old-file",
+  "prompt": "A job writes the new config to config.json.tmp and is then killed, before it reaches os.replace. What does the service read from config.json?",
+  "options": [
+    {
+      "label": "Nothing. config.json was truncated when the write started",
+      "feedback": "That is precisely what happens WITHOUT this pattern, and it is the outcome it exists to prevent. Nothing ever opened config.json for writing here, so it was never truncated."
+    },
+    {
+      "label": "The complete old config, untouched",
+      "correct": true,
+      "feedback": "Right, and a stray .tmp file is the whole cost of the crash. The next run overwrites it, and the service never once saw a half-written config."
+    },
+    {
+      "label": "The partially written new config",
+      "feedback": "That is the failure mode of writing in place, where a reader can observe a file mid-write. The partial bytes here are in the .tmp file, which nothing is configured to read."
+    },
+    {
+      "label": "Whichever of the two files the operating system decides is newer",
+      "feedback": "Nothing in the filesystem chooses between two paths on your behalf: the service opens the name it was told to open. Modification times only matter to tools that go looking for them."
+    }
+  ],
+  "reveal": "The rule generalises: make the new thing somewhere harmless, then move it into place in one operation. It is the same shape as a blue-green deploy or an index swap, just at file scale."
+}
+\`\`\`
+
+### Pitfalls
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "unflushed-writes-are-not-on-disk",
+  "prompt": "Code calls out = open(path, 'w'), then out.write('done'), with no with block and no close. The process is killed a second later. What does another process reading the file find?",
+  "options": [
+    {
+      "label": "done, because write puts the characters on disk immediately",
+      "feedback": "Tempting, because write returns straight away and reports how many characters it took. It reports what it ACCEPTED: small writes sit in a userspace buffer, and only flush or close pushes them onward."
+    },
+    {
+      "label": "An empty file, because the buffered write was never flushed",
+      "correct": true,
+      "feedback": "Right, and it is why the with block is not a style preference. Exiting the block closes the file, and closing flushes it, so the bytes are there even if the next line raises."
+    },
+    {
+      "label": "A FileNotFoundError, since the file was never really created",
+      "feedback": "The file appears at open time, which is also when its old contents are destroyed in w mode. So there is a file, and its emptiness is the more dangerous outcome of the two."
+    },
+    {
+      "label": "Whatever the file held before, since the write did not complete",
+      "feedback": "Opening in w mode truncated the file before a single byte was written, so the old contents were already gone. You lose the old data and do not gain the new."
+    }
+  ]
+}
+\`\`\`
+
+- **Always use \`with\`.** It closes the handle on the way out, and closing is what flushes your writes to disk. Without it, a crash between the write and the close loses everything you wrote.
+- **\`Path.write_text\` truncates too.** It is a whole-file write, not an append, so calling it twice leaves you with only the second call's content.
+- **Create the parent first.** Writing to \`reports/2026/out.txt\` raises \`FileNotFoundError\` when \`reports/2026\` does not exist. \`path.parent.mkdir(parents=True, exist_ok=True)\` first.
+
+**Interview nuance:** "how would you make that write safe?" is a real system-design question at file scale, and the answer is the temp-then-rename pattern. Name the property you are buying, which is that a reader can never observe a partial state, and note that it only holds when the temp file is on the SAME filesystem as the target, because a rename across filesystems is a copy plus a delete and is not atomic. That is the same reasoning that makes an atomic index swap or a blue-green cutover work.`,
+    demoCode: `import tempfile
+from pathlib import Path
+
+folder = Path(tempfile.mkdtemp())
+report = folder / "report.txt"
+
+with open(report, "w", encoding="utf-8") as out:
+    for line in ["alpha", "beta"]:
+        out.write(line + "\\n")
+
+with open(report, "a", encoding="utf-8") as out:
+    out.write("gamma\\n")
+
+print(repr(report.read_text(encoding="utf-8")))   # 'alpha\\nbeta\\ngamma\\n'
+print(report.read_text(encoding="utf-8").splitlines())`,
+  },
+  apply: {
+    id: "py-l2-writing-files-apply",
+    executionMode: "single-file",
+    prompt: `Write a function \`save_lines(lines)\` that writes each string in \`lines\` to a file as its own
+line, then returns the file's full contents as one string.
+
+For \`["alpha", "beta"]\` return \`"alpha\\nbeta\\n"\`. Every line ends in a newline, including the last,
+and an empty list produces an empty file. Create somewhere private to write with
+\`tempfile.mkdtemp()\`.`,
+    starterCode: `import tempfile
+from pathlib import Path
+
+
+def save_lines(lines):
+    # Build a path under a fresh temp directory, write one line per item, then read it back.
+    pass`,
+    hints: [
+      "`Path(tempfile.mkdtemp()) / 'report.txt'` gives you a private file that nothing else touches.",
+      "`write` adds no newline of its own, so build the text as `''.join(line + '\\n' for line in lines)`.",
+      "`target.write_text(text, encoding='utf-8')` writes it, and `target.read_text(encoding='utf-8')` reads it back.",
+    ],
+    referenceSolution: `import tempfile
+from pathlib import Path
+
+
+def save_lines(lines):
+    target = Path(tempfile.mkdtemp()) / "report.txt"
+    target.write_text("".join(line + "\\n" for line in lines), encoding="utf-8")
+    return target.read_text(encoding="utf-8")`,
+    testCases: [
+      {
+        input: { lines: ["alpha", "beta"] },
+        expected: "alpha\nbeta\n",
+        description: "two lines, each newline-terminated",
+      },
+      { input: { lines: [] }, expected: "", description: "no lines, so an empty file" },
+      {
+        input: { lines: ["only"] },
+        expected: "only\n",
+        description: "one line still gets its newline",
+      },
+      {
+        input: { lines: ["a", "b", "c"] },
+        expected: "a\nb\nc\n",
+        description: "three lines in order",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l2-writing-files-practice",
+    executionMode: "single-file",
+    prompt: `An audit log has to survive the code that writes to it. A deploy script opened the log in \`"w"\`
+mode to add a single line, and a month of history went with it, because \`"w"\` empties the file
+before the first write lands.
+
+Implement \`append_event(existing, event)\`: write each string in \`existing\` to a fresh file as its own
+line, then add \`event\` as one more line WITHOUT rewriting what is already there, and return the
+file's lines as a list of strings.
+
+For \`existing = ["login"]\` and \`event = "logout"\` return \`["login", "logout"]\`.`,
+    starterCode: `import tempfile
+from pathlib import Path
+
+
+def append_event(existing, event):
+    # Write the existing lines, then open the SAME file again in append mode for the new one.
+    pass`,
+    hints: [
+      "`Path(tempfile.mkdtemp()) / 'audit.log'` gives you a private file to build up.",
+      "Write the existing lines first with mode `'w'`, one `out.write(line + '\\n')` per item.",
+      "Open the same path a second time with mode `'a'`, then `path.read_text(encoding='utf-8').splitlines()` returns the lines without their newlines.",
+    ],
+    referenceSolution: `import tempfile
+from pathlib import Path
+
+
+def append_event(existing, event):
+    path = Path(tempfile.mkdtemp()) / "audit.log"
+    with open(path, "w", encoding="utf-8") as out:
+        for line in existing:
+            out.write(line + "\\n")
+    with open(path, "a", encoding="utf-8") as out:
+        out.write(event + "\\n")
+    return path.read_text(encoding="utf-8").splitlines()`,
+    testCases: [
+      {
+        input: { existing: ["login"], event: "logout" },
+        expected: ["login", "logout"],
+        description: "the earlier line survives the append",
+      },
+      {
+        input: { existing: [], event: "boot" },
+        expected: ["boot"],
+        description: "appending to an empty log",
+      },
+      {
+        input: { existing: ["a", "b"], event: "c" },
+        expected: ["a", "b", "c"],
+        description: "order is preserved",
+      },
+      {
+        input: { existing: ["only"], event: "only" },
+        expected: ["only", "only"],
+        description: "a repeated event is written twice, not deduplicated",
+      },
+    ],
+  },
+}
+
 const textAndBytesLesson: PythonLesson = {
   id: "py-l2-text-and-bytes",
   title: "Text is bytes underneath",
@@ -4877,7 +5203,13 @@ export const level2: PythonLevel = {
       id: "py-l2-errors-files-modules",
       title: "Errors, Files & Modules",
       description: "Handle errors, parse JSON/CSV, and use the standard library.",
-      lessons: [exceptionsLesson, filesJsonCsvLesson, textAndBytesLesson, modulesLesson],
+      lessons: [
+        exceptionsLesson,
+        filesJsonCsvLesson,
+        writingFilesLesson,
+        textAndBytesLesson,
+        modulesLesson,
+      ],
     },
     {
       id: "py-l2-stdlib-toolkit",
