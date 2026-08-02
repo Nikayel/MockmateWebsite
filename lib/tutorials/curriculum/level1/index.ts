@@ -2770,6 +2770,30 @@ const identityEqualityLesson: PythonLesson = {
 
 Every value in Python is an object with a fixed identity, which you can inspect with \`id()\`. A variable is just a name pointing at one of those objects. \`is\` compares identities (roughly \`id(a) == id(b)\`), while \`==\` asks the left object to compare itself to the right one by calling its \`__eq__\` method.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "equal-lists-are-different-objects",
+  "prompt": "You build a = [1, 2, 3] on one line and b = [1, 2, 3] on the next. What do a == b and a is b report?",
+  "options": [
+    {
+      "label": "Both True, since the lists are the same",
+      "feedback": "Tempting, because in everyday speech those lists are the same. They are two separate objects built at two different moments, so identity differs even where contents match."
+    },
+    {
+      "label": "a == b is True and a is b is False",
+      "correct": true,
+      "feedback": "Right. == compares what is inside the boxes, is compares which box. Two literals mean two lists, no matter what they hold."
+    },
+    {
+      "label": "Both False",
+      "feedback": "Close, in that you have identity right. But == asks the list to compare itself element by element, and element by element these two match exactly."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`python
 a = [1, 2, 3]
 b = [1, 2, 3]
@@ -2825,6 +2849,30 @@ print(value is None)   # True
 
 Style guides (PEP 8) and linters flag \`value == None\`. It usually works, but it routes through \`__eq__\`, which any class is free to override.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "eq-none-can-be-overridden",
+  "prompt": "Your function starts with if value == None: return 0. One day it is handed a NumPy array. What goes wrong?",
+  "options": [
+    {
+      "label": "Nothing, == None behaves the same for every type",
+      "feedback": "Tempting, because it does behave the same for every type you have used so far, which is exactly why this line survives code review. == calls the object's own __eq__, and a class may define that however it likes."
+    },
+    {
+      "label": "The comparison returns an array of booleans, and the if then raises",
+      "correct": true,
+      "feedback": "Right. NumPy compares elementwise, so you get an array back, and asking an array for a single truth value raises a ValueError. No class can redefine what is None does."
+    },
+    {
+      "label": "It quietly returns 0 for every array",
+      "feedback": "Close, and a silent wrong answer would honestly be the worse outcome. Here it fails loudly: the if cannot reduce an array of booleans down to one True or False."
+    }
+  ]
+}
+\`\`\`
+
 ### Why \`== None\` can bite you
 
 \`==\` runs the object's own \`__eq__\`. A NumPy array, for instance, defines \`==\` to compare elementwise:
@@ -2836,6 +2884,30 @@ arr == None            # array([False, False, False]), not a plain bool
 \`\`\`
 
 Now \`if arr == None:\` raises a \`ValueError\` about the truth value of an array being ambiguous. Writing \`arr is None\` sidesteps all of that: it is a pure identity check that no class can redefine, and it is exactly what \`is_missing(value)\` should use.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "is-on-large-ints",
+  "prompt": "x = 1000 and y = 1000 are written on two separate lines. What does x is y report?",
+  "options": [
+    {
+      "label": "True, because equal numbers are the same object",
+      "feedback": "Tempting, because it really is True for small integers: CPython caches -5 through 256, so a quick experiment with 5 seems to prove the rule. Step outside that cached range and the guarantee disappears."
+    },
+    {
+      "label": "It depends on the interpreter, so you cannot rely on it either way",
+      "correct": true,
+      "feedback": "Right. Whether two equal ints share identity is a CPython implementation detail. Use == for values and save is for None."
+    },
+    {
+      "label": "False, always",
+      "feedback": "Close, and it is the likelier outcome for this particular pair. It is not a rule you can lean on though: the same two values written inside one function body may well be True."
+    }
+  ]
+}
+\`\`\`
 
 ### Do not use \`is\` for numbers or strings
 
