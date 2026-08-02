@@ -77,13 +77,17 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
         {/* ring-inset gives the 0-100 axis a visible extent: the bare bg-muted/60
             track measured 1.05:1 — the axis the dots' position depends on did not
             exist in light mode. */}
+        {/* The dark overrides are not optional: dark --muted is the SAME hex as
+            --card (#232220), so bg-muted/60 composites to 1.00:1 and ring-border to
+            1.31:1 — the identical "axis does not exist" failure this ring was added
+            to fix for light mode. foreground/10 + foreground/40 clears 3:1. */}
         <div
-          className="bg-muted/60 ring-border absolute inset-x-0 inset-y-1 overflow-hidden rounded ring-1 ring-inset"
+          className="bg-muted/60 ring-border dark:bg-foreground/10 dark:ring-foreground/40 absolute inset-x-0 inset-y-1 overflow-hidden rounded ring-1 ring-inset"
           aria-hidden="true"
         >
           {/* The at-risk zone, so a dot's position carries a verdict and not just a value. */}
           <div
-            className="absolute inset-y-0 left-0 bg-rose-500/10 dark:bg-rose-400/15"
+            className="absolute inset-y-0 left-0 bg-rose-500/10 dark:bg-rose-400/25"
             style={{ width: `${AT_RISK_BELOW}%` }}
           />
           {/* A hard boundary line: the tint alone measured 1.15:1, so where the
