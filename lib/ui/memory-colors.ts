@@ -23,12 +23,14 @@ import type { MemoryUrgency } from "@/lib/spaced-repetition/algorithm-router"
  * Shape of the memory indicator at the call site:
  * - `chip` pill with border + fill + text, for the per-card retention badge
  * - `bar`  solid fill for a progress/meter track
+ * - `ink`  text colour only, picked up by SVG marks via `currentColor`
  */
-export type MemoryColorVariant = "chip" | "bar"
+export type MemoryColorVariant = "chip" | "bar" | "ink"
 
 const FALLBACK: Record<MemoryColorVariant, string> = {
   chip: "border-border bg-muted text-muted-foreground",
   bar: "bg-muted-foreground/40",
+  ink: "text-muted-foreground/50",
 }
 
 const TABLE: Record<MemoryColorVariant, Record<MemoryUrgency, string>> = {
@@ -45,6 +47,14 @@ const TABLE: Record<MemoryColorVariant, Record<MemoryUrgency, string>> = {
     ok: "bg-amber-500 dark:bg-amber-400",
     warning: "bg-orange-500 dark:bg-orange-400",
     urgent: "bg-rose-500 dark:bg-rose-400",
+  },
+  // -600 rather than -700 in light mode: these drive SVG strokes, which are graphics
+  // and answer to the 3:1 non-text contrast bar, not the 4.5:1 text one.
+  ink: {
+    safe: "text-emerald-600 dark:text-emerald-400",
+    ok: "text-amber-600 dark:text-amber-400",
+    warning: "text-orange-600 dark:text-orange-400",
+    urgent: "text-rose-600 dark:text-rose-400",
   },
 }
 
