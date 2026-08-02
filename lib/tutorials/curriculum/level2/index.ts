@@ -110,6 +110,34 @@ distinct = {n % 3 for n in nums}   # {0, 1, 2}
 
 The \`{word: len(word) for word in words}\` form is precisely what the Practice exercise builds.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "leading-if-else-is-a-map",
+  "prompt": "With nums = [1, 2, 3, 4, 5], what does [n if n > 2 else 0 for n in nums] produce?",
+  "options": [
+    {
+      "label": "[3, 4, 5], the same result as [n for n in nums if n > 2]",
+      "feedback": "Tempting, because both spellings contain the same condition and read almost the same aloud. But an if that sits in FRONT of the for is a conditional expression: it chooses what to emit for every item, so nothing is ever dropped."
+    },
+    {
+      "label": "[0, 0, 3, 4, 5]",
+      "correct": true,
+      "feedback": "Right. A leading if ... else transforms every item, so the result is the same length as the input. Only a trailing if with no else filters."
+    },
+    {
+      "label": "[1, 2, 0, 0, 0]",
+      "feedback": "You spotted the important half: five items in, five items out, so this maps rather than filters. The branch order is the other way round though, since the value before the else is what a true condition emits."
+    },
+    {
+      "label": "A SyntaxError, because if cannot come before the for",
+      "feedback": "Understandable, since the trailing filter is the form most tutorials show first. Both positions are legal: leading if ... else is a conditional expression, trailing if is a filter clause."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfall: two different \`if\` positions
 
 \`if\` at the **end** filters. \`if ... else\` at the **front** is a conditional expression that transforms every item and drops nothing:
@@ -121,9 +149,75 @@ The \`{word: len(word) for word in words}\` form is precisely what the Practice 
 
 Interns mix these up constantly. If your output got shorter, you filtered. If it stayed the same length, you mapped.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "dict-comprehension-duplicate-keys",
+  "prompt": "What is {len(w): w for w in ['hi', 'by', 'ok']}?",
+  "options": [
+    {
+      "label": "{2: 'hi'}, since the first word to claim the key keeps it",
+      "feedback": "Tempting, because setdefault and a few other languages do keep the first write. Plain assignment does not: every iteration writes the same key, so the last word is the one left standing."
+    },
+    {
+      "label": "{2: 'ok'}",
+      "correct": true,
+      "feedback": "Right. All three words have length 2, so all three write to key 2 and the last one wins. Two records vanish and nothing warns you."
+    },
+    {
+      "label": "{2: ['hi', 'by', 'ok']}",
+      "feedback": "That is what a defaultdict(list) grouping loop would give you, and it is often what you actually wanted. A dict comprehension assigns rather than appends, so it stores exactly one value per key."
+    },
+    {
+      "label": "A KeyError, because the key 2 is produced three times",
+      "feedback": "A fair instinct: silent data loss feels like it deserves an error. Python treats a repeated key as an ordinary reassignment, which is exactly why this bug survives code review."
+    }
+  ]
+}
+\`\`\`
+
 One more, for dicts: duplicate keys silently overwrite, and the last one wins. \`{len(w): w for w in ["hi", "by", "ok"]}\` keeps only \`{2: "ok"}\` because all three keys are \`2\`. In the Practice exercise the words are the keys, so you are safe, but flip the mapping and you will quietly lose data.
 
-**Interview nuance:** a comprehension is eager. It runs to completion and materializes the whole collection in memory, so it costs O(n) time and O(n) space. That is fine for thousands of items and wasteful for a billion-row scan. The lazy cousin is the generator expression \`(n * n for n in nums)\`, the same syntax with \`( )\`, which yields one value at a time in O(1) extra space. When an interviewer asks what you would run over a huge stream, "a generator, because the full list would not fit in memory" is the answer they are listening for.`,
+**Interview nuance:** a comprehension is eager. It runs to completion and materializes the whole collection in memory, so it costs O(n) time and O(n) space. That is fine for thousands of items and wasteful for a billion-row scan. The lazy cousin is the generator expression \`(n * n for n in nums)\`, the same syntax with \`( )\`, which yields one value at a time in O(1) extra space. When an interviewer asks what you would run over a huge stream, "a generator, because the full list would not fit in memory" is the answer they are listening for.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "list-comp-vs-genexp",
+  "prompt": "You are choosing between [x for x in src] and (x for x in src). Sort each requirement into the tool that satisfies it.",
+  "buckets": ["List comprehension", "Generator expression"],
+  "items": [
+    {
+      "label": "You loop over the result twice",
+      "bucket": "List comprehension",
+      "feedback": "A generator is consumed once, so the second loop sees an empty sequence. A list can be walked as often as you like."
+    },
+    {
+      "label": "You total one number over a 10 GB log file",
+      "bucket": "Generator expression",
+      "feedback": "One value in memory at a time, O(1) extra space. The list version would try to hold every line at once."
+    },
+    {
+      "label": "You call len() on the result",
+      "bucket": "List comprehension",
+      "feedback": "A generator has no length: it does not know how many values it will produce until it has produced them."
+    },
+    {
+      "label": "You read the result with [0]",
+      "bucket": "List comprehension",
+      "feedback": "Generators do not support indexing. Use next(gen) to pull the first value, or build a list when random access matters."
+    },
+    {
+      "label": "You stop at the first match and abandon the rest",
+      "bucket": "Generator expression",
+      "feedback": "Laziness means the items after the match are never computed at all, so the work you skip is real work saved."
+    }
+  ],
+  "reveal": "The dividing line is passes and size: a list when you need indexing, len, or more than one walk, a generator when you consume the sequence once and the full collection would not fit."
+}
+\`\`\``,
     demoCode: `nums = [1, 2, 3, 4, 5]
 print([n * n for n in nums])              # [1, 4, 9, 16, 25]
 print([n for n in nums if n % 2 == 0])    # [2, 4]
@@ -242,6 +336,34 @@ When you scan a 10 GB log file to count errors, you do not want the whole file s
 }
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "calling-a-generator-runs-nothing",
+  "prompt": "A generator function begins with print('start') and then yields 1. You run the single line g = gen() and nothing else. What is printed?",
+  "options": [
+    {
+      "label": "start, because calling a function runs its body",
+      "feedback": "Tempting, and true of every ordinary function you have written so far. The presence of a yield anywhere in the body changes what the call does: it builds a generator object and runs none of the code."
+    },
+    {
+      "label": "Nothing at all",
+      "correct": true,
+      "feedback": "Right. The call only constructs a paused generator. Not one line of the body runs until something pulls a value out of it."
+    },
+    {
+      "label": "start, then 1",
+      "feedback": "This mixes up producing a value with printing it, and it also assumes the body ran. Even once you do pull from the generator, yield hands the value to the caller rather than printing it."
+    },
+    {
+      "label": "Nothing, and g is None because the function never returns anything",
+      "feedback": "Half right, which makes it the sharpest wrong answer: nothing prints. But g is a generator object, not None, and that object is what you iterate to make the body run."
+    }
+  ]
+}
+\`\`\`
+
 A generator function uses \`yield\` instead of \`return\`. Calling it does not run the body. It hands you a generator object. Each time you ask for a value (via \`for\`, \`next\`, \`sum\`, and friends), the body runs until it hits a \`yield\`, hands back that value, and freezes right there with every local variable intact. The next request resumes on the line after the \`yield\`.
 
 \`\`\`python
@@ -276,6 +398,34 @@ print(next((x for x in nums if x), None))   # 7
 
 That is exactly the shape for finding the first truthy value: the \`if x\` filter keeps only truthy items, and \`next(..., None)\` supplies the fallback when nothing qualifies.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "generator-consumed-once",
+  "prompt": "g = (n * n for n in range(1, 5)). You call sum(g) and it returns 30. What does a second sum(g) on the very next line return?",
+  "options": [
+    {
+      "label": "30 again, because the expression is re-evaluated",
+      "feedback": "Tempting, because a list assigned to a name really does survive being read twice, and the source range(1, 5) has not gone anywhere. But g is a single generator object, not a recipe that reruns."
+    },
+    {
+      "label": "0",
+      "correct": true,
+      "feedback": "Right. The first sum drove g to exhaustion, so the second one iterates an empty sequence and sum of nothing is 0. There is no rewind: build a fresh generator, or keep a list, when you need a second pass."
+    },
+    {
+      "label": "60, because the two sums accumulate",
+      "feedback": "Nothing accumulates across calls: sum starts from 0 every time and only ever adds what it pulls. The interesting question is what is left to pull, and after the first sum the answer is nothing."
+    },
+    {
+      "label": "It raises StopIteration, since the generator is exhausted",
+      "feedback": "Close, and it is the right instinct about exhaustion. StopIteration is how the generator signals the end, but for and sum catch that signal and treat it as a clean finish, so you get an empty total rather than a crash."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfall: a generator is single-use
 
 Iterating a generator consumes it. There is no rewind.
@@ -288,7 +438,32 @@ print(sum(g))   # 0   <- already exhausted, nothing left to yield
 
 The second \`sum\` sees an empty generator, not a fresh one. Also, \`next(gen)\` with no default raises \`StopIteration\` on an empty generator, so always pass a default when "not found" is a real outcome.
 
-**Interview nuance:** a generator *is* an iterator. It implements \`__iter__\` (returning itself) and \`__next__\`, holds one value at a time, and runs in O(1) extra memory no matter how many values it produces. A list comprehension is O(n) memory and re-iterable; a generator is O(1) memory and single-pass. Interviewers probe that trade-off directly: reach for a generator when you consume the sequence once and streaming saves memory, and for a list when you need indexing, \`len\`, or more than one pass.`,
+**Interview nuance:** a generator *is* an iterator. It implements \`__iter__\` (returning itself) and \`__next__\`, holds one value at a time, and runs in O(1) extra memory no matter how many values it produces. A list comprehension is O(n) memory and re-iterable; a generator is O(1) memory and single-pass. Interviewers probe that trade-off directly: reach for a generator when you consume the sequence once and streaming saves memory, and for a list when you need indexing, \`len\`, or more than one pass.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "first-match-over-a-huge-file",
+  "prompt": "You are scanning millions of log lines for the first one containing ERROR, and a clean run contains none. Which expression is correct and cheap?",
+  "options": [
+    {
+      "label": "next(line for line in lines if 'ERROR' in line)",
+      "feedback": "Cheap and lazy, so half the job is done: it stops at the first hit and never reads the rest. But with no default it raises StopIteration on a clean run, which is the common case you most need to survive."
+    },
+    {
+      "label": "next((line for line in lines if 'ERROR' in line), None)",
+      "correct": true,
+      "feedback": "Right. Lazy enough to stop at the first hit, and the default turns the empty case into a value you can test instead of an exception you have to catch."
+    },
+    {
+      "label": "[line for line in lines if 'ERROR' in line][0]",
+      "feedback": "It reads correctly, which is why it slips through review. It also scans every one of the millions of lines and materialises every match before taking one, then raises IndexError on the clean run."
+    }
+  ],
+  "reveal": "Two habits worth carrying out of this lesson: filter inside a generator expression so the scan stops at the first hit, and always pass next() a default when not found is a legitimate outcome."
+}
+\`\`\``,
     demoCode: `def countdown(n):
     while n > 0:
         yield n
