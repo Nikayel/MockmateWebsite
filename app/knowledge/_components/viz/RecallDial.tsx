@@ -1,7 +1,7 @@
 "use client"
 
 import { memoryColorClass } from "@/lib/ui/memory-colors"
-import type { MemoryUrgency } from "@/lib/spaced-repetition/memory-bands"
+import { displayRetention, type MemoryUrgency } from "@/lib/spaced-repetition/memory-bands"
 import { cn } from "@/lib/utils"
 
 /**
@@ -83,9 +83,10 @@ export function RecallDial({
   ariaLabel,
   className,
 }: RecallDialProps) {
-  // Round to the nearest 5 and prefix a tilde. Printing "69%" off a handful of
-  // reviews asserts a resolution the estimate does not carry.
-  const rounded = value === null ? null : Math.round(value / 5) * 5
+  // Round with displayRetention, not plain nearest-5: a card at 68% printed "~70%"
+  // in the tile while the band word beside it said "Weakening" AND its own row said
+  // "~65%" — the tile and the row disagreeing about one card, mid-demo.
+  const rounded = value === null ? null : displayRetention(value)
   const label = rounded === null ? "--" : `~${rounded}%`
 
   const fraction = value === null ? 0 : Math.min(1, Math.max(0, value / 100))
