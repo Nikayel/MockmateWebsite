@@ -99,7 +99,7 @@ export function CardBeliefRow({
           {challengesEnabled && onChallenge && !masked && (
             <button
               onClick={() => onChallenge(card)}
-              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-accent/50 flex items-center gap-1 rounded text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
               title="Dispute what the system believes about this problem"
             >
               <Flag className="h-3 w-3" />
@@ -108,7 +108,7 @@ export function CardBeliefRow({
           )}
           <Link
             href={`/interview?scenario=${card.scenario_id}&practice=true`}
-            className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-accent/50 flex items-center gap-1 rounded text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
           >
             Practice
             <ArrowRight className="h-3 w-3" />
