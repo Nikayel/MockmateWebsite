@@ -53,6 +53,38 @@ A line starting with \`#\` is a comment. Python ignores everything after the \`#
 print("this runs")   # a comment can also trail real code
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "comment-or-code",
+  "prompt": "Sort these lines by whether Python actually runs them.",
+  "buckets": ["Python runs it", "Python ignores it"],
+  "items": [
+    {
+      "label": "# check the spacing here",
+      "bucket": "Python ignores it",
+      "feedback": "The line starts with #, so the whole line is a note for humans."
+    },
+    {
+      "label": "print('this runs')   # a trailing note",
+      "bucket": "Python runs it",
+      "feedback": "The comment begins at the #, so print still runs. Only the note after it is skipped."
+    },
+    {
+      "label": "# print('this runs')",
+      "bucket": "Python ignores it",
+      "feedback": "Putting a # in front of real code is how you disable a line without deleting it."
+    },
+    {
+      "label": "print('# not a comment')",
+      "bucket": "Python runs it",
+      "feedback": "The # sits inside quotes, so it is just a character in the text. This prints # not a comment."
+    }
+  ]
+}
+\`\`\`
+
 ## Building strings with \`+\`
 
 A string is text in quotes. The \`+\` operator on two strings joins them into one new string (this is called concatenation).
@@ -77,6 +109,34 @@ print(greet("Ada"))   # Hello, Ada!
 
 Calling \`greet("Ada")\` substitutes \`"Ada"\` for \`name\`, builds \`"Hello, Ada!"\`, and returns it. The same shape covers \`banner(name)\`: wrap the name by returning \`"=== " + name + " ==="\`.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "concat-str-and-int",
+  "prompt": "You write print('Room ' + 12). What happens?",
+  "options": [
+    {
+      "label": "It prints Room 12, converting the number to text",
+      "feedback": "Tempting, because print itself displays numbers happily and many languages do convert silently here. But + between a str and an int is not defined, so the line fails before print is ever called."
+    },
+    {
+      "label": "It prints Room12, with the space lost",
+      "feedback": "Close on the spacing instinct: that trailing space inside 'Room ' really is what gives you the gap. The line never gets far enough to print anything at all, though."
+    },
+    {
+      "label": "It raises a TypeError",
+      "correct": true,
+      "feedback": "Right. + only joins str with str. Convert the number first with str(12), or build the whole thing with an f-string."
+    },
+    {
+      "label": "It prints Room and quietly drops the 12",
+      "feedback": "Tempting if you picture + as loose glue that skips whatever it cannot handle. Python never silently discards an operand: a combination it has no rule for is an error."
+    }
+  ]
+}
+\`\`\`
+
 ## Pitfall: \`+\` will not mix a string and a number
 
 \`+\` only concatenates string with string. If one side is a number you get a crash, not automatic conversion:
@@ -87,6 +147,31 @@ Calling \`greet("Ada")\` substitutes \`"Ada"\` for \`name\`, builds \`"Hello, Ad
 \`\`\`
 
 The fix is to convert the number first with \`str(...)\`: \`"Room " + str(12)\` gives \`"Room 12"\`. In these exercises \`name\` is already a string, so plain \`+\` is safe.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "print-returns-none",
+  "prompt": "A function body is nothing but print('Hello, ' + name). You call result = greet('Ada'). What is result?",
+  "options": [
+    {
+      "label": "The string Hello, Ada!",
+      "feedback": "Tempting, because you watched that text appear the moment the call ran. It went to the screen, not back to the caller, and the two paths are completely separate."
+    },
+    {
+      "label": "None",
+      "correct": true,
+      "feedback": "Right. A function with no return statement hands back None, and print itself also evaluates to None. The greeting was displayed, never returned."
+    },
+    {
+      "label": "An empty string",
+      "feedback": "Close, in that result really does hold something empty-feeling and useless. Python's stand-in for no value is None, not '', and the two behave differently the moment you call len() or use + on them."
+    }
+  ],
+  "reveal": "This is why the grader calls your function and reads what comes back. Printing is for a human watching a terminal; returning is how one piece of code hands a value to another."
+}
+\`\`\`
 
 **Interview nuance:** every Python function returns something. If you never write \`return\`, or you only \`print(...)\` inside it, the function hands back \`None\`, and \`print(...)\` itself evaluates to \`None\`. So \`return print("Hello")\` returns \`None\`, not the text. Interviewers use this to check that you separate a value (what \`return\` produces) from a side effect (what \`print\` does). The grader here calls your function and inspects the returned string, so always \`return\` the message rather than printing it.`,
     demoCode: `# Comments start with # and are ignored.
