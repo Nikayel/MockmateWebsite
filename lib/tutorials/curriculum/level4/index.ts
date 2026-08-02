@@ -2652,6 +2652,34 @@ cProfile.run("slow_function()")
 # 900000  0.850  0.850  app.py:30(lookup)   <- the real hot path
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "reading-tottime-vs-cumtime",
+  "prompt": "That profile is your whole optimisation budget for the afternoon. slow_function shows cumtime 0.900 with tottime 0.002. lookup shows tottime 0.850 across 900000 calls. Where do you spend the afternoon?",
+  "options": [
+    {
+      "label": "slow_function, since its cumtime of 0.900 is essentially the entire run",
+      "feedback": "The classic misread, and the numbers really do point at it. cumtime includes everything the function called, so 0.900 is mostly other people's time. Its own tottime of 0.002 says there is nothing there to cut."
+    },
+    {
+      "label": "lookup, since its own 0.850 is nearly all the runtime and it is being called 900000 times",
+      "correct": true,
+      "feedback": "Right. tottime plus a large ncalls is the signature of a real hot path, and it also hints at the better fix: call it less often, not just make it faster."
+    },
+    {
+      "label": "Both, since 0.900 and 0.850 are close enough that the time is split between them",
+      "feedback": "It looks like two similar numbers, but they are not measuring the same thing. The 0.850 is a subset of the 0.900, so this is one cost reported at two levels, not two costs."
+    },
+    {
+      "label": "Neither yet. Time both with timeit first to get a stable measurement",
+      "feedback": "Careful instinct, and timeit is the right tool for comparing two candidate implementations. Aimed at a whole program it misleads: it runs a snippet in isolation, warm and without the real call counts, which is exactly the context the profile just gave you."
+    }
+  ]
+}
+\`\`\`
+
 Read \`tottime\` (time in that function itself) and \`ncalls\`. A function called 900,000 times is your target, not the one that merely *looks* heavy.
 
 ### Complexity is the biggest lever
@@ -2684,6 +2712,34 @@ Measured on CPython 3.11 for a two-attribute object, \`sys.getsizeof\` reports 4
 against 56 bytes **plus** a separate per-instance dict without it. Across a million objects that gap
 is the difference between fitting in memory and not. Attribute access also gets slightly faster,
 because it is an array offset rather than a dict lookup.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "slots-blocks-new-attributes",
+  "prompt": "Point now declares __slots__ = ('x', 'y'). Somewhere far away, a debugging helper does p.label = 'origin'. What happens?",
+  "options": [
+    {
+      "label": "It works. Python always lets you attach a new attribute to an instance",
+      "feedback": "True of every class you have written until now, which is why this bites during a refactor rather than while writing new code. That freedom comes from the per-instance dict, and __slots__ is precisely the removal of that dict."
+    },
+    {
+      "label": "AttributeError, because there is no per-instance dict for label to live in",
+      "correct": true,
+      "feedback": "Right. The slots are fixed descriptors, so anything not declared has nowhere to go. Treat it as a feature: a misspelled attribute name becomes an error instead of a silently new field."
+    },
+    {
+      "label": "It works, but label becomes a class attribute shared by every Point",
+      "feedback": "Attribute assignment on an instance never writes to the class, with or without slots. Sharing across instances is the descriptor bug from the earlier lesson, not what happens here."
+    },
+    {
+      "label": "It works, because Python quietly gives that instance a __dict__ back",
+      "feedback": "There is a real version of this: a subclass that does not declare its own __slots__ gets a dict back, and gives up the saving with it. It never happens to an individual instance though, only through inheritance."
+    }
+  ]
+}
+\`\`\`
 
 The cost is flexibility, and it is worth naming precisely:
 
@@ -2730,13 +2786,70 @@ A generator streams values instead of building a list, so it uses constant memor
 total = sum(x * x for x in range(10_000_000))   # no 10M-element list
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "lru-cache-unhashable-argument",
+  "prompt": "Pricing is slow, so you put @lru_cache on def price(items, region), where items is a list of SKU strings. What happens on the very first call?",
+  "options": [
+    {
+      "label": "It works, but the cache never hits, because two equal lists are still different objects",
+      "feedback": "A sharp guess, and identity versus equality is a real trap elsewhere. The cache does compare by equality, not identity. The list never gets that far: building the key requires hashing it."
+    },
+    {
+      "label": "TypeError about an unhashable type, raised before the function body runs",
+      "correct": true,
+      "feedback": "Right. The cache key is a tuple of the arguments, so every argument has to be hashable. The usual fix is to accept a tuple, or convert at the boundary with tuple(items)."
+    },
+    {
+      "label": "It works and caches correctly, since lru_cache compares arguments by equality",
+      "feedback": "Equality is indeed how a cache hit is decided, but only after the arguments have been hashed to find the bucket. A list has no hash at all, so there is no bucket to look in."
+    },
+    {
+      "label": "It works, and lru_cache just skips caching for arguments it cannot hash",
+      "feedback": "That would be a friendly design, and some caches do work that way. functools.lru_cache does not degrade quietly: it raises, which at least means you find out immediately rather than in a latency graph."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfalls
 
 - \`lru_cache\` keys on the arguments, so every argument must be **hashable**. \`fib(2)\` is fine; passing a \`list\` or \`dict\` raises \`TypeError: unhashable type\`.
 - With \`maxsize=None\` the cache never evicts. That is perfect for \`fib\`, but calling a cached function with millions of distinct arguments leaks memory.
 - Recursive \`fib\` recurses \`n\` frames deep, so a cold \`fib(3000)\` hits Python's default recursion limit (\`RecursionError\`) before the cache helps. Warm it incrementally (\`fib(500)\`, then \`fib(1000)\`, ...) so each call only recurses to the first uncached \`n\`, or convert to a loop.
 
-**Interview nuance:** memoization works because \`fib\` has *overlapping subproblems*. There are only \`n + 1\` distinct inputs (\`0\` through \`n\`), each solved once, so the cache collapses exponential time to \`O(n)\` time and \`O(n)\` space. Being able to name that space cost, and the recursion-depth limit, is what separates "I added a decorator" from understanding why it works.`,
+**Interview nuance:** memoization works because \`fib\` has *overlapping subproblems*. There are only \`n + 1\` distinct inputs (\`0\` through \`n\`), each solved once, so the cache collapses exponential time to \`O(n)\` time and \`O(n)\` space. Being able to name that space cost, and the recursion-depth limit, is what separates "I added a decorator" from understanding why it works.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "cold-cache-deep-recursion",
+  "prompt": "fib is decorated with lru_cache(maxsize=None) and is genuinely fast. A freshly started worker process makes fib(3000) its very first call. What happens?",
+  "options": [
+    {
+      "label": "It returns instantly. That is the whole point of the cache",
+      "feedback": "True from the second call onward, and true in every demo, because the demo warmed the cache on the way up from small inputs. A cold process has an empty cache, so this first call gets no help at all."
+    },
+    {
+      "label": "RecursionError, because the first call still descends 3000 frames before any entry exists",
+      "correct": true,
+      "feedback": "Right. A cache changes how often work is repeated, never how deep the first descent goes. Warm it in steps, or rewrite the function as a loop."
+    },
+    {
+      "label": "MemoryError, because maxsize=None lets the cache grow without a bound",
+      "feedback": "An unbounded cache really is a leak worth worrying about, just at a different scale: it bites when you cache millions of distinct arguments. Three thousand small integers is nothing."
+    },
+    {
+      "label": "It is slow on this call and instant afterwards, which is the normal cold-cache cost",
+      "feedback": "That is the right model for most caches, and it would be the answer if fib were iterative. Recursion adds a hard ceiling that no amount of patience gets you past."
+    }
+  ],
+  "reveal": "Two separate costs hide behind one decorator. Time drops from exponential to linear because there are only n distinct inputs, but you now hold n results in memory and the first call still recurses n frames deep. Naming all three is the difference between using lru_cache and understanding it."
+}
+\`\`\``,
     demoCode: `from functools import lru_cache
 
 
