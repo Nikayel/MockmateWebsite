@@ -54,6 +54,8 @@ export function CardBeliefRow({
   // nothing to dispute — offering to re-grade an attempt that never happened.
   const noBelief = card.retrievability === null
   const scores = card.scores_history ?? []
+  // The authoritative count. scores.length is only the retained window (last ten).
+  const reviewCount = card.review_count ?? scores.length
   const expandable = Boolean(onExpandEvidence)
 
   // Days since the last review, recomputed here rather than shipped, so an open tab
@@ -146,9 +148,17 @@ export function CardBeliefRow({
 
           {!noBelief && scores.length > 0 && (
             <div className="mt-1.5 flex items-center gap-2">
-              <ScoreTrack scores={scores} />
+              <ScoreTrack scores={scores} totalReviews={card.review_count} />
+              {/*
+                The count comes from review_count, not scores.length: the scheduler
+                caps scores_history at the last ten while review_count keeps
+                incrementing, so a 25-review card used to print "10 reviews" here and
+                "25 reviews" three lines below in the same row — the open learner
+                model disagreeing with itself about how much evidence it has.
+              */}
               <span className="text-muted-foreground text-xs">
-                {scores.length} review{scores.length === 1 ? "" : "s"}
+                {reviewCount} review{reviewCount === 1 ? "" : "s"}
+                {reviewCount > scores.length ? ` · last ${scores.length} shown` : ""}
                 {card.hints_used_total ? ` · ${card.hints_used_total} hints` : ""}
               </span>
             </div>
