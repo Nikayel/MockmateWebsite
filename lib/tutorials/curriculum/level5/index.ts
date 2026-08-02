@@ -4505,6 +4505,464 @@ reordered in place.`,
   },
 }
 
+const reviewPassLesson: PythonLesson = {
+  id: "py-l5-review-pass",
+  title: "Ship it or send it back",
+  summary:
+    "The whole level as one repeatable pass: six questions in order, a verdict, and a comment specific enough to act on.",
+  estimatedMinutes: 26,
+  difficulty: "hard",
+  skills: ["code review", "verification", "communication", "judgment"],
+  teach: {
+    estimatedMinutes: 10,
+    markdown: `## A pass you can run when you are tired
+
+Everything in this level is a technique. This lesson is the order you apply them in, so that reviewing a hundred-line diff at the end of a long day still produces the same result as reviewing it fresh.
+
+Six questions. In this order, because each one tells you what to look for in the next.
+
+### 1. What is the contract?
+
+Say it in one sentence, including what happens for the awkward inputs, before you read the body. If you cannot, stop here: that is the review comment, and it is the most valuable one you will write today. Code that does not have a statable contract cannot be verified by anybody, including its author in six months.
+
+### 2. What are the boundaries?
+
+The body tells you. Any division, any index, any comparison against a threshold, any accumulator seeded with a literal, any assumption that a collection is non-empty. Write down the three inputs you would need in order to be sure, and check whether the tests contain them. Usually they do not.
+
+### 3. What happens on the error paths?
+
+Every \`try\`, every \`except\`, every external call, every parse. Is the exception narrowed to the one that is expected? Is a failure visible in the value that comes back, or does it vanish? What does the caller see when the dependency is down?
+
+### 4. What does it mutate?
+
+Arguments, module-level state, files, rows, anything outside the function. A function that sorts its argument in place is a different contract from one that returns a sorted copy, and the difference is invisible in the return value.
+
+### 5. What will it cost at real size?
+
+Membership tests against lists, front-of-list removals, string concatenation in loops, sorting inside loops. Correct output at the wrong cost is the one defect no test result will show you.
+
+### 6. What does it depend on, and does it exist?
+
+Imports, methods, keyword arguments, version-specific behavior. Loud failures are cheap. The dangerous case is a real API used with the wrong meaning.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "review-pass-order",
+  "prompt": "Why does the review pass start with the contract instead of reading the body?",
+  "options": [
+    {
+      "label": "Because the body is usually too long to read carefully",
+      "feedback": "Length is a real constraint on review quality, and skipping the body is not the answer. The contract comes first because it changes how you read the body, not because it lets you avoid it."
+    },
+    {
+      "label": "Because without a contract there is no definition of wrong, so nothing you notice is a finding",
+      "correct": true,
+      "feedback": "Right. Every later question is measured against the contract: a boundary matters because the contract says something about it, and a mutation matters because the contract did not permit it."
+    },
+    {
+      "label": "Because the contract is where most bugs are",
+      "feedback": "Ambiguous contracts do cause a great deal of trouble, so the instinct is sound. Most individual defects live in the body, and it is the contract that lets you recognise them as defects."
+    },
+    {
+      "label": "Because reading the body first biases you towards approving it",
+      "feedback": "There is a real effect here: reading an implementation makes its logic feel inevitable. The primary reason is simpler, which is that you cannot judge code against a standard you have not stated."
+    }
+  ]
+}
+\`\`\`
+
+## Turning findings into a verdict
+
+Not everything you notice should block a merge. Sorting your findings is part of the job, and doing it badly is how reviews become slow without becoming better.
+
+**Block** when the code is wrong for an input that will occur, when a failure is silent, when data can be corrupted, or when the cost is wrong at the size the system actually runs at.
+
+**Comment without blocking** when the finding is a readability preference, a smaller improvement, or a question you would like answered but whose answer will not change the merge.
+
+**Say nothing** about style a formatter already owns.
+
+One rule makes the difference between a review that gets acted on and one that gets a thumbs up and no change: **every blocking comment names an input**. Not "this might break on edge cases". Instead: "\`page_slice(rows, 1, 3)\` returns rows 4 to 6, and page 1 should be rows 1 to 3."
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "block-or-comment",
+  "prompt": "Sort each review finding by whether it should block the merge.",
+  "buckets": ["Block the merge", "Comment without blocking"],
+  "items": [
+    {
+      "label": "except Exception: pass around the parse loop, so malformed rows vanish",
+      "bucket": "Block the merge",
+      "feedback": "A silent failure produces wrong totals with no signal at all, and the damage compounds every night the job runs."
+    },
+    {
+      "label": "The helper could be a comprehension instead of a loop",
+      "bucket": "Comment without blocking",
+      "feedback": "A readability preference with no behavioral consequence, so it belongs in the conversation rather than in the gate."
+    },
+    {
+      "label": "The function sorts its argument in place, and two callers reuse that list",
+      "bucket": "Block the merge",
+      "feedback": "It corrupts data belonging to the caller, and the symptom will appear in an unrelated function that is hard to trace back here."
+    },
+    {
+      "label": "A membership test against a list inside a loop over 200k rows",
+      "bucket": "Block the merge",
+      "feedback": "Correct output at a cost that misses the batch window, and the fix is a one-word change, so there is no reason to defer it."
+    },
+    {
+      "label": "The variable named data could have a more specific name",
+      "bucket": "Comment without blocking",
+      "feedback": "Worth saying, since vague names accumulate. It changes nothing about whether the code is correct today."
+    },
+    {
+      "label": "No test covers the empty input the contract explicitly mentions",
+      "bucket": "Block the merge",
+      "feedback": "The contract names the case, so an untested branch of the contract is an unverified claim rather than a missing nicety."
+    }
+  ]
+}
+\`\`\`
+
+## Writing the comment
+
+A comment that gets acted on has three parts: the line, the input, and the consequence. Anything shorter starts a discussion instead of a fix.
+
+> Line 6: \`seen\` is a list, so \`n in seen\` scans it. On the 200k-row nightly import that is about twenty billion comparisons and the job will not finish in its window. Making \`seen\` a set is a one-word change.
+
+> Line 12: this returns \`0\` when there are no ratings, and the caller renders it as the average. A listing with no reviews will display "0.0 stars" rather than "no reviews yet". Should this return \`None\` instead?
+
+Notice the second one is a question. Plenty of findings are genuinely questions about intent, and asking is faster and more accurate than guessing at what the author meant.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "review-comment-quality",
+  "prompt": "Which review comment is most likely to result in a change?",
+  "options": [
+    {
+      "label": "This does not handle edge cases",
+      "feedback": "It names no case, no line, and no consequence, so the author has to guess what you meant. The most common reply is a request for clarification, which costs a full round trip."
+    },
+    {
+      "label": "I would write this differently",
+      "feedback": "It reads as taste rather than a defect, so it is easy to acknowledge and ignore. Even when you are right, nothing here tells the author what would change if they agreed."
+    },
+    {
+      "label": "Line 6 returns 2 for page_count(10, 10), and 10 items at 10 per page is 1 page",
+      "correct": true,
+      "feedback": "Right. A line, an input, and the expected value, which the author can verify in ten seconds. There is nothing to debate and the fix is obvious."
+    },
+    {
+      "label": "Please add more tests",
+      "feedback": "Almost always true and almost never acted on, because it does not say which case is missing. Naming the one input you are worried about turns it into a five minute task."
+    }
+  ]
+}
+\`\`\`
+
+## What this level was actually about
+
+The market changed the question. Writing a small function that passes hidden tests is the task that is now automated end to end, and the interviews that used to test it have moved on to something else: here is code you did not write, tell me what is wrong with it and prove it.
+
+Every technique in this level is one answer to that question.
+
+- Recover the contract, trace the boundary before you run anything.
+- Assume the example passes, because whatever produced the code was fitted to it.
+- Know the failure shapes on sight, so a suspicion becomes a specific input.
+- Write the assertion that fails now, because that is the only durable artifact.
+- Use properties and a slow oracle when examples run out.
+- Shrink the failing input until it explains itself.
+- Repair to the class the contract names, and do not rewrite.
+- Read for cost, which no test result will show you.
+- Wrap unreliable dependencies, validate what they return, verify the APIs are real.
+
+None of this is anti-AI. Generated code is a draft from a fast collaborator who does not know your codebase, has not read your contract, and will not be on call when it fails. Judging that draft accurately, and proving your judgement with a test, is the part of the job that got more valuable, not less.
+
+**Interview nuance:** if an interviewer hands you a function and asks what you think, the pass in this lesson is your answer, spoken out loud. Contract, boundaries, error paths, mutation, cost, dependencies. You will find something almost every time, because the code was chosen to have something in it, and you will find it in a visibly repeatable way rather than by luck.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "review-pass-cumulative",
+  "prompt": "You have thirty minutes to review a 200 line generated pull request. What produces the most value?",
+  "options": [
+    {
+      "label": "Read every line carefully from top to bottom",
+      "feedback": "Thorough and poorly targeted, since attention is uniform while risk is not. You will spend most of the half hour on lines that could not have been wrong."
+    },
+    {
+      "label": "Run the six questions against the two or three functions that touch data or money",
+      "correct": true,
+      "feedback": "Right. The pass is what makes the review repeatable, and pointing it at the highest-consequence functions is what makes it fit in the time you have."
+    },
+    {
+      "label": "Run the test suite and approve if it is green",
+      "feedback": "Worth doing and nowhere near sufficient. The suite was very likely generated alongside the code, from the same understanding of the contract, so it agrees with the code by construction."
+    },
+    {
+      "label": "Rewrite the parts you would have written differently",
+      "feedback": "It produces code you trust and it is not a review, it is authorship. It also takes far longer than thirty minutes and leaves the author having learned nothing."
+    }
+  ],
+  "reveal": "Contract, boundaries, error paths, mutation, cost, dependencies. Then a verdict, and a comment that names a line, an input, and a consequence. That is the whole level, in the order you use it."
+}
+\`\`\``,
+    demoCode: `def weekly_summary(entries):
+    total = 0
+    for day, minutes in entries:
+        total += minutes
+    return {"total": total, "average": round(total / len(entries), 1)}
+
+
+# Question 1: what is the contract when a day was never logged?
+# Question 2: what happens on an empty list?
+print(weekly_summary([["mon", 30], ["tue", 45]]))`,
+  },
+  apply: {
+    id: "py-l5-review-pass-apply",
+    executionMode: "single-file",
+    prompt: `Write a function \`check(name)\` that returns \`True\` only when the candidate stored under
+\`name\` is a correct \`apply_refund\`, and \`False\` otherwise.
+
+The contract: \`apply_refund(order, amount)\` refunds \`amount\` cents against an order dictionary
+holding \`"total"\` and \`"refunded"\`. The amount is capped so \`"refunded"\` never exceeds \`"total"\`.
+An \`amount\` of zero or less refunds nothing. The function returns a **new** dictionary and does not
+modify the one it was given.
+
+The starter holds five candidates. Two are correct, and the three that are not each fail a different
+question from the review pass: one mutates its argument, one skips the cap, and one lets a negative
+amount run backwards. Keep \`check\` as the last function in the file.`,
+    starterCode: `def a(order, amount):
+    if amount <= 0:
+        return dict(order)
+    allowed = min(amount, order["total"] - order["refunded"])
+    updated = dict(order)
+    updated["refunded"] = order["refunded"] + allowed
+    return updated
+
+
+def b(order, amount):
+    if amount <= 0:
+        return order
+    allowed = min(amount, order["total"] - order["refunded"])
+    order["refunded"] += allowed
+    return order
+
+
+def c(order, amount):
+    updated = dict(order)
+    if amount > 0:
+        updated["refunded"] = order["refunded"] + amount
+    return updated
+
+
+def d(order, amount):
+    updated = dict(order)
+    updated["refunded"] = min(order["total"], order["refunded"] + amount)
+    return updated
+
+
+def e(order, amount):
+    updated = dict(order)
+    if amount > 0:
+        remaining = order["total"] - order["refunded"]
+        updated["refunded"] = order["refunded"] + min(amount, remaining)
+    return updated
+
+
+CANDIDATES = {"a": a, "b": b, "c": c, "d": d, "e": e}
+
+
+def check(name):
+    # Probe CANDIDATES[name] and return True only if it satisfies the contract.
+    pass`,
+    hints: [
+      "One case per contract clause: an ordinary refund, a refund larger than what remains, a negative amount, and zero.",
+      "Build the order dictionary inside `check` and compare it against a saved copy after the call to catch a mutation.",
+      "An order already refunded up to 900 of 1000 separates the candidate that never caps the amount.",
+    ],
+    referenceSolution: `def a(order, amount):
+    if amount <= 0:
+        return dict(order)
+    allowed = min(amount, order["total"] - order["refunded"])
+    updated = dict(order)
+    updated["refunded"] = order["refunded"] + allowed
+    return updated
+
+
+def b(order, amount):
+    if amount <= 0:
+        return order
+    allowed = min(amount, order["total"] - order["refunded"])
+    order["refunded"] += allowed
+    return order
+
+
+def c(order, amount):
+    updated = dict(order)
+    if amount > 0:
+        updated["refunded"] = order["refunded"] + amount
+    return updated
+
+
+def d(order, amount):
+    updated = dict(order)
+    updated["refunded"] = min(order["total"], order["refunded"] + amount)
+    return updated
+
+
+def e(order, amount):
+    updated = dict(order)
+    if amount > 0:
+        remaining = order["total"] - order["refunded"]
+        updated["refunded"] = order["refunded"] + min(amount, remaining)
+    return updated
+
+
+CANDIDATES = {"a": a, "b": b, "c": c, "d": d, "e": e}
+
+
+def check(name):
+    fn = CANDIDATES[name]
+    cases = [
+        ({"total": 1000, "refunded": 0}, 300, {"total": 1000, "refunded": 300}),
+        ({"total": 1000, "refunded": 900}, 500, {"total": 1000, "refunded": 1000}),
+        ({"total": 1000, "refunded": 200}, -50, {"total": 1000, "refunded": 200}),
+        ({"total": 1000, "refunded": 200}, 0, {"total": 1000, "refunded": 200}),
+    ]
+    for order, amount, expected in cases:
+        passed_in = dict(order)
+        result = fn(passed_in, amount)
+        if result != expected:
+            return False
+        if passed_in != order:
+            return False
+    return True`,
+    testCases: [
+      { input: { name: "a" }, expected: true, description: "candidate a" },
+      { input: { name: "b" }, expected: false, description: "candidate b" },
+      { input: { name: "c" }, expected: false, description: "candidate c" },
+      { input: { name: "d" }, expected: false, description: "candidate d" },
+      { input: { name: "e" }, expected: true, description: "candidate e" },
+    ],
+  },
+  practice: {
+    id: "py-l5-review-pass-practice",
+    executionMode: "single-file",
+    prompt: `Your habit-tracking product emails every user a weekly summary on Monday morning, and an
+assistant wrote the \`weekly_summary\` function in the starter. It was tested on one full week of
+data, which is the only shape it handles. Users who missed a day, users who logged nothing all week,
+and users who signed up on Sunday are all currently getting either a crash or a wrong number.
+
+Repair \`weekly_summary\` so it satisfies its contract.
+
+The contract: \`entries\` is a list of \`[day, minutes]\` pairs, where \`minutes\` is a whole number or
+\`None\` for a day that was never logged. Return a dictionary with \`"days_logged"\` (how many entries
+have a real number), \`"total"\` (the sum of those minutes), \`"best_day"\` (the day with the most
+minutes, with ties going to the one earliest in the list, and \`None\` when nothing was logged), and
+\`"average"\` (the total divided by \`"days_logged"\`, rounded to one decimal place, or \`0.0\` when
+nothing was logged).
+
+A logged day of zero minutes still counts as logged.`,
+    starterCode: `def weekly_summary(entries):
+    # Generated code. It was tested on one complete week and nothing else.
+    total = 0
+    best_day = None
+    best_minutes = 0
+    for day, minutes in entries:
+        total += minutes
+        if minutes > best_minutes:
+            best_minutes = minutes
+            best_day = day
+    return {
+        "days_logged": len(entries),
+        "total": total,
+        "best_day": best_day,
+        "average": round(total / len(entries), 1),
+    }`,
+    hints: [
+      "Skip entries whose `minutes` is `None` before doing any arithmetic with them, and count the rest yourself.",
+      "Seeding `best_minutes` at `0` means a day of zero minutes can never win. Seed it at `None` and treat the first logged day as the best so far.",
+      "Handle the no-logged-days case with an early return, before any division.",
+    ],
+    referenceSolution: `def weekly_summary(entries):
+    total = 0
+    days_logged = 0
+    best_day = None
+    best_minutes = None
+    for day, minutes in entries:
+        if minutes is None:
+            continue
+        days_logged += 1
+        total += minutes
+        if best_minutes is None or minutes > best_minutes:
+            best_minutes = minutes
+            best_day = day
+    if days_logged == 0:
+        return {"days_logged": 0, "total": 0, "best_day": None, "average": 0.0}
+    return {
+        "days_logged": days_logged,
+        "total": total,
+        "best_day": best_day,
+        "average": round(total / days_logged, 1),
+    }`,
+    testCases: [
+      {
+        input: {
+          entries: [
+            ["mon", 30],
+            ["tue", 45],
+            ["wed", null],
+          ],
+        },
+        expected: { days_logged: 2, total: 75, best_day: "tue", average: 37.5 },
+        description: "one day of the week was never logged",
+      },
+      {
+        input: { entries: [] },
+        expected: { days_logged: 0, total: 0, best_day: null, average: 0.0 },
+        description: "a user who signed up on Sunday",
+      },
+      {
+        input: {
+          entries: [
+            ["mon", null],
+            ["tue", null],
+          ],
+        },
+        expected: { days_logged: 0, total: 0, best_day: null, average: 0.0 },
+        description: "a user who logged nothing all week",
+      },
+      {
+        input: {
+          entries: [
+            ["mon", 0],
+            ["tue", 0],
+          ],
+        },
+        expected: { days_logged: 2, total: 0, best_day: "mon", average: 0.0 },
+        description: "logged days of zero minutes still count",
+      },
+      {
+        input: {
+          entries: [
+            ["mon", 20],
+            ["tue", 20],
+          ],
+        },
+        expected: { days_logged: 2, total: 40, best_day: "mon", average: 20.0 },
+        description: "a tie goes to the earlier day",
+      },
+    ],
+  },
+}
+
 export const level5: PythonLevel = {
   id: 5,
   slug: "verification",
@@ -4539,7 +4997,12 @@ export const level5: PythonLevel = {
       title: "Calling a Model Like Any Other Unreliable Dependency",
       description:
         "Wrap the call, validate what comes back, and check the API it used actually exists before any of it reaches production.",
-      lessons: [modelDependencyLesson, validateOutputLesson, hallucinatedApiLesson],
+      lessons: [
+        modelDependencyLesson,
+        validateOutputLesson,
+        hallucinatedApiLesson,
+        reviewPassLesson,
+      ],
     },
   ],
 }
