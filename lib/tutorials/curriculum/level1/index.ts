@@ -2376,12 +2376,60 @@ seen = {1, 2, 2, 3}      # stored as {1, 2, 3}
 len(set([1, 2, 2, 3]))   # 3   distinct count
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "empty-braces-make-a-dict",
+  "prompt": "You start a collection of ids you have already seen with seen = {} and then call seen.add(7). What happens?",
+  "options": [
+    {
+      "label": "It works, and seen now holds 7",
+      "feedback": "Tempting, because braces are exactly how you write a set literal like {1, 2}, so empty braces look like the empty set. Dicts claimed that spelling first: {} is an empty dict."
+    },
+    {
+      "label": "It raises an AttributeError, because seen is an empty dict",
+      "correct": true,
+      "feedback": "Right. Dicts have no add method. Write seen = set() when you want an empty set."
+    },
+    {
+      "label": "It works, and seen becomes the dict with key 7",
+      "feedback": "Close, in that dicts do have ways to take a bare key, such as seen[7] = None or setdefault. add is simply not part of the dict interface, so the call raises instead."
+    }
+  ]
+}
+\`\`\`
+
 Wrapping a list in \`set(...)\` is the idiomatic way to drop duplicates or count distinct values.
 
 ### When to use which
 
 - \`tuple\`: a small fixed record whose fields will not change.
 - \`set\`: you care about uniqueness or membership, not order or position.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "single-element-tuple-needs-a-comma",
+  "prompt": "You write point = (3) and then call len(point). What happens?",
+  "options": [
+    {
+      "label": "It returns 1, since the tuple holds one item",
+      "feedback": "Tempting, because the parentheses look like tuple syntax and this is how you would write a one-item tuple in several other languages. What makes a tuple in Python is the comma, not the brackets."
+    },
+    {
+      "label": "It raises a TypeError, because point is just the int 3",
+      "correct": true,
+      "feedback": "Right. A one-element tuple needs the trailing comma: (3,). Without it the brackets are only grouping, and ints have no length."
+    },
+    {
+      "label": "It returns 3",
+      "feedback": "Close if you read len as reporting the value it is given. len asks how many items a container holds, and an int is not a container at all."
+    }
+  ]
+}
+\`\`\`
 
 Braces and parentheses are overloaded in Python, and the literal you write is not always the type you get:
 
@@ -2408,6 +2456,30 @@ Braces and parentheses are overloaded in Python, and the literal you write is no
 - A one-element tuple needs a trailing comma. \`(3)\` is just the integer \`3\`; \`(3,)\` is a tuple.
 - Sets are unordered. Never rely on iteration order or index a set (\`my_set[0]\` raises \`TypeError\`). If you need order, sort into a list.
 - Set elements must be hashable, so a \`set\` of \`list\`s fails, but a \`set\` of \`tuple\`s works.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "membership-cost-list-vs-set",
+  "prompt": "A loop runs a million times and each pass evaluates x in c. Which container keeps that loop fast?",
+  "options": [
+    {
+      "label": "Either one, since the line of code is identical",
+      "feedback": "That is exactly the trap: it reads the same for both, which is why the wrong container hides so well in review. The work behind those characters is completely different."
+    },
+    {
+      "label": "A set, because membership hashes straight to one slot",
+      "correct": true,
+      "feedback": "Right. x in a_set is O(1) on average while x in a_list is O(n), so over a million passes this is the difference between linear and quadratic."
+    },
+    {
+      "label": "A list, because it can stop as soon as it finds a match",
+      "feedback": "Tempting, and an early match really does cut the scan short. The misses are what cost you: a value that is absent is compared against every single element before the scan gives up."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** membership cost is the reason to reach for a set. \`x in some_list\` is \`O(n)\` because Python checks each element in turn, while \`x in some_set\` is \`O(1)\` on average because it hashes straight to a bucket. That is exactly why counting distinct values through a \`set\` beats comparing every pair, and why de-duplication loops that build a set as they go run in linear time.`,
     demoCode: `nums = [1, 2, 2, 3, 3, 3]
@@ -2487,6 +2559,34 @@ Two consequences of the hash-map design:
 
 ## Reading and writing
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "missing-key-raises",
+  "prompt": "prices holds one pair, apple mapped to 3. What does prices['banana'] do?",
+  "options": [
+    {
+      "label": "Returns None, since the key is not there",
+      "feedback": "Tempting, because .get does exactly that and most languages hand back a null for a missing key. Bracket access is the strict form, and strict means it raises."
+    },
+    {
+      "label": "Raises a KeyError",
+      "correct": true,
+      "feedback": "Right. Use .get(key, default) when absence is expected and you want a fallback instead of a crash."
+    },
+    {
+      "label": "Returns 0",
+      "feedback": "Close to what you usually want when counting, which is why .get(key, 0) is such a common pattern. You have to ask for that fallback though: d[key] never invents one."
+    },
+    {
+      "label": "Adds banana to the dict with an empty value",
+      "feedback": "Tempting, because assignment does create a key on the fly and setdefault really does insert. Reading is not writing: a plain lookup never modifies the dict."
+    }
+  ]
+}
+\`\`\`
+
 Index a key with \`d[key]\`, but a missing key raises \`KeyError\`. Reach for \`.get(key, default)\` when the key might be absent and you want a fallback instead of a crash:
 
 \`\`\`python
@@ -2498,6 +2598,30 @@ prices["apple"] = 5        # the same syntax updates an existing key
 \`\`\`
 
 That \`.get(name, 0)\` pattern is exactly what the \`lookup\` exercise needs.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "in-tests-keys-not-values",
+  "prompt": "prices maps apple to 3 and pear to 2. What does the expression 3 in prices report?",
+  "options": [
+    {
+      "label": "True, since 3 is one of the prices",
+      "feedback": "Tempting, because 3 is very clearly in there and iterating a list of the values would find it. The in operator on a dict looks only at keys."
+    },
+    {
+      "label": "False",
+      "correct": true,
+      "feedback": "Right. in tests keys and never values. Write 3 in prices.values() when the value is what you actually mean."
+    },
+    {
+      "label": "It raises a TypeError, since 3 is not a string like the other keys",
+      "feedback": "Close, in that mixing key types feels like it should bother something. A dict is happy to be asked about any hashable key; it simply reports that this one is not present."
+    }
+  ]
+}
+\`\`\`
 
 \`\`\`csdiagram
 {
@@ -2512,6 +2636,30 @@ That \`.get(name, 0)\` pattern is exactly what the \`lookup\` exercise needs.
   ],
   "highlightCols": ["Key is missing"],
   "caption": "Only the missing-key column differs, and only one row there raises. Two of the others return something falsy without complaint, which is why a bare .get(key) so often turns a typo into a silent None instead of an error."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "merge-conflict-winner",
+  "prompt": "Two dicts both hold the key x, the first mapping it to 1 and the second to 9. You merge them in that order. What is the merged result?",
+  "options": [
+    {
+      "label": "x maps to 1, since that value was already there",
+      "feedback": "Tempting, because a first-writer-wins rule would protect existing data, and some merge helpers do work that way. A merge is just repeated assignment, and a later assignment overwrites an earlier one."
+    },
+    {
+      "label": "x maps to 9",
+      "correct": true,
+      "feedback": "Right. The right-hand dict wins, because each key is assigned in order and the last write stands. It is the same rule that makes d[key] = value overwrite silently."
+    },
+    {
+      "label": "x maps to both values, kept as a list",
+      "feedback": "Close to what you would want for grouping, and a defaultdict(list) would build exactly that. A plain dict stores one value per key, so one of the two has to lose."
+    }
+  ]
 }
 \`\`\`
 
