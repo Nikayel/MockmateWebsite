@@ -4,8 +4,20 @@ import Link from "next/link"
 import { ArrowRight, Flag } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
-import { memoryColorClass } from "@/lib/ui/memory-colors"
 import type { CardBelief } from "@/lib/learner-model/types"
+import { RecallDial } from "./viz/RecallDial"
+import { ScoreTrack } from "./viz/ScoreTrack"
+
+/**
+ * One problem, and what the model believes about it.
+ *
+ * The row used to state the same number three times — as a chip, as a sentence
+ * ("The system estimates a ~69% chance…"), and again in the tooltip — then spend a
+ * third line on `scores.join(" → ")`. Every fact now has exactly one visual home:
+ * the dial carries the estimate and its uncertainty, the track carries the history,
+ * and the sentence moves to the accessible description and the tooltip, where it is
+ * read once by the people it actually helps.
+ */
 
 interface CardBeliefRowProps {
   card: CardBelief
@@ -26,15 +38,59 @@ export function CardBeliefRow({
   expanded = false,
 }: CardBeliefRowProps) {
   const masked = card.retrievability === null && card.belief_text === null
+  const scores = card.scores_history ?? []
+
+  const dial = (
+    <RecallDial
+      value={card.retrievability}
+      reviewCount={card.review_count}
+      urgency={card.memory?.urgency ?? null}
+      size="md"
+      // The belief sentence is the accessible text for the dial. It is the one place
+      // the full explanation still appears verbatim.
+      ariaLabel={card.belief_text ?? undefined}
+    />
+  )
 
   return (
-    <div className="group py-3">
-      <div className="flex items-start justify-between gap-3">
+    <div className="py-3">
+      <div className="flex items-start gap-3">
+        {/* The estimate leads: it is the only thing that decides whether to act. */}
+        {card.memory ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {/*
+                A button, not a span: stability, lapses and review count live only in
+                this tooltip, so a non-focusable trigger meant keyboard and screen
+                reader users could never reach the model's reasoning on the page built
+                to expose it.
+              */}
+              <button
+                type="button"
+                className="focus-visible:ring-accent/50 shrink-0 cursor-help rounded-full focus-visible:ring-2 focus-visible:outline-none"
+              >
+                {dial}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p className="mb-1 font-medium">{card.memory.label} — why this number?</p>
+              <p>
+                Estimated chance you could solve this cold right now, from the FSRS forgetting
+                curve: stability {card.stability_days}d, {card.lapses ?? 0} lapse
+                {(card.lapses ?? 0) === 1 ? "" : "s"}, {card.review_count ?? 0} reviews.
+              </p>
+              {card.belief_text && <p className="mt-1 opacity-80">{card.belief_text}</p>}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          dial
+        )}
+
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <button
               onClick={() => onExpandEvidence?.(card)}
-              className="text-foreground hover:text-foreground/80 truncate text-left text-sm font-medium"
+              className="text-foreground hover:text-foreground/80 focus-visible:ring-accent/50 truncate rounded text-left text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
               aria-expanded={expanded}
             >
               {card.title}
@@ -42,42 +98,21 @@ export function CardBeliefRow({
             <span className={`text-xs ${difficultyColorClass(card.difficulty, "text")}`}>
               {card.difficulty}
             </span>
-            {card.memory && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  {/*
-                    A button, not a span: stability, lapses and review count live only
-                    inside this tooltip, so a non-focusable trigger meant keyboard and
-                    screen-reader users could never reach the model's actual reasoning
-                    on the page built to expose it.
-                  */}
-                  <button
-                    type="button"
-                    className={`focus-visible:ring-accent/50 inline-flex cursor-help items-center rounded-full border px-2 py-0.5 text-xs font-medium focus-visible:ring-2 focus-visible:outline-none ${memoryColorClass(card.memory.urgency, "chip")}`}
-                  >
-                    {card.retrievability}% · {card.memory.label}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p className="mb-1 font-medium">Why this number?</p>
-                  <p>
-                    Estimated chance you could solve this cold right now, from the FSRS forgetting
-                    curve: stability {card.stability_days}d, {card.lapses ?? 0} lapse
-                    {(card.lapses ?? 0) === 1 ? "" : "s"}, {card.review_count ?? 0} reviews.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            )}
           </div>
-          {card.belief_text && (
-            <p className="text-muted-foreground mt-1 text-xs italic">{card.belief_text}</p>
+
+          {!masked && scores.length > 0 && (
+            <div className="mt-1.5 flex items-center gap-2">
+              <ScoreTrack scores={scores} />
+              <span className="text-muted-foreground text-xs">
+                {scores.length} review{scores.length === 1 ? "" : "s"}
+                {card.hints_used_total ? ` · ${card.hints_used_total} hints` : ""}
+              </span>
+            </div>
           )}
-          {!masked && card.scores_history && card.scores_history.length > 0 && (
-            <p className="text-muted-foreground mt-1 text-xs">
-              Evidence: scores {card.scores_history.join(" → ")}
-              {card.hints_used_total ? ` · ${card.hints_used_total} hints` : ""}
-              {card.review_count ? ` · ${card.review_count} reviews` : ""}
-            </p>
+
+          {/* Masked rows keep whatever the black-box condition left behind. */}
+          {masked && card.belief_text && (
+            <p className="text-muted-foreground mt-1 text-xs italic">{card.belief_text}</p>
           )}
         </div>
 
