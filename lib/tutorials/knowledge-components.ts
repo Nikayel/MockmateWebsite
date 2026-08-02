@@ -336,6 +336,9 @@ const SKILL_TO_KC: Record<string, KnowledgeComponent> = {
   design: "py.oop",
 
   errors: "py.errors",
+  bisection: "py.errors",
+  "minimal-reproduction": "py.errors",
+  "minimal-change": "py.code-review",
   "custom-exceptions": "py.errors",
   "error-boundaries": "py.errors",
   raise: "py.errors",
@@ -352,6 +355,8 @@ const SKILL_TO_KC: Record<string, KnowledgeComponent> = {
   invariants: "py.testing",
   "property-testing": "py.testing",
   "regression-tests": "py.testing",
+  "differential-testing": "py.testing",
+  "brute-force": "py.testing",
 
   findall: "py.regex",
   sub: "py.regex",
