@@ -4,6 +4,7 @@ import {
   memoryBandFor,
   getMemoryStrength,
 } from "@/lib/spaced-repetition/algorithm-router"
+import { displayRetention } from "@/lib/spaced-repetition/memory-bands"
 import { memoryColorClass } from "@/lib/ui/memory-colors"
 
 /**
@@ -47,6 +48,31 @@ describe("memory strength bands", () => {
     // Same retention in, same band out — whichever door the caller came through.
     const strength = getMemoryStrength("fsrs", { fsrs_card: undefined }, 0)
     expect(strength).toMatchObject(memoryBandFor(strength.score))
+  })
+})
+
+describe("displayRetention", () => {
+  it("rounds to the nearest 5 when that stays inside the band", () => {
+    expect(displayRetention(72)).toBe(70) // 70 is still "ok", same as 72
+    expect(displayRetention(93)).toBe(95)
+    expect(displayRetention(50)).toBe(50)
+  })
+
+  it("never lets the shown number contradict the band word", () => {
+    // 68 is "Weakening"; nearest-5 gives 70, which is the Good floor. The display
+    // must round toward its own band, or the number and the label tell two stories.
+    expect(displayRetention(68)).toBe(65)
+    expect(memoryBandFor(displayRetention(68)).urgency).toBe(memoryBandFor(68).urgency)
+    // 88 is "Good"; nearest-5 gives 90, the Strong floor.
+    expect(displayRetention(88)).toBe(85)
+    // 48 is "Fading"; nearest-5 gives 50, the Weakening floor.
+    expect(displayRetention(48)).toBe(45)
+  })
+
+  it("agrees with the band for every integer value", () => {
+    for (let v = 0; v <= 100; v++) {
+      expect(memoryBandFor(displayRetention(v)).urgency).toBe(memoryBandFor(v).urgency)
+    }
   })
 })
 
