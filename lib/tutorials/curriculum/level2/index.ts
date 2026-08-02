@@ -3141,6 +3141,30 @@ except ZeroDivisionError:
     result = None         # ...jump here, but only for this error type
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "except-catches-only-its-own-type",
+  "prompt": "safe_divide wraps a / b in try and catches ZeroDivisionError, returning None. A caller passes b as the string '2' instead of a number. What does that caller see?",
+  "options": [
+    {
+      "label": "None, because the except branch handles whatever goes wrong in the try",
+      "feedback": "Tempting, because the try block does mark the risky region and returning None reads like a general fallback. An except clause is a filter, though: it only catches the class you named and its subclasses, and TypeError is not one of them."
+    },
+    {
+      "label": "A TypeError propagating out of safe_divide",
+      "correct": true,
+      "feedback": "Right, and that is the behaviour you want. A bad argument type is a caller bug, not a divide-by-zero, and hiding it behind None would send the wrong value downstream."
+    },
+    {
+      "label": "5.0, because Python converts the string to a number for the division",
+      "feedback": "Python does no implicit numeric conversion for strings, which is deliberate: '2' could just as easily be data that must never be treated as a number. int('2') is how you opt in."
+    }
+  ]
+}
+\`\`\`
+
 \`except ZeroDivisionError\` matches that class and its subclasses. Any other error (a \`TypeError\`, say) is not caught here and keeps propagating. Catch the specific exception you expect, not everything. That is exactly what \`safe_divide\` in the demo below does: it returns \`5.0\` for \`safe_divide(10, 2)\` and \`None\` for \`safe_divide(5, 0)\`, and it never hides an unrelated bug.
 
 ### \`finally\` always runs
@@ -3169,6 +3193,34 @@ finally:
     cleanup()             # runs on success and on failure
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "return-inside-finally-wins",
+  "prompt": "A function's try block does return 'a' and its finally block does return 'b'. What does calling that function give you?",
+  "options": [
+    {
+      "label": "'a', because the try block reached its return first",
+      "feedback": "Tempting, because the try really did run first and had its answer ready. finally runs on the way out, though, and a return there replaces the value already in flight."
+    },
+    {
+      "label": "'b'",
+      "correct": true,
+      "feedback": "Right, and the same override applies to exceptions: a return in finally discards an in-flight exception entirely, so the error simply disappears. Do cleanup in finally, never return from it."
+    },
+    {
+      "label": "'a' first and 'b' ignored, since a function can only return once",
+      "feedback": "A function does return once, so the instinct is sound. The question is which value survives, and the later return wins because finally executes after the try has handed its value over but before the caller receives it."
+    },
+    {
+      "label": "SyntaxError, because return is not allowed inside finally",
+      "feedback": "It is legal, which is unfortunate given how surprising the behaviour is. Linters flag it precisely because the language will not."
+    }
+  ]
+}
+\`\`\`
+
 ### Raising your own
 
 Use \`raise\` to signal a failure yourself, and subclass \`Exception\` to give that failure a name so callers can catch exactly your error and nothing else:
@@ -3187,6 +3239,34 @@ def validate(n):
 
 print(validate(5))    # too small
 print(validate(10))   # ok
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "bare-except-hides-real-bugs",
+  "prompt": "You guard a division with a bare except: that returns None. Months later someone mistypes a variable name on a line inside that same try block. What does the caller see?",
+  "options": [
+    {
+      "label": "A NameError traceback pointing straight at the typo",
+      "feedback": "Tempting, because that is what you get everywhere else in the file and it is what you would want here. A bare except catches every exception class, and NameError is one of them."
+    },
+    {
+      "label": "None, indistinguishable from a genuine divide-by-zero, with the typo invisible",
+      "correct": true,
+      "feedback": "Right. The bug is not just hidden, it is disguised as a handled case. A bare except also swallows KeyboardInterrupt and SystemExit, so it can make a process refuse to stop."
+    },
+    {
+      "label": "None, plus a warning that an unexpected exception type was caught",
+      "feedback": "Nothing warns you. The handler was written to accept anything, so from Python's point of view catching a NameError is the code working exactly as instructed."
+    },
+    {
+      "label": "The typo is reported at import time, before any except clause can hide it",
+      "feedback": "Import only checks that the syntax parses. A name is resolved when the line actually runs, which is inside the try, which is inside the reach of the bare except."
+    }
+  ]
+}
 \`\`\`
 
 ## Pitfalls
@@ -3294,6 +3374,34 @@ with open("data.txt") as fh:
 
 The second argument to \`open\` is the mode, and picking the wrong one is how files get erased:
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "open-w-truncates-immediately",
+  "prompt": "A 2 GB log file exists. You run open(path, 'w') meaning to add a line to it, and the process is killed before you write anything. What is in the file afterwards?",
+  "options": [
+    {
+      "label": "The original 2 GB, since nothing was ever written",
+      "feedback": "Tempting, because it feels like a file can only change when you write to it. Opening in w mode is itself a destructive act: the file is truncated to zero bytes at open time, before your first write call."
+    },
+    {
+      "label": "Nothing. The file was emptied the moment it was opened",
+      "correct": true,
+      "feedback": "Right, and there is no undo. Use a when you mean to add to a file, and x when you are creating something that must not already exist."
+    },
+    {
+      "label": "The original contents plus a partially written line",
+      "feedback": "That is roughly what a mode gives you, where writes are appended to the existing end. In w mode there is no existing content left to append to."
+    },
+    {
+      "label": "An error, because w refuses to open a file that already exists",
+      "feedback": "You are describing x mode, which raises FileExistsError and is the safe choice when you must not clobber anything. w is the opposite: it clobbers without asking."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`csdiagram
 {
   "type": "table",
@@ -3335,6 +3443,30 @@ rows = list(csv.reader(io.StringIO("a,b\\nc,d")))
 # [["a", "b"], ["c", "d"]]
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "csv-values-stay-strings",
+  "prompt": "csv.reader parses the row Ada,30 into a list. You take the second value and add 1 to it. What happens?",
+  "options": [
+    {
+      "label": "The value is the int 30, so you get 31",
+      "feedback": "Tempting, because the cell holds nothing but digits and most spreadsheet tools would treat it as a number. A CSV file has no type information at all, so the reader hands every cell back as a str and leaves the decision to you."
+    },
+    {
+      "label": "The value is the string '30', and adding 1 raises TypeError",
+      "correct": true,
+      "feedback": "Right. Convert at the boundary with int() or float(), and do it where you can report a bad row, because that conversion is exactly where malformed data announces itself."
+    },
+    {
+      "label": "The value is the string '30', and adding 1 gives '301'",
+      "feedback": "You have the type exactly right, which is the important half. Python will not concatenate a str with an int though: it raises rather than guessing which of the two you meant to convert."
+    }
+  ]
+}
+\`\`\`
+
 Every CSV value comes back as a \`str\`. There is no type inference: the number \`30\` in a CSV cell arrives as \`"30"\`, and you must call \`int()\` yourself.
 
 ### Pitfalls
@@ -3342,6 +3474,35 @@ Every CSV value comes back as a \`str\`. There is no type inference: the number 
 - **Do not \`split(",")\` a CSV line.** For \`'"a,b",c'\`, \`str.split(",")\` returns three broken pieces, while \`csv.reader\` correctly returns \`["a,b", "c"]\` because it respects the quotes.
 - **\`loads\` vs \`load\`.** Pass a string to \`json.loads\` and a file object to \`json.load\`. Mixing them raises \`TypeError\` or \`AttributeError\`.
 - **When reading a real CSV file, open it with \`newline=""\`** so \`csv\` handles line endings itself: \`open(path, newline="")\`.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "json-roundtrip-loses-tuples",
+  "prompt": "point = (1, 2). What is json.loads(json.dumps(point)) == point?",
+  "options": [
+    {
+      "label": "True. Serialising and parsing is a round trip, so you get the tuple back",
+      "feedback": "Tempting, because round trip suggests the value survives untouched, and it does survive in the sense that the numbers are all there. JSON has no tuple type, so the shape it can express is an array, and an array parses back as a list."
+    },
+    {
+      "label": "False. It comes back as the list [1, 2]",
+      "correct": true,
+      "feedback": "Right. Anything that depends on the exact Python type after a serialise-and-parse cycle will break. Sets cannot be serialised at all, and integer dict keys come back as strings."
+    },
+    {
+      "label": "TypeError, because json cannot serialise a tuple",
+      "feedback": "That is true of a set, which json refuses outright. A tuple is close enough to an array that json accepts it happily, which is exactly why the loss is quiet."
+    },
+    {
+      "label": "True, but only for tuples whose items are all numbers",
+      "feedback": "The item types make no difference here: the container type is what gets flattened. A tuple of strings comes back as a list of strings just the same."
+    }
+  ],
+  "reveal": "Treat JSON as a wire format, not as Python storage. Parse it into the shape your code wants at the boundary, and never assume the type you sent is the type you get back."
+}
+\`\`\`
 
 **Interview nuance:** JSON round-tripping is lossy for Python types. \`json.dumps((1, 2))\` produces the array \`"[1, 2]"\`, and \`json.loads\` of that gives back the list \`[1, 2]\`, not the original tuple. JSON has no concept of tuples, sets, or non-string dict keys, so tuples become lists, sets are unserializable, and integer keys are coerced to strings. If your code depends on getting the exact Python type back after a serialize-then-parse cycle, it will break.`,
     demoCode: `import json
