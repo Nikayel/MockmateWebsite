@@ -3664,6 +3664,30 @@ for name, score in zip(["Ada", "Sam"], [90, 85]):
 # Sam 85
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "zip-truncates-silently",
+  "prompt": "A nightly report zips 300 names with 300 scores. One night the scores file arrives with only 299 rows. What does the report look like?",
+  "options": [
+    {
+      "label": "The job fails with an error about mismatched lengths",
+      "feedback": "Tempting, because a mismatch really is a data bug and you would want to hear about it loudly. Plain zip stops at the shorter input without a word. Pass strict=True on Python 3.10 and later to get that error."
+    },
+    {
+      "label": "It runs fine and one person is silently missing from the report",
+      "correct": true,
+      "feedback": "Right. zip truncates to the shortest input, so a lost record looks like a slightly short report rather than a crash. Assert the lengths match, or use strict=True."
+    },
+    {
+      "label": "The last person appears with a score of None",
+      "feedback": "Close, and that is exactly what itertools.zip_longest does. Plain zip truncates rather than padding, so the row disappears entirely instead of showing up empty."
+    }
+  ]
+}
+\`\`\`
+
 To collect \`[name, score]\` lists (the Practice), build \`[name, score]\` inside the loop or a comprehension.
 
 ### \`.items()\`: keys and values from a dict together
@@ -3683,7 +3707,56 @@ for fruit, price in prices.items():
 ### Pitfalls
 
 - **\`zip\` silently truncates to the shortest input.** \`zip(["a", "b", "c"], [1, 2])\` yields only two pairs and drops \`"c"\` with no error. If your lists are meant to be the same length, that hides a data bug. Fix: assert \`len(a) == len(b)\` first, or use \`zip(a, b, strict=True)\` (Python 3.10+), which raises \`ValueError\` on a length mismatch.
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "enumerate-yields-tuples",
+  "prompt": "What does list(enumerate(['a'])) give you?",
+  "options": [
+    {
+      "label": "A list holding the list [0, 'a']",
+      "feedback": "Tempting, because you asked for a list and the pair prints with brackets around it in your head. enumerate yields tuples, so the inner pair is (0, 'a') and not [0, 'a']."
+    },
+    {
+      "label": "A list holding the tuple (0, 'a')",
+      "correct": true,
+      "feedback": "Right. The pairs are tuples. Convert them explicitly when a caller expects lists, which is exactly what the Apply exercise asks you to build."
+    },
+    {
+      "label": "A list holding just 'a'",
+      "feedback": "Close if you expect list() to simply collect the values it is handed. enumerate wraps each value together with its position, so what gets collected is the pairs, not the bare items."
+    }
+  ]
+}
+\`\`\`
+
 - **\`enumerate\` yields tuples, not lists.** \`list(enumerate(["a"]))\` is \`[(0, "a")]\`. If the caller expects \`[0, "a"]\`, convert explicitly.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "zip-iterator-exhausts",
+  "prompt": "z = zip(names, scores). You call list(z), get your pairs, then call list(z) again. What does the second call return?",
+  "options": [
+    {
+      "label": "The same pairs again",
+      "feedback": "Tempting, because z still exists, nothing was reassigned, and lists behave this way. In Python 3 zip returns a one-pass iterator, and that first list() already walked it to the end."
+    },
+    {
+      "label": "An empty list",
+      "correct": true,
+      "feedback": "Right. The iterator is exhausted after one pass. Store list(zip(a, b)) once if you need to go over the result more than one time."
+    },
+    {
+      "label": "A TypeError, since z has already been consumed",
+      "feedback": "Close, in that reusing something spent usually does fail loudly. An exhausted iterator is not an error state: it simply reports that there is nothing left."
+    }
+  ],
+  "reveal": "enumerate and zip are lazy for a reason: they pull one item at a time and use O(1) extra memory no matter how large the input. The price of that is a single pass."
+}
+\`\`\`
 
 **Interview nuance:** both \`enumerate\` and \`zip\` return lazy iterators in Python 3, not lists. They pull one item at a time and use O(1) extra memory regardless of input size, which is why they scale to large or streaming data. The catch is single-pass: an iterator is exhausted after one loop. \`z = zip(a, b); list(z)\` gives the pairs, but a second \`list(z)\` gives \`[]\`, because the first pass consumed it. Wrap in \`list(...)\` once if you need to iterate the result more than once.`,
     demoCode: `for i, letter in enumerate(["a", "b", "c"]):
@@ -3837,11 +3910,84 @@ Each call pauses and waits for the call it made. Python stacks these paused fram
 
 ### Pitfalls
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "base-case-that-skips-zero",
+  "prompt": "A factorial uses if n == 1: return 1 as its base case. What happens on factorial(0)?",
+  "options": [
+    {
+      "label": "It returns 1, since 0 is close enough to the base case",
+      "feedback": "Tempting, because 0 factorial really is 1 and the function looks like it covers the small cases. The check is an exact match against 1, and 0 does not match it."
+    },
+    {
+      "label": "It recurses until Python raises a RecursionError",
+      "correct": true,
+      "feedback": "Right. 0 falls through to 0 times factorial(-1), then -1, then -2, moving further from the base case every step. Write if n <= 1 so both 0 and 1 stop."
+    },
+    {
+      "label": "It returns 0, since the first multiplication is 0 times something",
+      "feedback": "Close, and the multiplication really would be 0 times whatever came back. Nothing ever comes back: the recursive call has to finish before the multiply can happen at all."
+    }
+  ]
+}
+\`\`\`
+
 **A base case that skips 0.** Writing \`if n == 1\` looks fine until you call \`factorial(0)\`: it does not match, so you compute \`0 * factorial(-1) * factorial(-2) ...\` forever, straight to \`RecursionError\`. Use \`if n <= 1\` so both \`0\` and \`1\` hit the base case and return \`1\` directly. That is exactly why the exercise pins \`factorial(0)\` to \`1\`.
 
 **Not shrinking toward the base.** The recursive call must move closer to the base case every time. A \`factorial(n)\` that calls \`factorial(n)\` never ends.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "trusting-the-recursive-call",
+  "prompt": "While summing a nested list, you reach an element that is itself a list. What should the recursive case do with it?",
+  "options": [
+    {
+      "label": "Loop over that inner list and add up its numbers",
+      "feedback": "Tempting, and it works perfectly for one level of nesting, which is exactly why this bug survives a quick test. An element two levels down would still arrive as a list and break the addition."
+    },
+    {
+      "label": "Call the same function on it and add whatever comes back",
+      "correct": true,
+      "feedback": "Right. Trust the call to handle any depth. One isinstance check plus one recursive call is what lets a single function work on a shape you have never seen."
+    },
+    {
+      "label": "Convert it to a number with sum() and add that",
+      "feedback": "Close, and sum() would do the job on a flat inner list. It raises the moment that inner list contains a list of its own, which is precisely the case recursion exists to handle."
+    }
+  ]
+}
+\`\`\`
+
 For the nested-sum exercise, your base case is a plain number and your recursive case is a list. Check which one you have with \`isinstance(x, list)\`: if it is a list, recurse into it and add the pieces; otherwise it is a number, so add it directly. That single \`isinstance\` check is what lets one function reach any depth without knowing the shape in advance.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "recursion-costs-stack-space",
+  "prompt": "A recursive sum over a list passes your 10-item test and then dies on 10000 real records. What ran out?",
+  "options": [
+    {
+      "label": "Time, since recursion is slower than a loop and the job timed out",
+      "feedback": "Tempting, and a recursive call really does cost more than a loop iteration. The failure here is not slowness: it happens at a fixed depth, whether the machine is fast or slow."
+    },
+    {
+      "label": "The call stack, since every pending call holds a frame and CPython stops near 1000",
+      "correct": true,
+      "feedback": "Right. Recursion uses O(n) call-stack space where a loop uses O(1), and past the limit Python raises RecursionError. Check the expected depth before you reach for recursion."
+    },
+    {
+      "label": "Memory for the list itself, since 10000 records is a lot to hold",
+      "feedback": "Close, in that running out of memory is the right family of answer. It is the call stack that fills, not the heap: the same list handled by a loop would be perfectly fine."
+    }
+  ],
+  "reveal": "Recursion buys clarity on data whose depth you do not know in advance. It does not buy free memory, which is why tree and graph problems usually call out the expected depth explicitly."
+}
+\`\`\`
 
 **Interview nuance:** Python has no tail-call optimization, so a recursive solution uses \`O(n)\` call-stack space, one frame per pending call, while an equivalent loop uses \`O(1)\`. Interviewers probe this: recursion over a length-\`n\` structure can overflow the stack where a loop would not, which is why tree and graph problems often call out the depth explicitly. Recursion buys clarity on nested data. It does not buy free memory.`,
     demoCode: `def factorial(n):
