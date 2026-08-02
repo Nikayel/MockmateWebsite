@@ -42,9 +42,45 @@ interface ConceptRiskStripProps {
  * invisible, and its hit target fully occluded. All lanes keep the 10px mark inside
  * the 24px box (12±8 centers span 3-21px).
  */
-const CLUSTER_LANES = [0, -4, 4, -8, 8]
+const MAX_LANE_OFFSET = 8
 /** Dots closer than this (in retrievability points) count as one cluster. */
 const CLUSTER_EPSILON = 3
+
+/**
+ * Vertical offset per dot, given retrievabilities in ASCENDING order.
+ *
+ * Each cluster's members spread EVENLY across the available height rather than
+ * cycling a fixed lane list. Any fixed list has a capacity and fails past it: the
+ * first version compared each dot only against its predecessor and collided at 3,
+ * the five-lane cycle that replaced it collided at 6 — a modulo always drops the
+ * (n+1)th dot exactly onto the 1st. Distributing by run length means no two dots in
+ * a cluster ever share an offset, at any size.
+ *
+ * It cannot manufacture space: past roughly five dots inside three percentage
+ * points, 10px marks visually overlap however they are placed. They stay
+ * individually addressable — each is its own button with its own accessible name —
+ * and crucially none is ever EXACTLY occluded by another.
+ *
+ * Exported for testing; no-two-share-an-offset is the property worth pinning.
+ */
+export function clusterLanes(sortedValues: number[]): number[] {
+  const lanes = new Array<number>(sortedValues.length).fill(0)
+  let start = 0
+  const flush = (end: number) => {
+    const length = end - start
+    if (length > 1) {
+      for (let i = 0; i < length; i++) {
+        lanes[start + i] = -MAX_LANE_OFFSET + (2 * MAX_LANE_OFFSET * i) / (length - 1)
+      }
+    }
+    start = end
+  }
+  for (let i = 1; i < sortedValues.length; i++) {
+    if (sortedValues[i] - sortedValues[i - 1] >= CLUSTER_EPSILON) flush(i)
+  }
+  flush(sortedValues.length)
+  return lanes
+}
 
 export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: ConceptRiskStripProps) {
   const scored = cards.filter(
@@ -55,15 +91,7 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
   const sorted = [...scored].sort((a, b) => a.retrievability - b.retrievability)
   const weakest = sorted[0]
 
-  // Lane assignment for clusters. The old nudge only compared each dot to its
-  // predecessor, so the 3rd of three coincident dots landed back on the 2nd; a
-  // run-length cycle keeps every member of a cluster on its own lane.
-  let run = 0
-  const lanes = sorted.map((card, i) => {
-    run =
-      i > 0 && card.retrievability - sorted[i - 1].retrievability < CLUSTER_EPSILON ? run + 1 : 0
-    return CLUSTER_LANES[run % CLUSTER_LANES.length]
-  })
+  const lanes = clusterLanes(sorted.map((c) => c.retrievability))
 
   return (
     <div className={cn("w-full", className)}>
