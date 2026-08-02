@@ -97,12 +97,12 @@ export function KnowledgeSummary({ model, now = Date.now() }: KnowledgeSummaryPr
             today, from your review history. It is a guess. Tell it when it&apos;s wrong.
           </p>
 
+          {/*
+            Full token, no alpha: text-muted-foreground/80 measures 3.47:1 in light
+            mode, under the AA 4.5:1 bar. Every alpha step of this token fails — see
+            components/tutorials/__tests__/no-faded-text.test.ts for the arithmetic.
+          */}
           {freshness && (
-            {/*
-              Full token, no alpha: text-muted-foreground/80 measures 3.47:1 in light
-              mode, under the AA 4.5:1 bar. Every alpha step of this token fails — see
-              components/tutorials/__tests__/no-faded-text.test.ts for the arithmetic.
-            */}
             <p className="text-muted-foreground mt-2 text-xs">
               Estimates refreshed {freshness}. They decay as time passes.
             </p>
