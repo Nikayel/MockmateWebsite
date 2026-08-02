@@ -3657,9 +3657,66 @@ print(tally.most_common(1))   # [('b', 3)]
 
 \`most_common(k)\` returns the top \`k\` items as \`(item, count)\` pairs, already sorted from most to least frequent. That is exactly what the Apply exercise needs: \`Counter(text).most_common(1)[0][0]\` is the single most frequent character. For the Practice exercise, \`math.gcd(a, b)\` returns the greatest common divisor with no loop of your own: \`math.gcd(12, 8)\` is \`4\`.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "import-math-does-not-bind-gcd",
+  "prompt": "Your file's only import line is import math. Further down you call gcd(12, 8). What happens?",
+  "options": [
+    {
+      "label": "It returns 4, because importing a module makes its names available",
+      "feedback": "Tempting, because the import clearly succeeded and the function clearly exists. What the import bound is a single name, math, and gcd lives as an attribute on it rather than in your file."
+    },
+    {
+      "label": "NameError: name 'gcd' is not defined",
+      "correct": true,
+      "feedback": "Right. Either reach it through the module as math.gcd(12, 8), or bind it directly with from math import gcd. Mixing the two styles is what produces this error."
+    },
+    {
+      "label": "AttributeError: module 'math' has no attribute 'gcd'",
+      "feedback": "That is the message you would get from math.gcd if the name were genuinely missing from the module, so it is worth telling the two apart. Here the lookup never reaches math at all: Python is searching your own file's namespace."
+    },
+    {
+      "label": "It returns 4, since gcd is also available as a builtin",
+      "feedback": "A reasonable guess given how many small numeric helpers are builtins. gcd is not one of them: math.gcd is where it lives, alongside a version in the fractions module."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfall: do not name your file after a stdlib module
 
 If you save your own file as \`collections.py\`, your file shadows the real one, and \`import collections\` imports *your* file. You get a confusing \`ImportError\` or \`AttributeError\` on names that clearly exist. The fix: never name a script after a stdlib module you import, and delete any stray \`.pyc\` files or \`__pycache__\` folders left behind. A related trap is mixing import styles: after \`import math\` alone, writing \`gcd(12, 8)\` raises \`NameError\`, because the name lives at \`math.gcd\`, not in your file.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "most-common-breaks-ties-by-first-seen",
+  "prompt": "What does Counter('abcabx').most_common(1) return? Both a and b appear twice.",
+  "options": [
+    {
+      "label": "Either [('a', 2)] or [('b', 2)]. Ties are arbitrary, so you cannot rely on which",
+      "feedback": "Tempting, and it is the safe-sounding answer people give in interviews. It is more pessimistic than reality: dicts have preserved insertion order since Python 3.7, and most_common inherits that, so the result is fully determined."
+    },
+    {
+      "label": "[('a', 2)]",
+      "correct": true,
+      "feedback": "Right. Ties come back in the order the keys were first encountered while building the Counter, and a was seen before b. If your spec wants a different tiebreak, sort explicitly."
+    },
+    {
+      "label": "[('b', 2)], because b was the last key to reach a count of 2",
+      "feedback": "Recency is not the rule, and neither is alphabetical order among the tied keys. What decides it is first insertion, which happened when the character was first counted, not when it reached its final tally."
+    },
+    {
+      "label": "[('a', 2), ('b', 2)], because most_common returns every item tied for the top",
+      "feedback": "The argument is a hard limit on the number of pairs returned, so asking for 1 gives exactly 1 even in a tie. Call most_common() with no argument if you want the whole ranking and want to inspect the ties yourself."
+    }
+  ],
+  "reveal": "The honest interview answer is that the winner is the first key to reach the top count, and that if the requirement is alphabetical or newest-first you must sort for it rather than trust most_common."
+}
+\`\`\`
 
 **Interview nuance:** \`most_common\` is deterministic even on ties. When two items share the same count, they come back in the order first encountered while building the \`Counter\` (guaranteed since Python 3.7). So \`Counter("abcabx").most_common(1)\` returns \`[('a', 2)]\`, not \`[('b', 2)]\`, because \`a\` was seen first. If an interviewer asks "what if two characters tie for most frequent?", the honest answer is that your code returns the first one to reach that count, and if the spec needs a different tiebreak (say, alphabetical) you must sort explicitly rather than trust \`most_common\`.`,
     demoCode: `from collections import Counter
@@ -3744,6 +3801,34 @@ Raw text arrives messy: log lines like \`"order 12, item 345"\`, user-typed phon
 
 ### Write patterns as raw strings
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "patterns-need-raw-strings",
+  "prompt": "You write a word-boundary pattern as an ordinary string, '\\\\bcat\\\\b', with no r prefix. What is the risk?",
+  "options": [
+    {
+      "label": "None. Python treats the backslash the same way in both kinds of string",
+      "feedback": "Tempting, because some patterns really do survive it: an unrecognised escape like the one in a digit class is left alone, so the code appears to work. The escapes Python DOES recognise are the problem, and \\\\b is one of them."
+    },
+    {
+      "label": "Python turns \\\\b into a backspace character, so the pattern looks for a literal backspace instead of a word boundary",
+      "correct": true,
+      "feedback": "Right, and nothing raises: you get a valid pattern that quietly matches nothing. The r prefix stops Python interpreting the backslash so the regex engine receives it intact."
+    },
+    {
+      "label": "It is an immediate SyntaxError, so you find out at once",
+      "feedback": "That would be the kind outcome. Recognised escapes are substituted silently, and unrecognised ones only produce a SyntaxWarning in Python 3.12 and later, which is easy to miss in a noisy log."
+    },
+    {
+      "label": "The re module rejects any pattern that is not a raw string",
+      "feedback": "re only ever receives a finished str and has no way to know how it was spelled. By the time the pattern arrives, the damage from an interpreted escape has already been done."
+    }
+  ]
+}
+\`\`\`
+
 Always write patterns as raw strings (\`r"..."\`). Regex leans on the backslash (\`\\d\`, \`\\w\`, \`\\s\`), and in a normal Python string the backslash is an escape character. \`r"\\d"\` is the two characters backslash-\`d\`, exactly what the regex engine wants; a plain \`"\\d"\` is fragile because \`\\d\` is not a valid string escape, and in Python 3.12 and later it triggers a \`SyntaxWarning\`.
 
 ### The pieces you will use most
@@ -3783,6 +3868,34 @@ re.sub(r"\\d", "#", "a1b2")      # 'a#b#'  replace every match
 
 **\`\\d\` matches one digit; \`\\d+\` matches a whole run.** \`re.findall(r"\\d", "a1b22")\` returns \`['1', '2', '2']\` (three separate digits), while \`re.findall(r"\\d+", "a1b22")\` returns \`['1', '22']\`. Reach for \`+\` when you want whole numbers, and drop it when you want single characters (as in redaction, where replacing each digit one at a time is fine).
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "capture-groups-reshape-findall",
+  "prompt": "What does re.findall(r'(\\\\w+)@(\\\\w+)', 'a@x b@y') return?",
+  "options": [
+    {
+      "label": "['a@x', 'b@y'], the two full matches",
+      "feedback": "Tempting, because that is what the same pattern returns without the parentheses, and parentheses usually just group things for a quantifier. In findall they change the return shape: once any group exists, the full match is no longer what you get."
+    },
+    {
+      "label": "[('a', 'x'), ('b', 'y')]",
+      "correct": true,
+      "feedback": "Right. No groups gives you full matches, one group gives you just that group, and two or more give you a tuple per match. Use a non-capturing group (?:...) when you want to group without changing the result."
+    },
+    {
+      "label": "['a', 'x', 'b', 'y'], every group flattened into one list",
+      "feedback": "A very reasonable expectation, and it is what you would have to write yourself if you wanted it. findall keeps each match's groups together as a tuple, which is usually what you want for unpacking in a loop."
+    },
+    {
+      "label": "['a', 'b'], only the first group of each match",
+      "feedback": "That is exactly the behaviour with ONE group in the pattern, so this answer is a good instinct applied one step too narrowly. With two groups, both are reported."
+    }
+  ]
+}
+\`\`\`
+
 **A capture group changes what \`findall\` returns.** With no group it returns the full match; with one group it returns only that group; with several it returns tuples:
 
 \`\`\`python
@@ -3791,6 +3904,35 @@ re.findall(r"(\\w+)@(\\w+)", "a@x b@y") # [('a', 'x'), ('b', 'y')]
 \`\`\`
 
 So do not wrap your whole pattern in \`()\` out of habit; it silently reshapes the result.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "greedy-star-runs-to-the-last-match",
+  "prompt": "What does re.findall(r'<.*>', '<a><b>') return?",
+  "options": [
+    {
+      "label": "['<a>', '<b>'], the two tags",
+      "feedback": "Tempting, because it is obviously what the pattern was meant to express and what a human reads it as. Quantifiers are greedy: .* takes as much text as it can and then backtracks only far enough to let the closing > match, which is the LAST one in the string."
+    },
+    {
+      "label": "['<a><b>'], one match spanning both tags",
+      "correct": true,
+      "feedback": "Right. Add a question mark to make the quantifier lazy, so r'<.*?>' stops at the first > and gives you the two tags you wanted."
+    },
+    {
+      "label": "['<a>'], because the engine stops after the first match",
+      "feedback": "findall never stops at the first match: it keeps scanning from the end of each match to the end of the string. Here the single greedy match consumed everything, so there was nothing left to scan."
+    },
+    {
+      "label": "[], because . does not match the > character",
+      "feedback": "The dot matches any character except a newline, angle brackets included. The character it will not cross is the newline, which is why multi-line scraping with .* fails for a completely different reason."
+    }
+  ],
+  "reveal": "Greedy first, lazy on request. When a pattern swallows more than you expected, the fix is almost always a question mark after the quantifier, or a negated character class such as [^>]* that cannot cross the delimiter at all."
+}
+\`\`\`
 
 **Interview nuance:** quantifiers are **greedy** by default. \`.*\` matches as much as it can, then backtracks. \`re.findall(r"<.*>", "<a><b>")\` returns \`['<a><b>']\`, not the two tags you probably wanted. Add \`?\` to make it lazy: \`re.findall(r"<.*?>", "<a><b>")\` returns \`['<a>', '<b>']\`. Interviewers use this to check whether you understand that the engine explores text by backtracking, which is also why a careless pattern over adversarial input can blow up to quadratic time.`,
     demoCode: `import re
