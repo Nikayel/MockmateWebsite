@@ -66,11 +66,18 @@ export function CardBeliefRow({
             {card.memory && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span
-                    className={`inline-flex cursor-help items-center rounded-full border px-2 py-0.5 text-xs font-medium ${chipClass(card.memory.urgency)}`}
+                  {/*
+                    A button, not a span: stability, lapses and review count live only
+                    inside this tooltip, so a non-focusable trigger meant keyboard and
+                    screen-reader users could never reach the model's actual reasoning
+                    on the page built to expose it.
+                  */}
+                  <button
+                    type="button"
+                    className={`focus-visible:ring-accent/50 inline-flex cursor-help items-center rounded-full border px-2 py-0.5 text-xs font-medium focus-visible:ring-2 focus-visible:outline-none ${chipClass(card.memory.urgency)}`}
                   >
                     {card.retrievability}% · {card.memory.label}
-                  </span>
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
                   <p className="mb-1 font-medium">Why this number?</p>
