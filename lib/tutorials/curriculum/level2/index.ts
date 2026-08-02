@@ -4233,6 +4233,328 @@ def group_by_first(words):
   },
 }
 
+const datetimesLesson: PythonLesson = {
+  id: "py-l2-datetimes",
+  title: "Dates, times & the naive-vs-aware trap",
+  summary: "Parse and format timestamps, subtract them safely, and never mix naive with aware.",
+  estimatedMinutes: 13,
+  difficulty: "medium",
+  skills: ["standard-library", "parsing", "formatting", "comparisons"],
+  teach: {
+    estimatedMinutes: 6,
+    markdown: `## Two mistakes cause most time bugs
+
+Timestamps look like the simplest data you will ever handle, and they are behind a startling share of production incidents. Two mistakes cause most of them. The first is a format string that does not match the text you were handed, so a batch job either dies halfway through or, worse, reads \`03/08\` as the eighth of March in one service and the third of August in another. The second is mixing a datetime that knows its offset from UTC with one that does not, which either raises the moment you compare them or quietly reports a duration that is wrong by exactly the size of an offset. Both are cheap to avoid once you know where the seam is.
+
+### \`date\` is a calendar day, \`datetime\` is a day plus a clock
+
+They are separate types and Python will not blur them for you:
+
+\`\`\`python
+from datetime import date, datetime
+
+day = date(2026, 3, 8)                    # 2026-03-08, no time of day
+stamp = datetime(2026, 3, 8, 1, 59, 30)   # 2026-03-08 01:59:30
+stamp.date()                              # back to a plain date
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "date-and-datetime-never-compare-equal",
+  "prompt": "day = date(2026, 3, 8) and stamp = datetime(2026, 3, 8, 0, 0, 0), midnight on that exact day. What is day == stamp?",
+  "options": [
+    {
+      "label": "True. Midnight is the instant that calendar day begins",
+      "feedback": "Tempting, because midnight really is the moment the day starts, and datetime is even a subclass of date. Python still answers False: the two values carry different amounts of information, so it refuses to treat them as the same thing."
+    },
+    {
+      "label": "False. A date and a datetime are never equal, whatever the clock reads",
+      "correct": true,
+      "feedback": "Right, and it answers False instead of raising, so a filter that mixes the two quietly matches nothing at all. Call stamp.date() first and compare like with like."
+    },
+    {
+      "label": "TypeError, because the operands are different types",
+      "feedback": "Ordering them with a less-than does raise TypeError, so the instinct is sound. Equality is more forgiving in Python: values it considers non-comparable come back False rather than blowing up."
+    },
+    {
+      "label": "True, but only when the datetime carries no timezone",
+      "feedback": "Timezone awareness has no bearing on this one, since the mismatch is between a day and a day-plus-clock. An aware datetime is exactly as unequal to a date as a naive one is."
+    }
+  ]
+}
+\`\`\`
+
+Reach for \`date\` when the clock genuinely does not matter (a birthday, a billing day) and \`datetime\` when it does. Mixing the two in one column is how a report ends up comparing a whole day against one specific second of it.
+
+### \`strptime\` reads text, \`strftime\` writes it
+
+Memorise them by the middle letter: \`strptime\` **p**arses a string into a datetime, \`strftime\` **f**ormats a datetime into a string. Both take the same format codes.
+
+\`\`\`python
+from datetime import datetime
+
+parsed = datetime.strptime("08/03/2026 01:59:30", "%d/%m/%Y %H:%M:%S")
+parsed.strftime("%Y-%m-%dT%H:%M:%S")   # '2026-03-08T01:59:30'
+parsed.isoformat()                     # same string, no format to mistype
+\`\`\`
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Code", "Reads or writes", "In 2026-03-08 01:59:30"],
+  "rows": [
+    ["%Y", "four-digit year", "2026"],
+    ["%m", "zero-padded month number", "03"],
+    ["%d", "zero-padded day of the month", "08"],
+    ["%H", "hour on a 24-hour clock", "01"],
+    ["%M", "minute", "59"],
+    ["%S", "second", "30"],
+    ["%z", "offset from UTC, such as +0000", "absent here, so the result is naive"]
+  ],
+  "highlightCols": ["Code"],
+  "caption": "The same codes work in both directions: strptime reads them out of text and strftime writes them into text. %m is the month and %M is the minute, and swapping the two is the classic typo."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "strptime-format-must-match-exactly",
+  "prompt": "A vendor changes its export from 2026-03-08 to 2026/03/08 and your loader still calls datetime.strptime(text, '%Y-%m-%d'). What happens on the first row?",
+  "options": [
+    {
+      "label": "It parses. strptime normalises common separators",
+      "feedback": "Tempting, because any human reading both strings sees the same date and plenty of parsers do normalise separators. strptime is not one of them: the literal characters between the codes have to match the input too."
+    },
+    {
+      "label": "It raises ValueError and the load stops on row one",
+      "correct": true,
+      "feedback": "Right, and a loud stop at the boundary is the good outcome here. Catch it per row if you want to quarantine bad input, but never let an unparsed date through quietly."
+    },
+    {
+      "label": "It returns None, so the row is skipped",
+      "feedback": "Nothing in the datetime module signals failure by returning None, which would only push the error onto whatever touched the value next. It raises, so the blame lands on the parse itself."
+    },
+    {
+      "label": "It parses partially and defaults the day to 1",
+      "feedback": "Partial matching would be far more dangerous than failing, because a wrong but plausible date then survives into a report. strptime either consumes the whole string or raises."
+    }
+  ]
+}
+\`\`\`
+
+The format has to match the input exactly, separators included. A mismatch raises \`ValueError\` rather than guessing, which is the behaviour you want: a loud failure at the boundary beats a silently wrong date in a report. When the text is already ISO 8601, skip the format string entirely and call \`datetime.fromisoformat\`, which is faster and impossible to mistype.
+
+### Subtracting two datetimes gives a \`timedelta\`
+
+\`\`\`python
+from datetime import datetime, timedelta
+
+start = datetime(2026, 3, 8, 1, 0, 0)
+end = datetime(2026, 3, 9, 1, 0, 30)
+gap = end - start             # timedelta(days=1, seconds=30)
+gap.total_seconds()           # 86430.0
+start + timedelta(hours=2)    # 2026-03-08 03:00:00
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "timedelta-seconds-is-not-the-total",
+  "prompt": "gap = datetime(2026, 3, 9, 1, 0, 30) - datetime(2026, 3, 8, 1, 0, 0). What does gap.seconds return?",
+  "options": [
+    {
+      "label": "86430, the whole gap expressed in seconds",
+      "feedback": "That is what gap.total_seconds() returns, and it is almost always the number you actually wanted. The plain seconds attribute is one of three raw storage fields, so it never counts the days."
+    },
+    {
+      "label": "30, the seconds left over once the whole days are counted",
+      "correct": true,
+      "feedback": "Right. A timedelta stores days, seconds, and microseconds separately, so seconds only ever ranges from 0 to 86399. Call total_seconds() when you want a single number."
+    },
+    {
+      "label": "1, because the gap is one day and a bit",
+      "feedback": "That is gap.days, the field holding the whole days. Reading days and seconds together does work, but total_seconds() says it in one step and cannot be half remembered."
+    },
+    {
+      "label": "30.0 as a float, since durations are stored as floats",
+      "feedback": "You picked the right field and the wrong type: days, seconds, and microseconds are all plain ints. total_seconds() is the float one, because it has to carry the microseconds."
+    }
+  ]
+}
+\`\`\`
+
+A \`timedelta\` stores days, seconds, and microseconds as three separate fields, so \`gap.seconds\` is the leftover inside the final day and not the total. Ask for \`gap.total_seconds()\` whenever you want one number, then divide.
+
+### Naive vs aware: the one that pages you at 3am
+
+A **naive** datetime carries no timezone, so it is a wall-clock reading with no way to know which wall. An **aware** datetime carries a \`tzinfo\`, so it pins an exact instant. \`datetime.now()\` hands you a naive one; \`datetime.now(timezone.utc)\` hands you an aware one.
+
+\`\`\`python
+from datetime import datetime, timezone
+
+naive = datetime(2026, 3, 8, 1, 0, 0)
+aware = datetime(2026, 3, 8, 1, 0, 0, tzinfo=timezone.utc)
+naive.utcoffset()   # None, this one does not know
+aware.utcoffset()   # 0:00:00
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "aware-minus-naive-raises",
+  "prompt": "A log parser produces naive datetimes and an API client produces aware UTC ones. Your latency metric subtracts one from the other. What happens?",
+  "options": [
+    {
+      "label": "It works, and Python assumes the naive value is UTC",
+      "feedback": "Tempting, because most servers really do run on UTC and the assumption would be right most of the time. Python declines to guess: an assumption that holds most of the time is a bug for exactly the cases where it does not."
+    },
+    {
+      "label": "TypeError, because offset-naive and offset-aware datetimes cannot be subtracted",
+      "correct": true,
+      "feedback": "Right, and this is the module protecting you. Attach the offset where the naive value is born, or convert once at the boundary, so everything downstream is aware UTC."
+    },
+    {
+      "label": "It works, and the answer is off by the size of the offset",
+      "feedback": "That is precisely the failure Python is preventing, and it is what you get in languages that coerce silently. Here the same mistake surfaces as a raise rather than as a plausible wrong number."
+    },
+    {
+      "label": "It works, and the answer is always negative",
+      "feedback": "Sign has nothing to do with it, since a later instant minus an earlier one is positive however the offsets fall. The operand types alone are what Python rejects."
+    }
+  ],
+  "reveal": "Store and compute in UTC, and convert to local time only when a human is about to read it. Parse into aware UTC at the boundary and every comparison after that is safe."
+}
+\`\`\`
+
+Python refuses to subtract or order a naive datetime against an aware one, because there is no honest answer. The rule that keeps this out of a codebase for good: store and compute in UTC, and convert to local only when you show a value to a human. Parse at the boundary into aware UTC, compare there, and format for display last. The Practice exercise makes you enforce exactly that rule before it trusts a subtraction.
+
+### Pitfalls
+
+- \`datetime.utcnow()\` returns a **naive** datetime that happens to hold UTC time, which is the worst of both worlds: it looks safe and it compares wrong. Use \`datetime.now(timezone.utc)\`.
+- Adding \`timedelta(days=1)\` adds exactly 24 hours. Across a daylight-saving change that is not the same wall-clock time the next day, which is why "every day at 09:00" jobs drift twice a year.
+- \`fromisoformat\` returns an aware datetime when the text carries an offset like \`+00:00\` and a naive one when it does not. One function, two kinds of result, so check \`utcoffset()\` instead of assuming.
+
+**Interview nuance:** "naive or aware?" is the fastest way to sound like you have run a system in production. Say that you normalise to aware UTC at every input boundary, keep UTC in storage and in every comparison, and render local time only in the presentation layer. Then name the two failure modes you are buying your way out of: the \`TypeError\` when the two kinds meet, and the silent off-by-an-offset duration you get in any language that coerces instead of raising.`,
+    demoCode: `from datetime import datetime, timedelta, timezone
+
+parsed = datetime.strptime("08/03/2026 01:59:30", "%d/%m/%Y %H:%M:%S")
+print(parsed.isoformat())          # 2026-03-08T01:59:30
+
+gap = datetime(2026, 3, 9, 1, 0, 30) - datetime(2026, 3, 8, 1, 0, 0)
+print(gap.seconds, gap.total_seconds())   # 30 86430.0
+
+print(datetime(2026, 3, 8, tzinfo=timezone.utc).utcoffset())   # 0:00:00
+print(datetime(2026, 3, 8).utcoffset())                        # None`,
+  },
+  apply: {
+    id: "py-l2-datetimes-apply",
+    executionMode: "single-file",
+    prompt: `Write a function \`to_iso(stamp)\` that returns the ISO 8601 form of a day-first timestamp.
+
+The input looks like \`"08/03/2026 01:59:30"\`, meaning day, then month, then year. Return
+\`"2026-03-08T01:59:30"\`.`,
+    starterCode: `from datetime import datetime
+
+
+def to_iso(stamp):
+    # Parse the day-first timestamp, then format it as ISO 8601.
+    pass`,
+    hints: [
+      "Read the text with `datetime.strptime(stamp, ...)`. The day comes first, so the format starts `%d/%m/%Y`.",
+      "The clock part is `%H:%M:%S`, separated from the date by one space.",
+      "`datetime.strptime(stamp, '%d/%m/%Y %H:%M:%S').isoformat()` does both halves.",
+    ],
+    referenceSolution: `from datetime import datetime
+
+
+def to_iso(stamp):
+    parsed = datetime.strptime(stamp, "%d/%m/%Y %H:%M:%S")
+    return parsed.isoformat()`,
+    testCases: [
+      {
+        input: { stamp: "08/03/2026 01:59:30" },
+        expected: "2026-03-08T01:59:30",
+        description: "a day-first timestamp",
+      },
+      {
+        input: { stamp: "01/12/2025 00:00:00" },
+        expected: "2025-12-01T00:00:00",
+        description: "day 1 of month 12, so day-first really is day-first",
+      },
+      {
+        input: { stamp: "31/01/2026 23:59:59" },
+        expected: "2026-01-31T23:59:59",
+        description: "the last second of a day",
+      },
+      {
+        input: { stamp: "29/02/2024 12:00:00" },
+        expected: "2024-02-29T12:00:00",
+        description: "a leap day",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l2-datetimes-practice",
+    executionMode: "single-file",
+    prompt: `An incident timeline stitches two sources together: log lines that carry no timezone at all, and
+API records that carry a UTC offset. Subtracting one from the other is exactly the bug that reported
+a five hour outage as a twelve hour one.
+
+Implement \`safe_minutes_between(started, finished)\`: parse both ISO 8601 strings with
+\`datetime.fromisoformat\` and return the whole minutes between them as an \`int\`. When one value
+carries a UTC offset and the other does not, return \`None\` instead of a number, because the two are
+not comparable.`,
+    starterCode: `from datetime import datetime
+
+
+def safe_minutes_between(started, finished):
+    # Parse both, refuse to mix naive with aware, then return whole minutes.
+    pass`,
+    hints: [
+      "`datetime.fromisoformat(started)` handles a plain timestamp and one ending in an offset like +00:00.",
+      "A parsed value tells you which kind it is: `parsed.utcoffset()` is `None` for a naive datetime.",
+      "When both are the same kind, `int((end - start).total_seconds() // 60)` gives the whole minutes.",
+    ],
+    referenceSolution: `from datetime import datetime
+
+
+def safe_minutes_between(started, finished):
+    start = datetime.fromisoformat(started)
+    end = datetime.fromisoformat(finished)
+    if (start.utcoffset() is None) != (end.utcoffset() is None):
+        return None
+    return int((end - start).total_seconds() // 60)`,
+    testCases: [
+      {
+        input: { started: "2026-03-08T01:00:00", finished: "2026-03-08T01:45:00" },
+        expected: 45,
+        description: "both naive, so the subtraction is safe",
+      },
+      {
+        input: { started: "2026-03-08T01:00:00+00:00", finished: "2026-03-08T04:30:00+02:00" },
+        expected: 90,
+        description: "both aware in different zones, so the offsets are applied",
+      },
+      {
+        input: { started: "2026-03-08T01:00:00", finished: "2026-03-08T01:45:00+00:00" },
+        expected: null,
+        description: "naive then aware -> None",
+      },
+      {
+        input: { started: "2026-03-08T01:00:00+00:00", finished: "2026-03-08T01:45:00" },
+        expected: null,
+        description: "aware then naive -> None",
+      },
+    ],
+  },
+}
+
 export const level2: PythonLevel = {
   id: 2,
   slug: "intermediate",
@@ -4281,8 +4603,9 @@ export const level2: PythonLevel = {
     {
       id: "py-l2-stdlib-toolkit",
       title: "Standard Library Toolkit",
-      description: "Reach for the batteries: regular expressions and specialized collections.",
-      lessons: [regexLesson, collectionsToolkitLesson],
+      description:
+        "Reach for the batteries: regular expressions, specialized collections, and dates.",
+      lessons: [regexLesson, collectionsToolkitLesson, datetimesLesson],
     },
   ],
 }
