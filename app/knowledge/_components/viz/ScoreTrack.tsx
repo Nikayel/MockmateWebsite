@@ -28,13 +28,20 @@ interface ScoreTrackProps {
   className?: string
 }
 
-function describeTrend(scores: number[]): string {
+/**
+ * Exported for testing: this sentence is the entire chart for a screen reader, so it
+ * has to be right, and it must not call a flat history "improving".
+ */
+export function describeTrend(scores: number[]): string {
   if (scores.length < 2) return ""
-  // Compare the last score against the mean of what came before: robust to one
-  // outlier in a short history, which a first-vs-last comparison is not.
-  const prior = scores.slice(0, -1)
-  const priorMean = prior.reduce((sum, s) => sum + s, 0) / prior.length
-  const delta = scores[scores.length - 1] - priorMean
+  // Against the MEDIAN of everything prior, not the mean. A low first attempt is the
+  // norm on these cards, and it drags a mean down far enough that a flat history
+  // reads as "improving" — a systematic flattering bias, on the one page that exists
+  // to not flatter. The median shrugs the outlier off.
+  const prior = [...scores.slice(0, -1)].sort((a, b) => a - b)
+  const mid = Math.floor(prior.length / 2)
+  const priorMedian = prior.length % 2 === 0 ? (prior[mid - 1] + prior[mid]) / 2 : prior[mid]
+  const delta = scores[scores.length - 1] - priorMedian
   if (delta >= 8) return " Trend improving."
   if (delta <= -8) return " Trend slipping."
   return " Trend steady."
