@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { CheckCircle2, Loader2 } from "lucide-react"
 import {
   Dialog,
@@ -59,6 +59,19 @@ export function ChallengeDialog({ card, onClose, submitChallenge }: ChallengeDia
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<CorrectionSummary | null>(null)
 
+  // Arrow-key navigation for the radiogroup, which role="radio" promises and this
+  // dialog did not deliver. Wraps in both directions, per the WAI-ARIA radio pattern.
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const onOptionKeyDown = (e: React.KeyboardEvent, index: number) => {
+    const forward = e.key === "ArrowDown" || e.key === "ArrowRight"
+    const back = e.key === "ArrowUp" || e.key === "ArrowLeft"
+    if (!forward && !back) return
+    e.preventDefault()
+    const next = (index + (forward ? 1 : REASONS.length - 1)) % REASONS.length
+    setReason(REASONS[next].value)
+    optionRefs.current[next]?.focus()
+  }
+
   const reset = () => {
     setReason(null)
     setDetails("")
@@ -104,23 +117,51 @@ export function ChallengeDialog({ card, onClose, submitChallenge }: ChallengeDia
               aria-label="Why does this belief seem wrong?"
               className="space-y-3"
             >
-              {REASONS.map((r) => (
-                <button
-                  key={r.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={reason === r.value}
-                  onClick={() => setReason(r.value)}
-                  className={`focus-visible:ring-ring w-full rounded-lg border p-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none ${
-                    reason === r.value
-                      ? "border-foreground/40 bg-card"
-                      : "border-border bg-card/30 hover:bg-card/60"
-                  }`}
-                >
-                  <p className="text-foreground text-sm font-medium">{r.label}</p>
-                  <p className="text-muted-foreground mt-0.5 text-xs">{r.description}</p>
-                </button>
-              ))}
+              {REASONS.map((r, i) => {
+                const selected = reason === r.value
+                return (
+                  <button
+                    key={r.value}
+                    ref={(el) => {
+                      optionRefs.current[i] = el
+                    }}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    // Roving tabindex: role="radio" announces "1 of 3" and promises
+                    // arrow-key navigation, which this group did not implement. One
+                    // stop for the group, arrows move within it.
+                    tabIndex={selected || (reason === null && i === 0) ? 0 : -1}
+                    onKeyDown={(e) => onOptionKeyDown(e, i)}
+                    onClick={() => setReason(r.value)}
+                    // Selection was carried by border-foreground/40 over near-identical
+                    // fills — a ~2.25:1 border and a 1.04:1 fill difference, unreadable
+                    // on a projector in the flow this page exists for.
+                    className={`focus-visible:ring-ring flex w-full items-start gap-2.5 rounded-lg border p-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none ${
+                      selected
+                        ? "border-accent-strong bg-accent/10"
+                        : "border-border hover:border-muted-foreground bg-transparent"
+                    }`}
+                  >
+                    {/* Shape and fill, not a border tint: state survives greyscale,
+                        low contrast and a projector. */}
+                    <span
+                      aria-hidden="true"
+                      className={`mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border-2 ${
+                        selected ? "border-accent-strong" : "border-muted-foreground"
+                      }`}
+                    >
+                      {selected && <span className="bg-accent-strong h-1.5 w-1.5 rounded-full" />}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="text-foreground block text-sm font-medium">{r.label}</span>
+                      <span className="text-muted-foreground mt-0.5 block text-xs">
+                        {r.description}
+                      </span>
+                    </span>
+                  </button>
+                )
+              })}
             </div>
 
             <Textarea
