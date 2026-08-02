@@ -32,6 +32,11 @@ interface ConceptRiskStripProps {
   className?: string
 }
 
+/** Vertical offsets (px) cycled through a run of coincident dots. */
+const CLUSTER_LANES = [0, -4, 4]
+/** Dots closer than this (in retrievability points) count as one cluster. */
+const CLUSTER_EPSILON = 3
+
 export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: ConceptRiskStripProps) {
   const scored = cards.filter(
     (c): c is RiskStripCard & { retrievability: number } => c.retrievability !== null
@@ -41,29 +46,44 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
   const sorted = [...scored].sort((a, b) => a.retrievability - b.retrievability)
   const weakest = sorted[0]
 
+  // Lane assignment for clusters. The old nudge only compared each dot to its
+  // predecessor, so the 3rd of three coincident dots landed back on the 2nd; a
+  // run-length cycle keeps every member of a cluster on its own lane.
+  let run = 0
+  const lanes = sorted.map((card, i) => {
+    run =
+      i > 0 && card.retrievability - sorted[i - 1].retrievability < CLUSTER_EPSILON ? run + 1 : 0
+    return CLUSTER_LANES[run % CLUSTER_LANES.length]
+  })
+
   return (
     <div className={cn("w-full", className)}>
-      <div className="bg-muted/60 relative h-6 overflow-hidden rounded">
-        {/* The at-risk zone, so a dot's position carries a verdict and not just a value. */}
+      {/*
+        Two layers on purpose. The track (rounded, clipped) is an underlay; the dots
+        live in the outer, unclipped box. With everything in one overflow-hidden
+        container, a dot at 0% or 100% was sliced in half by its own -translate-x-1/2.
+      */}
+      <div className="relative h-6">
         <div
-          className="absolute inset-y-0 left-0 bg-rose-500/10 dark:bg-rose-400/10"
-          style={{ width: `${AT_RISK_BELOW}%` }}
+          className="bg-muted/60 absolute inset-x-0 inset-y-1 overflow-hidden rounded"
           aria-hidden="true"
-        />
-
-        {mean !== null && (
+        >
+          {/* The at-risk zone, so a dot's position carries a verdict and not just a value. */}
           <div
-            className="bg-foreground/40 absolute inset-y-0 w-px"
-            style={{ left: `${mean}%` }}
-            aria-hidden="true"
-            title={`Mean ${Math.round(mean)}%`}
+            className="absolute inset-y-0 left-0 bg-rose-500/10 dark:bg-rose-400/15"
+            style={{ width: `${AT_RISK_BELOW}%` }}
           />
-        )}
+          {mean !== null && (
+            <div
+              className="bg-foreground/40 absolute inset-y-0 w-px"
+              style={{ left: `${mean}%` }}
+              title={`Mean ${Math.round(mean)}%`}
+            />
+          )}
+        </div>
 
         {sorted.map((card, i) => {
           const { urgency, label } = memoryBandFor(card.retrievability)
-          // Nudge coincident dots apart so a cluster does not read as one card.
-          const collides = i > 0 && Math.abs(card.retrievability - sorted[i - 1].retrievability) < 3
           return (
             <button
               key={card.problem_id}
@@ -75,16 +95,23 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
               aria-label={`${card.title}, about ${
                 Math.round(card.retrievability / 5) * 5
               } percent, ${label}`}
-              className={cn(
-                "focus-visible:ring-accent/50 absolute h-2.5 w-2.5 -translate-x-1/2 rounded-full ring-offset-1 transition-transform hover:scale-125 focus-visible:ring-2 focus-visible:outline-none",
-                memoryColorClass(urgency, "bar")
-              )}
-              style={{
-                left: `${card.retrievability}%`,
-                top: collides ? "35%" : "50%",
-                marginTop: "-5px",
-              }}
-            />
+              // The button is the 24px hit target (WCAG 2.5.8); the span inside is the
+              // 10px mark. Cluster lanes move the mark, never the hit area. The clamp
+              // keeps an extreme value's mark on the track instead of past its end.
+              className="focus-visible:ring-accent/50 absolute flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full focus-visible:ring-2 focus-visible:outline-none"
+              style={{ left: `clamp(12px, ${card.retrievability}%, calc(100% - 12px))`, top: 0 }}
+            >
+              <span
+                aria-hidden="true"
+                // The background ring is the 2px surface gap that keeps clustered
+                // marks reading as separate dots instead of one blob.
+                className={cn(
+                  "ring-background block h-2.5 w-2.5 rounded-full ring-2 transition-transform hover:scale-125",
+                  memoryColorClass(urgency, "bar")
+                )}
+                style={{ transform: `translateY(${lanes[i]}px)` }}
+              />
+            </button>
           )
         })}
       </div>
