@@ -179,7 +179,10 @@ export function CardBeliefRow({
           )}
           <Link
             href={`/interview?scenario=${card.scenario_id}&practice=true`}
-            className="text-accent-strong hover:bg-accent/10 inline-flex min-h-6 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors"
+            // Steps back to neutral now that the challenge button owns the accent.
+            // The dark:hover is required: hover:bg-muted is a pixel-for-pixel no-op
+            // in dark, where --muted and --card are the same hex.
+            className="text-foreground hover:bg-muted dark:hover:bg-foreground/10 inline-flex min-h-6 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors"
           >
             Practice
             <ArrowRight className="h-3.5 w-3.5" />
