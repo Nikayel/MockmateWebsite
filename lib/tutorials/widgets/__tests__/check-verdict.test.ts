@@ -20,11 +20,25 @@ describe("stripLeadingVerdict", () => {
     )
   })
 
-  it("is case insensitive and handles the other punctuation authors use", () => {
+  it("is case insensitive across the sentence terminators", () => {
     expect(stripLeadingVerdict("RIGHT! Threads do not help here.")).toBe(
       "Threads do not help here."
     )
-    expect(stripLeadingVerdict("Exactly: the GIL is the ceiling.")).toBe("the GIL is the ceiling.")
+    expect(stripLeadingVerdict("correct. Sets need hashable members.")).toBe(
+      "Sets need hashable members."
+    )
+  })
+
+  it("keeps a verdict that opens a longer sentence, rather than leaving a fragment", () => {
+    // A comma or colon means the verdict is a clause, not a standalone sentence. Stripping
+    // it renders as "Correct. and that is the behaviour you want.", which is worse than the
+    // redundancy this function exists to remove. 77 of 486 authored strings are this shape.
+    expect(stripLeadingVerdict("Right, and that is the behaviour you want.")).toBe(
+      "Right, and that is the behaviour you want."
+    )
+    expect(stripLeadingVerdict("Exactly: the GIL is the ceiling.")).toBe(
+      "Exactly: the GIL is the ceiling."
+    )
   })
 
   it("leaves feedback alone when the opener is a real word, not a verdict", () => {

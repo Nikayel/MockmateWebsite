@@ -57,7 +57,12 @@ export function CheckWidget({ spec }: { spec: CheckSpec }) {
  * by a boundary is removed, so feedback that genuinely begins "Correctness depends on…"
  * is untouched.
  */
-const LEADING_VERDICT = /^(right|correct|yes|exactly|nope|no|not quite|almost)[.!,:]\s+/i
+// Only a SENTENCE-TERMINATING verdict is removed. A comma or colon means the verdict is
+// the opening clause of a longer sentence ("Right, and that is the behaviour you want."),
+// and stripping it leaves the chip followed by a lowercase fragment: "Correct. and that
+// is the behaviour you want." That is worse than the redundancy it was meant to fix, and
+// it hit 77 of 486 authored feedback strings.
+const LEADING_VERDICT = /^(right|correct|yes|exactly|nope|no|not quite|almost)[.!]\s+/i
 
 export function stripLeadingVerdict(feedback: string): string {
   return feedback.replace(LEADING_VERDICT, "")
