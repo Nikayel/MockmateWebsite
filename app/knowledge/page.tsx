@@ -338,7 +338,11 @@ export default function KnowledgePage() {
                   setIsLoading(true)
                   void fetchModel()
                 }}
-                className="shrink-0 rounded-md border border-rose-600/30 px-3 py-1 font-medium transition-colors hover:bg-rose-200/60 focus-visible:ring-2 focus-visible:ring-rose-600/40 focus-visible:outline-none dark:border-rose-500/30 dark:hover:bg-rose-500/10"
+                // No local focus ring: rose-600/40 measured 1.51:1 over the dark
+                // banner, and the page's doctrine is that the full-opacity base ring
+                // in globals.css is the sole supplier. The dark border also rises
+                // from /30 (1.48:1) to /60 to clear the 3:1 boundary bar.
+                className="shrink-0 rounded-md border border-rose-600/30 px-3 py-1 font-medium transition-colors hover:bg-rose-200/60 dark:border-rose-400/60 dark:hover:bg-rose-500/10"
               >
                 Try again
               </button>
