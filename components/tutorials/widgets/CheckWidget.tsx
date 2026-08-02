@@ -45,6 +45,24 @@ export function CheckWidget({ spec }: { spec: CheckSpec }) {
   )
 }
 
+/**
+ * Authors open correct-option feedback with a verdict ("Right.", "Correct.") and wrong
+ * options often with "Not quite." That reads fine in the source and badly on screen,
+ * because the widget ALREADY renders its own verdict chip immediately before it: the
+ * learner sees "Correct. Right. Replication fans out reads…".
+ *
+ * Stripping the duplicate here rather than rewriting ~400 authored checks keeps the
+ * convention intact for authors (a verdict-first sentence is easier to write and review)
+ * and fixes every existing check at once. Only an exact leading verdict token followed
+ * by a boundary is removed, so feedback that genuinely begins "Correctness depends on…"
+ * is untouched.
+ */
+const LEADING_VERDICT = /^(right|correct|yes|exactly|nope|no|not quite|almost)[.!,:]\s+/i
+
+export function stripLeadingVerdict(feedback: string): string {
+  return feedback.replace(LEADING_VERDICT, "")
+}
+
 /** Icon + word status chip. The word does the semantic work; the icon reinforces it. */
 function StatusWord({ correct }: { correct: boolean }) {
   return correct ? (
@@ -155,7 +173,8 @@ function PredictBody({ spec }: { spec: CheckSpec }) {
           )}
         >
           <p className="text-foreground/90">
-            <StatusWord correct={isCorrect} /> {committedOption?.feedback}
+            <StatusWord correct={isCorrect} />{" "}
+            {stripLeadingVerdict(committedOption?.feedback ?? "")}
           </p>
           {isCorrect && spec.reveal && (
             <p className="text-foreground/80 border-border/60 mt-2 border-t pt-2">{spec.reveal}</p>
@@ -273,7 +292,9 @@ function ClassifyBody({ spec }: { spec: CheckSpec }) {
               {itemWrong && (
                 <p className="text-foreground/80 mt-1.5 text-xs">
                   <StatusWord correct={false} />{" "}
-                  {item.feedback ?? `This one belongs in ${item.bucket}.`}
+                  {item.feedback
+                    ? stripLeadingVerdict(item.feedback)
+                    : `This one belongs in ${item.bucket}.`}
                 </p>
               )}
             </div>
