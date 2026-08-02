@@ -100,6 +100,22 @@ describe("memoryColorClass", () => {
     expect(memoryColorClass("nonsense", "chip")).toContain("muted")
   })
 
+  it("suppresses the verdict hue on thin evidence, without ever muting trouble entirely", () => {
+    // VSUP-lite: positive verdicts mute to neutral (a confident green off one review
+    // is an overclaim), but warning/urgent stay visibly warm — under-alerting on
+    // thin evidence would be its own kind of overclaim.
+    expect(memoryColorClass("safe", "ink", { suppressed: true })).toContain("muted")
+    expect(memoryColorClass("ok", "ink", { suppressed: true })).toContain("muted")
+    expect(memoryColorClass("warning", "ink", { suppressed: true })).toContain("orange")
+    expect(memoryColorClass("urgent", "ink", { suppressed: true })).toContain("orange")
+  })
+
+  it("suppression only touches ink — bars and chips keep the full ramp", () => {
+    expect(memoryColorClass("urgent", "bar", { suppressed: true })).toContain("rose")
+    expect(memoryColorClass("urgent", "chip", { suppressed: true })).toContain("rose")
+    expect(memoryColorClass("safe", "ink", { suppressed: false })).toContain("emerald")
+  })
+
   it("keeps light-mode text on the -700 shades for AA contrast", () => {
     // The -400 shades render around 1.8:1 on a light background.
     for (const band of MEMORY_STRENGTH_BANDS) {
