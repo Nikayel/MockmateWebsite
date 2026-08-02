@@ -142,7 +142,7 @@ export function ChallengeDialog({ card, onClose, submitChallenge }: ChallengeDia
             <Button
               onClick={handleSubmit}
               disabled={!reason || submitting}
-              className="bg-card text-foreground hover:bg-muted w-full"
+              className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/20 dark:text-accent w-full border"
             >
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Submit challenge
@@ -173,7 +173,10 @@ export function ChallengeDialog({ card, onClose, submitChallenge }: ChallengeDia
                 </p>
               </div>
             </div>
-            <Button onClick={handleClose} className="bg-card text-foreground hover:bg-muted w-full">
+            <Button
+              onClick={handleClose}
+              className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/20 dark:text-accent w-full border"
+            >
               Done
             </Button>
           </div>
