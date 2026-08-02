@@ -68,6 +68,23 @@ const TABLE: Record<MemoryColorVariant, Record<MemoryUrgency, string>> = {
   },
 }
 
+/**
+ * Below this many reviews, a mark's hue stops asserting a verdict (VSUP-lite, after
+ * Correll/Moritz/Heer's value-suppressing uncertainty palettes): one review at 52%
+ * must not shout the same warning ink as twelve reviews there. The feather already
+ * encodes thin evidence, but hue shouts louder than a fade. Positive verdicts mute
+ * entirely; trouble stays visible but drops to one cautious hue — under-alerting on
+ * thin evidence would be its own kind of overclaim.
+ */
+export const MIN_REVIEWS_FOR_VERDICT_HUE = 3
+
+const SUPPRESSED_INK: Record<MemoryUrgency, string> = {
+  safe: "text-muted-foreground",
+  ok: "text-muted-foreground",
+  warning: "text-orange-600 dark:text-orange-400",
+  urgent: "text-orange-600 dark:text-orange-400",
+}
+
 function isMemoryUrgency(value: string): value is MemoryUrgency {
   return value === "safe" || value === "ok" || value === "warning" || value === "urgent"
 }
@@ -79,8 +96,10 @@ function isMemoryUrgency(value: string): value is MemoryUrgency {
  */
 export function memoryColorClass(
   urgency: string | null | undefined,
-  variant: MemoryColorVariant = "chip"
+  variant: MemoryColorVariant = "chip",
+  opts?: { suppressed?: boolean }
 ): string {
   if (!urgency || !isMemoryUrgency(urgency)) return FALLBACK[variant]
+  if (opts?.suppressed && variant === "ink") return SUPPRESSED_INK[urgency]
   return TABLE[variant][urgency]
 }
