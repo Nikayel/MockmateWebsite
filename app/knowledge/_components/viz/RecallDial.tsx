@@ -119,10 +119,13 @@ export function RecallDial({
           fill="none"
           strokeWidth={4}
           strokeLinecap="round"
-          // stroke-muted measured 1.07:1 against the card — which made the dashed
-          // "no belief" ring, a SEMANTIC state, effectively invisible. The empty
-          // ring wears legible ink; the ordinary track stays quiet but present.
-          className={value === null ? "stroke-muted-foreground" : "stroke-border"}
+          // Legible ink on BOTH branches. The first pass only rescued the dashed
+          // "no belief" ring and left the ordinary track on stroke-border (1.23:1
+          // light / 1.45:1 dark) — so the dial, the tile's hero mark, had no
+          // rendered denominator and a 45% arc and an 85% arc were both just "some
+          // arc". Same fix BeliefBar's track already carries; the dash is left as
+          // the sole differentiator of the no-belief state.
+          className="stroke-muted-foreground"
           // A card with no belief gets a dashed empty ring rather than a 0% ring:
           // "unknown" and "you will certainly fail" are not the same claim.
           strokeDasharray={value === null ? "2 3" : undefined}
