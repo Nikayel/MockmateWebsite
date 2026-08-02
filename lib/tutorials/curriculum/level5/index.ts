@@ -1978,6 +1978,412 @@ def first_uneven_total(parts, start):
   },
 }
 
+const oracleLesson: PythonLesson = {
+  id: "py-l5-oracle",
+  title: "Check it against a version that is obviously correct",
+  summary:
+    "Write the slow, dull, clearly-right implementation and make the clever one agree with it. A brute force you trust is a specification you can execute.",
+  estimatedMinutes: 24,
+  difficulty: "medium",
+  skills: ["differential testing", "brute force", "code review", "verification"],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## When you cannot tell by reading
+
+Some code is optimized past the point where reading it settles the question. A single pass with a dictionary replaces a double loop, and now correctness depends on an argument about what the dictionary holds at each step. You can follow that argument, and you can also be wrong about it, confidently, in about forty seconds.
+
+There is a way out that costs almost nothing. Write the version that is too slow to ship and too simple to be wrong, then make the fast one agree with it on every input you can generate.
+
+\`\`\`python
+def count_pairs_slow(nums, target):
+    """Every pair, checked directly. Quadratic and obviously right."""
+    total = 0
+    for i in range(len(nums)):
+        for j in range(i + 1, len(nums)):
+            if nums[i] + nums[j] == target:
+                total += 1
+    return total
+\`\`\`
+
+Nobody ships this. But as a **reference oracle** it is worth more than the clever version, because you can verify it by reading it once, and then it verifies everything else for free.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "oracle-purpose",
+  "prompt": "Your quadratic reference and the generated single-pass version disagree on one input. What have you learned?",
+  "options": [
+    {
+      "label": "The fast version has a bug",
+      "feedback": "The most likely explanation and still an assumption. Disagreement is symmetric: it says one of the two is wrong on this input, and the reference is only more trustworthy because it is simpler."
+    },
+    {
+      "label": "That exactly one of them is wrong here, and you now have the input to work it out",
+      "correct": true,
+      "feedback": "Right. The value of a disagreement is the concrete input attached to it. You hand-check that one input against the contract and the question is settled in a minute."
+    },
+    {
+      "label": "Nothing, since two implementations can both be valid",
+      "feedback": "True for genuinely underspecified behavior such as tie ordering, which is worth ruling out first. For a counting function there is one right answer, so a disagreement is a real finding."
+    },
+    {
+      "label": "That the contract is ambiguous and needs rewriting",
+      "feedback": "Sometimes the correct conclusion, and worth reaching for when both answers look defensible. Jumping there first skips the cheap step of checking the input by hand."
+    }
+  ]
+}
+\`\`\`
+
+## The differential loop
+
+Generate inputs, run both, compare, stop at the first disagreement.
+
+\`\`\`python
+def first_disagreeing_target(nums, targets):
+    for target in targets:
+        if count_pairs_fast(nums, target) != count_pairs_slow(nums, target):
+            return target
+    return -1
+\`\`\`
+
+That is the whole technique. Its power comes from where the inputs come from: you no longer have to be clever about choosing them, because you are not predicting the answer, only comparing two answers. So you can throw thousands of ugly inputs at it, including inputs you would never have thought to write down.
+
+The inputs that find bugs fastest are the ones with structure a human would not bother typing: lots of duplicates, all the same value, everything negative, one element, empty.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "duplicate-blind-set",
+  "prompt": "A single-pass version tracks values it has seen in a set: for n in nums, if target - n in seen: total += 1, then seen.add(n). With nums = [1, 1, 1] and target = 2, what does it return, and what is right?",
+  "options": [
+    {
+      "label": "It returns 3, which is correct",
+      "feedback": "Three is the right answer, since positions (0,1), (0,2) and (1,2) all sum to 2. A set cannot produce it, because it has no way to know that the value 1 arrived more than once."
+    },
+    {
+      "label": "It returns 2, and the answer is 3",
+      "correct": true,
+      "feedback": "Right. The set records that 1 was seen, not how often, so each later 1 contributes one pair instead of one per earlier copy. A Counter is what this code needed."
+    },
+    {
+      "label": "It returns 1, and the answer is 3",
+      "feedback": "Close reading of the undercount, but off by one iteration. The first element adds nothing, and both the second and third find 1 already in the set, so the total reaches 2."
+    },
+    {
+      "label": "It returns 3, and the answer is 1, since the pairs are duplicates",
+      "feedback": "Whether repeated values count as distinct pairs is exactly the kind of thing the contract must settle, so the question is fair. For pairs identified by index, all three count."
+    }
+  ]
+}
+\`\`\`
+
+## When the oracle is the shipped code
+
+Differential testing is not only for speed. It is the fastest way to review a rewrite, a refactor, or a migration, because you already have a version everyone trusts: the one in production.
+
+\`\`\`python
+for row in sample_rows:
+    assert new_pricing(row) == old_pricing(row)
+\`\`\`
+
+Every disagreement is either a bug in the new code or an undocumented behavior of the old code that somebody depends on. Both are things you want to find before the deploy rather than after.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "oracle-is-available",
+  "prompt": "Sort each review situation by whether a reference oracle is available to you cheaply.",
+  "buckets": ["An oracle is right there", "You would have to invent the answer"],
+  "items": [
+    {
+      "label": "A single-pass rewrite of a function that used to use two nested loops",
+      "bucket": "An oracle is right there",
+      "feedback": "The nested-loop version is in the git history, so you can paste it back in as the reference and compare on thousands of inputs."
+    },
+    {
+      "label": "A new pricing rule that has never existed before",
+      "bucket": "You would have to invent the answer",
+      "feedback": "There is nothing to compare against, so verification has to come from the contract itself through examples and properties."
+    },
+    {
+      "label": "A caching layer added in front of an existing lookup",
+      "bucket": "An oracle is right there",
+      "feedback": "The uncached lookup is the oracle: for every key, the cached result must equal what the underlying lookup returns."
+    },
+    {
+      "label": "A generated regex replacing a hand-written parser",
+      "bucket": "An oracle is right there",
+      "feedback": "The old parser answers the same question, so you can run both over a corpus of real strings and inspect every disagreement."
+    },
+    {
+      "label": "A first implementation of a recommendation ranking",
+      "bucket": "You would have to invent the answer",
+      "feedback": "There is no prior behavior and often no single right answer, so properties and human judgment carry the whole review."
+    }
+  ]
+}
+\`\`\`
+
+## The two ways this goes wrong
+
+**The oracle is wrong too.** If you write the reference from the same misunderstanding of the contract, both versions agree and both are wrong. Guard against it by making the reference dumb enough that its correctness is visible in one reading, and by keeping a couple of hand-checked examples alongside.
+
+**Nothing generates interesting inputs.** A differential loop over ten hand-picked ordinary inputs finds nothing that ten ordinary example tests would not. The inputs have to include the shapes you find uncomfortable.
+
+**Interview nuance:** offering to write the brute force first is a strong move in an interview, not a weak one. "Let me get the obviously correct version down so I have something to check the optimized one against" shows you know that the optimization is the risky part. Plenty of candidates jump straight to the clever solution and then cannot tell whether it works.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "oracle-cumulative",
+  "prompt": "You have a trusted quadratic reference and a generated linear version. You run 10000 random lists of length 5 through both and find no disagreement. What is the honest conclusion?",
+  "options": [
+    {
+      "label": "The linear version is correct",
+      "feedback": "Stronger than the evidence supports. Ten thousand samples of one shape can only speak for that shape, and plenty of bugs need a longer list or a specific structure to appear."
+    },
+    {
+      "label": "The two agree on short random lists, and you have not yet tried the awkward shapes",
+      "correct": true,
+      "feedback": "Right. Random short lists rarely contain heavy duplication, all-equal values, or emptiness, which is where this class of bug lives. Name what you covered and what you did not."
+    },
+    {
+      "label": "The reference must be wrong, since a real bug would have shown up",
+      "feedback": "A useful suspicion in general, because a broken oracle does produce suspiciously clean runs. Here the simpler explanation is that the generator never produced an interesting input."
+    },
+    {
+      "label": "The test is worthless because it found nothing",
+      "feedback": "Too harsh. A clean differential run over a well-chosen input space is real evidence, and it also leaves you a harness you can immediately point at better inputs."
+    }
+  ],
+  "reveal": "Write the version that is too slow to ship and too simple to be wrong, then make the clever one agree with it. Most of the skill is in choosing inputs ugly enough to matter."
+}
+\`\`\``,
+    demoCode: `def count_pairs_slow(nums, target):
+    total = 0
+    for i in range(len(nums)):
+        for j in range(i + 1, len(nums)):
+            if nums[i] + nums[j] == target:
+                total += 1
+    return total
+
+
+def count_pairs_fast(nums, target):
+    seen = set()
+    total = 0
+    for n in nums:
+        if target - n in seen:
+            total += 1
+        seen.add(n)
+    return total
+
+
+print(count_pairs_slow([1, 1, 1], 2), count_pairs_fast([1, 1, 1], 2))   # 3 2`,
+  },
+  apply: {
+    id: "py-l5-oracle-apply",
+    executionMode: "single-file",
+    prompt: `Write a function \`first_disagreeing_target(nums, targets)\` that returns the first value in
+\`targets\` for which \`count_pairs_fast(nums, target)\` disagrees with \`count_pairs_slow(nums, target)\`,
+or \`-1\` when the two agree on every target in the list.
+
+Both functions are in the starter. \`count_pairs_slow\` is the reference oracle: it checks every pair
+directly, so it is slow and correct. \`count_pairs_fast\` is the single-pass version under review.
+Neither should be changed. No target in the graded inputs is negative, so \`-1\` is safe as the
+"they always agreed" answer.
+
+Keep \`first_disagreeing_target\` as the last function in the file.`,
+    starterCode: `def count_pairs_slow(nums, target):
+    # The reference oracle: every pair, checked directly.
+    total = 0
+    for i in range(len(nums)):
+        for j in range(i + 1, len(nums)):
+            if nums[i] + nums[j] == target:
+                total += 1
+    return total
+
+
+def count_pairs_fast(nums, target):
+    # Generated code under review. Leave it exactly as it is.
+    seen = set()
+    total = 0
+    for n in nums:
+        if target - n in seen:
+            total += 1
+        seen.add(n)
+    return total
+
+
+def first_disagreeing_target(nums, targets):
+    # Return the first target the two disagree on, or -1.
+    pass`,
+    hints: [
+      "Loop over `targets` and compare the two return values for each one.",
+      "Return the target itself, not its index, and return `-1` only after the loop finishes.",
+      "Hand-check `nums = [1, 1, 1]` with `target = 2` first: count the pairs by index.",
+    ],
+    referenceSolution: `def count_pairs_slow(nums, target):
+    total = 0
+    for i in range(len(nums)):
+        for j in range(i + 1, len(nums)):
+            if nums[i] + nums[j] == target:
+                total += 1
+    return total
+
+
+def count_pairs_fast(nums, target):
+    seen = set()
+    total = 0
+    for n in nums:
+        if target - n in seen:
+            total += 1
+        seen.add(n)
+    return total
+
+
+def first_disagreeing_target(nums, targets):
+    for target in targets:
+        if count_pairs_fast(nums, target) != count_pairs_slow(nums, target):
+            return target
+    return -1`,
+    testCases: [
+      {
+        input: { nums: [1, 1, 1], targets: [5, 2, 3] },
+        expected: 2,
+        description: "three copies of the same value",
+      },
+      {
+        input: { nums: [1, 2, 3], targets: [4, 5] },
+        expected: -1,
+        description: "all values distinct, so the two agree",
+      },
+      {
+        input: { nums: [2, 2, 2, 2], targets: [4] },
+        expected: 4,
+        description: "heavy duplication on the first target",
+      },
+      {
+        input: { nums: [5, 5, 1], targets: [6, 10] },
+        expected: 6,
+        description: "one repeated value and one unique value",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l5-oracle-practice",
+    executionMode: "single-file",
+    prompt: `A leaderboard service needs the top scores for a game, and four implementations are sitting
+in a pull request. All four look reasonable, all four return the right answer in the reviewer's
+manual test, and the service has started serving a leaderboard that is subtly wrong for some games.
+
+Write a function \`check(name)\` that returns \`True\` only when the candidate stored under \`name\` is a
+correct \`top_k\`, and \`False\` otherwise.
+
+The contract: \`top_k(scores, k)\` returns the \`k\` largest scores in descending order, keeping
+duplicates. \`k\` may be \`0\`, and it may be larger than the list, in which case every score is
+returned. The caller's list must not be modified.
+
+\`sorted(scores, reverse=True)[:k]\` is a correct and obviously right oracle, so use it to produce the
+expected value rather than writing expectations by hand. Keep \`check\` as the last function in the
+file.`,
+    starterCode: `def a(scores, k):
+    return sorted(scores)[-k:][::-1]
+
+
+def b(scores, k):
+    return sorted(scores, reverse=True)[:k]
+
+
+def c(scores, k):
+    out = []
+    for _ in range(min(k, len(scores))):
+        top = max(scores)
+        out.append(top)
+        scores.remove(top)
+    return out
+
+
+def d(scores, k):
+    remaining = list(scores)
+    out = []
+    for _ in range(min(k, len(remaining))):
+        top = max(remaining)
+        out.append(top)
+        remaining.remove(top)
+    return out
+
+
+CANDIDATES = {"a": a, "b": b, "c": c, "d": d}
+
+
+def check(name):
+    # Probe CANDIDATES[name] against the oracle and return True only if it satisfies the contract.
+    pass`,
+    hints: [
+      "For each case, compare the candidate's result against `sorted(scores, reverse=True)[:k]`.",
+      "Include `k = 0` in your cases. A negative slice bound behaves surprisingly when the bound is zero.",
+      "Pass a list you still hold a reference to, then compare it against a saved copy to catch a mutation.",
+    ],
+    referenceSolution: `def a(scores, k):
+    return sorted(scores)[-k:][::-1]
+
+
+def b(scores, k):
+    return sorted(scores, reverse=True)[:k]
+
+
+def c(scores, k):
+    out = []
+    for _ in range(min(k, len(scores))):
+        top = max(scores)
+        out.append(top)
+        scores.remove(top)
+    return out
+
+
+def d(scores, k):
+    remaining = list(scores)
+    out = []
+    for _ in range(min(k, len(remaining))):
+        top = max(remaining)
+        out.append(top)
+        remaining.remove(top)
+    return out
+
+
+CANDIDATES = {"a": a, "b": b, "c": c, "d": d}
+
+
+def check(name):
+    fn = CANDIDATES[name]
+    cases = [
+        ([5, 1, 9, 3], 2),
+        ([4, 4, 4], 2),
+        ([7, 2], 0),
+        ([1], 5),
+        ([], 3),
+    ]
+    for scores, k in cases:
+        passed_in = list(scores)
+        result = fn(passed_in, k)
+        if result != sorted(scores, reverse=True)[:k]:
+            return False
+        if passed_in != list(scores):
+            return False
+    return True`,
+    testCases: [
+      { input: { name: "a" }, expected: false, description: "candidate a" },
+      { input: { name: "b" }, expected: true, description: "candidate b" },
+      { input: { name: "c" }, expected: false, description: "candidate c" },
+      { input: { name: "d" }, expected: true, description: "candidate d" },
+    ],
+  },
+}
+
 export const level5: PythonLevel = {
   id: 5,
   slug: "verification",
@@ -1998,7 +2404,7 @@ export const level5: PythonLevel = {
       title: "The Test Is the Verification",
       description:
         "Turn a suspicion into an assertion that fails before the fix, using properties and a reference oracle when examples run out.",
-      lessons: [failingTestLesson, propertiesLesson],
+      lessons: [failingTestLesson, propertiesLesson, oracleLesson],
     },
   ],
 }
