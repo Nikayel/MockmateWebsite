@@ -57,9 +57,9 @@ export function ScoreTrack({
   const width = scores.length * (BAR_WIDTH + BAR_GAP) - BAR_GAP
   const lastIndex = scores.length - 1
 
-  const label =
-    `${scores.length} review${scores.length === 1 ? "" : "s"}, oldest to newest: ` +
-    `${scores.join(", ")}.${describeTrend(scores)}`
+  // No count in the label: the visible "{n} reviews" span beside this chart already
+  // owns it, and a row was announcing the same number three times.
+  const label = `Scores oldest to newest: ${scores.join(", ")}.${describeTrend(scores)}`
 
   return (
     <svg
@@ -83,7 +83,9 @@ export function ScoreTrack({
         y2={CHART_HEIGHT - (passingScore / 100) * CHART_HEIGHT}
         strokeWidth={0.75}
         strokeDasharray="1.5 1.5"
-        className="stroke-muted-foreground/60"
+        // Full ink: /60 measured ~2.4:1 in light mode on the line that carries the
+        // pass/fail verdict.
+        className="stroke-muted-foreground"
       />
       {scores.map((score, i) => {
         const clamped = Math.min(100, Math.max(0, score))
@@ -98,14 +100,26 @@ export function ScoreTrack({
               width={BAR_WIDTH}
               height={barHeight}
               rx={1}
-              className={cn(
+              // Opaque per-theme fills: the /70 alphas measured 1.87:1 and 2.77:1
+              // on the light card — the score history was nearly invisible.
+              className={
                 passed
-                  ? "fill-emerald-500/70 dark:fill-emerald-400/70"
-                  : "fill-rose-500/70 dark:fill-rose-400/70",
-                i === lastIndex && "stroke-foreground/40"
-              )}
-              strokeWidth={i === lastIndex ? 0.6 : 0}
+                  ? "fill-emerald-600 dark:fill-emerald-500"
+                  : "fill-rose-600 dark:fill-rose-500"
+              }
             />
+            {/* The newest review gets an under-tick: the old 0.6-unit ghost outline
+                measured ~1.5-2:1 against its own fill. A foreground tick under the
+                baseline is theme-proof, and overflow-visible already permits it. */}
+            {i === lastIndex && (
+              <rect
+                x={i * (BAR_WIDTH + BAR_GAP)}
+                y={CHART_HEIGHT + 1.5}
+                width={BAR_WIDTH}
+                height={1}
+                className="fill-foreground"
+              />
+            )}
             {/* Full-column hit area: the hover/tooltip target is the 6px column, not
                 the 4px mark, per the hit-target-bigger-than-the-mark rule. */}
             <rect
