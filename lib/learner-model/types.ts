@@ -39,6 +39,16 @@ export interface CardBelief {
   belief_text: string | null
   /** Days from now until recall drops below the solid-recall threshold. */
   days_until_forgetting: number | null
+  /**
+   * The card's forgetting curve, pre-sampled for rendering: recall `r` (0-100) at `t`
+   * days since the last review, covering the past through the near forecast.
+   *
+   * Sampled here rather than in the browser on purpose. The curve is FSRS business
+   * logic, so a client-side reimplementation would be a second copy of a scheduling
+   * rule, and importing the real one would pull ts-fsrs into a user-facing bundle.
+   * The client stays a polyline renderer.
+   */
+  recall_curve: Array<{ t: number; r: number }> | null
 
   next_review_at: string
   last_reviewed_at: string | null

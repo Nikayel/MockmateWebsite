@@ -14,6 +14,7 @@ import {
   estimateRetention,
   getMemoryStrength,
 } from "../spaced-repetition/algorithm-router"
+import { calculateRetrievability } from "../spaced-repetition/fsrs-algorithm"
 import { DSA_PATTERNS, PATTERN_METADATA, type DSAPattern } from "../types/dsa-patterns"
 import { formatPatternLabel } from "../pattern-labels"
 import { daysUntilRetentionDrops, describeCardBelief, describeConceptBelief } from "./translate"
@@ -21,6 +22,30 @@ import type { CardBelief, ConceptBelief, LearnerModelPayload } from "./types"
 
 /** Cards below this retrievability count as "at risk" in concept summaries. */
 const AT_RISK_RETRIEVABILITY = 70
+
+/** Samples in a rendered forgetting curve. Enough for a smooth path, small in JSON. */
+const RECALL_CURVE_SAMPLES = 16
+
+/**
+ * Sample the card's forgetting curve from its last review through a forecast window,
+ * so the client can draw the model's mechanism instead of just its output.
+ *
+ * The window always spans the elapsed time AND enough future to show the curve
+ * crossing the solid-recall line; a card that is already past it still gets a
+ * forward-looking tail so the shape reads as decay rather than a flat floor.
+ */
+function sampleRecallCurve(
+  stability: number,
+  elapsedDays: number,
+  daysUntilForgetting: number | null
+): Array<{ t: number; r: number }> {
+  const forecast = Math.max(elapsedDays + (daysUntilForgetting ?? 0), elapsedDays, 1) * 1.6
+  const step = forecast / (RECALL_CURVE_SAMPLES - 1)
+  return Array.from({ length: RECALL_CURVE_SAMPLES }, (_, i) => {
+    const t = Math.round(i * step * 10) / 10
+    return { t, r: Math.round(calculateRetrievability(stability, t) * 1000) / 10 }
+  })
+}
 
 function daysSince(iso: string | undefined | null, now: Date): number {
   if (!iso) return 0
@@ -63,6 +88,7 @@ export function buildCardBelief(card: ProblemMastery, now: Date = new Date()): C
       belief_text:
         "No reviews yet — the system has no evidence about this problem. Solve it once to give the model something to reason about.",
       days_until_forgetting: null,
+      recall_curve: null,
     }
   }
 
@@ -85,6 +111,7 @@ export function buildCardBelief(card: ProblemMastery, now: Date = new Date()): C
     memory,
     belief_text: describeCardBelief(retrievability, forgetIn ?? 0),
     days_until_forgetting: forgetIn,
+    recall_curve: stability !== null ? sampleRecallCurve(stability, elapsed, forgetIn) : null,
   }
 }
 
@@ -197,6 +224,9 @@ export function maskForBlackBox(payload: LearnerModelPayload): LearnerModelPaylo
     memory: null,
     belief_text: null,
     days_until_forgetting: null,
+    // The curve IS the belief, plotted. Leaving it would hand the control group the
+    // exact number every other field is masking.
+    recall_curve: null,
     interval_days: null,
     review_count: null,
     last_score: null,
