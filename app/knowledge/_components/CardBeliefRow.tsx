@@ -1,23 +1,31 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, Flag } from "lucide-react"
+import { ArrowRight, ChevronDown, Flag } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
+import { memoryColorClass } from "@/lib/ui/memory-colors"
+import { displayRetention } from "@/lib/spaced-repetition/memory-bands"
 import type { CardBelief } from "@/lib/learner-model/types"
+import { BeliefBar } from "./viz/BeliefBar"
 import { ForgettingCurve } from "./viz/ForgettingCurve"
-import { RecallDial } from "./viz/RecallDial"
 import { ScoreTrack } from "./viz/ScoreTrack"
 
 /**
  * One problem, and what the model believes about it.
  *
- * The row used to state the same number three times — as a chip, as a sentence
- * ("The system estimates a ~69% chance…"), and again in the tooltip — then spend a
- * third line on `scores.join(" → ")`. Every fact now has exactly one visual home:
- * the dial carries the estimate and its uncertainty, the track carries the history,
- * and the sentence moves to the accessible description and the tooltip, where it is
- * read once by the people it actually helps.
+ * Anatomy: belief bar (position on the same 0-100 axis as the strip above), the
+ * number beside it, title with a visible disclosure chevron, score history, and the
+ * two actions. "This seems wrong" is the only bordered control on the row — the
+ * binding requirement is that challenging the model stays the most obvious act here.
+ *
+ * The model's reasoning (stability, lapses, belief sentence) lives permanently in
+ * the expanded panel; the hover tooltip is only a mouse shortcut to it, because
+ * Radix tooltips never open from touch.
+ *
+ * No local focus-visible ring classes anywhere in this file on purpose: the base
+ * layer in app/globals.css supplies the full-opacity ring, and the /50 local rings
+ * this page used to carry measured under 2.4:1 in both themes.
  */
 
 interface CardBeliefRowProps {
@@ -40,6 +48,7 @@ export function CardBeliefRow({
 }: CardBeliefRowProps) {
   const masked = card.retrievability === null && card.belief_text === null
   const scores = card.scores_history ?? []
+  const expandable = Boolean(onExpandEvidence)
 
   // Days since the last review, recomputed here rather than shipped, so an open tab
   // keeps moving the "now" marker as the estimate it sits next to goes stale.
@@ -47,61 +56,70 @@ export function CardBeliefRow({
     ? Math.max(0, (Date.now() - new Date(card.last_reviewed_at).getTime()) / 86_400_000)
     : 0
 
-  const dial = (
-    <RecallDial
-      value={card.retrievability}
-      reviewCount={card.review_count}
-      urgency={card.memory?.urgency ?? null}
-      size="md"
-      // The belief sentence is the accessible text for the dial. It is the one place
-      // the full explanation still appears verbatim.
-      ariaLabel={card.belief_text ?? undefined}
-    />
+  const bar = (
+    <span className={memoryColorClass(card.memory?.urgency ?? null, "ink")}>
+      <BeliefBar
+        value={card.retrievability}
+        reviewCount={card.review_count}
+        // The belief sentence is the accessible text for the mark — the one place
+        // the full explanation still appears verbatim for screen readers.
+        ariaLabel={card.belief_text ?? undefined}
+      />
+    </span>
   )
 
   return (
     <div className="py-3">
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         {/* The estimate leads: it is the only thing that decides whether to act. */}
         {card.memory ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              {/*
-                A button, not a span: stability, lapses and review count live only in
-                this tooltip, so a non-focusable trigger meant keyboard and screen
-                reader users could never reach the model's reasoning on the page built
-                to expose it.
-              */}
+              {/* Tap/Enter opens the evidence panel — the tooltip is unreachable on
+                  touch, so the trigger must DO something there, not just decorate. */}
               <button
                 type="button"
-                className="focus-visible:ring-accent/50 shrink-0 cursor-help rounded-full focus-visible:ring-2 focus-visible:outline-none"
+                onClick={() => onExpandEvidence?.(card)}
+                className="mt-1 shrink-0 cursor-help rounded"
               >
-                {dial}
+                {bar}
               </button>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs">
               <p className="mb-1 font-medium">{card.memory.label} — why this number?</p>
               <p>
                 Estimated chance you could solve this cold right now, from the FSRS forgetting
-                curve: stability {card.stability_days}d, {card.lapses ?? 0} lapse
+                curve: {card.stability_days !== null ? `stability ${card.stability_days}d, ` : ""}
+                {card.lapses ?? 0} lapse
                 {(card.lapses ?? 0) === 1 ? "" : "s"}, {card.review_count ?? 0} reviews.
               </p>
-              {card.belief_text && <p className="mt-1 opacity-80">{card.belief_text}</p>}
             </TooltipContent>
           </Tooltip>
         ) : (
-          dial
+          <span className="mt-1 shrink-0">{bar}</span>
         )}
+
+        <span className="text-foreground w-11 shrink-0 text-right text-sm font-medium tabular-nums">
+          {card.retrievability === null ? "–" : `~${displayRetention(card.retrievability)}%`}
+        </span>
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <button
-              onClick={() => onExpandEvidence?.(card)}
-              className="text-foreground hover:text-foreground/80 focus-visible:ring-accent/50 truncate rounded text-left text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
-              aria-expanded={expanded}
-            >
-              {card.title}
-            </button>
+            {expandable ? (
+              <button
+                onClick={() => onExpandEvidence?.(card)}
+                aria-expanded={expanded}
+                aria-controls={`evidence-${card.problem_id}`}
+                className="group text-foreground -my-0.5 flex min-w-0 items-center gap-1.5 rounded py-0.5 text-left text-sm font-medium"
+              >
+                <span className="truncate">{card.title}</span>
+                <ChevronDown className="text-muted-foreground h-3.5 w-3.5 shrink-0 transition-transform group-aria-expanded:rotate-180 motion-reduce:transition-none" />
+              </button>
+            ) : (
+              // Black-box condition: no evidence to disclose, so no button — a
+              // focusable no-op with aria-expanded=false was a lie to assistive tech.
+              <span className="text-foreground truncate text-sm font-medium">{card.title}</span>
+            )}
             <span className={`text-xs ${difficultyColorClass(card.difficulty, "text")}`}>
               {card.difficulty}
             </span>
@@ -123,29 +141,48 @@ export function CardBeliefRow({
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        {/* Below sm the actions wrap to their own full-width line instead of
+            crushing the title column to a sliver at 360px. */}
+        <div className="flex w-full shrink-0 items-center gap-1.5 sm:w-auto">
           {challengesEnabled && onChallenge && !masked && (
             <button
+              type="button"
               onClick={() => onChallenge(card)}
-              className="text-muted-foreground hover:text-foreground focus-visible:ring-accent/50 flex items-center gap-1 rounded text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
               title="Dispute what the system believes about this problem"
+              className="border-border hover:border-accent/40 hover:bg-accent/10 text-foreground inline-flex min-h-6 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
             >
-              <Flag className="h-3 w-3" />
+              <Flag className="h-3.5 w-3.5" />
               This seems wrong
             </button>
           )}
           <Link
             href={`/interview?scenario=${card.scenario_id}&practice=true`}
-            className="text-muted-foreground hover:text-foreground focus-visible:ring-accent/50 flex items-center gap-1 rounded text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            className="text-accent-strong hover:bg-accent/10 inline-flex min-h-6 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors"
           >
             Practice
-            <ArrowRight className="h-3 w-3" />
+            <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
       </div>
 
       {expanded && (
-        <div className="mt-2 ml-[52px]">
+        <div
+          id={`evidence-${card.problem_id}`}
+          role="region"
+          aria-label={`Evidence for ${card.title}`}
+          className="mt-2 ml-0 sm:ml-6"
+        >
+          {/* The model's reasoning gets a permanent, visible home — it used to live
+              only inside the hover tooltip, unreachable on touch and by keyboard. */}
+          {card.memory && (
+            <p className="text-muted-foreground mb-2 text-xs">
+              {card.memory.label}:{" "}
+              {card.stability_days !== null ? `stability ${card.stability_days}d, ` : ""}
+              {card.lapses ?? 0} lapse{(card.lapses ?? 0) === 1 ? "" : "s"},{" "}
+              {card.review_count ?? 0} reviews.
+              {card.belief_text ? ` ${card.belief_text}` : ""}
+            </p>
+          )}
           {card.recall_curve && card.recall_curve.length > 1 && (
             <ForgettingCurve
               points={card.recall_curve}
