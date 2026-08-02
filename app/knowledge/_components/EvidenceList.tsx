@@ -76,40 +76,61 @@ export function EvidenceList({ loading, error, rows }: EvidenceListProps) {
   const calibration = calibrationOf(rows)
 
   return (
-    <div className="border-border mt-2 rounded-lg border p-3">
-      {calibration && (
-        <p className="text-foreground mb-2 text-xs font-medium">
-          {/*
-            The most persuasive sentence available on this page, and it was derivable
-            from data already loaded. A model that publishes its own hit rate is a
-            different kind of artifact from one that publishes a confident number.
-          */}
-          The model called {calibration.hits} of your last {calibration.total} review
-          {calibration.total === 1 ? "" : "s"} correctly.
-        </p>
-      )}
-
-      <div className="overflow-x-auto">
+    // An indent rail, not a third nested border: the panel already sits inside an
+    // expanded row inside a bordered group container.
+    <div className="border-border mt-2 border-l-2 pl-3 sm:pl-4">
+      {/* Keyboard-scrollable region: a bare overflow-x-auto div cannot take focus in
+          Safari/Firefox, so the wide table was mouse-only. */}
+      <div
+        className="focus-visible:ring-accent overflow-x-auto rounded focus-visible:ring-2 focus-visible:outline-none"
+        tabIndex={0}
+        role="region"
+        aria-label="Review history"
+      >
         <table className="w-full text-xs">
-          <caption className="sr-only">
-            Review history for this problem, oldest first: score, what the model predicted, what
-            happened, and how the review interval moved.
+          {/*
+            The calibration line is the page's money line — including when it is
+            unflattering — and it is the table's own summary, so it IS the caption:
+            visible, and announced with the table instead of orphaned above it.
+          */}
+          <caption className="text-foreground mb-2 text-left text-sm font-medium tabular-nums">
+            {calibration
+              ? `The model called ${calibration.hits} of your last ${calibration.total} review${
+                  calibration.total === 1 ? "" : "s"
+                } correctly.`
+              : null}
+            <span className="sr-only">
+              {" "}
+              Review history, oldest first: score, prediction, outcome, interval.
+            </span>
           </caption>
           <thead>
             <tr className="text-muted-foreground text-left">
-              <th scope="col" className="pr-3 pb-1 font-medium">
+              <th
+                scope="col"
+                className="pr-3 pb-1 text-[11px] font-medium tracking-wider uppercase"
+              >
                 Date
               </th>
-              <th scope="col" className="pr-3 pb-1 font-medium">
+              <th
+                scope="col"
+                className="pr-3 pb-1 text-[11px] font-medium tracking-wider uppercase"
+              >
                 Score
               </th>
-              <th scope="col" className="pr-3 pb-1 font-medium">
+              <th
+                scope="col"
+                className="pr-3 pb-1 text-[11px] font-medium tracking-wider uppercase"
+              >
                 Predicted
               </th>
-              <th scope="col" className="pr-3 pb-1 font-medium">
+              <th
+                scope="col"
+                className="pr-3 pb-1 text-[11px] font-medium tracking-wider uppercase"
+              >
                 Outcome
               </th>
-              <th scope="col" className="pb-1 font-medium">
+              <th scope="col" className="pb-1 text-[11px] font-medium tracking-wider uppercase">
                 Interval
               </th>
             </tr>
@@ -122,20 +143,26 @@ export function EvidenceList({ loading, error, rows }: EvidenceListProps) {
               const score = row.mastery_score ?? row.score
               return (
                 <tr key={row.event_id} className="border-border/60 border-t">
-                  <td className="text-foreground/80 py-1 pr-3 whitespace-nowrap">
+                  <td className="text-muted-foreground py-1 pr-3 whitespace-nowrap">
                     {new Date(row.timestamp).toLocaleDateString()}
                   </td>
                   <td className="py-1 pr-3 tabular-nums">
                     {score === null ? "—" : Math.round(score)}
+                    {/* No opacity fades here: opacity-70 on muted-foreground text
+                        composited to ~2.9:1 — the exact fade the guard test forbids,
+                        dodged via the opacity property. */}
                     {row.hints_used ? (
-                      <span className="opacity-70">
+                      <span>
                         {" "}
                         ({row.hints_used} hint{row.hints_used === 1 ? "" : "s"})
                       </span>
                     ) : null}
-                    {row.is_first_review ? <span className="opacity-70"> first</span> : null}
+                    {row.is_first_review ? <span> first</span> : null}
                   </td>
                   <td className="py-1 pr-3 tabular-nums">
+                    {/* Exact, not rounded-to-5: this column is a ledger of what the
+                        model actually said going in; fuzzing the audit record would
+                        undercut the calibration claim in the caption. */}
                     {row.predicted_retention === null
                       ? "—"
                       : `${Math.round(row.predicted_retention)}%`}
