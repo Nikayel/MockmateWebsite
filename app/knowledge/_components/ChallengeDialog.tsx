@@ -192,7 +192,11 @@ export function ChallengeDialog({ card, onClose, submitChallenge }: ChallengeDia
         )}
 
         {result && (
-          <div className="space-y-3">
+          // role="status" + focusing Done: on success the form unmounts under the
+          // focused Submit button, so focus fell to the body and the outcome was
+          // announced to nobody. The error path already uses role="alert"; the
+          // flagship action should not be the silent one.
+          <div className="space-y-3" role="status">
             <div className="flex items-start gap-2">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-400" />
               <div className="text-sm">
@@ -216,6 +220,7 @@ export function ChallengeDialog({ card, onClose, submitChallenge }: ChallengeDia
             </div>
             <Button
               onClick={handleClose}
+              autoFocus
               className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/20 dark:text-accent w-full border"
             >
               Done
