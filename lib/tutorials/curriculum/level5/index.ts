@@ -2730,6 +2730,300 @@ def smallest_failing_prefix(times):
   },
 }
 
+const repairLesson: PythonLesson = {
+  id: "py-l5-repair-not-rewrite",
+  title: "Repair, do not rewrite",
+  summary:
+    "The instinct to throw the function away and start again feels efficient and quietly discards every case it already got right.",
+  estimatedMinutes: 22,
+  difficulty: "medium",
+  skills: ["debugging", "minimal change", "regression tests", "code review"],
+  teach: {
+    estimatedMinutes: 8,
+    markdown: `## Why the rewrite is tempting and usually wrong
+
+You have found the bug. The function is not how you would have written it. Rewriting it will take four minutes and the result will be code you understand completely.
+
+Here is what that trade actually costs. The function in front of you already handles cases you have not thought about: the empty input somebody hit in March, the negative quantity that a refund flow produces, the currency rounding rule that took two days to get right. None of that is documented and some of it is invisible in the code, sitting in an \`if\` that looks redundant until you delete it.
+
+A rewrite throws all of it away and replaces it with your model of the problem, which is one afternoon old. The bug you set out to fix does get fixed. What you cannot see is the three you reintroduced.
+
+**The default is the smallest change that makes the failing case pass without changing any passing case.**
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "redundant-looking-guard",
+  "prompt": "While fixing a bug you find this line near the top of the function: if not rows: return []. The bug you are fixing has nothing to do with empty input. What should you do with the line?",
+  "options": [
+    {
+      "label": "Delete it, since the loop below handles an empty list correctly anyway",
+      "feedback": "Very likely true today and it is exactly how guards get removed. If the loop really is equivalent, deleting it changes nothing that matters and risks something you have not checked."
+    },
+    {
+      "label": "Leave it alone, because it is outside the change you came to make",
+      "correct": true,
+      "feedback": "Right. A repair that also tidies unrelated lines is much harder to review, and any regression it causes is now attributed to the bug fix rather than the cleanup."
+    },
+    {
+      "label": "Move it into the caller where the empty case originates",
+      "feedback": "Sometimes the right long-term design, and it is still a separate change. Doing it inside a bug fix means one commit that both repairs and relocates behavior."
+    },
+    {
+      "label": "Replace it with an assertion so the empty case becomes visible",
+      "feedback": "Turning a handled case into a crash is a behavior change dressed up as a diagnostic. Whoever relied on the empty result would now get an exception in production."
+    }
+  ]
+}
+\`\`\`
+
+## The repair loop
+
+Four steps, in this order, every time.
+
+1. **Pin the failure.** Write the assertion that fails now. If you cannot, you do not yet know what the bug is.
+2. **Find the smallest change** that makes it pass. Usually one line, often one operator or one guard.
+3. **Run the other cases.** The repair is not done because the new test is green. It is done when the new test is green and nothing else turned red.
+4. **Keep the assertion.** It goes into the suite named after the claim it makes.
+
+The second step is where judgment lives. Minimal does not mean cheapest to type. \`if page == 0: page = 1\` makes one failing test pass and leaves \`page = -3\` broken. \`page = max(1, page)\` handles the whole class the contract describes, in the same amount of code.
+
+\`\`\`python
+def page_slice(items, page, per_page):
+    page = max(1, page)                # the class, not the one failing value
+    start = (page - 1) * per_page
+    return items[start : start + per_page]
+\`\`\`
+
+The test tells you the case. The **contract** tells you the class. Repair to the class.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "repair-the-class",
+  "prompt": "A price function must never return a negative amount. It currently returns -100 for one input. Which repair is right?",
+  "options": [
+    {
+      "label": "if total == -100: return 0",
+      "feedback": "It makes the failing test pass, which is the only thing it does. Every other combination of inputs that overshoots still returns a negative price."
+    },
+    {
+      "label": "return max(0, total)",
+      "correct": true,
+      "feedback": "Right. The contract says never negative, so the repair covers every input that could go below zero rather than the single one your test happened to find."
+    },
+    {
+      "label": "Raise a ValueError when the total is negative",
+      "feedback": "It does make the violation loud, and for an internal invariant that can be the right call. Here it changes the contract from returning a floor to failing, which callers are not prepared for."
+    },
+    {
+      "label": "Rewrite the discount logic so a negative total cannot arise",
+      "feedback": "The most thorough option and the most expensive one, and it may well be the right follow-up. As a bug fix it replaces working logic to address a case one guard handles."
+    }
+  ]
+}
+\`\`\`
+
+## Repairs that break something else
+
+Every guard you add is a behavior change for some input, and the inputs you were not thinking about are the ones that bite.
+
+\`\`\`python
+# Bug: crashes on an empty list.
+def average(values):
+    return sum(values) / len(values)
+
+# Repair A
+def average(values):
+    if not values:
+        return 0
+    return sum(values) / len(values)
+
+# Repair B
+def average(values):
+    if not values:
+        return None
+    return sum(values) / len(values)
+\`\`\`
+
+Both stop the crash. They are not equivalent, and choosing between them is not a matter of taste. If the caller displays the result, \`0\` reads as "the average is zero", which is a claim about data that does not exist. If the caller sums averages, \`None\` crashes one line later instead. The contract has to decide, and if the contract does not say, that is the review comment: ask, do not guess.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "repair-scope",
+  "prompt": "You are fixing one bug in a generated function. Sort each change by whether it belongs in this commit.",
+  "buckets": ["Part of the repair", "A separate change"],
+  "items": [
+    {
+      "label": "Adding a guard for the input class the contract describes",
+      "bucket": "Part of the repair",
+      "feedback": "This is the fix itself, written to cover the class rather than the single failing value."
+    },
+    {
+      "label": "Renaming three variables to be clearer",
+      "bucket": "A separate change",
+      "feedback": "It touches lines unrelated to the defect and makes the diff harder to review for the thing that actually changed."
+    },
+    {
+      "label": "Adding the failing case to the test suite",
+      "bucket": "Part of the repair",
+      "feedback": "The assertion is what proves the fix was needed and stops the same bug returning, so it ships with the fix."
+    },
+    {
+      "label": "Replacing the loop with a comprehension because it is shorter",
+      "bucket": "A separate change",
+      "feedback": "A rewrite of working code inside a bug fix. If it introduces a regression, the commit that caused it looks like the bug fix."
+    },
+    {
+      "label": "Narrowing an except Exception that was hiding the failure",
+      "bucket": "Part of the repair",
+      "feedback": "The broad except is why the bug was invisible, so narrowing it is part of fixing this defect rather than a tidy-up."
+    }
+  ]
+}
+\`\`\`
+
+**Interview nuance:** in a debugging exercise, saying "I could rewrite this but I would rather make the minimal change and keep the behavior it already has" is a signal that you have maintained code someone else wrote. It is also the answer that keeps you inside the time limit, because a rewrite always takes longer than it looks and the interviewer is watching the clock.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "repair-cumulative",
+  "prompt": "Your one-line repair makes the failing test pass, and two previously green tests are now red. What is the most likely explanation?",
+  "options": [
+    {
+      "label": "Those two tests were wrong and should be updated to the new behavior",
+      "feedback": "Occasionally true, and it is the most dangerous conclusion to reach first because it is always available. Editing a red test to match new behavior can hide a real regression permanently."
+    },
+    {
+      "label": "Your repair changed behavior for a class of input wider than the bug",
+      "correct": true,
+      "feedback": "Right. Two independent tests turning red is strong evidence that the guard caught cases that were already handled correctly, so the repair needs narrowing."
+    },
+    {
+      "label": "The test suite is flaky and they should be run again",
+      "feedback": "Worth ruling out in a suite with real flakiness, and cheap to check. Two failures appearing exactly when you changed one line is a poor fit for randomness."
+    },
+    {
+      "label": "The bug was deeper than one line and the function needs rewriting",
+      "feedback": "This is the conclusion the rewrite instinct wants, and it may eventually be right. Reaching it before reading the two failures skips the step that would tell you which class you over-caught."
+    }
+  ],
+  "reveal": "Pin the failure, change the smallest thing that covers the class the contract names, re-run everything, keep the assertion. A rewrite is a separate decision made with a clear head, not a debugging step."
+}
+\`\`\``,
+    demoCode: `def page_slice(items, page, per_page):
+    start = page * per_page          # page is documented as 1-based
+    return items[start : start + per_page]
+
+
+rows = [10, 20, 30, 40, 50, 60, 70]
+print(page_slice(rows, 1, 3))    # [40, 50, 60], and page 1 should be [10, 20, 30]`,
+  },
+  apply: {
+    id: "py-l5-repair-not-rewrite-apply",
+    executionMode: "single-file",
+    prompt: `Repair \`final_price\` in the starter so it satisfies its contract, changing as little as
+possible.
+
+The contract: \`final_price(cents, percent_off, flat_off_cents)\` returns the price in whole cents
+after a percentage discount and then a flat discount. \`percent_off\` is clamped into the range 0 to
+100 first, so a value below 0 counts as 0 and a value above 100 counts as 100. The percentage
+discount is \`cents * percent_off // 100\` (floor division, so it is already a whole number of
+cents). The flat discount is then subtracted. The result is never below \`0\`.
+
+The generated version applies both discounts and clamps neither end. Fix the class of inputs the
+contract describes, not just one value.`,
+    starterCode: `def final_price(cents, percent_off, flat_off_cents):
+    # Generated code. It priced the example in the ticket correctly.
+    return cents - cents * percent_off // 100 - flat_off_cents`,
+    hints: [
+      "Clamp the percentage before you use it: `min(100, max(0, percent_off))`.",
+      "Clamp the result at the end with `max(0, ...)` so a large flat discount cannot go negative.",
+      "Keep the floor division exactly as it is. The contract specifies that rounding.",
+    ],
+    referenceSolution: `def final_price(cents, percent_off, flat_off_cents):
+    percent = min(100, max(0, percent_off))
+    discount = cents * percent // 100
+    return max(0, cents - discount - flat_off_cents)`,
+    testCases: [
+      {
+        input: { cents: 1000, percent_off: 10, flat_off_cents: 0 },
+        expected: 900,
+        description: "the example from the ticket still prices correctly",
+      },
+      {
+        input: { cents: 1000, percent_off: 50, flat_off_cents: 600 },
+        expected: 0,
+        description: "the discounts together exceed the price",
+      },
+      {
+        input: { cents: 1000, percent_off: 150, flat_off_cents: 0 },
+        expected: 0,
+        description: "a percentage above one hundred",
+      },
+      {
+        input: { cents: 500, percent_off: -20, flat_off_cents: 100 },
+        expected: 400,
+        description: "a negative percentage must not add money",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l5-repair-not-rewrite-practice",
+    executionMode: "single-file",
+    prompt: `Search results on your site are paginated, and users have started reporting that the first
+page of results is missing the top matches. An assistant generated the \`page_slice\` function in the
+starter, and the reviewer's manual test used page 2, where the numbers happened to look plausible.
+
+Repair \`page_slice\` so it satisfies its contract, changing as little as possible.
+
+The contract: \`page_slice(items, page, per_page)\` returns the items on the requested page, where
+\`page\` is 1-based, so page 1 is the first \`per_page\` items. A page past the end of the list returns
+an empty list. A page number below 1 is treated as page 1.`,
+    starterCode: `def page_slice(items, page, per_page):
+    # Generated code. Page 2 looked right, so nobody checked page 1.
+    start = page * per_page
+    return items[start : start + per_page]`,
+    hints: [
+      "A 1-based page number means the offset is `(page - 1) * per_page`.",
+      "Clamp the page rather than special-casing 0: `page = max(1, page)` covers every value below 1.",
+      "A slice past the end of a list already returns an empty list, so that rule needs no code.",
+    ],
+    referenceSolution: `def page_slice(items, page, per_page):
+    page = max(1, page)
+    start = (page - 1) * per_page
+    return items[start : start + per_page]`,
+    testCases: [
+      {
+        input: { items: [10, 20, 30, 40, 50, 60, 70], page: 1, per_page: 3 },
+        expected: [10, 20, 30],
+        description: "page one starts at the first item",
+      },
+      {
+        input: { items: [10, 20, 30, 40, 50, 60, 70], page: 3, per_page: 3 },
+        expected: [70],
+        description: "the last page is short",
+      },
+      {
+        input: { items: [10, 20, 30, 40, 50, 60, 70], page: 9, per_page: 3 },
+        expected: [],
+        description: "a page past the end",
+      },
+      {
+        input: { items: [10, 20, 30, 40, 50, 60, 70], page: -1, per_page: 3 },
+        expected: [10, 20, 30],
+        description: "a page number below one",
+      },
+    ],
+  },
+}
+
 export const level5: PythonLevel = {
   id: 5,
   slug: "verification",
@@ -2757,7 +3051,7 @@ export const level5: PythonLevel = {
       title: "Debugging Code You Did Not Author",
       description:
         "Shrink the failing input, repair without rewriting, and read a solution for the cost it will have in production.",
-      lessons: [shrinkLesson],
+      lessons: [shrinkLesson, repairLesson],
     },
   ],
 }
