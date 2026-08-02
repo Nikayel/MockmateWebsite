@@ -1600,6 +1600,384 @@ def check(name):
   },
 }
 
+const propertiesLesson: PythonLesson = {
+  id: "py-l5-properties",
+  title: "Properties catch what examples miss",
+  summary:
+    "When you run out of examples, assert a property that must hold for every input and search for the smallest input that violates it.",
+  estimatedMinutes: 24,
+  difficulty: "medium",
+  skills: ["property testing", "invariants", "test design", "verification"],
+  teach: {
+    estimatedMinutes: 10,
+    markdown: `## The limit of examples
+
+An example test says "this input gives that output". It is precise, it is easy to read, and it covers exactly one point in an infinite space. You can write twenty of them and still miss the case that matters, because you chose all twenty and you chose them from the same mental model that wrote the code.
+
+A **property** is a claim that holds for every valid input. You do not have to guess which input breaks it. You write the claim once and let a loop go looking.
+
+Four kinds cover most of what you will need.
+
+### Round trip
+
+Encoding then decoding must give back what you started with.
+
+\`\`\`python
+for n in range(1, 200):
+    original = "a" * n
+    assert decode(encode(original)) == original
+\`\`\`
+
+### Invariant
+
+Something must be true of the output no matter what went in. Splitting a bill preserves the total. Sorting preserves the multiset of elements. A discount never produces a negative price.
+
+\`\`\`python
+parts = split_evenly(total, count)
+assert sum(parts) == total                  # nothing was created or lost
+assert max(parts) - min(parts) <= 1         # the split is actually even
+\`\`\`
+
+### Idempotence
+
+Applying it twice is the same as applying it once. True of normalizing, trimming, deduplicating, and most "clean this up" functions, and very often false in the implementation.
+
+\`\`\`python
+assert normalize(normalize(text)) == normalize(text)
+\`\`\`
+
+### Agreement with something obviously correct
+
+A slow, dull, clearly-right implementation is a specification you can execute. The fast one must agree with it on every input.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "rle-round-trip-break",
+  "prompt": "Run-length encoding turns 'aaab' into 'a3b1', and the decoder walks the code two characters at a time reading a letter then a count. What is the smallest run of one repeated letter that breaks the round trip?",
+  "options": [
+    {
+      "label": "1, because a single character has no run to compress",
+      "feedback": "A run of one encodes as 'a1', which is two characters and decodes back to 'a' correctly. Compression making the string longer is wasteful, not wrong."
+    },
+    {
+      "label": "9, the last single-digit count",
+      "feedback": "Very close to the real boundary and one short of it. A run of nine still encodes as two characters, 'a9', so the two-at-a-time walk reads it correctly."
+    },
+    {
+      "label": "10, the first count that needs two digits",
+      "correct": true,
+      "feedback": "Right. 'a10' is three characters, so a decoder stepping in pairs reads 'a' and '1' as the first pair and then runs off the end of the string looking for a partner for '0'."
+    },
+    {
+      "label": "26, once the counts exceed the alphabet",
+      "feedback": "The alphabet size has nothing to do with the format, so this is a false lead. What matters is the number of characters the count occupies in the encoded string."
+    }
+  ]
+}
+\`\`\`
+
+## Searching for the smallest violation
+
+Once you have a property, finding a counterexample is a loop. Start small and stop at the first failure, because the smallest failing input is the easiest one to reason about.
+
+\`\`\`python
+def first_round_trip_failure(limit):
+    for n in range(1, limit + 1):
+        original = "a" * n
+        try:
+            if decode(encode(original)) != original:
+                return n
+        except Exception:
+            return n            # a crash is a violation too
+    return -1
+\`\`\`
+
+The \`try\` matters. A property can be violated by a wrong answer or by an exception, and a search that only handles the first stops at the second. This is one of the few places where catching \`Exception\` broadly is right: inside a probe you genuinely do want every failure mode to count as a failure, and the exception is being converted into a verdict rather than discarded.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "property-or-restatement",
+  "prompt": "You are reviewing split_evenly(total, parts), which should return as many whole numbers as parts asks for, summing to total, differing by at most 1. Sort each assertion by whether it is a property worth checking or a restatement of the implementation.",
+  "buckets": ["A property worth asserting", "A restatement of the implementation"],
+  "items": [
+    {
+      "label": "sum(result) == total",
+      "bucket": "A property worth asserting",
+      "feedback": "This comes from the contract and is independent of how the split is computed, so any implementation that loses a unit fails it."
+    },
+    {
+      "label": "result[0] == total // parts + total % parts",
+      "bucket": "A restatement of the implementation",
+      "feedback": "This copies the formula out of the body, so it passes whatever that body does, including piling the whole remainder onto one element."
+    },
+    {
+      "label": "max(result) - min(result) <= 1",
+      "bucket": "A property worth asserting",
+      "feedback": "This is the word evenly, written as something executable. It is the assertion that catches a remainder dumped onto a single part."
+    },
+    {
+      "label": "len(result) == parts",
+      "bucket": "A property worth asserting",
+      "feedback": "Small, cheap, and derived from the contract rather than the code. It catches an off-by-one in whatever builds the list."
+    },
+    {
+      "label": "all(x == result[0] for x in result[1:])",
+      "bucket": "A restatement of the implementation",
+      "feedback": "It describes one particular implementation, where every element after the first is the base value. A correct split that spreads the remainder fails this assertion."
+    }
+  ]
+}
+\`\`\`
+
+## Where properties come from
+
+You do not invent them. You read the contract and translate each promise into something executable.
+
+| The contract says | The property is |
+| --- | --- |
+| "splits the total between them" | \`sum(parts) == total\` |
+| "evenly" | \`max(parts) - min(parts) <= 1\` |
+| "returns a sorted copy" | \`sorted(result) == result\` and \`sorted(original) == result\` |
+| "removes duplicates" | \`len(set(result)) == len(result)\` |
+| "never charges more than the cap" | \`result <= cap\` |
+| "cleans up the input" | \`clean(clean(x)) == clean(x)\` |
+
+If a promise in the contract has no executable form, that is worth noticing on its own: it usually means the requirement is not yet specific enough to build against, and asking the question is a more valuable review comment than any test.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "property-vs-example-budget",
+  "prompt": "A generated sort_by_priority passes all six of your example tests. You have time for one more check. Which is worth the most?",
+  "options": [
+    {
+      "label": "A seventh example with realistic production data",
+      "feedback": "Realistic data is reassuring and mostly ordinary, so a seventh example is very likely to pass alongside the other six. It adds confidence rather than information."
+    },
+    {
+      "label": "A property loop asserting the result is a permutation of the input across many random lists",
+      "correct": true,
+      "feedback": "Right. It checks something no single example can: that nothing was dropped or duplicated, across inputs you did not choose and therefore did not bias."
+    },
+    {
+      "label": "A timing measurement to confirm it is fast enough",
+      "feedback": "Cost is a real review dimension and deserves attention on hot paths. It answers a different question though, and a fast function that silently drops elements is still broken."
+    },
+    {
+      "label": "A test that the function does not print anything",
+      "feedback": "Stray debug output is a genuine annoyance in a shared codebase and cheap to check. It is nowhere near the value of confirming that no data goes missing."
+    }
+  ]
+}
+\`\`\`
+
+**Interview nuance:** in a pairing interview, "what property should always hold here?" is a question you can ask about any function on the screen, and it moves the conversation from typing to specification instantly. For a sort it is "the output is a permutation of the input". For a cache it is "a hit returns exactly what was written". Interviewers notice, because most candidates only ever discuss examples.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "properties-cumulative",
+  "prompt": "Your property loop over inputs 1 through 500 reports the first violation at 10. What do you do next?",
+  "options": [
+    {
+      "label": "Widen the search to 5000 in case there are worse violations further out",
+      "feedback": "There may well be more failures out there, and none of them are more informative than the first. A bigger search costs time and gives you a longer list of the same bug."
+    },
+    {
+      "label": "Look at what is special about 10 and turn it into a named example test",
+      "correct": true,
+      "feedback": "Right. The smallest counterexample is the diagnosis: 10 is the first count that needs two digits. Pinning it as a named test keeps the finding after the search is deleted."
+    },
+    {
+      "label": "Fix the code until the loop passes, then remove the loop",
+      "feedback": "The first half is exactly right and the second half throws away the evidence. Without a kept assertion, the next rewrite of the decoder can reintroduce the same bug unnoticed."
+    },
+    {
+      "label": "Report that the function fails on 491 of 500 inputs",
+      "feedback": "Technically accurate and much harder to act on than one input. A single minimal counterexample points at a line, while a large failure count only measures how far the bug spreads."
+    }
+  ],
+  "reveal": "Examples check the points you thought of. Properties check the space you did not. Search finds the smallest violation, and the smallest violation is usually the explanation."
+}
+\`\`\``,
+    demoCode: `def encode(text):
+    if not text:
+        return ""
+    out = []
+    current = text[0]
+    count = 1
+    for ch in text[1:]:
+        if ch == current:
+            count += 1
+        else:
+            out.append(current + str(count))
+            current = ch
+            count = 1
+    out.append(current + str(count))
+    return "".join(out)
+
+
+print(encode("a" * 9))    # a9,  two characters
+print(encode("a" * 10))   # a10, three characters and the pair-wise decoder breaks`,
+  },
+  apply: {
+    id: "py-l5-properties-apply",
+    executionMode: "single-file",
+    prompt: `Write a function \`first_round_trip_failure(limit)\` that returns the smallest run length
+\`n\` between \`1\` and \`limit\` for which \`decode(encode("a" * n))\` does not give back \`"a" * n\`, or
+\`-1\` when every length in that range round-trips correctly.
+
+The property: for any text, \`decode(encode(text))\` must equal \`text\`. Both functions are in the
+starter and neither should be changed.
+
+A violation can be a wrong answer **or** an exception, so your search has to survive both. Keep
+\`first_round_trip_failure\` as the last function in the file.`,
+    starterCode: `def encode(text):
+    # Generated code under review. Leave it exactly as it is.
+    if not text:
+        return ""
+    out = []
+    current = text[0]
+    count = 1
+    for ch in text[1:]:
+        if ch == current:
+            count += 1
+        else:
+            out.append(current + str(count))
+            current = ch
+            count = 1
+    out.append(current + str(count))
+    return "".join(out)
+
+
+def decode(code):
+    # Generated code under review. Leave it exactly as it is.
+    out = []
+    for i in range(0, len(code), 2):
+        out.append(code[i] * int(code[i + 1]))
+    return "".join(out)
+
+
+def first_round_trip_failure(limit):
+    # Return the smallest n in 1..limit that breaks the round trip, or -1.
+    pass`,
+    hints: [
+      "Loop `n` from 1 to `limit` and compare `decode(encode('a' * n))` against `'a' * n`.",
+      "Wrap the round trip in `try` / `except Exception` and return `n` from the except block: a crash is a violation.",
+      "Encode a run of 9 and a run of 10 by hand and count the characters in each result.",
+    ],
+    referenceSolution: `def encode(text):
+    if not text:
+        return ""
+    out = []
+    current = text[0]
+    count = 1
+    for ch in text[1:]:
+        if ch == current:
+            count += 1
+        else:
+            out.append(current + str(count))
+            current = ch
+            count = 1
+    out.append(current + str(count))
+    return "".join(out)
+
+
+def decode(code):
+    out = []
+    for i in range(0, len(code), 2):
+        out.append(code[i] * int(code[i + 1]))
+    return "".join(out)
+
+
+def first_round_trip_failure(limit):
+    for n in range(1, limit + 1):
+        original = "a" * n
+        try:
+            if decode(encode(original)) != original:
+                return n
+        except Exception:
+            return n
+    return -1`,
+    testCases: [
+      { input: { limit: 20 }, expected: 10, description: "a range wide enough to reach the bug" },
+      { input: { limit: 5 }, expected: -1, description: "short runs all round-trip" },
+      { input: { limit: 9 }, expected: -1, description: "the last length before the boundary" },
+      {
+        input: { limit: 100 },
+        expected: 10,
+        description: "a much wider range finds the same first failure",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l5-properties-practice",
+    executionMode: "single-file",
+    prompt: `Your product splits a group order between the people at the table, and an assistant wrote
+the \`split_evenly\` function in the starter. The bill always adds up, so accounting is happy, but
+customers on large tables have started complaining that one person is charged noticeably more than
+everyone else.
+
+Write a function \`first_uneven_total(parts, start)\` that returns the smallest \`total\` between
+\`start\` and \`start + 100\` inclusive for which \`split_evenly\` violates one of its two properties, or
+\`-1\` if none of those totals do.
+
+The two properties: the returned numbers must sum to \`total\`, and the largest must exceed the
+smallest by at most 1. Check both. Keep \`first_uneven_total\` as the last function in the file.`,
+    starterCode: `def split_evenly(total, parts):
+    # Generated code under review. Leave it exactly as it is.
+    base = total // parts
+    result = [base] * parts
+    result[0] += total % parts
+    return result
+
+
+def first_uneven_total(parts, start):
+    # Return the smallest total in start..start+100 that breaks a property, or -1.
+    pass`,
+    hints: [
+      "Loop `total` over `range(start, start + 101)` and call `split_evenly(total, parts)` for each.",
+      "Assert both properties: `sum(result) == total`, and `max(result) - min(result) <= 1`.",
+      "One of the two properties holds for every input here. Finding which one is the point of checking both.",
+    ],
+    referenceSolution: `def split_evenly(total, parts):
+    base = total // parts
+    result = [base] * parts
+    result[0] += total % parts
+    return result
+
+
+def first_uneven_total(parts, start):
+    for total in range(start, start + 101):
+        result = split_evenly(total, parts)
+        if sum(result) != total:
+            return total
+        if max(result) - min(result) > 1:
+            return total
+    return -1`,
+    testCases: [
+      { input: { parts: 5, start: 10 }, expected: 12, description: "a table of five" },
+      {
+        input: { parts: 2, start: 1 },
+        expected: -1,
+        description: "a table of two never splits unevenly",
+      },
+      {
+        input: { parts: 4, start: 100 },
+        expected: 102,
+        description: "a large bill on a table of four",
+      },
+      { input: { parts: 3, start: 7 }, expected: 8, description: "a table of three" },
+    ],
+  },
+}
+
 export const level5: PythonLevel = {
   id: 5,
   slug: "verification",
@@ -1620,7 +1998,7 @@ export const level5: PythonLevel = {
       title: "The Test Is the Verification",
       description:
         "Turn a suspicion into an assertion that fails before the fix, using properties and a reference oracle when examples run out.",
-      lessons: [failingTestLesson],
+      lessons: [failingTestLesson, propertiesLesson],
     },
   ],
 }
