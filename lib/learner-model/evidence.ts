@@ -33,6 +33,72 @@ export interface EvidenceRow {
 
 const MAX_EVIDENCE_ROWS = 10
 
+/**
+ * How many rows the no-index fallback reads before ordering in memory. A single card
+ * accumulates one event per review, so this covers any realistic history; a card that
+ * somehow exceeded it would surface a slightly stale window rather than an error.
+ */
+const FALLBACK_SCAN_LIMIT = 100
+
+/**
+ * Firestore rejects a query it has no index for with FAILED_PRECONDITION (gRPC 9).
+ * Matched on the numeric code first and the message only as a fallback, because the
+ * message is not part of the API contract.
+ */
+function isMissingIndexError(error: unknown): boolean {
+  const code = (error as { code?: number | string } | null | undefined)?.code
+  if (code === 9 || code === "failed-precondition") return true
+  return error instanceof Error && error.message.includes("requires an index")
+}
+
+/**
+ * Latest-first review events for one card.
+ *
+ * The natural form of this query — two equality filters plus `orderBy timestamp` —
+ * needs the composite index `algorithm_research_events (user_id, problem_id,
+ * timestamp DESC)`. That index is declared in `firestore.indexes.json` but is NOT
+ * deployed on the live project, so the query throws and every caller 500s: the
+ * evidence panel on /knowledge and, worse, the whole "This seems wrong" challenge
+ * flow through `amendForChallenge`.
+ *
+ * Deploying the index is still the right fix and makes the fast path live again. Until
+ * then, fall back to the equality-only query, which Firestore serves by merging
+ * single-field indexes with no composite required, and order in memory. Document ids
+ * are `<user>_<problem>_<epochMs>`, so the fallback's implicit __name__ order is
+ * already close; the explicit sort makes it exact.
+ */
+export async function fetchCardResearchEvents(
+  userId: string,
+  problemId: string,
+  limit: number
+): Promise<Array<AlgorithmResearchEvent & { id: string }>> {
+  const forCard = adminDb
+    .collection("algorithm_research_events")
+    .where("user_id", "==", userId)
+    .where("problem_id", "==", problemId)
+
+  const withId = (doc: FirebaseFirestore.QueryDocumentSnapshot) => ({
+    ...(doc.data() as AlgorithmResearchEvent),
+    id: doc.id,
+  })
+
+  try {
+    const snapshot = await forCard.orderBy("timestamp", "desc").limit(limit).get()
+    return snapshot.docs.map(withId)
+  } catch (error) {
+    if (!isMissingIndexError(error)) throw error
+    console.warn(
+      "algorithm_research_events (user_id, problem_id, timestamp DESC) is not deployed; " +
+        "serving card evidence from the unordered fallback. Run: firebase deploy --only firestore:indexes"
+    )
+    const snapshot = await forCard.limit(FALLBACK_SCAN_LIMIT).get()
+    return snapshot.docs
+      .map(withId)
+      .sort((a, b) => (b.timestamp ?? "").localeCompare(a.timestamp ?? ""))
+      .slice(0, limit)
+  }
+}
+
 function toRow(event: AlgorithmResearchEvent & { id?: string }): EvidenceRow {
   return {
     event_id: event.id ?? "",
@@ -54,17 +120,8 @@ function toRow(event: AlgorithmResearchEvent & { id?: string }): EvidenceRow {
 
 /** Latest-first review history for one card (most recent MAX_EVIDENCE_ROWS). */
 export async function getCardEvidence(userId: string, problemId: string): Promise<EvidenceRow[]> {
-  const snapshot = await adminDb
-    .collection("algorithm_research_events")
-    .where("user_id", "==", userId)
-    .where("problem_id", "==", problemId)
-    .orderBy("timestamp", "desc")
-    .limit(MAX_EVIDENCE_ROWS)
-    .get()
-
-  return snapshot.docs.map((doc) =>
-    toRow({ ...(doc.data() as AlgorithmResearchEvent), id: doc.id })
-  )
+  const events = await fetchCardResearchEvents(userId, problemId, MAX_EVIDENCE_ROWS)
+  return events.map(toRow)
 }
 
 export { toRow as mapResearchEventToEvidenceRow }
