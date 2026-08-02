@@ -577,7 +577,67 @@ values = {"name": "Ada", "age": 30}
 
 \`format(**values)\` is exactly \`format(name="Ada", age=30)\`. One pair of symbols, two mirror roles: \`*\` and \`**\` collect inside a \`def\`, and spread inside a call.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "star-collects-vs-spreads",
+  "prompt": "The same two symbols do opposite jobs depending on where they appear. Sort each line by which job the star is doing.",
+  "buckets": ["Collecting into one parameter", "Spreading one value into many arguments"],
+  "items": [
+    {
+      "label": "def total(*nums):",
+      "bucket": "Collecting into one parameter",
+      "feedback": "Inside a def, the star sweeps every leftover positional argument into a single tuple named nums."
+    },
+    {
+      "label": "total(*nums)",
+      "bucket": "Spreading one value into many arguments",
+      "feedback": "At a call site, the star takes one iterable apart and hands its items over as separate positional arguments."
+    },
+    {
+      "label": "def tag(name, **attrs):",
+      "bucket": "Collecting into one parameter",
+      "feedback": "Two stars in a def gather the leftover keyword arguments into a single dict named attrs."
+    },
+    {
+      "label": "template.format(**values)",
+      "bucket": "Spreading one value into many arguments",
+      "feedback": "Two stars at a call site turn each key/value pair in the dict into its own keyword argument."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfall: passing a container where you meant to unpack it
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "list-passed-instead-of-spread",
+  "prompt": "total is defined as def total(*nums): return sum(nums). You already hold nums = [1, 2, 3] and write total(nums). What happens?",
+  "options": [
+    {
+      "label": "It returns 6, because *nums accepts an iterable",
+      "feedback": "Tempting, because the argument you passed does contain exactly the three numbers you want summed. The star collects loose arguments though, so a single list arrives as a single item rather than as three."
+    },
+    {
+      "label": "TypeError, because nums binds to ([1, 2, 3],) and sum tries to add a list to 0",
+      "correct": true,
+      "feedback": "Right. One argument means a one-element tuple, and that element is a list. Spread it with total(*nums) to restore the three separate arguments."
+    },
+    {
+      "label": "TypeError, because a *nums parameter rejects a list argument outright",
+      "feedback": "The verdict is right and the mechanism is wrong, which matters when you read the traceback. Binding succeeds happily: *nums takes any positional value. The failure happens one line later, inside sum."
+    },
+    {
+      "label": "It returns [1, 2, 3], since sum of a single list is that list",
+      "feedback": "sum never returns its input unchanged: it starts at 0 and adds each item, so the first addition here is 0 + [1, 2, 3]. Integers and lists do not add, which is what raises."
+    }
+  ]
+}
+\`\`\`
 
 \`\`\`csdiagram
 {
@@ -625,6 +685,34 @@ total(*nums)   # 6  (spreads to total(1, 2, 3))
 \`\`\`
 
 The formatting side has its own traps. A placeholder in the template with no matching key raises \`KeyError\`, and a literal brace in the text must be doubled as \`{{\` so \`format\` does not read it as a slot.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "params-after-star-args-are-keyword-only",
+  "prompt": "Given def f(a, *args, b): return a, args, b, what does the call f(1, 2, 3) do?",
+  "options": [
+    {
+      "label": "Returns (1, (2,), 3): the last positional argument fills b",
+      "feedback": "Tempting, because parameters normally fill left to right and there are exactly enough values to go round. But *args is greedy: it has already claimed every remaining positional, so nothing is left for b to catch."
+    },
+    {
+      "label": "Raises TypeError: missing 1 required keyword-only argument: 'b'",
+      "correct": true,
+      "feedback": "Right. Anything declared after *args can only be passed by name, so this call needs f(1, 2, 3, b=4). That is the standard trick for forcing callers to be explicit."
+    },
+    {
+      "label": "Returns (1, (2, 3), None): b is unset, so it defaults to None",
+      "feedback": "You read the binding correctly, and args really does end up as (2, 3). Python never invents a default though: a parameter with no default written in the signature is required, keyword-only or not."
+    },
+    {
+      "label": "Raises SyntaxError at definition time, since no parameter may follow *args",
+      "feedback": "A reasonable guess given how unusual the signature looks, but this is legal and deliberate syntax. It is exactly how library authors make an option impossible to pass by accident in the wrong position."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** any parameter listed after \`*args\` becomes keyword-only. It can no longer be filled positionally, because \`*args\` has already claimed every remaining positional argument. So \`def f(a, *args, b)\` requires \`b\` to be passed by name, and \`f(1, 2, 3)\` raises \`TypeError: f() missing 1 required keyword-only argument: 'b'\`. Interviewers use this to check that you understand the argument-binding order (named parameters fill first, \`*args\` sweeps the rest, then keyword-only parameters and \`**kwargs\`), not just the syntax.`,
     demoCode: `def total(*nums):
@@ -714,6 +802,34 @@ Half of real Python data code is "sort these records by the right field," "trans
 
 In Python a function is an ordinary value, like an \`int\` or a \`list\`. You can store it in a variable, put it in a list, and pass it into another function to call later. A function that takes or returns a function is a **higher-order function**. \`sorted\`, \`map\`, and \`filter\` are all higher-order: they do the looping, you supply the rule.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "filter-wants-a-verdict",
+  "prompt": "What does list(filter(lambda x: x * 2, [0, 1, 2, 3])) return?",
+  "options": [
+    {
+      "label": "[0, 2, 4, 6], every item doubled",
+      "feedback": "Tempting, because the lambda plainly doubles its argument and that is the only arithmetic in sight. But filter never uses the returned value as data: it only asks whether that value is truthy, and then keeps or drops the ORIGINAL item."
+    },
+    {
+      "label": "[1, 2, 3]",
+      "correct": true,
+      "feedback": "Right. 0 * 2 is 0, which is falsy, so only the zero is dropped and the surviving items come back unchanged. A filter rule that is not a yes/no question tends to keep almost everything."
+    },
+    {
+      "label": "[0, 1, 2, 3], because nothing is dropped",
+      "feedback": "Very close, and you have the key insight that filter returns the original items rather than doubled ones. The one exception is 0: doubling it gives 0, Python reads that as false, and the item is dropped."
+    },
+    {
+      "label": "TypeError, because filter requires a function that returns a bool",
+      "feedback": "It would be safer if it did. Python accepts any return value and applies its ordinary truthiness rules, which is precisely why this bug is silent instead of loud."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`csdiagram
 {
   "type": "table",
@@ -760,10 +876,66 @@ list(map(lambda w: w.upper(), words))     # ['CCC', 'A', 'BB']
 list(filter(lambda x: x % 2 == 0, nums))  # keep even numbers
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "list-sort-returns-none",
+  "prompt": "words = ['ccc', 'a', 'bb']. You write result = words.sort() and then print(result). What prints?",
+  "options": [
+    {
+      "label": "['a', 'bb', 'ccc']",
+      "feedback": "Tempting, because the sort really did happen and that is exactly the order words now holds. The catch is what the method HANDS BACK: it sorts in place and returns None, so the sorted data is in words, not in result."
+    },
+    {
+      "label": "None",
+      "correct": true,
+      "feedback": "Right. Python methods that mutate in place return None by convention, which is also true of list.append, list.reverse, and dict.update. Use sorted(words) when you want a value back."
+    },
+    {
+      "label": "['ccc', 'a', 'bb']",
+      "feedback": "That would be the answer if sort left the original untouched and returned a copy, which is what sorted does. The method version is the opposite: it changes words and returns nothing."
+    },
+    {
+      "label": "It raises TypeError, since sort takes a key argument",
+      "feedback": "key is optional in both spellings, so calling sort with no arguments is fine and sorts by the natural ordering of the elements. The surprise here is the return value, not the call."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfalls
 
 - **\`sort\` versus \`sorted\`.** \`sorted(x)\` returns a new list; \`x.sort()\` sorts in place and returns \`None\`. Writing \`result = words.sort()\` gives you \`None\`, a bug interns hit constantly. In the Apply, \`return sorted(words, key=len)\`, not \`words.sort()\`.
 - **Iterators are one-shot.** A \`map\` or \`filter\` object is exhausted after you walk it once. \`m = map(...); list(m)\` works, but a second \`list(m)\` returns \`[]\`. Call \`list(...)\` once and keep that list.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "multi-key-sort-order",
+  "prompt": "You need employees ordered by department name ascending, and within each department by salary descending. Using two calls to sorted, which order do you run them in?",
+  "options": [
+    {
+      "label": "Sort by department first, then sort the result by salary",
+      "feedback": "Tempting, because you naturally state the primary key first and it feels like you should apply it first. But the LAST sort is the one that wins outright: a final pass over salary reshuffles the whole list and scatters the departments."
+    },
+    {
+      "label": "Sort by salary first, then sort the result by department",
+      "correct": true,
+      "feedback": "Right. Apply the least significant key first, the most significant last. Because sorted is stable, the salary order survives inside each department group."
+    },
+    {
+      "label": "The order does not matter, because sorted is stable",
+      "feedback": "Stability is the right concept, but it is the reason the order DOES matter. Stability only guarantees that ties keep their current relative order, which is what makes the earlier sort's work carry through the later one."
+    },
+    {
+      "label": "Neither works: two fields need one call with a tuple key",
+      "feedback": "A tuple key is a perfectly good solution and often the clearest one. It is not the only one though, and the tuple gets awkward when the two fields sort in opposite directions and the values are not numbers you can negate."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** Python's \`sorted\` is **stable** and computes each \`key\` exactly once per element (the decorate-sort-undecorate strategy). Stable means elements with equal keys stay in their original relative order, which lets you sort by a secondary field first and a primary field second to build a multi-key sort. Computing \`key\` once means \`n\` key calls plus \`O(n log n)\` comparisons on those cheap precomputed keys, so an expensive \`key\` is evaluated \`n\` times, not on every comparison.`,
     demoCode: `words = ["ccc", "a", "bb"]
