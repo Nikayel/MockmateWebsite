@@ -4,7 +4,7 @@ import Link from "next/link"
 import { ArrowRight, ChevronDown, Flag } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
-import { memoryColorClass } from "@/lib/ui/memory-colors"
+import { MIN_REVIEWS_FOR_VERDICT_HUE, memoryColorClass } from "@/lib/ui/memory-colors"
 import { displayRetention } from "@/lib/spaced-repetition/memory-bands"
 import type { CardBelief } from "@/lib/learner-model/types"
 import { BeliefBar } from "./viz/BeliefBar"
@@ -57,7 +57,13 @@ export function CardBeliefRow({
     : 0
 
   const bar = (
-    <span className={memoryColorClass(card.memory?.urgency ?? null, "ink")}>
+    // The hue holds its verdict until the estimate has real evidence behind it —
+    // "the model won't even commit to a color until it has three data points."
+    <span
+      className={memoryColorClass(card.memory?.urgency ?? null, "ink", {
+        suppressed: (card.review_count ?? 0) < MIN_REVIEWS_FOR_VERDICT_HUE,
+      })}
+    >
       <BeliefBar
         value={card.retrievability}
         reviewCount={card.review_count}
