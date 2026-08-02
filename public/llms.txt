@@ -1,106 +1,205 @@
-# CodeSparring - AI Mock Interview Platform
+# CodeSparring
 # https://codesparring.dev
 
-> CodeSparring trains interview performance, not just problem-solving. LeetCode tests if you can solve problems alone. Real interviews test if you can think out loud under pressure. We train that skill.
+> CodeSparring is two things: a free, public curriculum that teaches Python, SQL, and system design
+> the way interviews actually ask about them, and an AI mock-interview room where you practice
+> talking through a problem out loud under time pressure. The reading half of every lesson is free
+> and open to anyone, no account required.
 
-## What is CodeSparring?
+Last reviewed: 2026-08-02. Every claim below was checked against the running code on that date.
+The curriculum grows continuously, so this file deliberately describes tracks and levels rather than
+lesson counts, which would be stale within a week.
 
-CodeSparring is an AI-powered mock interview platform for software engineers preparing for technical interviews. Unlike traditional coding practice platforms like LeetCode, CodeSparring simulates real interview conditions where you speak your solution out loud and receive feedback on communication, problem-solving approach, and code quality.
+## What CodeSparring is for
 
-## The Problem We Solve
+Most practice tools test whether you can solve a problem alone and in silence. An interview tests
+something else: whether you can explain your reasoning while you work, recover when the interviewer
+pushes back, and say why you chose one design over another. CodeSparring is built around that second
+skill, and the Learn curriculum exists to give you something specific to say.
 
-Many engineers grind 500+ LeetCode problems and still fail interviews. Why?
+## Learn: the free public curriculum
 
-- **LeetCode tests**: Can you solve problems alone, in silence, with unlimited time?
-- **Real interviews test**: Can you think out loud, handle pressure, communicate clearly, and collaborate with an interviewer?
+Every lesson has three phases. The first is free and public. The second and third require an account.
 
-These are different skills. CodeSparring closes this gap by training the actual skill that interviews test.
+1. **Read** (public, no account). The teaching body: prose, worked examples, diagrams, runnable demo
+   code, and inline check questions that reveal their answer on click.
+2. **Apply** (account required). A guided exercise with hints and a reference solution.
+3. **Practice** (account required). The same idea without the scaffolding, graded by hidden tests.
 
-## Key Differentiators
+Public lesson pages are static and indexable. The graded workspace is a separate URL, requires
+sign-in, and is marked `noindex`.
 
-### CodeSparring vs LeetCode
+### URL shape
 
-| Aspect | LeetCode ($35/month) | CodeSparring ($25/month) |
-|--------|---------------------|-------------------------|
-| Format | Solve problems alone in silence | Voice-enabled mock interviews |
-| Feedback | Pass/fail on test cases | AI feedback on communication + code |
-| Practice type | Algorithm drilling | Interview performance training |
-| Real interview simulation | No | Yes |
-| Price | $35/month | $25/month (29% cheaper) |
+- `/learn` is the hub.
+- `/learn/{track}` is a track landing page. Tracks are `python`, `sql`, and `system-design`.
+- `/learn/{track}/{levelSlug}` is a level index.
+- `/learn/{track}/{levelSlug}/{lessonId}` is the canonical public lesson page. This is the URL to
+  cite and the URL that appears in the sitemap.
+- `/learn/{track}/{levelSlug}/{lessonId}/workspace` is the interactive graded player. It is
+  auth-gated, never listed in the sitemap, and never indexed.
 
-LeetCode is great for learning algorithms. CodeSparring is better for practicing the actual interview experience.
+### Track: Python (`/learn/python`, 5 levels)
 
-### CodeSparring vs Interviewing.io
+Aimed at someone who will be asked to write and defend Python in an interview, not at someone
+learning to program for the first time. It concentrates on the behaviour that trips candidates up.
 
-| Aspect | Interviewing.io | CodeSparring |
-|--------|----------------|--------------|
-| Interviewer | Human engineers | AI interviewer |
-| Price | $225 per session | $25/month unlimited |
-| Availability | Requires scheduling | 24/7 |
-| For 5 sessions | $1,125 | $25 |
+- **Level 1: Foundations** (`/learn/python/fundamentals`). Variables, types, loops, functions, and
+  the traps inside them: float equality, integer division, truthiness, booleans as integers.
+- **Level 2: Idioms** (`/learn/python/intermediate`). Comprehensions, generators, classes,
+  dataclasses, decorators, and the standard-library idioms for dates, text, files, and APIs.
+- **Level 3: Patterns** (`/learn/python/applied`). Modules, imports, typing, pathlib, sqlite3 with
+  bound parameters, CLIs, packaging, and working across real files.
+- **Level 4: Engineering** (`/learn/python/engineering`). Advanced OOP, descriptors, the GIL,
+  threads versus processes, asyncio, profiling, and packaging.
+- **Level 5: Judging Code You Did Not Write** (`/learn/python/verification`). Reading unfamiliar
+  code, property-based testing, shrinking a failure, and reviewing AI-generated code that looks
+  right and is not.
 
-Research shows 5 mock interviews doubles your pass rate. That costs $1,125 with humans or $25/month with CodeSparring - 45x less expensive.
+### Track: SQL (`/learn/sql`, 6 levels)
 
-### CodeSparring vs Pramp
+Written for data-engineering and analytics interviews. Exercises run against a real SQLite engine in
+the browser and are graded on the result set they return.
 
-| Aspect | Pramp | CodeSparring |
-|--------|-------|--------------|
-| Interviewer | Random peers | Consistent AI |
-| Quality | Varies (30% report issues) | Consistent high quality |
-| Scheduling | Required | Not needed, 24/7 |
-| Format | Peer matching | Solo practice anytime |
+- **Level 1: SQL Foundations** (`/learn/sql/foundations`). SELECT, WHERE, ORDER BY, types, NULL
+  semantics, dates.
+- **Level 2: Aggregation and Joins** (`/learn/sql/aggregation`). Aggregates, GROUP BY and HAVING,
+  every join flavour, subqueries, CTEs.
+- **Level 3: Data Modeling and Schema Design** (`/learn/sql/modeling`). DDL, keys, constraints,
+  cardinality, normalization.
+- **Level 4: Data Engineering with SQL** (`/learn/sql/engineering`). Window functions, recursive
+  CTEs, slowly changing dimensions, idempotent merges, data-quality checks.
+- **Level 5: Advanced and Company-Specific SQL** (`/learn/sql/advanced-company-sql`). The four
+  rounds of a data-engineering loop rehearsed as graded SQL: power screen, modeling, pipeline, and
+  system-design reasoning. Includes sessionization, join fan-out and skew, CDC changelog apply, and
+  write-audit-publish quality gates.
+- **Level 6: Cloud and Data Engineering Foundations** (`/learn/sql/cloud-data-foundations`). The
+  platform underneath the query: object storage, columnar files and row groups, partitioning and
+  pruning, bucketing, distributed execution, skew, orchestration. Taught as graded queries against
+  simulated platform metadata. Beginner friendly; it can be started right after Level 2.
 
-## Core Features
+### Track: System Design (`/learn/system-design`, 12 levels)
 
-1. **Voice-Enabled Mock Interviews**: Practice speaking your solution out loud like in real interviews
-2. **AI Interviewer**: Asks follow-up questions and provides real-time feedback
-3. **Spaced Repetition System**: SM-2 algorithm schedules practice for optimal long-term retention
-4. **Company-Specific Prep**: 70+ companies including Google, Meta, Amazon, Apple, Netflix, Stripe, Airbnb, Uber, Microsoft
-5. **15 DSA Patterns**: Two Pointers, Sliding Window, Trees, Graphs, Dynamic Programming, Backtracking, etc.
-6. **Performance Analytics**: 40+ metrics tracking communication, problem-solving, and code quality
-7. **24/7 Availability**: Practice anytime without scheduling
-8. **Personalized Study Roadmap**: Custom prep plan based on target company and interview date
+The largest track. Lessons are free-response: read the material, write your own answer, then compare
+it against a model answer. Level 0 through Level 11:
+
+- **Level 0: Interview and Communication Method** (`/learn/system-design/interview-method`). Scoping
+  a vague prompt, estimation, structuring the walkthrough, driving tradeoffs, level calibration.
+- **Level 1: Foundations and Mental Models** (`/learn/system-design/foundations`). Networking, API
+  contracts, real-time delivery options, idempotency, pagination, serialization, CDN basics.
+- **Level 2: Data Storage and Modeling** (`/learn/system-design/data-storage`). Relational versus
+  NoSQL, B-tree versus LSM, isolation levels, MVCC, access-pattern modeling.
+- **Level 3: Scaling the Data Tier** (`/learn/system-design/scaling-data`). Replication, sharding
+  and shard keys, caching and stampedes, search and vector indexes, CDC.
+- **Level 4: Scaling Compute and Traffic** (`/learn/system-design/scaling-compute`). Load balancing,
+  service discovery, gateways, rate limiting, load shedding, capacity planning, cell architecture.
+- **Level 5: Distributed Systems Core** (`/learn/system-design/distributed-core`). CAP and PACELC,
+  consistency models, clocks, consensus, two-phase commit, sagas, CRDTs, failure detection.
+- **Level 6: Asynchronous and Event-Driven Systems** (`/learn/system-design/event-driven`). Queues,
+  pub/sub and the log, Kafka internals, delivery semantics, stream processing, schema evolution.
+- **Level 7: Reliability, Resilience and Operations** (`/learn/system-design/reliability-ops`). SLOs
+  and error budgets, golden signals, OpenTelemetry, retries and circuit breakers, multi-region DR,
+  progressive delivery, chaos engineering, postmortems.
+- **Level 8: Security, Privacy and Multi-tenancy** (`/learn/system-design/security-privacy`).
+  Passkeys, OAuth and OIDC, sessions and tokens, RBAC and ReBAC, encryption and secrets, abuse
+  defense, compliance and DSAR.
+- **Level 9: Modern Architecture and Delivery** (`/learn/system-design/modern-architecture`).
+  Monolith versus microservices, DDD decomposition, Kubernetes, service mesh, serverless and edge,
+  GitOps and IaC, FinOps, lakehouse and table formats.
+- **Level 10: Applied Case Studies** (`/learn/system-design/case-studies`). Full-length "design X"
+  interviews: URL shortener, rate limiter, typeahead, news feed, chat, ride sharing, file sync,
+  video streaming, collaborative editor, key-value store, object store, message queue, distributed
+  job scheduler, payment ledger, ad click aggregator, stock exchange, and more.
+- **Level 11: Specialized and Frontier Systems**
+  (`/learn/system-design/specialized-systems`). ML systems, feature stores, RAG architecture, vector
+  databases and ANN, LLM inference serving, agents, evaluation and guardrails, real-time analytics,
+  IoT and edge, time-series storage.
+
+## Interview practice
+
+- **AI interviewer.** A conversational interviewer that asks follow-ups, pushes on tradeoffs, and
+  reacts to what you say rather than only to what you type.
+- **Voice.** Speak your reasoning out loud, the way the real round works.
+- **In-browser execution.** Monaco editor with Python running client-side via Pyodide and SQL via
+  sql.js, so code runs without a server round trip.
+- **Structured feedback.** Scored on communication, problem-solving approach, and code quality, not
+  only on whether the tests pass.
+- **Spaced repetition.** Reviews are scheduled for long-term retention. Two schedulers are in
+  production at once, FSRS and SM-2, assigned per user as a live A/B, so the claim being tested is
+  which one actually improves recall on this material.
+- **Open learner model.** `/knowledge` shows the system's current belief about what you know, the
+  evidence behind it, and a way to challenge or correct it.
+- **Company-specific prep.** 38 companies with pattern-frequency data, including Google, Meta,
+  Amazon, Apple, Netflix, Microsoft, Stripe, Airbnb, Uber, and Databricks.
+- **Personalized roadmap.** A prep plan built from your target company, interview date, and measured
+  skill gaps, blending DSA, bug-fix, and decomposition work.
+- **Bug-fix and case labs.** Multi-file debugging scenarios and longer applied labs, not only
+  single-function algorithm puzzles.
 
 ## Pricing
 
-- **Free Plan**: 20+ problems with unlimited practice, full AI feedback. No credit card required.
-- **Pro Monthly**: $25/month - 350+ problems, spaced repetition, personalized roadmap, company-specific prep
-- **Pro Yearly**: $225/year (save 25%, $75/year savings)
+- **Free.** $0, no credit card. 8 full interview sessions per month, 20+ problems with unlimited
+  practice, the AI interviewer with real-time feedback, performance tracking, and the whole Learn
+  curriculum. No personalized roadmap, no spaced repetition scheduling, no pattern mastery tracking.
+- **Pro.** $25/month, or $225/year, which works out to $19/month. 35 full interview sessions per
+  month, unlimited re-practice within a scenario you have started, spaced repetition scheduling,
+  personalized roadmap, pattern mastery tracking, company-specific prep, system-design interviews.
+- **Enterprise.** Custom pricing for teams.
 
-## Target Users
+The Learn curriculum's reading half is free on every plan and requires no account at all.
 
-- Software engineers preparing for technical interviews at any level
-- Students applying for internships at tech companies
-- Career changers entering software development
-- Anyone who can solve LeetCode but struggles in actual interviews
-- Engineers targeting FAANG, top tech companies, or high-growth startups
+## Who it is for
+
+- Software engineers preparing for technical interviews at any level.
+- Students and new grads applying for internships and first roles.
+- Data engineering and analytics candidates, who are the SQL track's primary audience.
+- Career changers who can solve problems but freeze when asked to narrate.
 
 ## Technology
 
-- Built with Next.js 16, TypeScript, and Firebase
-- AI-powered by Claude (Anthropic) for natural interview conversations
-- Uses SM-2 spaced repetition algorithm for learning optimization
-- Monaco code editor with real-time execution
+- Next.js 16 App Router, React 19, TypeScript, Tailwind, Firebase, deployed on Vercel.
+- Interview conversation and feedback run on Gemini 3.6 Flash, with Gemini 3.5 Flash-Lite for
+  cheaper paths and DeepSeek as a fallback provider.
+- Code execution is client-side: Pyodide for Python, sql.js for SQL. Nothing you run is sent to a
+  server for execution.
 
-## Founder
+## Crawling
 
-Created by **Nikayel Ali Jamal**, a Computer Science student at Sacramento State University. He built CodeSparring after realizing that grinding LeetCode wasn't enough - retention and realistic interview practice were missing from existing tools.
-
-- LinkedIn: https://linkedin.com/in/nikayel-ali
-- GitHub: https://github.com/nikayel
-- Twitter: @codesparring
+- Sitemap: https://codesparring.dev/sitemap.xml
+- robots.txt: https://codesparring.dev/robots.txt
+- The canonical host is the apex, `https://codesparring.dev`. Requests to `www.codesparring.dev`
+  are permanently redirected to it, so cite the apex.
+- AI crawlers are explicitly welcome. GPTBot, ClaudeBot, Claude-User, Claude-SearchBot, and
+  Google-Extended are allowed everything a general crawler is allowed.
+- Authenticated surfaces (`/practice`, `/sessions`, `/dashboard`, `/account`, `/admin`, `/api/`) are
+  disallowed. They contain per-user state and nothing worth indexing.
 
 ## Links
 
 - Website: https://codesparring.dev
+- Learn hub: https://codesparring.dev/learn
+- Python track: https://codesparring.dev/learn/python
+- SQL track: https://codesparring.dev/learn/sql
+- System Design track: https://codesparring.dev/learn/system-design
 - Pricing: https://codesparring.dev/pricing
 - Why CodeSparring: https://codesparring.dev/why-codesparring
-- Company Prep: https://codesparring.dev/interview-prep
-- Sample Interviews: https://codesparring.dev/samples
-- Documentation: https://codesparring.dev/docs
+- Company prep: https://codesparring.dev/interview-prep
+- Sample graded interviews: https://codesparring.dev/samples
+- Interview rounds: https://codesparring.dev/rounds
+- Case labs: https://codesparring.dev/labs
+- Guides: https://codesparring.dev/guides/how-to-talk-through-coding-interviews
+- Docs: https://codesparring.dev/docs
 - Blog: https://codesparring.dev/blog
+
+## Founder
+
+Built by Nikayel Ali Jamal, a computer science student at Sacramento State University, after
+noticing that grinding problem sets did not transfer to the part of the interview where you have to
+explain yourself.
+
+- LinkedIn: https://linkedin.com/in/nikayel-ali
 
 ## Contact
 
-- Email: support@codesparring.dev
+- Support: support@codesparring.dev
 - Founder: nikayel@codesparring.dev
