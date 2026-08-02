@@ -68,7 +68,7 @@ export function KnowledgeSummary({ model, now = Date.now() }: KnowledgeSummaryPr
   const hasEstimates = cards.some((c) => c.retrievability !== null)
 
   return (
-    <section className="border-border bg-card/30 mb-6 rounded-xl border p-5">
+    <section className="border-border bg-card mb-6 rounded-xl border p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           {hasEstimates ? (
@@ -90,12 +90,17 @@ export function KnowledgeSummary({ model, now = Date.now() }: KnowledgeSummaryPr
 
           {/*
             Said once, here, instead of once per card. Every row below drops its copy
-            of this sentence and keeps it only as accessible text.
+            of this sentence and keeps it only as accessible text. Gated on
+            hasEstimates: in the black-box condition no estimate is visible and
+            challenges are disabled, so "tell it when it's wrong" would advertise a
+            control that does not exist.
           */}
-          <p className="text-muted-foreground mt-1 max-w-2xl text-sm text-pretty">
-            A recall estimate is the model&apos;s guess at your chance of solving a problem cold
-            today, from your review history. It is a guess. Tell it when it&apos;s wrong.
-          </p>
+          {hasEstimates && (
+            <p className="text-muted-foreground mt-1 max-w-2xl text-sm text-pretty">
+              A recall estimate is the model&apos;s guess at your chance of solving a problem cold
+              today, from your review history. It is a guess. Tell it when it&apos;s wrong.
+            </p>
+          )}
 
           {/*
             Full token, no alpha: text-muted-foreground/80 measures 3.47:1 in light
@@ -107,12 +112,50 @@ export function KnowledgeSummary({ model, now = Date.now() }: KnowledgeSummaryPr
               Estimates refreshed {freshness}. They decay as time passes.
             </p>
           )}
+
+          {/*
+            Precision hierarchy — the rule that resolves professional-vs-honest:
+            COUNTS are facts and get big tabular numerals; ESTIMATES stay small,
+            tilded and rounded. Never promote an estimate into this row.
+          */}
+          {hasEstimates && (
+            <dl className="border-border mt-5 grid max-w-sm grid-cols-3 gap-4 border-t pt-4">
+              <div>
+                <dt className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
+                  Tracked
+                </dt>
+                <dd className="text-foreground mt-0.5 text-xl font-semibold tabular-nums">
+                  {cards.length}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
+                  Reviews
+                </dt>
+                <dd className="text-foreground mt-0.5 text-xl font-semibold tabular-nums">
+                  {cards.reduce((n, c) => n + (c.review_count ?? 0), 0)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
+                  Slipping
+                </dt>
+                <dd
+                  className={`mt-0.5 text-xl font-semibold tabular-nums ${
+                    atRisk.length > 0 ? "text-rose-700 dark:text-rose-400" : "text-foreground"
+                  }`}
+                >
+                  {atRisk.length}
+                </dd>
+              </div>
+            </dl>
+          )}
         </div>
 
         {atRisk.length > 0 && (
           <Link
             href="/practice"
-            className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/20 focus-visible:ring-accent/50 dark:text-accent inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/20 dark:text-accent inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors"
           >
             Review the {atRisk.length}
             <ArrowRight className="h-4 w-4" />
@@ -126,14 +169,16 @@ export function KnowledgeSummary({ model, now = Date.now() }: KnowledgeSummaryPr
             <li key={card.problem_id}>
               <Link
                 href={`/interview?scenario=${card.scenario_id}&practice=true`}
-                className="border-border bg-background/60 hover:border-accent/40 focus-visible:ring-accent/50 flex items-center gap-3 rounded-lg border p-3 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                className="border-border bg-background hover:border-accent/40 flex items-center gap-3 rounded-lg border p-3 transition-colors"
               >
+                {/* md with the label: a 28px dial with a 3px feather said nothing at
+                    projector distance, then the number was restated as 11px prose.
+                    The dial carries the number; the line below keeps the band word. */}
                 <RecallDial
                   value={card.retrievability}
                   reviewCount={card.review_count}
                   urgency={card.memory?.urgency ?? null}
-                  size="sm"
-                  showLabel={false}
+                  size="md"
                   ariaLabel={card.belief_text ?? undefined}
                 />
                 <span className="min-w-0">
@@ -142,9 +187,6 @@ export function KnowledgeSummary({ model, now = Date.now() }: KnowledgeSummaryPr
                   </span>
                   <span className="text-muted-foreground block text-xs">
                     {card.memory?.label ?? "No estimate"}
-                    {card.retrievability !== null
-                      ? ` · ~${Math.round(card.retrievability / 5) * 5}%`
-                      : ""}
                   </span>
                 </span>
               </Link>
