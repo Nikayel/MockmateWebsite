@@ -1367,6 +1367,284 @@ For \`("b", "hi")\` return \`"<b>hi</b>"\`.`,
   },
 }
 
+// Authored into L1-M5 directly after `py-l1-functions`, whose teach block introduces reading a
+// traceback. This lesson picks that up and adds the loop around it (`breakpoint()`, pdb, print vs
+// stepping). `pdb` needs an interactive prompt the browser sandbox cannot provide, so both graded
+// exercises parse traceback TEXT, which is the transferable half of the skill.
+const debuggingLesson: PythonLesson = {
+  id: "py-l1-debugging",
+  title: "Debugging: reading a traceback & stepping with breakpoint()",
+  summary: "Read a traceback bottom-up, pause code with breakpoint(), and pick print vs stepping.",
+  estimatedMinutes: 13,
+  difficulty: "medium",
+  skills: ["debugging", "tracebacks", "errors", "error-handling"],
+  teach: {
+    estimatedMinutes: 6,
+    markdown: `## The question every interview asks
+
+"How do you debug?" comes up in nearly every screen, and the weak answer is "I add print statements until I find it." That is not wrong, it is incomplete. A strong answer has three parts: read the traceback properly so you start at the right line, use prints when the question is what a value was, and use a real debugger when the question is how the program got here at all. This lesson covers all three.
+
+**The debugger commands below run in a terminal, not in the editor on this page.** The browser sandbox has no interactive prompt, so \`breakpoint()\` would have nothing to talk to. The graded exercises pull apart traceback text instead, which is the half of the skill that travels furthest: a crash report from CI or an on-call channel arrives as text, and you have to answer "what broke" and "where" from it with no debugger anywhere in reach.
+
+## A traceback is a stack, printed oldest first
+
+\`\`\`text
+Traceback (most recent call last):
+  File "report.py", line 21, in <module>
+    print(average(readings))
+  File "report.py", line 14, in average
+    return total(values) / len(values)
+  File "report.py", line 9, in total
+    return sum(values)
+TypeError: unsupported operand type(s) for +: 'int' and 'str'
+\`\`\`
+
+Read it bottom-up.
+
+1. **The last line is the error.** \`TypeError\` is the exception type and everything after the colon is its message. Start here every single time: it usually names the fix, and it costs you nothing to read.
+2. **The frame directly above it is where execution stopped.** \`line 9, in total\`, at the statement \`return sum(values)\`. That is the innermost frame, and it prints last, which is exactly what "most recent call last" in the header is telling you.
+3. **Every frame above that is the caller of the one below it.** \`total\` was called from \`average\` at line 14, which was called from the top level of the file (\`<module>\`) at line 21. That chain is the route a bad value took to reach the line that finally choked on it.
+
+The innermost frame is where the program died. It is not always where the bug lives. Here \`sum(values)\` is perfectly reasonable code: the real defect is whoever put a string into \`readings\`, several frames up.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "innermost-frame-is-library-code",
+  "prompt": "The innermost frame of your traceback points at a file inside site-packages, deep in a library you did not write. Where is the bug most likely to be?",
+  "options": [
+    {
+      "label": "In the library, since that is the code that actually raised",
+      "feedback": "Tempting, because the failing statement really does sit in their file and the frame is pointing straight at it. Popular libraries are heavily used, so the odds that you found a fresh bug in one are much worse than the odds you handed it something odd."
+    },
+    {
+      "label": "In the last frame that belongs to your own code, which passed the library something it could not handle",
+      "correct": true,
+      "feedback": "Right. Walk up the frames until you reach a file you wrote, and read the call there. Nine times in ten the library is faithfully reporting that your argument was the wrong type, shape, or empty."
+    },
+    {
+      "label": "In the outermost frame, since that is where the program started",
+      "feedback": "Close, in that the outermost frame really does show how the run began, and for a short script it may be the only code you own. In a larger program it is usually just an entry point that forwards arguments and hides nothing interesting."
+    }
+  ]
+}
+\`\`\`
+
+## Pausing the program with \`breakpoint()\`
+
+A print tells you what one value was, at one line you had to guess in advance. A debugger stops the program and lets you ask anything, at any point, without editing and re-running. Since Python 3.7 you get one with a single line, no import required:
+
+\`\`\`python
+def average(values):
+    breakpoint()          # execution pauses here and hands you a prompt
+    return sum(values) / len(values)
+\`\`\`
+
+Run the file normally and you land at a \`(Pdb)\` prompt with the program frozen mid-call, every local variable still alive.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["At the (Pdb) prompt", "What it does", "Reach for it when"],
+  "rows": [
+    ["p values", "Evaluates any expression in the paused frame", "You want a value, or p type(values[0]) to see what it really is"],
+    ["n (next)", "Runs the current line and stops on the next one in this function", "You trust the calls on this line and want the result"],
+    ["s (step)", "Same, but steps INTO the call instead of over it", "One of the calls on this line is your suspect"],
+    ["l (list)", "Shows the source around where you are paused", "You have lost track of which line you are on"],
+    ["c (continue)", "Runs on until the next breakpoint or the end", "You have seen enough here"],
+    ["q (quit)", "Stops the program", "You already know the fix"]
+  ],
+  "highlightCols": ["Reach for it when"],
+  "caption": "Only two of these do investigative work. p answers what a value is right now, and n versus s decides whether you watch a call from outside or from inside. The rest is navigation."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "step-into-versus-over",
+  "prompt": "You are paused on return total(values) / len(values) and you suspect total is computing the wrong number. Do you press n or s?",
+  "options": [
+    {
+      "label": "n, because it runs the line and shows you what came back",
+      "feedback": "Tempting, and n is the right default for the other ninety percent of lines. It runs total to completion in one go, so you see the wrong answer arrive and still have no idea which statement inside produced it."
+    },
+    {
+      "label": "s, because it steps into total so you can watch it compute",
+      "correct": true,
+      "feedback": "Right. Step into the call you suspect and over the ones you trust. That single choice is the whole difference between a debugger and a very slow print."
+    },
+    {
+      "label": "c, because continuing lets the error surface with a full traceback",
+      "feedback": "Close, and continuing is genuinely useful once you have finished looking around. Here it throws away the pause you already paid for and hands you back the same traceback that sent you to the debugger in the first place."
+    }
+  ]
+}
+\`\`\`
+
+## When a print is genuinely the better tool
+
+Print debugging is not the beginner version of a debugger, it is a different instrument. Reach for a print when the question is "what was this value" and you already know the line to ask at, when you need a pattern across thousands of iterations rather than one frozen moment, or when the code runs somewhere nothing can attach to it: CI, a container, a scheduled job at 3am.
+
+Reach for \`breakpoint()\` when you do not know where to look yet, so any print is a guess. When the state is big and you want to poke at six values, because each extra print costs a whole re-run. Or when the question is not a value at all but the route: how did control reach this line.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "print-or-breakpoint-nightly-job",
+  "prompt": "A nightly job processes 5000 rows and raises a KeyError on roughly one of them. It runs unattended at 3am. What do you do first?",
+  "options": [
+    {
+      "label": "Drop a breakpoint() in the loop and inspect the row that fails",
+      "feedback": "Tempting, and a CONDITIONAL breakpoint really is the expert move on this exact bug. A plain one stops you on about 4999 healthy rows first, and nothing can sit at a prompt for a job that runs unattended overnight."
+    },
+    {
+      "label": "Log the key and the row id from the failing branch, then read the log after the next run",
+      "correct": true,
+      "feedback": "Right. The job is unattended and the failure is rare, so you need a record rather than a pause. Once the log names the bad row you can reproduce it locally in one second, and then a debugger is worth reaching for."
+    },
+    {
+      "label": "Wrap the lookup in try/except so the job stops dying on that row",
+      "feedback": "Close, and skipping a bad row may well be the right final behavior once you understand it. Doing it before you know which key is missing converts a loud failure into silent data loss, which is a much more expensive bug to find later."
+    }
+  ],
+  "reveal": "Pick the tool from the question you have left. Prints and logs answer 'what was this value' and survive running unattended. breakpoint() answers 'how did we get here and what else is true right now' and needs you sitting in front of it."
+}
+\`\`\`
+
+## The shape of the exercises
+
+Both exercises take one traceback as a single string and answer a question about it. Split it into lines with \`trace.strip().split("\\n")\`. The last line is the error, and every line that starts with \`File \` once you strip its indentation is a frame. Apply asks for the exception type, which is the "what". Practice asks for the line number of the innermost frame, which is the "where", the first place you would open your editor.
+
+**Interview nuance:** the shape of a strong answer to "how do you debug" is three moves. Read the last line of the traceback for what broke. Walk up the frames to the last one in code you own, which is usually where the bad value entered. Then pick a tool by the question you have left: \`print\` for "what was this value at this line", \`breakpoint()\` for "how did we get here and what else is true right now". Saying only "I add prints" reads as never having debugged something you could not guess.`,
+    demoCode: `trace = """Traceback (most recent call last):
+  File "report.py", line 21, in <module>
+    print(average(readings))
+  File "report.py", line 9, in total
+    return sum(values)
+TypeError: unsupported operand type(s) for +: 'int' and 'str'"""
+
+lines = trace.strip().split("\\n")
+print(lines[-1])                 # the error itself
+print(lines[-1].split(":")[0])   # just the exception type`,
+  },
+  apply: {
+    id: "py-l1-debugging-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`exception_type(trace)\`: return the exception type named at the end of a traceback.
+
+The last line of a traceback is the error, like \`ZeroDivisionError: division by zero\`. Return only
+the type name, \`"ZeroDivisionError"\`. A last line carrying no message at all, like
+\`StopIteration\`, returns that whole line.`,
+    starterCode: `def exception_type(trace):
+    # The last line is the error. Return the part before the first ":".
+    pass`,
+    hints: [
+      'Split the report into lines with `trace.strip().split("\\n")`; `[-1]` is the last one.',
+      'Split that line on `":"` and keep `[0]`, which is everything before the first colon.',
+      "Call `.strip()` on the result so no stray whitespace comes back.",
+    ],
+    referenceSolution: `def exception_type(trace):
+    last = trace.strip().split("\\n")[-1]
+    return last.split(":")[0].strip()`,
+    testCases: [
+      {
+        input: {
+          trace:
+            "Traceback (most recent call last):\n  File \"report.py\", line 21, in <module>\n    print(average(readings))\n  File \"report.py\", line 9, in total\n    return sum(values)\nTypeError: unsupported operand type(s) for +: 'int' and 'str'",
+        },
+        expected: "TypeError",
+        description: "a message that itself contains a colon",
+      },
+      {
+        input: {
+          trace:
+            'Traceback (most recent call last):\n  File "app.py", line 3, in <module>\n    print(user["user_id"])\nKeyError: \'user_id\'',
+        },
+        expected: "KeyError",
+        description: "a KeyError naming the missing key",
+      },
+      {
+        input: {
+          trace:
+            'Traceback (most recent call last):\n  File "main.py", line 2, in <module>\n    raise StopIteration\nStopIteration',
+        },
+        expected: "StopIteration",
+        description: "an exception with no message at all",
+      },
+      {
+        input: {
+          trace:
+            'Traceback (most recent call last):\n  File "report.py", line 14, in average\n    return total / count\nZeroDivisionError: division by zero',
+        },
+        expected: "ZeroDivisionError",
+        description: "the classic divide by an empty count",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l1-debugging-practice",
+    executionMode: "single-file",
+    prompt: `An overnight job died and the on-call channel holds nothing but the traceback somebody pasted
+into it. Before you can open a file you need the one number that says where to look.
+
+Implement \`crash_line(trace)\`: return the line number of the innermost frame, which is the LAST
+line of the traceback that starts with \`File \` once its indentation is stripped. A frame line looks
+like \`  File "report.py", line 9, in total\`. Return \`0\` when the report was truncated and carries
+no frame at all.`,
+    starterCode: `def crash_line(trace):
+    # Walk the lines, remember the number from each File frame, return the last one.
+    pass`,
+    hints: [
+      "Strip each line before testing it: a frame only starts with `File ` after its indentation is gone.",
+      'On a frame line, `line.split("line ")[1]` is `9, in total`, so splitting that on `","` gives the number.',
+      "Overwrite the same variable each time you see a frame, so the last one is what you return.",
+    ],
+    referenceSolution: `def crash_line(trace):
+    number = 0
+    for raw in trace.strip().split("\\n"):
+        line = raw.strip()
+        if line.startswith("File "):
+            after = line.split("line ")[1]
+            number = int(after.split(",")[0])
+    return number`,
+    testCases: [
+      {
+        input: {
+          trace:
+            'Traceback (most recent call last):\n  File "report.py", line 21, in <module>\n    print(average(readings))\n  File "report.py", line 14, in average\n    return total(values) / len(values)\n  File "report.py", line 9, in total\n    return sum(values)\nTypeError: unsupported operand type(s) for +: \'int\' and \'str\'',
+        },
+        expected: 9,
+        description: "three frames, so the deepest one wins",
+      },
+      {
+        input: {
+          trace:
+            'Traceback (most recent call last):\n  File "app.py", line 3, in <module>\n    print(user["user_id"])\nKeyError: \'user_id\'',
+        },
+        expected: 3,
+        description: "a single frame",
+      },
+      {
+        input: {
+          trace:
+            'Traceback (most recent call last):\n  File "app.py", line 42, in <module>\n    load(config)\n  File "/usr/lib/python3.11/json/decoder.py", line 355, in raw_decode\n    obj, end = self.scan_once(s, idx)\njson.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)',
+        },
+        expected: 355,
+        description: "the deepest frame is library code, and the error text mentions a line too",
+      },
+      {
+        input: { trace: "ValueError: invalid literal for int() with base 10: 'abc'" },
+        expected: 0,
+        description: "a truncated report with no frames at all",
+      },
+    ],
+  },
+}
+
 // Agent 1's canonical single-file sample, pinned by registry.test.ts (which fixes its id and
 // exercise modes, never its position). Authored into L1-M1 directly after `py-l1-hello`, whose
 // teach block already introduces `def`/parameters/`return` and return-vs-print: this lesson
@@ -4370,6 +4648,7 @@ export const level1: PythonLevel = {
         loopsLesson,
         loopIdiomsLesson,
         functionsLesson,
+        debuggingLesson,
         referencesCopyLesson,
         complexityChoiceLesson,
         recursionLesson,
