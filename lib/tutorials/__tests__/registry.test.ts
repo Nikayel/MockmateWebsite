@@ -1,5 +1,5 @@
 /**
- * Invariants the tutorial registry must hold: four levels, working lookups, linear progression,
+ * Invariants the tutorial registry must hold: five levels, working lookups, linear progression,
  * and — the rule the execution layer depends on — globally unique lesson and exercise ids.
  */
 import { describe, it, expect } from "vitest"
@@ -20,8 +20,8 @@ import {
 import type { PythonLevelId } from "../types"
 
 describe("tutorial registry", () => {
-  it("lists four levels with ids 1–4", () => {
-    expect(listLevels().map((level) => level.id)).toEqual([1, 2, 3, 4])
+  it("lists five levels with ids 1-5", () => {
+    expect(listLevels().map((level) => level.id)).toEqual([1, 2, 3, 4, 5])
   })
 
   it("looks up a level by id and by slug", () => {
