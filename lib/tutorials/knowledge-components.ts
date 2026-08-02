@@ -237,6 +237,11 @@ const SKILL_TO_KC: Record<string, KnowledgeComponent> = {
   regex: "py.regex",
   re: "py.regex",
   "pattern-matching": "py.regex",
+  // `match`/`case` is structural pattern matching and belongs with control flow, not
+  // with regular expressions. Spelled out because the bare "pattern-matching" tag above
+  // reads as if it would cover it, and filing a match statement under regex would be
+  // wrong in a way nobody would notice from the chip.
+  "structural-pattern-matching": "py.control-flow",
 
   logging: "py.logging",
   "structured-logging": "py.logging",
@@ -284,6 +289,17 @@ const SKILL_TO_KC: Record<string, KnowledgeComponent> = {
   "pre-commit": "py.tooling",
 
   "code-review": "py.code-review",
+  judgment: "py.code-review",
+  communication: "py.code-review",
+  "performance-review": "py.code-review",
+  "defensive-programming": "py.code-review",
+  "api-verification": "py.testing",
+  "api-integration": "py.http-and-apis",
+  "input-validation": "py.http-and-apis",
+  "json-parsing": "py.io-and-files",
+  "stdlib-semantics": "py.modules-and-packaging",
+  reliability: "py.errors",
+  retries: "py.errors",
   "code-reading": "py.code-review",
   "ai-collaboration": "py.code-review",
   "reviewing-generated-code": "py.code-review",
