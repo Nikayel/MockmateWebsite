@@ -80,7 +80,10 @@ export function ConceptCard({
         <button
           onClick={toggle}
           aria-expanded={open}
-          aria-controls={`concept-rows-${concept.pattern}`}
+          // Only while open: the id does not exist in the collapsed state, and a
+          // dangling aria-controls fails aria-valid-attr-value. aria-expanded alone
+          // conveys the state until then.
+          aria-controls={open ? `concept-rows-${concept.pattern}` : undefined}
           className="flex min-w-0 flex-1 items-center gap-2 rounded text-left"
         >
           {/* One chevron that rotates, not two icons that swap. */}
