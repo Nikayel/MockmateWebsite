@@ -921,6 +921,30 @@ print(power(2, 3))   # 8    exp is given as 3, so 2 ** 3
 
 \`power(5)\` binds \`base\` to \`5\` and lets \`exp\` default to \`2\`. \`power(2, 3)\` binds \`base\` to \`2\` and \`exp\` to \`3\`. You can also pass by name in any order: \`power(exp=3, base=2)\` also returns \`8\`.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "a-default-does-not-cover-other-params",
+  "prompt": "The signature is def power(base, exp=2). What does calling power() with no arguments at all do?",
+  "options": [
+    {
+      "label": "Returns 0, since both parameters fall back to something",
+      "feedback": "Tempting, because one parameter visibly does have a fallback and it is easy to read that as the function being callable bare. A default only covers the parameter it is attached to."
+    },
+    {
+      "label": "Raises a TypeError about a missing required argument",
+      "correct": true,
+      "feedback": "Right. Giving exp a default never makes base optional. Every parameter without its own default has to receive a value from the caller."
+    },
+    {
+      "label": "Waits for the arguments, since the call is incomplete",
+      "feedback": "Close to how a partially applied function behaves in some languages, and functools.partial exists in Python for exactly that. A plain call either binds everything it needs or raises immediately."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`csdiagram
 {
   "type": "table",
@@ -955,6 +979,30 @@ TypeError: unsupported operand type(s) for ** or pow(): 'str' and 'int'
 
 The **last line** names the error type and message: a \`TypeError\` because \`"2"\` is a \`str\`, and you cannot raise a string to a power. The frames above it are the call chain, newest at the bottom. Here they say the failure happened at \`return base ** exp\`, called from \`print(power("2", 3))\`. Read the last line first, then walk up only as far as you need.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "default-before-required-param",
+  "prompt": "A file contains def power(exp=2, base): as its first line. What happens when you run the file?",
+  "options": [
+    {
+      "label": "It works, as long as every caller passes base by name",
+      "feedback": "Tempting, because keyword arguments really would make every such call unambiguous, and that reasoning is what keyword-only parameters are built on. The def itself is rejected before any call exists."
+    },
+    {
+      "label": "It raises a SyntaxError at definition time",
+      "correct": true,
+      "feedback": "Right. A parameter without a default cannot follow one that has a default, because positional arguments are filled left to right. Put the required parameters first."
+    },
+    {
+      "label": "It works until someone calls power(5), which then raises",
+      "feedback": "Close, in that a call is where you would normally feel a signature problem. Python catches this one earlier: it is a syntax error, so the module never even finishes loading."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfall: default parameters must come last
 
 Every parameter with a default has to appear after every parameter without one:
@@ -965,6 +1013,30 @@ def power(exp=2, base):   # SyntaxError: non-default argument follows default ar
 \`\`\`
 
 Python cannot fill positional arguments left to right if a required parameter sits behind an optional one. Fix it by ordering required parameters first: \`def power(base, exp=2)\`.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "default-evaluated-once",
+  "prompt": "def collect(item, bucket=[]) appends item to bucket and returns it. You call collect('a'), then collect('b'). What does the second call return?",
+  "options": [
+    {
+      "label": "A list holding only b, since bucket starts empty on every call",
+      "feedback": "Tempting, and it is what the signature seems to promise: a fresh empty list each time. The default expression runs once, when def executes, so there is only ever one list."
+    },
+    {
+      "label": "A list holding a and then b",
+      "correct": true,
+      "feedback": "Right. The single default list is stored on the function object and reused by every call that omits the argument, so results leak between calls. Use bucket=None and build the list inside the body."
+    },
+    {
+      "label": "A list holding only a, since the default is restored between calls",
+      "feedback": "Close, in that you are picturing some kind of reset step. Nothing resets it: that same list object stays attached to the function for the life of the program."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** a default value is evaluated **once**, when \`def\` runs, not on each call, so a mutable default like \`bucket=[]\` is shared across calls and quietly accumulates results between them. The next lesson, References, copies and the mutable-default trap, covers why this happens and the \`None\`-sentinel fix in full.`,
     demoCode: `def power(base, exp=2):
