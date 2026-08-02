@@ -417,6 +417,18 @@ export default function KnowledgePage() {
                 even though they share one 0-100 axis, and bg-card/30 composited to
                 ~1.03:1 — borders around nothing, the wireframe look.
               */}
+              {/*
+                The first group was unlabeled while the second got a lone "Systems"
+                heading, so the reader met an unnamed block and had to retroactively
+                decide what it was — and ConceptCard emits h3 titles inside it, so
+                h3s appeared before any h2 existed (a level skip from the h1).
+                Both labels use the 11px uppercase idiom the summary stat row and
+                evidence table already use, so a structural label stops competing
+                with the summary's verdict line for weight.
+              */}
+              <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                Patterns
+              </h2>
               <div className="divide-border border-border bg-card divide-y overflow-hidden rounded-xl border shadow-sm">
                 {model.concepts.map((concept) => (
                   <ConceptCard
@@ -435,7 +447,9 @@ export default function KnowledgePage() {
 
               {model.systems.length > 0 && (
                 <>
-                  <h2 className="text-foreground pt-4 text-lg font-medium">Systems</h2>
+                  <h2 className="text-muted-foreground pt-4 text-xs font-semibold tracking-wider uppercase">
+                    Systems
+                  </h2>
                   <div className="divide-border border-border bg-card divide-y overflow-hidden rounded-xl border shadow-sm">
                     {model.systems.map((concept) => (
                       <ConceptCard
