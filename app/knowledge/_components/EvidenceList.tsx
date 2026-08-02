@@ -54,29 +54,38 @@ export function EvidenceList({ loading, error, rows }: EvidenceListProps) {
         These attempts produced this belief
       </p>
       <div className="space-y-1.5">
-        {rows.map((row) => (
-          <div key={row.event_id} className="text-muted-foreground flex flex-wrap gap-x-3 text-xs">
-            <span className="text-foreground/80 w-20 shrink-0">
-              {new Date(row.timestamp).toLocaleDateString()}
-            </span>
-            <span>
-              scored {Math.round(row.mastery_score ?? row.score ?? 0)}
-              {row.hints_used ? `, ${row.hints_used} hint${row.hints_used === 1 ? "" : "s"}` : ""}
-              {row.is_first_review ? " (first attempt)" : ""}
-            </span>
-            {row.interval_before_days !== null && row.interval_after_days !== null && (
-              <span>
-                interval {row.interval_before_days}d → {row.interval_after_days}d
+        {rows.map((row) => {
+          // Nullish-coalesce, never `|| 0`: a legitimate score of 0 and a review we
+          // have no score for are different claims, and the old `?? 0` rendered the
+          // second as the first — inventing a failing grade.
+          const score = row.mastery_score ?? row.score
+          return (
+            <div
+              key={row.event_id}
+              className="text-muted-foreground flex flex-wrap gap-x-3 text-xs"
+            >
+              <span className="text-foreground/80 w-20 shrink-0">
+                {new Date(row.timestamp).toLocaleDateString()}
               </span>
-            )}
-            {row.predicted_retention !== null && row.actual_retention !== null && (
               <span>
-                predicted {Math.round(row.predicted_retention)}% recall ·{" "}
-                {row.actual_retention ? "recalled" : "forgot"}
+                {score === null ? "score not recorded" : `scored ${Math.round(score)}`}
+                {row.hints_used ? `, ${row.hints_used} hint${row.hints_used === 1 ? "" : "s"}` : ""}
+                {row.is_first_review ? " (first attempt)" : ""}
               </span>
-            )}
-          </div>
-        ))}
+              {row.interval_before_days !== null && row.interval_after_days !== null && (
+                <span>
+                  interval {row.interval_before_days}d → {row.interval_after_days}d
+                </span>
+              )}
+              {row.predicted_retention !== null && row.actual_retention !== null && (
+                <span>
+                  predicted {Math.round(row.predicted_retention)}% recall ·{" "}
+                  {row.actual_retention ? "recalled" : "forgot"}
+                </span>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
