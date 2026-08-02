@@ -1333,13 +1333,97 @@ account.deposit(50)          # self is account; balance becomes 150
 print(account.balance)       # 150
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "init-does-not-return-a-value",
+  "prompt": "A learner writes def __init__(self, balance): return balance, hoping that BankAccount(100) evaluates to 100. What actually happens?",
+  "options": [
+    {
+      "label": "account is 100, since the constructor returned it",
+      "feedback": "Tempting, because every other function you have written hands back whatever you return. Construction is a two-step protocol though: the object is created first, and __init__ only gets a chance to set it up."
+    },
+    {
+      "label": "It raises TypeError: __init__() should return None, not 'int'",
+      "correct": true,
+      "feedback": "Right. Python enforces this rather than letting a stray return silently do nothing. An initializer sets attributes on self; it never produces the value the call evaluates to."
+    },
+    {
+      "label": "account is a BankAccount and the return value is silently ignored",
+      "feedback": "The most plausible wrong answer, and it is what happens for a bare return with no value, since returning None is allowed. Return an actual object and Python refuses instead of ignoring you."
+    },
+    {
+      "label": "account is a BankAccount, but reading account.balance raises AttributeError",
+      "feedback": "You correctly noticed that this __init__ never assigns self.balance, so the attribute genuinely would be missing. The type error comes first though: the returned int stops construction before you ever read an attribute."
+    }
+  ]
+}
+\`\`\`
+
 ### \`__init__\` and \`self\`
 
 \`__init__\` is the initializer. Python calls it automatically when you write \`BankAccount(100)\`, passing \`100\` in as \`balance\`. Its job is to set the instance's starting attributes. \`self\` is the instance the method is currently working on. It is the first parameter of every method, and \`self.balance\` is how you reach that specific instance's data. Two accounts each carry their own \`balance\`, and writing \`self.balance\` on one never touches the other.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "bare-name-is-not-an-attribute",
+  "prompt": "Inside deposit a learner writes balance = self.balance + amount and nothing else. account starts at 100 and you call account.deposit(50). What is account.balance afterwards?",
+  "options": [
+    {
+      "label": "150, because a bare name inside a method resolves to the attribute",
+      "feedback": "Tempting, and it is exactly how several other languages behave, which is why this bug travels with people who learned Java or C++ first. Python has no implicit this: a bare name is a plain local variable."
+    },
+    {
+      "label": "100, and the method raised no error at all",
+      "correct": true,
+      "feedback": "Right. The line computed the correct number into a local that vanished when the method returned. Silent wrong answers like this are why self. on the left-hand side matters."
+    },
+    {
+      "label": "It raises UnboundLocalError, since balance is read before assignment",
+      "feedback": "The right instinct about assignment making a name local, and it would be the answer if the right-hand side said balance rather than self.balance. Here the read goes through the attribute, so nothing is unbound."
+    },
+    {
+      "label": "It raises AttributeError, because balance was never declared on the class",
+      "feedback": "Python does not require attributes to be declared anywhere: __init__ already created self.balance by assigning it. Nothing about this method is missing an attribute, which is precisely why the bug is invisible."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfall: forgetting \`self\`
 
 Inside a method, \`balance = amount\` creates a throwaway local variable that vanishes when the method returns. The attribute is never touched. You must write \`self.balance = amount\`, and read it back the same way with \`self.balance\`, not a bare \`balance\`. Every method also needs \`self\` as its first parameter, even when the method takes no other argument. In Practice, \`increment(self)\` has no extra parameters, but \`self\` still comes first.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "method-defined-without-self",
+  "prompt": "A method is defined as def deposit(amount): ... with no self in the parameter list. You call account.deposit(50). What do you see?",
+  "options": [
+    {
+      "label": "TypeError: deposit() takes 1 positional argument but 2 were given",
+      "correct": true,
+      "feedback": "Right, and the arithmetic in that message is the tell: you passed one argument, Python passed the instance too, so the method received two. The dot always hands the instance in as the first argument."
+    },
+    {
+      "label": "TypeError: deposit() missing 1 required positional argument: 'self'",
+      "feedback": "This message looks like the one you would expect, which is what makes it tempting, but it says the opposite of what happened. Python is not short an argument here, it has one too many."
+    },
+    {
+      "label": "No error, since self is only needed when the method touches instance data",
+      "feedback": "Nothing about the call is conditional on what the body does: the instance is passed on every method call, used or not. That is why self appears even on a method with no other parameters."
+    },
+    {
+      "label": "NameError: self is not defined",
+      "feedback": "That error appears when the BODY mentions self without it being a parameter. Here the body never mentions it, so the failure lands earlier, while Python is still binding arguments to parameters."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** \`account.deposit(50)\` is shorthand. Python looks up \`deposit\` on the class and calls \`BankAccount.deposit(account, 50)\`, binding \`account\` to \`self\`. That is why \`self\` is an ordinary first parameter and not magic: the dot syntax just passes the instance in for you. Knowing that a call is really \`Class.method(instance, ...)\` explains a common error too. If you omit \`self\` from a method's parameter list, calling it raises \`TypeError\` complaining that too many positional arguments were given, because Python still passes the instance.`,
     demoCode: `class BankAccount:
@@ -1484,6 +1568,34 @@ Notice \`LoudGreeter\` never redefines \`__init__\`. Because it inherits the par
 
 ## What super() actually resolves to
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "super-follows-the-mro-not-the-parent",
+  "prompt": "class A defines who() returning 'A'. class B(A) and class C(A) each return their own letter followed by super().who(). class D(B, C) has an empty body. What does D().who() return?",
+  "options": [
+    {
+      "label": "'B -> A', because B's super() is B's own parent, which is A",
+      "feedback": "Tempting, and it is the model almost everyone carries: super() means my parent. Read as a rule about B alone that is what you get, but the lookup order is a property of D, the object the call started from."
+    },
+    {
+      "label": "'B -> C -> A'",
+      "correct": true,
+      "feedback": "Right. D's method resolution order is D, B, C, A, so B's super() lands on its sibling C even though B does not inherit from C at all. That is what makes the shared base run exactly once."
+    },
+    {
+      "label": "'B -> A -> C -> A', walking each inheritance path in turn",
+      "feedback": "This is what naive depth-first inheritance would do, and it is exactly the duplicated-base problem that C3 linearization exists to prevent. A appears once in the MRO, so it runs once."
+    },
+    {
+      "label": "'C -> B -> A', since the last base listed wins",
+      "feedback": "You are right that the order of the bases in class D(B, C) decides things, but it reads left to right: B is searched before C, so B's who() is the one that runs first."
+    }
+  ]
+}
+\`\`\`
+
 \`super()\` does not mean "my parent class". It means "the next class after me in the **method
 resolution order**", and that distinction only shows up once more than one base is involved. Every
 class carries its MRO as a list you can read:
@@ -1560,15 +1672,109 @@ print(p.wallet.balance)          # 50
 
 The \`Person\` delegates money handling to the \`Wallet\` and stays small. That is the Practice exercise: set both \`self.name\` and a brand-new \`self.wallet = Wallet()\`.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "is-a-versus-has-a",
+  "prompt": "Sort each pair by the relationship that fits it. Ask whether the first thing IS a kind of the second, or merely HAS one.",
+  "buckets": ["Inheritance (is-a)", "Composition (has-a)"],
+  "items": [
+    {
+      "label": "AdminUser and User",
+      "bucket": "Inheritance (is-a)",
+      "feedback": "An admin really is a user with extra powers, and anywhere a User is expected an AdminUser can stand in. That substitutability is the test."
+    },
+    {
+      "label": "Car and Engine",
+      "bucket": "Composition (has-a)",
+      "feedback": "A car is not a kind of engine. It owns one, and being able to swap the engine without touching the car's own type is the payoff."
+    },
+    {
+      "label": "Playlist and Song",
+      "bucket": "Composition (has-a)",
+      "feedback": "A playlist holds many songs. Container relationships are always has-a, no matter how central the contents feel to the object."
+    },
+    {
+      "label": "Square and Shape",
+      "bucket": "Inheritance (is-a)",
+      "feedback": "A square is a kind of shape, and every operation defined on Shape still makes sense on it. This is the case inheritance was designed for."
+    },
+    {
+      "label": "Report and the Formatter it renders itself with",
+      "bucket": "Composition (has-a)",
+      "feedback": "The report delegates rendering to a collaborator. Holding it as an attribute means you can hand in a different formatter, including a fake one in tests."
+    }
+  ]
+}
+\`\`\`
+
 ## Which to use
 
 Prefer composition when one thing *contains* or *uses* another. Reserve inheritance for a genuine "is-a" relationship where the subclass is fully substitutable for its parent. Composition keeps classes small and lets you swap a part out without touching a whole hierarchy.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "subclass-init-skips-super",
+  "prompt": "LoudGreeter(Greeter) defines its own __init__ that sets self.volume and never calls super().__init__(name). You build LoudGreeter('Ada') and then call greet(). What happens?",
+  "options": [
+    {
+      "label": "Python calls the parent __init__ for you once the subclass one finishes",
+      "feedback": "Tempting, because several other languages do chain to the base constructor implicitly. Python does not: if you write your own __init__, the parent's runs only when you call it."
+    },
+    {
+      "label": "The object builds fine, and greet() raises AttributeError: no attribute 'name'",
+      "correct": true,
+      "feedback": "Right, and the delay is what makes it painful. Construction looks healthy and the failure surfaces somewhere else entirely, on whichever line first reads the attribute the parent was supposed to set."
+    },
+    {
+      "label": "Construction itself raises TypeError, because the parent's setup was skipped",
+      "feedback": "Nothing checks that you called up the chain, so nothing can raise at construction time. Python has no notion of a partially initialised object to complain about."
+    },
+    {
+      "label": "self.name is quietly set to None, since the parent declares it",
+      "feedback": "That would require the parent to declare fields the way a typed language does. Attributes only exist once something assigns them, so the name is not None here, it is absent."
+    }
+  ]
+}
+\`\`\`
 
 ## Pitfalls
 
 The classic trap: a subclass defines its own \`__init__\` but forgets to call \`super().__init__(...)\`. The parent's setup never runs, so attributes like \`self.name\` are silently missing and you get an \`AttributeError\` only later, when some method reads them. If you override \`__init__\`, call the parent's inside it. (\`LoudGreeter\` sidesteps this by not defining \`__init__\` at all.)
 
-**Interview nuance:** know why "prefer composition over inheritance" is standard advice. Inheritance couples a subclass to the parent's internals, so a change in the base class can quietly break every subclass (the fragile base class problem), and deep chains make method lookup hard to trace through the MRO. Composition swaps that inheritance coupling for a narrow "uses" boundary you can test and replace in isolation.`,
+**Interview nuance:** know why "prefer composition over inheritance" is standard advice. Inheritance couples a subclass to the parent's internals, so a change in the base class can quietly break every subclass (the fragile base class problem), and deep chains make method lookup hard to trace through the MRO. Composition swaps that inheritance coupling for a narrow "uses" boundary you can test and replace in isolation.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "square-inherits-rectangle-trap",
+  "prompt": "Rectangle lets callers set width and height independently. You write Square(Rectangle) and override both setters so the two always stay equal. What is the real problem?",
+  "options": [
+    {
+      "label": "Nothing. A square is a rectangle, so the is-a test passes",
+      "feedback": "Tempting, because it is true in geometry and the is-a phrasing sounds like it settles the question. The test is not what the words mean, it is whether the subclass can stand in wherever the parent is used without surprising the caller."
+    },
+    {
+      "label": "Any code written against Rectangle that sets width then height now silently gets the wrong shape",
+      "correct": true,
+      "feedback": "Right. Set width to 5 and height to 4 on a Square and you get a 4 by 4, so a caller that computes area on a Rectangle reference is now quietly wrong. Composition, or an immutable value type, avoids the whole problem."
+    },
+    {
+      "label": "Python raises TypeError, because an override changed the meaning of an inherited setter",
+      "feedback": "Nothing at the language level notices. Python checks that the method exists, never that it keeps the promises the parent made, which is exactly why this class of bug reaches production."
+    },
+    {
+      "label": "It only breaks when Square forgets to call super().__init__()",
+      "feedback": "That is a real and separate bug, and worth catching. Here the constructors can be perfectly correct and the class still misbehaves the moment someone resizes it through a Rectangle reference."
+    }
+  ],
+  "reveal": "This is the substitution test in practice. Before you inherit, ask whether every promise the parent makes to its callers still holds for the subclass. When the answer is no, hold the parent as an attribute instead."
+}
+\`\`\``,
     demoCode: `class Greeter:
     def __init__(self, name):
         self.name = name
