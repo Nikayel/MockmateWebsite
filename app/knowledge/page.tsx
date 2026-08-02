@@ -79,7 +79,13 @@ export default function KnowledgePage() {
   const fetchModel = useCallback(async () => {
     try {
       const token = await getAuthToken()
-      if (!token) return
+      if (!token) {
+        // Signed in as far as the auth context knows, but no usable token — the
+        // session lapsed mid-visit. Bailing out silently here left isLoading false
+        // with no response and no error, so <main> rendered completely empty.
+        setError("Your session expired. Sign in again to see what the system knows.")
+        return
+      }
       const res = await fetch("/api/learner-model", {
         headers: { Authorization: `Bearer ${token}` },
       })
