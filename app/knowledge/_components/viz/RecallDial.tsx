@@ -115,7 +115,10 @@ export function RecallDial({
           fill="none"
           strokeWidth={4}
           strokeLinecap="round"
-          className="stroke-muted"
+          // stroke-muted measured 1.07:1 against the card — which made the dashed
+          // "no belief" ring, a SEMANTIC state, effectively invisible. The empty
+          // ring wears legible ink; the ordinary track stays quiet but present.
+          className={value === null ? "stroke-muted-foreground" : "stroke-border"}
           // A card with no belief gets a dashed empty ring rather than a 0% ring:
           // "unknown" and "you will certainly fail" are not the same claim.
           strokeDasharray={value === null ? "2 3" : undefined}
@@ -161,7 +164,10 @@ export function RecallDial({
         <span
           aria-hidden="true"
           className={cn(
-            "text-foreground absolute inset-0 flex items-center justify-center font-medium tabular-nums",
+            "absolute inset-0 flex items-center justify-center tabular-nums",
+            // A bold foreground "--" read as a broken value; the null label is
+            // muted and unemphasized, like the unknown it reports.
+            value === null ? "text-muted-foreground font-normal" : "text-foreground font-medium",
             LABEL_CLASS[size]
           )}
         >
