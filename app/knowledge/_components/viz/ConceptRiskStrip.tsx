@@ -1,6 +1,10 @@
 "use client"
 
-import { memoryBandFor } from "@/lib/spaced-repetition/memory-bands"
+import {
+  MEMORY_STRENGTH_BANDS,
+  displayRetention,
+  memoryBandFor,
+} from "@/lib/spaced-repetition/memory-bands"
 import { memoryColorClass } from "@/lib/ui/memory-colors"
 import { cn } from "@/lib/utils"
 
@@ -15,8 +19,8 @@ import { cn } from "@/lib/utils"
  * card is both the leftmost mark and one keyboard stop away.
  */
 
-/** Below this the model calls a card at risk — the "ok" band floor. */
-const AT_RISK_BELOW = 70
+/** Below this the model calls a card at risk — derived, never re-hardcoded. */
+const AT_RISK_BELOW = MEMORY_STRENGTH_BANDS.find((b) => b.urgency === "ok")!.floor
 
 export interface RiskStripCard {
   problem_id: string
@@ -63,9 +67,18 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
         live in the outer, unclipped box. With everything in one overflow-hidden
         container, a dot at 0% or 100% was sliced in half by its own -translate-x-1/2.
       */}
-      <div className="relative h-6">
+      <div
+        className="relative h-6"
+        role="group"
+        aria-label={`${scored.length} problem${scored.length === 1 ? "" : "s"} by recall estimate${
+          mean !== null ? `, mean about ${Math.round(mean)} percent` : ""
+        }`}
+      >
+        {/* ring-inset gives the 0-100 axis a visible extent: the bare bg-muted/60
+            track measured 1.05:1 — the axis the dots' position depends on did not
+            exist in light mode. */}
         <div
-          className="bg-muted/60 absolute inset-x-0 inset-y-1 overflow-hidden rounded"
+          className="bg-muted/60 ring-border absolute inset-x-0 inset-y-1 overflow-hidden rounded ring-1 ring-inset"
           aria-hidden="true"
         >
           {/* The at-risk zone, so a dot's position carries a verdict and not just a value. */}
@@ -73,10 +86,16 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
             className="absolute inset-y-0 left-0 bg-rose-500/10 dark:bg-rose-400/15"
             style={{ width: `${AT_RISK_BELOW}%` }}
           />
+          {/* A hard boundary line: the tint alone measured 1.15:1, so where the
+              at-risk zone ENDS — the strip's one verdict — was invisible. */}
+          <div
+            className="absolute inset-y-0 w-px bg-rose-600 dark:bg-rose-400"
+            style={{ left: `${AT_RISK_BELOW}%` }}
+          />
           {mean !== null && (
             <div
-              className="bg-foreground/40 absolute inset-y-0 w-px"
-              style={{ left: `${mean}%` }}
+              className="bg-foreground/60 absolute inset-y-0 w-0.5"
+              style={{ left: `min(${mean}%, calc(100% - 2px))` }}
               title={`Mean ${Math.round(mean)}%`}
             />
           )}
@@ -89,16 +108,14 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
               key={card.problem_id}
               type="button"
               onClick={() => onSelectCard?.(card.problem_id)}
-              // Stops the concept accordion's own toggle from firing underneath.
-              onKeyDown={(e) => e.stopPropagation()}
-              title={`${card.title}: ~${Math.round(card.retrievability / 5) * 5}%, ${label}`}
-              aria-label={`${card.title}, about ${
-                Math.round(card.retrievability / 5) * 5
-              } percent, ${label}`}
+              title={`${card.title}: ~${displayRetention(card.retrievability)}%, ${label}`}
+              aria-label={`${card.title}, about ${displayRetention(
+                card.retrievability
+              )} percent, ${label}`}
               // The button is the 24px hit target (WCAG 2.5.8); the span inside is the
               // 10px mark. Cluster lanes move the mark, never the hit area. The clamp
               // keeps an extreme value's mark on the track instead of past its end.
-              className="focus-visible:ring-accent/50 absolute flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full focus-visible:ring-2 focus-visible:outline-none"
+              className="absolute flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full"
               style={{ left: `clamp(12px, ${card.retrievability}%, calc(100% - 12px))`, top: 0 }}
             >
               <span
@@ -106,7 +123,7 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
                 // The background ring is the 2px surface gap that keeps clustered
                 // marks reading as separate dots instead of one blob.
                 className={cn(
-                  "ring-background block h-2.5 w-2.5 rounded-full ring-2 transition-transform hover:scale-125",
+                  "ring-background block h-2.5 w-2.5 rounded-full ring-2 motion-safe:transition-transform motion-safe:hover:scale-125",
                   memoryColorClass(urgency, "bar")
                 )}
                 style={{ transform: `translateY(${lanes[i]}px)` }}
@@ -120,9 +137,16 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
         {/*
           Replaces the "Forgetting soonest: X" sentence: the same fact, but as a
           position on the axis with the name attached rather than a second line of
-          prose repeating what the marks already show.
+          prose repeating what the marks already show. With one reviewed card,
+          "weakest" is a comparison with no comparanda — say what is true instead.
         */}
-        Weakest: {weakest.title} (~{Math.round(weakest.retrievability / 5) * 5}%)
+        {sorted.length > 1 ? (
+          <>
+            Weakest: {weakest.title} (~{displayRetention(weakest.retrievability)}%)
+          </>
+        ) : (
+          <>Only 1 reviewed problem so far.</>
+        )}
       </p>
     </div>
   )
