@@ -9,7 +9,7 @@
  * spaced repetition.
  */
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ArrowRight, Brain, Loader2, Lock } from "lucide-react"
@@ -169,13 +169,24 @@ export default function KnowledgePage() {
     [reportEvent]
   )
 
+  // Monotonic token for the evidence fetch. Two fast clicks used to race: whichever
+  // request resolved LAST won setEvidence, so card B's panel could render card A's
+  // review history. On a page whose premise is "this evidence produced this belief",
+  // cross-attributed evidence is the worst possible bug — every await below re-checks
+  // that it still speaks for the newest request before touching state.
+  const evidenceReq = useRef(0)
+
   /** Toggle a card's evidence panel; lazily fetch its review history. */
   const handleExpandEvidence = useCallback(
     async (card: CardBelief) => {
       if (expandedCardId === card.problem_id) {
+        // Invalidate in-flight work too, or a stale resolve repopulates the panel
+        // the next time it opens.
+        evidenceReq.current++
         setExpandedCardId(null)
         return
       }
+      const reqId = ++evidenceReq.current
       setExpandedCardId(card.problem_id)
       setEvidence([])
       setEvidenceError(null)
@@ -183,6 +194,7 @@ export default function KnowledgePage() {
       void reportEvent("olm_card_evidence_viewed", { problem_id: card.problem_id })
       try {
         const token = await getAuthToken()
+        if (reqId !== evidenceReq.current) return
         if (!token) {
           // Returning silently here left the panel on EvidenceList's empty state,
           // which asserts "No review log yet" — stating a fact about the user's
@@ -194,16 +206,18 @@ export default function KnowledgePage() {
           `/api/learner-model/history?problem_id=${encodeURIComponent(card.problem_id)}`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
+        if (reqId !== evidenceReq.current) return
         if (!res.ok) {
           setEvidenceError(evidenceErrorForStatus(res.status))
           return
         }
         const data = await res.json()
+        if (reqId !== evidenceReq.current) return
         setEvidence(data.evidence ?? [])
       } catch {
-        setEvidenceError(EVIDENCE_LOAD_FAILED)
+        if (reqId === evidenceReq.current) setEvidenceError(EVIDENCE_LOAD_FAILED)
       } finally {
-        setEvidenceLoading(false)
+        if (reqId === evidenceReq.current) setEvidenceLoading(false)
       }
     },
     [expandedCardId, getAuthToken, reportEvent]
