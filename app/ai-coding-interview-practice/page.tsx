@@ -1,6 +1,7 @@
 import { Metadata } from "next"
 import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
+import { trackPath } from "@/lib/tutorials/lesson-routes"
 
 export const metadata: Metadata = {
   title: "AI Coding Interview Practice Simulator",
@@ -63,6 +64,11 @@ export default function AICodingInterviewPracticePage() {
               techniques.
             </li>
           </ul>
+          <p className="mt-4">
+            If the language is what slows you down rather than the pattern, our free{" "}
+            <Link href={trackPath("python")}>Python course</Link> covers the behaviour these
+            problems lean on, with graded exercises that run in the browser.
+          </p>
         </>
       ),
     },

@@ -1,5 +1,7 @@
 import { Metadata } from "next"
+import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
+import { trackPath } from "@/lib/tutorials/lesson-routes"
 
 export const metadata: Metadata = {
   title: "System Design Interview Practice",
@@ -25,6 +27,12 @@ export default function SystemDesignInterviewPracticePage() {
             Because of this ambiguity, practicing alone is incredibly difficult. Reading "Designing
             Data-Intensive Applications" is great, but it doesn't prepare you for an interviewer
             asking, "What happens if our database node goes down?" midway through your explanation.
+          </p>
+          <p>
+            If the concepts themselves are still shaky, start with our free{" "}
+            <Link href={trackPath("system-design")}>System Design course</Link>. It takes one
+            building block at a time, from load balancers to consistency models, and makes you write
+            your own answer before it shows you a model one.
           </p>
         </>
       ),

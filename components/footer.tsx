@@ -1,12 +1,45 @@
 import { Github, Twitter, Mail } from "lucide-react"
 import Link from "next/link"
 import { Logo } from "@/components/Logo"
+import { LEARN_COURSE_LABEL, LEARN_HUB_PATH, trackPath } from "@/lib/tutorials/lesson-routes"
+import type { CourseId } from "@/lib/tutorials/types"
+
+/**
+ * The complete lesson index. Hardcoded as a literal here rather than imported from
+ * `app/learn/all/page.tsx`, because that page imports the curriculum registries and this footer is
+ * rendered inside several `"use client"` trees. Pulling a server-only module in through a shared
+ * constant would ship megabytes of authored lessons to the browser.
+ */
+const LEARN_ALL_LESSONS_PATH = "/learn/all"
+
+type FooterTrackLink = { label: string; href: string }
+
+/**
+ * The Learn tracks, one footer link each.
+ *
+ * Before this column existed the marketing surface had no crawlable link into `/learn` at all, so
+ * every lesson page launched as an orphan. Site-wide footer links are what put each track one hop
+ * from the homepage and every lesson three.
+ *
+ * Written as a `Record<CourseId, …>` so the day a fourth course lands this fails to compile instead
+ * of quietly dropping a track. `trackPath` is the URL authority; the paths are never spelled out
+ * here. `lesson-routes` is pure string building, which is what makes it safe to import from a
+ * component that ends up in client bundles.
+ */
+const FOOTER_TRACK_LINKS: Record<CourseId, FooterTrackLink> = {
+  python: { label: LEARN_COURSE_LABEL.python, href: trackPath("python") },
+  sql: { label: LEARN_COURSE_LABEL.sql, href: trackPath("sql") },
+  "system-design": {
+    label: LEARN_COURSE_LABEL["system-design"],
+    href: trackPath("system-design"),
+  },
+}
 
 export function Footer() {
   return (
     <footer className="bg-background border-border border-t">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5">
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
@@ -71,6 +104,39 @@ export function Footer() {
                 >
                   Documentation
                 </a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Learn — the free curriculum. Every entry is a plain anchor so it is crawlable. */}
+          <div>
+            <h3 className="text-foreground mb-4 font-semibold">Learn</h3>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link
+                  href={LEARN_HUB_PATH}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  All courses
+                </Link>
+              </li>
+              {Object.values(FOOTER_TRACK_LINKS).map((track) => (
+                <li key={track.href}>
+                  <Link
+                    href={track.href}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {track.label}
+                  </Link>
+                </li>
+              ))}
+              <li>
+                <Link
+                  href={LEARN_ALL_LESSONS_PATH}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Lesson index
+                </Link>
               </li>
             </ul>
           </div>

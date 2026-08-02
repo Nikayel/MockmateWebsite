@@ -22,6 +22,7 @@ import { signOut } from "@/lib/auth"
 import { useAuth } from "@/lib/auth-context"
 import { isLearnPath } from "@/components/learn/learn-tracks"
 import { LearnTrackDialog } from "@/components/learn/LearnTrackPicker"
+import { LEARN_HUB_PATH } from "@/lib/tutorials/lesson-routes"
 import { NotificationBell } from "@/components/notification-bell"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { Button } from "@/components/ui/button"
@@ -115,6 +116,15 @@ const MARKETING_NAV: MarketingNavItem[] = [
     isActive: (pathname) => pathname.startsWith("/why-codesparring"),
   },
   {
+    label: "Learn",
+    // A real anchor, deliberately NOT the picker button the signed-in nav uses. The Learn hub is the
+    // entry point to the whole public lesson corpus, and a crawler (or anyone middle-clicking) can
+    // only follow an <a href>. `LEARN_HUB_PATH` comes from the pure route module, so importing it
+    // here does not drag the multi-megabyte curriculum registries into the client bundle.
+    href: LEARN_HUB_PATH,
+    isActive: isLearnPath,
+  },
+  {
     label: "Interviews",
     href: "/interview-prep",
     isActive: (pathname) => pathname.startsWith("/interview-prep"),
@@ -198,7 +208,9 @@ export function Header() {
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className={`hidden items-center md:flex ${user ? "space-x-5" : "gap-8"}`}>
+            {/* The logged-out row gained a "Learn" link, so it tightens to gap-5 at the md
+                breakpoint (where the bar is narrowest) and only opens back up to gap-8 at lg. */}
+            <nav className={`hidden items-center md:flex ${user ? "space-x-5" : "gap-5 lg:gap-8"}`}>
               {!initialized ? (
                 <div className="flex h-10 items-center">
                   <div className="border-foreground h-5 w-5 animate-spin rounded-full border-b-2 opacity-50"></div>
