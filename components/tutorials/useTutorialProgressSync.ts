@@ -1,10 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { trackEvent } from "@/lib/analytics"
 import { useTutorialStore } from "@/lib/stores/tutorial-store"
 import { fetchLessonProgress, saveLessonProgress } from "@/lib/tutorials/progress-client"
 import type { TutorialProgressInput } from "@/lib/tutorials/progress"
-import type { TutorialLevelId } from "@/lib/tutorials/types"
+import type { SectionStatus, TutorialLevelId } from "@/lib/tutorials/types"
 
 /**
  * Resumes saved progress on mount and debounce-autosaves changes. Mirrors
@@ -15,6 +16,24 @@ import type { TutorialLevelId } from "@/lib/tutorials/types"
  * pristine (untouched) lesson is never persisted — no empty docs for mere visits.
  */
 const SAVE_DEBOUNCE_MS = 1000
+
+/**
+ * Which analytics event (if any) a lessonStatus sync should emit. `prevSynced` is the last
+ * status this session already accounted for: the post-hydration baseline on load, then each
+ * synced value. A lesson that loads as already completed therefore emits nothing, and re-saves
+ * of an unchanged status stay silent. Exported for unit testing.
+ */
+export function lessonStatusAnalyticsEvent(
+  prevSynced: SectionStatus | null,
+  next: SectionStatus
+): "lesson_started" | "lesson_complete" | null {
+  if (prevSynced === next) return null
+  if (next === "completed") return "lesson_complete"
+  if (next === "in_progress" && (prevSynced === null || prevSynced === "not_started")) {
+    return "lesson_started"
+  }
+  return null
+}
 
 export function useTutorialProgressSync(lessonId: string | null, levelId: TutorialLevelId | null) {
   const initLesson = useTutorialStore((s) => s.initLesson)
@@ -36,12 +55,17 @@ export function useTutorialProgressSync(lessonId: string | null, levelId: Tutori
   // Gate autosave until the initial load RESOLVES (progress hydrated, or a genuine "none"). If the load
   // FAILS, this stays false so autosave never overwrites the unread server doc with a reset state. (Audit #4.)
   const hasLoaded = useRef(false)
+  // Analytics baseline: the last lessonStatus already accounted for. Captured from the
+  // POST-hydration store when the load resolves, so a revisit to an already-completed
+  // lesson never re-emits lesson_complete.
+  const trackedStatus = useRef<SectionStatus | null>(null)
   useEffect(() => {
     if (!lessonId || !levelId) return
     const key = `${lessonId}:${reloadNonce}`
     if (loadedKey.current === key) return
     loadedKey.current = key
     hasLoaded.current = false
+    trackedStatus.current = null
 
     initLesson(lessonId, levelId)
     setError(null)
@@ -50,6 +74,7 @@ export function useTutorialProgressSync(lessonId: string | null, levelId: Tutori
       .then((progress) => {
         if (loadedKey.current !== key) return
         if (progress) hydrate(progress)
+        trackedStatus.current = useTutorialStore.getState().lessonStatus
         // Load confirmed (saved progress or a genuine none) — autosave may now persist changes.
         hasLoaded.current = true
       })
@@ -61,6 +86,23 @@ export function useTutorialProgressSync(lessonId: string | null, levelId: Tutori
         if (loadedKey.current === key) setLoading(false)
       })
   }, [lessonId, levelId, reloadNonce, initLesson, hydrate, setLoading, setError])
+
+  // Learn funnel events. Deliberately not folded into the autosave effect below: autosave skips
+  // pristine lessons and de-dupes identical snapshots, whereas the funnel only cares about
+  // lessonStatus crossing a boundary. Gated on the same `hasLoaded` as autosave so a lesson still
+  // hydrating never reports a resumed lesson as freshly started, and scoped to `storeLessonId` so a
+  // half-swapped store cannot attribute one lesson's transition to another.
+  useEffect(() => {
+    if (!lessonId || !levelId) return
+    if (!hasLoaded.current) return
+    if (storeLessonId !== lessonId) return
+
+    const event = lessonStatusAnalyticsEvent(trackedStatus.current, lessonStatus)
+    // Advance the baseline even when nothing is emitted, so a status only ever reports once.
+    // This is also what makes the StrictMode double-invoke a no-op on its second pass.
+    trackedStatus.current = lessonStatus
+    if (event) trackEvent(event, { lessonId, levelId })
+  }, [lessonId, levelId, storeLessonId, lessonStatus])
 
   // Debounced autosave of the persisted fields only.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
