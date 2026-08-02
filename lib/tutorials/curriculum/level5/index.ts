@@ -773,6 +773,397 @@ highest real rating). When there is no real rating at all, return
   },
 }
 
+const failureSignaturesLesson: PythonLesson = {
+  id: "py-l5-failure-signatures",
+  title: "The failure signatures of generated code",
+  summary:
+    "Seven shapes account for most bugs in code you did not write. Learn to name them on sight, then repair a function that swallows its own errors.",
+  estimatedMinutes: 24,
+  difficulty: "medium",
+  skills: ["code review", "debugging", "error handling", "verification"],
+  teach: {
+    estimatedMinutes: 10,
+    markdown: `## Bugs come in shapes
+
+Reviewing gets fast when you stop looking for "a bug" and start looking for known shapes. Code written quickly by anyone, human or model, fails in a small number of recognisable ways. Seven of them cover most of what you will actually find.
+
+### 1. Off by one at a boundary
+
+The correction that is right in the common case and wrong at the edge.
+
+\`\`\`python
+def page_count(total, per_page):
+    return total // per_page + 1     # wrong on every exact multiple
+\`\`\`
+
+Signature: an arithmetic \`+ 1\` or \`- 1\`, a slice bound, or \`range(1, n)\` versus \`range(n)\`. Test the exact multiple, the first element, and the last element.
+
+### 2. Unhandled empty or None
+
+The function assumes there is at least one of something, or that a value is present.
+
+\`\`\`python
+def busiest_hour(counts):
+    return counts.index(max(counts))     # ValueError on []
+\`\`\`
+
+Signature: \`max\`, \`min\`, \`[0]\`, \`[-1]\`, or division by \`len(...)\` with no guard above it. Test \`[]\`, and test data with a \`None\` in it.
+
+### 3. Silently swallowed errors
+
+The one that costs the most in production, because it produces no signal at all.
+
+\`\`\`python
+for row in rows:
+    try:
+        values[row.split("=")[0]] = int(row.split("=")[1])
+    except Exception:
+        pass                              # the bad rows just vanish
+\`\`\`
+
+Signature: \`except Exception: pass\`, \`except: continue\`, or a \`try\` block wrapping more lines than the one that can actually fail. A dropped row is indistinguishable from a row that was never there, so the report is quietly short and nobody finds out for a month.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "silent-except-cost",
+  "prompt": "A config loader wraps its parse loop in try/except Exception: pass. Ten of a thousand rows are malformed. What does the system do?",
+  "options": [
+    {
+      "label": "It crashes on the first malformed row, so the problem is found immediately",
+      "feedback": "That is what you would want, and it is what would happen without the except. The bare except is precisely what converts a loud failure into a silent one."
+    },
+    {
+      "label": "It logs a warning for each malformed row and carries on",
+      "feedback": "Reasonable to assume, because that is what a careful implementation does. But pass does not log anything: it discards the exception object and moves to the next iteration."
+    },
+    {
+      "label": "It returns 990 rows and reports complete success",
+      "correct": true,
+      "feedback": "Right, and this is the expensive part. Nothing distinguishes a dropped row from a row that never existed, so every downstream total is quietly low and the run looks clean."
+    },
+    {
+      "label": "It returns 1000 rows with None in the ten bad positions",
+      "feedback": "That would at least leave a trace you could find later. The except fires before any assignment happens, so nothing is written for those rows at all."
+    }
+  ]
+}
+\`\`\`
+
+### 4. The wrong side of a comparison
+
+\`>\` where the policy said "at or above", \`<=\` where it said "strictly under". No crash, no clue, and the difference shows up only on the exact boundary value.
+
+\`\`\`python
+def sla_breached(hours_open, sla_hours):
+    return hours_open > sla_hours    # policy says "at or above", so equality is missed
+\`\`\`
+
+Signature: any comparison against a threshold, a limit, a quota, or an expiry. Always test the exact threshold value.
+
+### 5. The ignored return value
+
+Python's string and tuple methods return new objects. Calling one and throwing away the result is a no-op that looks like work.
+
+\`\`\`python
+def redact(text, secrets):
+    for secret in secrets:
+        text.replace(secret, "[REDACTED]")   # result discarded, text unchanged
+    return text
+\`\`\`
+
+Signature: a bare method call on its own line whose object is immutable. \`str.replace\`, \`str.strip\`, \`str.upper\`, \`sorted\`, and \`list.copy\` all return; \`list.sort\`, \`list.append\`, and \`dict.update\` all mutate. Mixing the two conventions up is a top-three cause of "it does nothing and does not error".
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "ignored-return-value",
+  "prompt": "With redact above, what is the result of redact('token abc123', ['abc123'])?",
+  "options": [
+    {
+      "label": "'token [REDACTED]'",
+      "feedback": "That is what the code was meant to do and what a quick read suggests. str.replace builds and returns a new string though, and nothing here captures it."
+    },
+    {
+      "label": "'token abc123', unchanged",
+      "correct": true,
+      "feedback": "Right. Strings are immutable, so replace cannot alter text in place. The new string is created, discarded, and the original is returned."
+    },
+    {
+      "label": "'token abc123' with a warning printed to stderr",
+      "feedback": "Python does not warn about discarded return values, which is exactly why this bug survives. The expression is legal and its result is simply dropped."
+    },
+    {
+      "label": "A TypeError, because replace needs an assignment target",
+      "feedback": "A method call is a valid statement on its own, so there is no syntax or type problem here. The code runs cleanly and accomplishes nothing."
+    }
+  ]
+}
+\`\`\`
+
+### 6. The API that does not exist
+
+Confident calls to methods, keyword arguments, or modules that were never in the library. \`str.rreplace\`, \`sorted(x, cmp=...)\`, \`dict.get_or_default\`. These at least fail loudly, unless someone wrapped them in a \`try\`.
+
+### 7. The complexity you did not ask for
+
+Correct output, wrong cost. A membership test against a list inside a loop, \`list.pop(0)\` in a queue, string concatenation in a loop. It passes every test on ten rows and falls over on a hundred thousand.
+
+## Sorting a bug into its shape
+
+Naming the shape tells you the test to write. That is the whole payoff.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "sort-the-signature",
+  "prompt": "Each line comes from a function you are reviewing. Sort each one by how it will fail.",
+  "buckets": ["Silently wrong", "Raises on some input", "Right answer, wrong cost"],
+  "items": [
+    {
+      "label": "name.strip()",
+      "bucket": "Silently wrong",
+      "feedback": "strip returns a new string. On its own line the result is dropped and the original keeps its whitespace."
+    },
+    {
+      "label": "return sum(values) / len(values)",
+      "bucket": "Raises on some input",
+      "feedback": "An empty list makes len zero, so this raises ZeroDivisionError rather than returning anything wrong."
+    },
+    {
+      "label": "if item in seen_list:",
+      "bucket": "Right answer, wrong cost",
+      "feedback": "Membership in a list scans it, so inside a loop this is quadratic. The answers are correct until the input grows."
+    },
+    {
+      "label": "return balance > limit",
+      "bucket": "Silently wrong",
+      "feedback": "If the policy says at or above the limit, the equality case is missed and no error is ever raised."
+    },
+    {
+      "label": "config = json.loads(response)",
+      "bucket": "Raises on some input",
+      "feedback": "Any response that is not valid JSON raises JSONDecodeError right here, before any field is read."
+    },
+    {
+      "label": "output += line + chr(10)",
+      "bucket": "Right answer, wrong cost",
+      "feedback": "Each concatenation copies the whole accumulated string, so building a large document this way is quadratic in its length."
+    }
+  ]
+}
+\`\`\`
+
+## Errors are data, not noise
+
+The repair for a swallowed error is almost never "let it crash". It is to make the failure visible in the value the function returns, so the caller can decide.
+
+\`\`\`python
+def load_thresholds(rows):
+    values = {}
+    rejected = []
+    for row in rows:
+        try:
+            name, raw = row.split("=")
+            values[name] = int(raw)
+        except ValueError:
+            rejected.append(row)       # the row is reported, not deleted
+    return {"values": values, "rejected": rejected}
+\`\`\`
+
+Two changes carry all the weight. The \`except\` names \`ValueError\` rather than \`Exception\`, so a typo in your own code inside that block still crashes the way it should. And the bad row leaves the function in the return value, so a caller can count it, log it, or refuse to start.
+
+**Interview nuance:** when you are asked to review code out loud, naming the shape is the move. "This except swallows everything, so a malformed row is indistinguishable from a missing row" is a specific, testable claim. "This error handling could be better" is not, and interviewers hear the difference immediately.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "failure-signature-cumulative",
+  "prompt": "You are reviewing a generated function and you spot except Exception: pass around a parse loop. What is the strongest single change to ask for?",
+  "options": [
+    {
+      "label": "Delete the try/except so failures are loud",
+      "feedback": "It does restore the signal, and for a small script it may be right. For a batch job it means one malformed row out of a million kills the whole run, which is usually worse."
+    },
+    {
+      "label": "Narrow the except to the expected error and return the rejected rows",
+      "correct": true,
+      "feedback": "Right. Narrowing keeps your own bugs loud, and returning the rejects makes the failure a value the caller can count, log, or refuse to proceed on."
+    },
+    {
+      "label": "Add a print inside the except so the problem is visible in the logs",
+      "feedback": "Better than nothing and a genuine improvement in a script. In a service it buries the signal in log volume, and the function still reports success to its caller."
+    },
+    {
+      "label": "Wrap the whole function in a retry so transient failures resolve themselves",
+      "feedback": "Retrying is the right answer for a flaky network call, so the instinct transfers from somewhere real. A malformed row is deterministic and will fail identically on every attempt."
+    }
+  ],
+  "reveal": "Off by one, unhandled empty, swallowed error, wrong comparison side, ignored return value, invented API, wrong cost. Naming the shape is what turns a vague worry into the test you write next."
+}
+\`\`\``,
+    demoCode: `def redact(text, secrets):
+    for secret in secrets:
+        text.replace(secret, "[REDACTED]")   # result discarded
+    return text
+
+
+print(redact("token abc123", ["abc123"]))   # token abc123, unchanged`,
+  },
+  apply: {
+    id: "py-l5-failure-signatures-apply",
+    executionMode: "single-file",
+    prompt: `Repair \`load_thresholds(rows)\` in the starter so that a row it cannot parse is reported
+instead of dropped.
+
+The contract: each row is a string of the form \`"name=value"\` where \`value\` is an integer. Return
+a dictionary with \`"values"\` (the parsed \`name\` to integer mapping, in the order the rows arrived)
+and \`"rejected"\` (the raw rows that did not parse, in the order they arrived).
+
+The generated version swallows every failure with \`except Exception: pass\`, so a malformed row is
+indistinguishable from a row that was never sent. Narrow the exception it catches and put the bad
+rows in the return value.`,
+    starterCode: `def load_thresholds(rows):
+    # Generated code. Every failure disappears here.
+    values = {}
+    for row in rows:
+        try:
+            name, raw = row.split("=")
+            values[name] = int(raw)
+        except Exception:
+            pass
+    return {"values": values, "rejected": []}`,
+    hints: [
+      "Collect a `rejected` list alongside `values` and append `row` inside the except block.",
+      "Catch `ValueError` rather than `Exception`: both a bad integer and a row with the wrong number of `=` signs raise it.",
+      'A row like `"a=1=2"` fails when unpacking into two names, and `"broken"` fails the same way.',
+    ],
+    referenceSolution: `def load_thresholds(rows):
+    values = {}
+    rejected = []
+    for row in rows:
+        try:
+            name, raw = row.split("=")
+            values[name] = int(raw)
+        except ValueError:
+            rejected.append(row)
+    return {"values": values, "rejected": rejected}`,
+    testCases: [
+      {
+        input: { rows: ["cpu=80", "mem=70"] },
+        expected: { values: { cpu: 80, mem: 70 }, rejected: [] },
+        description: "every row parses",
+      },
+      {
+        input: { rows: ["cpu=80", "mem=high", "disk=90"] },
+        expected: { values: { cpu: 80, disk: 90 }, rejected: ["mem=high"] },
+        description: "a value that is not an integer",
+      },
+      {
+        input: { rows: ["broken", "a=1=2", "ok=5"] },
+        expected: { values: { ok: 5 }, rejected: ["broken", "a=1=2"] },
+        description: "rows with the wrong number of equals signs",
+      },
+      {
+        input: { rows: [] },
+        expected: { values: {}, rejected: [] },
+        description: "no rows at all",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l5-failure-signatures-practice",
+    executionMode: "single-file",
+    prompt: `Your team pipes support-ticket text into an analytics tool, and a \`redact\` function is
+supposed to strip API keys out first. An assistant wrote the version in the starter. Nobody has
+reported a problem, which is itself worrying, so you are checking it against a set of recorded
+tickets before the next release.
+
+Write a function \`first_leaking_case(cases)\` that returns the index of the first case in which
+\`redact\` disagrees with its contract, or \`-1\` if it handles all of them.
+
+Each case is a two-element list \`[text, secrets]\`. The contract: \`redact(text, secrets)\` returns
+\`text\` with every string in \`secrets\` replaced by \`"[REDACTED]"\`. Note that a case whose secret
+never appears in the text is handled correctly, so it is not a leak. Keep \`first_leaking_case\` as
+the last function in the file.`,
+    starterCode: `def redact(text, secrets):
+    # Generated code under review. Leave it exactly as it is.
+    for secret in secrets:
+        text.replace(secret, "[REDACTED]")
+    return text
+
+
+def first_leaking_case(cases):
+    # Each case is [text, secrets]. Return the index of the first one redact gets wrong.
+    pass`,
+    hints: [
+      "Write your own correct version first. The only difference is one assignment.",
+      "Unpack each case with `text, secrets = case` before you call anything.",
+      "A secret that does not occur in the text leaves the string unchanged either way, so that case passes.",
+    ],
+    referenceSolution: `def redact(text, secrets):
+    for secret in secrets:
+        text.replace(secret, "[REDACTED]")
+    return text
+
+
+def correct_redact(text, secrets):
+    for secret in secrets:
+        text = text.replace(secret, "[REDACTED]")
+    return text
+
+
+def first_leaking_case(cases):
+    for index, case in enumerate(cases):
+        text, secrets = case
+        if redact(text, secrets) != correct_redact(text, secrets):
+            return index
+    return -1`,
+    testCases: [
+      {
+        input: {
+          cases: [
+            ["hello", ["zzz"]],
+            ["token abc", ["abc"]],
+          ],
+        },
+        expected: 1,
+        description: "the first secret never appears, the second does",
+      },
+      {
+        input: {
+          cases: [
+            ["nothing to hide", []],
+            ["clean text", ["nope"]],
+          ],
+        },
+        expected: -1,
+        description: "no case actually contains a secret",
+      },
+      {
+        input: { cases: [["key=SECRET", ["SECRET"]]] },
+        expected: 0,
+        description: "the very first ticket leaks",
+      },
+      {
+        input: {
+          cases: [
+            ["a", ["b"]],
+            ["c", ["d"]],
+            ["e f", ["f"]],
+          ],
+        },
+        expected: 2,
+        description: "two harmless cases before the leak",
+      },
+    ],
+  },
+}
+
 export const level5: PythonLevel = {
   id: 5,
   slug: "verification",
@@ -786,7 +1177,7 @@ export const level5: PythonLevel = {
       title: "Read It Before You Run It",
       description:
         "Recover the contract, trace the boundary, and find the input that exposes plausible-looking code.",
-      lessons: [traceFirstLesson, happyPathLesson],
+      lessons: [traceFirstLesson, happyPathLesson, failureSignaturesLesson],
     },
   ],
 }
