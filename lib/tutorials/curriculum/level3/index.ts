@@ -4877,11 +4877,12 @@ def run_tests(record):
 
     def broadcasts_a_scalar():
         result = Vector([1, 2, 3]) * 2
-        assert result == Vector([2, 4, 6]), f"got {result!r}"
+        assert result.values == [2, 4, 6], f"got {result!r}"
+        assert result.dtype == "int64", f"got {result.dtype!r}"
 
     def adds_elementwise():
         result = Vector([1, 2, 3]) + Vector([10, 20, 30])
-        assert result == Vector([11, 22, 33]), f"got {result!r}"
+        assert result.values == [11, 22, 33], f"got {result!r}"
 
     record("infers int64 for whole numbers", infers_int64_for_whole_numbers)
     record("one float promotes the whole array", one_float_promotes_the_whole_array)
