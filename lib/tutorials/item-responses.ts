@@ -49,7 +49,9 @@ const failedTestSchema = z.object({
  * server-owned or server-derived and are never trusted from the body.
  */
 export const learnItemResponseInputSchema = z.object({
-  kind: z.enum(["exercise_run", "check_answer", "hint_reveal", "reference_reveal"]),
+  kind: z.enum(["exercise_run", "check_answer", "hint_reveal", "reference_reveal", "demo_run"]),
+  /** `demo_run` only: whether the learner edited the example before running it. */
+  edited: z.boolean().optional(),
   lessonId: z.string().min(1).max(200),
   levelId: z.union([
     z.literal(0),
@@ -158,6 +160,8 @@ export function composeItemResponse(
 
   if (input.hintIndex !== undefined) optional.hint_index = input.hintIndex
   if (input.hintsTotal !== undefined) optional.hints_total = input.hintsTotal
+
+  if (input.edited !== undefined) optional.edited = input.edited
 
   if (input.latencyMs !== undefined) {
     optional.latency_ms = Math.round(Math.min(input.latencyMs, MAX_LATENCY_MS))

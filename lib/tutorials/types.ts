@@ -340,12 +340,19 @@ export interface TutorialLessonProgress {
  *  - `check_answer`      one commit of an inline `check` widget
  *  - `hint_reveal`       the learner opened hint N of M
  *  - `reference_reveal`  the learner opened the reference solution
+ *  - `demo_run`          the learner ran the teach example, ungraded
+ *
+ * `demo_run` is the only one that is not an assessment. It is worth a row because
+ * whether a learner experiments with the worked example before attempting the
+ * exercise is a real behavioral variable, and the ungraded playground is exactly
+ * where self-directed exploration would show up if it happens at all.
  */
 export type LearnItemResponseKind =
   | "exercise_run"
   | "check_answer"
   | "hint_reveal"
   | "reference_reveal"
+  | "demo_run"
 
 /** One failing assertion, captured for error-taxonomy work. Truncated before write. */
 export interface LearnFailedTest {
@@ -413,6 +420,10 @@ export interface LearnItemResponse {
   // ---- hint_reveal ----
   hint_index?: number
   hints_total?: number
+
+  // ---- demo_run ----
+  /** Whether the learner modified the worked example before running it. */
+  edited?: boolean
 
   /** Milliseconds from the item becoming interactive to this action. Client-measured, clamped. */
   latency_ms?: number
