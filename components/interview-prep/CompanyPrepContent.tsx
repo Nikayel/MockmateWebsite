@@ -3,11 +3,25 @@
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Lock, Users, Clock, Crown } from "lucide-react"
+import { ArrowRight, Lock, Clock, Crown } from "lucide-react"
 import Link from "next/link"
 import type { CompanyQuestionData } from "@/lib/data/company-questions/types"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 
+/**
+ * The gated body of a company guide.
+ *
+ * NOTE FOR FUTURE EDITORS: this component used to open with a banner reading "N engineers prepared
+ * for {company} this month", where N was `1200 + (sum of the company name's char codes % 800)`. It
+ * was invented social proof, it was deterministic per company so it never even changed, and it was
+ * rendered on every one of the statically generated company pages. The same page also told visitors
+ * that "the average candidate needs `mustKnowQuestions.length * 2.5` hours", a number with no
+ * grounding in anything.
+ *
+ * Both are gone. If a section here needs a figure, it must come from the company's own authored
+ * record (pattern count, difficulty mix, round count, timeline) and it must be labelled as what it
+ * is. Do not reintroduce a usage or popularity metric until there is a real one to read.
+ */
 interface CompanyPrepContentProps {
   company: CompanyQuestionData
 }
@@ -74,43 +88,35 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
   const lockedRoundsCount = Math.max(0, company.interviewProcess.rounds.length - FREE_ROUNDS_COUNT)
   const lockedTipsCount = Math.max(0, company.interviewProcess.tips.length - FREE_TIPS_COUNT)
 
-  // Generate social proof number (deterministic based on company name)
-  const hash = company.name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
-  const monthlyCount = 1200 + (hash % 800)
+  // The mix of typical difficulties across this company's own patterns. A real fact about the
+  // company's data, computed from the company's data, and the only "at a glance" claim this
+  // component makes.
+  const hardPatternCount = company.topPatterns.filter(
+    (pattern) => pattern.typicalDifficulty === "hard"
+  ).length
 
   return (
     <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 lg:grid-cols-3">
       {/* Left Column - Main Content */}
       <div className="space-y-8 lg:col-span-2">
-        {/* Social Proof Banner - Only for non-logged-in users after auth initialized */}
-        {!isLoggedIn && initialized && (
-          <div className="rounded-lg border border-emerald-900/50 bg-emerald-950/30 p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-900/50">
-                  <Users className="h-4 w-4 text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-white">
-                    <span className="font-semibold text-emerald-400">
-                      {monthlyCount.toLocaleString()}
-                    </span>{" "}
-                    engineers prepared for {company.name} this month
-                  </p>
-                </div>
-              </div>
-              <Link href={`/login?redirect=/interview-prep/${company.id}`}>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-emerald-700 text-xs text-emerald-400 hover:bg-emerald-900/50"
-                >
-                  Join them
-                </Button>
-              </Link>
-            </div>
-          </div>
-        )}
+        {/* What this guide contains. Derived from the company record, not from usage we cannot see. */}
+        <div className="border-border bg-card rounded-lg border p-4">
+          <p className="text-muted-foreground text-sm">
+            This guide tracks{" "}
+            <span className="text-foreground font-medium">
+              {company.topPatterns.length} patterns
+            </span>
+            {hardPatternCount > 0 && <> ({hardPatternCount} of them typically hard)</>},{" "}
+            <span className="text-foreground font-medium">
+              {company.mustKnowQuestions.length} commonly reported questions
+            </span>
+            , and a{" "}
+            <span className="text-foreground font-medium">
+              {company.interviewProcess.totalRounds}-round loop
+            </span>{" "}
+            that usually runs {company.interviewProcess.timeline}.
+          </p>
+        </div>
 
         {/* Top Patterns */}
         <div>
@@ -151,7 +157,6 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
               <LockedContentOverlay
                 count={lockedPatternsCount}
                 contentType="patterns"
-                companyName={company.name}
                 companyId={company.id}
                 previewItems={company.topPatterns
                   .slice(FREE_PATTERNS_COUNT, FREE_PATTERNS_COUNT + 2)
@@ -218,7 +223,6 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
               <LockedContentOverlay
                 count={lockedQuestionsCount}
                 contentType="must-know questions"
-                companyName={company.name}
                 companyId={company.id}
                 previewItems={company.mustKnowQuestions
                   .slice(FREE_QUESTIONS_COUNT, FREE_QUESTIONS_COUNT + 2)
@@ -287,7 +291,6 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
               <LockedContentOverlay
                 count={lockedRoundsCount}
                 contentType="interview rounds"
-                companyName={company.name}
                 companyId={company.id}
                 previewItems={company.interviewProcess.rounds
                   .slice(FREE_ROUNDS_COUNT, FREE_ROUNDS_COUNT + 1)
@@ -511,16 +514,17 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
           )}
         </div>
 
-        {/* Urgency CTA for non-logged-in users */}
+        {/* Signed-out CTA. States the real shape of the loop rather than an invented study duration. */}
         {!isLoggedIn && (
           <div className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-4">
             <div className="flex items-start gap-3">
-              <Clock className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
+              <Clock className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" aria-hidden="true" />
               <div>
                 <h3 className="mb-1 text-sm font-medium text-amber-400">Interview coming up?</h3>
                 <p className="text-muted-foreground mb-3 text-xs">
-                  The average {company.name} candidate needs{" "}
-                  {Math.ceil(company.mustKnowQuestions.length * 2.5)} hours to cover all patterns.
+                  {company.name} runs {company.interviewProcess.totalRounds} rounds over{" "}
+                  {company.interviewProcess.timeline}. A free account unlocks the rest of this guide
+                  and a full practice round against the AI interviewer.
                 </p>
                 <Link href={`/login?redirect=/interview-prep/${company.id}`}>
                   <Button
@@ -528,7 +532,7 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
                     variant="outline"
                     className="w-full border-amber-700 text-xs text-amber-400 hover:bg-amber-900/30"
                   >
-                    Start preparing now
+                    Create a free account
                   </Button>
                 </Link>
               </div>
@@ -540,17 +544,16 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
   )
 }
 
-// Locked content overlay component
+// Locked content overlay component. `companyName` used to be passed in and never read; it is gone
+// rather than prefixed, since the only string this renders is the count and the content type.
 function LockedContentOverlay({
   count,
   contentType,
-  companyName,
   companyId,
   previewItems,
 }: {
   count: number
   contentType: string
-  companyName: string
   companyId: string
   previewItems: React.ReactNode
 }) {

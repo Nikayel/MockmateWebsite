@@ -81,7 +81,7 @@ export const stripeData: CompanyQuestionData = {
     ],
     timeline: "3-5 weeks",
     tips: [
-      "⚠️ IMPORTANT: Stripe does NOT do traditional LeetCode-style interviews - grinding LC may be counterproductive",
+      "Stripe does not run traditional LeetCode-style interviews, so grinding LeetCode alone can be counterproductive",
       "Stripe interviews include practical coding (debugging real code from their codebase)",
       "Focus on debugging skills, code reading, and practical problem-solving",
       "Know payment systems and financial concepts",
@@ -99,7 +99,7 @@ export const stripeData: CompanyQuestionData = {
     allowsPseudocode: false,
     providesHints: true,
     uniqueTraits: [
-      "⚠️ NOT a typical LeetCode interview - practical coding focus",
+      "Not a typical LeetCode interview: the focus is practical coding",
       "Practical debugging/bug-fix rounds with real Stripe code",
       "Financial domain knowledge is a plus",
       "API design questions are common",

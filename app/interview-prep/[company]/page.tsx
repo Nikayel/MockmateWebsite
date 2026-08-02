@@ -3,10 +3,37 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { ALL_COMPANIES, COMPANY_TIERS, getCompanyById, CompanyId } from "@/lib/data/company-questions"
+import {
+  ALL_COMPANIES,
+  COMPANY_TIERS,
+  getCompanyById,
+  CompanyId,
+} from "@/lib/data/company-questions"
 import { BreadcrumbJsonLd } from "@/components/seo/JsonLd"
 import { CompanyPrepContent } from "@/components/interview-prep/CompanyPrepContent"
 import { CompanyHeroCTA } from "@/components/interview-prep/CompanyHeroCTA"
+import { CompanyLearnPaths } from "@/components/interview-prep/CompanyLearnPaths"
+import { CompanyCulture } from "@/components/interview-prep/CompanyCulture"
+import { PlatformSummary } from "@/components/interview-prep/PlatformSummary"
+import {
+  listCompanyLearnPaths,
+  summarizeLearnCorpus,
+} from "@/lib/interview-prep/company-learn-routes"
+import { absoluteUrl } from "@/lib/seo/site"
+
+/**
+ * One company's interview guide. Statically generated for every company in `ALL_COMPANIES`.
+ *
+ * This is the most-crawled template on the site, and it used to be the least representative of the
+ * product: pattern tables, lock icons, and an invented social-proof counter. It now ends with three
+ * ungated, server-rendered sections that are all driven by data already in the repo:
+ * `CompanyLearnPaths` (real public lesson URLs resolved from the live curriculum catalog),
+ * `CompanyCulture` (the `coreValues` / `engineeringCulture` records that had zero render sites), and
+ * `PlatformSummary` (what CodeSparring is, with live curriculum totals).
+ *
+ * Keeping those three as Server Components matters: they land in the static HTML, so a signed-out
+ * visitor and a crawler see the same thing, and the company pages stop being crawl dead ends.
+ */
 
 // Generate static paths for all companies
 export async function generateStaticParams() {
@@ -32,7 +59,7 @@ export async function generateMetadata({
 
   const currentYear = new Date().getFullYear()
   const title = `${company.name} Interview Prep Guide ${currentYear} | Patterns, Questions & Tips`
-  const description = `Complete ${company.name} coding interview preparation guide. Learn the top ${company.topPatterns.length} DSA patterns, ${company.mustKnowQuestions.length}+ must-know questions, ${company.interviewProcess.totalRounds}-round interview process, and insider tips. Updated for ${currentYear}.`
+  const description = `Complete ${company.name} coding interview preparation guide. The top ${company.topPatterns.length} DSA patterns, ${company.mustKnowQuestions.length} commonly reported questions, the ${company.interviewProcess.totalRounds}-round loop, and free lessons you can start reading without an account.`
 
   return {
     title,
@@ -53,14 +80,16 @@ export async function generateMetadata({
       canonical: `/interview-prep/${company.id}`,
     },
     openGraph: {
+      // `images` is intentionally omitted: `app/opengraph-image.tsx` is inherited by this segment.
       title: `${company.name} Interview Prep | CodeSparring`,
-      description: `Master your ${company.name} interview with our comprehensive guide. ${company.topPatterns.length} patterns, ${company.mustKnowQuestions.length}+ must-know questions.`,
+      description: `${company.name} interview guide: ${company.topPatterns.length} patterns, ${company.mustKnowQuestions.length} commonly reported questions, and the ${company.interviewProcess.totalRounds}-round loop.`,
+      url: `/interview-prep/${company.id}`,
       type: "article",
     },
     twitter: {
       card: "summary_large_image",
       title: `${company.name} Interview Prep Guide`,
-      description: `Everything you need to ace your ${company.name} coding interview.`,
+      description: `Everything you need to prepare for your ${company.name} coding interview.`,
     },
   }
 }
@@ -76,6 +105,11 @@ export default async function CompanyPrepPage({
   if (!company) {
     notFound()
   }
+
+  // Resolved at build time against the live curriculum. Both lists can be empty, and the components
+  // render nothing in that case rather than an empty container.
+  const { patternLinks, systemDesignLinks } = listCompanyLearnPaths(company)
+  const corpus = summarizeLearnCorpus()
 
   // Find related companies, preferring the same tier first, then filling from the
   // rest of the roster. Still capped at slice(0, 3) so the rendered shape is unchanged.
@@ -97,7 +131,12 @@ export default async function CompanyPrepPage({
         ]}
       />
 
-      {/* Company-specific JSON-LD */}
+      {/*
+        Company-specific JSON-LD. `courseWorkload` used to be emitted here as
+        `P{ceil(mustKnowQuestions.length / 2)}D`, which published an invented study duration as a
+        machine-readable fact; it is gone rather than re-derived, because no field in the data
+        measures how long preparation takes.
+      */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -105,16 +144,16 @@ export default async function CompanyPrepPage({
             "@context": "https://schema.org",
             "@type": "Course",
             name: `${company.name} Interview Preparation`,
-            description: `Comprehensive coding interview preparation for ${company.name}. Covers ${company.topPatterns.length} DSA patterns and ${company.mustKnowQuestions.length}+ must-know questions.`,
+            description: `Coding interview preparation guide for ${company.name}. Covers ${company.topPatterns.length} DSA patterns, ${company.mustKnowQuestions.length} commonly reported questions, and the ${company.interviewProcess.totalRounds}-round interview loop.`,
+            url: absoluteUrl(`/interview-prep/${company.id}`),
             provider: {
               "@type": "Organization",
               name: "CodeSparring",
-              url: "https://codesparring.dev",
+              url: absoluteUrl("/"),
             },
             hasCourseInstance: {
               "@type": "CourseInstance",
               courseMode: "online",
-              courseWorkload: `P${Math.ceil(company.mustKnowQuestions.length / 2)}D`,
             },
             about: {
               "@type": "Organization",
@@ -132,9 +171,9 @@ export default async function CompanyPrepPage({
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-5xl">
             {/* Breadcrumb */}
-            <nav className="text-muted-foreground mb-4 text-sm">
+            <nav aria-label="Breadcrumb" className="text-muted-foreground mb-4 text-sm">
               <Link href="/interview-prep" className="hover:text-foreground">
-                ← All companies
+                &larr; All companies
               </Link>
             </nav>
 
@@ -145,11 +184,11 @@ export default async function CompanyPrepPage({
             {/* Key info inline */}
             <div className="text-muted-foreground mb-6 flex flex-wrap items-center gap-4 text-sm">
               <span>{company.interviewProcess.totalRounds} rounds</span>
-              <span>·</span>
+              <span aria-hidden="true">·</span>
               <span>{company.interviewProcess.timeline}</span>
-              <span>·</span>
+              <span aria-hidden="true">·</span>
               <span>{company.topPatterns.length} patterns</span>
-              <span>·</span>
+              <span aria-hidden="true">·</span>
               <span
                 className={
                   company.difficultyDistribution.hard >= 30 ? "text-red-400" : "text-amber-400"
@@ -171,20 +210,36 @@ export default async function CompanyPrepPage({
         </div>
       </section>
 
+      {/* The secondary path: free public lessons, ungated, in the static HTML. */}
+      <CompanyLearnPaths
+        companyName={company.name}
+        patternLinks={patternLinks}
+        systemDesignLinks={systemDesignLinks}
+      />
+
+      {/* Authored company culture data that previously had no render site anywhere. */}
+      <CompanyCulture company={company} />
+
+      {/* The primary path: what practicing here actually looks like. */}
+      <PlatformSummary corpus={corpus} companyName={company.name} />
+
       {/* Related Companies - Simple */}
       <section className="border-border border-t py-8">
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-5xl">
             <h2 className="text-muted-foreground mb-4 text-sm">Other companies</h2>
-            <div className="flex flex-wrap gap-2">
+            <ul className="flex flex-wrap gap-2">
               {relatedCompanies.map((related) => (
-                <Link key={related.id} href={`/interview-prep/${related.id}`}>
-                  <span className="border-border bg-card text-foreground hover:border-border hover:bg-muted inline-block rounded-lg border px-4 py-2 text-sm transition-colors">
+                <li key={related.id}>
+                  <Link
+                    href={`/interview-prep/${related.id}`}
+                    className="border-border bg-card text-foreground hover:border-border hover:bg-muted focus-visible:ring-ring inline-block rounded-lg border px-4 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                  >
                     {related.name}
-                  </span>
-                </Link>
+                  </Link>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
         </div>
       </section>
