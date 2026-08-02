@@ -11,6 +11,7 @@
 
 import { adminDb } from "../firebase-admin"
 import { getAlgorithmConfig } from "./algorithm-config"
+import { MEMORY_STRENGTH_BANDS, memoryBandFor, type MemoryUrgency } from "./memory-bands"
 import type { SpacedRepetitionAlgorithm, SpacedRepetitionMasteryLevel } from "../types"
 import type { Difficulty, MasteryLevel as SM2MasteryLevel } from "./sm2-algorithm"
 import {
@@ -509,35 +510,10 @@ export function estimateRetentionForAlgorithm(
   return estimateRetention(algorithm, state, daysSinceReview)
 }
 
-export type MemoryUrgency = "safe" | "ok" | "warning" | "urgent"
-
-/**
- * The one place the retention bands are defined, highest floor first.
- *
- * Exported because several surfaces band the same number independently and had
- * already drifted: /knowledge coloured its concept bars at 80/60/40 while the card
- * chip beside it used these cut points, so one value could read green on the bar and
- * amber on the chip. Anything that turns a 0-100 retention into a label, a colour or
- * a verdict must derive it from here.
- *
- * The two named constants elsewhere are the same numbers by design:
- * `SOLID_RECALL_THRESHOLD` (0.9) is the "safe" floor and `AT_RISK_RETRIEVABILITY`
- * (70) is the "ok" floor.
- */
-export const MEMORY_STRENGTH_BANDS = [
-  { floor: 90, label: "Strong", urgency: "safe" },
-  { floor: 70, label: "Good", urgency: "ok" },
-  { floor: 50, label: "Weakening", urgency: "warning" },
-  { floor: 0, label: "Fading", urgency: "urgent" },
-] as const satisfies ReadonlyArray<{ floor: number; label: string; urgency: MemoryUrgency }>
-
-/** The band a 0-100 retention falls in. Values outside the range clamp to an end band. */
-export function memoryBandFor(retention: number): { label: string; urgency: MemoryUrgency } {
-  const band =
-    MEMORY_STRENGTH_BANDS.find((b) => retention >= b.floor) ??
-    MEMORY_STRENGTH_BANDS[MEMORY_STRENGTH_BANDS.length - 1]
-  return { label: band.label, urgency: band.urgency }
-}
+// Re-exported so existing server-side callers keep one import site. CLIENT
+// components must import from ./memory-bands directly — this module pulls in
+// firebase-admin, which cannot go in a browser bundle.
+export { MEMORY_STRENGTH_BANDS, memoryBandFor, type MemoryUrgency }
 
 /**
  * Convert retention to a consistent "memory strength" score
