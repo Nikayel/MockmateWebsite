@@ -3445,6 +3445,34 @@ sender.assert_any_call("a")  # passes: "a" appears in the history
 sender.call_args_list        # [call('a'), call('b')]
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "unconfigured-mock-return-value",
+  "prompt": "The code under test does: result = client.fetch(user_id), then if result: save(result). Your test passes in a plain Mock() and never sets return_value. Does the save branch run?",
+  "options": [
+    {
+      "label": "No. An unconfigured mock returns None, which is falsy",
+      "feedback": "The most common wrong model of Mock, and it makes tests look far more meaningful than they are. Mock is built to answer everything, so returning None would defeat its whole design."
+    },
+    {
+      "label": "Yes. The call returns another Mock, and a Mock is truthy",
+      "correct": true,
+      "feedback": "Right, and that is why a test like this passes whatever your code does. If the branch matters, configure the return explicitly with client.fetch.return_value."
+    },
+    {
+      "label": "It raises AttributeError, because fetch was never configured on the mock",
+      "feedback": "That is what you get from Mock(spec=Client) or create_autospec, which is exactly why those exist. A plain Mock invents any attribute you ask for, silently."
+    },
+    {
+      "label": "No. The mock records the call instead of returning a value from it",
+      "feedback": "It does record the call, and that recording is the point of a mock. Recording and returning are not alternatives though: every call is logged and also hands back a value."
+    }
+  ]
+}
+\`\`\`
+
 This is why the Apply and Practice steps keep \`sender\` as a parameter: the driver passes in a recorder (Apply) or a real \`Mock\` (Practice), then asserts how you called it.
 
 The recorder answers a handful of different questions, and mixing them up is why mock assertions pass when they should not:
@@ -3477,7 +3505,65 @@ m.snd("hi")   # typo of .send: no error, and the test still "passes"
 
 So a test can be green while production crashes. Two fixes: \`Mock(spec=Emailer)\` rejects attributes the real class does not have (\`m.snd\` now raises \`AttributeError\`), and \`create_autospec(Emailer)\` additionally checks call signatures, so calling \`send()\` with the wrong arguments raises \`TypeError\` inside the test.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "assert-called-with-checks-last-call",
+  "prompt": "send_all(sender, ['a', 'b']) has just run, so the mock recorded two calls. Your test then asserts sender.assert_called_with('a'). What happens?",
+  "options": [
+    {
+      "label": "It passes. 'a' was one of the calls, and that is what the method checks",
+      "feedback": "The name really does read that way, which is why this one is missed in review. It checks the most recent call only, so with two calls it is asking about the second."
+    },
+    {
+      "label": "It fails, because it only checks the most recent call, which was sender('b')",
+      "correct": true,
+      "feedback": "Right. Use assert_any_call when you mean somewhere in the history, or compare call_args_list against a list when you also care about the order."
+    },
+    {
+      "label": "It passes, but only because call_count happens to be greater than one",
+      "feedback": "Getting the direction backwards is understandable given how many of these methods there are. More calls make this assertion harder to satisfy, not easier, since only the last one is examined."
+    },
+    {
+      "label": "It quietly does nothing, since assert methods on a Mock are no-ops",
+      "feedback": "A sharp thing to be suspicious about: a MISSPELLED assert method really is a silent no-op, because Mock invents the attribute and returns another Mock. This name is spelled correctly, so it genuinely runs."
+    }
+  ]
+}
+\`\`\`
+
 Also watch \`assert_called_with\`: it checks only the most recent call. After the demo, \`sender.assert_called_with("a")\` fails because the last call was \`sender("b")\`. Use \`assert_any_call\` when you mean "somewhere in the history."
+
+When a collaborator cannot be injected, the fallback is \`unittest.mock.patch\`, and it has one rule that trips up nearly everybody:
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "patch-where-it-is-looked-up",
+  "prompt": "myapp/service.py starts with: from myapp.clients import fetch_user, and get_profile() calls fetch_user(uid). Your test patches myapp.clients.fetch_user. What happens?",
+  "options": [
+    {
+      "label": "The real function is replaced, since that is the module where it is defined",
+      "feedback": "The intuition nearly everyone starts with, and the patch does succeed: it really does swap the attribute on myapp.clients. The problem is that service.py is no longer reading from there."
+    },
+    {
+      "label": "Nothing is intercepted. The from-import already bound a reference in service, so you must patch myapp.service.fetch_user",
+      "correct": true,
+      "feedback": "Right. from X import Y copies the object into the importing module's namespace at import time, so patch where the name is looked up, not where it was defined."
+    },
+    {
+      "label": "AttributeError, because fetch_user is not an attribute of myapp.clients",
+      "feedback": "It is an attribute there, which is precisely what makes this quiet. patch only raises when the target name genuinely does not exist, and here it does."
+    },
+    {
+      "label": "It works, but the patch leaks into later tests unless you use a context manager or decorator",
+      "feedback": "Leaking is a real concern with patch.start() and no matching stop(). Both the decorator and the with-block undo themselves, so cleanup is not the issue here. The target path is."
+    }
+  ]
+}
+\`\`\`
 
 ## The modern tool stack
 
@@ -3486,7 +3572,36 @@ Also watch \`assert_called_with\`: it checks only the most recent call. After th
 - \`pytest --cov\` (coverage.py): reports which lines your tests exercised. Cover the branches that matter, not a 100% badge.
 - \`pre-commit\`: runs all of these on \`git commit\`, so nothing broken lands.
 
-**Interview nuance:** know what a coverage number does not tell you. \`pytest --cov\` reports line coverage by default, so a line counts as covered the moment it runs once. An \`if\` with no \`else\` can show 100% while the case where the condition is false never executes. Add \`--cov-branch\` to require both directions of each branch, and remember that even full branch coverage only proves the lines ran, not that your assertions checked the right thing.`,
+**Interview nuance:** know what a coverage number does not tell you. \`pytest --cov\` reports line coverage by default, so a line counts as covered the moment it runs once. An \`if\` with no \`else\` can show 100% while the case where the condition is false never executes. Add \`--cov-branch\` to require both directions of each branch, and remember that even full branch coverage only proves the lines ran, not that your assertions checked the right thing.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "what-100-percent-coverage-proves",
+  "prompt": "Your PR reports 100 percent line coverage on the module you changed. What has that actually established?",
+  "options": [
+    {
+      "label": "Every line ran at least once while the suite was executing",
+      "correct": true,
+      "feedback": "Right, and that is the entire claim. Coverage is a floor: it tells you what was definitely not exercised, and never that what ran was correct."
+    },
+    {
+      "label": "Every branch was taken in both directions",
+      "feedback": "That is a different measurement, and you have to ask for it with --cov-branch. An if with no else reaches 100 percent line coverage while the false path never runs once."
+    },
+    {
+      "label": "The module has no untested behavior left in it",
+      "feedback": "The reading that makes coverage targets so seductive to managers. Behavior is not lines: an unhandled empty list, a boundary value, an exception path with no raise in the suite are all uncovered behavior on fully covered lines."
+    },
+    {
+      "label": "The assertions in those tests checked the right values",
+      "feedback": "Nothing in the world can establish that from a coverage number. Delete every assert in the suite and coverage stays at 100 percent, which is the fastest way to see what the metric does not measure."
+    }
+  ],
+  "reveal": "Each tool in the stack answers one narrow question. Coverage says which lines ran, mypy says which types cannot line up, and only your assertions say whether the answers were right. They catch different bugs, and none of the three substitutes for another."
+}
+\`\`\``,
     demoCode: `from unittest.mock import Mock
 
 
