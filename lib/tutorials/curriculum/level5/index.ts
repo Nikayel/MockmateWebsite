@@ -1164,6 +1164,442 @@ def first_leaking_case(cases):
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L5-M2: The Test Is the Verification
+// ───────────────────────────────────────────────────────────────────────────
+
+const failingTestLesson: PythonLesson = {
+  id: "py-l5-failing-test",
+  title: "Write the test that catches the bug",
+  summary:
+    "A suspicion is not a bug. The assertion that fails before the fix and passes after it is the only durable artifact of a review.",
+  estimatedMinutes: 24,
+  difficulty: "medium",
+  skills: ["test design", "assertions", "code review", "regression tests"],
+  teach: {
+    estimatedMinutes: 10,
+    markdown: `## The only review comment that cannot be argued with
+
+"I think this breaks on empty input" starts a conversation. "\`summarize([])\` raises IndexError, here is the line" ends one. The difference is not tone, it is that the second is a fact anyone can reproduce in five seconds.
+
+A test is that fact, written down so it keeps being checked. Everything else in a review evaporates the moment the branch merges.
+
+A useful test has exactly two properties:
+
+1. It **fails** against the current code.
+2. It **passes** against code that satisfies the contract.
+
+A test that passes both before and after the fix proves nothing about the fix. That sounds obvious and it is the single most common flaw in tests written under time pressure, because the natural instinct is to test the behavior you understand, which is the behavior that already works.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "test-must-fail-first",
+  "prompt": "You suspect that def busiest_hour(counts): return counts.index(max(counts)) mishandles ties. Which assertion is worth adding?",
+  "options": [
+    {
+      "label": "assert busiest_hour([1, 5, 2]) == 1",
+      "feedback": "It documents the ordinary case, which is genuinely worth having in a suite. It cannot tell you anything about ties, because there is no tie in this input."
+    },
+    {
+      "label": "assert busiest_hour([5, 5, 2]) == 0",
+      "correct": true,
+      "feedback": "Right. This is the smallest input that contains a tie, so it forces the code to reveal which of the tied positions it reports and pins that decision down."
+    },
+    {
+      "label": "assert busiest_hour([]) is None",
+      "feedback": "A real boundary and worth a separate test, but it is about emptiness rather than ties. Mixing the two concerns into one investigation is how bugs get half-diagnosed."
+    },
+    {
+      "label": "assert isinstance(busiest_hour([1, 5, 2]), int)",
+      "feedback": "Type assertions look rigorous and almost never fail, because the wrong answer is usually the right type. This one passes whether the tie handling is correct or not."
+    }
+  ]
+}
+\`\`\`
+
+## Arrange, act, assert
+
+Every test has the same three parts, and keeping them visually separate is what makes a failing test readable at 2am.
+
+\`\`\`python
+def test_blank_ratings_do_not_crash():
+    scores = [4, None, 5]                 # arrange: the input, built here, not shared
+    summary = summarize_ratings(scores)   # act: exactly one call
+    assert summary["count"] == 2          # assert: one claim per line
+    assert summary["average"] == 4.5
+\`\`\`
+
+Three rules earn their keep.
+
+**Build the input inside the test.** A fixture shared between tests is a dependency between tests: if the function under review mutates its argument, test three fails because of what test one did, and you spend an hour on the wrong function.
+
+**One call in the act.** If two calls are needed to reproduce, the second one belongs to a different test, or the pair is itself the thing being tested and should say so.
+
+**Name the test after the claim.** \`test_blank_ratings_do_not_crash\` tells you what broke from the failure line alone. \`test_summarize_2\` tells you to go read it.
+
+## Probing a function you cannot see inside
+
+In a review you often have several candidate implementations and no time to read all of them carefully. A probe treats each one as a black box: call it on inputs derived from the contract, compare against the answer the contract demands, and report a verdict.
+
+\`\`\`python
+def check(fn):
+    cases = [
+        ("abcdefghi12", True),    # happy path: eleven characters, digit, letter
+        ("abcdefgh12", True),     # exactly ten: the boundary the rule names
+        ("abcdefg 12", False),    # ten characters but one of them is a space
+        ("abcdefghij", False),    # no digit
+        ("1234567890", False),    # no letter
+    ]
+    return all(fn(text) is expected for text, expected in cases)
+\`\`\`
+
+Read the comments rather than the code. Each case exists because a specific misreading of the contract would pass every other case. That is the design method: for each rule in the contract, write the input that only that rule rejects.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "boundary-case-purpose",
+  "prompt": "In the probe above, what does the case ('abcdefgh12', True) exist to catch?",
+  "options": [
+    {
+      "label": "An implementation that forgets to check for digits",
+      "feedback": "That job belongs to 'abcdefghij', which has letters and no digit. This case contains a digit, so an implementation missing the digit rule still passes it."
+    },
+    {
+      "label": "An implementation that wrote len(text) > 10 instead of len(text) >= 10",
+      "correct": true,
+      "feedback": "Right. Ten characters is exactly the threshold the rule names, so it is the only length that separates the two comparisons. Eleven characters passes under both."
+    },
+    {
+      "label": "An implementation that allows spaces",
+      "feedback": "There is no space in this string, so a permissive implementation passes it happily. The case with the space in the middle is the one doing that work."
+    },
+    {
+      "label": "An implementation that returns a truthy value instead of True",
+      "feedback": "The probe does use is rather than ==, which would catch that, but any of the five cases would. This case was chosen for its length rather than its return type."
+    }
+  ]
+}
+\`\`\`
+
+## Some contracts are about what did not happen
+
+Not every rule is visible in the return value. "Do not modify the caller's data" is a promise about the world after the call, and the only way to check it is to look.
+
+\`\`\`python
+def check(fn):
+    defaults = {"theme": "light", "rows": 20}
+    overrides = {"rows": 50}
+
+    result = fn(defaults, overrides)
+
+    if result != {"theme": "light", "rows": 50}:
+        return False
+    if defaults != {"theme": "light", "rows": 20}:   # the caller's dict must survive
+        return False
+    return True
+\`\`\`
+
+An implementation that writes \`defaults.update(overrides)\` and returns \`defaults\` produces a perfectly correct return value. It also silently rewrites the caller's configuration, and every later read of \`defaults\` in that process sees the merged version. Only the second assertion finds it.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "probe-hygiene-shared-input",
+  "prompt": "A probe builds its input dict once at module level and reuses it across four candidates. Candidate two mutates its argument. What happens?",
+  "options": [
+    {
+      "label": "Candidates three and four are judged against corrupted input",
+      "correct": true,
+      "feedback": "Right. The mutation persists in the shared dict, so every later candidate is measured against data the previous one rewrote, and the verdicts after the second are meaningless."
+    },
+    {
+      "label": "Nothing, because Python passes dictionaries by value",
+      "feedback": "A very common belief and the source of this whole bug class. Python passes a reference to the same object, so a mutation inside the function is visible to the caller."
+    },
+    {
+      "label": "Candidate two is correctly reported as broken and the rest are unaffected",
+      "feedback": "You would like this to be true and it is exactly half true: candidate two does get caught. The damage to the shared dict outlives the call and taints everything after it."
+    },
+    {
+      "label": "Python raises a RuntimeError for mutating a shared structure",
+      "feedback": "Python only raises for mutating a collection while iterating over it, which is a different situation. A plain update on a shared dict is legal and silent."
+    }
+  ]
+}
+\`\`\`
+
+## The test outlives the review
+
+Once a bug is found, the assertion that found it goes into the suite permanently. That is what a regression test is: not a new idea, just the failing test kept after the fix landed, so the same mistake cannot return in six months when someone rewrites the function for unrelated reasons.
+
+**Interview nuance:** when you find a bug in a pairing exercise, the strongest thing you can do is write the failing assertion before you write the fix. It proves the diagnosis is real, it gives you an unambiguous definition of done, and it is exactly the loop a professional works in. Saying "let me pin this with a test first" reads as senior in a way that no amount of fluent typing does.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "failing-test-cumulative",
+  "prompt": "You have found and fixed a bug in someone else's function. What do you do with the input that exposed it?",
+  "options": [
+    {
+      "label": "Mention it in the pull request description so reviewers know it was considered",
+      "feedback": "Useful context and better than nothing, but a description is not executed by anything. The next rewrite of that function has no way to know the case mattered."
+    },
+    {
+      "label": "Keep it as an assertion in the test suite, named after the claim it makes",
+      "correct": true,
+      "feedback": "Right. The failing test is the durable artifact of the whole review: it proved the bug, it defined done, and kept in the suite it prevents the same mistake returning."
+    },
+    {
+      "label": "Delete it, since the code now passes and a passing test adds no information",
+      "feedback": "Tempting because a green test does feel redundant on the day you write it. Its value is entirely in the future, the day someone changes the function and it turns red."
+    },
+    {
+      "label": "Replace it with a broader test covering the whole function",
+      "feedback": "Broader coverage is worth having in general, so this instinct is not wrong. A broad test that happens to exercise the case is much harder to interpret when it fails than one written for it."
+    }
+  ],
+  "reveal": "A review produces two things worth keeping: the fix, and the assertion that proved it was needed. Only one of them survives the next rewrite."
+}
+\`\`\``,
+    demoCode: `def merge_settings(defaults, overrides):
+    defaults.update(overrides)      # returns the right value, wrecks the caller's dict
+    return defaults
+
+
+base = {"theme": "light", "rows": 20}
+print(merge_settings(base, {"rows": 50}))   # {'theme': 'light', 'rows': 50}
+print(base)                                 # {'theme': 'light', 'rows': 50} <- mutated`,
+  },
+  apply: {
+    id: "py-l5-failing-test-apply",
+    executionMode: "single-file",
+    prompt: `Write a function \`check(name)\` that returns \`True\` only when the candidate stored under
+\`name\` is a correct \`is_strong_password\`, and \`False\` otherwise.
+
+The contract: \`is_strong_password(text)\` returns \`True\` when \`text\` is **at least** 10 characters
+long, contains at least one digit, contains at least one letter, and contains no space character.
+Otherwise it returns \`False\`.
+
+The starter holds four candidates in \`CANDIDATES\`. Two of them are correct. Each rule in the
+contract needs its own probe case, including one input that sits exactly on the length threshold.
+Keep \`check\` as the last function in the file.`,
+    starterCode: `def a(text):
+    return (
+        len(text) > 10
+        and any(c.isdigit() for c in text)
+        and any(c.isalpha() for c in text)
+        and " " not in text
+    )
+
+
+def b(text):
+    return (
+        len(text) >= 10
+        and any(c.isdigit() for c in text)
+        and any(c.isalpha() for c in text)
+        and " " not in text
+    )
+
+
+def c(text):
+    return (
+        len(text) >= 10
+        and any(ch.isdigit() for ch in text)
+        and any(ch.isalpha() for ch in text)
+    )
+
+
+def d(text):
+    if len(text) < 10:
+        return False
+    has_digit = False
+    has_letter = False
+    for ch in text:
+        if ch == " ":
+            return False
+        if ch.isdigit():
+            has_digit = True
+        elif ch.isalpha():
+            has_letter = True
+    return has_digit and has_letter
+
+
+CANDIDATES = {"a": a, "b": b, "c": c, "d": d}
+
+
+def check(name):
+    # Probe CANDIDATES[name] and return True only if it satisfies the contract.
+    pass`,
+    hints: [
+      "Build a list of `(text, expected)` pairs, one per rule in the contract, then call the candidate on each.",
+      "A password of exactly 10 characters separates `len(text) > 10` from `len(text) >= 10`.",
+      "A 10-character string containing a space, a digit and a letter separates the candidate that forgot the space rule.",
+    ],
+    referenceSolution: `def a(text):
+    return (
+        len(text) > 10
+        and any(c.isdigit() for c in text)
+        and any(c.isalpha() for c in text)
+        and " " not in text
+    )
+
+
+def b(text):
+    return (
+        len(text) >= 10
+        and any(c.isdigit() for c in text)
+        and any(c.isalpha() for c in text)
+        and " " not in text
+    )
+
+
+def c(text):
+    return (
+        len(text) >= 10
+        and any(ch.isdigit() for ch in text)
+        and any(ch.isalpha() for ch in text)
+    )
+
+
+def d(text):
+    if len(text) < 10:
+        return False
+    has_digit = False
+    has_letter = False
+    for ch in text:
+        if ch == " ":
+            return False
+        if ch.isdigit():
+            has_digit = True
+        elif ch.isalpha():
+            has_letter = True
+    return has_digit and has_letter
+
+
+CANDIDATES = {"a": a, "b": b, "c": c, "d": d}
+
+
+def check(name):
+    fn = CANDIDATES[name]
+    cases = [
+        ("abcdefghi12", True),
+        ("abcdefgh12", True),
+        ("abcdefg 12", False),
+        ("abcdefghij", False),
+        ("1234567890", False),
+        ("abc12", False),
+    ]
+    for text, expected in cases:
+        if fn(text) != expected:
+            return False
+    return True`,
+    testCases: [
+      { input: { name: "a" }, expected: false, description: "candidate a" },
+      { input: { name: "b" }, expected: true, description: "candidate b" },
+      { input: { name: "c" }, expected: false, description: "candidate c" },
+      { input: { name: "d" }, expected: true, description: "candidate d" },
+    ],
+  },
+  practice: {
+    id: "py-l5-failing-test-practice",
+    executionMode: "single-file",
+    prompt: `Your app loads a dictionary of default settings once at start-up and merges each user's
+saved preferences on top of it. Four implementations of that merge are sitting in an open pull
+request, all of them produce the right settings screen in a manual test, and one reviewer has
+noticed that a user who changes their row count seems to change it for everyone.
+
+Write a function \`check(name)\` that returns \`True\` only when the candidate stored under \`name\` is a
+correct \`merge_settings\`, and \`False\` otherwise.
+
+The contract: \`merge_settings(defaults, overrides)\` returns a **new** dictionary holding every key
+from both, with the value from \`overrides\` winning wherever a key appears in both. Neither argument
+may be modified. Build fresh input dictionaries inside \`check\`, and keep \`check\` as the last
+function in the file.`,
+    starterCode: `def a(defaults, overrides):
+    merged = dict(defaults)
+    merged.update(overrides)
+    return merged
+
+
+def b(defaults, overrides):
+    defaults.update(overrides)
+    return defaults
+
+
+def c(defaults, overrides):
+    return {**defaults, **overrides}
+
+
+def d(defaults, overrides):
+    merged = dict(overrides)
+    merged.update(defaults)
+    return merged
+
+
+CANDIDATES = {"a": a, "b": b, "c": c, "d": d}
+
+
+def check(name):
+    # Probe CANDIDATES[name] and return True only if it satisfies the contract.
+    pass`,
+    hints: [
+      "Give the candidate a key that appears in both dictionaries, so you can see which side wins.",
+      "After the call, compare `defaults` against the value you built it with. That is the only way to see a mutation.",
+      "Build the dictionaries inside `check` so one candidate's mutation cannot reach the next call.",
+    ],
+    referenceSolution: `def a(defaults, overrides):
+    merged = dict(defaults)
+    merged.update(overrides)
+    return merged
+
+
+def b(defaults, overrides):
+    defaults.update(overrides)
+    return defaults
+
+
+def c(defaults, overrides):
+    return {**defaults, **overrides}
+
+
+def d(defaults, overrides):
+    merged = dict(overrides)
+    merged.update(defaults)
+    return merged
+
+
+CANDIDATES = {"a": a, "b": b, "c": c, "d": d}
+
+
+def check(name):
+    fn = CANDIDATES[name]
+    defaults = {"theme": "light", "rows": 20}
+    overrides = {"rows": 50, "font": "mono"}
+
+    result = fn(defaults, overrides)
+
+    if result != {"theme": "light", "rows": 50, "font": "mono"}:
+        return False
+    if defaults != {"theme": "light", "rows": 20}:
+        return False
+    if overrides != {"rows": 50, "font": "mono"}:
+        return False
+    return True`,
+    testCases: [
+      { input: { name: "a" }, expected: true, description: "candidate a" },
+      { input: { name: "b" }, expected: false, description: "candidate b" },
+      { input: { name: "c" }, expected: true, description: "candidate c" },
+      { input: { name: "d" }, expected: false, description: "candidate d" },
+    ],
+  },
+}
+
 export const level5: PythonLevel = {
   id: 5,
   slug: "verification",
@@ -1178,6 +1614,13 @@ export const level5: PythonLevel = {
       description:
         "Recover the contract, trace the boundary, and find the input that exposes plausible-looking code.",
       lessons: [traceFirstLesson, happyPathLesson, failureSignaturesLesson],
+    },
+    {
+      id: "py-l5-tests",
+      title: "The Test Is the Verification",
+      description:
+        "Turn a suspicion into an assertion that fails before the fix, using properties and a reference oracle when examples run out.",
+      lessons: [failingTestLesson],
     },
   ],
 }
