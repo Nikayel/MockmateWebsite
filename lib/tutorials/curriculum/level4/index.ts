@@ -2248,6 +2248,34 @@ async def fetch_one(n):
 coro = fetch_one(1)   # nothing has run yet; coro is a coroutine object
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "unawaited-coroutine-does-nothing",
+  "prompt": "A request handler needs to write an audit record but does not need the result, so you call record_audit(event), an async def, and deliberately do not await it. What actually happens?",
+  "options": [
+    {
+      "label": "It runs in the background on the loop, which is what fire and forget means",
+      "feedback": "Tempting, because that is genuinely what you want and it is what asyncio.create_task or a TaskGroup would give you. A bare call only builds the coroutine object. Nothing has told the loop it exists."
+    },
+    {
+      "label": "Nothing runs. You get a coroutine object and a RuntimeWarning that it was never awaited",
+      "correct": true,
+      "feedback": "Right. A coroutine is a value until something drives it, and the warning is the only sign you get, which is why these audit records silently stop appearing."
+    },
+    {
+      "label": "It runs immediately and synchronously, since there is no await to suspend at",
+      "feedback": "Reasonable if you picture async def as a normal function with extra powers. The def is what changes: calling it constructs a suspended object instead of executing the body."
+    },
+    {
+      "label": "It runs later, once the handler returns and the loop has nothing else to do",
+      "feedback": "That describes a task queue, and it is what create_task actually arranges. Without that registration the loop never learns about the coroutine, so idle time changes nothing."
+    }
+  ]
+}
+\`\`\`
+
 \`await\` is the only place a coroutine gives up control. Between awaits it runs straight through like ordinary code.
 
 \`\`\`csdiagram
@@ -2281,15 +2309,100 @@ asyncio.run(main())   # [10, 20, 30] after ~0.1s total, not 0.3s
 
 \`asyncio.run(coro)\` is the one synchronous door into async code: it starts a fresh event loop, runs the coroutine to completion, and closes the loop.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "sequential-awaits-vs-gather",
+  "prompt": "Instead of gather you write: results = [await fetch_one(n) for n in range(50)]. Every fetch waits about 100 ms on the network. Roughly how long does the whole line take?",
+  "options": [
+    {
+      "label": "About 0.1 seconds. They are coroutines on one loop, so the loop overlaps them",
+      "feedback": "The most expensive misconception in async code: writing async def and await does not by itself make anything concurrent. Overlap requires handing the loop several things at once, which is exactly what gather does."
+    },
+    {
+      "label": "About 5 seconds. Each await runs to completion before the next coroutine is even created",
+      "correct": true,
+      "feedback": "Right. await means wait here, so this is a sequential loop with extra syntax. The loop has only ever been given one thing to do at a time."
+    },
+    {
+      "label": "About 0.1 seconds, because the comprehension builds all 50 coroutines first and then awaits them",
+      "feedback": "Worth thinking through, because that split would help. The await is inside the comprehension body, so each iteration builds one coroutine and drains it before the next is constructed."
+    },
+    {
+      "label": "About 2.5 seconds, since consecutive awaits partly overlap",
+      "feedback": "There is no partial credit here. Either something scheduled the tasks together or it did not, and a plain await schedules exactly one thing and blocks on it."
+    }
+  ]
+}
+\`\`\`
+
 ### Why this sandbox uses a helper
 
 \`asyncio.run\` refuses to start when a loop is already running and raises \`RuntimeError\`. This sandbox runs your code *inside* a loop, so it hands you \`run_coroutines(coros)\` instead. It drives each coroutine with \`coro.send(None)\` and reads the return value off the resulting \`StopIteration\`. That works because the sandbox \`fetch_one\` awaits nothing, so a single \`send\` finishes it. You still build real coroutines with \`fetch_one(n)\`; you just pass them to \`run_coroutines\` in place of \`asyncio.run(asyncio.gather(*coros))\`.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "blocking-sleep-inside-a-coroutine",
+  "prompt": "Inside a coroutine that handles a request you back off before a retry with time.sleep(2), not asyncio.sleep(2). A hundred other requests are in flight on the same loop. What is the effect?",
+  "options": [
+    {
+      "label": "Only this request is delayed by 2 seconds. The other hundred keep making progress",
+      "feedback": "This is what you paid for and what asyncio.sleep would deliver, so the code reads as if it were true. time.sleep blocks the thread rather than yielding, and the loop lives on that thread."
+    },
+    {
+      "label": "Every task on the loop stalls for 2 seconds, because the loop only regains control at an await",
+      "correct": true,
+      "feedback": "Right. Scheduling here is cooperative: the loop cannot interrupt a running coroutine, so a blocking call inside one freezes the entire service for its duration."
+    },
+    {
+      "label": "time.sleep raises inside a coroutine, since asyncio forbids blocking calls",
+      "feedback": "You would be much better off if it did. Nothing detects or forbids it, which is why blocking calls sneak in through ordinary library code and only show up as latency under load."
+    },
+    {
+      "label": "The loop notices the blocking call and moves it to a worker thread",
+      "feedback": "That offload is real but it is never automatic: asyncio.to_thread and run_in_executor exist precisely because you have to ask for it explicitly."
+    }
+  ]
+}
+\`\`\`
 
 ### Pitfall: a coroutine you never drive
 
 Calling \`fetch_one(5)\` and treating the result like a number does nothing useful. The body never runs, and Python warns \`RuntimeWarning: coroutine 'fetch_one' was never awaited\`. A coroutine only executes when something awaits it, gathers it, or runs it on a loop. The reverse trap is just as common: never put a blocking call (\`time.sleep\`, a synchronous DB driver, a heavy compute loop) inside a coroutine, because it freezes the whole thread and no other task can make progress.
 
-**Interview nuance:** asyncio is *cooperative*, not preemptive. The event loop can only switch tasks at an \`await\`; it cannot interrupt running code. So \`gather\` speeds up work that spends its time awaiting real I/O, but a CPU-bound coroutine (or a stray \`time.sleep\`) starves every other task on the loop. That is the core reason asyncio scales I/O-bound fan-out yet does nothing for CPU-bound work, where you reach for processes instead.`,
+**Interview nuance:** asyncio is *cooperative*, not preemptive. The event loop can only switch tasks at an \`await\`; it cannot interrupt running code. So \`gather\` speeds up work that spends its time awaiting real I/O, but a CPU-bound coroutine (or a stray \`time.sleep\`) starves every other task on the loop. That is the core reason asyncio scales I/O-bound fan-out yet does nothing for CPU-bound work, where you reach for processes instead.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "one-slow-endpoint-times-out-the-rest",
+  "prompt": "An async service starts timing out under load. One endpoint does a 300 ms pure-Python transform inside its coroutine, but unrelated endpoints are timing out too. Why do the others suffer?",
+  "options": [
+    {
+      "label": "The interpreter lock is held during the transform, so no other request can run Python",
+      "feedback": "Tempting, because the lock is real and the phrase fits. There is only one thread here though, so the lock was never contended. Adding a second thread would not fix this either."
+    },
+    {
+      "label": "The loop cannot preempt a running coroutine, so every other task queues behind each 300 ms transform",
+      "correct": true,
+      "feedback": "Right. Cooperative scheduling means the loop gets control back only at an await, so one uninterruptible stretch of CPU is a stall for the whole service, not just for its own request."
+    },
+    {
+      "label": "The connection pool or thread pool behind the service is exhausted, so new requests wait for a slot",
+      "feedback": "A completely real failure mode and the right suspicion in a threaded service. Here the queue is not a pool of workers, it is the single loop, and no pool sizing will change that."
+    },
+    {
+      "label": "The transform starves the loop only if it allocates heavily and triggers garbage collection",
+      "feedback": "Garbage collection does add pauses, and they are worth knowing about. They are measured in single-digit milliseconds though, so they are noise next to 300 ms of code the loop cannot interrupt."
+    }
+  ],
+  "reveal": "The practical rule that follows: anything more than a few milliseconds of CPU does not belong directly on the loop. Push it to asyncio.to_thread if a library releases the lock for you, or to a process pool if it is pure Python."
+}
+\`\`\``,
     demoCode: `# Normally: asyncio.run(asyncio.gather(fetch_one(1), fetch_one(2), fetch_one(3)))
 # This sandbox is already inside an event loop, so we drive the coroutines directly:
 async def fetch_one(n):
