@@ -349,6 +349,9 @@ const SKILL_TO_KC: Record<string, KnowledgeComponent> = {
   capstone: "py.modules-and-packaging",
 
   "boundary-analysis": "py.testing",
+  invariants: "py.testing",
+  "property-testing": "py.testing",
+  "regression-tests": "py.testing",
 
   findall: "py.regex",
   sub: "py.regex",
