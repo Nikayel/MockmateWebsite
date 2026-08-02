@@ -3932,7 +3932,7 @@ const textAndBytesLesson: PythonLesson = {
     "Encode and decode deliberately, and read the error that says these bytes were never UTF-8.",
   estimatedMinutes: 12,
   difficulty: "medium",
-  skills: ["encoding", "unicode", "strings", "error-handling"],
+  skills: ["bytes", "encoding", "unicode", "decoding"],
   teach: {
     estimatedMinutes: 5,
     markdown: `## The first real wall you hit with real data
@@ -4844,7 +4844,7 @@ const datetimesLesson: PythonLesson = {
   summary: "Parse and format timestamps, subtract them safely, and never mix naive with aware.",
   estimatedMinutes: 13,
   difficulty: "medium",
-  skills: ["standard-library", "parsing", "formatting", "comparisons"],
+  skills: ["datetime", "timezones", "timedelta", "strptime"],
   teach: {
     estimatedMinutes: 6,
     markdown: `## Two mistakes cause most time bugs
@@ -5167,7 +5167,7 @@ const itertoolsLesson: PythonLesson = {
     "Name the loops you keep rewriting, keep them lazy, and never call groupby on unsorted rows.",
   estimatedMinutes: 12,
   difficulty: "medium",
-  skills: ["iteration", "iterators", "laziness", "standard-library"],
+  skills: ["itertools", "iterators", "laziness", "iteration"],
   teach: {
     estimatedMinutes: 5,
     markdown: `## The loops you keep rewriting already have names

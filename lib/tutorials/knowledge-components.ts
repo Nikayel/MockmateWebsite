@@ -53,6 +53,11 @@ export const KNOWLEDGE_COMPONENTS = [
   "py.metaprogramming",
   "py.tooling",
   "py.code-review",
+  // Dates and times earn their own component rather than folding into values-and-types.
+  // Naive-vs-aware, format codes, and interval arithmetic are a distinct competence with
+  // an unusually high bug density, and the alternative was tagging the lesson with
+  // "standard-library, parsing, formatting", which loses the signal entirely.
+  "py.dates-and-times",
 ] as const
 
 export type KnowledgeComponent = (typeof KNOWLEDGE_COMPONENTS)[number]
@@ -92,6 +97,8 @@ const SKILL_TO_KC: Record<string, KnowledgeComponent> = {
   "text-processing": "py.strings",
   encoding: "py.strings",
   unicode: "py.strings",
+  bytes: "py.strings",
+  decoding: "py.strings",
 
   // sequences
   lists: "py.sequences",
@@ -156,6 +163,16 @@ const SKILL_TO_KC: Record<string, KnowledgeComponent> = {
   yield: "py.generators",
   iterators: "py.generators",
   laziness: "py.generators",
+  itertools: "py.generators",
+
+  datetime: "py.dates-and-times",
+  datetimes: "py.dates-and-times",
+  dates: "py.dates-and-times",
+  times: "py.dates-and-times",
+  timezones: "py.dates-and-times",
+  timedelta: "py.dates-and-times",
+  strptime: "py.dates-and-times",
+  strftime: "py.dates-and-times",
 
   closures: "py.closures-and-decorators",
   decorators: "py.closures-and-decorators",
