@@ -3065,6 +3065,34 @@ port = int(env.get("PORT", "8000"))          # "9000" becomes 9000
 debug = env.get("DEBUG", "false").lower() == "true"
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "bool-of-the-string-false",
+  "prompt": "A teammate finds the .lower() comparison verbose and simplifies it to debug = bool(env.get('DEBUG', 'false')). Production has DEBUG set to the string false. What is debug in production?",
+  "options": [
+    {
+      "label": "False, since the value literally says false",
+      "feedback": "Exactly the reading that lets this through review: the line looks like it says what it means. bool() never inspects the text, it only asks whether the object is empty."
+    },
+    {
+      "label": "True, because every non-empty string is truthy",
+      "correct": true,
+      "feedback": "Right, and the fallout is worse than a wrong flag. The only value that would give you False here is the empty string, so this flag is on in every environment."
+    },
+    {
+      "label": "False, because bool() parses the text the same way int('9000') parses a number",
+      "feedback": "A fair guess given how int() behaves, and the asymmetry is genuinely surprising. int() parses, bool() only measures emptiness, so the two constructors are not the same kind of thing."
+    },
+    {
+      "label": "It raises ValueError, since false is not a valid boolean literal",
+      "feedback": "That is what int('abc') would do, and you would be far better off if bool worked that way. bool accepts absolutely any object, which is why this failure is silent."
+    }
+  ]
+}
+\`\`\`
+
 \`env.get("PORT", "8000")\` returns the default only when \`"PORT"\` is absent. If the key exists, you get its string value and must convert it yourself.
 
 ### Secrets: record presence, never the value
@@ -3076,6 +3104,34 @@ has_secret = "SECRET" in env    # a True/False flag is safe to emit; the value i
 \`\`\`
 
 \`"SECRET" in env\` tests key membership, so it stays \`False\` until the key exists and never reads the value.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "safe-way-to-log-a-secret",
+  "prompt": "During an incident nobody can tell which API key a pod was started with. Which line is actually safe to add to the startup log?",
+  "options": [
+    {
+      "label": "Log the first four characters, key[:4] plus an ellipsis, so you can tell keys apart",
+      "feedback": "Very common in real code and it feels like a compromise. It is still the secret, just less of it, and it lands in whatever aggregator, screenshot, or support ticket the log reaches."
+    },
+    {
+      "label": "Log a boolean, has_api_key set from 'API_KEY' in env",
+      "correct": true,
+      "feedback": "Right. Presence is what almost every incident actually needs, and membership never touches the value, so there is nothing to leak even if the log level is turned up."
+    },
+    {
+      "label": "Log the full key, but only at DEBUG level so it never reaches production",
+      "feedback": "The reasoning holds right up until the incident where someone raises the log level to debug the incident. Log level is a runtime setting, not a security boundary."
+    },
+    {
+      "label": "Log a SHA-256 of the key, so you can compare pods without exposing anything",
+      "feedback": "Better than the alternatives above and genuinely used for correlation. It is still a stable fingerprint of a secret, and if the secret has low entropy the hash can be guessed offline, so it is not free."
+    }
+  ]
+}
+\`\`\`
 
 ### Structured logging
 
@@ -3089,11 +3145,68 @@ logger.info("startup", extra={"port": port, "debug": debug})
 
 The \`extra\` fields attach to the log record, but they only surface if your handler uses a structured (often JSON) formatter. The default formatter prints just the message text.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "empty-env-var-is-not-missing",
+  "prompt": "A deploy template writes PORT= with nothing after the equals sign, so the variable exists with an empty value. Your code is port = int(env.get('PORT', '8000')). What does the service do at boot?",
+  "options": [
+    {
+      "label": "Starts on port 8000, since an empty value counts as unset",
+      "feedback": "The assumption behind a great many broken deploys. get only checks whether the key is there, and it is: the value just happens to be the empty string, which is a value like any other."
+    },
+    {
+      "label": "Crashes with ValueError, because int() is handed an empty string",
+      "correct": true,
+      "feedback": "Right, and crashing at boot is the good outcome. The fix is to treat empty as missing explicitly, for example env.get('PORT') or '8000', so the default covers both cases."
+    },
+    {
+      "label": "Starts on port 0, since int() of an empty string is zero",
+      "feedback": "That is how a few other languages behave, and it would be worse than the crash: port 0 tells the OS to pick any free port, so the service would come up somewhere nobody can reach."
+    },
+    {
+      "label": "Starts on port 8000, because get treats an empty string as falsy and falls back",
+      "feedback": "You are describing env.get('PORT') or '8000', which really does fall back on empty because or tests truthiness. The default argument to get is chosen by key presence alone."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfalls
 
 - \`bool("false")\` is \`True\`. Every non-empty string is truthy, so never coerce a flag with \`bool(...)\`. Compare the lowered string explicitly, as above.
 - \`int(env.get("PORT", "8000"))\` raises \`ValueError\` if \`PORT\` is set to \`""\` or \`"abc"\`. A present-but-empty variable is not the same as a missing one, and \`.get\` only defends against the missing case.
 - Reusing a reserved field name in \`extra\` (like \`message\` or \`name\`) raises \`KeyError\`. Choose your own keys.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "why-load-config-once",
+  "prompt": "A reviewer asks why you build one Config at startup instead of calling os.environ.get wherever a value is needed. What is the strongest answer?",
+  "options": [
+    {
+      "label": "Reading os.environ repeatedly is slow, so caching the values saves real time",
+      "feedback": "Tempting because caching usually is a performance argument. os.environ is a dict, so a lookup is nanoseconds, and nothing in a request budget will ever notice it."
+    },
+    {
+      "label": "One place validates everything, so a bad value kills the process at boot instead of on one code path at 3am",
+      "correct": true,
+      "feedback": "Right. Scattered lookups mean a typo in an env var stays invisible until the one endpoint that reads it runs, which is usually during an incident and rarely on your screen."
+    },
+    {
+      "label": "os.environ is not safe to read from multiple threads",
+      "feedback": "It sounds like the kind of thing that would be true, and it is worth being able to reject confidently: reads are perfectly safe. Mutating it at runtime is the questionable practice, not reading it."
+    },
+    {
+      "label": "It keeps the os import in one module, which reduces coupling",
+      "feedback": "A tidy side effect, and not nothing in a large codebase. It is a style argument though, and it would not survive a reviewer who asks what actually breaks without it."
+    }
+  ],
+  "reveal": "The three real reasons stack up: validate once and fail fast at boot, hand the function an env dict so tests need no environment at all, and give every request the same snapshot instead of values that can shift under it."
+}
+\`\`\`
 
 **Interview nuance:** interviewers probe why config should be loaded once, at startup, into a typed object rather than read from \`os.environ\` all over the codebase. Loading once gives you a single place to validate and fail fast, makes the code testable (you inject an \`env\` dict, exactly like this exercise), and guarantees every request sees one consistent snapshot instead of values that could change mid-run.`,
     demoCode: `def load_config(env):
