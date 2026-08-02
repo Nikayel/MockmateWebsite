@@ -10,12 +10,12 @@ import { findCatalogEntry, listCourseEntries } from "@/lib/tutorials/course-cata
 import { publicLessonPath } from "@/lib/tutorials/lesson-routes"
 import { toPublicLessonPreview } from "@/lib/tutorials/public-preview"
 
-const COURSE_ID = "sql" as const
+const COURSE_ID = "data-engineering" as const
 
 type Props = { params: Promise<{ levelSlug: string; lessonId: string }> }
 
 /**
- * The PUBLIC SQL lesson page: `/learn/sql/{levelSlug}/{lessonId}`.
+ * The PUBLIC Data Engineering lesson page: `/learn/data-engineering/{levelSlug}/{lessonId}`.
  *
  * ## The standing rule for this file
  *

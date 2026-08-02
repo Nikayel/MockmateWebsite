@@ -32,15 +32,29 @@ function PythonMark({ className }: MarkProps) {
   )
 }
 
-/** SQL's stacked-cylinder database mark. */
-function SqlMark({ className }: MarkProps) {
+/**
+ * Data engineering's pipeline mark: a source store on the left, a pipe carrying it down and
+ * across, and the curated layers it lands in. Keeps the SQL track's blue family, because SQL is
+ * still the first section of this course, but reads as movement rather than as one database.
+ */
+function DataEngineeringMark({ className }: MarkProps) {
   return (
     <svg viewBox="0 0 100 100" className={className} aria-hidden="true" focusable="false">
-      <path fill="#0369A1" d="M14,26 h72 v48 c0,8 -16,14 -36,14 S14,82 14,74 z" />
-      <ellipse cx="50" cy="66" rx="36" ry="14" fill="#0284C7" />
-      <ellipse cx="50" cy="46" rx="36" ry="14" fill="#0EA5E9" />
-      <ellipse cx="50" cy="26" rx="36" ry="14" fill="#38BDF8" />
-      <ellipse cx="50" cy="26" rx="24" ry="8" fill="#E0F2FE" opacity="0.55" />
+      <path fill="#0369A1" d="M8,20 h36 v24 c0,4 -8,7 -18,7 S8,48 8,44 z" />
+      <ellipse cx="26" cy="20" rx="18" ry="7" fill="#38BDF8" />
+      <ellipse cx="26" cy="20" rx="11" ry="4" fill="#E0F2FE" opacity="0.55" />
+      <path
+        d="M26,51 v13 c0,6 4,10 10,10 h16"
+        fill="none"
+        stroke="#0284C7"
+        strokeWidth="6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path fill="#0284C7" d="M52,66 l12,8 -12,8 z" />
+      <rect x="70" y="58" width="24" height="9" rx="3" fill="#7DD3FC" />
+      <rect x="70" y="70" width="24" height="9" rx="3" fill="#38BDF8" />
+      <rect x="70" y="82" width="24" height="9" rx="3" fill="#0EA5E9" />
     </svg>
   )
 }
@@ -83,12 +97,13 @@ export const LEARN_TRACKS: LearnTrack[] = [
     Mark: PythonMark,
   },
   {
-    id: "sql",
-    label: "SQL",
-    href: "/learn/sql",
-    blurb: "Query a real database that runs in your browser, from SELECT to window functions.",
+    id: "data-engineering",
+    label: "Data Engineering",
+    href: "/learn/data-engineering",
+    blurb:
+      "SQL, cloud platforms, and pipelines, all graded against a real database running in your browser.",
     loop: ["Read", "Apply", "Practice"],
-    Mark: SqlMark,
+    Mark: DataEngineeringMark,
   },
   {
     id: "system-design",

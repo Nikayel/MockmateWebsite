@@ -103,7 +103,7 @@ export type LearnItemResponseInput = z.infer<typeof learnItemResponseInputSchema
  */
 function courseIdFromLessonId(lessonId: string): CourseId {
   if (lessonId.startsWith("sd-")) return "system-design"
-  if (lessonId.startsWith("sql-") || lessonId.startsWith("de-")) return "sql"
+  if (lessonId.startsWith("sql-") || lessonId.startsWith("de-")) return "data-engineering"
   return "python"
 }
 

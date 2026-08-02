@@ -31,11 +31,23 @@ describe("composeItemResponse", () => {
   it("derives course from the lesson id prefix", () => {
     expect(composeItemResponse("u", baseInput(), AT).course_id).toBe("python")
     expect(composeItemResponse("u", baseInput({ lessonId: "sql-l2-joins" }), AT).course_id).toBe(
-      "sql"
+      "data-engineering"
     )
     expect(composeItemResponse("u", baseInput({ lessonId: "sd-l3-caching" }), AT).course_id).toBe(
       "system-design"
     )
+  })
+
+  // The Data Engineering course carries two id prefixes: the frozen `sql-` ids from the levels it
+  // grew out of, and `de-` for the levels authored after the rename. Both must land on one course,
+  // or a dashboard would split one learner's progress across two names.
+  it("maps both the sql- and de- prefixes to the data-engineering course", () => {
+    expect(
+      composeItemResponse("u", baseInput({ lessonId: "de-l8-idempotent-load" }), AT).course_id
+    ).toBe("data-engineering")
+    expect(
+      composeItemResponse("u", baseInput({ lessonId: "sql-l6-partitions" }), AT).course_id
+    ).toBe("data-engineering")
   })
 
   it("builds a deterministic id from user, item, and timestamp", () => {

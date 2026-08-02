@@ -3,7 +3,7 @@ import { ChevronRight } from "lucide-react"
 import { ThemeToggle } from "@/components/ThemeToggle"
 
 /**
- * Slim breadcrumb bar for the Learn track landing pages (`/learn/python`, `/learn/sql`).
+ * Slim breadcrumb bar for the Learn track landing pages (`/learn/python`, `/learn/data-engineering`).
  * Mirrors the bar in `LevelPathView` — no full site nav, just a link back home and the theme
  * toggle — so the two path screens give learners a way back into the app instead of dead-ending.
  * `containerClass` aligns the bar's inner width with each page's content column.

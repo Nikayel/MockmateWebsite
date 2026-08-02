@@ -61,7 +61,8 @@ export default function VsLeetCodePage() {
         <>
           <p>
             <strong>Build your fundamentals for free on CodeSparring.</strong> Our free{" "}
-            <Link href="/learn/python">Python</Link>, <Link href="/learn/sql">SQL</Link>, and{" "}
+            <Link href="/learn/python">Python</Link>,{" "}
+            <Link href="/learn/data-engineering">SQL</Link>, and{" "}
             <Link href="/learn/system-design">System Design</Link> tracks teach the core concepts
             with graded exercises that run in your browser, so you don't have to outsource the
             basics to a separate problem grinder.

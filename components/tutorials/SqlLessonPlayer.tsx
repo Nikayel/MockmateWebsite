@@ -32,10 +32,12 @@ import { usePersistentState } from "./usePersistentState"
 import type { LessonSection, SqlExercise, SqlLesson } from "@/lib/tutorials/types"
 
 /**
- * SQL Lesson Player — a parallel of `LessonPlayer` bound to the SQL registry, `/learn/sql` routes,
- * and the SQL runners. The graded core is fully REUSED: `useTutorialProgressSync` (same
- * `user_tutorial_progress` collection, `sql-`-namespaced ids), the tutorial store, `TeachPanel`,
- * `LessonOutline`, `LessonHeader`, `SableTutor`, and — for L3/L4 — the byte-identical
+ * SQL Lesson Player — a parallel of `LessonPlayer` bound to the SQL registry, the
+ * `/learn/data-engineering` routes, and the SQL runners. It serves the whole Data Engineering
+ * course, whose graded exercises are all SQL; the file keeps its `Sql` name because it is the SQL
+ * *runner* shell, not the course. The graded core is fully REUSED: `useTutorialProgressSync` (same
+ * `user_tutorial_progress` collection, `sql-` and `de-`-namespaced ids), the tutorial store,
+ * `TeachPanel`, `LessonOutline`, `LessonHeader`, `SableTutor`, and — for L3/L4 — the byte-identical
  * `WorkspaceExerciseRunner`. Only the Python-hardwired shell (registry imports, routes, title,
  * tutor-persistence key) diverges, so this is a thin fork rather than a shared parameterized player.
  */
@@ -96,7 +98,7 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
   // The player is a Client Component and the route sets no metadata, so set the tab title here.
   useEffect(() => {
     const previous = document.title
-    document.title = `${lesson.title} | Learn SQL`
+    document.title = `${lesson.title} | Learn Data Engineering`
     return () => {
       document.title = previous
     }
@@ -205,13 +207,13 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
         </a>
         <header className="border-border bg-background/80 flex shrink-0 items-center gap-3 border-b px-4 py-2.5 backdrop-blur-md">
           <Link
-            href={trackPath("sql")}
+            href={trackPath("data-engineering")}
             className="text-foreground text-sm font-semibold tracking-tight"
           >
             CodeSparring
           </Link>
           <Link
-            href={levelPath("sql", level.slug)}
+            href={levelPath("data-engineering", level.slug)}
             className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/15 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors"
           >
             LEVEL {level.id}
@@ -241,7 +243,7 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
             </div>
             <ThemeToggle />
             <Link
-              href={trackPath("sql")}
+              href={trackPath("data-engineering")}
               className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -267,7 +269,7 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
               active={active}
               onSelect={goToSection}
               upNext={upNext}
-              courseId="sql"
+              courseId="data-engineering"
             />
 
             <main
@@ -361,7 +363,13 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
                             backwards. */}
                           {nextStep.kind === "lesson" && (
                             <Button asChild className="gap-2">
-                              <Link href={lessonWorkspacePath("sql", nextStep.slug, nextStep.id)}>
+                              <Link
+                                href={lessonWorkspacePath(
+                                  "data-engineering",
+                                  nextStep.slug,
+                                  nextStep.id
+                                )}
+                              >
                                 Next lesson: {nextStep.title}
                                 <ArrowRight className="h-4 w-4" />
                               </Link>
@@ -378,14 +386,18 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
                               <div className="flex flex-wrap gap-2">
                                 <Button asChild className="gap-2">
                                   <Link
-                                    href={lessonWorkspacePath("sql", nextStep.slug, nextStep.id)}
+                                    href={lessonWorkspacePath(
+                                      "data-engineering",
+                                      nextStep.slug,
+                                      nextStep.id
+                                    )}
                                   >
                                     Start Level {nextStep.levelId}
                                     <ArrowRight className="h-4 w-4" />
                                   </Link>
                                 </Button>
                                 <Button asChild variant="outline" className="gap-2">
-                                  <Link href={trackPath("sql")}>
+                                  <Link href={trackPath("data-engineering")}>
                                     <ArrowLeft className="h-4 w-4" />
                                     All levels
                                   </Link>

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 
 /**
- * Shared layout for the SQL track. Deliberately a pass-through: `/learn/sql`, each level
+ * Shared layout for the Data Engineering track. Deliberately a pass-through: `/learn/data-engineering`, each level
  * index, and each lesson's public reading page are all PUBLIC and indexable, so nothing here may
  * gate rendering.
  *

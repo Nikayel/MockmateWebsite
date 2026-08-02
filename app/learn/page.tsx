@@ -32,7 +32,7 @@ import type { CourseId } from "@/lib/tutorials/types"
 const LEARN_ALL_LESSONS_PATH = "/learn/all"
 
 export const metadata: Metadata = {
-  title: "Learn Python, SQL, and System Design — CodeSparring",
+  title: "Learn Python, Data Engineering, and System Design — CodeSparring",
   description:
     "Free interactive courses that run in your browser. Read a concept, apply it on a guided exercise, then practice it on an interview-shaped problem with automated grading.",
   alternates: {
@@ -77,9 +77,9 @@ const COURSE_PITCH: Record<CourseId, { headline: string; body: string }> = {
     headline: "The Python that interviews actually test",
     body: "Not a language tour. Each lesson takes one behaviour that trips people up under pressure, such as mutable default arguments, integer division, truthiness, or the GIL, explains why it works that way, and then makes you write it. Every exercise runs in your browser and is graded against real test cases.",
   },
-  sql: {
+  "data-engineering": {
     headline: "A real database, running in the tab",
-    body: "You write queries against seeded tables and see the rows come back, from your first SELECT through joins, aggregation, and window functions. Because the database is real, a wrong query fails the way it would in production rather than the way a quiz says it should.",
+    body: "The course starts where every data engineering interview starts, with SQL: you write queries against seeded tables and see the rows come back, from your first SELECT through joins, aggregation, and window functions. Later sections keep the same graded editor and point it at the rest of the job, querying a simulated cloud platform's own metadata to reason about storage, file formats, partitioning, pipelines, and cost. Because the database is real, a wrong query fails the way it would in production rather than the way a quiz says it should.",
   },
   "system-design": {
     headline: "Write the answer, then compare it",

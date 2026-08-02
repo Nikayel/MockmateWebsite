@@ -21,7 +21,11 @@ import type { AuthoredLesson, AuthoredLevel } from "./public-preview"
 import type { CourseId } from "./types"
 
 /** Every course id, in the order they should appear in navigation and in the sitemap. */
-export const COURSE_IDS: readonly CourseId[] = ["python", "sql", "system-design"] as const
+export const COURSE_IDS: readonly CourseId[] = [
+  "python",
+  "data-engineering",
+  "system-design",
+] as const
 
 /** One lesson, together with the course and level that locate it. The unit every walk yields. */
 export interface CatalogEntry {
@@ -46,7 +50,7 @@ export function listCourseLevels(courseId: CourseId): AuthoredLevel[] {
   switch (courseId) {
     case "python":
       return listLevels()
-    case "sql":
+    case "data-engineering":
       return listSqlLevels()
     case "system-design":
       return listSystemDesignLevels()

@@ -39,8 +39,10 @@ export default function FreePracticePage() {
           <p>
             Ready to jump in? Create a free account and start your first full AI mock interview. No
             credit card required. Want to shore up the basics first? Our free{" "}
-            <Link href="/learn/python">Python</Link>, <Link href="/learn/sql">SQL</Link>, and{" "}
-            <Link href="/learn/system-design">System Design</Link> courses run right in your browser.
+            <Link href="/learn/python">Python</Link>,{" "}
+            <Link href="/learn/data-engineering">SQL</Link>, and{" "}
+            <Link href="/learn/system-design">System Design</Link> courses run right in your
+            browser.
           </p>
         </>
       ),

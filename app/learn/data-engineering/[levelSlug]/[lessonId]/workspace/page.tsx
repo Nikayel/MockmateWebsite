@@ -22,7 +22,7 @@ type Props = { params: Promise<{ levelSlug: string; lessonId: string }> }
  *
  * ## Why this is a separate route from the page above it
  *
- * The parent `/learn/sql/{levelSlug}/{lessonId}` is public, static, and indexed. THIS route is the
+ * The parent `/learn/data-engineering/{levelSlug}/{lessonId}` is public, static, and indexed. THIS route is the
  * graded half: it serializes the full authored lesson (seed SQL, assertion queries, expected result
  * sets, hints, reference solution) into the client payload, which is fine for a signed-in learner
  * and unacceptable in a CDN cache or a search index. Hence the two route-segment configs below,
@@ -56,7 +56,7 @@ export default async function SqlLessonWorkspacePage({ params }: Props) {
           This lesson may have been moved or renamed.
         </p>
         <Link
-          href={trackPath("sql")}
+          href={trackPath("data-engineering")}
           className="text-primary mt-4 inline-flex items-center gap-1.5 text-sm font-medium hover:underline"
         >
           <ArrowLeft className="h-4 w-4" />

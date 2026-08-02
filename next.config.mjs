@@ -35,6 +35,26 @@ const nextConfig = {
   },
   // Mark firebase-admin as a server-only package (Next.js 15+)
   serverExternalPackages: ['firebase-admin'],
+
+  // The SQL track became the Data Engineering course (SQL is now one section of it), which moved
+  // every lesson, level, and workspace URL from /learn/sql/* to /learn/data-engineering/*. The
+  // public lesson pages are statically generated with `dynamicParams: false`, so without these the
+  // old URLs would hard-404 for every already-indexed page and every existing bookmark. Permanent
+  // (308) because the move is permanent and the destination is the canonical URL.
+  async redirects() {
+    return [
+      {
+        source: '/learn/sql',
+        destination: '/learn/data-engineering',
+        permanent: true,
+      },
+      {
+        source: '/learn/sql/:path*',
+        destination: '/learn/data-engineering/:path*',
+        permanent: true,
+      },
+    ]
+  },
   // Security headers
   async headers() {
     return [

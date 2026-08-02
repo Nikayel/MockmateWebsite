@@ -28,7 +28,10 @@ type FooterTrackLink = { label: string; href: string }
  */
 const FOOTER_TRACK_LINKS: Record<CourseId, FooterTrackLink> = {
   python: { label: LEARN_COURSE_LABEL.python, href: trackPath("python") },
-  sql: { label: LEARN_COURSE_LABEL.sql, href: trackPath("sql") },
+  "data-engineering": {
+    label: LEARN_COURSE_LABEL["data-engineering"],
+    href: trackPath("data-engineering"),
+  },
   "system-design": {
     label: LEARN_COURSE_LABEL["system-design"],
     href: trackPath("system-design"),

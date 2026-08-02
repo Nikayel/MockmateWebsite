@@ -27,7 +27,8 @@ import type { CourseId } from "@/lib/tutorials/types"
 const COURSE_DESCRIPTIONS: Record<CourseId, string> = {
   python:
     "Free interactive Python course in the browser: read a concept, apply it on a guided exercise, then practice it on an interview-shaped problem with automated grading.",
-  sql: "Free interactive SQL course in the browser: real queries against seeded tables, graded instantly, from SELECT basics to the window functions and pipeline patterns data engineering interviews test.",
+  "data-engineering":
+    "Free interactive data engineering course in the browser: real queries against seeded tables, graded instantly, from SELECT basics through window functions to the cloud platform, file format, and pipeline patterns data engineering interviews test.",
   "system-design":
     "Free system design course: read each concept, then write your own design answer and compare it against a model answer, from the interview method to distributed systems and case studies.",
 }

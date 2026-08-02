@@ -21,7 +21,13 @@ import type { DifficultyLevel, WorkspaceScenarioConfig } from "@/lib/scenarios/t
 
 // ---- shared, course-agnostic skeleton ----
 
-export type CourseId = "python" | "sql" | "system-design"
+/**
+ * The three courses. `"data-engineering"` is the course that grew out of the original SQL track:
+ * SQL is now one section of it (levels 1-5) alongside the cloud, pipeline, and AI-era sections.
+ * Its authored content still lives under `lib/tutorials/sql/` and its L1-L6 lesson ids still carry
+ * the frozen `sql-` prefix, because those ids key every stored progress and telemetry row.
+ */
+export type CourseId = "python" | "data-engineering" | "system-design"
 
 /**
  * SQL ships 6 levels (L5 is the advanced/company-specific DE-interview capstone; L6 is the

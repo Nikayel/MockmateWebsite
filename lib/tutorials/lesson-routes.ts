@@ -20,15 +20,24 @@ import type { CourseId } from "./types"
 /** Route base for each course. Keys are the `CourseId` union, so a new course fails to compile here first. */
 export const LEARN_BASE_PATH: Record<CourseId, string> = {
   python: "/learn/python",
-  sql: "/learn/sql",
+  "data-engineering": "/learn/data-engineering",
   "system-design": "/learn/system-design",
 }
 
 /** Human label for a course, for breadcrumbs and metadata. */
 export const LEARN_COURSE_LABEL: Record<CourseId, string> = {
   python: "Python",
-  sql: "SQL",
+  "data-engineering": "Data Engineering",
   "system-design": "System Design",
+}
+
+/**
+ * Paths this course used to live at, kept so the 308s in `next.config.mjs` and any copy that still
+ * says "SQL" can be traced back here. `/learn/sql/*` was the Data Engineering course's base path
+ * until the SQL track became one section of it.
+ */
+export const LEGACY_LEARN_BASE_PATH: Partial<Record<CourseId, string>> = {
+  "data-engineering": "/learn/sql",
 }
 
 /** The child segment that carries the graded, auth-gated player. */

@@ -2,7 +2,7 @@ import type { ReactNode } from "react"
 import { LearnAuthGuard } from "@/components/tutorials/LearnAuthGuard"
 
 /**
- * The auth gate for the SQL lesson workspace, and the ONLY auth gate under `/learn/sql`.
+ * The auth gate for the Data Engineering lesson workspace, and the ONLY auth gate under `/learn/data-engineering`.
  *
  * It sits here rather than on the track layout on purpose. Everything above this folder (the track
  * landing, each level index, and the public lesson reading page) is now public and statically

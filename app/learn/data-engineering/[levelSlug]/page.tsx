@@ -13,7 +13,7 @@ import {
   trackPath,
 } from "@/lib/tutorials/lesson-routes"
 
-const COURSE_ID = "sql" as const
+const COURSE_ID = "data-engineering" as const
 
 type Props = { params: Promise<{ levelSlug: string }> }
 

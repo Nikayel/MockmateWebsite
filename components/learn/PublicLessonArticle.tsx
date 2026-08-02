@@ -66,7 +66,7 @@ const DIFFICULTY_CLASS: Record<DifficultyLevel, string> = {
 /** Fence language for the worked example, by course. System Design lessons carry no demo code. */
 const DEMO_LANGUAGE: Record<PublicLessonPreview["courseId"], string> = {
   python: "Python",
-  sql: "SQL",
+  "data-engineering": "SQL",
   "system-design": "",
 }
 

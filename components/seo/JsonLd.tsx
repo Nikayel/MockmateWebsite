@@ -542,7 +542,7 @@ function buildCourseSchema(course: CourseSchemaInput): Record<string, unknown> {
  * index. It replaces a version that shipped a hardcoded `courseWorkload: "PT30M"` and had zero call
  * sites, so nothing downstream depended on the old shape.
  *
- * Mount on: `/learn/python`, `/learn/sql`, `/learn/system-design`.
+ * Mount on: `/learn/python`, `/learn/data-engineering`, `/learn/system-design`.
  */
 export function CourseJsonLd(course: CourseSchemaInput) {
   const schema = {

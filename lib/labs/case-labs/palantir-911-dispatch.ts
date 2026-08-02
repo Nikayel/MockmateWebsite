@@ -47,7 +47,7 @@ export const palantir911Dispatch: CaseLab = {
       {
         round: "SQL (Online Assessment + the SQL-heavy Learning round)",
         cta: "Learn SQL",
-        href: "/learn/sql",
+        href: "/learn/data-engineering",
       },
       {
         round: "Behavioral, “why Palantir,” and mission fit",
