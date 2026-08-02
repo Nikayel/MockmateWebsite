@@ -1,0 +1,66 @@
+/**
+ * Centralized memory-urgency → color mapping (single source of truth).
+ *
+ * /knowledge rendered the same retention twice with two different scales: the card
+ * chip banded at 90/70/50 via getMemoryStrength, the concept bar at 80/60/40 inline.
+ * A value of 85 therefore drew a green bar above an amber chip. Urgency now comes
+ * from `memoryBandFor` and the colour comes from here, so the two cannot disagree.
+ *
+ * Colours follow the same severity ramp as lib/ui/difficulty-colors.ts:
+ * emerald (safe) → amber (ok) → orange (warning) → rose (urgent).
+ *
+ * Light mode uses the -700 text shades. The -400 shades used on dark render at
+ * roughly 1.8:1 on a light background, far below the AA 4.5:1 bar for text this
+ * small.
+ *
+ * IMPORTANT: Tailwind's JIT compiler only sees class names that appear as literal
+ * strings in source. Every class below is spelled out in full — never build these
+ * via string interpolation, or the styles will be purged from the production build.
+ */
+import type { MemoryUrgency } from "@/lib/spaced-repetition/algorithm-router"
+
+/**
+ * Shape of the memory indicator at the call site:
+ * - `chip` pill with border + fill + text, for the per-card retention badge
+ * - `bar`  solid fill for a progress/meter track
+ */
+export type MemoryColorVariant = "chip" | "bar"
+
+const FALLBACK: Record<MemoryColorVariant, string> = {
+  chip: "border-border bg-muted text-muted-foreground",
+  bar: "bg-muted-foreground/40",
+}
+
+const TABLE: Record<MemoryColorVariant, Record<MemoryUrgency, string>> = {
+  chip: {
+    safe: "border-emerald-600/20 bg-emerald-100 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-400",
+    ok: "border-amber-600/20 bg-amber-100 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-400",
+    warning:
+      "border-orange-600/20 bg-orange-100 text-orange-700 dark:border-orange-400/20 dark:bg-orange-400/10 dark:text-orange-400",
+    urgent:
+      "border-rose-600/20 bg-rose-100 text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-400",
+  },
+  bar: {
+    safe: "bg-emerald-500 dark:bg-emerald-400",
+    ok: "bg-amber-500 dark:bg-amber-400",
+    warning: "bg-orange-500 dark:bg-orange-400",
+    urgent: "bg-rose-500 dark:bg-rose-400",
+  },
+}
+
+function isMemoryUrgency(value: string): value is MemoryUrgency {
+  return value === "safe" || value === "ok" || value === "warning" || value === "urgent"
+}
+
+/**
+ * Returns the Tailwind classes for a memory urgency in the requested shape.
+ * Unknown / missing values fall back to a neutral treatment — used for cards the
+ * model has no belief about, which must not be coloured as if it did.
+ */
+export function memoryColorClass(
+  urgency: string | null | undefined,
+  variant: MemoryColorVariant = "chip"
+): string {
+  if (!urgency || !isMemoryUrgency(urgency)) return FALLBACK[variant]
+  return TABLE[variant][urgency]
+}
