@@ -3214,6 +3214,30 @@ Every real tool you use, \`git\`, \`pytest\`, \`pip\`, \`uv\`, is a CLI: it read
 
 ### A CLI is a function from strings to a result
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "argv-zero-is-program-name",
+  "prompt": "At a shell you run: python mytool.py add 2 3. Inside the program, what is sys.argv[0]?",
+  "options": [
+    {
+      "label": "'add', the first thing you typed after the program name.",
+      "feedback": "Tempting, because it is the first argument YOU typed, and several languages do number their arguments that way. Python puts the script's own name at index 0, so your first real argument sits at index 1."
+    },
+    {
+      "label": "'mytool.py', the script name. Your own arguments start at index 1.",
+      "correct": true,
+      "feedback": "Right. That is why real code parses sys.argv[1:] rather than sys.argv. Getting it wrong shifts every argument by one and usually surfaces as a baffling 'unknown command'."
+    },
+    {
+      "label": "'python', the interpreter the shell actually launched.",
+      "feedback": "Tempting, because 'python' really is the first word on the command line and it is what the OS started. Python strips the interpreter and its own options before building argv, so index 0 is the script."
+    }
+  ]
+}
+\`\`\`
+
 When you type \`mytool add 2 3\`, Python receives \`sys.argv\`, a list of strings: \`["mytool", "add", "2", "3"]\`. \`sys.argv[0]\` is the program name; the real arguments start at index \`1\`. Everything arrives as text, even \`"2"\`. A CLI does three things with that list:
 
 1. Collect the raw string arguments.
@@ -3232,6 +3256,30 @@ parser.add_argument("command")
 parser.add_argument("a", type=int)
 parser.add_argument("b", type=int)
 args = parser.parse_args()   # args.a is an int
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "argparse-type-converter",
+  "prompt": "The parser above declares parser.add_argument('a', type=int). A user runs the tool passing abc where a number was expected. What happens?",
+  "options": [
+    {
+      "label": "args.a holds the string 'abc', and the crash comes later when your code does arithmetic on it.",
+      "feedback": "Tempting, because type= reads like a type annotation, and you have just learned that annotations do nothing at runtime. This one is genuinely different: argparse calls int('abc') itself while parsing."
+    },
+    {
+      "label": "argparse prints a usage error and exits non-zero before any of your code runs.",
+      "correct": true,
+      "feedback": "Right. type= names a converter function that argparse really calls, and a failure there becomes a short usage message plus SystemExit. Your command function never receives a bad value."
+    },
+    {
+      "label": "A ValueError traceback, since int('abc') raises.",
+      "feedback": "Half right: int('abc') really does raise ValueError underneath. argparse catches it and turns it into a usage message instead, because a stack trace is not a useful thing to show someone at a terminal."
+    }
+  ]
+}
 \`\`\`
 
 \`typer\` (built on \`click\`) turns a function's type hints into the CLI, so \`a: int\` becomes a required, int-converted argument:
@@ -3265,9 +3313,58 @@ Because \`run\` receives its input, a test can call \`run(["mul", "4", "5"])\` a
 
 ### Pitfalls
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "argv-values-are-strings",
+  "prompt": "Someone writes run so it does command, a, b = argv[0], argv[1], argv[2], with no int() anywhere. They call run(['add', '2', '3']). What comes back?",
+  "options": [
+    {
+      "label": "5, because the add branch adds a and b.",
+      "feedback": "Tempting, because that is plainly what the command means and it is what the same call returns as soon as you convert. Everything in argv is a string, and + on two strings concatenates rather than adds."
+    },
+    {
+      "label": "'23', the two strings glued together.",
+      "correct": true,
+      "feedback": "Right, and the mul branch behaves differently: '2' * '3' raises TypeError. So one command fails loudly and the other fails silently. Convert once, at the boundary where the strings arrive."
+    },
+    {
+      "label": "TypeError, since you cannot add two strings.",
+      "feedback": "That is exactly what the mul branch would give you, where '2' * '3' really does raise. But + is defined for two strings, which is the whole reason this particular bug slips through code review."
+    }
+  ]
+}
+\`\`\`
+
 - Arguments are strings. Skip \`int()\` and \`argv[1]\` is \`"2"\`, not \`2\`. Then \`"2" + "3"\` is \`"23"\` and \`"2" * "3"\` raises \`TypeError\`. Convert at the boundary.
 - Off-by-one on \`argv\`. In a real \`main\`, the command is \`sys.argv[1]\`, not \`sys.argv[0]\` (that is the program name). Slicing \`sys.argv[1:]\` avoids the mistake.
 - An unknown command should do something defined (here, return \`0\`), not fall through and crash.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "pure-core-testability",
+  "prompt": "Two designs for the same tool. Design A: run(argv) takes the list as a parameter and returns a number. Design B: main() reads sys.argv itself and prints the result. Which is easier to unit-test, and why?",
+  "options": [
+    {
+      "label": "They are equally testable. A test can set sys.argv before it calls main().",
+      "feedback": "You can do that, and plenty of test suites do, which is why the two feel equivalent. But now the test mutates global interpreter state, has to restore it afterwards, and has to capture stdout to read the answer."
+    },
+    {
+      "label": "Design A. A test calls run(['mul', '4', '5']) and asserts on the return value, with no globals and no stdout.",
+      "correct": true,
+      "feedback": "Right. This is the thin shell, pure core pattern: keep sys.argv and print out at the edge, and put every decision in a function that takes its input and returns its output."
+    },
+    {
+      "label": "Design B, because it exercises the real entry point end to end.",
+      "feedback": "There is a real point buried in here: you do want at least one test that goes through the actual entry point. That is an integration test though. Making it the only way to test your logic is what makes a suite slow and brittle."
+    }
+  ],
+  "reveal": "The same split shows up everywhere: parsing and I/O at the edge, decisions in the middle. It is why the Practice exercise hands run its argv rather than letting it reach for sys.argv."
+}
+\`\`\`
 
 **Interview nuance:** this is the "thin shell, pure core" pattern interviewers look for. Keep argument reading and I/O at the edge (\`sys.argv\`, \`print\`) and put the decision logic in a pure function that takes \`argv\` and returns a value. A pure function is deterministic and trivial to unit-test: you assert on its return value. Once the logic reads global state or prints instead of returning, testing it means patching \`sys.argv\` and capturing stdout, which is slower and more brittle than checking a returned value.`,
     demoCode: `def run(argv):
