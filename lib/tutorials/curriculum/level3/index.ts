@@ -2459,6 +2459,30 @@ The bug that ruins a data pipeline at 2am is rarely the algorithm. It is a path.
 
 ## The mental model
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "path-does-no-io",
+  "prompt": "You run p = Path('data/scores.txt') on a machine where no such file exists. What happens on that line?",
+  "options": [
+    {
+      "label": "FileNotFoundError, because the path does not point at anything.",
+      "feedback": "Tempting, because the name looks like it refers to a real file and most file APIs do fail fast. Building a Path is pure string work: nothing touches disk until you call something like read_text or exists."
+    },
+    {
+      "label": "Nothing at all. You get a Path object and no disk access happens yet.",
+      "correct": true,
+      "feedback": "Right. A Path represents a location, not contents. That is what lets you build and manipulate paths for files you are about to create, and it is why exists() has to be a separate call."
+    },
+    {
+      "label": "It creates an empty file at that location.",
+      "feedback": "Tempting if you are thinking of shell redirection or open(path, 'w'), both of which really do create the file. Constructing a Path writes nothing. Even touch(), which does create it, is a separate explicit call."
+    }
+  ]
+}
+\`\`\`
+
 A \`Path\` is an object that represents a location, not the file's contents. Building one does no I/O and does not require the file to exist. You only touch disk when you call a method like \`read_text()\` or \`exists()\`.
 
 \`\`\`python
@@ -2473,6 +2497,30 @@ text = p.read_text(encoding="utf-8")   # whole file -> one str
 The \`/\` operator is real: \`Path\` overloads it so \`Path("data") / "scores.txt"\` builds the joined path with the correct separator on any OS. Prefer it over \`"data/" + name\`.
 
 Once you have a \`Path\`, its parts are attributes rather than string surgery:
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "suffix-double-extension",
+  "prompt": "A pipeline receives a file named archive.tar.gz. For Path('archive.tar.gz'), what do .suffix and .stem give you?",
+  "options": [
+    {
+      "label": "'.tar.gz' and 'archive'",
+      "feedback": "Tempting, because that is how a human reads the filename: the extension is tar.gz and the name is archive. Both attributes look only at the LAST dot, so they cut the name in a different place than you would."
+    },
+    {
+      "label": "'.gz' and 'archive.tar'",
+      "correct": true,
+      "feedback": "Right. Both split on the final dot. When you need the whole compound extension, .suffixes hands you ['.tar', '.gz'] as a list."
+    },
+    {
+      "label": "'gz' and 'archive.tar'",
+      "feedback": "Half right, and you got the harder half: the stem really is archive.tar. But .suffix keeps its leading dot, so it is '.gz'. That dot is exactly why a comparison like p.suffix == 'csv' quietly never matches anything."
+    }
+  ]
+}
+\`\`\`
 
 \`\`\`csdiagram
 {
@@ -2504,6 +2552,30 @@ print(sum(numbers))   # 60
 
 ## Pitfalls
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "splitlines-vs-split-newline",
+  "prompt": "A real scores file ends with a trailing newline, the way almost every file written by an editor does. Your code splits the text on the newline character with split(), then calls int() on each piece. What happens?",
+  "options": [
+    {
+      "label": "It works. Splitting on newlines is what splitlines does anyway.",
+      "feedback": "Tempting, because for a file with no trailing newline the two really are identical, which is how this bug survives every hand-written test fixture. The trailing newline leaves an empty string as the final piece."
+    },
+    {
+      "label": "ValueError, because int() is handed the empty string left after the last newline.",
+      "correct": true,
+      "feedback": "Right. split leaves a phantom empty piece after a trailing separator, while splitlines drops it. Use splitlines, or keep an if line.strip() guard, or both. The guard also covers blank lines in the middle."
+    },
+    {
+      "label": "It quietly returns a total that is short by the last line.",
+      "feedback": "Close to a real class of bug, and a silent wrong number really is the worst outcome. This one is loud though: int('') raises ValueError instead of politely returning 0."
+    }
+  ]
+}
+\`\`\`
+
 Real files almost always end with a trailing newline, and that is where interns get burned. Compare:
 
 \`\`\`python
@@ -2512,6 +2584,30 @@ Real files almost always end with a trailing newline, and that is where interns 
 \`\`\`
 
 If you use \`split("\\n")\` you get a phantom empty string at the end, and \`int("")\` raises \`ValueError\`. Use \`splitlines()\`, or keep the \`if line.strip()\` guard, or both. That guard is your safety net for blank lines anywhere in the file, not just the last one.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "cwd-not-script-dir",
+  "prompt": "A script at tools/report.py opens Path('data/scores.txt'). It works when you run 'python tools/report.py' from the project root. A teammate cds into tools/ and runs 'python report.py' instead. What do they get?",
+  "options": [
+    {
+      "label": "It works. The path is written inside report.py, so it is anchored to that file.",
+      "feedback": "Tempting, because the path literal lives in report.py and it feels like it should travel with the file. A relative path is resolved against the current working directory, which is wherever the process was launched from."
+    },
+    {
+      "label": "FileNotFoundError. The relative path now resolves under tools/, not the project root.",
+      "correct": true,
+      "feedback": "Right, and this is the classic 'works on my machine' path bug. When the answer has to be stable, anchor it explicitly: Path(__file__).parent and build outward from there."
+    },
+    {
+      "label": "It works, because Python puts the script's own directory on the path.",
+      "feedback": "You are thinking of sys.path, which really does receive the script's directory, and that is what makes imports resolve. sys.path governs module lookup only. File I/O never consults it."
+    }
+  ]
+}
+\`\`\`
 
 The second trap: a relative path like \`Path("data/scores.txt")\` resolves against the current working directory, which is wherever the process was launched, not where your script file lives. Run the same code from a different folder and it fails. When it matters, anchor to the file with \`Path(__file__).parent / "data" / "scores.txt"\`.
 
