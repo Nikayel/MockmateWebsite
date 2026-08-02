@@ -15,8 +15,13 @@ import {
 } from "../registry"
 
 describe("sql registry — level-scoped navigation", () => {
-  it("lists six levels with ids 1–6", () => {
-    expect(listSqlLevels().map((level) => level.id)).toEqual([1, 2, 3, 4, 5, 6])
+  // Ids must be contiguous from 1 and stay inside the shared `TutorialLevelId` 0..11 ceiling, which
+  // `tutorialProgressInputSchema`'s literal union mirrors: a level id the schema does not list would
+  // make every progress write for that level fail validation.
+  it("lists levels with contiguous ids starting at 1, none above 11", () => {
+    const ids = listSqlLevels().map((level) => level.id)
+    expect(ids).toEqual(Array.from({ length: ids.length }, (_, i) => i + 1))
+    expect(Math.max(...ids)).toBeLessThanOrEqual(11)
   })
 
   it("advances to the next lesson within the same level", () => {
