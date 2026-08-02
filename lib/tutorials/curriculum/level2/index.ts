@@ -5768,9 +5768,9 @@ export const level2: PythonLevel = {
   slug: "intermediate",
   title: "Level 2: Idioms",
   tagline:
-    "Comprehensions, generators, classes, dataclasses, decorators, and standard-library idioms.",
+    "Comprehensions, generators, classes, dataclasses, decorators, and the standard-library idioms for dates, text, files, and APIs.",
   defaultExecutionMode: "single-file",
-  estimatedHours: 3,
+  estimatedHours: 4,
   modules: [
     {
       id: "py-l2-comprehensions-generators",
