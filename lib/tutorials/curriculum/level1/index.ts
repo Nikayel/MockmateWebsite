@@ -3456,12 +3456,98 @@ for x in nums:
     seen.add(x)
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "seen-list-makes-it-quadratic",
+  "prompt": "You keep a seen collection and run one x in seen check per item, over n items. What is the total cost if seen is a list?",
+  "options": [
+    {
+      "label": "O(n), because you do exactly one check per item",
+      "feedback": "Tempting, because the loop really does run n times and counting iterations is the usual first move. Each check is itself a scan, so the cost per item is not constant."
+    },
+    {
+      "label": "O(n squared)",
+      "correct": true,
+      "feedback": "Right. n checks, each scanning up to n elements. Swapping the list for a set makes every check flat and drops the whole loop to O(n)."
+    },
+    {
+      "label": "O(n log n), since the list stays sorted as it grows",
+      "feedback": "Close to what a sorted structure with binary search would give you, and that is a real alternative worth naming. A plain list is not kept sorted, and in does a straight linear scan rather than a binary one."
+    }
+  ]
+}
+\`\`\`
+
 That loop is \`O(n)\`: one pass, each check flat. The list version, \`if x in seen\` against a growing list, would be \`O(n²)\`.
 
 ### Pitfalls
 
 - \`set(nums)\` throws away order. It can tell you THAT a value repeated, but not WHICH one repeated first. For \`first_repeated\` you must scan left to right and test a growing \`seen\` set, returning the first \`x\` that is already inside it.
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "unhashable-list-in-a-set",
+  "prompt": "You try to build a set holding one list, written as seen = {[1, 2]}. What happens?",
+  "options": [
+    {
+      "label": "It works, and seen holds that one list",
+      "feedback": "Tempting, because the syntax is perfectly well formed and a set looks like it should accept any value. A set has to hash each element to place it, and a list has no stable hash because its contents can change."
+    },
+    {
+      "label": "It raises a TypeError about an unhashable type",
+      "correct": true,
+      "feedback": "Right. Mutable objects cannot be set elements or dict keys. Convert to a tuple first, and a set of tuples works fine."
+    },
+    {
+      "label": "It works, but membership tests on that set fall back to O(n)",
+      "feedback": "Close, and quietly degrading to a scan would be one reasonable design. Python refuses instead: it rejects the unhashable element outright rather than silently getting slower."
+    }
+  ]
+}
+\`\`\`
+
 - Set and dict elements must be hashable, which in practice means immutable. \`{[1, 2]}\` raises \`TypeError: unhashable type: 'list'\`. Numbers, strings, and tuples are fine; lists, dicts, and sets are not.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "list-or-set-for-the-job",
+  "prompt": "Sort each job by the container that fits it better.",
+  "buckets": ["A list fits better", "A set fits better"],
+  "items": [
+    {
+      "label": "Keep the rows of a report in the order they were read",
+      "bucket": "A list fits better",
+      "feedback": "Sets have no order at all, so anything ordered or positional stays a list."
+    },
+    {
+      "label": "Answer 'have I already processed this id?' a million times",
+      "bucket": "A set fits better",
+      "feedback": "Repeated membership is the reason sets exist: each check is flat instead of a scan."
+    },
+    {
+      "label": "Count how many distinct addresses appeared in a log",
+      "bucket": "A set fits better",
+      "feedback": "Duplicates collapse on the way in, so the length of the set is the distinct count."
+    },
+    {
+      "label": "Collect coordinate pairs that arrive as lists like [1, 2]",
+      "bucket": "A list fits better",
+      "feedback": "Set elements must be hashable and a list is not. Convert the pairs to tuples first if you do want a set."
+    },
+    {
+      "label": "Return the top three results to a caller, in rank order",
+      "bucket": "A list fits better",
+      "feedback": "Ranking is order, and you cannot index a set to pull the first three anyway."
+    }
+  ],
+  "reveal": "Membership speed is one axis of the choice, not the whole choice. A set costs extra memory, keeps no order, supports no indexing, and refuses unhashable values, which is the honest answer to 'why not always use a set?'"
+}
+\`\`\`
 
 **Interview nuance:** \`O(1)\` membership is average case, not a guarantee. A hash table is fast because elements scatter across many slots, but adversarial or unlucky inputs can collide into one slot and degrade a single lookup toward \`O(n)\`. You also trade memory for that speed. So the honest answer to "why not always use a set?" is that sets cost extra memory, accept only hashable values, and keep no order.`,
     demoCode: `nums = [3, 1, 4, 1, 5, 9, 2, 6]
