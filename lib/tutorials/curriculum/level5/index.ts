@@ -3386,6 +3386,412 @@ def rows_within_budget(row_length, budget):
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L5-M4: Calling a Model Like Any Other Unreliable Dependency
+// ───────────────────────────────────────────────────────────────────────────
+
+const modelDependencyLesson: PythonLesson = {
+  id: "py-l5-model-dependency",
+  title: "A model call is a network call",
+  summary:
+    "Slow, metered, and allowed to fail. Wrap it the way you would wrap any third party: a timeout, a bounded retry, a budget, and a defined answer for when it does not come back.",
+  estimatedMinutes: 24,
+  difficulty: "medium",
+  skills: ["error handling", "retries", "reliability", "api integration"],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## What the call actually is
+
+Strip away the interesting part and a model call is an HTTP request to somebody else's server. Everything you already know about third-party dependencies applies, and the parts people forget are exactly the parts they forget for payment gateways and geocoding APIs:
+
+- It is **slow**, in seconds rather than milliseconds, and the variance is large.
+- It **costs money** per call, roughly in proportion to the text going in and coming out.
+- It **fails**, with timeouts, rate limits, overload responses, and transport errors.
+- It returns **text**, which is not the same thing as data. That is the next lesson.
+
+The exact client library differs between vendors and changes every few months, so the shape below is deliberately generic. What does not change is the wrapping.
+
+\`\`\`python
+answer = client.complete(prompt)     # one network call: slow, metered, failure-prone
+\`\`\`
+
+A line like that in the middle of a request handler, with nothing around it, is the same defect as an unwrapped call to a payment provider. It happens to be written by the person most excited about the feature, which is why it so often ships.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "no-timeout-consequence",
+  "prompt": "A request handler calls a model with no timeout set. The provider starts responding in 90 seconds instead of 2. What breaks first?",
+  "options": [
+    {
+      "label": "Nothing, users just see a slower page",
+      "feedback": "That is what it looks like for the first few requests. Each of those slow requests is holding a worker the whole time, so the queue behind them grows faster than it drains."
+    },
+    {
+      "label": "Your own service, because every worker is held waiting and new requests queue behind them",
+      "correct": true,
+      "feedback": "Right. A slow dependency without a timeout converts into an outage of your service, and pages that never touch the model go down alongside the ones that do."
+    },
+    {
+      "label": "The provider, once your retries add enough load",
+      "feedback": "Retry storms are a real way to make a struggling dependency worse, which is why backoff matters. Your own worker pool exhausts long before your traffic moves their needle."
+    },
+    {
+      "label": "The database, because the connections stay open",
+      "feedback": "Connections held across a slow external call are a genuine second-order problem worth checking. The immediate constraint is the worker itself, which is blocked whether or not it holds a connection."
+    }
+  ]
+}
+\`\`\`
+
+## Four wrappings, always
+
+**A timeout.** Pick one and pass it. Every client library takes one, and the default is usually far longer than you want. A timeout is how you convert an unbounded wait into a failure you can handle.
+
+**A bounded retry.** Transient failures are common enough that one retry is worth it and unbounded retries are how you take down a recovering provider. Three attempts is a reasonable default, with a growing pause between them so a hundred clients do not all return at the same instant.
+
+\`\`\`python
+def call_with_retry(client, prompt, attempts=3):
+    for attempt in range(attempts):
+        try:
+            return client.complete(prompt)
+        except TransientError:
+            if attempt == attempts - 1:
+                raise
+            sleep(2 ** attempt)      # 1s, then 2s: give the provider room
+\`\`\`
+
+**A budget.** Calls cost money and a loop over user-supplied input is a loop over your invoice. Count the calls and stop at a cap you chose, rather than at the one your finance team discovers.
+
+**A defined answer for failure.** When the call does not come back, what does your function return? "It raises" is a legitimate answer. So is a cached previous result, a simpler non-model fallback, or a sentinel the caller can render. What is not legitimate is not having decided, because then the answer is whatever exception happens to escape.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "retry-or-not",
+  "prompt": "Sort each failure from a model provider by whether retrying it is worth doing.",
+  "buckets": ["Retry with backoff", "Do not retry"],
+  "items": [
+    {
+      "label": "A 429 rate limit response",
+      "bucket": "Retry with backoff",
+      "feedback": "This is the provider asking you to slow down, so the same request will succeed shortly. Backoff is not optional here, it is the whole point."
+    },
+    {
+      "label": "A 500 from the provider",
+      "bucket": "Retry with backoff",
+      "feedback": "A server-side error is usually transient, so the identical request has a good chance of succeeding on the next attempt."
+    },
+    {
+      "label": "A 401 invalid API key",
+      "bucket": "Do not retry",
+      "feedback": "The credential will be exactly as invalid on the next attempt. Retrying turns a clear configuration error into a slow one."
+    },
+    {
+      "label": "A connection timeout",
+      "bucket": "Retry with backoff",
+      "feedback": "Transport failures are the classic transient case, and the request may not even have reached the provider."
+    },
+    {
+      "label": "A 400 saying the request exceeds the context limit",
+      "bucket": "Do not retry",
+      "feedback": "The request is too big and will still be too big next time. This needs shorter input, not another attempt."
+    }
+  ]
+}
+\`\`\`
+
+## Retrying is only safe when repeating is safe
+
+A retry sends the same request again, which is fine when the call only reads. It is not fine when the call causes something.
+
+If the model call is one step in a flow that also charges a card, sends an email, or writes a row, ask what happens when step three fails after step two succeeded. The answer is usually that the retry must not repeat step two, which means the write needs an idempotency key or the retry has to be scoped to just the model call. This is the same reasoning you would apply to any external write, and generated code almost never includes it, because nothing in the prompt mentioned it.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "retry-side-effects",
+  "prompt": "A function drafts an email with a model, then sends it. The send occasionally times out. A colleague wraps the whole function in a three-attempt retry. What is the risk?",
+  "options": [
+    {
+      "label": "The drafts will differ between attempts, so the user gets an inconsistent email",
+      "feedback": "Real and worth pinning down with a fixed seed or a cached draft. It is much less serious than what the send step does on a retry."
+    },
+    {
+      "label": "A send that timed out after the provider accepted it is repeated, so the user gets several emails",
+      "correct": true,
+      "feedback": "Right. A timeout means you do not know whether the action happened, so retrying an action rather than a query can duplicate it. The retry belongs around the read, not the write."
+    },
+    {
+      "label": "Nothing, since a failed send did not send anything",
+      "feedback": "That is true for a clean rejection and not for a timeout, which is the case here. A timeout is silence, and silence does not tell you which side of the send you are on."
+    },
+    {
+      "label": "The retry costs three times as much in model tokens",
+      "feedback": "It genuinely does, and cost is a real reason to scope retries narrowly. Duplicate emails to a customer are the more serious of the two problems."
+    }
+  ]
+}
+\`\`\`
+
+## Testing it without the network
+
+You cannot write a reliable test against a live provider: it is slow, it costs money, and it will not fail on demand. So you do what you would do for any other dependency and hand your code a stand-in that fails exactly when you tell it to.
+
+\`\`\`python
+class FlakyModel:
+    """A stand-in client. Each entry in script is what the next call does."""
+    def __init__(self, script):
+        self.script = list(script)
+        self.calls = 0
+
+    def complete(self, prompt):
+        self.calls += 1
+        step = self.script.pop(0)
+        if step == "error":
+            raise RuntimeError("upstream error")
+        return step
+\`\`\`
+
+Now "the second attempt succeeds" is a test, and so is "every attempt fails", and both run in a millisecond. The counter matters as much as the responses: an implementation that retries forever and one that stops at three both pass a script of two errors, and only the call count separates them.
+
+**Interview nuance:** "how would you test this?" applied to a model call is a question that separates people quickly. The weak answer describes checking the output text. The strong answer is that the provider gets replaced by a stand-in, and the tests are about attempt counts, timeouts, and what the function returns when the model never answers. That is ordinary dependency discipline, and the fact that the dependency is a model changes none of it.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "model-dependency-cumulative",
+  "prompt": "You are reviewing a pull request whose diff is one line: summary = client.complete(prompt) inside a request handler. What is the first thing to ask for?",
+  "options": [
+    {
+      "label": "A better prompt, since the output quality depends on it",
+      "feedback": "Prompt quality does matter to the feature and is worth iterating on. It is not what turns a slow dependency into an outage of your own service."
+    },
+    {
+      "label": "A timeout, a bounded retry, and a defined behavior when the call fails",
+      "correct": true,
+      "feedback": "Right. Those three are what stop somebody else's bad afternoon becoming yours, and none of them are visible in output quality, so only a reviewer will catch their absence."
+    },
+    {
+      "label": "A cache, so repeated prompts do not cost twice",
+      "feedback": "Often a genuine win for both cost and latency, and worth raising second. It does nothing for the first call, which is the one that can hang forever."
+    },
+    {
+      "label": "A test that asserts the summary is accurate",
+      "feedback": "Output quality is worth evaluating, though rarely with an equality assertion, since the text varies between runs. It is a separate concern from whether the call is safely wrapped."
+    }
+  ],
+  "reveal": "Timeout, bounded retry with backoff, a call budget, and a defined answer for failure. A model is a third-party dependency, and the fact that its output is interesting does not exempt it from any of that."
+}
+\`\`\``,
+    demoCode: `class FlakyModel:
+    def __init__(self, script):
+        self.script = list(script)
+        self.calls = 0
+
+    def complete(self, prompt):
+        self.calls += 1
+        step = self.script.pop(0)
+        if step == "error":
+            raise RuntimeError("upstream error")
+        return step
+
+
+model = FlakyModel(["error", "error", "summary text"])
+for attempt in range(3):
+    try:
+        print("attempt", attempt + 1, "->", model.complete("summarise"))
+        break
+    except RuntimeError as exc:
+        print("attempt", attempt + 1, "->", exc)`,
+  },
+  apply: {
+    id: "py-l5-model-dependency-apply",
+    executionMode: "single-file",
+    prompt: `Write a function \`call_with_retry(script)\` that builds a \`FlakyModel(script)\`, asks it to
+complete the prompt \`"summarise"\`, and returns the first response it gets back.
+
+The rules: make at most **3** attempts in total. If an attempt raises, try again. If all 3 attempts
+raise, return the string \`"unavailable"\` rather than letting the exception escape. Never make a
+fourth call, even when the script still has entries left in it.
+
+\`FlakyModel\` is in the starter: each entry of \`script\` says what the next call does, where
+\`"error"\` raises and anything else is returned as the response text. Keep \`call_with_retry\` as the
+last function in the file.`,
+    starterCode: `class FlakyModel:
+    """A stand-in model client. Each entry in script is what the next call does."""
+
+    def __init__(self, script):
+        self.script = list(script)
+        self.calls = 0
+
+    def complete(self, prompt):
+        self.calls += 1
+        step = self.script.pop(0)
+        if step == "error":
+            raise RuntimeError("upstream error")
+        return step
+
+
+def call_with_retry(script):
+    # Build a FlakyModel(script), call complete("summarise") at most 3 times,
+    # and return the first response or "unavailable".
+    pass`,
+    hints: [
+      "Loop `for attempt in range(3)` and put the call inside a `try`.",
+      "`return` the response from inside the `try` so a success stops the loop immediately.",
+      "Return `'unavailable'` after the loop, which is only reached when all three attempts raised.",
+    ],
+    referenceSolution: `class FlakyModel:
+    def __init__(self, script):
+        self.script = list(script)
+        self.calls = 0
+
+    def complete(self, prompt):
+        self.calls += 1
+        step = self.script.pop(0)
+        if step == "error":
+            raise RuntimeError("upstream error")
+        return step
+
+
+def call_with_retry(script):
+    model = FlakyModel(script)
+    for _ in range(3):
+        try:
+            return model.complete("summarise")
+        except RuntimeError:
+            continue
+    return "unavailable"`,
+    testCases: [
+      { input: { script: ["ok"] }, expected: "ok", description: "the first attempt succeeds" },
+      {
+        input: { script: ["error", "fine"] },
+        expected: "fine",
+        description: "one transient failure, then a response",
+      },
+      {
+        input: { script: ["error", "error", "done"] },
+        expected: "done",
+        description: "the third and last attempt succeeds",
+      },
+      {
+        input: { script: ["error", "error", "error", "never"] },
+        expected: "unavailable",
+        description: "the fourth call must never be made",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l5-model-dependency-practice",
+    executionMode: "single-file",
+    prompt: `Your support tool summarises each ticket in a queue with a model. Last week a provider
+incident turned a nightly batch into a retry storm that ran for six hours and produced an invoice
+nobody had approved, so every batch now has to run under a hard cap on how many calls it may make.
+
+Write a function \`process_batch(scripts, call_budget)\` that returns a list with one result per
+entry in \`scripts\`, in the same order.
+
+The rules, applied to each entry in turn:
+
+- If the number of calls already made has reached \`call_budget\`, record \`"[skipped]"\` and move on
+  without calling at all.
+- Otherwise attempt the call, retrying up to **3** attempts for that entry, and never make a call
+  once the number of calls made has reached \`call_budget\`.
+- Record the first response you get. If every attempt you were able to make raised, record
+  \`"[unavailable]"\`.
+
+\`FlakyModel\` is in the starter and each entry of \`scripts\` is one script for it. Keep
+\`process_batch\` as the last function in the file.`,
+    starterCode: `class FlakyModel:
+    """A stand-in model client. Each entry in script is what the next call does."""
+
+    def __init__(self, script):
+        self.script = list(script)
+        self.calls = 0
+
+    def complete(self, prompt):
+        self.calls += 1
+        step = self.script.pop(0)
+        if step == "error":
+            raise RuntimeError("upstream error")
+        return step
+
+
+def process_batch(scripts, call_budget):
+    # Return one result per script, respecting the total call budget.
+    pass`,
+    hints: [
+      "Keep one `calls` counter across the whole batch, not one per entry.",
+      "Check the budget before each individual call, including before the first attempt of an entry.",
+      "Track whether the entry got to make any call at all: none means `[skipped]`, some but all failing means `[unavailable]`.",
+    ],
+    referenceSolution: `class FlakyModel:
+    def __init__(self, script):
+        self.script = list(script)
+        self.calls = 0
+
+    def complete(self, prompt):
+        self.calls += 1
+        step = self.script.pop(0)
+        if step == "error":
+            raise RuntimeError("upstream error")
+        return step
+
+
+def process_batch(scripts, call_budget):
+    results = []
+    calls = 0
+    for script in scripts:
+        model = FlakyModel(script)
+        answer = None
+        attempted = False
+        for _ in range(3):
+            if calls >= call_budget:
+                break
+            calls += 1
+            attempted = True
+            try:
+                answer = model.complete("summarise")
+                break
+            except RuntimeError:
+                answer = None
+        if not attempted:
+            results.append("[skipped]")
+        elif answer is None:
+            results.append("[unavailable]")
+        else:
+            results.append(answer)
+    return results`,
+    testCases: [
+      {
+        input: { scripts: [["error", "yes"], ["no"]], call_budget: 10 },
+        expected: ["yes", "no"],
+        description: "a retry inside a generous budget",
+      },
+      {
+        input: { scripts: [["error", "error", "error"], ["hi"]], call_budget: 10 },
+        expected: ["[unavailable]", "hi"],
+        description: "one entry exhausts its three attempts",
+      },
+      {
+        input: { scripts: [["error", "a"], ["b"], ["c"]], call_budget: 2 },
+        expected: ["a", "[skipped]", "[skipped]"],
+        description: "the budget runs out after the first entry",
+      },
+      {
+        input: { scripts: [["ok"]], call_budget: 0 },
+        expected: ["[skipped]"],
+        description: "no budget at all means no calls at all",
+      },
+    ],
+  },
+}
+
 export const level5: PythonLevel = {
   id: 5,
   slug: "verification",
@@ -3414,6 +3820,13 @@ export const level5: PythonLevel = {
       description:
         "Shrink the failing input, repair without rewriting, and read a solution for the cost it will have in production.",
       lessons: [shrinkLesson, repairLesson, costLesson],
+    },
+    {
+      id: "py-l5-model-calls",
+      title: "Calling a Model Like Any Other Unreliable Dependency",
+      description:
+        "Wrap the call, validate what comes back, and check the API it used actually exists before any of it reaches production.",
+      lessons: [modelDependencyLesson],
     },
   ],
 }
