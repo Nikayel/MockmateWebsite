@@ -3599,6 +3599,285 @@ def parse_csv(text):
   },
 }
 
+const textAndBytesLesson: PythonLesson = {
+  id: "py-l2-text-and-bytes",
+  title: "Text is bytes underneath",
+  summary:
+    "Encode and decode deliberately, and read the error that says these bytes were never UTF-8.",
+  estimatedMinutes: 12,
+  difficulty: "medium",
+  skills: ["encoding", "unicode", "strings", "error-handling"],
+  teach: {
+    estimatedMinutes: 5,
+    markdown: `## The first real wall you hit with real data
+
+Toy data is ASCII, so text feels like a solved problem. Then a partner sends a customer list, one name has an accent in it, and the ingest dies with \`UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe9 in position 0\`. Nothing in the code changed. The bytes changed, and the code had been quietly assuming what those bytes meant.
+
+A file does not contain text. It contains bytes. Text is what you get when you interpret those bytes with a codec, and the whole family of encoding bugs comes from doing that interpretation by accident instead of on purpose.
+
+### \`str\` and \`bytes\` are different types
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Question", "str", "bytes"],
+  "rows": [
+    ["What it holds", "characters", "raw byte values, 0 to 255"],
+    ["How you write a literal", "'hi'", "b'hi'"],
+    ["What len() counts", "characters", "bytes"],
+    ["How you reach the other one", ".encode('utf-8')", ".decode('utf-8')"],
+    ["What a file or socket carries", "never this", "always this"]
+  ],
+  "highlightCols": ["Question"],
+  "caption": "Every file, socket, and HTTP body carries bytes. A str only ever exists inside your program, so encode and decode are the two doors between the outside world and it. Every text bug lives at one of those two doors."
+}
+\`\`\`
+
+\`\`\`python
+text = "café"
+raw = text.encode("utf-8")   # b'caf\\xc3\\xa9'
+raw.decode("utf-8")          # back to 'café'
+\`\`\`
+
+Read \`\\xc3\\xa9\` as "two bytes that no ASCII character claims". UTF-8 spends one byte on every ASCII character and two to four bytes on everything else, which is exactly why it took over: plain English text costs nothing extra, and the rest of the world still fits.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "one-character-is-not-one-byte",
+  "prompt": "text = 'cafe' with an accented final e, so four characters. What do len(text) and len(text.encode('utf-8')) return?",
+  "options": [
+    {
+      "label": "4 and 4. One character is one byte",
+      "feedback": "Tempting, because it is exactly true for plain ASCII, which is most of the text any tutorial shows you. UTF-8 spends one byte on ASCII and two to four on everything else, so the two lengths agree only by luck."
+    },
+    {
+      "label": "4 and 5, because the accented character costs two bytes",
+      "correct": true,
+      "feedback": "Right. len on a str counts characters and len on bytes counts bytes, so any column width, buffer size, or truncation computed from one and applied to the other is wrong for real names."
+    },
+    {
+      "label": "5 and 5, because Python counts the accent as its own character",
+      "feedback": "A str stores characters rather than the bytes behind them, so this string is four of them however it is stored. The extra byte only appears once you encode it."
+    },
+    {
+      "label": "4 and 8, since UTF-8 always uses two bytes per character",
+      "feedback": "Fixed-width two-byte storage is UTF-16's idea, not UTF-8's. UTF-8 is variable width precisely so that ASCII text stays one byte per character and nothing has to be rewritten."
+    }
+  ]
+}
+\`\`\`
+
+### Why \`UnicodeDecodeError\` happens
+
+UTF-8 is a structured encoding: a byte in the \`0x80\` to \`0xFF\` range announces a multi-byte sequence and the bytes that follow have to fit the pattern. Bytes written by a different codec usually do not, so the decode fails:
+
+\`\`\`python
+raw = bytes([0xe9])          # 'é' as latin-1 wrote it
+raw.decode("utf-8")          # UnicodeDecodeError: can't decode byte 0xe9 in position 0
+raw.decode("latin-1")        # 'é'
+\`\`\`
+
+The error message is unusually good. It names the codec it tried, the offending byte, and the position, which together tell you both what the data probably is and where to look.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "latin1-decodes-any-byte",
+  "prompt": "The same bytes are decoded twice, once as utf-8 and once as latin-1, and they are not valid UTF-8. Which call raises?",
+  "options": [
+    {
+      "label": "Both, since the bytes are malformed",
+      "feedback": "Malformed is relative to a codec rather than absolute. latin-1 maps all 256 possible byte values to a character, so there is no byte sequence at all that it can call invalid."
+    },
+    {
+      "label": "Only the utf-8 call. latin-1 accepts absolutely any bytes",
+      "correct": true,
+      "feedback": "Right, and that is the danger rather than a feature: latin-1 never fails, it just hands back the wrong characters. Silent mojibake is far harder to trace than a loud UnicodeDecodeError."
+    },
+    {
+      "label": "Only the latin-1 call, since latin-1 is the narrower codec",
+      "feedback": "It is narrower in what it can WRITE, and encoding a character outside its 256 really does raise UnicodeEncodeError. Decoding runs the other direction, where narrow means total: every byte has a meaning."
+    },
+    {
+      "label": "Neither. Python retries with another codec automatically",
+      "feedback": "There is no automatic fallback anywhere in the codec machinery, and that is deliberate: guessing an encoding is how corrupted text spreads through a system. A fallback is something you write yourself, as the Practice exercise does."
+    }
+  ]
+}
+\`\`\`
+
+### \`errors="replace"\` buys quiet, and it costs data
+
+Every \`decode\` takes an \`errors\` argument. The default is \`"strict"\`, which raises. \`"replace"\` substitutes \`U+FFFD\` (the black diamond question mark) for anything it cannot read:
+
+\`\`\`python
+bytes([0xe9]).decode("utf-8", errors="replace")   # '\\ufffd'
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "errors-replace-is-lossy",
+  "prompt": "An ingest keeps failing on a few bad bytes, so someone changes the call to raw.decode('utf-8', errors='replace'). What does that buy, and what does it cost?",
+  "options": [
+    {
+      "label": "It repairs the bytes, so the original characters come back",
+      "feedback": "Tempting, because the job stops failing and the output looks like text again. Nothing is repaired: the undecodable bytes are swapped for a replacement character and the original values are gone for good."
+    },
+    {
+      "label": "It never raises, but every unreadable byte becomes a replacement character and is lost",
+      "correct": true,
+      "feedback": "Right. It is the correct tool when you are grepping logs and one garbled line is acceptable, and the wrong tool for anything you will store, bill against, or hand back to a customer."
+    },
+    {
+      "label": "It drops the whole line that contained the bad byte",
+      "feedback": "That is closer to errors='ignore', which drops the offending bytes and silently shortens the string. Neither handler works at line granularity, since a decode has no idea where your lines are."
+    },
+    {
+      "label": "It re-decodes the bad bytes as latin-1 automatically",
+      "feedback": "A per-byte codec fallback would be a reasonable design, and it is exactly what you build by hand in the Practice exercise. The replace handler has no second codec to try, so it substitutes one fixed character."
+    }
+  ]
+}
+\`\`\`
+
+Use \`"replace"\` when a human is going to eyeball the output and a few garbled characters are survivable. Never use it on data you will store, compare, bill against, or send back to a customer, because the replacement is permanent and the original bytes are unrecoverable from that point on.
+
+### Always pass \`encoding=\` when you open a file
+
+\`\`\`python
+with open("names.csv", encoding="utf-8") as fh:
+    text = fh.read()
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "open-without-encoding-is-platform-dependent",
+  "prompt": "open(path) with no encoding argument reads a file holding an accented name. It passes on the author's laptop and raises UnicodeDecodeError in production. Why?",
+  "options": [
+    {
+      "label": "Production runs a different Python version with stricter defaults",
+      "feedback": "Version drift is always worth ruling out, and the text defaults really have shifted across recent releases. The classic cause here is the environment rather than the interpreter: with no explicit encoding, open follows the platform locale."
+    },
+    {
+      "label": "With no encoding argument, open uses the platform default, and the two machines disagree",
+      "correct": true,
+      "feedback": "Right. Pass encoding='utf-8' whenever you know the encoding and the same code then behaves identically on a laptop, in a container, and on a build agent."
+    },
+    {
+      "label": "The file was corrupted on its way to production",
+      "feedback": "Worth ruling out with a checksum, and corruption does happen. A file that decodes cleanly on one machine and not on another is usually being read through two different codecs rather than being two different byte streams."
+    },
+    {
+      "label": "Reading is fine, and the real failure is printing to the terminal",
+      "feedback": "Console encoding causes its own family of failures, so the suspicion is well aimed. A UnicodeDecodeError names a decode though, and printing a str encodes rather than decodes."
+    }
+  ],
+  "reveal": "Decode once at the input boundary with an encoding you named, work in str everywhere inside, and encode once on the way out. Bugs then have exactly two places to hide instead of being spread over every read."
+}
+\`\`\`
+
+### Pitfalls
+
+- **\`str\` and \`bytes\` never mix.** \`"a" + b"b"\` raises \`TypeError\`, and \`"abc" == b"abc"\` is \`False\`. Decide which side of the boundary you are on and stay there.
+- **Encoding can fail too.** \`"café".encode("ascii")\` raises \`UnicodeEncodeError\`, which is the same problem running the other way.
+- **A BOM is real bytes.** A file saved by some Windows tools starts with \`\\xef\\xbb\\xbf\`, and UTF-8 decodes it as an invisible character that then breaks your first column name. \`encoding="utf-8-sig"\` strips it.
+
+**Interview nuance:** the sentence to have ready is "decode at the boundary, work in \`str\`, encode on the way out." It is the same shape as the naive-versus-aware rule for datetimes, and for the same reason: a program is easiest to reason about when every value inside it is already normalised. If pressed on a real incident, name latin-1 as the codec that never raises, so the failure it causes is wrong characters in your database rather than an exception in your logs.`,
+    demoCode: `text = "café"
+raw = text.encode("utf-8")
+print(raw)                      # b'caf\\xc3\\xa9'
+print(len(text), len(raw))      # 4 5
+print(raw.decode("utf-8"))      # café
+
+latin = bytes([0xe9])
+print(latin.decode("latin-1"))                      # é
+print(latin.decode("utf-8", errors="replace"))      # the replacement character`,
+  },
+  apply: {
+    id: "py-l2-text-and-bytes-apply",
+    executionMode: "single-file",
+    prompt: `Write a function \`utf8_byte_values(text)\` that returns the list of byte values UTF-8 uses to
+store \`text\`.
+
+For \`"hi"\` return \`[104, 105]\`. For a single accented character it will be two values, not one.`,
+    starterCode: `def utf8_byte_values(text):
+    # Encode the text as UTF-8, then return its bytes as a list of ints.
+    pass`,
+    hints: [
+      "`text.encode('utf-8')` gives you a `bytes` object.",
+      "Iterating a `bytes` object yields ints, so `list(...)` around it is all you need.",
+      "`return list(text.encode('utf-8'))`.",
+    ],
+    referenceSolution: `def utf8_byte_values(text):
+    return list(text.encode("utf-8"))`,
+    testCases: [
+      { input: { text: "hi" }, expected: [104, 105], description: "ASCII costs one byte each" },
+      {
+        input: { text: "é" },
+        expected: [195, 169],
+        description: "one character, two bytes",
+      },
+      {
+        input: { text: "€" },
+        expected: [226, 130, 172],
+        description: "one character, three bytes",
+      },
+      { input: { text: "" }, expected: [], description: "empty text, no bytes" },
+    ],
+  },
+  practice: {
+    id: "py-l2-text-and-bytes-practice",
+    executionMode: "single-file",
+    prompt: `A partner drops a nightly export onto your SFTP box. Most nights it is UTF-8 and the ingest is
+quiet. Then one file is written by an older Windows tool in latin-1, a single accented surname lands
+in it, and the whole batch dies on \`UnicodeDecodeError\`. You cannot make the partner change, so the
+loader has to cope.
+
+Implement \`decode_with_fallback(byte_values)\`: build \`bytes\` from the list of byte values, decode it
+as UTF-8, and when that raises \`UnicodeDecodeError\`, decode it as latin-1 instead. Return the
+resulting \`str\` either way.`,
+    starterCode: `def decode_with_fallback(byte_values):
+    # Try UTF-8 first; fall back to latin-1 only when UTF-8 refuses the bytes.
+    pass`,
+    hints: [
+      "`bytes(byte_values)` turns a list of ints back into a `bytes` object.",
+      "Wrap the UTF-8 decode in `try` / `except UnicodeDecodeError`, not a bare `except`.",
+      "In the handler, `return raw.decode('latin-1')`, which never raises whatever the bytes are.",
+    ],
+    referenceSolution: `def decode_with_fallback(byte_values):
+    raw = bytes(byte_values)
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw.decode("latin-1")`,
+    testCases: [
+      { input: { byte_values: [104, 105] }, expected: "hi", description: "plain ASCII" },
+      {
+        input: { byte_values: [195, 169] },
+        expected: "é",
+        description: "valid UTF-8, so the first decode wins",
+      },
+      {
+        input: { byte_values: [233] },
+        expected: "é",
+        description: "latin-1 bytes, so the fallback runs",
+      },
+      {
+        input: { byte_values: [67, 97, 102, 233] },
+        expected: "Café",
+        description: "ASCII plus one latin-1 byte",
+      },
+    ],
+  },
+}
+
 const modulesLesson: PythonLesson = {
   id: "py-l2-modules",
   title: "Modules, imports & the standard library",
@@ -4598,7 +4877,7 @@ export const level2: PythonLevel = {
       id: "py-l2-errors-files-modules",
       title: "Errors, Files & Modules",
       description: "Handle errors, parse JSON/CSV, and use the standard library.",
-      lessons: [exceptionsLesson, filesJsonCsvLesson, modulesLesson],
+      lessons: [exceptionsLesson, filesJsonCsvLesson, textAndBytesLesson, modulesLesson],
     },
     {
       id: "py-l2-stdlib-toolkit",
