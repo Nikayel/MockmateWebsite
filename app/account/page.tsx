@@ -46,6 +46,7 @@ import {
 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { SubscriptionStatusBanner } from "@/components/ui/subscription-status-banner"
+import { ResearchConsentCard } from "@/components/account/ResearchConsentCard"
 import { Profile, ProfileQuota, NotificationPreferences, PaymentHistory } from "@/lib/types"
 import {
   DEFAULT_NOTIFICATION_PREFERENCES as DEFAULT_SMART_NOTIFICATION_PREFERENCES,
@@ -595,11 +596,11 @@ export default function AccountPage() {
 
   if (authLoading || dataLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background">
+      <main className="bg-background flex min-h-screen items-center justify-center">
         <div className="flex items-center gap-3">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-muted" />
-          <div className="h-2 w-2 animate-pulse rounded-full bg-muted delay-75" />
-          <div className="h-2 w-2 animate-pulse rounded-full bg-muted delay-150" />
+          <div className="bg-muted h-2 w-2 animate-pulse rounded-full" />
+          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-75" />
+          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-150" />
         </div>
       </main>
     )
@@ -612,7 +613,7 @@ export default function AccountPage() {
   const usagePercentage = (usedSessions / maxSessions) * 100
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="bg-background min-h-screen">
       <Header />
 
       <div className="pt-20 pb-12 sm:pt-24 sm:pb-16">
@@ -627,14 +628,14 @@ export default function AccountPage() {
 
           {/* Profile Header - Compact */}
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-muted">
-              <User className="h-7 w-7 text-muted-foreground" />
+            <div className="bg-muted flex h-14 w-14 shrink-0 items-center justify-center rounded-xl">
+              <User className="text-muted-foreground h-7 w-7" />
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-xl font-semibold text-foreground">
+              <h1 className="text-foreground truncate text-xl font-semibold">
                 {user?.user_metadata?.full_name || "Developer"}
               </h1>
-              <p className="truncate text-sm text-muted-foreground">{user?.email}</p>
+              <p className="text-muted-foreground truncate text-sm">{user?.email}</p>
             </div>
             <div className="flex items-center gap-2">
               <Badge
@@ -652,24 +653,24 @@ export default function AccountPage() {
 
           {/* Quick Stats Row */}
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+            <div className="border-border/50 bg-card/50 rounded-xl border p-4">
               <div className="mb-1 flex items-center gap-2">
-                <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-[11px] text-muted-foreground">Sessions</span>
+                <BarChart3 className="text-muted-foreground h-3.5 w-3.5" />
+                <span className="text-muted-foreground text-[11px]">Sessions</span>
               </div>
               <div className="flex items-baseline gap-1">
-                <span className="text-xl font-light text-foreground">{usedSessions}</span>
-                <span className="text-xs text-muted-foreground">/ {maxSessions}</span>
+                <span className="text-foreground text-xl font-light">{usedSessions}</span>
+                <span className="text-muted-foreground text-xs">/ {maxSessions}</span>
               </div>
-              <Progress value={usagePercentage} className="mt-2 h-1 bg-muted" />
+              <Progress value={usagePercentage} className="bg-muted mt-2 h-1" />
             </div>
 
-            <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+            <div className="border-border/50 bg-card/50 rounded-xl border p-4">
               <div className="mb-1 flex items-center gap-2">
-                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-[11px] text-muted-foreground">Member Since</span>
+                <Calendar className="text-muted-foreground h-3.5 w-3.5" />
+                <span className="text-muted-foreground text-[11px]">Member Since</span>
               </div>
-              <span className="text-sm text-foreground">
+              <span className="text-foreground text-sm">
                 {profile?.created_at
                   ? new Date(profile.created_at).toLocaleDateString("en-US", {
                       month: "short",
@@ -679,10 +680,10 @@ export default function AccountPage() {
               </span>
             </div>
 
-            <div className="col-span-2 rounded-xl border border-border/50 bg-card/50 p-4 sm:col-span-1">
+            <div className="border-border/50 bg-card/50 col-span-2 rounded-xl border p-4 sm:col-span-1">
               <div className="mb-1 flex items-center gap-2">
-                <Crown className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-[11px] text-muted-foreground">Subscription</span>
+                <Crown className="text-muted-foreground h-3.5 w-3.5" />
+                <span className="text-muted-foreground text-[11px]">Subscription</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className={`text-sm ${isPro ? "text-amber-400" : "text-muted-foreground"}`}>
@@ -692,7 +693,7 @@ export default function AccountPage() {
                   <Link href="/upgrade">
                     <Button
                       size="sm"
-                      className="h-6 bg-card text-[10px] text-foreground hover:bg-muted"
+                      className="bg-card text-foreground hover:bg-muted h-6 text-[10px]"
                     >
                       Upgrade
                     </Button>
@@ -705,7 +706,7 @@ export default function AccountPage() {
           {/* Quick Actions */}
           <div className="mb-6 flex flex-wrap gap-2">
             <Link href="/interview">
-              <Button size="sm" className="h-8 bg-card text-xs text-foreground hover:bg-muted">
+              <Button size="sm" className="bg-card text-foreground hover:bg-muted h-8 text-xs">
                 <ExternalLink className="mr-1.5 h-3 w-3" />
                 Start Practice
               </Button>
@@ -714,7 +715,7 @@ export default function AccountPage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 border-border text-xs text-muted-foreground hover:bg-muted"
+                className="border-border text-muted-foreground hover:bg-muted h-8 text-xs"
               >
                 <BarChart3 className="mr-1.5 h-3 w-3" />
                 View Metrics
@@ -724,7 +725,7 @@ export default function AccountPage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 border-border text-xs text-muted-foreground hover:bg-muted"
+                className="border-border text-muted-foreground hover:bg-muted h-8 text-xs"
                 onClick={handleSyncSubscription}
                 disabled={isSyncing}
               >
@@ -741,17 +742,17 @@ export default function AccountPage() {
           <div className="space-y-3">
             {/* Pro Subscription Details */}
             {isPro && profile && (
-              <div className="overflow-hidden rounded-xl border border-border/50 bg-card/50">
+              <div className="border-border/50 bg-card/50 overflow-hidden rounded-xl border">
                 <button
                   onClick={() => toggleSection("subscription")}
-                  className="flex w-full items-center justify-between p-4 transition-colors hover:bg-muted/30"
+                  className="hover:bg-muted/30 flex w-full items-center justify-between p-4 transition-colors"
                 >
                   <div className="flex items-center gap-2">
                     <Crown className="h-4 w-4 text-amber-400" />
-                    <span className="text-sm font-medium text-foreground">Pro Subscription</span>
+                    <span className="text-foreground text-sm font-medium">Pro Subscription</span>
                   </div>
                   <ChevronDown
-                    className={`h-4 w-4 text-muted-foreground transition-transform ${expandedSections.has("subscription") ? "rotate-180" : ""}`}
+                    className={`text-muted-foreground h-4 w-4 transition-transform ${expandedSections.has("subscription") ? "rotate-180" : ""}`}
                   />
                 </button>
                 {expandedSections.has("subscription") && (
@@ -759,7 +760,7 @@ export default function AccountPage() {
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       {profile.subscription_start_date && (
                         <div>
-                          <span className="text-xs text-muted-foreground">Pro Since</span>
+                          <span className="text-muted-foreground text-xs">Pro Since</span>
                           <p className="text-foreground">
                             {new Date(profile.subscription_start_date).toLocaleDateString()}
                           </p>
@@ -767,7 +768,7 @@ export default function AccountPage() {
                       )}
                       {profile.subscription_current_period_end && (
                         <div>
-                          <span className="text-xs text-muted-foreground">Period Ends</span>
+                          <span className="text-muted-foreground text-xs">Period Ends</span>
                           <p className="text-foreground">
                             {new Date(profile.subscription_current_period_end).toLocaleDateString()}
                           </p>
@@ -776,7 +777,7 @@ export default function AccountPage() {
                     </div>
                     {profile.subscription_status && (
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Status:</span>
+                        <span className="text-muted-foreground text-xs">Status:</span>
                         <Badge
                           className={
                             profile.subscription_status === "active"
@@ -791,7 +792,7 @@ export default function AccountPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-8 w-full border-border text-xs text-muted-foreground hover:bg-muted"
+                      className="border-border text-muted-foreground hover:bg-muted h-8 w-full text-xs"
                       onClick={handleManageSubscription}
                     >
                       <Settings className="mr-1.5 h-3 w-3" />
@@ -803,32 +804,32 @@ export default function AccountPage() {
             )}
 
             {/* Email Notifications */}
-            <div className="overflow-hidden rounded-xl border border-border/50 bg-card/50">
+            <div className="border-border/50 bg-card/50 overflow-hidden rounded-xl border">
               <button
                 onClick={() => toggleSection("notifications")}
-                className="flex w-full items-center justify-between p-4 transition-colors hover:bg-muted/30"
+                className="hover:bg-muted/30 flex w-full items-center justify-between p-4 transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">Notifications</span>
+                  <Bell className="text-muted-foreground h-4 w-4" />
+                  <span className="text-foreground text-sm font-medium">Notifications</span>
                   {notificationPrefs.email_notifications_enabled ? (
                     <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-400">
                       On
                     </span>
                   ) : (
-                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                    <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[10px]">
                       Off
                     </span>
                   )}
                 </div>
                 <ChevronDown
-                  className={`h-4 w-4 text-muted-foreground transition-transform ${expandedSections.has("notifications") ? "rotate-180" : ""}`}
+                  className={`text-muted-foreground h-4 w-4 transition-transform ${expandedSections.has("notifications") ? "rotate-180" : ""}`}
                 />
               </button>
               {expandedSections.has("notifications") && (
                 <div className="space-y-4 px-4 pb-4">
                   {/* Master toggle with better copy */}
-                  <div className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-3">
+                  <div className="bg-muted/30 flex items-center justify-between rounded-lg px-3 py-3">
                     <div className="flex items-center gap-3">
                       <div
                         className={`flex h-8 w-8 items-center justify-center rounded-lg ${notificationPrefs.email_notifications_enabled ? "bg-emerald-500/20" : "bg-muted/50"}`}
@@ -838,8 +839,10 @@ export default function AccountPage() {
                         />
                       </div>
                       <div>
-                        <span className="text-sm font-medium text-foreground">Email Notifications</span>
-                        <p className="text-xs text-muted-foreground">
+                        <span className="text-foreground text-sm font-medium">
+                          Email Notifications
+                        </span>
+                        <p className="text-muted-foreground text-xs">
                           Stay on track with practice reminders
                         </p>
                       </div>
@@ -857,15 +860,15 @@ export default function AccountPage() {
                     className={`space-y-1 ${!notificationPrefs.email_notifications_enabled ? "pointer-events-none opacity-40" : ""}`}
                   >
                     {/* Practice Reminders */}
-                    <div className="flex items-center justify-between rounded-lg px-3 py-3 transition-colors hover:bg-muted/20">
+                    <div className="hover:bg-muted/20 flex items-center justify-between rounded-lg px-3 py-3 transition-colors">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-foreground">Practice Reminders</span>
+                          <span className="text-foreground text-sm">Practice Reminders</span>
                           <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-400">
                             Recommended
                           </span>
                         </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
+                        <p className="text-muted-foreground mt-0.5 text-xs">
                           Gentle nudge when you haven&apos;t practiced in a while
                         </p>
                       </div>
@@ -879,15 +882,15 @@ export default function AccountPage() {
                     </div>
 
                     {/* Spaced Repetition */}
-                    <div className="flex items-center justify-between rounded-lg px-3 py-3 transition-colors hover:bg-muted/20">
+                    <div className="hover:bg-muted/20 flex items-center justify-between rounded-lg px-3 py-3 transition-colors">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-foreground">Review Alerts</span>
+                          <span className="text-foreground text-sm">Review Alerts</span>
                           <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-400">
                             High Impact
                           </span>
                         </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
+                        <p className="text-muted-foreground mt-0.5 text-xs">
                           Know when it&apos;s time to review for maximum retention
                         </p>
                       </div>
@@ -901,10 +904,10 @@ export default function AccountPage() {
                     </div>
 
                     {/* Milestones */}
-                    <div className="flex items-center justify-between rounded-lg px-3 py-3 transition-colors hover:bg-muted/20">
+                    <div className="hover:bg-muted/20 flex items-center justify-between rounded-lg px-3 py-3 transition-colors">
                       <div className="flex-1">
-                        <span className="text-sm text-foreground">Milestone Celebrations</span>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
+                        <span className="text-foreground text-sm">Milestone Celebrations</span>
+                        <p className="text-muted-foreground mt-0.5 text-xs">
                           Celebrate streaks, progress, and achievements
                         </p>
                       </div>
@@ -918,10 +921,10 @@ export default function AccountPage() {
                     </div>
 
                     {/* Product Updates - Marketing */}
-                    <div className="flex items-center justify-between rounded-lg px-3 py-3 transition-colors hover:bg-muted/20">
+                    <div className="hover:bg-muted/20 flex items-center justify-between rounded-lg px-3 py-3 transition-colors">
                       <div className="flex-1">
-                        <span className="text-sm text-foreground">Product Updates</span>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
+                        <span className="text-foreground text-sm">Product Updates</span>
+                        <p className="text-muted-foreground mt-0.5 text-xs">
                           New features, tips, and interview prep insights
                         </p>
                       </div>
@@ -937,11 +940,11 @@ export default function AccountPage() {
 
                   {/* Quiet Hours & Timezone */}
                   {notificationPrefs.email_notifications_enabled && (
-                    <div className="space-y-3 border-t border-border/50 pt-3">
+                    <div className="border-border/50 space-y-3 border-t pt-3">
                       <div className="flex items-center justify-between py-2">
                         <div>
-                          <span className="text-sm text-muted-foreground">Quiet Hours</span>
-                          <p className="text-xs text-muted-foreground">
+                          <span className="text-muted-foreground text-sm">Quiet Hours</span>
+                          <p className="text-muted-foreground text-xs">
                             No emails between 10 PM - 8 AM your time
                           </p>
                         </div>
@@ -951,17 +954,19 @@ export default function AccountPage() {
                       {/* Timezone Selector */}
                       <div className="flex items-center justify-between py-2">
                         <div className="flex items-center gap-3">
-                          <Globe className="h-4 w-4 text-muted-foreground" />
+                          <Globe className="text-muted-foreground h-4 w-4" />
                           <div>
-                            <span className="text-sm text-muted-foreground">Timezone</span>
-                            <p className="text-xs text-muted-foreground">For streak and reminder timing</p>
+                            <span className="text-muted-foreground text-sm">Timezone</span>
+                            <p className="text-muted-foreground text-xs">
+                              For streak and reminder timing
+                            </p>
                           </div>
                         </div>
                         <select
                           value={userTimezone}
                           onChange={(e) => handleUpdateTimezone(e.target.value)}
                           disabled={isSavingPrefs}
-                          className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-foreground focus:border-border focus:ring-1 focus:ring-border focus:outline-none"
+                          className="border-border bg-muted text-foreground focus:border-border focus:ring-border rounded-md border px-2 py-1 text-xs focus:ring-1 focus:outline-none"
                         >
                           <option value="America/Los_Angeles">Pacific Time (LA)</option>
                           <option value="America/Denver">Mountain Time (Denver)</option>
@@ -988,17 +993,17 @@ export default function AccountPage() {
             </div>
 
             {/* Practice Settings */}
-            <div className="overflow-hidden rounded-xl border border-border/50 bg-card/50">
+            <div className="border-border/50 bg-card/50 overflow-hidden rounded-xl border">
               <button
                 onClick={() => toggleSection("practice")}
-                className="flex w-full items-center justify-between p-4 transition-colors hover:bg-muted/30"
+                className="hover:bg-muted/30 flex w-full items-center justify-between p-4 transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <Brain className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">Practice Settings</span>
+                  <Brain className="text-muted-foreground h-4 w-4" />
+                  <span className="text-foreground text-sm font-medium">Practice Settings</span>
                 </div>
                 <ChevronDown
-                  className={`h-4 w-4 text-muted-foreground transition-transform ${expandedSections.has("practice") ? "rotate-180" : ""}`}
+                  className={`text-muted-foreground h-4 w-4 transition-transform ${expandedSections.has("practice") ? "rotate-180" : ""}`}
                 />
               </button>
               {expandedSections.has("practice") && (
@@ -1006,8 +1011,8 @@ export default function AccountPage() {
                   {/* Daily Review Limit */}
                   <div className="flex items-center justify-between py-2">
                     <div>
-                      <span className="text-sm text-muted-foreground">Daily Review Limit</span>
-                      <p className="text-xs text-muted-foreground">
+                      <span className="text-muted-foreground text-sm">Daily Review Limit</span>
+                      <p className="text-muted-foreground text-xs">
                         Max reviews shown per day. Excess items can be deferred.
                       </p>
                     </div>
@@ -1017,7 +1022,7 @@ export default function AccountPage() {
                         handleUpdatePracticeSetting("max_daily_reviews", Number(e.target.value))
                       }
                       disabled={isSavingPracticeSettings}
-                      className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-foreground focus:border-border focus:ring-1 focus:ring-border focus:outline-none"
+                      className="border-border bg-muted text-foreground focus:border-border focus:ring-border rounded-md border px-2 py-1 text-xs focus:ring-1 focus:outline-none"
                     >
                       {[5, 10, 15, 20, 25, 30].map((n) => (
                         <option key={n} value={n}>
@@ -1028,10 +1033,10 @@ export default function AccountPage() {
                   </div>
 
                   {/* Daily Goal */}
-                  <div className="flex items-center justify-between border-t border-border/50 py-2 pt-4">
+                  <div className="border-border/50 flex items-center justify-between border-t py-2 pt-4">
                     <div>
-                      <span className="text-sm text-muted-foreground">Daily Goal</span>
-                      <p className="text-xs text-muted-foreground">
+                      <span className="text-muted-foreground text-sm">Daily Goal</span>
+                      <p className="text-muted-foreground text-xs">
                         Target problems to complete each day for streak progress.
                       </p>
                     </div>
@@ -1041,7 +1046,7 @@ export default function AccountPage() {
                         handleUpdatePracticeSetting("daily_goal", Number(e.target.value))
                       }
                       disabled={isSavingPracticeSettings}
-                      className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-foreground focus:border-border focus:ring-1 focus:ring-border focus:outline-none"
+                      className="border-border bg-muted text-foreground focus:border-border focus:ring-border rounded-md border px-2 py-1 text-xs focus:ring-1 focus:outline-none"
                     >
                       {[1, 3, 5, 10, 15, 20].map((n) => (
                         <option key={n} value={n}>
@@ -1051,7 +1056,7 @@ export default function AccountPage() {
                     </select>
                   </div>
 
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-muted-foreground text-[10px]">
                     When reviews exceed your daily limit, you&apos;ll see a &quot;Feeling
                     overwhelmed?&quot; option to defer low-priority items.
                   </p>
@@ -1060,25 +1065,26 @@ export default function AccountPage() {
             </div>
 
             {/* Privacy & Data */}
-            <div className="overflow-hidden rounded-xl border border-border/50 bg-card/50">
+            <div className="border-border/50 bg-card/50 overflow-hidden rounded-xl border">
               <button
                 onClick={() => toggleSection("privacy")}
-                className="flex w-full items-center justify-between p-4 transition-colors hover:bg-muted/30"
+                className="hover:bg-muted/30 flex w-full items-center justify-between p-4 transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">Privacy & Data</span>
+                  <Shield className="text-muted-foreground h-4 w-4" />
+                  <span className="text-foreground text-sm font-medium">Privacy & Data</span>
                 </div>
                 <ChevronDown
-                  className={`h-4 w-4 text-muted-foreground transition-transform ${expandedSections.has("privacy") ? "rotate-180" : ""}`}
+                  className={`text-muted-foreground h-4 w-4 transition-transform ${expandedSections.has("privacy") ? "rotate-180" : ""}`}
                 />
               </button>
               {expandedSections.has("privacy") && (
                 <div className="space-y-2 px-4 pb-4">
+                  <ResearchConsentCard />
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-9 w-full justify-start border-border text-xs text-muted-foreground hover:bg-muted"
+                    className="border-border text-muted-foreground hover:bg-muted h-9 w-full justify-start text-xs"
                     onClick={handleExportData}
                     disabled={isExporting}
                   >
@@ -1088,7 +1094,7 @@ export default function AccountPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-9 w-full justify-start border-border text-xs text-muted-foreground hover:bg-muted"
+                    className="border-border text-muted-foreground hover:bg-muted h-9 w-full justify-start text-xs"
                     onClick={handleOpenCookieSettings}
                   >
                     <Cookie className="mr-2 h-3.5 w-3.5" />
@@ -1098,13 +1104,13 @@ export default function AccountPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-9 w-full justify-start border-border text-xs text-muted-foreground hover:bg-muted"
+                      className="border-border text-muted-foreground hover:bg-muted h-9 w-full justify-start text-xs"
                     >
                       <Shield className="mr-2 h-3.5 w-3.5" />
                       Privacy Policy
                     </Button>
                   </Link>
-                  <div className="border-t border-border/50 pt-2">
+                  <div className="border-border/50 border-t pt-2">
                     <Button
                       size="sm"
                       variant="outline"
@@ -1121,43 +1127,43 @@ export default function AccountPage() {
 
             {/* Payment History */}
             {(paymentHistory.length > 0 || profile?.stripe_customer_id) && (
-              <div className="overflow-hidden rounded-xl border border-border/50 bg-card/50">
+              <div className="border-border/50 bg-card/50 overflow-hidden rounded-xl border">
                 <button
                   onClick={() => toggleSection("payments")}
-                  className="flex w-full items-center justify-between p-4 transition-colors hover:bg-muted/30"
+                  className="hover:bg-muted/30 flex w-full items-center justify-between p-4 transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <Receipt className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">Payment History</span>
+                    <Receipt className="text-muted-foreground h-4 w-4" />
+                    <span className="text-foreground text-sm font-medium">Payment History</span>
                     {paymentHistory.length > 0 && (
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[10px]">
                         {paymentHistory.length}
                       </span>
                     )}
                   </div>
                   <ChevronDown
-                    className={`h-4 w-4 text-muted-foreground transition-transform ${expandedSections.has("payments") ? "rotate-180" : ""}`}
+                    className={`text-muted-foreground h-4 w-4 transition-transform ${expandedSections.has("payments") ? "rotate-180" : ""}`}
                   />
                 </button>
                 {expandedSections.has("payments") && (
                   <div className="px-4 pb-4">
                     {paymentHistory.length === 0 ? (
                       <div className="py-6 text-center">
-                        <CreditCard className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
-                        <p className="text-xs text-muted-foreground">No payments yet</p>
+                        <CreditCard className="text-muted-foreground mx-auto mb-2 h-6 w-6" />
+                        <p className="text-muted-foreground text-xs">No payments yet</p>
                       </div>
                     ) : (
                       <div className="space-y-2">
                         {paymentHistory.slice(0, 5).map((payment) => (
                           <div
                             key={payment.id}
-                            className="flex items-center justify-between border-b border-border/50 py-2 last:border-0"
+                            className="border-border/50 flex items-center justify-between border-b py-2 last:border-0"
                           >
                             <div>
-                              <p className="text-sm text-foreground">
+                              <p className="text-foreground text-sm">
                                 {payment.description || "Subscription"}
                               </p>
-                              <p className="text-[11px] text-muted-foreground">
+                              <p className="text-muted-foreground text-[11px]">
                                 {new Date(payment.created_at).toLocaleDateString("en-US", {
                                   month: "short",
                                   day: "numeric",
@@ -1166,14 +1172,14 @@ export default function AccountPage() {
                               </p>
                             </div>
                             <div className="text-right">
-                              <p className="font-mono text-sm text-foreground">
+                              <p className="text-foreground font-mono text-sm">
                                 ${(payment.amount / 100).toFixed(2)}
                               </p>
                               <Badge
                                 className={
                                   payment.status === "succeeded"
                                     ? "border-0 bg-emerald-500/10 text-[10px] text-emerald-400"
-                                    : "border-0 bg-muted text-[10px] text-muted-foreground"
+                                    : "bg-muted text-muted-foreground border-0 text-[10px]"
                                 }
                               >
                                 {payment.status === "succeeded" ? "Paid" : payment.status}
@@ -1195,13 +1201,13 @@ export default function AccountPage() {
 
       {/* Delete Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent className="max-w-md border-border bg-card">
+        <AlertDialogContent className="border-border bg-card max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-foreground">
+            <AlertDialogTitle className="text-foreground flex items-center gap-2">
               <Trash2 className="h-4 w-4 text-red-400" />
               Delete Account
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm text-muted-foreground">
+            <AlertDialogDescription className="text-muted-foreground text-sm">
               This is <strong className="text-red-400">permanent</strong>. All data will be deleted:
               <ul className="mt-2 list-inside list-disc space-y-1 text-xs">
                 <li>Profile and account info</li>
@@ -1211,7 +1217,7 @@ export default function AccountPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-9 border-border bg-transparent text-sm text-foreground hover:bg-muted">
+            <AlertDialogCancel className="border-border text-foreground hover:bg-muted h-9 bg-transparent text-sm">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
