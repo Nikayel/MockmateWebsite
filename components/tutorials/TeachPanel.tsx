@@ -9,6 +9,7 @@ import { usePersistentState } from "./usePersistentState"
 import { isSqlRuntimeWarm, runSqlInWorker } from "@/lib/workspace-execution"
 import { ColdStartNote } from "./ColdStartNote"
 import { ReadOnlyCodeBlock } from "./ReadOnlyCodeBlock"
+import { PythonDemoRunner } from "./PythonDemoRunner"
 import { SqlDataPreview } from "./SqlDataPreview"
 import { SqlResultGrid } from "./SqlResultGrid"
 import { isSqlResultSet, type SqlResultSet, type TeachSection } from "@/lib/tutorials/types"
@@ -17,8 +18,10 @@ import { isSqlResultSet, type SqlResultSet, type TeachSection } from "@/lib/tuto
  * The "Read" phase: self-contained teaching markdown plus an optional worked example. For SQL
  * lessons that carry a `demoSeedSql`, the example query is EXECUTED live (client-side sql.js, no
  * grading, no network) so the learner sees its output table — and, when `showDemoInput` is set, the
- * input tables it runs against — before being asked to write their own. Python teach demos stay
- * read-only/highlighted (nothing to run). Ends with the hand-off to the "Apply" phase.
+ * input tables it runs against, before being asked to write their own. Python teach demos are an
+ * EDITABLE, runnable scratchpad (`PythonDemoRunner`): same in-browser Pyodide the graded exercises
+ * use, but ungraded, so a learner can change a value and watch what happens. Ends with the hand-off
+ * to the "Apply" phase.
  */
 export interface TeachPanelProps {
   teach: TeachSection
@@ -49,6 +52,9 @@ export function TeachPanel({
 }: TeachPanelProps) {
   const { demoCode, demoSeedSql, showDemoInput } = teach
   const canRunDemo = demoLanguage === "sql" && !!demoCode && !!demoSeedSql
+  // Python demos become an editable scratchpad. Gated on `lessonId` because the runner
+  // needs it to tag telemetry, and on the language so SQL keeps its own auto-run path.
+  const isRunnablePythonDemo = demoLanguage === "python" && !!demoCode && !!lessonId
 
   // One segment unless the caller opted in AND the teach is long enough to warrant
   // pacing, so short lessons and non-opted-in callers keep the original single render.
@@ -135,13 +141,17 @@ export function TeachPanel({
         <SqlDataPreview seedSql={demoSeedSql} title="Tables in this example" />
       )}
 
-      {demoCode && allRevealed && (
-        <ReadOnlyCodeBlock
-          code={demoCode}
-          language={demoLanguage}
-          label={canRunDemo ? "Example query" : "Live example"}
-        />
-      )}
+      {demoCode &&
+        allRevealed &&
+        (isRunnablePythonDemo ? (
+          <PythonDemoRunner code={demoCode} lessonId={lessonId} />
+        ) : (
+          <ReadOnlyCodeBlock
+            code={demoCode}
+            language={demoLanguage}
+            label={canRunDemo ? "Example query" : "Live example"}
+          />
+        ))}
 
       {canRunDemo && allRevealed && (
         <div className="flex flex-col gap-1.5">
