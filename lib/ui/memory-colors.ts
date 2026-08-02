@@ -17,7 +17,7 @@
  * strings in source. Every class below is spelled out in full — never build these
  * via string interpolation, or the styles will be purged from the production build.
  */
-import type { MemoryUrgency } from "@/lib/spaced-repetition/algorithm-router"
+import type { MemoryUrgency } from "@/lib/spaced-repetition/memory-bands"
 
 /**
  * Shape of the memory indicator at the call site:

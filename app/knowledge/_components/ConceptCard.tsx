@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { ChevronDown, ChevronRight } from "lucide-react"
-import { memoryBandFor } from "@/lib/spaced-repetition/algorithm-router"
+import { memoryBandFor } from "@/lib/spaced-repetition/memory-bands"
 import { memoryColorClass } from "@/lib/ui/memory-colors"
 import type { CardBelief, ConceptBelief } from "@/lib/learner-model/types"
 import { CardBeliefRow } from "./CardBeliefRow"

@@ -1,7 +1,7 @@
 "use client"
 
 import { memoryColorClass } from "@/lib/ui/memory-colors"
-import type { MemoryUrgency } from "@/lib/spaced-repetition/algorithm-router"
+import type { MemoryUrgency } from "@/lib/spaced-repetition/memory-bands"
 import { cn } from "@/lib/utils"
 
 /**
