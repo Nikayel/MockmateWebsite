@@ -124,6 +124,7 @@ function buildConcept(pattern: DSAPattern, cards: CardBelief[]): ConceptBelief {
     label,
     description: metadata?.description ?? null,
     card_count: cards.length,
+    reviewed_count: reviewed.length,
     ...counts,
     mean_retrievability: meanRet,
     min_retrievability: minRet,

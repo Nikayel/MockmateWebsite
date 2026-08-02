@@ -63,6 +63,12 @@ export interface ConceptBelief {
   description: string | null
 
   card_count: number
+  /**
+   * How many of those cards have actually been reviewed. Every statistic below is
+   * computed over these, not over card_count, so the UI has to be able to say which
+   * number a claim is about.
+   */
+  reviewed_count: number
   mastered: number
   reviewing: number
   learning: number
