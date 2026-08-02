@@ -167,7 +167,11 @@ export function CardBeliefRow({
               type="button"
               onClick={() => onChallenge(card)}
               title="Dispute what the system believes about this problem"
-              className="border-border hover:border-accent/40 hover:bg-accent/10 text-foreground inline-flex min-h-6 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
+              // Accent ink, not just a border: border-border alone measures 1.29:1 on
+              // the white card, so the "bordered control" this row was built around
+              // did not actually render and the eye went to Practice instead. Accent
+              // consistently means "act on the model" across the page now.
+              className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/20 dark:text-accent inline-flex min-h-6 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
             >
               <Flag className="h-3.5 w-3.5" />
               This seems wrong
