@@ -326,7 +326,10 @@ export default function KnowledgePage() {
           {error && (
             <div
               role="alert"
-              className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-600/20 bg-rose-100 p-4 text-sm text-rose-700 dark:border-rose-500/10 dark:bg-rose-500/5 dark:text-rose-400"
+              // The dark surface was bg-rose-500/5 (1.05:1) with a /10 border
+              // (1.10:1) — imperceptible, so in dark the alert collapsed to bare
+              // rose text floating on the page while light got a real tinted block.
+              className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-600/20 bg-rose-100 p-4 text-sm text-rose-700 dark:border-rose-400/60 dark:bg-rose-500/12 dark:text-rose-400"
             >
               <span>{error}</span>
               {/* The failure is usually a lapsed token or a blip; a dead end here
@@ -340,9 +343,16 @@ export default function KnowledgePage() {
                 }}
                 // No local focus ring: rose-600/40 measured 1.51:1 over the dark
                 // banner, and the page's doctrine is that the full-opacity base ring
-                // in globals.css is the sole supplier. The dark border also rises
-                // from /30 (1.48:1) to /60 to clear the 3:1 boundary bar.
-                className="shrink-0 rounded-md border border-rose-600/30 px-3 py-1 font-medium transition-colors hover:bg-rose-200/60 dark:border-rose-400/60 dark:hover:bg-rose-500/10"
+                // in globals.css is the sole supplier.
+                //
+                // Both borders are now FULL opacity. The previous attempt raised only
+                // the dark side, to /60, and its comment claimed that cleared 3:1 —
+                // it measured 2.96:1, and the light border was never touched at all
+                // (rose-600/30 on the rose-100 banner: 1.63:1). This button has no
+                // fill and inherits the banner's own text colour, so the border is
+                // the only thing identifying it as a control, and it is the page's
+                // sole recovery affordance. rose-700 is 5.02:1; rose-400 is 5.95:1.
+                className="shrink-0 rounded-md border border-rose-700 px-3 py-1 font-medium transition-colors hover:bg-rose-200/60 dark:border-rose-400 dark:hover:bg-rose-500/10"
               >
                 Try again
               </button>
