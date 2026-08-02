@@ -22,6 +22,7 @@
 import { z } from "zod"
 import { adminDb } from "@/lib/firebase-admin"
 import { getResearchConsent, isResearchUsable } from "./research-consent"
+import { toKnowledgeComponents } from "./knowledge-components"
 import type { CourseId, LearnItemResponse } from "./types"
 
 const COLLECTION = "learn_item_responses"
@@ -180,6 +181,9 @@ export function composeItemResponse(
     item_id: input.itemId,
     section: input.section,
     skills: input.skills ?? [],
+    // Canonical vocabulary alongside the authored chips. Analysis groups by this;
+    // `skills` stays exactly as a human wrote it. See knowledge-components.ts.
+    knowledge_components: toKnowledgeComponents(input.skills),
     // The learner's consent state AT THE MOMENT OF OBSERVATION. See research-consent.ts
     // for why this is stamped rather than joined at export.
     research_consent: researchConsent,

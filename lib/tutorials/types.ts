@@ -388,8 +388,14 @@ export interface LearnItemResponse {
   item_id: string
   /** Which phase of the lesson the item lives in. */
   section: LessonSection
-  /** The lesson's authored knowledge-component tags, denormalized so analysis needs one read. */
+  /** The lesson's authored skill chips, verbatim, denormalized so analysis needs one read. */
   skills: string[]
+  /**
+   * The canonical knowledge components those skills map to. This is the analysis key:
+   * authored skills are free-form and full of near-duplicates, which can never
+   * accumulate the repeated per-component observations knowledge tracing requires.
+   */
+  knowledge_components: string[]
   /**
    * Whether the learner had consented to research use AT THE TIME THIS ROW WAS WRITTEN.
    * Stamped, never joined at export: a later opt-in does not retroactively consent past
