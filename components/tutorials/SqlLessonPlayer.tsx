@@ -266,7 +266,9 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
 
               {!isLoading && active === "teach" && (
                 <TeachPanel
+                  lessonId={lesson.id}
                   teach={lesson.teach}
+                  teachCompleted={sections.teach === "completed"}
                   demoLanguage="sql"
                   onContinue={() => {
                     markComplete("teach")
