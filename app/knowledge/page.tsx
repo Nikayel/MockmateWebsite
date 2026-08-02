@@ -277,7 +277,7 @@ export default function KnowledgePage() {
               estimate — and correct it when it&apos;s wrong.
             </p>
             <Link href="/pricing">
-              <Button className="bg-card text-foreground hover:bg-muted">
+              <Button className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/20 dark:text-accent border">
                 Upgrade to Pro
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -371,7 +371,7 @@ export default function KnowledgePage() {
                 this will fill in.
               </p>
               <Link href="/practice">
-                <Button className="bg-card text-foreground hover:bg-muted">
+                <Button className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/20 dark:text-accent border">
                   Go to Practice
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -391,7 +391,7 @@ export default function KnowledgePage() {
                 back.
               </p>
               <Link href="/practice">
-                <Button className="bg-card text-foreground hover:bg-muted">
+                <Button className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/20 dark:text-accent border">
                   Go to Practice
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
