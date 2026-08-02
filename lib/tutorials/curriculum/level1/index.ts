@@ -431,6 +431,276 @@ One hour is \`3600\` seconds and one minute is \`60\` seconds. Combine both part
   },
 }
 
+// Authored into L1-M1 as its closing lesson. The commands it teaches (`venv`, `pip`) cannot run in
+// the browser sandbox, so both graded exercises work on the TEXT those commands produce, which is
+// the part a learner can reason about anywhere. See the teach block's sandbox note.
+const environmentsLesson: PythonLesson = {
+  id: "py-l1-environments",
+  title: "Running Python & installing packages",
+  summary: "Run a .py file, isolate dependencies in a virtual environment, and pin them with pip.",
+  estimatedMinutes: 12,
+  difficulty: "easy",
+  skills: ["venv", "pip", "packaging", "project-structure"],
+  teach: {
+    estimatedMinutes: 6,
+    markdown: `## The two commands every project starts with
+
+Everything you have written so far ran inside this page. A real project runs somewhere else: a file on your own machine, started from a terminal, leaning on libraries somebody else published. Two commands cover nearly all of it. \`python3 file.py\` runs your code, and \`pip install\` fetches someone else's. The wrinkle is that \`pip install\` has to put the library *somewhere*, and choosing that somewhere on purpose is the difference between a project that still installs next year and one that breaks the day another project needs a different version.
+
+**These commands run in a terminal on your machine, not in the editor on this page.** The sandbox here is a Python compiled to WebAssembly: no shell, no \`pip\`, no folder to install into. So the graded exercises below check that you can reason about environments in plain Python rather than build one in the browser.
+
+## Running a file
+
+Save code in a file whose name ends in \`.py\`, then hand that file to the interpreter:
+
+\`\`\`bash
+python3 hello.py     # macOS and Linux
+py hello.py          # Windows
+\`\`\`
+
+Python reads the file top to bottom, exactly as it does here, and exits at the end. Anything you \`print\` lands in the terminal. There is no separate compile step to remember and no build output to run instead.
+
+## Why one shared install folder goes wrong
+
+\`pip install requests\` downloads the library into a directory called \`site-packages\`. If every project on your machine shares one \`site-packages\`, then every project shares one version of every library, and libraries change. The scraper you wrote last spring pinned to an old API. The dashboard you started yesterday needs the new one. There is exactly one slot, so one of them loses.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "one-slot-per-library",
+  "prompt": "Two projects live on your machine with no virtual environments anywhere. Project A was built against pandas 1.5. In project B you run pip install pandas and get 2.2. What happens to project A?",
+  "options": [
+    {
+      "label": "Nothing, because pip keeps both versions and hands each project the one it was built with",
+      "feedback": "Tempting, because that really is what a lockfile-driven tool does per project, and npm keeps versions per folder this way. A plain pip install has only one site-packages to write into, and it has no idea project A exists."
+    },
+    {
+      "label": "Project A silently starts running against pandas 2.2 and breaks the next time you open it",
+      "correct": true,
+      "feedback": "Right. The install overwrote the shared copy, and nothing warned you because nothing was watching project A. You find out later, from a stack trace that looks nothing like a dependency problem."
+    },
+    {
+      "label": "pip refuses the install and tells you project A already pinned that library",
+      "feedback": "Close, in that a resolver really can refuse a conflicting install and pip does that within one environment. Across separate projects there is nothing to detect: pip sees one machine, one folder, one version."
+    }
+  ]
+}
+\`\`\`
+
+## What a virtual environment actually is
+
+A **virtual environment** is a folder. Inside it sit a link to a Python interpreter and, more importantly, its own private \`site-packages\`. That is the whole trick: each project gets its own install folder, so project A can hold \`pandas 1.5\` and project B \`pandas 2.2\` while neither knows the other exists.
+
+Create one, then activate it:
+
+\`\`\`bash
+python3 -m venv .venv        # create the folder .venv in this project
+source .venv/bin/activate    # macOS and Linux
+.venv\\Scripts\\activate       # Windows
+\`\`\`
+
+Creating is per project and you do it once. Activating is per terminal window: it repoints \`python\` and \`pip\` in that one shell at the folder, usually adding \`(.venv)\` to your prompt so you can see it worked. \`deactivate\` puts the shell back. Calling the folder \`.venv\` is a convention, not a rule, but it is the one every tool and every teammate expects.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "forgot-to-activate",
+  "prompt": "You ran python3 -m venv .venv, opened a fresh terminal, and ran pip install requests without activating. Where did requests land?",
+  "options": [
+    {
+      "label": "In .venv, since that is the environment sitting in this project folder",
+      "feedback": "Tempting, because the folder is right there and you are standing in the project. Nothing about your current directory selects an environment: only activation repoints the pip your shell resolves."
+    },
+    {
+      "label": "In whichever Python the shell resolves by default, which is usually the system-wide one",
+      "correct": true,
+      "feedback": "Right. An unactivated shell still points at the default interpreter, so the install went global. This is the single most common cause of ModuleNotFoundError right after a successful install."
+    },
+    {
+      "label": "Nowhere, because pip refuses to install while an environment exists but is inactive",
+      "feedback": "Close, and modern pip does refuse in one specific case, an externally managed system Python on Linux. In general pip has no idea an inactive .venv folder is nearby, so it installs happily into the wrong place."
+    }
+  ]
+}
+\`\`\`
+
+## Writing down what you installed
+
+Installing solves today. It does not solve the next person, including you on a new laptop, who needs the same libraries at the same versions. \`pip freeze\` prints exactly what is installed, one \`name==version\` line per package, and \`>\` redirects that into a file you commit:
+
+\`\`\`bash
+pip install requests            # add a dependency
+pip freeze > requirements.txt   # write down what is installed right now
+pip install -r requirements.txt # rebuild that exact set somewhere else
+\`\`\`
+
+\`\`\`text
+certifi==2024.7.4
+charset-normalizer==3.3.2
+requests==2.32.3
+\`\`\`
+
+Note that \`requests\` pulled in two libraries you never asked for. \`pip freeze\` lists those too, because reproducing your environment means reproducing all of it.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Command", "What it actually does", "How often you run it"],
+  "rows": [
+    ["python3 -m venv .venv", "Creates a folder with its own interpreter and its own site-packages", "Once, when the project is created"],
+    ["source .venv/bin/activate", "Repoints python and pip in THIS shell at that folder", "Every new terminal window"],
+    ["pip install requests", "Downloads the library into the currently active environment", "Whenever you add a dependency"],
+    ["pip freeze > requirements.txt", "Writes every installed name==version into a file you commit", "After you add or upgrade anything"],
+    ["pip install -r requirements.txt", "Installs exactly those pins into a fresh environment", "On a clone, on a new laptop, in CI"]
+  ],
+  "highlightCols": ["How often you run it"],
+  "caption": "The third column is the one people get wrong. Creating is per project, but activating is per terminal, which is why 'I installed it and it still says ModuleNotFoundError' is almost always a shell that was never activated."
+}
+\`\`\`
+
+## What never gets committed
+
+\`requirements.txt\` goes into git. \`.venv\` does not. It holds hundreds of megabytes of binaries built for one operating system and one Python version, and \`pip install -r requirements.txt\` rebuilds it in seconds, so committing it costs everyone a huge download to receive files that may not even run on their machine. Put a line for it in \`.gitignore\` alongside \`__pycache__/\` and \`*.pyc\`, the compiled bytecode Python writes next to your source and regenerates whenever it needs to.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "clone-without-the-venv",
+  "prompt": "Your repo ignores .venv. A teammate clones it on a laptop that has never seen your project. What gets them a working set of libraries?",
+  "options": [
+    {
+      "label": "Nothing extra, since git restores every file the project needs",
+      "feedback": "Tempting, because a clone really does reproduce the repository exactly. It reproduces what was committed, and the whole point of ignoring .venv is that the libraries were deliberately left out of it."
+    },
+    {
+      "label": "Creating their own environment, then pip install -r requirements.txt",
+      "correct": true,
+      "feedback": "Right. The committed pin file is the record that survives the clone, and rebuilding from it is fast. That pair is what makes an install reproducible instead of a folder someone has to mail you."
+    },
+    {
+      "label": "Installing each library by hand, since the exact versions are gone with the folder",
+      "feedback": "Close on the instinct that deleting .venv loses information, and it would if requirements.txt did not exist. That file is precisely the version record, which is why freezing it is not optional busywork."
+    }
+  ],
+  "reveal": "One rule covers it: commit what a human decided, never commit what a machine can rebuild from that decision. requirements.txt is a decision. .venv and __pycache__ are rebuildable output."
+}
+\`\`\`
+
+## The shape of the exercises
+
+Both exercises below work on the text these commands produce, because text is the part you can reason about anywhere. Apply hands you lines that look like \`pip list\` output, \`"requests 2.31.0"\`, and asks for pins. Splitting a line gives you its pieces: \`"requests 2.31.0".split()\` returns \`["requests", "2.31.0"]\`, so \`parts[0]\` is the name and \`parts[1]\` is the version. Practice hands you file paths and asks which ones belong in \`.gitignore\`.
+
+## The tool you will meet at Level 3
+
+\`uv\` is a newer, much faster tool that folds \`venv\`, \`pip\`, and dependency resolution into one binary: \`uv venv\`, \`uv add requests\`, \`uv sync\`. Plenty of new projects start with it. Learn \`venv\` plus \`pip\` first anyway, because that pair is what you will find in almost every existing repository, Dockerfile, and CI config you inherit. Level 3 picks up \`uv\` and \`pyproject.toml\` properly.
+
+**Interview nuance:** "how do you manage dependencies?" is really asking whether you understand reproducibility. The answer that lands is three sentences: one environment per project so versions cannot collide, a committed record of exact versions so any install can be repeated, and never commit the environment itself. Naming the gap in a plain \`pip freeze\` file, that it pins whatever happened to be installed rather than what the project actually declares it needs, is what separates a memorized answer from someone who has debugged a broken build.`,
+    demoCode: `installed = ["requests 2.31.0", "flask 3.0.0"]
+
+pins = []
+for line in installed:
+    parts = line.split()
+    pins.append(parts[0] + "==" + parts[1])
+
+print(sorted(pins))   # ['flask==3.0.0', 'requests==2.31.0']`,
+  },
+  apply: {
+    id: "py-l1-environments-apply",
+    executionMode: "single-file",
+    prompt: `Implement \`to_requirements(installed)\`: return the pinned requirement lines for a list of
+installed packages.
+
+Each item in \`installed\` looks like \`"requests 2.31.0"\`, a name and a version separated by a
+space. Return a list of \`"name==version"\` strings, sorted alphabetically.`,
+    starterCode: `def to_requirements(installed):
+    # Split each line, join the two parts with "==", and return them sorted.
+    pass`,
+    hints: [
+      '`"requests 2.31.0".split()` gives you `["requests", "2.31.0"]`.',
+      'Build one pin with `parts[0] + "==" + parts[1]` and collect it in a list.',
+      "Return `sorted(pins)` so the result does not depend on the input order.",
+    ],
+    referenceSolution: `def to_requirements(installed):
+    pins = []
+    for line in installed:
+        parts = line.split()
+        pins.append(parts[0] + "==" + parts[1])
+    return sorted(pins)`,
+    testCases: [
+      {
+        input: { installed: ["requests 2.31.0", "flask 3.0.0"] },
+        expected: ["flask==3.0.0", "requests==2.31.0"],
+        description: "two packages, sorted by name",
+      },
+      {
+        input: { installed: ["numpy 1.26.4"] },
+        expected: ["numpy==1.26.4"],
+        description: "a single package",
+      },
+      {
+        input: { installed: [] },
+        expected: [],
+        description: "nothing installed yet",
+      },
+      {
+        input: { installed: ["pytest 8.2.0", "black 24.4.2", "mypy 1.10.0"] },
+        expected: ["black==24.4.2", "mypy==1.10.0", "pytest==8.2.0"],
+        description: "three packages given out of order",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l1-environments-practice",
+    executionMode: "single-file",
+    prompt: `A teammate opens a pull request with four thousand changed files: their whole \`.venv\` folder
+and every \`__pycache__\` directory got committed along with the two lines they meant to change. You
+are writing the check that should have caught it.
+
+Implement \`should_ignore(path)\`: return \`True\` when \`path\` is generated output that never belongs
+in a repository, and \`False\` otherwise. A path is ignorable when it starts with \`".venv/"\`, when it
+contains \`"__pycache__"\`, or when it ends with \`".pyc"\`.`,
+    starterCode: `def should_ignore(path):
+    # True for anything inside .venv, any __pycache__ path, and any .pyc file.
+    pass`,
+    hints: [
+      '`path.startswith(".venv/")` catches everything inside the environment folder.',
+      '`"__pycache__" in path` is true wherever that folder appears in the path.',
+      'Finish with `return path.endswith(".pyc")` so every other path answers `False`.',
+    ],
+    referenceSolution: `def should_ignore(path):
+    if path.startswith(".venv/"):
+        return True
+    if "__pycache__" in path:
+        return True
+    return path.endswith(".pyc")`,
+    testCases: [
+      {
+        input: { path: ".venv/lib/python3.12/site-packages/requests/__init__.py" },
+        expected: true,
+        description: "anything inside the environment folder",
+      },
+      {
+        input: { path: "app/__pycache__/main.cpython-312.pyc" },
+        expected: true,
+        description: "compiled bytecode Python regenerates on its own",
+      },
+      {
+        input: { path: "requirements.txt" },
+        expected: false,
+        description: "the pin file is exactly what you do commit",
+      },
+      {
+        input: { path: "src/report.py" },
+        expected: false,
+        description: "your own source always belongs in the repo",
+      },
+    ],
+  },
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // L1-M5: Control Flow & Functions
 // `py-l1-temperature` is defined further down (next to these, for historical reasons) but is
@@ -4070,8 +4340,8 @@ export const level1: PythonLevel = {
       id: "py-l1-fundamentals",
       title: "First Steps",
       description:
-        "Run your first program, show output, return a computed value, and store values in variables.",
-      lessons: [helloLesson, temperatureLesson, variablesLesson],
+        "Run your first program, show output, return a computed value, store values in variables, and set up an environment you can install real packages into.",
+      lessons: [helloLesson, temperatureLesson, variablesLesson, environmentsLesson],
     },
     {
       id: "py-l1-data-types",
