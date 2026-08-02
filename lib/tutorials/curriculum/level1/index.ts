@@ -1269,6 +1269,30 @@ Every counter, price, average, and timestamp your code touches is a number, and 
 2 ** 10   # 1024  power
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "true-division-always-float",
+  "prompt": "What type does 6 / 2 produce in Python 3?",
+  "options": [
+    {
+      "label": "int, since the division comes out even",
+      "feedback": "Tempting, because the result really is a whole number and Python 2 did behave this way. In Python 3 a single slash always produces a float, so you get 3.0 rather than 3."
+    },
+    {
+      "label": "float",
+      "correct": true,
+      "feedback": "Right. / is true division and always returns a float, even for 6 / 2. Reach for // when you want an int back from an even split."
+    },
+    {
+      "label": "It depends: int when it divides evenly, float otherwise",
+      "feedback": "Close, and that is the rule people carry over from C, Java, and Go. Python 3 deliberately made / predictable: the type of the result never depends on the values you feed it."
+    }
+  ]
+}
+\`\`\`
+
 The one to memorize: \`/\` always gives a \`float\`, even when the result is whole. \`6 / 2\` is \`3.0\`, not \`3\`. That is exactly what your \`average(a, b, c)\` exercise wants: sum the three numbers and divide by \`3\`, and a decimal answer is correct.
 
 ### Floor division and modulo: splitting into groups
@@ -1283,9 +1307,94 @@ mins  = total % 60    # 5   leftover minutes
 
 That is the entire trick behind \`minutes_to_hm(total_minutes)\`: return \`[total_minutes // 60, total_minutes % 60]\`, which is \`[2, 5]\` for \`125\`. Reach for \`//\` and \`%\` whenever you mean "how many whole groups" and "what is left".
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "floor-division-or-modulo",
+  "prompt": "Which operator answers each question: floor division // or modulo %?",
+  "buckets": ["Floor division //", "Modulo %"],
+  "items": [
+    {
+      "label": "How many whole hours are in 125 minutes",
+      "bucket": "Floor division //",
+      "feedback": "125 // 60 is 2. Floor division answers how many times the divisor fits."
+    },
+    {
+      "label": "How many minutes are left after those whole hours",
+      "bucket": "Modulo %",
+      "feedback": "125 % 60 is 5. Modulo answers what could not be grouped."
+    },
+    {
+      "label": "Wrap an index back to the front of a 5-item list",
+      "bucket": "Modulo %",
+      "feedback": "i % 5 always lands between 0 and 4, which is what makes flooring modulo the clock-arithmetic tool."
+    },
+    {
+      "label": "Split 17 records into full pages of 5, how many full pages",
+      "bucket": "Floor division //",
+      "feedback": "17 // 5 is 3 full pages. The 2 records left over are the % half of the same question."
+    },
+    {
+      "label": "Test whether a number is even",
+      "bucket": "Modulo %",
+      "feedback": "n % 2 == 0. Evenness is a question about the remainder, not about the quotient."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfalls
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "float-equality-lies",
+  "prompt": "What does 0.1 + 0.2 == 0.3 evaluate to?",
+  "options": [
+    {
+      "label": "True, since both sides are the same number",
+      "feedback": "Tempting, and it is the correct answer in decimal arithmetic. Floats are binary approximations, though, and neither 0.1 nor 0.2 has an exact binary form, so the sum lands slightly high."
+    },
+    {
+      "label": "False",
+      "correct": true,
+      "feedback": "Right. 0.1 + 0.2 is actually 0.30000000000000004. Compare floats with a tolerance, such as abs(x - y) < 1e-9, or use math.isclose."
+    },
+    {
+      "label": "True on most machines, False on some",
+      "feedback": "Close, in that this really does come down to how numbers are represented in hardware. But the double-precision format is standard across the machines you will meet, so this comparison is reliably False rather than flaky."
+    }
+  ]
+}
+\`\`\`
+
 **Float equality lies.** Because floats are binary approximations, \`0.1 + 0.2 == 0.3\` evaluates to \`False\` (\`0.1 + 0.2\` is actually \`0.30000000000000004\`). Never compare floats with \`==\`. Compare with a tolerance, for example \`abs(x - y) < 1e-9\`, or use \`math.isclose(x, y)\`.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "floor-division-with-negatives",
+  "prompt": "What is -7 // 2 in Python?",
+  "options": [
+    {
+      "label": "-3, dropping the remainder",
+      "feedback": "Tempting, because dropping the fractional part is how C, Java, and Go do it, and truncating toward zero gives -3. Python floors instead, which for a negative result means going further from zero, not closer."
+    },
+    {
+      "label": "-4",
+      "correct": true,
+      "feedback": "Right. // floors toward negative infinity, so -3.5 becomes -4. The matching remainder is -7 % 2 == 1, because the remainder takes the sign of the divisor."
+    },
+    {
+      "label": "-3.5, since a negative cannot be floored",
+      "feedback": "Close on the intermediate value, which really is -3.5. But // never hands back a fraction: given two ints it always returns an int."
+    }
+  ]
+}
+\`\`\`
 
 **\`//\` is not truncation.** \`//\` floors toward negative infinity, so \`-7 // 2\` is \`-4\`, not \`-3\`. And \`%\` takes the sign of the divisor: \`-7 % 2\` is \`1\` in Python. This surprises people coming from C or Java. For your minute problems the inputs are non-negative, so \`//\` and \`%\` line up with everyday intuition, but know the edge case exists.
 
