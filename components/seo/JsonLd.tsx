@@ -1,7 +1,19 @@
-// JSON-LD Structured Data Components for SEO Rich Snippets
-
-// Use consistent URL - codesparring.dev is the canonical domain
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.dev"
+/**
+ * JSON-LD structured data components.
+ *
+ * Every `@id`, `url`, and `item` below has to name the SAME host the page's `rel=canonical` names,
+ * or the graph describes a different document than the one being served. That is why the origin is
+ * imported from `lib/seo/site.ts` rather than re-derived here: this file used to hold one of four
+ * independent copies of the apex literal, each free to drift.
+ *
+ * Only schema types Google still renders a rich result for are worth adding. Verified against
+ * Google's structured data gallery (checked 2026-08): Breadcrumb and Course list are supported; the
+ * practice-problem / Quiz type was pulled from Search Console and the Rich Results Test in January
+ * 2026; FAQ rich results end 2026-05-07; `LearningResource` has never had a Google rich result at
+ * all. Nothing belongs here on the theory that "more schema is better" - an unrendered type is bytes
+ * on every page for no return.
+ */
+import { SITE_ORIGIN, absoluteUrl } from "@/lib/seo/site"
 
 // WebSite Schema - enables sitelinks search box in Google SERPs
 // This is a powerful SEO feature that shows a search box directly in search results
@@ -11,21 +23,21 @@ export function WebSiteJsonLd() {
     "@type": "WebSite",
     name: "CodeSparring",
     alternateName: ["Code Sparring", "CodeSparring.dev"],
-    url: SITE_URL,
+    url: SITE_ORIGIN,
     description: "AI-powered coding interview practice platform",
     // potentialAction enables the sitelinks search box
     potentialAction: {
       "@type": "SearchAction",
       target: {
         "@type": "EntryPoint",
-        urlTemplate: `${SITE_URL}/blog?q={search_term_string}`,
+        urlTemplate: `${SITE_ORIGIN}/blog?q={search_term_string}`,
       },
       "query-input": "required name=search_term_string",
     },
     publisher: {
       "@type": "Organization",
       name: "CodeSparring",
-      url: SITE_URL,
+      url: SITE_ORIGIN,
     },
   }
 
@@ -43,11 +55,11 @@ export function OrganizationJsonLd() {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "CodeSparring",
-    url: SITE_URL,
+    url: SITE_ORIGIN,
     // Use PNG for better Google search result display (dynamically generated at /api/logo.png)
     logo: {
       "@type": "ImageObject",
-      url: `${SITE_URL}/api/logo.png`,
+      url: `${SITE_ORIGIN}/api/logo.png`,
       width: 512,
       height: 512,
     },
@@ -104,7 +116,7 @@ export function SoftwareApplicationJsonLd() {
     name: "CodeSparring",
     applicationCategory: "EducationalApplication",
     operatingSystem: "Web",
-    url: SITE_URL,
+    url: SITE_ORIGIN,
     description:
       "CodeSparring is an AI mock interview platform that trains interview performance, not just problem-solving. Unlike LeetCode which only tests if you can solve problems alone, CodeSparring simulates real interview conditions where you speak your solution out loud and receive feedback on communication, problem-solving approach, and code quality. Available 24/7 with no scheduling required, at a fraction of the cost of human mock interviews ($25/month vs $225/session).",
     offers: [
@@ -216,11 +228,11 @@ export function WebPageJsonLd({
     "@type": "WebPage",
     name: title,
     description: description,
-    url: `${SITE_URL}${url}`,
+    url: absoluteUrl(url),
     isPartOf: {
       "@type": "WebSite",
       name: "CodeSparring",
-      url: SITE_URL,
+      url: SITE_ORIGIN,
     },
   }
 
@@ -294,7 +306,7 @@ export function ArticleJsonLd({
     "@type": "Article",
     headline: title,
     description: description,
-    url: `${SITE_URL}${url}`,
+    url: absoluteUrl(url),
     datePublished: datePublished,
     dateModified: dateModified || datePublished,
     author: {
@@ -308,16 +320,16 @@ export function ArticleJsonLd({
       name: "CodeSparring",
       logo: {
         "@type": "ImageObject",
-        url: `${SITE_URL}/api/logo.png`,
+        url: `${SITE_ORIGIN}/api/logo.png`,
         width: 512,
         height: 512,
       },
     },
     // Use dynamically generated OG image (Next.js serves opengraph-image.tsx at /opengraph-image)
-    image: image ? `${SITE_URL}${image}` : `${SITE_URL}/opengraph-image`,
+    image: absoluteUrl(image ?? "/opengraph-image"),
     mainEntityOfPage: {
       "@type": "WebPage",
-      "@id": `${SITE_URL}${url}`,
+      "@id": absoluteUrl(url),
     },
   }
 
@@ -329,7 +341,16 @@ export function ArticleJsonLd({
   )
 }
 
-// BreadcrumbList Schema - for navigation trail in SERP
+/**
+ * BreadcrumbList - the navigation trail Google renders in place of the raw URL in a result.
+ *
+ * `url` is a site-relative path and is resolved through `absoluteUrl`, not string-concatenated.
+ * Google matches breadcrumb `item` values against the page's canonical URL, so a trailing-slash or
+ * double-slash mismatch quietly disqualifies the whole trail rather than erroring.
+ *
+ * This is the highest-value schema on a deep Learn corpus: a lesson four segments down otherwise
+ * shows a URL, and instead shows "CodeSparring > Learn > Python > Truthiness traps".
+ */
 export function BreadcrumbJsonLd({ items }: { items: Array<{ name: string; url: string }> }) {
   const schema = {
     "@context": "https://schema.org",
@@ -338,7 +359,7 @@ export function BreadcrumbJsonLd({ items }: { items: Array<{ name: string; url: 
       "@type": "ListItem",
       position: index + 1,
       name: item.name,
-      item: `${SITE_URL}${item.url}`,
+      item: absoluteUrl(item.url),
     })),
   }
 
@@ -362,24 +383,24 @@ export function BlogCollectionJsonLd({
     name: "CodeSparring Blog",
     description:
       "Guides on technical interview prep, real-codebase debugging, spaced repetition, and FAANG interviews.",
-    url: `${SITE_URL}/blog`,
+    url: `${SITE_ORIGIN}/blog`,
     isPartOf: {
       "@type": "WebSite",
       name: "CodeSparring",
-      url: SITE_URL,
+      url: SITE_ORIGIN,
     },
     mainEntity: {
       "@type": "ItemList",
       itemListElement: posts.map((post, index) => ({
         "@type": "ListItem",
         position: index + 1,
-        url: `${SITE_URL}/blog/${post.slug}`,
+        url: `${SITE_ORIGIN}/blog/${post.slug}`,
         item: {
           "@type": "BlogPosting",
           headline: post.title,
           description: post.description,
           datePublished: post.date,
-          url: `${SITE_URL}/blog/${post.slug}`,
+          url: `${SITE_ORIGIN}/blog/${post.slug}`,
         },
       })),
     },
@@ -410,7 +431,7 @@ export function FounderPersonJsonLd() {
     description:
       "Computer Science student at Sacramento State University. Founder of CodeSparring, an AI-powered coding interview preparation platform. Passionate about helping developers ace technical interviews through spaced repetition and AI mock interviews.",
     url: "https://linkedin.com/in/nikayel-ali",
-    image: `${SITE_URL}/api/logo.png`,
+    image: `${SITE_ORIGIN}/api/logo.png`,
     // Educational background
     alumniOf: {
       "@type": "CollegeOrUniversity",
@@ -421,7 +442,7 @@ export function FounderPersonJsonLd() {
     worksFor: {
       "@type": "Organization",
       name: "CodeSparring",
-      url: SITE_URL,
+      url: SITE_ORIGIN,
     },
     // Knowledge areas (helps with topical authority)
     knowsAbout: [
@@ -442,7 +463,7 @@ export function FounderPersonJsonLd() {
       "https://linkedin.com/in/nikayel-ali",
       "https://github.com/nikayel",
       "https://twitter.com/codesparring",
-      SITE_URL,
+      SITE_ORIGIN,
     ],
   }
 
@@ -454,31 +475,153 @@ export function FounderPersonJsonLd() {
   )
 }
 
-// Course Schema - for educational content (DSA patterns, interview prep)
-export function CourseJsonLd({
-  name,
-  description,
-  provider,
-}: {
+/** One course as both the `Course` schema and a `ListItem` in a course list carousel needs it. */
+export interface CourseSchemaInput {
+  /** Course title, e.g. "Python for Interviews". Required by Google. */
   name: string
+  /** Required by Google. Displayed with a 60-character limit, so lead with the substance. */
   description: string
-  provider?: string
-}) {
-  const schema = {
-    "@context": "https://schema.org",
+  /** Site-relative path to the course landing page. Resolved through `absoluteUrl`. */
+  url: string
+  /**
+   * Total authored minutes across the whole track, summed from the live curriculum at build time.
+   * Never a guess: this used to be a hardcoded `PT30M` on a track that is many hours long.
+   */
+  workloadMinutes: number
+  /** Optional skill list, e.g. the union of lesson `skills`. Surfaced as `teaches`. */
+  teaches?: string[]
+}
+
+/**
+ * Minutes to an ISO 8601 duration, which is the only format `courseWorkload` accepts.
+ *
+ * Hours are NOT rolled into days. `P1DT4H` would claim the work is spread over a calendar day, while
+ * `PT28H` states the honest thing: twenty-eight hours of study, whenever the learner takes them.
+ */
+function toIsoDuration(totalMinutes: number): string {
+  const safeMinutes = Math.max(0, Math.round(totalMinutes))
+  const hours = Math.floor(safeMinutes / 60)
+  const minutes = safeMinutes % 60
+  if (hours === 0) return `PT${minutes}M`
+  if (minutes === 0) return `PT${hours}H`
+  return `PT${hours}H${minutes}M`
+}
+
+/** Shared object builder so a standalone `Course` and a `Course` nested in a list never diverge. */
+function buildCourseSchema(course: CourseSchemaInput): Record<string, unknown> {
+  return {
     "@type": "Course",
-    name: name,
-    description: description,
+    name: course.name,
+    description: course.description,
+    url: absoluteUrl(course.url),
     provider: {
       "@type": "Organization",
-      name: provider || "CodeSparring",
-      url: SITE_URL,
+      name: "CodeSparring",
+      url: SITE_ORIGIN,
     },
+    // Every Learn track is readable without an account, which is the single most useful fact a
+    // search or answer engine can carry about this corpus.
+    isAccessibleForFree: true,
+    inLanguage: "en",
+    ...(course.teaches?.length ? { teaches: course.teaches } : {}),
     hasCourseInstance: {
       "@type": "CourseInstance",
       courseMode: "online",
-      courseWorkload: "PT30M", // 30 minutes average per session
+      courseWorkload: toIsoDuration(course.workloadMinutes),
     },
+  }
+}
+
+/**
+ * `Course` for a single Learn track page.
+ *
+ * Honest scope note: Google retired the standalone "course info" rich result in June 2025, so this
+ * on its own does not draw a SERP treatment. It is still worth emitting because the vocabulary is
+ * current, it is what the `Course list` carousel points at (see {@link CourseListJsonLd}), and it is
+ * how an answer engine learns that `/learn/python` is a free multi-hour course rather than a blog
+ * index. It replaces a version that shipped a hardcoded `courseWorkload: "PT30M"` and had zero call
+ * sites, so nothing downstream depended on the old shape.
+ *
+ * Mount on: `/learn/python`, `/learn/sql`, `/learn/system-design`.
+ */
+export function CourseJsonLd(course: CourseSchemaInput) {
+  const schema = {
+    "@context": "https://schema.org",
+    ...buildCourseSchema(course),
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
+/**
+ * `ItemList` of `Course` - the shape behind Google's Course list carousel.
+ *
+ * Google's all-in-one variant puts the full `Course` inside each `ListItem`, alongside the
+ * `position` and `url` the carousel requires. Eligibility needs at least three courses from one
+ * provider, which is exactly what the Learn hub lists.
+ *
+ * Mount on: `/learn` (the hub), passing every course in `COURSE_IDS` order.
+ */
+export function CourseListJsonLd({ courses }: { courses: CourseSchemaInput[] }) {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: courses.map((course, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      url: absoluteUrl(course.url),
+      item: buildCourseSchema(course),
+    })),
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}
+
+/**
+ * `ItemList` of lessons, for a track page or a level page.
+ *
+ * This one earns no rich result by itself, and that is fine. Its job is to state the page's real
+ * structure: a track index and a level index are ordered collections of lesson URLs, and saying so
+ * explicitly gives a crawler the ordering and the titles without depending on it inferring both from
+ * link markup. On a corpus this deep that is the difference between lessons being discovered in
+ * curriculum order and being discovered at random.
+ *
+ * `name` on each item carries the lesson title so the list is readable on its own; `url` is what
+ * makes each entry resolvable.
+ *
+ * Mount on: `/learn/{track}` (all lessons in the track) and `/learn/{track}/{levelSlug}` (that
+ * level's lessons).
+ */
+export function LessonListJsonLd({
+  name,
+  lessons,
+}: {
+  /** What the list is, e.g. "Python for Interviews lessons". */
+  name: string
+  lessons: Array<{ title: string; url: string }>
+}) {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name,
+    numberOfItems: lessons.length,
+    itemListOrder: "https://schema.org/ItemListOrderAscending",
+    itemListElement: lessons.map((lesson, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: lesson.title,
+      url: absoluteUrl(lesson.url),
+    })),
   }
 
   return (

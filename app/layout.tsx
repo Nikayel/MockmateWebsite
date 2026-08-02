@@ -19,6 +19,7 @@ import {
   WebSiteJsonLd,
   FounderPersonJsonLd,
 } from "@/components/seo/JsonLd"
+import { SITE_ORIGIN } from "@/lib/seo/site"
 import "./globals.css"
 
 const workSans = Work_Sans({
@@ -52,7 +53,9 @@ const siteConfig = {
   tagline: "AI Technical Interview Practice for Coding, System Design, and Real-World Rounds",
   description:
     "Practice technical interviews with an AI interviewer. CodeSparring helps engineers prepare for coding, system design, bug-fix, and real-world interview rounds, plus free Python, SQL, and System Design courses, with feedback, hints, and performance tracking.",
-  url: process.env.NEXT_PUBLIC_SITE_URL || "https://codesparring.dev",
+  // One origin for the whole app, from lib/seo/site.ts. This was a fourth private copy of the apex
+  // literal, and the copies are what let the site publish canonicals against a redirecting host.
+  url: SITE_ORIGIN,
   // OG images are now dynamically generated via app/opengraph-image.tsx
 }
 
@@ -134,7 +137,13 @@ export const metadata: Metadata = {
   // The root layout intentionally does NOT set alternates.canonical: a root
   // canonical is inherited by every page and would point them all at the
   // homepage. The homepage sets its own canonical in app/page.tsx.
-  metadataBase: new URL(siteConfig.url),
+  //
+  // Audited: this is the apex, it carries no trailing slash (SITE_ORIGIN strips
+  // one), and it is now the SAME value the sitemap, robots.txt, and every
+  // JSON-LD node resolve against. A relative canonical on a Learn lesson page
+  // therefore resolves to the exact URL the sitemap submitted, which is the
+  // condition Google needs to treat the two as one document.
+  metadataBase: new URL(SITE_ORIGIN),
 
   // Open Graph - for social sharing
   // Images are auto-generated via app/opengraph-image.tsx
