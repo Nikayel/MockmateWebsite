@@ -116,7 +116,9 @@ export function CardBeliefRow({
           <span className="mt-1 shrink-0">{bar}</span>
         )}
 
-        <span className="text-foreground w-11 shrink-0 text-right text-sm font-medium tabular-nums">
+        {/* w-12, not w-11: "~100%" is reachable (displayRetention returns 100 for a
+            freshly reviewed card) and overflowed the shared right-aligned rail. */}
+        <span className="text-foreground w-12 shrink-0 text-right text-sm font-medium tabular-nums">
           {card.retrievability === null ? "–" : `~${displayRetention(card.retrievability)}%`}
         </span>
 
