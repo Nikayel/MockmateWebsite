@@ -31,18 +31,27 @@ const SECTION_DOT: Record<LevelPathModel["sections"][number]["status"], string> 
 /**
  * The sticky, resume-first summary rail: level identity, a progress ring, the primary Continue
  * action (deep-links to the next incomplete lesson), and a section-jump nav with per-section status
- * dots + counts. Everything is derived from `path` — nothing here is hardcoded.
+ * dots + counts. Everything is derived from `path` — nothing here is hardcoded, including the
+ * destinations, which the caller has already resolved to either the public reading page or the
+ * gated workspace (`withWorkspaceDestinations`).
  */
 export function LevelSummaryRail({
   eyebrow,
   title,
   tagline,
   path,
+  showProgress = true,
 }: {
   eyebrow: string
   title: string
   tagline: string
   path: LevelPathModel
+  /**
+   * Whether to render the completion card (ring + "n of m lessons"). The level pages are public, and
+   * for a visitor with no account there is no completion to report: a 0% ring would be stating
+   * something about them that we do not know. Defaults to true so signed-in surfaces are unchanged.
+   */
+  showProgress?: boolean
 }) {
   const { continueTarget, isComplete } = path
   const firstLessonHref = path.sections[0]?.lessons[0]?.href ?? null
@@ -58,8 +67,9 @@ export function LevelSummaryRail({
         <p className="text-muted-foreground mt-1.5 text-sm text-pretty">{tagline}</p>
       </div>
 
-      {/* Progress card — omitted for an unauthored (coming-soon) level. */}
-      {hasLessons && (
+      {/* Progress card — omitted for an unauthored (coming-soon) level, and for a visitor whose
+          progress we have no way of knowing. */}
+      {hasLessons && showProgress && (
         <div className="border-border bg-card/60 flex items-center gap-4 rounded-2xl border p-4 shadow-sm">
           <LevelProgressRing percent={path.percent} />
           <div className="min-w-0">

@@ -9,37 +9,53 @@ import { LevelSummaryRail } from "./LevelSummaryRail"
 import { LessonPathCard } from "./LessonPathCard"
 import { useCompletedLessons } from "./useCompletedLessons"
 import { rememberLevel } from "@/lib/tutorials/level-preference"
-import { computeLevelPath, type LevelListModel } from "@/lib/tutorials/level-path"
-import type { PythonLevelId } from "@/lib/tutorials/types"
+import {
+  computeLevelPath,
+  withWorkspaceDestinations,
+  type LevelListModel,
+} from "@/lib/tutorials/level-path"
+import { LEARN_COURSE_LABEL, trackPath } from "@/lib/tutorials/lesson-routes"
+import { useAuth } from "@/lib/auth-context"
+import type { CourseId, PythonLevelId } from "@/lib/tutorials/types"
 
 /**
  * The level's lesson list, rebuilt as a guided path (not a catalog). Shared by all three courses
- * (Python, SQL, and System Design) — only `basePath` / `courseLabel` differ. A slim breadcrumb bar, a
+ * (Python, SQL, and System Design) — only `courseId` / `courseLabel` differ. A slim breadcrumb bar, a
  * sticky resume-first summary rail, and a
  * right column of sections whose lessons pack into an auto-fill grid. Per-lesson status, progress,
  * minutes-left, and the Continue target are all computed from the (best-effort) completion overlay.
+ *
+ * This is the ONE place that decides where a lesson card goes. The level page is public now, so a
+ * signed-out visitor must land on the public reading page and a signed-in learner must land in their
+ * workspace; `withWorkspaceDestinations` performs that swap after auth resolves, and every child
+ * (`LessonPathCard`, `LevelSummaryRail`) keeps consuming a single already-resolved `href`.
  */
 export function LevelPathView({
   model,
-  basePath,
-  courseLabel,
+  courseId,
+  courseLabel = `Learn ${LEARN_COURSE_LABEL[courseId]}`,
 }: {
   model: LevelListModel
-  basePath: string
-  courseLabel: string
+  courseId: CourseId
+  /** Breadcrumb label. Defaults to "Learn <Course>", which is what all three tracks use. */
+  courseLabel?: string
 }) {
   const completed = useCompletedLessons()
-  const isPython = basePath.endsWith("/python")
+  const { user, initialized } = useAuth()
+  // "Still initializing" counts as signed out, so the first paint matches the server HTML.
+  const signedIn = initialized && Boolean(user)
+  const isPython = courseId === "python"
+  const basePath = trackPath(courseId)
 
   // Keep the Python resume pointer (cs_py_level) in sync when a level page is opened directly.
   useEffect(() => {
     if (isPython) rememberLevel(model.id as PythonLevelId)
   }, [isPython, model.id])
 
-  const path = useMemo(
-    () => computeLevelPath(model, completed, basePath),
-    [model, completed, basePath]
-  )
+  const path = useMemo(() => {
+    const publicPath = computeLevelPath(model, completed, courseId)
+    return signedIn ? withWorkspaceDestinations(publicPath) : publicPath
+  }, [model, completed, courseId, signedIn])
 
   return (
     <div className="min-h-screen">
@@ -53,14 +69,20 @@ export function LevelPathView({
             >
               CodeSparring
             </Link>
-            <ChevronRight className="text-muted-foreground/50 hidden h-3.5 w-3.5 shrink-0 sm:inline" aria-hidden="true" />
+            <ChevronRight
+              className="text-muted-foreground/50 hidden h-3.5 w-3.5 shrink-0 sm:inline"
+              aria-hidden="true"
+            />
             <Link
               href={basePath}
               className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
             >
               {courseLabel}
             </Link>
-            <ChevronRight className="text-muted-foreground/50 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <ChevronRight
+              className="text-muted-foreground/50 h-3.5 w-3.5 shrink-0"
+              aria-hidden="true"
+            />
             <span className="text-foreground truncate font-medium" aria-current="page">
               Level {model.id}
             </span>
@@ -85,6 +107,10 @@ export function LevelPathView({
             title={model.title}
             tagline={model.tagline}
             path={path}
+            // A signed-out visitor has no progress to report, so "0%" in a ring would be a claim
+            // about them rather than a fact. They get the level index and a Start affordance; the
+            // progress card appears once there is a learner it could describe.
+            showProgress={signedIn}
           />
 
           <main className="min-w-0">

@@ -2,7 +2,7 @@
 
 import { LessonOutline, type UpNextLesson } from "./LessonOutline"
 import { LessonRailStrip } from "./LessonRailStrip"
-import type { LessonSection, SectionStatus } from "@/lib/tutorials/types"
+import type { CourseId, LessonSection, SectionStatus } from "@/lib/tutorials/types"
 
 /**
  * The lesson workspace's left column, in one of two widths. Collapsed (default) it's a slim strip of
@@ -18,7 +18,7 @@ export function LessonRail({
   active,
   onSelect,
   upNext,
-  basePath,
+  courseId,
   sectionOrder,
   sectionLabels,
 }: {
@@ -29,8 +29,8 @@ export function LessonRail({
   active: LessonSection
   onSelect: (section: LessonSection) => void
   upNext: UpNextLesson[]
-  /** Route prefix for "Up next" links, e.g. "/learn/python" or "/learn/sql". */
-  basePath: string
+  /** Which course the "Up next" lessons belong to; passed through to build workspace links. */
+  courseId: CourseId
   /** Phases to show, in order. Omit for the code-course Read → Apply → Practice loop; System Design
    * passes just Read → Design (it has no standalone Practice phase). */
   sectionOrder?: LessonSection[]
@@ -55,7 +55,7 @@ export function LessonRail({
             active={active}
             onSelect={onSelect}
             upNext={upNext}
-            basePath={basePath}
+            courseId={courseId}
             onCollapse={onToggle}
             sectionOrder={sectionOrder}
             sectionLabels={sectionLabels}

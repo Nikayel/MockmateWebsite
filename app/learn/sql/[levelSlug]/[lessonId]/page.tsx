@@ -1,60 +1,94 @@
-import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import type { Metadata } from "next"
+import { notFound } from "next/navigation"
+
 import {
-  getFirstLessonOfNextSqlLevel,
-  getNextSqlLessonInLevel,
-  getSqlLessonLocation,
-  listSqlLessonsInLevel,
-} from "@/lib/tutorials/sql/registry"
-import { buildLessonNav, toLeanLevel } from "@/lib/tutorials/level-path"
-import { SqlLessonPlayer } from "@/components/tutorials/SqlLessonPlayer"
+  PublicLessonArticle,
+  type PublicLessonArticleNav,
+} from "@/components/learn/PublicLessonArticle"
+import { learnLessonMetadata } from "@/lib/seo/learn-metadata"
+import { findCatalogEntry, listCourseEntries } from "@/lib/tutorials/course-catalog"
+import { publicLessonPath } from "@/lib/tutorials/lesson-routes"
+import { toPublicLessonPreview } from "@/lib/tutorials/public-preview"
+
+const COURSE_ID = "sql" as const
 
 type Props = { params: Promise<{ levelSlug: string; lessonId: string }> }
 
 /**
- * The SQL Lesson Player route (Server Component) — resolves the single lesson from the URL and
- * computes next-lesson / level-boundary navigation server-side (preserving the "Level N complete"
- * hand-off), then hands the client player only a lean level + the resolved nav so no other lesson's
- * exercise payloads ship to the client. Auth is hard-gated by `proxy.ts` (PROTECTED_ROUTES →
- * "/learn/sql") plus the in-page `LearnAuthGuard` in the layout, and the Read → Apply → Practice loop
- * runs entirely in the client player.
+ * The PUBLIC SQL lesson page: `/learn/sql/{levelSlug}/{lessonId}`.
+ *
+ * ## The standing rule for this file
+ *
+ * This page must never read `cookies()`, `headers()`, auth, or Firestore, and must never become
+ * `dynamic`. It is statically generated at build time and served from the CDN byte-identically to
+ * every visitor. Two things depend on that:
+ *
+ *  1. **Correctness.** A single cached HTML document is shared by everyone who asks for this URL.
+ *     Personalising it server-side would serve one learner's progress, name, or resume position to
+ *     strangers. If this page ever needs to know something about the visitor, that belongs in a
+ *     client component (see `LessonUnlockCard`), never here.
+ *  2. **Honesty.** Users and crawlers receive the same bytes, which is what makes serving a
+ *     reading-optimised page to Googlebot provably not cloaking. The graded half lives at
+ *     `.../workspace`, which is auth-gated AND noindexed, so nothing indexed is unreachable and
+ *     nothing reachable is hidden.
+ *
+ * `dynamicParams = false` means an id that `generateStaticParams` did not emit 404s at the CDN
+ * before this module runs. That is also the canonicalization guarantee: a real lesson id under the
+ * wrong level slug is not a redirect and not a duplicate page, it is a 404, because
+ * `findCatalogEntry` only matches a lesson inside the level the URL names.
  */
-export default async function SqlLessonPage({ params }: Props) {
-  const { lessonId } = await params
-  const location = getSqlLessonLocation(lessonId)
+export const dynamicParams = false
 
-  if (!location) {
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <p className="text-lg font-medium">Lesson not found</p>
-        <p className="text-muted-foreground mt-1 text-sm">
-          This lesson may have been moved or renamed.
-        </p>
-        <Link
-          href="/learn/sql"
-          className="text-primary mt-4 inline-flex items-center gap-1.5 text-sm font-medium hover:underline"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to SQL Path
-        </Link>
-      </div>
-    )
+export async function generateStaticParams() {
+  // Derived from the live registry on every build. The corpus grows constantly, so a hardcoded list
+  // here would silently stop publishing new lessons the day it was written.
+  return listCourseEntries(COURSE_ID).map(({ level, lesson }) => ({
+    levelSlug: level.slug,
+    lessonId: lesson.id,
+  }))
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { levelSlug, lessonId } = await params
+  const entry = findCatalogEntry(COURSE_ID, levelSlug, lessonId)
+  // Unreachable while `dynamicParams` is false; kept so a future config change degrades to an
+  // untitled page rather than a build crash.
+  if (!entry) return {}
+  return learnLessonMetadata(toPublicLessonPreview(entry))
+}
+
+/**
+ * Previous/next in the course's reading order. Deliberately flat across the whole course rather than
+ * scoped to the level, so a crawler can walk the entire track from any lesson and a reader who
+ * finishes the last lesson of a level is offered the first of the next.
+ */
+function buildReadingNav(levelSlug: string, lessonId: string): PublicLessonArticleNav {
+  const entries = listCourseEntries(COURSE_ID)
+  const index = entries.findIndex(
+    (entry) => entry.level.slug === levelSlug && entry.lesson.id === lessonId
+  )
+  if (index === -1) return { previous: null, next: null }
+
+  const toLink = (offset: number) => {
+    const neighbour = entries[index + offset]
+    if (!neighbour) return null
+    return {
+      title: neighbour.lesson.title,
+      href: publicLessonPath(COURSE_ID, neighbour.level.slug, neighbour.lesson.id),
+    }
   }
 
-  const { level, lesson } = location
+  return { previous: toLink(-1), next: toLink(1) }
+}
 
-  // Resolve navigation server-side via the registry so its exact in-level ordering + the deliberate
-  // level-boundary hand-off (`getFirstLessonOfNextSqlLevel`) are preserved unchanged.
-  const nav = buildLessonNav({
-    level,
-    lessonId: lesson.id,
-    lessonsInLevel: listSqlLessonsInLevel(level),
-    nextInLevel: getNextSqlLessonInLevel(lesson.id),
-    firstOfNextLevel: getFirstLessonOfNextSqlLevel(lesson.id),
-  })
+export default async function PublicSqlLessonPage({ params }: Props) {
+  const { levelSlug, lessonId } = await params
+  const entry = findCatalogEntry(COURSE_ID, levelSlug, lessonId)
+  if (!entry) notFound()
 
-  // `key={lesson.id}` forces a fresh player instance per lesson so navigating between lessons never
-  // carries over the previous lesson's open phase, resume flag, or runner results (local component
-  // state, not in the store).
-  return <SqlLessonPlayer key={lesson.id} lesson={lesson} level={toLeanLevel(level)} nav={nav} />
+  // `toPublicLessonPreview` is the allowlist projection. Nothing that grades or answers survives it,
+  // so nothing this component receives can leak into the published HTML.
+  const preview = toPublicLessonPreview(entry)
+
+  return <PublicLessonArticle preview={preview} nav={buildReadingNav(levelSlug, lessonId)} />
 }

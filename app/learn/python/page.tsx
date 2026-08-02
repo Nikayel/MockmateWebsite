@@ -3,19 +3,32 @@ import Link from "next/link"
 import { Terminal } from "lucide-react"
 import { listLevels } from "@/lib/tutorials/registry"
 import { toPathLevelSummary } from "@/lib/tutorials/level-path"
+import { learnTrackMetadata } from "@/lib/seo/learn-metadata"
+import { learnCourseSchemaInput } from "@/lib/seo/learn-course-schema"
+import { listCourseEntries } from "@/lib/tutorials/course-catalog"
+import { LEARN_HUB_PATH, publicLessonPath, trackPath } from "@/lib/tutorials/lesson-routes"
+import { BreadcrumbJsonLd, CourseJsonLd, LessonListJsonLd } from "@/components/seo/JsonLd"
 import { LevelSelector } from "@/components/tutorials/LevelSelector"
 import { ResumeLearning } from "@/components/tutorials/ResumeLearning"
 import { LearnPathTopBar } from "@/components/tutorials/LearnPathTopBar"
 
-export const metadata: Metadata = {
-  title: "Learn Python — CodeSparring",
+export const metadata: Metadata = learnTrackMetadata({
+  courseId: "python",
   description:
     "Free interactive Python course that runs in your browser. Read, apply, and practice the exact Python that intern and new-grad SWE and DE interviews test.",
-}
+})
 
 const LOOP_PHASES = ["Read", "Apply", "Practice"]
 
-/** Screen 1 — the Python Path. Server Component: static content from `listLevels()`. */
+/**
+ * Screen 1 — the Python Path. Server Component: static content from `listLevels()`.
+ *
+ * Public. Nothing on this page reads auth or progress on the server. The two progress-aware pieces
+ * are client components that degrade honestly for a visitor with no account: `ResumeLearning`
+ * renders nothing at all without saved progress (so there is no empty Continue button), and
+ * `LevelSelector` shows every level with its lesson count and a "Start Level N" call to action
+ * rather than a zeroed progress readout.
+ */
 export default function LearnPythonPage() {
   // Project to the lean Path summary so the ~440 KB authored PythonLevel[] (starter code, reference
   // solutions, tests) never serializes into the client bundle — the landing only needs ids + skills.
@@ -23,6 +36,23 @@ export default function LearnPythonPage() {
 
   return (
     <>
+      {/* Standalone Course (vocabulary for answer engines; the SERP carousel lives on the hub) plus
+          the full lesson ItemList and the breadcrumb. All inputs derive from the live catalog. */}
+      <CourseJsonLd {...learnCourseSchemaInput("python")} />
+      <LessonListJsonLd
+        name="Learn Python lessons"
+        lessons={listCourseEntries("python").map(({ level, lesson }) => ({
+          title: lesson.title,
+          url: publicLessonPath("python", level.slug, lesson.id),
+        }))}
+      />
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", url: "/" },
+          { name: "Learn", url: LEARN_HUB_PATH },
+          { name: "Python", url: trackPath("python") },
+        ]}
+      />
       <LearnPathTopBar label="Learn Python" />
       <div className="mx-auto max-w-6xl px-4 py-12 sm:py-16">
         <header className="mb-12 text-center">

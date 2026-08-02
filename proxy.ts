@@ -1,29 +1,31 @@
 /**
- * Next.js Edge Proxy
+ * Next.js Proxy (routing middleware)
  *
- * Provides server-side protection for admin routes BEFORE pages render.
- * This prevents admin pages from briefly flashing before client-side auth check.
+ * Bounces obviously-anonymous requests away from the two surfaces that require an account, before
+ * those pages render, so neither flashes its signed-out state on the way to a client-side redirect.
  *
- * SECURITY: This proxy runs on Edge runtime (before page render).
- * - Checks for authentication token in cookies or Authorization header
- * - For /admin/* routes, requires authentication to proceed
- * - Actual admin role verification happens in admin layout (defense-in-depth)
+ * Runtime note: in Next 16 this runs on the Node.js runtime, not the Edge runtime. The old header
+ * here claimed Edge, which mattered because people reasoned about what APIs were available.
+ *
+ * SECURITY: this layer is NOT a security boundary. `hasAuthToken()` below is a presence check — ANY
+ * value in the `__session` / `firebase-auth-token` cookie passes, nothing is verified — so treat it
+ * strictly as a UX gate. Real enforcement lives where it must: admin RBAC in the admin layout and
+ * `lib/admin/middleware.ts`, `LearnAuthGuard` in the workspace layout, and every tutorial progress /
+ * saved-answer API verifying a real Firebase token server-side.
  */
 
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-// Routes that require a plausible auth signal before render.
-// IMPORTANT: this layer is NOT a security boundary. hasAuthToken() below is a
-// presence check — ANY value in the __session / firebase-auth-token cookie
-// passes — so it only prevents the signed-out flash and bounces
-// obviously-anonymous visitors to /login. Real enforcement lives where it
-// must: admin RBAC in the admin layout + lib/admin/middleware.ts, and every
-// tutorial progress / saved-answer API verifies a real Firebase token
-// server-side. Tutorial lesson content itself is intentionally free, so a
-// spoofed cookie reveals nothing that is not already public. The prefix match
-// covers all sub-paths (/learn/sql, /learn/sql/<level>/<lesson>).
-const PROTECTED_ROUTES = ["/admin", "/learn/python", "/learn/sql", "/learn/system-design"]
+import { isLessonWorkspacePath } from "@/lib/tutorials/lesson-routes"
+
+// Prefix-matched protected routes. `/learn` is deliberately NOT here any more: the track landings,
+// the level indexes, and every lesson's reading page at
+// `/learn/{track}/{levelSlug}/{lessonId}` are PUBLIC, statically generated, and indexed. Only the
+// `.../workspace` child requires an account, and it is matched by `isLessonWorkspacePath` below
+// rather than by a prefix, so the gate and the link builder read from one definition and cannot
+// drift apart.
+const PROTECTED_ROUTES = ["/admin"]
 
 // Routes that should redirect authenticated users away
 const AUTH_ROUTES = ["/login", "/signup"]
@@ -61,9 +63,14 @@ function hasAuthToken(request: NextRequest): boolean {
 }
 
 /**
- * Check if path matches any protected route patterns
+ * Check if path matches any protected route patterns.
+ *
+ * Two rules, deliberately different in shape: a prefix match for `/admin` (everything under it is
+ * protected), and a segment match for a lesson workspace (everything AROUND it is public, so a
+ * prefix would over-match and re-gate the whole Learn corpus).
  */
 function isProtectedRoute(pathname: string): boolean {
+  if (isLessonWorkspacePath(pathname)) return true
   return PROTECTED_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))
 }
 
@@ -89,7 +96,8 @@ export function proxy(request: NextRequest) {
 
   const isAuthenticated = hasAuthToken(request)
 
-  // Protect admin routes - redirect to login if not authenticated
+  // Admin and lesson workspaces: send an anonymous visitor to /login carrying the path they wanted,
+  // so signing in returns them to it rather than to a generic dashboard.
   if (isProtectedRoute(pathname)) {
     if (!isAuthenticated) {
       const loginUrl = new URL("/login", request.url)

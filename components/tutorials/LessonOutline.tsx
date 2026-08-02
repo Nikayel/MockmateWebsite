@@ -4,7 +4,8 @@ import Link from "next/link"
 import { Check, PanelLeftClose } from "lucide-react"
 import { LESSON_SECTION_ORDER } from "@/lib/stores/tutorial-store"
 import { PHASE_ICON, SECTION_HINT, SECTION_LABEL } from "./lessonPhases"
-import type { LessonSection, SectionStatus } from "@/lib/tutorials/types"
+import { lessonWorkspacePath } from "@/lib/tutorials/lesson-routes"
+import type { CourseId, LessonSection, SectionStatus } from "@/lib/tutorials/types"
 
 /**
  * The lesson workspace's left outline (HANDOFF §C), shown when the rail is expanded: the Read →
@@ -25,7 +26,7 @@ export function LessonOutline({
   active,
   onSelect,
   upNext,
-  basePath,
+  courseId,
   onCollapse,
   sectionOrder = LESSON_SECTION_ORDER,
   sectionLabels,
@@ -34,8 +35,12 @@ export function LessonOutline({
   active: LessonSection
   onSelect: (section: LessonSection) => void
   upNext: UpNextLesson[]
-  /** Route prefix for "Up next" links, e.g. "/learn/python" or "/learn/sql". */
-  basePath: string
+  /**
+   * Which course these lessons belong to. "Up next" links stay inside the workspace (the learner is
+   * already signed in and mid-lesson), and the URL is built by the route authority so this list and
+   * the proxy's gate cannot drift apart.
+   */
+  courseId: CourseId
   /** When set, renders a control by the heading that folds the rail to its slim strip. */
   onCollapse?: () => void
   /** Which phases to show, in order. Defaults to the code-course Read → Apply → Practice loop; System
@@ -141,7 +146,7 @@ export function LessonOutline({
             {upNext.map((lesson) => (
               <li key={lesson.id}>
                 <Link
-                  href={`${basePath}/${lesson.levelSlug}/${lesson.id}`}
+                  href={lessonWorkspacePath(courseId, lesson.levelSlug, lesson.id)}
                   className="group focus-visible:ring-accent/50 hover:bg-muted/50 flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors focus-visible:ring-2 focus-visible:outline-none"
                 >
                   <span

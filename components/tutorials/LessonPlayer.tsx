@@ -11,6 +11,7 @@ import {
   useTutorialStore,
 } from "@/lib/stores/tutorial-store"
 import type { LeanTutorialLevel, LessonNavModel } from "@/lib/tutorials/level-path"
+import { levelPath, lessonWorkspacePath, trackPath } from "@/lib/tutorials/lesson-routes"
 import { useCompletedLessons } from "./useCompletedLessons"
 import { rememberLevel } from "@/lib/tutorials/level-preference"
 import { TeachPanel } from "./TeachPanel"
@@ -209,13 +210,13 @@ export function LessonPlayer({ lesson, level, nav, onSectionComplete }: LessonPl
         {/* Top bar (§C): brand · level badge · title · lesson n/total + progress · theme · Levels. */}
         <header className="border-border bg-background/80 flex shrink-0 items-center gap-3 border-b px-4 py-2.5 backdrop-blur-md">
           <Link
-            href="/learn/python"
+            href={trackPath("python")}
             className="text-foreground text-sm font-semibold tracking-tight"
           >
             CodeSparring
           </Link>
           <Link
-            href={`/learn/python/${level.slug}`}
+            href={levelPath("python", level.slug)}
             className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/15 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors"
           >
             LEVEL {level.id}
@@ -245,7 +246,7 @@ export function LessonPlayer({ lesson, level, nav, onSectionComplete }: LessonPl
             </div>
             <ThemeToggle />
             <Link
-              href="/learn/python"
+              href={trackPath("python")}
               className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -274,7 +275,7 @@ export function LessonPlayer({ lesson, level, nav, onSectionComplete }: LessonPl
               active={active}
               onSelect={goToSection}
               upNext={upNext}
-              basePath="/learn/python"
+              courseId="python"
             />
 
             <main
@@ -364,9 +365,14 @@ export function LessonPlayer({ lesson, level, nav, onSectionComplete }: LessonPl
                           Lesson complete. Nice work. Revisit it in a few days to lock it in.
                         </p>
                         <div>
+                          {/* Every hand-off from a finished lesson stays inside the workspace: the
+                              learner is signed in and mid-path, so the reading page would be a step
+                              backwards. */}
                           {nextStep.kind === "lesson" && (
                             <Button asChild className="gap-2">
-                              <Link href={`/learn/python/${nextStep.slug}/${nextStep.id}`}>
+                              <Link
+                                href={lessonWorkspacePath("python", nextStep.slug, nextStep.id)}
+                              >
                                 Next lesson: {nextStep.title}
                                 <ArrowRight className="h-4 w-4" />
                               </Link>
@@ -382,13 +388,15 @@ export function LessonPlayer({ lesson, level, nav, onSectionComplete }: LessonPl
                               </p>
                               <div className="flex flex-wrap gap-2">
                                 <Button asChild className="gap-2">
-                                  <Link href={`/learn/python/${nextStep.slug}/${nextStep.id}`}>
+                                  <Link
+                                    href={lessonWorkspacePath("python", nextStep.slug, nextStep.id)}
+                                  >
                                     Start Level {nextStep.levelId}
                                     <ArrowRight className="h-4 w-4" />
                                   </Link>
                                 </Button>
                                 <Button asChild variant="outline" className="gap-2">
-                                  <Link href="/learn/python">
+                                  <Link href={trackPath("python")}>
                                     <ArrowLeft className="h-4 w-4" />
                                     All levels
                                   </Link>

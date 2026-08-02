@@ -2,22 +2,57 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowRight, Database } from "lucide-react"
 import { listSqlLevels } from "@/lib/tutorials/sql/registry"
+import { learnTrackMetadata } from "@/lib/seo/learn-metadata"
+import { learnCourseSchemaInput } from "@/lib/seo/learn-course-schema"
+import { listCourseEntries } from "@/lib/tutorials/course-catalog"
+import {
+  LEARN_HUB_PATH,
+  levelPath,
+  publicLessonPath,
+  trackPath,
+} from "@/lib/tutorials/lesson-routes"
+import { BreadcrumbJsonLd, CourseJsonLd, LessonListJsonLd } from "@/components/seo/JsonLd"
+import { firstPublishedLesson } from "@/lib/tutorials/level-path"
 import { LearnPathTopBar } from "@/components/tutorials/LearnPathTopBar"
 
-export const metadata: Metadata = {
-  title: "Learn SQL — CodeSparring",
+export const metadata: Metadata = learnTrackMetadata({
+  courseId: "sql",
   description:
     "Learn SQL and data engineering against a live in-browser database. Read, apply, and practice the exact SQL that data engineering internship interviews test.",
-}
+})
 
 const LOOP_PHASES = ["Read", "Apply", "Practice"]
 
-/** Screen 1 — the SQL Path. Server Component: static content from `listSqlLevels()`. */
+/**
+ * Screen 1 — the SQL Path. Server Component: static content from `listSqlLevels()`.
+ *
+ * Public, and nothing here reads auth or progress, so the page is the same clean index for a first
+ * time visitor as for a returning learner. The "Start with" link gives that visitor one obvious way
+ * in (and gives a crawler a deep link into the corpus instead of only level indexes).
+ */
 export default function LearnSqlPage() {
   const levels = listSqlLevels()
+  const firstLesson = firstPublishedLesson(levels)
 
   return (
     <>
+      {/* Standalone Course (vocabulary for answer engines; the SERP carousel lives on the hub) plus
+          the full lesson ItemList and the breadcrumb. All inputs derive from the live catalog. */}
+      <CourseJsonLd {...learnCourseSchemaInput("sql")} />
+      <LessonListJsonLd
+        name="Learn SQL lessons"
+        lessons={listCourseEntries("sql").map(({ level, lesson }) => ({
+          title: lesson.title,
+          url: publicLessonPath("sql", level.slug, lesson.id),
+        }))}
+      />
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", url: "/" },
+          { name: "Learn", url: LEARN_HUB_PATH },
+          { name: "SQL", url: trackPath("sql") },
+        ]}
+      />
       <LearnPathTopBar label="Learn SQL" containerClass="max-w-4xl" />
       <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
         <header className="mb-10 text-center">
@@ -45,6 +80,21 @@ export default function LearnSqlPage() {
               </span>
             ))}
           </div>
+
+          {firstLesson && (
+            <div className="mt-6 flex justify-center">
+              <Link
+                href={publicLessonPath("sql", firstLesson.levelSlug, firstLesson.lessonId)}
+                className="bg-accent text-accent-foreground hover:bg-accent/90 focus-visible:ring-accent/50 group inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              >
+                Start with {firstLesson.lessonTitle}
+                <ArrowRight
+                  className="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+                  aria-hidden="true"
+                />
+              </Link>
+            </div>
+          )}
         </header>
 
         <ol className="flex flex-col gap-4">
@@ -54,7 +104,7 @@ export default function LearnSqlPage() {
             return (
               <li key={level.id}>
                 <Link
-                  href={`/learn/sql/${level.slug}`}
+                  href={levelPath("sql", level.slug)}
                   className="group border-border bg-card hover:border-accent/40 hover:bg-accent/[0.03] flex items-start gap-4 rounded-xl border p-5 transition-colors"
                 >
                   <span

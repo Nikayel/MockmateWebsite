@@ -53,6 +53,10 @@ function StatusIndicator({ status }: { status: LessonPathNode["status"] }) {
  * One lesson in the level's path grid. Renders one of three meaningful states (done / current /
  * open) and is always a navigable `<Link>` — there is no gating. The `current` card is the Continue
  * target: highlighted, badged "Up next", with a Start CTA.
+ *
+ * `node.href` arrives already resolved: `LevelPathView` picks the public reading page or the gated
+ * workspace once, for the whole level, from auth state. This card must not make that choice itself,
+ * or two lessons on the same screen could point at different halves of the product.
  */
 export function LessonPathCard({ node }: { node: LessonPathNode }) {
   const { item, index, status, href } = node

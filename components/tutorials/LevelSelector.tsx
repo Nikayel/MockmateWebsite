@@ -7,6 +7,8 @@ import { LevelPreviewPanel } from "./LevelPreviewPanel"
 import { Reveal } from "./Reveal"
 import { useCompletedLessons } from "./useCompletedLessons"
 import { recallLevel, rememberLevel } from "@/lib/tutorials/level-preference"
+import { levelPath, lessonWorkspacePath, publicLessonPath } from "@/lib/tutorials/lesson-routes"
+import { useAuth } from "@/lib/auth-context"
 import type { PythonLevelId } from "@/lib/tutorials/types"
 import type { PathLevelSummary } from "@/lib/tutorials/level-path"
 
@@ -16,11 +18,18 @@ import type { PathLevelSummary } from "@/lib/tutorials/level-path"
  * that reacts to the selected level. Selecting a node updates the preview; the preview's CTA stores
  * the chosen level (`localStorage[cs_py_level]`) and opens the level's first unfinished lesson.
  * Completion is hydrated best-effort from saved progress (empty when signed out).
+ *
+ * The Path landing is public, so Start has two possible destinations: a visitor with no account is
+ * sent to the lesson's public reading page, a signed-in learner to their workspace. The choice
+ * happens at click time, in the browser, so nothing about the rendered page depends on who is
+ * looking at it.
  */
 export function LevelSelector({ levels }: { levels: PathLevelSummary<PythonLevelId>[] }) {
   const router = useRouter()
   const [selectedId, setSelectedId] = useState<PythonLevelId>(levels[0]?.id ?? 1)
   const completedLessonIds = useCompletedLessons()
+  const { user, initialized } = useAuth()
+  const signedIn = initialized && Boolean(user)
 
   // Preselect the level the learner last started, if any.
   useEffect(() => {
@@ -43,7 +52,15 @@ export function LevelSelector({ levels }: { levels: PathLevelSummary<PythonLevel
     // Open the first not-yet-completed lesson in the level (a "continue"), else lesson 1.
     const lessons = level.lessons
     const next = lessons.find((l) => !completedLessonIds.has(l.id)) ?? lessons[0]
-    router.push(next ? `/learn/python/${level.slug}/${next.id}` : `/learn/python/${level.slug}`)
+    if (!next) {
+      router.push(levelPath("python", level.slug))
+      return
+    }
+    router.push(
+      signedIn
+        ? lessonWorkspacePath("python", level.slug, next.id)
+        : publicLessonPath("python", level.slug, next.id)
+    )
   }
 
   if (!selected) return null
