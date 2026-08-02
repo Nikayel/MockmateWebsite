@@ -23,6 +23,13 @@ export interface EvidenceRow {
   /** What the model predicted going in, and whether the user actually recalled. */
   predicted_retention: number | null
   actual_retention: boolean | null
+  /**
+   * Whether the prediction matched the outcome, as the scheduler judged it at write
+   * time. Surfaced rather than recomputed from the two fields above: the
+   * predicted-recall cut-off is a scheduling rule, and the UI must not own a second
+   * copy of it. This is what lets /knowledge report its own error rate.
+   */
+  retention_as_predicted: boolean | null
   /** Scheduling movement this review caused. */
   interval_before_days: number | null
   interval_after_days: number | null
@@ -110,6 +117,7 @@ function toRow(event: AlgorithmResearchEvent & { id?: string }): EvidenceRow {
     is_first_review: event.is_first_review === true,
     predicted_retention: event.pre_review?.predicted_retention ?? null,
     actual_retention: event.actual_retention ?? null,
+    retention_as_predicted: event.retention_as_predicted ?? null,
     interval_before_days: event.pre_review?.interval_days ?? null,
     interval_after_days: event.post_review?.new_interval_days ?? null,
     stability_before: event.pre_review?.stability ?? null,
