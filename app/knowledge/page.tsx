@@ -35,6 +35,31 @@ interface ModelResponse {
   model?: LearnerModelPayload
 }
 
+const EVIDENCE_LOAD_FAILED =
+  "Couldn't load the review history for this problem. Try again in a moment."
+
+/**
+ * Why the evidence panel came back empty, in the user's terms.
+ *
+ * Every outcome used to collapse into one "couldn't load" line, which hid three
+ * genuinely different situations — and a 403 is not a failure at all, it is the
+ * black-box study condition doing exactly what it is supposed to do. On a page whose
+ * entire premise is being honest about what the system knows and why, reporting
+ * "withheld by design" as "something went wrong" is the wrong answer.
+ */
+function evidenceErrorForStatus(status: number): string {
+  switch (status) {
+    case 401:
+      return "Your session expired. Sign in again to see this history."
+    case 403:
+      return "Review history is hidden for this account."
+    case 404:
+      return "Review history isn't available on this account yet."
+    default:
+      return EVIDENCE_LOAD_FAILED
+  }
+}
+
 export default function KnowledgePage() {
   const router = useRouter()
   const { user, loading: authLoading, initialized } = useAuth()
@@ -157,16 +182,25 @@ export default function KnowledgePage() {
       void reportEvent("olm_card_evidence_viewed", { problem_id: card.problem_id })
       try {
         const token = await getAuthToken()
-        if (!token) return
+        if (!token) {
+          // Returning silently here left the panel on EvidenceList's empty state,
+          // which asserts "No review log yet" — stating a fact about the user's
+          // history when we simply never managed to read it.
+          setEvidenceError(evidenceErrorForStatus(401))
+          return
+        }
         const res = await fetch(
           `/api/learner-model/history?problem_id=${encodeURIComponent(card.problem_id)}`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
-        if (!res.ok) throw new Error(`Request failed (${res.status})`)
+        if (!res.ok) {
+          setEvidenceError(evidenceErrorForStatus(res.status))
+          return
+        }
         const data = await res.json()
         setEvidence(data.evidence ?? [])
       } catch {
-        setEvidenceError("Couldn't load the review history for this problem.")
+        setEvidenceError(EVIDENCE_LOAD_FAILED)
       } finally {
         setEvidenceLoading(false)
       }
