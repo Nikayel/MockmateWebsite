@@ -86,7 +86,10 @@ export function RecallDial({
   const label = rounded === null ? "--" : `~${rounded}%`
 
   const fraction = value === null ? 0 : Math.min(1, Math.max(0, value / 100))
-  const feather = Math.min(featherFor(reviewCount), fraction)
+  // Never let the feather eat more than half the swept arc: at very low values the
+  // whole sweep otherwise became fog, and a dial that renders as nothing is not
+  // "uncertain", it is invisible. Half fog on a short arc still reads as a guess.
+  const feather = Math.min(featherFor(reviewCount), fraction * 0.5)
   const solidEnd = fraction - feather
 
   const describedAs =
