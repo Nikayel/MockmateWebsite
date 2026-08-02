@@ -107,7 +107,11 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
           mean !== null ? `, mean about ${Math.round(mean)} percent` : ""
         }`}
       >
-        {/* ring-inset gives the 0-100 axis a visible extent: the bare bg-muted/60
+        {/* ring-muted-foreground, matching the ink BeliefBar uses for its own track,
+            so the two marks that claim to share one 0-100 grammar draw their extents
+            alike. ring-border was 1.29:1 on the white card — the light half of this
+            fix was left undone when the dark override landed.
+            ring-inset gives the 0-100 axis a visible extent: the bare bg-muted/60
             track measured 1.05:1 — the axis the dots' position depends on did not
             exist in light mode. */}
         {/* The dark overrides are not optional: dark --muted is the SAME hex as
@@ -115,7 +119,7 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
             1.31:1 — the identical "axis does not exist" failure this ring was added
             to fix for light mode. foreground/10 + foreground/40 clears 3:1. */}
         <div
-          className="bg-muted/60 ring-border dark:bg-foreground/10 dark:ring-foreground/40 absolute inset-x-0 inset-y-1 overflow-hidden rounded ring-1 ring-inset"
+          className="bg-muted/60 ring-muted-foreground dark:bg-foreground/10 dark:ring-foreground/40 absolute inset-x-0 inset-y-1 overflow-hidden rounded ring-1 ring-inset"
           aria-hidden="true"
         >
           {/* The at-risk zone, so a dot's position carries a verdict and not just a value. */}
