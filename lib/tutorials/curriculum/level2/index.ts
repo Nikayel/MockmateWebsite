@@ -1014,6 +1014,34 @@ Every time you write \`@app.route\`, \`@pytest.fixture\`, or \`@functools.lru_ca
 
 ## Scope: how Python resolves a name
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "assignment-makes-a-name-local",
+  "prompt": "count = 0 sits at module level. A function is defined as def bump(): print(count); count += 1. What happens when you call bump()?",
+  "options": [
+    {
+      "label": "It prints 0, then sets the module-level count to 1",
+      "feedback": "Tempting, because reading a global from inside a function really does work, and the print line comes first. The += changes the picture: assigning to a name anywhere in a function marks it local for the WHOLE function, including lines above the assignment."
+    },
+    {
+      "label": "It raises UnboundLocalError on the print line",
+      "correct": true,
+      "feedback": "Right. Python decides local versus global when it compiles the function, not while it runs, so count is local from the first line and printing it before any value is assigned fails."
+    },
+    {
+      "label": "It prints 0, then raises UnboundLocalError on the += line",
+      "feedback": "The sharpest wrong answer, because the error name is exactly right. The timing is not: the decision that count is local is already made before the body starts, so the very first read is the one that fails."
+    },
+    {
+      "label": "It raises NameError, since count was never defined inside bump",
+      "feedback": "Close relatives, and the distinction is worth knowing. NameError means the name was found nowhere at all; UnboundLocalError is the more specific case where Python knows it is a local and knows it has no value yet."
+    }
+  ]
+}
+\`\`\`
+
 When you use a name, Python searches four scopes in order: Local, Enclosing, Global, Built-in (LEGB). An inner function can *read* names from the enclosing function for free. To *rebind* one, you must declare it \`nonlocal\`; otherwise any assignment inside the function marks that name as local for the whole function, so reading it before the assignment runs raises \`UnboundLocalError\`.
 
 ## A closure captures its enclosing scope
@@ -1046,6 +1074,34 @@ print(c(), c(), c())           # 1 2 3
 \`\`\`
 
 ## Decorators wrap a function
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "decorator-rebinds-the-name",
+  "prompt": "double is a decorator that defines wrapper(x) returning fn(x) * 2 and then returns wrapper. You write @double on the line above def identity(x): return x. Immediately after that def, what is the name identity bound to?",
+  "options": [
+    {
+      "label": "Still the original identity function, since the decorator only kicks in when you call it",
+      "feedback": "Tempting, because @double reads like an annotation sitting off to the side. It is executable code: the decorator runs once at definition time, and the value it returns replaces the name."
+    },
+    {
+      "label": "The wrapper function that double returned",
+      "correct": true,
+      "feedback": "Right. The @ line is exactly identity = double(identity), so calls to identity land in wrapper, which calls the original and doubles what it gets back."
+    },
+    {
+      "label": "A copy of identity with the doubling patched into its body",
+      "feedback": "Nothing rewrites the original function's code, which is the whole appeal: the body you wrote stays untouched and readable. The behaviour changes by wrapping it in another function, not by editing it."
+    },
+    {
+      "label": "None, because a decorator does not return anything",
+      "feedback": "This one is worth remembering, because it is what you actually get when you forget the final return wrapper inside double. Then identity is None and calling it raises TypeError: 'NoneType' object is not callable."
+    }
+  ]
+}
+\`\`\`
 
 \`\`\`csdiagram
 {
@@ -1091,6 +1147,34 @@ print(c(), c(), c())           # 1 2 3
 
 A decorator is a higher-order function: it takes a function and returns a replacement. The demo below defines \`double\`, whose inner \`wrapper\` calls the original \`fn\` and doubles the result. Writing \`@double\` above \`identity\` is exactly \`identity = double(identity)\`, so the name \`identity\` now points at \`wrapper\`, and \`identity(5)\` returns \`10\`.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "closure-late-binding-in-a-loop",
+  "prompt": "funcs = [lambda: i for i in range(3)]. What does [f() for f in funcs] give you?",
+  "options": [
+    {
+      "label": "[0, 1, 2]",
+      "feedback": "Tempting, and it is what almost everyone expects the first time, because each lambda was created while i held a different value. But a closure keeps a link to the VARIABLE, not a snapshot of what it held at the moment of creation."
+    },
+    {
+      "label": "[2, 2, 2]",
+      "correct": true,
+      "feedback": "Right. All three lambdas share one i, and by the time you call them the loop has finished with i at its last value, 2. Bind eagerly with lambda i=i: i to get [0, 1, 2]."
+    },
+    {
+      "label": "[3, 3, 3]",
+      "feedback": "You have the mechanism exactly right: one shared variable, read at call time. The final value is off by one though. Python's loop variable stops at the last value it actually took, which for range(3) is 2, not the exhausted bound."
+    },
+    {
+      "label": "A NameError, because i no longer exists once the comprehension ends",
+      "feedback": "A fair worry, since a comprehension really does keep i out of the surrounding scope. The closures still hold their own reference to that variable, so it stays alive as long as they do."
+    }
+  ]
+}
+\`\`\`
+
 ### Pitfall: late binding in loops
 
 Closures capture the *variable*, not its value at definition time:
@@ -1101,6 +1185,35 @@ print([f() for f in funcs])    # [2, 2, 2], not [0, 1, 2]
 \`\`\`
 
 Every lambda shares the same \`i\`, which has reached \`2\` by the time you call them. Bind the value eagerly with a default argument: \`lambda i=i: i\` gives \`[0, 1, 2]\`.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "decorator-loses-dunder-name",
+  "prompt": "After the plain @double decorator is applied, what does identity.__name__ return?",
+  "options": [
+    {
+      "label": "'identity', the name you wrote in the def",
+      "feedback": "Tempting, because that is the name you type at every call site and it is what any debugger ought to show you. But __name__ belongs to the function OBJECT, and the object living under that name now is the wrapper."
+    },
+    {
+      "label": "'wrapper'",
+      "correct": true,
+      "feedback": "Right. The decorator swapped in a different object, and that object was defined as wrapper. This is why tracebacks, logging, and framework registries all go vague once decorators appear."
+    },
+    {
+      "label": "'double', the name of the decorator",
+      "feedback": "double is the factory that produced the replacement, not the replacement itself. What identity holds is double's return value, and that inner function carries its own name."
+    },
+    {
+      "label": "It raises AttributeError, since a wrapper has no __name__",
+      "feedback": "Every function object gets a __name__ automatically, wrappers included, so nothing raises here. The problem is the opposite of missing: it is present and quietly wrong."
+    }
+  ],
+  "reveal": "The fix is one line: decorate wrapper with @functools.wraps(fn), which copies __name__ and __doc__ across and sets __wrapped__ back to the original. Make it a reflex in every decorator you write."
+}
+\`\`\`
 
 **Interview nuance:** a naive decorator hides the function it wraps. After \`@double\`, \`identity.__name__\` is \`"wrapper"\` and its docstring is \`None\`, which breaks debuggers, introspection, and some frameworks. The fix is to decorate \`wrapper\` with \`functools.wraps(fn)\`, which copies \`__name__\` and \`__doc__\` from the original and sets \`__wrapped__\` to point back at it, so the wrapped function still looks like itself.`,
     demoCode: `def double(fn):
