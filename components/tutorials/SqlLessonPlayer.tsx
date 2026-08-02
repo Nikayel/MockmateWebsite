@@ -11,6 +11,7 @@ import {
   useTutorialStore,
 } from "@/lib/stores/tutorial-store"
 import type { LeanTutorialLevel, LessonNavModel } from "@/lib/tutorials/level-path"
+import { levelPath, lessonWorkspacePath, trackPath } from "@/lib/tutorials/lesson-routes"
 import { prewarmSqlRuntime } from "@/lib/workspace-execution"
 import { useCompletedLessons } from "./useCompletedLessons"
 import { TeachPanel } from "./TeachPanel"
@@ -25,6 +26,7 @@ import { ExtraPracticeSection } from "./ExtraPracticeSection"
 import { LessonErrorBanner, LessonLoadingState } from "./LessonProgressStates"
 import { SectionDoneButton } from "./SectionDoneButton"
 import { SableTutor } from "./SableTutor"
+import { LessonTelemetryProvider } from "./LessonTelemetryProvider"
 import { VerticalRail } from "./VerticalRail"
 import { usePersistentState } from "./usePersistentState"
 import type { LessonSection, SqlExercise, SqlLesson } from "@/lib/tutorials/types"
@@ -80,6 +82,12 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
   const markPassed = (section: LessonSection) =>
     setPassedSections((prev) => ({ ...prev, [section]: true }))
 
+  // The last graded pass rate per section. `lastExerciseScore` used to be written as a
+  // hardcoded 100 while its type documented it as "% of tests passed".
+  const [scoreBySection, setScoreBySection] = useState<Partial<Record<LessonSection, number>>>({})
+  const recordScore = (section: LessonSection, score: number) =>
+    setScoreBySection((prev) => ({ ...prev, [section]: score }))
+
   // Compile the sql.js engine on mount so the learner's first Run isn't the first compile.
   useEffect(() => {
     prewarmSqlRuntime()
@@ -133,7 +141,7 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
   }, [active])
 
   const markComplete = (section: LessonSection) => {
-    completeSection(section, section === "practice" ? 100 : undefined)
+    completeSection(section, section === "practice" ? scoreBySection.practice : undefined)
     onSectionComplete?.(section)
   }
 
@@ -142,7 +150,13 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
 
   const renderExercise = (
     exercise: SqlExercise,
-    opts: { canRevealReference?: boolean; brief?: ExerciseBriefMeta; onPass: () => void }
+    opts: {
+      canRevealReference?: boolean
+      brief?: ExerciseBriefMeta
+      onPass: () => void
+      section: LessonSection
+      onScore?: (score: number) => void
+    }
   ) => {
     if (exercise.executionMode === "workspace" && exercise.workspace) {
       // Reused byte-for-byte: SqlWorkspaceGrading is a WorkspaceScenarioConfig, and the SQL script is
@@ -155,6 +169,8 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
           seedSql={exercise.workspace.seedSql}
           brief={opts.brief}
           onPass={opts.onPass}
+          onScore={opts.onScore}
+          section={opts.section}
           persistedState={workspaceStateByExercise[exercise.id]}
           onPersistState={(state) =>
             setWorkspaceStateByExercise((prev) => ({ ...prev, [exercise.id]: state }))
@@ -170,6 +186,8 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
         canRevealReference={opts.canRevealReference}
         brief={opts.brief}
         onPass={opts.onPass}
+        onScore={opts.onScore}
+        section={opts.section}
       />
     )
   }
@@ -177,215 +195,230 @@ export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLe
   const progress = computeLessonProgress(sections)
 
   return (
-    <div className="flex h-[100dvh] flex-col">
-      <a
-        href="#lesson-main"
-        className="bg-accent text-accent-foreground focus-visible:ring-accent/50 sr-only z-50 rounded-md px-3 py-1.5 text-sm font-medium focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus-visible:ring-2 focus-visible:outline-none"
-      >
-        Skip to lesson
-      </a>
-      <header className="border-border bg-background/80 flex shrink-0 items-center gap-3 border-b px-4 py-2.5 backdrop-blur-md">
-        <Link href="/learn/sql" className="text-foreground text-sm font-semibold tracking-tight">
-          CodeSparring
-        </Link>
-        <Link
-          href={`/learn/sql/${level.slug}`}
-          className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/15 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors"
+    <LessonTelemetryProvider lessonId={lesson.id} levelId={level.id} skills={lesson.skills}>
+      <div className="flex h-[100dvh] flex-col">
+        <a
+          href="#lesson-main"
+          className="bg-accent text-accent-foreground focus-visible:ring-accent/50 sr-only z-50 rounded-md px-3 py-1.5 text-sm font-medium focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus-visible:ring-2 focus-visible:outline-none"
         >
-          LEVEL {level.id}
-        </Link>
-        <span className="text-foreground hidden truncate text-sm font-medium sm:block">
-          {lesson.title}
-        </span>
-
-        <div className="ml-auto flex items-center gap-3">
-          <div className="hidden items-center gap-2 md:flex">
-            <span className="text-muted-foreground text-xs whitespace-nowrap">
-              Lesson {lessonNumber} / {totalInLevel}
-            </span>
-            <span
-              className="bg-muted h-1.5 w-24 overflow-hidden rounded-full"
-              role="progressbar"
-              aria-label="Lesson progress"
-              aria-valuenow={progress.percentage}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
-              <span
-                className="bg-accent block h-full rounded-full transition-[width] duration-500"
-                style={{ width: `${progress.percentage}%` }}
-              />
-            </span>
-          </div>
-          <ThemeToggle />
+          Skip to lesson
+        </a>
+        <header className="border-border bg-background/80 flex shrink-0 items-center gap-3 border-b px-4 py-2.5 backdrop-blur-md">
           <Link
-            href="/learn/sql"
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
+            href={trackPath("sql")}
+            className="text-foreground text-sm font-semibold tracking-tight"
           >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Levels</span>
+            CodeSparring
           </Link>
-        </div>
-      </header>
-
-      <div className="flex-1 overflow-x-auto">
-        <div
-          className="grid h-full min-w-[1080px] transition-[grid-template-columns] duration-200 ease-out"
-          style={
-            {
-              gridTemplateColumns: `var(--railw, 58px) minmax(400px,1fr) ${tutorOpen === "1" ? "300px" : "2.5rem"}`,
-              "--railw": railExpanded ? "248px" : "58px",
-            } as CSSProperties
-          }
-        >
-          <LessonRail
-            collapsed={!railExpanded}
-            onToggle={() => setRail(railExpanded ? "0" : "1")}
-            sections={sections}
-            active={active}
-            onSelect={goToSection}
-            upNext={upNext}
-            basePath="/learn/sql"
-          />
-
-          <main
-            id="lesson-main"
-            ref={centerRef}
-            tabIndex={-1}
-            className="overflow-y-auto px-8 py-6 focus:outline-none"
-            aria-label="Lesson content"
+          <Link
+            href={levelPath("sql", level.slug)}
+            className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/15 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors"
           >
-            {/* Read keeps a ~720px reading measure; Apply/Practice go full-width so the two-column
-                workspace can give the editor the room it needs. */}
-            <div className={active === "teach" ? "mx-auto w-full max-w-[45rem]" : "w-full"}>
-              <LessonHeader lesson={lesson} />
+            LEVEL {level.id}
+          </Link>
+          <span className="text-foreground hidden truncate text-sm font-medium sm:block">
+            {lesson.title}
+          </span>
 
-              {error && <LessonErrorBanner error={error} onReload={reload} />}
-
-              {isLoading && <LessonLoadingState />}
-
-              {!isLoading && active === "teach" && (
-                <TeachPanel
-                  lessonId={lesson.id}
-                  teach={lesson.teach}
-                  teachCompleted={sections.teach === "completed"}
-                  demoLanguage="sql"
-                  onContinue={() => {
-                    markComplete("teach")
-                    goToSection("apply")
-                  }}
+          <div className="ml-auto flex items-center gap-3">
+            <div className="hidden items-center gap-2 md:flex">
+              <span className="text-muted-foreground text-xs whitespace-nowrap">
+                Lesson {lessonNumber} / {totalInLevel}
+              </span>
+              <span
+                className="bg-muted h-1.5 w-24 overflow-hidden rounded-full"
+                role="progressbar"
+                aria-label="Lesson progress"
+                aria-valuenow={progress.percentage}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <span
+                  className="bg-accent block h-full rounded-full transition-[width] duration-500"
+                  style={{ width: `${progress.percentage}%` }}
                 />
-              )}
+              </span>
+            </div>
+            <ThemeToggle />
+            <Link
+              href={trackPath("sql")}
+              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Levels</span>
+            </Link>
+          </div>
+        </header>
 
-              {!isLoading && active === "apply" && (
-                <div className="flex flex-col gap-4">
-                  {renderExercise(lesson.apply, {
-                    canRevealReference: true,
-                    brief: { eyebrow: "Apply", title: "Your turn" },
-                    onPass: () => markPassed("apply"),
-                  })}
-                  <SectionDoneButton
-                    passed={Boolean(passedSections.apply)}
-                    completed={sections.apply === "completed"}
-                    onMarkDone={() => markComplete("apply")}
-                  />
-                  {sections.apply === "completed" && (
-                    <div>
-                      <Button onClick={() => goToSection("practice")} className="gap-2">
-                        Practice it
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
+        <div className="flex-1 overflow-x-auto">
+          <div
+            className="grid h-full min-w-[1080px] transition-[grid-template-columns] duration-200 ease-out"
+            style={
+              {
+                gridTemplateColumns: `var(--railw, 58px) minmax(400px,1fr) ${tutorOpen === "1" ? "300px" : "2.5rem"}`,
+                "--railw": railExpanded ? "248px" : "58px",
+              } as CSSProperties
+            }
+          >
+            <LessonRail
+              collapsed={!railExpanded}
+              onToggle={() => setRail(railExpanded ? "0" : "1")}
+              sections={sections}
+              active={active}
+              onSelect={goToSection}
+              upNext={upNext}
+              courseId="sql"
+            />
 
-              {!isLoading && active === "practice" && (
-                <div className="flex flex-col gap-4">
-                  {renderExercise(lesson.practice, {
-                    brief: { eyebrow: "Practice", title: "Make it stick", resurfaces: true },
-                    onPass: () => markPassed("practice"),
-                  })}
-                  <SectionDoneButton
-                    passed={Boolean(passedSections.practice)}
-                    completed={sections.practice === "completed"}
-                    onMarkDone={() => markComplete("practice")}
+            <main
+              id="lesson-main"
+              ref={centerRef}
+              tabIndex={-1}
+              className="overflow-y-auto px-8 py-6 focus:outline-none"
+              aria-label="Lesson content"
+            >
+              {/* Read keeps a ~720px reading measure; Apply/Practice go full-width so the two-column
+                workspace can give the editor the room it needs. */}
+              <div className={active === "teach" ? "mx-auto w-full max-w-[45rem]" : "w-full"}>
+                <LessonHeader lesson={lesson} />
+
+                {error && <LessonErrorBanner error={error} onReload={reload} />}
+
+                {isLoading && <LessonLoadingState />}
+
+                {!isLoading && active === "teach" && (
+                  <TeachPanel
+                    lessonId={lesson.id}
+                    teach={lesson.teach}
+                    teachCompleted={sections.teach === "completed"}
+                    demoLanguage="sql"
+                    onContinue={() => {
+                      markComplete("teach")
+                      goToSection("apply")
+                    }}
                   />
-                  {lesson.extraPractice && lesson.extraPractice.length > 0 && (
-                    <ExtraPracticeSection
-                      exercises={lesson.extraPractice}
-                      renderExercise={(exercise) =>
-                        renderExercise(exercise, {
-                          canRevealReference: true,
-                          brief: { eyebrow: "Drill", title: "Extra practice" },
-                          onPass: () => {},
-                        })
-                      }
+                )}
+
+                {!isLoading && active === "apply" && (
+                  <div className="flex flex-col gap-4">
+                    {renderExercise(lesson.apply, {
+                      canRevealReference: true,
+                      brief: { eyebrow: "Apply", title: "Your turn" },
+                      onPass: () => markPassed("apply"),
+                      onScore: (score) => recordScore("apply", score),
+                      section: "apply",
+                    })}
+                    <SectionDoneButton
+                      passed={Boolean(passedSections.apply)}
+                      completed={sections.apply === "completed"}
+                      onMarkDone={() => markComplete("apply")}
                     />
-                  )}
-                  {sections.practice === "completed" && (
-                    <div className="flex flex-col gap-3">
-                      <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                        Lesson complete. Nice work. Revisit it in a few days to lock it in.
-                      </p>
+                    {sections.apply === "completed" && (
                       <div>
-                        {nextStep.kind === "lesson" && (
-                          <Button asChild className="gap-2">
-                            <Link href={`/learn/sql/${nextStep.slug}/${nextStep.id}`}>
-                              Next lesson: {nextStep.title}
-                              <ArrowRight className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                        )}
-                        {nextStep.kind === "level-complete" && (
-                          <div className="border-accent/40 bg-accent/[0.07] flex flex-col gap-3 rounded-xl border p-4">
-                            <p className="text-foreground text-sm font-semibold">
-                              You finished {level.title}.
-                            </p>
-                            <p className="text-muted-foreground text-sm">
-                              Next up: {nextStep.levelTitle}.
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              <Button asChild className="gap-2">
-                                <Link href={`/learn/sql/${nextStep.slug}/${nextStep.id}`}>
-                                  Start Level {nextStep.levelId}
-                                  <ArrowRight className="h-4 w-4" />
-                                </Link>
-                              </Button>
-                              <Button asChild variant="outline" className="gap-2">
-                                <Link href="/learn/sql">
-                                  <ArrowLeft className="h-4 w-4" />
-                                  All levels
-                                </Link>
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                        {nextStep.kind === "finished" && (
-                          <Button asChild variant="outline" className="gap-2">
-                            <Link href="/labs">
-                              <ArrowLeft className="h-4 w-4" />
-                              You finished the path. Try the case labs
-                            </Link>
-                          </Button>
-                        )}
+                        <Button onClick={() => goToSection("practice")} className="gap-2">
+                          Practice it
+                          <ArrowRight className="h-4 w-4" />
+                        </Button>
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </main>
+                    )}
+                  </div>
+                )}
 
-          {tutorOpen === "1" ? (
-            <div className="border-border overflow-hidden border-l p-3">
-              <SableTutor onCollapse={() => setTutorOpen("0")} />
-            </div>
-          ) : (
-            <VerticalRail label="Sable" side="right" onExpand={() => setTutorOpen("1")} />
-          )}
+                {!isLoading && active === "practice" && (
+                  <div className="flex flex-col gap-4">
+                    {renderExercise(lesson.practice, {
+                      brief: { eyebrow: "Practice", title: "Make it stick", resurfaces: true },
+                      onPass: () => markPassed("practice"),
+                      onScore: (score) => recordScore("practice", score),
+                      section: "practice",
+                    })}
+                    <SectionDoneButton
+                      passed={Boolean(passedSections.practice)}
+                      completed={sections.practice === "completed"}
+                      onMarkDone={() => markComplete("practice")}
+                    />
+                    {lesson.extraPractice && lesson.extraPractice.length > 0 && (
+                      <ExtraPracticeSection
+                        exercises={lesson.extraPractice}
+                        renderExercise={(exercise) =>
+                          renderExercise(exercise, {
+                            canRevealReference: true,
+                            brief: { eyebrow: "Drill", title: "Extra practice" },
+                            onPass: () => {},
+                            section: "practice",
+                          })
+                        }
+                      />
+                    )}
+                    {sections.practice === "completed" && (
+                      <div className="flex flex-col gap-3">
+                        <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                          Lesson complete. Nice work. Revisit it in a few days to lock it in.
+                        </p>
+                        <div>
+                          {/* Every hand-off from a finished lesson stays inside the workspace: the
+                            learner is signed in and mid-path, so the reading page would be a step
+                            backwards. */}
+                          {nextStep.kind === "lesson" && (
+                            <Button asChild className="gap-2">
+                              <Link href={lessonWorkspacePath("sql", nextStep.slug, nextStep.id)}>
+                                Next lesson: {nextStep.title}
+                                <ArrowRight className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          )}
+                          {nextStep.kind === "level-complete" && (
+                            <div className="border-accent/40 bg-accent/[0.07] flex flex-col gap-3 rounded-xl border p-4">
+                              <p className="text-foreground text-sm font-semibold">
+                                You finished {level.title}.
+                              </p>
+                              <p className="text-muted-foreground text-sm">
+                                Next up: {nextStep.levelTitle}.
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                <Button asChild className="gap-2">
+                                  <Link
+                                    href={lessonWorkspacePath("sql", nextStep.slug, nextStep.id)}
+                                  >
+                                    Start Level {nextStep.levelId}
+                                    <ArrowRight className="h-4 w-4" />
+                                  </Link>
+                                </Button>
+                                <Button asChild variant="outline" className="gap-2">
+                                  <Link href={trackPath("sql")}>
+                                    <ArrowLeft className="h-4 w-4" />
+                                    All levels
+                                  </Link>
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                          {nextStep.kind === "finished" && (
+                            <Button asChild variant="outline" className="gap-2">
+                              <Link href="/labs">
+                                <ArrowLeft className="h-4 w-4" />
+                                You finished the path. Try the case labs
+                              </Link>
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </main>
+
+            {tutorOpen === "1" ? (
+              <div className="border-border overflow-hidden border-l p-3">
+                <SableTutor onCollapse={() => setTutorOpen("0")} />
+              </div>
+            ) : (
+              <VerticalRail label="Sable" side="right" onExpand={() => setTutorOpen("1")} />
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </LessonTelemetryProvider>
   )
 }

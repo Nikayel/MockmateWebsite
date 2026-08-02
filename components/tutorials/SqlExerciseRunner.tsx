@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { CheckCircle2, Database, Eye, Lightbulb, Play, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
@@ -13,7 +13,8 @@ import { ReadOnlyCodeBlock } from "./ReadOnlyCodeBlock"
 import { SqlDataPreview } from "./SqlDataPreview"
 import { SqlResultGrid } from "./SqlResultGrid"
 import { useExerciseRun } from "./useExerciseRun"
-import { isSqlResultSet, type SqlExercise } from "@/lib/tutorials/types"
+import { useLessonTelemetry } from "./LessonTelemetryProvider"
+import { isSqlResultSet, type LessonSection, type SqlExercise } from "@/lib/tutorials/types"
 import { LessonNotice } from "./LessonNotice"
 
 /**
@@ -29,6 +30,10 @@ export interface SqlExerciseRunnerProps {
   onCodeChange: (value: string) => void
   onPass?: () => void
   onRunResult?: (passed: boolean) => void
+  /** Fires after each graded run with the % of assertions passed — the real `lastExerciseScore`. */
+  onScore?: (score: number) => void
+  /** Which lesson phase this runner is mounted in. Tags telemetry; defaults to `"apply"`. */
+  section?: LessonSection
   /** Fires when the learner reveals a hint (1-based index, total available). Drives Sable. */
   onHintReveal?: (index: number, total: number) => void
   /** Fires when the gated reference solution is revealed. Drives Sable. */
@@ -46,22 +51,33 @@ export function SqlExerciseRunner({
   onCodeChange,
   onPass,
   onRunResult,
+  onScore,
+  section = "apply",
   onHintReveal,
   onReferenceReveal,
   canRevealReference = false,
   revealReferenceAfter = 2,
   brief,
 }: SqlExerciseRunnerProps) {
-  const { running, warming, results, runError, attempts, lastRunPassed, run } = useExerciseRun(
-    exercise,
-    {
+  const { record } = useLessonTelemetry()
+  const { running, warming, results, runError, attempts, lastRunPassed, lastScore, run } =
+    useExerciseRun(exercise, {
       onPass,
       onResult: onRunResult,
-    }
-  )
+      section,
+    })
   const [emptyWarning, setEmptyWarning] = useState(false)
   const [hintsShown, setHintsShown] = useState(0)
   const [showReference, setShowReference] = useState(false)
+
+  // Report the graded score upward so the player persists the real pass rate.
+  const reportedScore = useRef<number | null>(null)
+  useEffect(() => {
+    if (lastScore !== null && lastScore !== reportedScore.current) {
+      reportedScore.current = lastScore
+      onScore?.(lastScore)
+    }
+  }, [lastScore, onScore])
 
   const handleRun = () => {
     if (!code.trim()) {
@@ -142,7 +158,16 @@ export function SqlExerciseRunner({
             onClick={() =>
               setHintsShown((n) => {
                 const next = Math.min(n + 1, hints.length)
-                if (next > n) onHintReveal?.(next, hints.length)
+                if (next > n) {
+                  onHintReveal?.(next, hints.length)
+                  record({
+                    kind: "hint_reveal",
+                    section,
+                    itemId: exercise.id,
+                    hintIndex: next,
+                    hintsTotal: hints.length,
+                  })
+                }
                 return next
               })
             }
@@ -159,6 +184,12 @@ export function SqlExerciseRunner({
             onClick={() => {
               setShowReference(true)
               onReferenceReveal?.()
+              record({
+                kind: "reference_reveal",
+                section,
+                itemId: exercise.id,
+                attemptIndex: attempts,
+              })
             }}
             className="gap-2"
           >
