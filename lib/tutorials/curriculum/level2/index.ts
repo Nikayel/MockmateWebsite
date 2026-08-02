@@ -5160,6 +5160,296 @@ def safe_minutes_between(started, finished):
   },
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// L2-M7: Talking to Services
+// ───────────────────────────────────────────────────────────────────────────
+
+const fetchingJsonLesson: PythonLesson = {
+  id: "py-l2-fetching-json",
+  title: "Fetching JSON from an API",
+  summary:
+    "Read the shape of an HTTP call, then handle the half that actually breaks: the status and the parse.",
+  estimatedMinutes: 13,
+  difficulty: "medium",
+  skills: ["http", "apis", "json", "error-handling"],
+  teach: {
+    estimatedMinutes: 6,
+    markdown: `## One line fetches. The other ten decide what to do about it
+
+Calling an API is three steps: send a request, look at what came back, and turn the body into Python values. The sending is one line and it is the part nobody gets wrong. Everything that breaks in production lives in the other two steps, because a response can arrive perfectly well and still be a failure, and a body can arrive perfectly well and still not be the shape you expected.
+
+> This editor runs Python in your browser, which has no network, so nothing here will actually fetch. Read the call below to learn its shape, then practise the half that breaks: reading a status and parsing a body. Level 3 does the rigorous version against a real service with \`httpx\` and \`pydantic\`.
+
+### The shape of the call
+
+\`\`\`python
+import httpx
+
+response = httpx.get("https://api.example.com/repos/python/cpython", timeout=5.0)
+response.raise_for_status()      # turn a 4xx or 5xx into an exception, here
+payload = response.json()        # dict, list, str, int, bool or None
+payload["name"]                  # 'cpython'
+\`\`\`
+
+Four things are doing work in those lines. \`timeout\` stops a hung server from hanging your process too. \`status_code\` carries the verdict. \`raise_for_status()\` converts a bad status into an exception at a line you chose, rather than letting it travel on as data. And \`.json()\` parses the body, which is the same \`json.loads\` you already know, run over whatever bytes came back.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "a-404-does-not-raise",
+  "prompt": "httpx.get(url) comes back with status 404 and an HTML error page. Your next line is response.json(). What did the get call itself do?",
+  "options": [
+    {
+      "label": "It raised, so the next line never runs",
+      "feedback": "Tempting, because a 404 is plainly a failure from your program's point of view. From HTTP's point of view the request succeeded: a response came back and its status IS the answer. Only a timeout or a connection problem raises."
+    },
+    {
+      "label": "It returned normally. The 404 is just the status on an ordinary response object",
+      "correct": true,
+      "feedback": "Right, and that is exactly why raise_for_status() exists: it turns a bad status into an exception at a line you picked. Without it, the failure travels on disguised as data."
+    },
+    {
+      "label": "It returned None, since there is no useful body to parse",
+      "feedback": "A 404 body is usually a real payload, often an HTML page or a JSON error object, and the client always hands back a response object rather than None. Reading response.text is how you see it."
+    },
+    {
+      "label": "It retried automatically until the URL resolved",
+      "feedback": "No HTTP client retries by default, because a retry is a policy decision only the caller can make. A 404 is also one of the statuses that would never clear however long you waited."
+    }
+  ]
+}
+\`\`\`
+
+### The status is a decision, not a detail
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Status", "What it means", "What the caller should do"],
+  "rows": [
+    ["2xx", "the request worked", "parse the body"],
+    ["429", "you are being rate limited", "wait, then retry, honouring Retry-After"],
+    ["other 4xx", "your request is wrong", "fix the request; retrying changes nothing"],
+    ["5xx", "the other side is broken", "retry with backoff, then give up loudly"],
+    ["no response at all", "a timeout or a connection error", "this is the case that raises, so catch it"]
+  ],
+  "highlightCols": ["What the caller should do"],
+  "caption": "The split that matters is transient versus permanent. 429 and 5xx can clear on their own, so a retry is useful. Other 4xx statuses say the request itself is wrong, so an identical retry produces an identical failure while spending your rate limit."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "retry-only-what-can-clear",
+  "prompt": "A worker retries every failed call five times with a backoff. Which status is the one where retrying is genuinely useful?",
+  "options": [
+    {
+      "label": "400, because a bad request might go through on a second attempt",
+      "feedback": "A 400 says the request you sent is malformed, and sending the identical bytes again produces the identical answer. Retrying it spends quota while hiding a bug you could have fixed in a minute."
+    },
+    {
+      "label": "503, because the service is temporarily unavailable",
+      "correct": true,
+      "feedback": "Right. 5xx and 429 are the transient family: your request was fine and the other side was not, so time plus backoff can genuinely fix them."
+    },
+    {
+      "label": "401, because the token may be accepted next time",
+      "feedback": "A rejected credential stays rejected until something refreshes it, so the useful response is to renew the token rather than to try the same one again. Hammering an expired token can also get the account locked out."
+    },
+    {
+      "label": "404, because the resource may show up shortly",
+      "feedback": "This is occasionally true in an eventually consistent system, which makes it the most defensible wrong answer here. As a blanket rule it turns one typo in a URL into five times the traffic."
+    }
+  ]
+}
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "json-on-an-html-error-page",
+  "prompt": "A load balancer returns an HTML maintenance page with status 502. The code calls response.json() without checking the status first. What comes back?",
+  "options": [
+    {
+      "label": "None, because the body is not JSON",
+      "feedback": "That would be a friendlier design and some wrappers do offer an opt-in version of it. Here the parse fails outright rather than handing back a value that every caller would then have to check."
+    },
+    {
+      "label": "A JSON decode error, and the traceback blames your parsing rather than the 502",
+      "correct": true,
+      "feedback": "Right, and that misdirection costs real debugging time at 3am. Call raise_for_status() first so the traceback names the status your service actually received."
+    },
+    {
+      "label": "The HTML as a plain string, since json() falls back to text",
+      "feedback": "response.text is the attribute that hands you the raw body, and reaching for it is the right move while debugging. json() only ever parses and never quietly falls back."
+    },
+    {
+      "label": "An empty dict, which the code then reads as a missing record",
+      "feedback": "An empty dict would be the quietest possible failure, and plenty of hand-rolled wrappers produce exactly that by accident. The library raises instead of inventing a value for you."
+    }
+  ]
+}
+\`\`\`
+
+### Parse the body as if it were written by a stranger
+
+Because it was. A response is untrusted input: a field can be absent, be \`null\`, be a string where you expected a number, or be an empty list where you expected one element. Chained square brackets assume all of it is fine:
+
+\`\`\`python
+payload["owner"]["login"]          # KeyError the first time owner is missing
+payload["items"][0]["id"]          # IndexError the first time a page is empty
+
+owner = payload.get("owner") or {}
+owner.get("login", "unknown")      # a default you chose, at the field you chose
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "nested-lookup-names-the-first-gap",
+  "prompt": "A response usually looks like a dict with an owner key holding a dict with a login key. One record has no owner key at all, and the code reads payload['owner']['login']. What happens?",
+  "options": [
+    {
+      "label": "It returns None, which the next line can handle",
+      "feedback": "Square brackets never return None on a mapping, since that is what .get() is for. Indexing is the strict form, so an absence gets reported rather than papered over."
+    },
+    {
+      "label": "KeyError naming 'owner', which kills the whole batch on one bad record",
+      "correct": true,
+      "feedback": "Right, and the fix is to decide field by field whether absence is expected. Use .get() with a default where it is, and let the KeyError stand where a missing field really does mean a broken record."
+    },
+    {
+      "label": "KeyError naming 'login', since the outer lookup succeeded",
+      "feedback": "The failure is reported at the FIRST missing link in the chain, so the message names owner. Reading which key is in the message is what tells you where the shape actually diverged."
+    },
+    {
+      "label": "TypeError, because you cannot index into a missing value",
+      "feedback": "That is the error you get one step later, when an outer .get() returns None and you index into that. Plain bracket indexing raises before it ever reaches the second pair of brackets."
+    }
+  ],
+  "reveal": "Decide per field whether absence is normal. A default belongs on the fields a caller can live without, and a loud failure belongs on the fields that make the record meaningless."
+}
+\`\`\`
+
+Note that \`.get("owner")\` returns \`None\` both when the key is missing and when the value really is JSON \`null\`, so \`payload.get("owner").get("login")\` still raises \`AttributeError\` on a null. The \`or {}\` above is what closes that gap, and the Apply exercise makes you handle exactly this case.
+
+### Pitfalls
+
+- **No timeout means no limit.** \`httpx\` defaults to five seconds, but \`requests\` has no default at all, so a hung server can pin a worker forever. Always pass one explicitly and you never have to remember which library you are in.
+- **Retrying without backoff is a denial of service you aimed at yourself.** Sleep longer after every attempt, cap the number of attempts, and honour \`Retry-After\` when a 429 sends one.
+- **A 200 does not mean the body is right.** Plenty of APIs return errors inside a 200 envelope. Check the payload's own success field where one exists.
+
+**Interview nuance:** when you are asked to "call this API," the answer that lands is the failure taxonomy, not the request line. Say that you separate three cases: no response at all (a timeout or connection error, and the only case that raises), a response with a bad status (transient for 429 and 5xx, so retry with backoff; permanent for other 4xx, so fail loudly), and a response with a good status but an unexpected shape (validate at the boundary and reject the record, not the batch). Level 3 turns that third case into typed models with \`pydantic\`; the reasoning is the same at every scale.`,
+    demoCode: `# No network here, so this is what a real response would already have handed you.
+payload = {
+    "name": "cpython",
+    "owner": {"login": "python", "id": 1},
+    "items": [],
+}
+
+print(payload["owner"]["login"])              # python
+print((payload.get("license") or {}).get("key", "none"))   # none
+
+for status in (200, 404, 429, 503):
+    if 200 <= status < 300:
+        print(status, "ok")
+    elif status == 429 or 500 <= status < 600:
+        print(status, "retry")
+    else:
+        print(status, "fail")`,
+  },
+  apply: {
+    id: "py-l2-fetching-json-apply",
+    executionMode: "single-file",
+    prompt: `Write a function \`owner_login(payload)\` that returns the login name nested at \`owner.login\` in
+an API response, or the string \`"unknown"\` when the response does not carry one.
+
+\`{"name": "cpython", "owner": {"login": "python"}}\` returns \`"python"\`. A payload with no \`owner\`
+key, with an empty \`owner\`, or with \`owner\` set to \`null\` all return \`"unknown"\` instead of raising.`,
+    starterCode: `def owner_login(payload):
+    # Reach two levels down without assuming either level is there.
+    pass`,
+    hints: [
+      "`payload.get('owner')` returns `None` both when the key is missing and when its value is JSON null.",
+      "So guard the middle step before you index it: `owner = payload.get('owner') or {}`.",
+      "Then `return owner.get('login', 'unknown')`, which supplies the default at the field itself.",
+    ],
+    referenceSolution: `def owner_login(payload):
+    owner = payload.get("owner") or {}
+    return owner.get("login", "unknown")`,
+    testCases: [
+      {
+        input: { payload: { name: "cpython", owner: { login: "python", id: 1 } } },
+        expected: "python",
+        description: "the field is there",
+      },
+      {
+        input: { payload: { name: "cpython" } },
+        expected: "unknown",
+        description: "no owner key at all",
+      },
+      {
+        input: { payload: { name: "orphan", owner: {} } },
+        expected: "unknown",
+        description: "an owner with no login",
+      },
+      {
+        input: { payload: { name: "orphan", owner: null } },
+        expected: "unknown",
+        description: "owner is JSON null, not a dict",
+      },
+    ],
+  },
+  practice: {
+    id: "py-l2-fetching-json-practice",
+    executionMode: "single-file",
+    prompt: `An ingest worker polls a vendor's API every five minutes. Some failures are the vendor's and
+clear on their own, and some are the worker's own fault and will fail identically forever. Retrying
+the second kind burns the rate limit and hides the bug, so the worker has to tell them apart before
+it decides anything.
+
+Implement \`retry_decision(status)\`: return \`"ok"\` for any 2xx status, \`"retry"\` for 429 and for any
+5xx, and \`"fail"\` for everything else.`,
+    starterCode: `def retry_decision(status):
+    # Classify the status as ok, retry, or fail.
+    pass`,
+    hints: [
+      "Python chains comparisons, so `200 <= status < 300` reads exactly like the range it describes.",
+      "The retry family is two rules joined by `or`: `status == 429` and `500 <= status < 600`.",
+      "Return early from each branch and let a final `return 'fail'` catch everything left.",
+    ],
+    referenceSolution: `def retry_decision(status):
+    if 200 <= status < 300:
+        return "ok"
+    if status == 429 or 500 <= status < 600:
+        return "retry"
+    return "fail"`,
+    testCases: [
+      { input: { status: 200 }, expected: "ok", description: "a plain success" },
+      {
+        input: { status: 429 },
+        expected: "retry",
+        description: "rate limited, so waiting helps",
+      },
+      {
+        input: { status: 503 },
+        expected: "retry",
+        description: "the other side is down, so waiting helps",
+      },
+      {
+        input: { status: 404 },
+        expected: "fail",
+        description: "a permanent 4xx, so retrying changes nothing",
+      },
+    ],
+  },
+}
+
 export const level2: PythonLevel = {
   id: 2,
   slug: "intermediate",
@@ -5217,6 +5507,12 @@ export const level2: PythonLevel = {
       description:
         "Reach for the batteries: regular expressions, specialized collections, and dates.",
       lessons: [regexLesson, collectionsToolkitLesson, datetimesLesson],
+    },
+    {
+      id: "py-l2-services-and-apis",
+      title: "Talking to Services",
+      description: "Make an HTTP call, then handle the status and the parse it hands back.",
+      lessons: [fetchingJsonLesson],
     },
   ],
 }
