@@ -3024,6 +3024,368 @@ an empty list. A page number below 1 is treated as page 1.`,
   },
 }
 
+const costLesson: PythonLesson = {
+  id: "py-l5-cost",
+  title: "The cost you asked for is not the cost you got",
+  summary:
+    "Correct output, wrong cost. Learn to read a body for the work it hides, and to count that work exactly rather than guess at it.",
+  estimatedMinutes: 24,
+  difficulty: "hard",
+  skills: ["complexity", "performance review", "code reading", "verification"],
+  teach: {
+    estimatedMinutes: 9,
+    markdown: `## The bug that passes every test
+
+You asked for a linear solution. What came back is correct on every input you tried, reads cleanly, and is quadratic. There is no failing test to find, because there is no wrong answer. The defect only exists at a size your tests never reach, and it shows up in production as a job that used to take ninety seconds and now takes forty minutes.
+
+This is the one failure signature you cannot catch by comparing outputs. You have to read for it.
+
+## Where the hidden loop lives
+
+Python hides iteration behind operators and methods that look like single steps. Four shapes account for nearly all of it.
+
+**Membership in a list.**
+
+\`\`\`python
+seen = []
+for n in nums:
+    if n in seen:        # scans every element of seen
+        return True
+    seen.append(n)
+\`\`\`
+
+\`n in seen\` is a loop wearing a keyword. Inside another loop it is quadratic. \`n in some_set\` and \`key in some_dict\` are not, which is why the fix is usually a one-word change.
+
+**Removing from the front of a list.**
+
+\`\`\`python
+while queue:
+    job = queue.pop(0)   # shifts every remaining element left by one
+\`\`\`
+
+\`pop(0)\` is linear because a list is a contiguous block. \`collections.deque\` has \`popleft\` for exactly this.
+
+**Building a string by adding to it.**
+
+\`\`\`python
+out = ""
+for line in lines:
+    out = out + line + "\\n"   # allocates a new string of the full length, every time
+\`\`\`
+
+Strings are immutable, so each round copies everything accumulated so far. Ten thousand lines of eighty characters copies about four billion characters. \`"".join(parts)\` copies each character once.
+
+**Sorting inside a loop.**
+
+\`\`\`python
+for user in users:
+    ranked = sorted(scores)      # the same sort, n times
+    ...
+\`\`\`
+
+Correct, and it repeats identical work per iteration. Hoisting it above the loop is usually the whole fix.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "membership-in-list",
+  "prompt": "A generated has_duplicate keeps a list called seen and tests if n in seen inside its loop. What is its cost on a list of n distinct values, and what is the smallest fix?",
+  "options": [
+    {
+      "label": "Linear, and no fix is needed, because the loop runs once per element",
+      "feedback": "The outer loop does run once per element, which is what makes this read as linear. The membership test inside it is itself a loop over everything collected so far."
+    },
+    {
+      "label": "Quadratic, and the fix is to make seen a set",
+      "correct": true,
+      "feedback": "Right. Membership in a list scans it, so the work grows with the square of the input. A set answers the same question by hash, in constant time, and the rest of the code is unchanged."
+    },
+    {
+      "label": "Quadratic, and the fix is to sort the input first",
+      "feedback": "Sorting does enable a linear duplicate scan, so this is a real technique. It costs an extra sort, destroys the original order, and changes far more code than swapping one container."
+    },
+    {
+      "label": "Linear, because append is constant time",
+      "feedback": "Append genuinely is constant time on average, so half the loop body is cheap. The membership test on the line above it is the part that scans."
+    }
+  ]
+}
+\`\`\`
+
+## Count it, do not estimate it
+
+Big O is the right language for a review comment and the wrong tool for convincing yourself. When you want to know whether a body is really quadratic, count the operations exactly for a small input. It takes a minute and it is not arguable.
+
+\`\`\`python
+def scan_steps(nums):
+    """How many element comparisons does 'n in seen' actually perform?"""
+    seen = []
+    steps = 0
+    for n in nums:
+        for candidate in seen:      # what 'in' does, written out
+            steps += 1
+            if candidate == n:
+                return steps        # 'in' stops at the first match, and so does the outer loop
+        seen.append(n)
+    return steps
+\`\`\`
+
+Writing the hidden loop out by hand is the technique. Once \`in\` is a visible \`for\`, the cost is not a judgment call, and details you would have hand-waved past become obvious: the scan stops at the first match, and finding a duplicate ends the whole function early. That is why a list full of duplicates is fast and a list of distinct values is the worst case.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "count-the-comparisons",
+  "prompt": "For the has_duplicate loop above with nums = [1, 2, 3], how many element comparisons does the membership test perform in total?",
+  "options": [
+    {
+      "label": "0, because there are no duplicates to find",
+      "feedback": "No match is ever found, which is true. Every comparison still happens: the scan has to look at each collected element before it can conclude there is no match."
+    },
+    {
+      "label": "3",
+      "correct": true,
+      "feedback": "Right. The first element scans an empty list for 0 comparisons, the second scans one element, the third scans two, giving 0 plus 1 plus 2."
+    },
+    {
+      "label": "6, one comparison per pair of elements",
+      "feedback": "Every pair is a reasonable model and it double counts here. Each pair is only compared once, when the later element scans back over the earlier one."
+    },
+    {
+      "label": "9, since the loop runs three times over three elements",
+      "feedback": "Three times three is the shape of the worst case for a fully nested loop. The inner scan only covers the elements collected so far, so it is 0, then 1, then 2."
+    }
+  ]
+}
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "linear-or-quadratic",
+  "prompt": "Each snippet is the body of a loop over n items. Sort each by the total work it does.",
+  "buckets": ["Linear overall", "Quadratic overall"],
+  "items": [
+    {
+      "label": "seen.add(item) where seen is a set",
+      "bucket": "Linear overall",
+      "feedback": "A set add hashes the value and stores it, which does not depend on how many items are already in the set."
+    },
+    {
+      "label": "if item in results where results is a list",
+      "bucket": "Quadratic overall",
+      "feedback": "Membership in a list scans it, and the list grows with every iteration, so the total work is the sum 1 plus 2 plus 3 and so on."
+    },
+    {
+      "label": "parts.append(text)",
+      "bucket": "Linear overall",
+      "feedback": "Appending to a list is constant time on average, so building a list of n pieces is linear no matter how long the pieces are."
+    },
+    {
+      "label": "report = report + text",
+      "bucket": "Quadratic overall",
+      "feedback": "Strings are immutable, so each concatenation copies everything accumulated so far into a new string."
+    },
+    {
+      "label": "queue.pop(0)",
+      "bucket": "Quadratic overall",
+      "feedback": "Removing the front element shifts every remaining element left by one position, so draining a list this way is quadratic."
+    },
+    {
+      "label": "counts[key] = counts.get(key, 0) + 1",
+      "bucket": "Linear overall",
+      "feedback": "Both the dictionary lookup and the assignment are constant time, so counting n items costs linear work in total."
+    }
+  ]
+}
+\`\`\`
+
+## Say it as a review comment
+
+"This is O(n squared)" invites a debate about whether n is ever large. The version that gets fixed names the line, the input size, and the swap.
+
+> \`seen\` is a list, so \`n in seen\` on line 6 scans it. On the 200k-row import that is about twenty billion comparisons. Making \`seen\` a set is a one-word change and the rest of the function is unaffected.
+
+**Interview nuance:** when you are asked to review a solution, cost is the dimension most candidates skip entirely, so raising it is disproportionately valuable. The strongest form is not the label but the mechanism: "this reads as one pass, but the membership test on line 6 is itself a scan, so it is quadratic." Anyone can recite complexity classes. Pointing at the line that creates the hidden loop is what shows you read the code.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "cost-cumulative",
+  "prompt": "A generated function is correct and quadratic. Your test suite runs it on 50 items and passes in milliseconds. What is the right action?",
+  "options": [
+    {
+      "label": "Ship it, since correctness is what tests are for and it is fast enough today",
+      "feedback": "Defensible when the input truly is bounded, and worth saying out loud so the assumption is recorded. It is a bet on an input size nobody has committed to keeping small."
+    },
+    {
+      "label": "Name the line that hides the loop and give the expected size at production scale",
+      "correct": true,
+      "feedback": "Right. The finding is not visible in any test result, so the review comment is the only channel. Naming the line and the real input size makes it a decision rather than an opinion."
+    },
+    {
+      "label": "Add a test with 500000 items so the suite catches it",
+      "feedback": "It does convert the problem into a red test, which is appealing. It also makes the suite slow for everyone forever and only fails once the code is already written the wrong way."
+    },
+    {
+      "label": "Rewrite it yourself before merging, since the fix is usually one word",
+      "feedback": "Often true and often welcome, especially for a one-word swap. Doing it silently means the author never learns the shape, and you now own a function you did not write."
+    }
+  ],
+  "reveal": "Membership in a list, pop from the front, string concatenation in a loop, and sorting inside a loop. Write the hidden loop out by hand and count it. Cost is the one defect no output comparison can find."
+}
+\`\`\``,
+    demoCode: `def scan_steps(nums):
+    seen = []
+    steps = 0
+    for n in nums:
+        for candidate in seen:      # what 'n in seen' really does
+            steps += 1
+            if candidate == n:
+                return steps
+        seen.append(n)
+    return steps
+
+
+print(scan_steps([1, 2, 3]))        # 3
+print(scan_steps(list(range(50))))  # 1225`,
+  },
+  apply: {
+    id: "py-l5-cost-apply",
+    executionMode: "single-file",
+    prompt: `Write a function \`scan_steps(nums)\` that returns the exact number of element comparisons
+the membership test in \`has_duplicate\` performs on \`nums\`.
+
+\`has_duplicate\` is in the starter. It keeps a list called \`seen\` and asks \`if n in seen\`. That test
+walks \`seen\` from the front, comparing one element at a time, and stops as soon as it finds a match.
+When it finds one, \`has_duplicate\` returns immediately and no further comparisons happen.
+
+Count every comparison the test performs across the whole call. Keep \`scan_steps\` as the last
+function in the file.`,
+    starterCode: `def has_duplicate(nums):
+    # Generated code under review. Leave it exactly as it is.
+    seen = []
+    for n in nums:
+        if n in seen:
+            return True
+        seen.append(n)
+    return False
+
+
+def scan_steps(nums):
+    # Return how many element comparisons "n in seen" performs in total.
+    pass`,
+    hints: [
+      "Write the hidden loop out: replace `if n in seen` with a `for candidate in seen` loop you can count.",
+      "Increment the counter before comparing, since a comparison happens whether or not it matches.",
+      "A match ends the whole function, so return the count from inside the inner loop rather than continuing.",
+    ],
+    referenceSolution: `def has_duplicate(nums):
+    seen = []
+    for n in nums:
+        if n in seen:
+            return True
+        seen.append(n)
+    return False
+
+
+def scan_steps(nums):
+    seen = []
+    steps = 0
+    for n in nums:
+        for candidate in seen:
+            steps += 1
+            if candidate == n:
+                return steps
+        seen.append(n)
+    return steps`,
+    testCases: [
+      {
+        input: { nums: [1, 2, 3] },
+        expected: 3,
+        description: "no duplicates, so every scan runs to the end",
+      },
+      {
+        input: { nums: [1, 1] },
+        expected: 1,
+        description: "the duplicate is found on the first comparison",
+      },
+      {
+        input: { nums: [1, 2, 3, 2] },
+        expected: 5,
+        description: "the duplicate is found part way through the last scan",
+      },
+      { input: { nums: [] }, expected: 0, description: "nothing to compare" },
+    ],
+  },
+  practice: {
+    id: "py-l5-cost-practice",
+    executionMode: "single-file",
+    prompt: `Your nightly export builds a CSV in memory with \`report = report + row + "\\n"\` inside a
+loop, and it has started missing its window. Before you change anything you want a number to put in
+the ticket, because "string concatenation is slow" has already been dismissed once as premature
+optimisation.
+
+Write a function \`rows_within_budget(row_length, budget)\` that returns the largest number of rows
+the loop can append before the total characters it has copied would exceed \`budget\`.
+
+Every row has exactly \`row_length\` characters, and the loop adds a newline to each, so appending a
+row produces a new string one row longer than the previous one. The characters copied by an append
+is the length of the string it produces. Count zero rows as costing nothing.`,
+    starterCode: `def build_report(rows):
+    # The loop under review. Every append copies the whole accumulated string.
+    report = ""
+    for row in rows:
+        report = report + row + "\\n"
+    return report
+
+
+def rows_within_budget(row_length, budget):
+    # Return how many rows fit before the total characters copied exceeds budget.
+    pass`,
+    hints: [
+      "After the first append the string is `row_length + 1` characters, after the second it is twice that, and so on.",
+      "Keep a running `total` of characters copied and stop before the append that would push it past `budget`.",
+      "A budget of 0 fits no rows at all, since even the first append copies something.",
+    ],
+    referenceSolution: `def build_report(rows):
+    report = ""
+    for row in rows:
+        report = report + row + "\\n"
+    return report
+
+
+def rows_within_budget(row_length, budget):
+    total = 0
+    length = 0
+    rows = 0
+    while True:
+        length += row_length + 1
+        if total + length > budget:
+            return rows
+        total += length
+        rows += 1`,
+    testCases: [
+      { input: { row_length: 9, budget: 100 }, expected: 4, description: "ten characters per row" },
+      {
+        input: { row_length: 99, budget: 100 },
+        expected: 1,
+        description: "one long row uses the whole budget",
+      },
+      { input: { row_length: 9, budget: 0 }, expected: 0, description: "no budget at all" },
+      {
+        input: { row_length: 1, budget: 1000 },
+        expected: 31,
+        description: "short rows still hit the wall quickly",
+      },
+    ],
+  },
+}
+
 export const level5: PythonLevel = {
   id: 5,
   slug: "verification",
@@ -3051,7 +3413,7 @@ export const level5: PythonLevel = {
       title: "Debugging Code You Did Not Author",
       description:
         "Shrink the failing input, repair without rewriting, and read a solution for the cost it will have in production.",
-      lessons: [shrinkLesson, repairLesson],
+      lessons: [shrinkLesson, repairLesson, costLesson],
     },
   ],
 }
