@@ -74,7 +74,12 @@ export function BeliefBar({ value, reviewCount, ariaLabel, className }: BeliefBa
         height={TRACK_H}
         rx={2}
         strokeWidth={1}
-        className={value === null ? "stroke-muted-foreground" : "fill-muted stroke-border"}
+        // stroke-muted-foreground on both branches: stroke-border measured 1.12:1
+        // light / 1.3:1 dark, so the 0-100 denominator this whole mark is read
+        // against did not render — a 55% bar was a stub floating in space.
+        className={
+          value === null ? "stroke-muted-foreground" : "fill-muted stroke-muted-foreground"
+        }
         fill={value === null ? "none" : undefined}
         strokeDasharray={value === null ? "2 3" : undefined}
       />
@@ -119,7 +124,9 @@ export function BeliefBar({ value, reviewCount, ariaLabel, className }: BeliefBa
           y1={1}
           y2={BAR_H - 1}
           strokeWidth={1}
-          className="stroke-border"
+          // Same reference-mark ink the score track and forgetting curve already
+          // use; stroke-border left the band boundaries invisible in both themes.
+          className="stroke-muted-foreground"
         />
       ))}
     </svg>
