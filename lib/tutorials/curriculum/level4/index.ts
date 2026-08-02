@@ -281,6 +281,8 @@ This is structural (duck) typing made checkable. A third-party \`Circle\` you ca
 }
 \`\`\`
 
+That last row of the table is the one people trip over, because "checked by a type checker" is easy to read as "checked, eventually, somehow":
+
 \`\`\`cswidget
 {
   "type": "check",
