@@ -1038,6 +1038,34 @@ A **type hint** is a note you attach to a name saying what kind of value belongs
 
 ### A hint is metadata, not a check
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "hint-not-enforced",
+  "prompt": "average is declared as: def average(values: list[float]) -> float. A caller in another module runs average(['a', 'b']). Where does that go wrong?",
+  "options": [
+    {
+      "label": "At the call site, before the body runs. Python rejects the wrong argument type.",
+      "feedback": "Tempting, because that is what the annotation looks like it is for, and it is exactly what a compiled language would do. Python records the annotation and moves on. Nothing inspects it when the call happens."
+    },
+    {
+      "label": "Inside the body, at sum(values), with a TypeError about adding an int and a str.",
+      "correct": true,
+      "feedback": "Right. The call goes through untouched and the failure surfaces wherever the wrong type first breaks an operation, which is usually deep in the stack and far from the caller who actually caused it."
+    },
+    {
+      "label": "Nowhere. The hint coerces the strings to floats on the way in.",
+      "feedback": "Tempting, because pydantic and several web frameworks really do coerce from annotations, so you may have seen this behaviour. Plain Python never coerces: no conversion, no validation, no warning."
+    },
+    {
+      "label": "At import time, because the annotation does not match how the function is used.",
+      "feedback": "Close on timing, since annotations really are evaluated when the def statement runs. But what gets evaluated is the annotation expression itself, not any argument. Import time knows nothing about calls that have not happened yet."
+    }
+  ]
+}
+\`\`\`
+
 Python records annotations but never acts on them at runtime. \`average(["a", "b"])\` will happily start executing and only blow up inside \`sum\` (a \`TypeError\` from \`0 + "a"\`), not at the call site. The payoff comes from tools that read the annotations: your editor's autocomplete, and static checkers run as a build step.
 
 \`\`\`csdiagram
@@ -1059,6 +1087,30 @@ def average(values: list[float]) -> float:
     if not values:
         return 0.0
     return sum(values) / len(values)
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "int-list-where-float-hinted",
+  "prompt": "The parameter is annotated list[float] and the return is annotated float. You call average([2, 4]), passing two ints. What prints?",
+  "options": [
+    {
+      "label": "3, an int, since both inputs were ints and the division comes out even",
+      "feedback": "Tempting, because Python normally keeps int arithmetic in ints and 6 divided by 2 is exact. But / is true division: it returns a float every time, even when it divides evenly, so you get 3.0."
+    },
+    {
+      "label": "3.0, and a type checker is happy with the int list as well",
+      "correct": true,
+      "feedback": "Right. True division always yields a float, so the -> float hint is honest, and checkers accept an int wherever a float is wanted. Passing ints to a float parameter is normal, not a bug."
+    },
+    {
+      "label": "A TypeError, because the list holds ints and the hint asked for floats",
+      "feedback": "Tempting if you are still half expecting the hint to do work at runtime. It does none at all. And even a static checker allows this one, because int is accepted anywhere float is wanted."
+    }
+  ]
+}
 \`\`\`
 
 \`values: list[float]\` annotates the parameter; \`-> float\` annotates the return. \`sum(values) / len(values)\` is always a \`float\` because \`/\` is true division, so the return hint is honest. (Passing \`[2, 4]\`, which are \`int\`, still type-checks: a checker treats \`int\` as an acceptable \`float\`.)
@@ -1090,10 +1142,77 @@ Hints behave identically when code spans files. In the \`stats\` package, \`stat
 
 ### Pitfalls
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "round-half-to-even",
+  "prompt": "At a Python prompt you type round(2.5) and then round(3.5). What comes back?",
+  "options": [
+    {
+      "label": "3 and 4. A half always rounds up, the way you were taught in school.",
+      "feedback": "Tempting, because that is the rule almost everyone learned and it is what several other languages do. Python sends an exact tie to the nearest even digit instead, so 2.5 goes down to 2 while 3.5 goes up to 4."
+    },
+    {
+      "label": "2 and 4. An exact tie goes to the nearest even digit.",
+      "correct": true,
+      "feedback": "Right. This is banker's rounding, and it exists so that rounding a long column of numbers does not drift upward. It only ever applies to an exact tie."
+    },
+    {
+      "label": "2 and 3. A trailing .5 is dropped, so the value truncates toward zero.",
+      "feedback": "Half the answer, and 2.5 really does give 2, which makes this feel confirmed. But it is not truncation: 3.5 gives 4. The rule is 'land on the even digit', not 'always go down'."
+    }
+  ]
+}
+\`\`\`
+
 - **Hints are not runtime validation.** If you need to reject bad input at runtime, you still write an explicit check or reach for a validator like \`pydantic\`. \`-> float\` guarantees nothing on its own.
 - **\`round\` on floats can surprise you.** Two separate effects combine. First, \`round\` breaks exact ties to the nearest even digit, so \`round(2.5)\` is \`2\`, not \`3\`. Second, most decimals are not exactly representable: \`2.675\` is stored as \`2.67499...\`, so \`round(2.675, 2)\` returns \`2.67\`, not \`2.68\`, because the stored value is already below the tie. Expect small surprises when the Practice \`round2\` helper trims a mean to 2 decimals.
 
-**Interview nuance:** the interpreter ignores type hints at runtime. They are stored in a function's \`__annotations__\` and read only by tools and libraries that opt in (checkers, editors, \`@dataclass\`, \`pydantic\`); the interpreter itself does zero type checking. So typed Python buys a build-time guarantee, not a runtime one, which is exactly why teams pair hints with \`mypy\` in CI rather than trusting them at the call site.`,
+**Interview nuance:** the interpreter ignores type hints at runtime. They are stored in a function's \`__annotations__\` and read only by tools and libraries that opt in (checkers, editors, \`@dataclass\`, \`pydantic\`); the interpreter itself does zero type checking. So typed Python buys a build-time guarantee, not a runtime one, which is exactly why teams pair hints with \`mypy\` in CI rather than trusting them at the call site.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "who-reads-annotations",
+  "prompt": "Sort each of these by whether it actually reads the type hints you wrote.",
+  "buckets": ["Reads your hints", "Ignores them completely"],
+  "items": [
+    {
+      "label": "mypy running as a CI step",
+      "bucket": "Reads your hints",
+      "feedback": "This is the one that buys you safety. It reads every annotation and fails the build before the code ships."
+    },
+    {
+      "label": "The interpreter executing a function call",
+      "bucket": "Ignores them completely",
+      "feedback": "The single most important row. Python stashes the annotations in the function's __annotations__ dict and never consults them again."
+    },
+    {
+      "label": "Your editor's autocomplete and red squiggles",
+      "bucket": "Reads your hints",
+      "feedback": "The fastest feedback of the three tools, though it only covers the file you have open, which is why CI still matters."
+    },
+    {
+      "label": "@dataclass generating __init__ for a class",
+      "bucket": "Reads your hints",
+      "feedback": "dataclass is a library that opts in: it walks the class annotations to decide which fields exist and in what order they are passed."
+    },
+    {
+      "label": "pydantic validating an incoming API payload",
+      "bucket": "Reads your hints",
+      "feedback": "pydantic reads the annotations and genuinely enforces them at runtime, which is why typed pydantic code feels like Python is checking types. It is pydantic doing it, not Python."
+    },
+    {
+      "label": "The + operator deciding how to add two values",
+      "bucket": "Ignores them completely",
+      "feedback": "Operators dispatch on the objects' real runtime types. No annotation ever changes which code path an operator takes."
+    }
+  ],
+  "reveal": "The split never changes: hints are data that opted-in tools read, and the interpreter only records them. That is the whole reason typed Python needs a checker in CI to buy anything at all."
+}
+\`\`\``,
     demoCode: `def average(values: list[float]) -> float:
     if not values:
         return 0.0
