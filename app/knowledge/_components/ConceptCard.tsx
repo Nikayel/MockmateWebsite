@@ -2,16 +2,10 @@
 
 import { useState } from "react"
 import { ChevronDown, ChevronRight } from "lucide-react"
+import { memoryBandFor } from "@/lib/spaced-repetition/algorithm-router"
+import { memoryColorClass } from "@/lib/ui/memory-colors"
 import type { CardBelief, ConceptBelief } from "@/lib/learner-model/types"
 import { CardBeliefRow } from "./CardBeliefRow"
-
-/** Bar colors follow the PatternMastery thresholds. */
-function barColor(value: number): string {
-  if (value >= 80) return "bg-emerald-400"
-  if (value >= 60) return "bg-amber-400"
-  if (value >= 40) return "bg-orange-400"
-  return "bg-rose-400"
-}
 
 interface ConceptCardProps {
   concept: ConceptBelief
@@ -87,7 +81,10 @@ export function ConceptCard({
             <div className="text-foreground mb-1 text-right text-sm font-medium">{mean}%</div>
             <div className="bg-muted h-1 overflow-hidden rounded-full">
               <div
-                className={`h-full rounded-full ${barColor(mean)} transition-all duration-500`}
+                className={`h-full rounded-full transition-all duration-500 ${memoryColorClass(
+                  memoryBandFor(mean).urgency,
+                  "bar"
+                )}`}
                 style={{ width: `${mean}%` }}
               />
             </div>
