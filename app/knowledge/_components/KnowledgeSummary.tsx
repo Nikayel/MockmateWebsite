@@ -194,6 +194,18 @@ export function KnowledgeSummary({ model, now = Date.now() }: KnowledgeSummaryPr
               </Link>
             </li>
           ))}
+          {/* Without this, "7 problems are slipping" and "Review the 7" sat above
+              exactly three tiles — which reads as a rendering bug on a projector. */}
+          {atRisk.length > MAX_RISK_TILES && (
+            <li>
+              <Link
+                href="/practice"
+                className="border-border bg-background hover:border-accent/40 text-muted-foreground flex h-full items-center justify-center rounded-lg border p-3 text-sm transition-colors"
+              >
+                +{atRisk.length - MAX_RISK_TILES} more in Practice
+              </Link>
+            </li>
+          )}
         </ul>
       )}
     </section>
