@@ -49,7 +49,10 @@ export function BeliefBar({ value, reviewCount, ariaLabel, className }: BeliefBa
   const describedAs =
     ariaLabel ??
     (value === null
-      ? "No recall estimate yet: this card has not been reviewed."
+      ? // "not shown", not "not reviewed": this component cannot tell an unreviewed
+        // card from a masked one, so it must not assert either. Callers that know
+        // (CardBeliefRow does) pass the specific sentence via ariaLabel.
+        "No recall estimate shown for this card."
       : `Estimated ${displayRetention(value)}% chance of recall, from ${reviewCount ?? 0} review${
           reviewCount === 1 ? "" : "s"
         }.`)
