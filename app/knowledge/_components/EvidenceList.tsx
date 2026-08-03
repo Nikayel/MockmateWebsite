@@ -37,11 +37,30 @@ interface EvidenceListProps {
 }
 
 /**
+ * Whether this row records a prediction the model actually made.
+ *
+ * First reviews do not, and the stored data does not say so. Both write paths pass
+ * `predictedRetention: 0` for a first attempt (lib/learning-state.ts:679,
+ * spaced-repetition/complete/route.ts:341), and research-tracker.ts:105 then derives
+ * `retention_as_predicted = (0 >= 50) === actualRetention`. So a first attempt that
+ * PASSED is stored as the model having been wrong, and one that FAILED is stored as
+ * the model having been right — a fabricated verdict in both directions, on the row
+ * every card has.
+ *
+ * Excluding them here is the honest read of the data we have; storing null at the
+ * two write paths would be the durable fix, but it cannot repair existing rows, so
+ * this filter is needed either way.
+ */
+function isScoredPrediction(row: EvidenceRowView): boolean {
+  return !row.is_first_review && row.retention_as_predicted !== null
+}
+
+/**
  * How often the model's prediction matched the outcome, over the rows we have.
- * Returns null when no row recorded both, so the headline is never invented.
+ * Returns null when no row recorded a real call, so the headline is never invented.
  */
 export function calibrationOf(rows: EvidenceRowView[]): { hits: number; total: number } | null {
-  const judged = rows.filter((r) => r.retention_as_predicted !== null)
+  const judged = rows.filter(isScoredPrediction)
   if (judged.length === 0) return null
   return { hits: judged.filter((r) => r.retention_as_predicted).length, total: judged.length }
 }
@@ -98,13 +117,13 @@ export function EvidenceList({ loading, error, rows }: EvidenceListProps) {
           */}
           <caption className="text-foreground mb-2 text-left text-sm font-medium tabular-nums">
             {/*
-              Names its own denominator. calibrationOf counts only rows the scheduler
-              scored a prediction against, while the body renders every row, so a
-              card carrying legacy events (written before retention_as_predicted
-              existed, and showing "—" in Predicted and Outcome) gets a caption whose
-              total is smaller than the visible row count. Saying "the N it made a
-              call on" turns an unexplained mismatch into a stated fact — and the
-              rows it skipped are sitting right there, already marked.
+              Names its own denominator. calibrationOf counts only rows carrying a
+              real call, while the body renders every row, so the caption's total is
+              smaller than the visible row count whenever a card has a first review
+              (no prior belief to predict from) or a legacy event (written before
+              retention_as_predicted existed). Both show "—" in Predicted and
+              Outcome, so the excluded rows are already marked; saying "the N it made
+              a call on" turns an unexplained mismatch into a stated fact.
             */}
             {calibration
               ? `The model called ${calibration.hits} of the ${calibration.total} review${
@@ -114,7 +133,7 @@ export function EvidenceList({ loading, error, rows }: EvidenceListProps) {
             {calibration && calibration.total < rows.length ? (
               <span className="text-muted-foreground font-normal">
                 {" "}
-                The other {rows.length - calibration.total} predate its predictions.
+                The other {rows.length - calibration.total} had no prediction to score.
               </span>
             ) : null}
             <span className="sr-only">
@@ -180,13 +199,25 @@ export function EvidenceList({ loading, error, rows }: EvidenceListProps) {
                   <td className="py-1 pr-3 tabular-nums">
                     {/* Exact, not rounded-to-5: this column is a ledger of what the
                         model actually said going in; fuzzing the audit record would
-                        undercut the calibration claim in the caption. */}
-                    {row.predicted_retention === null
+                        undercut the calibration claim in the caption.
+
+                        A first review is an em-dash, not the stored 0%: the write
+                        path uses 0 as a placeholder for "no prior belief", and
+                        printing it claims the model predicted certain failure. */}
+                    {row.is_first_review || row.predicted_retention === null
                       ? "—"
                       : `${Math.round(row.predicted_retention)}%`}
                   </td>
                   <td className="py-1 pr-3 whitespace-nowrap">
-                    {row.actual_retention === null ? (
+                    {/* No verdict on a first review — there was no prediction to be
+                        right or wrong about, whatever the stored flag says. */}
+                    {row.is_first_review ? (
+                      row.actual_retention === null ? (
+                        "—"
+                      ) : (
+                        <span>{row.actual_retention ? "recalled" : "forgot"}</span>
+                      )
+                    ) : row.actual_retention === null ? (
                       "—"
                     ) : (
                       <span
