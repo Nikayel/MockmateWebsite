@@ -11,6 +11,8 @@
  * Pipelines & Reliability section: L8 Batch Pipelines & Orchestration, L9 Streaming & Change Data
  * Capture.
  * Compute & Operations section: L10 Distributed Compute & Data Operations.
+ * AI Era section: L11 Data Engineering for AI (its RAG modules are a deliberate placeholder, see
+ * the level's docstring).
  *
  * Levels 7 and up are authored per module under `level{N}/` and designed in
  * docs/data-engineering-curriculum/CURRICULUM-MAP.md. Which section a level renders under is
@@ -27,6 +29,7 @@ import { sqlLevel7 } from "./level7"
 import { sqlLevel8 } from "./level8"
 import { sqlLevel9 } from "./level9"
 import { sqlLevel10 } from "./level10"
+import { sqlLevel11 } from "./level11"
 
 export const SQL_LEVELS: SqlLevel[] = [
   sqlLevel1,
@@ -39,4 +42,5 @@ export const SQL_LEVELS: SqlLevel[] = [
   sqlLevel8,
   sqlLevel9,
   sqlLevel10,
+  sqlLevel11,
 ]
