@@ -693,6 +693,30 @@ export async function completeSessionWithMastery(
     }
   }
 
+  // Learner model: if this card had a pending challenge, THIS review is its
+  // verification — record whether the learner's dispute held up.
+  //
+  // This is the choke point both families /knowledge renders flow through: DSA via
+  // app/api/generate-feedback/route.ts and Case Labs via lib/labs/case-lab-mastery.ts.
+  // Without it, `resolveVerificationForReview` was reachable only from
+  // /api/spaced-repetition/complete, which only the SYSTEM DESIGN feedback path
+  // calls — so for every other card a challenge stayed "pending_verification"
+  // forever. The dialog promised "a quick verification review is scheduled — if
+  // you're right, the correction sticks" about a check nothing would ever perform,
+  // and the study's key dependent variable was silently never collected.
+  //
+  // Non-fatal and mirrors the shape at complete/route.ts: a failure here must never
+  // cost the user their completed session.
+  try {
+    const { resolveVerificationForReview } = await import("./learner-model/verification")
+    await resolveVerificationForReview(userId, sessionData.scenarioId, {
+      masteryScore: sessionData.masteryScore ?? sessionData.performanceScore,
+      reviewedAt: completedAt,
+    })
+  } catch (verificationError) {
+    console.error("[Learning State] Failed to resolve challenge verification:", verificationError)
+  }
+
   // Update longest streak
   await updateLongestStreak(userId)
 
