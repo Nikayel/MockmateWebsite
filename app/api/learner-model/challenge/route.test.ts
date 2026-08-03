@@ -21,6 +21,7 @@ const h = vi.hoisted(() => {
     requireTierForUser: vi.fn(),
     getFlag: vi.fn(),
     createChallenge: vi.fn(),
+    findPendingChallenge: vi.fn(() => Promise.resolve(null)),
     updateChallengeCorrection: vi.fn(() => Promise.resolve()),
     amendForChallenge: vi.fn(),
     logLearnerModelEvent: vi.fn(() => Promise.resolve()),
@@ -32,6 +33,7 @@ vi.mock("@/lib/quota-enforcement", () => ({ requireTierForUser: h.requireTierFor
 vi.mock("@/lib/feature-flags", () => ({ getFlag: h.getFlag }))
 vi.mock("@/lib/learner-model/challenges", () => ({
   createChallenge: h.createChallenge,
+  findPendingChallenge: h.findPendingChallenge,
   updateChallengeCorrection: h.updateChallengeCorrection,
   ChallengeError: h.MockChallengeError,
 }))
@@ -77,6 +79,9 @@ beforeEach(() => {
   h.requireTierForUser.mockReset()
   h.getFlag.mockReset()
   h.createChallenge.mockReset()
+  // Default: nothing pending, so the idempotency guard falls through.
+  h.findPendingChallenge.mockReset()
+  h.findPendingChallenge.mockResolvedValue(null)
   h.amendForChallenge.mockReset()
   h.updateChallengeCorrection.mockClear()
   h.logLearnerModelEvent.mockClear()
@@ -89,6 +94,33 @@ beforeEach(() => {
 })
 
 describe("POST /api/learner-model/challenge", () => {
+  it("does not apply a second correction while one is still pending", async () => {
+    // amendForChallenge re-rates from the card's CURRENT state and pulls a
+    // verification review, so it is not idempotent. The client disables Submit in
+    // flight, but a lost response sends the user round the retry path with the first
+    // challenge already recorded — and double-correcting a card is exactly the kind
+    // of unprincipled move this feature exists to disprove.
+    h.findPendingChallenge.mockResolvedValue(challenge)
+
+    const res = asStub(await POST(postRequest({ problem_id: "two-sum", reason: "typo" })))
+
+    expect(res.data.already_pending).toBe(true)
+    expect(res.data.challenge).toEqual(challenge)
+    // The three writes that must NOT happen twice.
+    expect(h.createChallenge).not.toHaveBeenCalled()
+    expect(h.amendForChallenge).not.toHaveBeenCalled()
+    expect(h.updateChallengeCorrection).not.toHaveBeenCalled()
+  })
+
+  it("checks for a pending challenge before recording a new one", async () => {
+    // Order matters: the guard is worthless if it runs after createChallenge.
+    await POST(postRequest({ problem_id: "two-sum", reason: "typo" }))
+    expect(h.findPendingChallenge).toHaveBeenCalledWith("u1", "two-sum")
+    expect(h.findPendingChallenge.mock.invocationCallOrder[0]).toBeLessThan(
+      h.createChallenge.mock.invocationCallOrder[0]
+    )
+  })
+
   it("records, amends, merges the correction, and logs both events", async () => {
     const res = asStub(await POST(postRequest({ problem_id: "two-sum", reason: "typo" })))
 
