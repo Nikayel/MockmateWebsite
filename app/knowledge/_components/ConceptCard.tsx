@@ -84,7 +84,7 @@ export function ConceptCard({
           // dangling aria-controls fails aria-valid-attr-value. aria-expanded alone
           // conveys the state until then.
           aria-controls={open ? `concept-rows-${concept.pattern}` : undefined}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded text-left"
+          className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 rounded text-left"
         >
           {/* One chevron that rotates, not two icons that swap. */}
           <ChevronRight
@@ -93,8 +93,18 @@ export function ConceptCard({
               open && "rotate-90"
             )}
           />
-          <h3 className="text-foreground truncate font-medium">{concept.label}</h3>
-          <span className="text-muted-foreground shrink-0 text-xs">
+          <h3 className="text-foreground min-w-0 truncate font-medium">{concept.label}</h3>
+          {/*
+            w-full below sm, matching the row actions: the counts were shrink-0 next
+            to a truncate'd h3, so the h3 (min-width 0, via overflow-hidden) absorbed
+            the whole deficit. At 360px "12 problems · 8 reviewed · 3 mastered" sets
+            wider than the space left, so the concept NAME collapsed to zero — no
+            ellipsis, just gone — and the counts still overran into the group
+            container's overflow-hidden. The accordion's own label lost to its
+            metadata on every mobile row. Dropping to a second line keeps both, and
+            puts the counts on the same rail as the risk strip below.
+          */}
+          <span className="text-muted-foreground w-full shrink-0 text-xs sm:w-auto">
             {concept.card_count} problem{concept.card_count === 1 ? "" : "s"}
             {/*
               Every statistic here is computed over reviewed cards only. Printing just
