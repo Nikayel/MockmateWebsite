@@ -29,7 +29,7 @@ import { ConceptCard } from "./_components/ConceptCard"
 import { KnowledgeSummary } from "./_components/KnowledgeSummary"
 import { BlackBoxNotice } from "./_components/BlackBoxNotice"
 import { EvidenceList, type EvidenceRowView } from "./_components/EvidenceList"
-import { ChallengeDialog } from "./_components/ChallengeDialog"
+import { ChallengeDialog, type CorrectionSummary } from "./_components/ChallengeDialog"
 
 interface ModelResponse {
   enabled: boolean
@@ -256,9 +256,18 @@ export default function KnowledgePage() {
         body: JSON.stringify({ problem_id: problemId, reason, details }),
       })
       if (!res.ok) throw new Error(`Request failed (${res.status})`)
-      const data = await res.json()
+      const data = (await res.json()) as {
+        challenge?: { correction?: CorrectionSummary | null }
+      }
+      // A 200 does not guarantee a correction: a challenge whose amendment failed
+      // is stored with correction: null. Returning that gave the dialog `null`,
+      // which re-rendered the untouched form — no error, no confirmation, spinner
+      // gone — so the flagship action failed silently. Treat it as the failure it
+      // is and let the dialog's catch say so.
+      const correction = data?.challenge?.correction
+      if (!correction) throw new Error("Challenge recorded without a correction")
       void fetchModel() // beliefs changed; refresh in the background
-      return data.challenge.correction
+      return correction
     },
     [getAuthToken, fetchModel]
   )
