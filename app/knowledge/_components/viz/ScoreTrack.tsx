@@ -24,12 +24,6 @@ const MIN_BAR_HEIGHT = 1.5
 interface ScoreTrackProps {
   /** Oldest to newest, matching how scores_history is appended. */
   scores: number[]
-  /**
-   * The card's true review count, which may exceed `scores.length`: the scheduler
-   * caps scores_history at the last ten. Without it the label would present a
-   * ten-item window as the complete record.
-   */
-  totalReviews?: number | null
   passingScore?: number
   className?: string
 }
@@ -55,24 +49,20 @@ export function describeTrend(scores: number[]): string {
 
 export function ScoreTrack({
   scores,
-  totalReviews,
   passingScore = SCORING.RETAINED_SCORE_THRESHOLD,
   className,
 }: ScoreTrackProps) {
   if (scores.length === 0) return null
 
-  const truncated = (totalReviews ?? scores.length) > scores.length
-
   const width = scores.length * (BAR_WIDTH + BAR_GAP) - BAR_GAP
   const lastIndex = scores.length - 1
 
-  // No count in the label: the visible "{n} reviews" span beside this chart already
-  // owns it, and a row was announcing the same number three times. But say so when
-  // this is a WINDOW — the scheduler keeps only the last ten scores, and presenting
-  // ten of twenty-five as the complete record is the page overstating its evidence.
-  const label =
-    `${truncated ? `Last ${scores.length} of ${totalReviews} scores` : "Scores"}` +
-    ` oldest to newest: ${scores.join(", ")}.${describeTrend(scores)}`
+  // No counts in the label. The visible span beside this chart already reads
+  // "25 reviews · last 10 shown", so stating the window here too — as the
+  // truncation fix briefly did — made a screen reader hear the same two numbers
+  // twice in adjacent nodes. This label carries only what the chart itself draws;
+  // CardBeliefRow owns both the count and the disclosure that it is a window.
+  const label = `Scores oldest to newest: ${scores.join(", ")}.${describeTrend(scores)}`
 
   return (
     <svg
