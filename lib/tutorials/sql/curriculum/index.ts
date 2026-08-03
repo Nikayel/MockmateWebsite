@@ -10,6 +10,7 @@
  * docs/sql-curriculum/cloud/PLAN.md), L7 Warehouses, Lakehouse & Dimensional Modeling.
  * Pipelines & Reliability section: L8 Batch Pipelines & Orchestration, L9 Streaming & Change Data
  * Capture.
+ * Compute & Operations section: L10 Distributed Compute & Data Operations.
  *
  * Levels 7 and up are authored per module under `level{N}/` and designed in
  * docs/data-engineering-curriculum/CURRICULUM-MAP.md. Which section a level renders under is
@@ -25,6 +26,7 @@ import { sqlLevel6 } from "./level6"
 import { sqlLevel7 } from "./level7"
 import { sqlLevel8 } from "./level8"
 import { sqlLevel9 } from "./level9"
+import { sqlLevel10 } from "./level10"
 
 export const SQL_LEVELS: SqlLevel[] = [
   sqlLevel1,
@@ -36,4 +38,5 @@ export const SQL_LEVELS: SqlLevel[] = [
   sqlLevel7,
   sqlLevel8,
   sqlLevel9,
+  sqlLevel10,
 ]
