@@ -34,7 +34,12 @@ const REASONS: Array<{ value: ChallengeReason; label: string; description: strin
   },
 ]
 
-interface CorrectionSummary {
+/**
+ * The client-side shape of a correction. Exported so the page can type the
+ * challenge response without importing lib/learner-model/challenges.ts, which
+ * pulls firebase-admin.
+ */
+export interface CorrectionSummary {
   type: "rerate" | "verification_pull_only"
   amendment_source: "event_snapshot" | "field_fallback" | "none"
   before: { stability: number | null }
