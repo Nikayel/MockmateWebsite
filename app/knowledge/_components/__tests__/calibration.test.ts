@@ -54,6 +54,36 @@ describe("calibrationOf", () => {
     ).toEqual({ hits: 1, total: 1 })
   })
 
+  it("never scores a first review — the model had no prior belief to predict from", () => {
+    // Both write paths pass predictedRetention: 0 for a first attempt, so
+    // research-tracker derives (0 >= 50) === actualRetention: a passed first attempt
+    // is stored as the model being WRONG, a failed one as the model being RIGHT.
+    // Counting either fabricates a verdict on the row every card has.
+    expect(
+      calibrationOf([
+        row({ event_id: "first", is_first_review: true, retention_as_predicted: false }),
+      ])
+    ).toBeNull()
+
+    expect(
+      calibrationOf([
+        row({ event_id: "first", is_first_review: true, retention_as_predicted: false }),
+        row({ event_id: "real", retention_as_predicted: true }),
+      ])
+    ).toEqual({ hits: 1, total: 1 })
+  })
+
+  it("does not credit a failed first attempt either", () => {
+    // The bug ran both ways: a failed first attempt stored retention_as_predicted
+    // true, which would have inflated the hit rate.
+    expect(
+      calibrationOf([
+        row({ event_id: "first", is_first_review: true, retention_as_predicted: true }),
+        row({ event_id: "real", retention_as_predicted: false }),
+      ])
+    ).toEqual({ hits: 0, total: 1 })
+  })
+
   it("can report a perfect miss rate", () => {
     // The headline has to be able to say something unflattering, or it is marketing.
     expect(calibrationOf([row({ retention_as_predicted: false })])).toEqual({
