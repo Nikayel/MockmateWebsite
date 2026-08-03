@@ -1055,7 +1055,7 @@ LIMIT 1;`,
 
 export const level9Module2: SqlModule = {
   id: "de-l9-change-data-capture",
-  title: "Change Data Capture",
+  title: "Module 9.2: Change Data Capture",
   description:
     "Debezium-shaped change events as a changelog table, and the discipline of applying one to a warehouse: log-order apply with upserts and tombstones, lsn-bounded checkpoints, and choosing where dedup lives, graded by running the script twice.",
   lessons: [changelogAnatomy, orderingGuarantees, dedupAtRead],

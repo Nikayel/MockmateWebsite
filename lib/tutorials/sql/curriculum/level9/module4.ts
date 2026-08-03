@@ -645,7 +645,7 @@ ORDER BY avg_landed_age_minutes DESC;`,
 
 export const level9Module4: SqlModule = {
   id: "de-l9-batch-vs-streaming",
-  title: "Choosing Batch vs Streaming",
+  title: "Module 9.4: Choosing Batch vs Streaming",
   description:
     "The decision framework interviewers actually reward, then freshness measured as an SLA over run metadata, closing the level with an unscaffolded SLA report.",
   lessons: [batchVsStreamingDecision, freshnessSlas],
