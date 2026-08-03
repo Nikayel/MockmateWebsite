@@ -8,7 +8,11 @@ import { EyeOff } from "lucide-react"
  */
 export function BlackBoxNotice() {
   return (
-    <div className="border-border bg-card/30 mb-6 flex items-start gap-3 rounded-xl border p-4">
+    // Solid, like every other card on the page. bg-card/30 composites within
+    // ~1.03:1 of the page background in both themes — a border around nothing —
+    // and this notice escaped the surfaces sweep only because it was not in that
+    // directive's file list.
+    <div className="border-border bg-card mb-6 flex items-start gap-3 rounded-xl border p-4 shadow-sm">
       <EyeOff className="text-muted-foreground mt-0.5 h-5 w-5 shrink-0" />
       <div>
         <p className="text-foreground text-sm font-medium">
