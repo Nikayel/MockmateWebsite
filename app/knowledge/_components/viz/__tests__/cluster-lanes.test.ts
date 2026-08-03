@@ -135,3 +135,76 @@ describe("hit bands resolve to their own dot", () => {
     }
   })
 })
+
+/**
+ * The hit regions, resolved to pixels at real strip widths.
+ *
+ * Vertical lane tiling only ever separated a CLUSTER. Dots just outside
+ * CLUSTER_EPSILON shared a vertical band, and their fixed-width boxes still
+ * overlapped horizontally on a narrow strip — measured: at a ~264px mobile strip a
+ * gap of 3 to 4.5 points put a mark's centre inside its neighbour's box. Regions
+ * derived from the data cannot do that at any width, which is the whole point.
+ */
+const HIT_HALF = 12
+
+/** Resolve one region to px, mirroring the CSS max()/min() the component emits. */
+function regionPx(values: number[], i: number, width: number) {
+  const v = values[i]
+  const lo = i === 0 ? 0 : (values[i - 1] + v) / 2
+  const hi = i === values.length - 1 ? 100 : (v + values[i + 1]) / 2
+  const pct = (p: number) => (p / 100) * width
+  return {
+    left: Math.max(pct(lo), pct(v) - HIT_HALF),
+    right: Math.min(pct(hi), pct(v) + HIT_HALF),
+    markCentre: pct(v),
+  }
+}
+
+const WIDTHS = [264, 375, 420, 700, 918]
+
+describe("hit regions are exclusive at every width", () => {
+  const inputs: Array<[string, number[]]> = [
+    ["the residual mobile window (3-4.5 pts apart)", [50, 53, 57]],
+    ["a tight cluster", [50, 50.4, 50.8, 51.2]],
+    ["cluster beside a lone dot", [40, 40.5, 41, 80]],
+    ["two separate clusters", [20, 20.5, 60, 60.4, 60.8]],
+    ["extremes", [0, 50, 100]],
+    ["twelve dots", Array.from({ length: 12 }, (_, i) => 40 + i * 0.4)],
+  ]
+
+  for (const [name, values] of inputs) {
+    it(`never overlaps: ${name}`, () => {
+      for (const w of WIDTHS) {
+        const rs = values.map((_, i) => regionPx(values, i, w))
+        for (let i = 1; i < rs.length; i++) {
+          expect(rs[i].left, `${name} @${w}px`).toBeGreaterThanOrEqual(rs[i - 1].right - 1e-9)
+        }
+      }
+    })
+
+    it(`every mark falls in its OWN region: ${name}`, () => {
+      for (const w of WIDTHS) {
+        const rs = values.map((_, i) => regionPx(values, i, w))
+        rs.forEach((r, i) => {
+          expect(r.markCentre, `${name} dot ${i} @${w}px`).toBeGreaterThanOrEqual(r.left - 1e-9)
+          expect(r.markCentre, `${name} dot ${i} @${w}px`).toBeLessThanOrEqual(r.right + 1e-9)
+        })
+      }
+    })
+  }
+
+  it("never grows a region beyond the 24px target width", () => {
+    for (const w of WIDTHS) {
+      const r = regionPx([10, 50, 90], 1, w)
+      expect(r.right - r.left).toBeLessThanOrEqual(2 * HIT_HALF + 1e-9)
+    }
+  })
+
+  it("closes the exact case that beat the previous fix", () => {
+    // Two dots 3 points apart on the narrowest strip: not a cluster, so lane tiling
+    // does nothing, and the old fixed-width boxes overlapped.
+    const [a, b] = [regionPx([50, 53], 0, 264), regionPx([50, 53], 1, 264)]
+    expect(a.right).toBeLessThanOrEqual(b.left + 1e-9)
+    expect(b.markCentre).toBeGreaterThan(a.right)
+  })
+})
