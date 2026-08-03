@@ -2,6 +2,35 @@
 
 **Status: BINDING for the restructure + authoring waves. 2026-08-02.**
 
+## Shipped so far
+
+| Piece | State |
+| --- | --- |
+| Course restructure (id, routes, 308s, sections, branding) | shipped |
+| `RESEARCH.md`, `CURRICULUM-MAP.md` | shipped |
+| L7 Warehouses, Lakehouse & Dimensional Modeling (13 lessons) | shipped |
+| L8 Batch Pipelines & Orchestration (13 lessons) | shipped |
+| L9 Streaming & Change Data Capture (12 lessons) | shipped |
+| L10 Distributed Compute & Data Operations | in progress |
+| L11 Data Engineering for AI | queued |
+
+The course is at **102 lessons** with L7 to L9 registered (77 SQL + 25 new), heading for ~141.
+
+### What the reviewer waves keep catching
+
+Worth knowing before authoring the remaining levels, because it recurs in every single module:
+
+1. **Exercises a wrong answer still passes.** By far the most common defect. The verifier proves the
+   reference reproduces the expected set; it cannot prove a *different* query fails. Every module
+   needed seed rows added so each graded predicate is load-bearing (a partition the raw table can no
+   longer reproduce, a key the change batch never mentions, a row exactly on the window boundary).
+   Authors should write the adversarial cases themselves, not wait for review.
+2. **Confidently-stated wrong vendor facts**, usually in the lesson whose whole job is that vendor
+   (a misdefined Debezium tombstone, dbt's default materialization, BigQuery syntax that does not
+   exist). Anything not in `RESEARCH.md` needs checking before it ships.
+3. **Duplication with SQL L4/L5**, which already teach upsert mechanics, the watermark control
+   table, and write-audit-publish. New levels cite them and grade what they leave out.
+
 The "Learn SQL" course becomes the **Data Engineering** course. SQL stays as a section of it,
 and the course grows a hands-on Data Engineering arc (cloud, warehouses/lakehouse, pipelines,
 streaming, quality/cost, data for AI) to 100+ lessons. Everything stays browser-executable
