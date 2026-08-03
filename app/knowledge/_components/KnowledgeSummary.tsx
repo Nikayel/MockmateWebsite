@@ -197,7 +197,7 @@ export function KnowledgeSummary({ model, now = Date.now() }: KnowledgeSummaryPr
                   reviewCount={card.review_count}
                   urgency={card.memory?.urgency ?? null}
                   suppressed={(card.review_count ?? 0) < MIN_REVIEWS_FOR_VERDICT_HUE}
-                  size="md"
+                  size="lg"
                   ariaLabel={card.belief_text ?? undefined}
                 />
                 <span className="min-w-0">
