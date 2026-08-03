@@ -59,8 +59,11 @@ describe("daysUntilRetentionDrops", () => {
 
 describe("describeCardBelief", () => {
   it("mentions the chance and the forecast for a healthy card", () => {
+    // 72 -> 70: these sentences round through displayRetention, like every number
+    // the page renders. They used to use Math.round, so the sentence and the rail
+    // beside it stated two percentages for one estimate.
     const text = describeCardBelief(72, 4)
-    expect(text).toContain("~72%")
+    expect(text).toContain("~70%")
     expect(text).toContain("4 days")
   })
 
@@ -69,12 +72,21 @@ describe("describeCardBelief", () => {
     expect(text).toContain("~55%")
     expect(text).toContain("review")
   })
+
+  it("never states a percentage its own band word contradicts", () => {
+    // 88 is Good; plain nearest-5 would print ~90%, the Strong floor. The whole
+    // reason displayRetention exists — and the sentence must obey it too, because
+    // it is the belief bar's accessible name and the expanded panel's prose.
+    expect(describeCardBelief(88, 3)).toContain("~85%")
+    expect(describeCardBelief(68, 0)).toContain("~65%")
+  })
 })
 
 describe("describeConceptBelief", () => {
   it("summarizes healthy concepts without an at-risk clause", () => {
+    // 88 -> 85, band-corrected off the Strong floor (see displayRetention).
     const text = describeConceptBelief("Two Pointers", 88, 5, 0)
-    expect(text).toContain("~88%")
+    expect(text).toContain("~85%")
     expect(text).toContain("5 problems")
     expect(text).not.toContain("at risk")
   })
