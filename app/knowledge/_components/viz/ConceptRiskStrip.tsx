@@ -5,7 +5,7 @@ import {
   displayRetention,
   memoryBandFor,
 } from "@/lib/spaced-repetition/memory-bands"
-import { memoryColorClass } from "@/lib/ui/memory-colors"
+import { MIN_REVIEWS_FOR_VERDICT_HUE, memoryColorClass } from "@/lib/ui/memory-colors"
 import { cn } from "@/lib/utils"
 
 /**
@@ -26,6 +26,8 @@ export interface RiskStripCard {
   problem_id: string
   title: string
   retrievability: number | null
+  /** Drives VSUP suppression, exactly as the row below the strip does it. */
+  review_count: number | null
 }
 
 interface ConceptRiskStripProps {
@@ -192,7 +194,14 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
                 // marks reading as separate dots instead of one blob.
                 className={cn(
                   "ring-background block h-2.5 w-2.5 rounded-full ring-2 motion-safe:transition-transform motion-safe:hover:scale-125",
-                  memoryColorClass(urgency, "bar")
+                  // Suppressed on thin evidence, like every other mark. The dots were
+                  // the last `bar` consumer outside the rule, so a 1-review card drew
+                  // a full-commitment rose dot here and an orange belief bar in its
+                  // own row — two verdict hues for one estimate, on the mark the page
+                  // draws FIRST, before anything is expanded.
+                  memoryColorClass(urgency, "bar", {
+                    suppressed: (card.review_count ?? 0) < MIN_REVIEWS_FOR_VERDICT_HUE,
+                  })
                 )}
               />
             </button>
