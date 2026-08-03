@@ -1839,7 +1839,7 @@ The invariant across all of it is **idempotency per partition**: running the sam
 
 **Interview nuance:** the number one incremental bug is a non-idempotent append (an \`INSERT\` with no delete or upsert), which doubles rows on any retry. If your loader cannot survive being run twice, it is wrong. Lead with "delete-then-insert the partition, or upsert on the key".
 
-> **In the warehouse this differs.** This maps to dbt \`is_incremental()\` models, BigQuery and Hive \`INSERT OVERWRITE PARTITION\`, Delta \`replaceWhere\`, and Snowflake \`CREATE OR REPLACE TABLE ... SWAP WITH\` plus Streams offsets. Airflow passes the data interval as the partition to overwrite, and \`catchup=True\` triggers the backfill runs.`,
+> **In the warehouse this differs.** This maps to dbt \`is_incremental()\` models, Hive and Spark \`INSERT OVERWRITE PARTITION\`, Delta \`replaceWhere\`, BigQuery's WRITE_TRUNCATE load into a single partition (it has no \`INSERT OVERWRITE\` statement), and Snowflake \`CREATE OR REPLACE TABLE ... SWAP WITH\` plus Streams offsets. Airflow passes the data interval as the partition to overwrite, and \`catchup=True\` triggers the backfill runs.`,
     demoSeedSql: `CREATE TABLE source (id INTEGER, updated_at TEXT, amount INTEGER);
 INSERT INTO source VALUES
   (2, '2026-03-02 10:00', 200), (3, '2026-03-03 10:00', 300), (4, '2026-03-02 09:00', 250);
