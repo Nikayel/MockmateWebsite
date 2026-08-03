@@ -719,7 +719,13 @@ FinOps and DEA-C01 Domain 4 as audits you run in SQL: attribute spend, quantify 
 
 **Lesson count note:** 12 lessons, two over target. Module 11.3 pins three distinct graded funnels (hash dedup, PII scrubbing, acceptance-rate monitoring) that cannot share a device without collapsing the NeMo Curator arc, and module 11.2 adds the implication-35 similarity-query demystification as its own lesson because the store-choice lesson's decision-framework apply cannot also carry the top-k cosine device in a single-file expected set; every other module is at its natural minimum.
 
-### Module 11.1 - RAG Is a Data Pipeline (id: de-l11-rag-pipeline)
+> **PLACEHOLDER, NOT SHIPPED.** Modules 11.1 and 11.2 below are the RAG half of this level and are
+> deliberately not in the course. They are kept here as a design placeholder for a later decision,
+> not as work queued for an authoring wave. The rest of Level 11 (11.3 and 11.4) ships without them
+> and does not depend on them, and the interview research found no RAG or vector-store questions in
+> standard DE loops, so nothing interview-critical is missing. Do not author these without asking.
+
+### Module 11.1 - RAG Is a Data Pipeline (id: de-l11-rag-pipeline) [PLACEHOLDER]
 The offline RAG indexing path (ingest, parse, chunk, embed, store) taught as the ETL job it is, over simulated document, chunk, and embedding-run catalogs. Scaffolding fades from a fully guided opener to an unhinted dead-letter triage.
 
 #### de-l11-rag-indexing-is-etl - The RAG Indexing Pipeline Is ETL You Already Know [easy] [~26 min]
@@ -752,7 +758,7 @@ The offline RAG indexing path (ingest, parse, chunk, embed, store) taught as the
 - **Extra practice:** total spend per model (easy); runs where retry_count > 0 with their cost share of the ledger (hard).
 - **Interview rationale:** Arms the "LLMs as ETL primitives" reliability canon (Shopify-scale batch classification); the DLQ split question generalizes to every pipeline round.
 
-### Module 11.2 - Vector Stores & Retrieval Ops (id: de-l11-retrieval-ops)
+### Module 11.2 - Vector Stores & Retrieval Ops (id: de-l11-retrieval-ops) [PLACEHOLDER]
 Choosing and operating the vector sink: the pgvector-first decision framework, the similarity query itself demystified in plain SQL, the silent freshness failure, and incremental re-embedding as the idempotent pipeline L8 built the muscles for.
 
 #### de-l11-vector-store-choice - pgvector or a Managed Store: A Decision Framework [medium] [~27 min]

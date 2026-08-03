@@ -11,10 +11,22 @@
 | L7 Warehouses, Lakehouse & Dimensional Modeling (13 lessons) | shipped |
 | L8 Batch Pipelines & Orchestration (13 lessons) | shipped |
 | L9 Streaming & Change Data Capture (12 lessons) | shipped |
-| L10 Distributed Compute & Data Operations | in progress |
-| L11 Data Engineering for AI | queued |
+| L10 Distributed Compute & Data Operations (14 lessons) | shipped |
+| L11 Data Engineering for AI, non-RAG half | in progress |
+| L11 RAG modules | **deferred, placeholder only** |
 
 The course is at **102 lessons** with L7 to L9 registered (77 SQL + 25 new), heading for ~141.
+
+### RAG is deferred, on purpose
+
+Level 11 ships only its non-RAG half: data quality for AI (dedup, PII scrubbing, training-data
+filtering funnels) and the semantic layer, text-to-SQL evaluation, and what the DE role is becoming.
+
+The two RAG modules from the original map (11.1 "RAG Is a Data Pipeline" and 11.2 "Vector Stores and
+Retrieval Ops") are **not** in the course. They stay as a placeholder in `CURRICULUM-MAP.md` for a
+later decision. The research supports the call: the interview lens found zero RAG or vector-store
+questions across a 2,817-report corpus of standard DE loops, so this is forward-looking content
+rather than interview-core, and the rest of Level 11 stands on its own without it.
 
 ### What the reviewer waves keep catching
 
