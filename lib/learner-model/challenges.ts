@@ -81,33 +81,60 @@ function daysSince(iso: string | undefined, now: Date): number {
 }
 
 /**
- * An already-pending challenge for this card, if one exists.
+ * How long after a challenge a repeat submission is read as a RETRY of it rather
+ * than a new dispute. Covers a lost response and the user clicking again; anything
+ * later is a genuine second challenge.
+ */
+const RETRY_WINDOW_MS = 60_000
+
+/**
+ * A just-applied challenge for this card that a repeat request is retrying.
  *
  * Challenges are NOT idempotent: `amendForChallenge` re-rates from the card's
  * CURRENT state and pulls a verification review, so applying it twice corrects
  * twice. The client disables Submit while in flight, which stops a double-click,
  * but not the retry path — the request lands, the response is lost, the user sees
- * "Couldn't record your challenge. Please try again" and obliges. On the page whose
- * whole claim is that a correction is principled, silently double-applying one is
- * the wrong failure.
+ * "Couldn't record your challenge. Please try again" and obliges.
+ *
+ * Both bounds below are load-bearing, and the first version had NEITHER:
+ *
+ * - RECENCY. Keying on `status === "pending_verification"` alone assumes something
+ *   clears that status. Only `resolveVerificationForReview` does, and its sole
+ *   caller is /api/spaced-repetition/complete, which is reachable only from the
+ *   SYSTEM DESIGN feedback path — DSA reviews write mastery through a different
+ *   route entirely. So for the DSA cards this page is mostly made of, the first
+ *   challenge stays pending forever and an unbounded guard silently swallows every
+ *   later dispute: the flagship affordance would stop working after one use and
+ *   report success anyway. Strictly worse than the double-correction it prevents.
+ *
+ * - A COMPLETED correction. If `amendForChallenge` threw after `createChallenge`
+ *   wrote the doc, `correction` is still null. Returning that doc latches the card
+ *   into a state where every future challenge is a silent no-op AND no correction
+ *   was ever applied. Falling through instead lets the next attempt repair it.
  *
  * Three equality filters and no ordering, so Firestore serves it by merging
  * single-field indexes; `resolveVerificationForReview` already relies on the same
  * shape.
  */
-export async function findPendingChallenge(
+export async function findRetriedChallenge(
   userId: string,
-  problemId: string
+  problemId: string,
+  now: Date = new Date()
 ): Promise<ChallengeDoc | null> {
   const snapshot = await adminDb
     .collection("learner_model_challenges")
     .where("user_id", "==", userId)
     .where("problem_id", "==", problemId)
     .where("status", "==", "pending_verification")
-    .limit(1)
     .get()
 
-  return snapshot.empty ? null : (snapshot.docs[0].data() as ChallengeDoc)
+  for (const doc of snapshot.docs) {
+    const challenge = doc.data() as ChallengeDoc
+    if (challenge.correction === null) continue
+    const age = now.getTime() - Date.parse(challenge.created_at)
+    if (Number.isFinite(age) && age >= 0 && age < RETRY_WINDOW_MS) return challenge
+  }
+  return null
 }
 
 /** Load the mastery doc a challenge targets, or throw a typed 404. */
