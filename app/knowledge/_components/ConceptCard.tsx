@@ -86,14 +86,27 @@ export function ConceptCard({
           aria-controls={open ? `concept-rows-${concept.pattern}` : undefined}
           className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 rounded text-left"
         >
-          {/* One chevron that rotates, not two icons that swap. */}
-          <ChevronRight
-            className={cn(
-              "text-muted-foreground h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none",
-              open && "rotate-90"
-            )}
-          />
-          <h3 className="text-foreground min-w-0 truncate font-medium">{concept.label}</h3>
+          {/*
+            Chevron and title are ONE flex item, in a non-wrapping wrapper.
+            `truncate` sets white-space:nowrap, so the h3's hypothetical main size is
+            its full max-content width — and flexbox collects items into lines using
+            hypothetical sizes, BEFORE any shrinking. So a long label like "Dynamic
+            Programming (2D)" (~205px against ~174px available at 360px once the
+            at-risk chip is present) was pushed to line 2 rather than ellipsised,
+            leaving line 1 holding nothing but a lone 16px chevron. It fired
+            precisely on the at-risk concept the page auto-opens.
+            Nested, the pair is always collected onto line 1 and the h3 truncates.
+          */}
+          <span className="flex max-w-full min-w-0 items-center gap-2">
+            {/* One chevron that rotates, not two icons that swap. */}
+            <ChevronRight
+              className={cn(
+                "text-muted-foreground h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none",
+                open && "rotate-90"
+              )}
+            />
+            <h3 className="text-foreground min-w-0 truncate font-medium">{concept.label}</h3>
+          </span>
           {/*
             w-full below sm, matching the row actions: the counts were shrink-0 next
             to a truncate'd h3, so the h3 (min-width 0, via overflow-hidden) absorbed
