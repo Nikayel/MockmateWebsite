@@ -69,6 +69,8 @@ export default function KnowledgePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isPro, setIsPro] = useState<boolean | null>(null)
+  /** True when we could not determine entitlement — distinct from "not entitled". */
+  const [entitlementFailed, setEntitlementFailed] = useState(false)
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
   const [challengeCard, setChallengeCard] = useState<CardBelief | null>(null)
   const [evidence, setEvidence] = useState<EvidenceRowView[]>([])
@@ -126,29 +128,42 @@ export default function KnowledgePage() {
   }, [getAuthToken])
 
   // Subscription check (same pattern as /practice).
-  useEffect(() => {
-    const checkSubscription = async () => {
-      if (!user) return
-      try {
-        const token = await getAuthToken()
-        if (!token) return
-        const res = await fetch("/api/user/profile", {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (res.ok) {
-          const profile = await res.json()
-          setIsPro(
-            profile.subscription_tier === "pro" || profile.subscription_tier === "enterprise"
-          )
-        } else {
-          setIsPro(false)
-        }
-      } catch {
+  /**
+   * Entitlement check. Three outcomes, not two — the previous version collapsed
+   * "not Pro", "the check failed" and "no token" into isPro=false, so a 500 or a
+   * network blip rendered the Upgrade wall to a paying subscriber with no error and
+   * no retry, and a lapsed token left isPro null forever behind a permanent spinner.
+   * Fail closed on ACCESS, never on the explanation.
+   */
+  const checkSubscription = useCallback(async () => {
+    if (!user) return
+    setEntitlementFailed(false)
+    try {
+      const token = await getAuthToken()
+      if (!token) {
+        setEntitlementFailed(true)
         setIsPro(false)
+        return
       }
+      const res = await fetch("/api/user/profile", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        setEntitlementFailed(true)
+        setIsPro(false)
+        return
+      }
+      const profile = await res.json()
+      setIsPro(profile.subscription_tier === "pro" || profile.subscription_tier === "enterprise")
+    } catch {
+      setEntitlementFailed(true)
+      setIsPro(false)
     }
-    if (initialized && user) checkSubscription()
-  }, [user, initialized, getAuthToken])
+  }, [user, getAuthToken])
+
+  useEffect(() => {
+    if (initialized && user) void checkSubscription()
+  }, [initialized, user, checkSubscription])
 
   useEffect(() => {
     if (initialized && user && isPro) fetchModel()
@@ -260,6 +275,38 @@ export default function KnowledgePage() {
   if (!user) return null // redirecting
 
   // Upgrade prompt for non-Pro users
+  // Entitlement could not be determined. Access still fails closed — the page below
+  // does not render — but the user is told the check failed and given a retry,
+  // rather than being shown an upgrade pitch they may already have paid for.
+  if (entitlementFailed) {
+    return (
+      <div className="bg-background min-h-screen">
+        <Header />
+        <main className="container mx-auto px-4 pt-24 pb-16">
+          <div className="mx-auto max-w-lg text-center">
+            <h1 className="text-foreground mb-3 text-2xl font-bold">
+              Couldn&apos;t check your account
+            </h1>
+            <p className="text-muted-foreground mb-8">
+              We couldn&apos;t confirm your subscription just now, so this page is holding back.
+              Nothing has changed on your account.
+            </p>
+            <Button
+              onClick={() => {
+                setIsPro(null)
+                void checkSubscription()
+              }}
+              className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/20 dark:text-accent border"
+            >
+              Try again
+            </Button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
   if (!isPro) {
     return (
       <div className="bg-background min-h-screen">
