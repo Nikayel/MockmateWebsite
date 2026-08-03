@@ -44,7 +44,13 @@ function freshnessLabel(generatedAt: string, now: number): string | null {
 
 interface KnowledgeSummaryProps {
   model: LearnerModelPayload
-  /** Rendered at mount time by the page so the component stays pure. */
+  /**
+   * Injectable clock, for tests that need a fixed freshness string. The page does
+   * NOT pass it — the default reads the wall clock on each render, which is what we
+   * want here: freshness re-derives as the tab ages, and the component only ever
+   * mounts client-side after the fetch resolves, so there is no hydration mismatch
+   * to worry about. (The previous doc claimed the page supplied it. It never did.)
+   */
   now?: number
 }
 
