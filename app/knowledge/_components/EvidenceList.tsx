@@ -97,7 +97,14 @@ export function EvidenceList({ loading, error, rows }: EvidenceListProps) {
   return (
     // An indent rail, not a third nested border: the panel already sits inside an
     // expanded row inside a bordered group container.
-    <div className="border-border mt-2 border-l-2 pl-3 sm:pl-4">
+    //
+    // border-muted-foreground at 1px, not border-border at 2px. I widened it to 2px
+    // precisely so it would read, and the token defeated that: border-border is
+    // 1.29:1 light / 1.32:1 dark — below perceptual threshold, so the centrepiece
+    // panel had no visible containment at all. This is the same reference-mark ink
+    // the belief bar's track, the score track's pass line and the curve's threshold
+    // already use (5.55:1 light / 7.26:1 dark).
+    <div className="border-muted-foreground mt-2 border-l pl-3 sm:pl-4">
       {/* Keyboard-scrollable region: a bare overflow-x-auto div cannot take focus in
           Safari/Firefox, so the wide table was mouse-only. tabIndex on a
           non-interactive element is exactly the W3C scrollable-region pattern here —
@@ -179,7 +186,7 @@ export function EvidenceList({ loading, error, rows }: EvidenceListProps) {
               // as the first — inventing a failing grade.
               const score = row.mastery_score ?? row.score
               return (
-                <tr key={row.event_id} className="border-border/60 border-t">
+                <tr key={row.event_id} className="border-muted-foreground/30 border-t">
                   <td className="text-muted-foreground py-1 pr-3 whitespace-nowrap">
                     {new Date(row.timestamp).toLocaleDateString()}
                   </td>
