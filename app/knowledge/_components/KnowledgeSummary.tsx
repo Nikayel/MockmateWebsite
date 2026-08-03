@@ -113,10 +113,21 @@ export function KnowledgeSummary({ model, now = Date.now() }: KnowledgeSummaryPr
             Full token, no alpha: text-muted-foreground/80 measures 3.47:1 in light
             mode, under the AA 4.5:1 bar. Every alpha step of this token fails — see
             components/tutorials/__tests__/no-faded-text.test.ts for the arithmetic.
+
+            Condition-neutral wording under the mask. maskForBlackBox leaves
+            generated_at intact, and this line was ungated — so a control-condition
+            user read "Estimates refreshed just now. They decay as time passes."
+            directly under "Progress details are hidden for your account": it names
+            estimates that are nowhere on the page, and it hands the arm of the study
+            that exists to have the model WITHHELD an explanation of how the model
+            works. The control group gets a page to visit, not the open condition's
+            framing.
           */}
           {freshness && (
             <p className="text-muted-foreground mt-2 text-xs">
-              Estimates refreshed {freshness}. They decay as time passes.
+              {hasEstimates
+                ? `Estimates refreshed ${freshness}. They decay as time passes.`
+                : `Last updated ${freshness}.`}
             </p>
           )}
 
