@@ -7,6 +7,7 @@
  */
 
 import { calculateRetrievability } from "../spaced-repetition/fsrs-algorithm"
+import { displayRetention } from "../spaced-repetition/memory-bands"
 
 /** Below this recall probability we say memory is no longer "solid". */
 export const SOLID_RECALL_THRESHOLD = 0.9
@@ -62,7 +63,13 @@ function humanizeDays(days: number): string {
  * and that your recall will drop below solid ~in 4 days."
  */
 export function describeCardBelief(retrievability: number, daysUntilForgetting: number): string {
-  const chance = Math.round(retrievability)
+  // displayRetention, not Math.round: this sentence is the belief bar's accessible
+  // name and it renders visibly in the expanded panel, in both cases immediately
+  // beside the same estimate rendered through displayRetention. Rounding it
+  // differently made one row state two percentages for one estimate — usually 1-2
+  // points apart, but 7 at a band edge, which is exactly where a "~70%" beside the
+  // word "Weakening" was already fixed once.
+  const chance = displayRetention(retrievability)
   if (daysUntilForgetting <= 0) {
     return `The system estimates a ~${chance}% chance you could solve this cold today — below its solid-recall bar, which is why it wants a review.`
   }
@@ -76,7 +83,7 @@ export function describeConceptBelief(
   cardCount: number,
   atRiskCount: number
 ): string {
-  const mean = Math.round(meanRetrievability)
+  const mean = displayRetention(meanRetrievability)
   if (atRiskCount === 0) {
     return `Across ${cardCount} ${cardCount === 1 ? "problem" : "problems"}, the system believes your ${label} recall averages ~${mean}% right now.`
   }
