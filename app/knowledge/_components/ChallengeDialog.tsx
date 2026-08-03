@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { CheckCircle2, Loader2 } from "lucide-react"
 import {
   Dialog,
@@ -77,7 +77,38 @@ export function ChallengeDialog({ card, onClose, submitChallenge }: ChallengeDia
     optionRefs.current[next]?.focus()
   }
 
+  /**
+   * Which card the in-flight submission belongs to.
+   *
+   * This component is mounted permanently by the page and only its `card` prop
+   * toggles, so `result` and `error` survive across cards. Submit for card A, close
+   * the dialog mid-flight (Escape, overlay, X), then open card B: the resolution
+   * would land on the shared state and card B would show card A's success panel —
+   * "The model updated", a stability delta, a verification date — for a card that
+   * was never challenged. The failure path leaked the same way.
+   *
+   * Same monotonic-token defence the page already uses for the evidence fetch,
+   * applied to the flagship action instead of a side panel.
+   */
+  const inFlightFor = useRef<string | null>(null)
+
+  /**
+   * On success the form unmounts under the focused Submit button, so focus would
+   * otherwise fall to the body. Focus the RESULT REGION rather than the Done
+   * button: it already carries role="status", so landing there reads the outcome
+   * and Tab reaches Done from it.
+   *
+   * Moved off an `autoFocus` prop deliberately — Radix owns focus on dialog OPEN,
+   * and this is a mid-life content swap it does not handle. An effect keyed on
+   * `result` says which of the two moments it is and does not fight the other.
+   */
+  const resultRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (result) resultRef.current?.focus()
+  }, [result])
+
   const reset = () => {
+    inFlightFor.current = null
     setReason(null)
     setDetails("")
     setSubmitting(false)
@@ -92,14 +123,19 @@ export function ChallengeDialog({ card, onClose, submitChallenge }: ChallengeDia
 
   const handleSubmit = async () => {
     if (!card || !reason) return
+    const problemId = card.problem_id
+    inFlightFor.current = problemId
     setSubmitting(true)
     setError(null)
     try {
-      setResult(await submitChallenge(card.problem_id, reason, details.trim() || undefined))
+      const correction = await submitChallenge(problemId, reason, details.trim() || undefined)
+      if (inFlightFor.current !== problemId) return
+      setResult(correction)
     } catch {
+      if (inFlightFor.current !== problemId) return
       setError("Couldn't record your challenge. Please try again.")
     } finally {
-      setSubmitting(false)
+      if (inFlightFor.current === problemId) setSubmitting(false)
     }
   }
 
@@ -201,7 +237,7 @@ export function ChallengeDialog({ card, onClose, submitChallenge }: ChallengeDia
           // focused Submit button, so focus fell to the body and the outcome was
           // announced to nobody. The error path already uses role="alert"; the
           // flagship action should not be the silent one.
-          <div className="space-y-3" role="status">
+          <div className="space-y-3 outline-none" role="status" tabIndex={-1} ref={resultRef}>
             <div className="flex items-start gap-2">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-400" />
               <div className="text-sm">
@@ -225,7 +261,6 @@ export function ChallengeDialog({ card, onClose, submitChallenge }: ChallengeDia
             </div>
             <Button
               onClick={handleClose}
-              autoFocus
               className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/20 dark:text-accent w-full border"
             >
               Done
