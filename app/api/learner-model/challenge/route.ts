@@ -16,6 +16,7 @@ import { requireTierForUser } from "@/lib/quota-enforcement"
 import { getFlag } from "@/lib/feature-flags"
 import {
   createChallenge,
+  findPendingChallenge,
   updateChallengeCorrection,
   ChallengeError,
 } from "@/lib/learner-model/challenges"
@@ -57,6 +58,16 @@ export async function POST(request: NextRequest) {
     }
 
     const condition = getFlag("LEARNER_MODEL_BLACK_BOX", userId) ? "black_box" : "open"
+
+    // Idempotency guard. amendForChallenge re-rates from the card's CURRENT state
+    // and pulls a verification review, so a second application corrects twice. The
+    // client disables Submit in flight, but a lost response sends the user round the
+    // retry path with the first challenge already recorded. Return the pending one
+    // instead of stacking a second correction on top of it.
+    const pending = await findPendingChallenge(userId, parsed.data.problem_id)
+    if (pending) {
+      return NextResponse.json({ success: true, challenge: pending, already_pending: true })
+    }
 
     // Record the challenge (throws 403 in black-box, 404 for unknown cards).
     const { challenge, mastery } = await createChallenge(userId, parsed.data, condition)
