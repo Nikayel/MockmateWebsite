@@ -118,7 +118,14 @@ export function ConceptCard({
         cards={concept.cards}
         mean={concept.mean_retrievability}
         onSelectCard={selectCard}
-        className="mt-3 ml-6"
+        // pl-6, not ml-6: the strip's root is w-full, and width:100% plus a left
+        // MARGIN over-constrains a block box, so margin-right is dropped and the
+        // whole thing overflowed 24px to the right (CSS 2.1 §10.3.3) — the axis ran
+        // flush into the card border at sm+, and past it below sm, where the group
+        // container's overflow-hidden clipped the 100% end. Padding insets instead,
+        // because preflight sets box-sizing: border-box, so the strip finally sits
+        // on the same 24px rail as the chevron, the rows and the evidence panel.
+        className="mt-3 pl-6"
       />
 
       {open && (
