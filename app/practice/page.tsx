@@ -102,6 +102,8 @@ export default function PracticePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isPro, setIsPro] = useState<boolean | null>(null)
+  /** True when entitlement could not be determined — distinct from "not entitled". */
+  const [entitlementFailed, setEntitlementFailed] = useState(false)
   const [isDeferring, setIsDeferring] = useState(false)
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list")
   const [corrections, setCorrections] = useState<CorrectionTrace[]>([])
@@ -277,41 +279,56 @@ export default function PracticePage() {
     }
   }
 
-  // Check subscription
-  useEffect(() => {
-    const checkSubscription = async () => {
-      if (!user) return
+  /**
+   * Entitlement check. Three outcomes, not two.
+   *
+   * Collapsing "not Pro", "the check failed" and "no token" into isPro=false means a
+   * 500 or a network blip shows the Upgrade wall to a PAYING subscriber, with no
+   * error and no retry — and `if (!currentUser) return` leaves isPro null forever,
+   * so the loading gate never clears and the page is a permanent spinner.
+   *
+   * Fail closed on ACCESS, never on the explanation. Same fix as /knowledge.
+   */
+  const checkSubscription = useCallback(async () => {
+    if (!user) return
+    setEntitlementFailed(false)
 
-      try {
-        const { auth } = await import("@/lib/firebase")
-        const currentUser = auth.currentUser
-        if (!currentUser) return
-
-        const token = await currentUser.getIdToken()
-
-        const res = await fetch("/api/user/profile", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        if (res.ok) {
-          const profile = await res.json()
-          setIsPro(
-            profile.subscription_tier === "pro" || profile.subscription_tier === "enterprise"
-          )
-        } else {
-          setIsPro(false)
-        }
-      } catch {
+    try {
+      const { auth } = await import("@/lib/firebase")
+      const currentUser = auth.currentUser
+      if (!currentUser) {
+        setEntitlementFailed(true)
         setIsPro(false)
+        return
       }
-    }
 
-    if (initialized && user) {
-      checkSubscription()
+      const token = await currentUser.getIdToken()
+
+      const res = await fetch("/api/user/profile", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!res.ok) {
+        setEntitlementFailed(true)
+        setIsPro(false)
+        return
+      }
+
+      const profile = await res.json()
+      setIsPro(profile.subscription_tier === "pro" || profile.subscription_tier === "enterprise")
+    } catch {
+      setEntitlementFailed(true)
+      setIsPro(false)
     }
-  }, [user, initialized])
+  }, [user])
+
+  useEffect(() => {
+    if (initialized && user) {
+      void checkSubscription()
+    }
+  }, [user, initialized, checkSubscription])
 
   useEffect(() => {
     if (initialized && user && isPro) {
@@ -333,6 +350,38 @@ export default function PracticePage() {
     )
   }
 
+  // Entitlement could not be determined. Access still fails closed, but the user is
+  // told the check failed and given a retry instead of an upgrade pitch they may
+  // already have paid for.
+  if (entitlementFailed) {
+    return (
+      <div className="bg-background min-h-screen">
+        <Header />
+        <main className="container mx-auto px-4 pt-24 pb-16">
+          <div className="mx-auto max-w-lg text-center">
+            <h1 className="text-foreground mb-3 text-2xl font-bold">
+              Couldn&apos;t check your account
+            </h1>
+            <p className="text-muted-foreground mb-8">
+              We couldn&apos;t confirm your subscription just now, so this page is holding back.
+              Nothing has changed on your account.
+            </p>
+            <Button
+              onClick={() => {
+                setIsPro(null)
+                void checkSubscription()
+              }}
+              className="border-accent/40 bg-accent/10 text-accent-strong hover:bg-accent/20 dark:text-accent border"
+            >
+              Try again
+            </Button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
   // Upgrade prompt for non-Pro users
   if (!isPro) {
     return (
@@ -340,7 +389,10 @@ export default function PracticePage() {
         <Header />
         <main className="container mx-auto px-4 pt-24 pb-16">
           <div className="mx-auto max-w-lg text-center">
-            <div className="bg-muted mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full">
+            {/* bg-muted on bg-background is 1.03:1 light / 1.10:1 dark (where --muted
+                is the same hex as --card), so this badge did not render in either
+                theme and the lock glyph floated in space. */}
+            <div className="border-border bg-card mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border shadow-sm">
               <Lock className="text-muted-foreground h-8 w-8" />
             </div>
             <h1 className="text-foreground mb-3 text-2xl font-bold">Spaced Repetition Practice</h1>
