@@ -54,6 +54,10 @@ interface ConceptRiskStripProps {
 const MAX_LANE_OFFSET = 8
 /** Dots closer than this (in retrievability points) count as one cluster. */
 const CLUSTER_EPSILON = 3
+/** Hit-target height for a dot with no neighbours (WCAG 2.5.8). */
+const FULL_TARGET = 24
+/** The strip box; MAX_LANE_OFFSET either side of a FULL_TARGET-tall centre band. */
+const STRIP_HEIGHT = FULL_TARGET + 2 * MAX_LANE_OFFSET
 
 /**
  * Vertical offset per dot, given retrievabilities in ASCENDING order.
@@ -72,14 +76,25 @@ const CLUSTER_EPSILON = 3
  *
  * Exported for testing; no-two-share-an-offset is the property worth pinning.
  */
-export function clusterLanes(sortedValues: number[]): number[] {
-  const lanes = new Array<number>(sortedValues.length).fill(0)
+export interface DotLane {
+  /** Vertical offset of the mark from the strip's centre line, in px. */
+  lane: number
+  /**
+   * Height of this dot's hit band, in px — the spacing to its neighbours in the
+   * run, so bands TILE instead of overlapping. A lone dot gets the full target.
+   */
+  step: number
+}
+
+export function clusterLanes(sortedValues: number[]): DotLane[] {
+  const out: DotLane[] = sortedValues.map(() => ({ lane: 0, step: FULL_TARGET }))
   let start = 0
   const flush = (end: number) => {
     const length = end - start
     if (length > 1) {
+      const step = (2 * MAX_LANE_OFFSET) / (length - 1)
       for (let i = 0; i < length; i++) {
-        lanes[start + i] = -MAX_LANE_OFFSET + (2 * MAX_LANE_OFFSET * i) / (length - 1)
+        out[start + i] = { lane: -MAX_LANE_OFFSET + step * i, step }
       }
     }
     start = end
@@ -88,7 +103,7 @@ export function clusterLanes(sortedValues: number[]): number[] {
     if (sortedValues[i] - sortedValues[i - 1] >= CLUSTER_EPSILON) flush(i)
   }
   flush(sortedValues.length)
-  return lanes
+  return out
 }
 
 export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: ConceptRiskStripProps) {
@@ -110,11 +125,12 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
         container, a dot at 0% or 100% was sliced in half by its own -translate-x-1/2.
       */}
       <div
-        // h-10, not h-6: the 24px hit targets now carry the cluster lane themselves
-        // (±8px), so the box needs 24 + 16 = 40px for them to stay contained. The
-        // visible track below keeps its 16px height via inset-y-3, so nothing about
+        // STRIP_HEIGHT (40px), not 24: the hit bands carry the cluster lane
+        // themselves (±8px), so the box needs 24 + 16 for them to stay contained.
+        // The visible track keeps its 16px height via inset-y-3, so nothing about
         // the mark's appearance changes — only the transparent targets around it.
-        className="relative h-10"
+        className="relative"
+        style={{ height: STRIP_HEIGHT }}
         role="group"
         aria-label={`${scored.length} problem${scored.length === 1 ? "" : "s"} by recall estimate${
           mean !== null ? `, mean about ${Math.round(mean)} percent` : ""
@@ -166,26 +182,24 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
               aria-label={`${card.title}, about ${displayRetention(
                 card.retrievability
               )} percent, ${label}`}
-              // The button is the 24px hit target (WCAG 2.5.8); the span inside is the
-              // 10px mark. The clamp keeps an extreme value's mark on the track
-              // rather than past its end.
+              // Hit bands TILE; they do not overlap. Two earlier attempts failed the
+              // same way: offsetting only the 10px mark left every dot in a cluster
+              // sharing one box, and then offsetting the 24px button still left them
+              // overlapping by 16-20px, because the lanes only span 16px in total. In
+              // both, a mark's centre fell inside a NEIGHBOUR's box, so clicking a dot
+              // opened a different card's evidence — evidence attached to the wrong
+              // problem, the one failure this page cannot afford.
               //
-              // The lane moves the BUTTON, not just the mark. Offsetting only the
-              // mark left every dot in a cluster sharing one 24px box at the same
-              // top: with no z-index, paint order is DOM order — ascending
-              // retrievability — so the STRONGEST card painted last and swallowed
-              // every click over the shared area. A user saw two dots 16px apart,
-              // clicked the weaker one, and the stronger card's evidence opened:
-              // evidence attached to the wrong problem, which is the precise failure
-              // the page hardened its evidence fetch against.
-              //
-              // z-index descends with strength so a weaker dot overlapped by a
-              // stronger one stays hittable.
-              className="absolute flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full"
+              // Each band is exactly the spacing to its neighbours, centred on its own
+              // mark, so the point you aim at always resolves to the dot you see. A
+              // dot with no neighbours keeps the full 24px target; inside a dense run
+              // the band is shorter, which WCAG 2.5.8 permits under Essential —
+              // position IS the datum here and cannot be spaced out.
+              className="absolute flex w-6 -translate-x-1/2 items-center justify-center rounded-full"
               style={{
                 left: `clamp(12px, ${card.retrievability}%, calc(100% - 12px))`,
-                top: 8 + lanes[i],
-                zIndex: sorted.length - i,
+                top: STRIP_HEIGHT / 2 + lanes[i].lane - lanes[i].step / 2,
+                height: lanes[i].step,
               }}
             >
               <span
