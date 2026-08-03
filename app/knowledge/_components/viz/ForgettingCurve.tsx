@@ -34,6 +34,13 @@ interface ForgettingCurveProps {
   /** days_until_forgetting: when recall crosses the solid line. 0 means already past. */
   crossingDays?: number | null
   urgency?: MemoryUrgency | null
+  /**
+   * VSUP-lite, threaded from the row. Without it this was the ONLY `ink` consumer
+   * that never suppressed, so a thin-evidence card rendered a muted belief bar
+   * directly above a fully-committed coloured curve — two verdict hues for one
+   * estimate, 30px apart, in the panel that exists to show the model's reasoning.
+   */
+  suppressed?: boolean
   /** `spark` is the inline row size; `full` adds the axis labels and the threshold. */
   variant?: "spark" | "full"
   className?: string
@@ -44,6 +51,7 @@ export function ForgettingCurve({
   elapsedDays,
   crossingDays,
   urgency,
+  suppressed,
   variant = "spark",
   className,
 }: ForgettingCurveProps) {
@@ -101,7 +109,7 @@ export function ForgettingCurve({
       : (after ?? points[points.length - 1]).r
 
   return (
-    <figure className={cn("m-0", memoryColorClass(urgency, "ink"), className)}>
+    <figure className={cn("m-0", memoryColorClass(urgency, "ink", { suppressed }), className)}>
       {/* The now-dot anchors to this wrapper, not the figure: with a figcaption
           below, a figure-relative top percentage would land under the chart. */}
       <div className="relative">
