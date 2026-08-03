@@ -43,11 +43,11 @@ interface ConceptRiskStripProps {
  * NOT a lane list: the cycled-list versions this replaced are described in
  * `clusterLanes` below, along with why every one of them had a capacity.
  *
- * The extremes put a mark's centre at 4px and 20px, so the 10px mark plus its 2px
- * ring overhangs the button by ~3px at each end. Deliberate: neither the button nor
- * the h-6 group box clips, and mt-3 leaves 12px of clearance above. Keeping the mark
- * strictly inside would mean ±7 with no ring, which costs more cluster separation
- * than the overhang costs anything.
+ * The offset moves the 24px BUTTON, not just the mark inside it — otherwise every
+ * dot in a cluster shares one hit box and a click lands on whichever painted last.
+ * The group box is therefore 40px (24 + 2x8) so the targets stay contained, while
+ * the visible track keeps its 16px height via inset-y-3: mark centres land at
+ * 12..28px, exactly the track band, so nothing about the mark's appearance changes.
  */
 const MAX_LANE_OFFSET = 8
 /** Dots closer than this (in retrievability points) count as one cluster. */
@@ -108,7 +108,11 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
         container, a dot at 0% or 100% was sliced in half by its own -translate-x-1/2.
       */}
       <div
-        className="relative h-6"
+        // h-10, not h-6: the 24px hit targets now carry the cluster lane themselves
+        // (±8px), so the box needs 24 + 16 = 40px for them to stay contained. The
+        // visible track below keeps its 16px height via inset-y-3, so nothing about
+        // the mark's appearance changes — only the transparent targets around it.
+        className="relative h-10"
         role="group"
         aria-label={`${scored.length} problem${scored.length === 1 ? "" : "s"} by recall estimate${
           mean !== null ? `, mean about ${Math.round(mean)} percent` : ""
@@ -126,7 +130,7 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
             1.31:1 — the identical "axis does not exist" failure this ring was added
             to fix for light mode. foreground/10 + foreground/40 clears 3:1. */}
         <div
-          className="bg-muted/60 ring-muted-foreground dark:bg-foreground/10 dark:ring-foreground/40 absolute inset-x-0 inset-y-1 overflow-hidden rounded ring-1 ring-inset"
+          className="bg-muted/60 ring-muted-foreground dark:bg-foreground/10 dark:ring-foreground/40 absolute inset-x-0 inset-y-3 overflow-hidden rounded ring-1 ring-inset"
           aria-hidden="true"
         >
           {/* The at-risk zone, so a dot's position carries a verdict and not just a value. */}
@@ -161,10 +165,26 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
                 card.retrievability
               )} percent, ${label}`}
               // The button is the 24px hit target (WCAG 2.5.8); the span inside is the
-              // 10px mark. Cluster lanes move the mark, never the hit area. The clamp
-              // keeps an extreme value's mark on the track instead of past its end.
+              // 10px mark. The clamp keeps an extreme value's mark on the track
+              // rather than past its end.
+              //
+              // The lane moves the BUTTON, not just the mark. Offsetting only the
+              // mark left every dot in a cluster sharing one 24px box at the same
+              // top: with no z-index, paint order is DOM order — ascending
+              // retrievability — so the STRONGEST card painted last and swallowed
+              // every click over the shared area. A user saw two dots 16px apart,
+              // clicked the weaker one, and the stronger card's evidence opened:
+              // evidence attached to the wrong problem, which is the precise failure
+              // the page hardened its evidence fetch against.
+              //
+              // z-index descends with strength so a weaker dot overlapped by a
+              // stronger one stays hittable.
               className="absolute flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full"
-              style={{ left: `clamp(12px, ${card.retrievability}%, calc(100% - 12px))`, top: 0 }}
+              style={{
+                left: `clamp(12px, ${card.retrievability}%, calc(100% - 12px))`,
+                top: 8 + lanes[i],
+                zIndex: sorted.length - i,
+              }}
             >
               <span
                 aria-hidden="true"
@@ -174,7 +194,6 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
                   "ring-background block h-2.5 w-2.5 rounded-full ring-2 motion-safe:transition-transform motion-safe:hover:scale-125",
                   memoryColorClass(urgency, "bar")
                 )}
-                style={{ transform: `translateY(${lanes[i]}px)` }}
               />
             </button>
           )
