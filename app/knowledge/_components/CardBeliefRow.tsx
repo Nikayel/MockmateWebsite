@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { ArrowRight, ChevronDown, Flag } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { MIN_REVIEWS_FOR_VERDICT_HUE, memoryColorClass } from "@/lib/ui/memory-colors"
 import { displayRetention } from "@/lib/spaced-repetition/memory-bands"
 import type { CardBelief } from "@/lib/learner-model/types"
@@ -106,7 +105,7 @@ export function CardBeliefRow({
                 onClick={() => onExpandEvidence?.(card)}
                 aria-expanded={expanded}
                 aria-controls={expanded ? `evidence-${card.problem_id}` : undefined}
-                className="mt-1 shrink-0 cursor-help rounded"
+                className="mt-1 shrink-0 cursor-pointer rounded"
               >
                 {bar}
               </button>
@@ -148,7 +147,17 @@ export function CardBeliefRow({
               // focusable no-op with aria-expanded=false was a lie to assistive tech.
               <span className="text-foreground truncate text-sm font-medium">{card.title}</span>
             )}
-            <span className={`text-xs ${difficultyColorClass(card.difficulty, "textOnLight")}`}>
+            {/*
+              No hue. difficultyColorClass runs emerald/amber/red, which collides
+              with the recall ramp (emerald/amber/orange/rose) twelve pixels away:
+              "medium" printed the SAME amber as the "Good" band, and "hard" a red
+              indistinguishable from urgent rose at distance — so a row could show an
+              emerald bar beside a red word and read as self-contradiction. Hue is
+              reserved for the recall verdict; difficulty takes the page's own label
+              idiom, the 11px uppercase used by the group h2s, the summary dt's and
+              the evidence table headers.
+            */}
+            <span className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
               {card.difficulty}
             </span>
           </div>
