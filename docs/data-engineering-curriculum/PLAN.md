@@ -12,10 +12,15 @@
 | L8 Batch Pipelines & Orchestration (13 lessons) | shipped |
 | L9 Streaming & Change Data Capture (12 lessons) | shipped |
 | L10 Distributed Compute & Data Operations (14 lessons) | shipped |
-| L11 Data Engineering for AI, non-RAG half | in progress |
+| L11 Data Engineering for AI, non-RAG half (5 lessons) | shipped |
 | L11 RAG modules | **deferred, placeholder only** |
 
-The course is at **102 lessons** with L7 to L9 registered (77 SQL + 25 new), heading for ~141.
+**Done.** The course is **134 lessons across five sections, ~62 hours**. Full gate green: typecheck,
+lint, 485 SQL-curriculum assertions, and a production build that prerenders all 57 new lesson pages.
+Across the five authoring waves the reviewers raised **158 findings**, essentially all applied.
+
+Section totals: SQL 63, Cloud and Data Platforms 27, Pipelines and Reliability 25, Compute and
+Operations 14, AI Era 5.
 
 ### RAG is deferred, on purpose
 
