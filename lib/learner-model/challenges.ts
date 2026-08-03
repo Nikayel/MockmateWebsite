@@ -80,6 +80,36 @@ function daysSince(iso: string | undefined, now: Date): number {
   return Math.max(0, (now.getTime() - then) / (1000 * 60 * 60 * 24))
 }
 
+/**
+ * An already-pending challenge for this card, if one exists.
+ *
+ * Challenges are NOT idempotent: `amendForChallenge` re-rates from the card's
+ * CURRENT state and pulls a verification review, so applying it twice corrects
+ * twice. The client disables Submit while in flight, which stops a double-click,
+ * but not the retry path — the request lands, the response is lost, the user sees
+ * "Couldn't record your challenge. Please try again" and obliges. On the page whose
+ * whole claim is that a correction is principled, silently double-applying one is
+ * the wrong failure.
+ *
+ * Three equality filters and no ordering, so Firestore serves it by merging
+ * single-field indexes; `resolveVerificationForReview` already relies on the same
+ * shape.
+ */
+export async function findPendingChallenge(
+  userId: string,
+  problemId: string
+): Promise<ChallengeDoc | null> {
+  const snapshot = await adminDb
+    .collection("learner_model_challenges")
+    .where("user_id", "==", userId)
+    .where("problem_id", "==", problemId)
+    .where("status", "==", "pending_verification")
+    .limit(1)
+    .get()
+
+  return snapshot.empty ? null : (snapshot.docs[0].data() as ChallengeDoc)
+}
+
 /** Load the mastery doc a challenge targets, or throw a typed 404. */
 export async function loadMasteryForChallenge(
   userId: string,
