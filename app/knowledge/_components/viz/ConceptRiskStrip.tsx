@@ -201,7 +201,11 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
           />
           {mean !== null && (
             <div
-              className="bg-foreground/60 absolute inset-y-0 w-0.5"
+              // w-px at /45, not w-0.5 at /60: the mean was the HEAVIEST mark in the
+              // strip — 2px of near-black, twice the width of the rose band boundary
+              // that carries the actual verdict — for the aggregate this component's
+              // own doc calls "the wrong lead statistic".
+              className="bg-foreground/45 absolute inset-y-0 w-px"
               style={{ left: `min(${mean}%, calc(100% - 2px))` }}
               title={`Mean ${Math.round(mean)}%`}
             />
@@ -274,6 +278,7 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
         {sorted.length > 1 ? (
           <>
             Weakest: {weakest.title} (~{displayRetention(weakest.retrievability)}%)
+            {mean !== null ? ` · Mean ~${displayRetention(mean)}%` : ""}
           </>
         ) : (
           <>Only 1 reviewed problem so far.</>
