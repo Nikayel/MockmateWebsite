@@ -61,7 +61,24 @@ export function ForgettingCurve({
   if (maxT <= 0) return null
 
   const x = (t: number) => (t / maxT) * VIEW_W
-  const y = (r: number) => VIEW_H - (Math.min(100, Math.max(0, r)) / 100) * VIEW_H
+
+  /*
+    A DATA-DRIVEN y floor, not a fixed 0-100.
+    The sampled window runs to 1.6x the solid-recall crossing, and FSRS puts a
+    healthy card's whole curve in r=[100, 85.3] — 14.7 points. Mapped onto 0-100 in
+    a 96px frame that is 14px of travel crammed into the top 15%, so the past path,
+    the forecast, the threshold line and the now-dot all overlapped in one band and
+    the mechanism visual read as three parallel horizontal rules under a caption
+    asserting decay. Flat is its own overclaim, in the opposite direction.
+
+    The floor always sits below the threshold, so the crossing the caption talks
+    about is always in frame — and the caption states the floor, because a zoomed
+    axis nobody mentions is the oldest way to oversell a slope, and this page does
+    not get to do that.
+  */
+  const rFloor = Math.max(0, Math.min(SOLID_RECALL_PCT - 5, ...points.map((p) => p.r)) - 4)
+  const rSpan = 100 - rFloor
+  const y = (r: number) => VIEW_H - ((Math.min(100, Math.max(rFloor, r)) - rFloor) / rSpan) * VIEW_H
 
   const nowX = x(Math.min(elapsedDays, maxT))
   const solidY = y(SOLID_RECALL_PCT)
@@ -185,9 +202,11 @@ export function ForgettingCurve({
         />
       </div>
 
-      {full && crossingLabel && (
+      {full && (
         <figcaption className="text-muted-foreground mt-1 text-xs">
-          Dashed line is solid recall ({SOLID_RECALL_PCT}%). This card {crossingLabel}.
+          Dashed line is solid recall ({SOLID_RECALL_PCT}%)
+          {crossingLabel ? `. This card ${crossingLabel}` : ""}. Vertical axis starts at{" "}
+          {Math.round(rFloor)}%.
         </figcaption>
       )}
     </figure>
