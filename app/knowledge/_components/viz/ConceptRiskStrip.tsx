@@ -106,6 +106,41 @@ export function clusterLanes(sortedValues: number[]): DotLane[] {
   return out
 }
 
+/** Half the widest a hit region may be, in px — keeps a lone dot at a 24px target. */
+const HIT_HALF_WIDTH = 12
+
+export interface HitRegion {
+  /** CSS `left` for this dot's exclusive region. */
+  left: string
+  /** CSS `right` for this dot's exclusive region. */
+  right: string
+}
+
+/**
+ * One exclusive horizontal region per dot, given values in ASCENDING order.
+ *
+ * A 1-D Voronoi partition: each dot owns the space nearer to it than to either
+ * neighbour, capped at HIT_HALF_WIDTH px so clicking bare track does nothing.
+ *
+ * This is what finally ends a bug three fixes failed to close. Vertical lane
+ * tiling separates a CLUSTER (dots within CLUSTER_EPSILON), but dots just OUTSIDE
+ * that threshold share one vertical band and their fixed-width boxes still overlap
+ * horizontally on a narrow strip — at ~264px a gap of 3 to 4.5 points put a mark's
+ * centre inside its neighbour's box, and the later-painted (stronger) card took the
+ * click. Regions derived from the data cannot overlap at any width, so the mark you
+ * aim at always resolves to its own card.
+ */
+export function hitRegions(sortedValues: number[]): HitRegion[] {
+  return sortedValues.map((v, i) => {
+    const lo = i === 0 ? 0 : (sortedValues[i - 1] + v) / 2
+    const hi = i === sortedValues.length - 1 ? 100 : (v + sortedValues[i + 1]) / 2
+    return {
+      left: `max(${lo}%, calc(${v}% - ${HIT_HALF_WIDTH}px))`,
+      right: `calc(100% - min(${hi}%, calc(${v}% + ${HIT_HALF_WIDTH}px)))`,
+    }
+  })
+}
+
 export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: ConceptRiskStripProps) {
   const scored = cards.filter(
     (c): c is RiskStripCard & { retrievability: number } => c.retrievability !== null
@@ -115,7 +150,9 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
   const sorted = [...scored].sort((a, b) => a.retrievability - b.retrievability)
   const weakest = sorted[0]
 
-  const lanes = clusterLanes(sorted.map((c) => c.retrievability))
+  const values = sorted.map((c) => c.retrievability)
+  const lanes = clusterLanes(values)
+  const regions = hitRegions(values)
 
   return (
     <div className={cn("w-full", className)}>
@@ -171,8 +208,46 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
           )}
         </div>
 
+        {/*
+          MARKS — purely visual, pointer-events-none. Kept out of the buttons so a
+          mark's position never has to double as a hit target: that coupling is what
+          made three earlier fixes fail, because a mark could always end up inside a
+          neighbour's box.
+        */}
         {sorted.map((card, i) => {
-          const { urgency, label } = memoryBandFor(card.retrievability)
+          const { urgency } = memoryBandFor(card.retrievability)
+          return (
+            <span
+              key={`mark-${card.problem_id}`}
+              aria-hidden="true"
+              // The background ring is the 2px surface gap that keeps clustered
+              // marks reading as separate dots instead of one blob.
+              className={cn(
+                "ring-background pointer-events-none absolute block h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2",
+                // Suppressed on thin evidence, like every other mark. The dots were
+                // the last `bar` consumer outside the rule, so a 1-review card drew
+                // a full-commitment rose dot here and an orange belief bar in its
+                // own row — two verdict hues for one estimate, on the mark the page
+                // draws FIRST, before anything is expanded.
+                memoryColorClass(urgency, "bar", {
+                  suppressed: (card.review_count ?? 0) < MIN_REVIEWS_FOR_VERDICT_HUE,
+                })
+              )}
+              style={{
+                left: `clamp(${HIT_HALF_WIDTH}px, ${card.retrievability}%, calc(100% - ${HIT_HALF_WIDTH}px))`,
+                top: STRIP_HEIGHT / 2 + lanes[i].lane,
+              }}
+            />
+          )
+        })}
+
+        {/*
+          HIT REGIONS — one exclusive slice per dot, full strip height. Because the
+          slices come from the data (see hitRegions) they cannot overlap at any
+          viewport width, so the dot you aim at is always the card that opens.
+        */}
+        {sorted.map((card, i) => {
+          const { label } = memoryBandFor(card.retrievability)
           return (
             <button
               key={card.problem_id}
@@ -182,43 +257,9 @@ export function ConceptRiskStrip({ cards, mean, onSelectCard, className }: Conce
               aria-label={`${card.title}, about ${displayRetention(
                 card.retrievability
               )} percent, ${label}`}
-              // Hit bands TILE; they do not overlap. Two earlier attempts failed the
-              // same way: offsetting only the 10px mark left every dot in a cluster
-              // sharing one box, and then offsetting the 24px button still left them
-              // overlapping by 16-20px, because the lanes only span 16px in total. In
-              // both, a mark's centre fell inside a NEIGHBOUR's box, so clicking a dot
-              // opened a different card's evidence — evidence attached to the wrong
-              // problem, the one failure this page cannot afford.
-              //
-              // Each band is exactly the spacing to its neighbours, centred on its own
-              // mark, so the point you aim at always resolves to the dot you see. A
-              // dot with no neighbours keeps the full 24px target; inside a dense run
-              // the band is shorter, which WCAG 2.5.8 permits under Essential —
-              // position IS the datum here and cannot be spaced out.
-              className="absolute flex w-6 -translate-x-1/2 items-center justify-center rounded-full"
-              style={{
-                left: `clamp(12px, ${card.retrievability}%, calc(100% - 12px))`,
-                top: STRIP_HEIGHT / 2 + lanes[i].lane - lanes[i].step / 2,
-                height: lanes[i].step,
-              }}
-            >
-              <span
-                aria-hidden="true"
-                // The background ring is the 2px surface gap that keeps clustered
-                // marks reading as separate dots instead of one blob.
-                className={cn(
-                  "ring-background block h-2.5 w-2.5 rounded-full ring-2 motion-safe:transition-transform motion-safe:hover:scale-125",
-                  // Suppressed on thin evidence, like every other mark. The dots were
-                  // the last `bar` consumer outside the rule, so a 1-review card drew
-                  // a full-commitment rose dot here and an orange belief bar in its
-                  // own row — two verdict hues for one estimate, on the mark the page
-                  // draws FIRST, before anything is expanded.
-                  memoryColorClass(urgency, "bar", {
-                    suppressed: (card.review_count ?? 0) < MIN_REVIEWS_FOR_VERDICT_HUE,
-                  })
-                )}
-              />
-            </button>
+              className="absolute inset-y-0 rounded"
+              style={{ left: regions[i].left, right: regions[i].right }}
+            />
           )
         })}
       </div>
