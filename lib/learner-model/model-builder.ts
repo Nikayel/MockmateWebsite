@@ -241,6 +241,15 @@ export function maskForBlackBox(payload: LearnerModelPayload): LearnerModelPaylo
 
   const maskConcept = (concept: ConceptBelief): ConceptBelief => ({
     ...concept,
+    // Set EQUAL to card_count, not zeroed: the header only prints the "N reviewed"
+    // segment when reviewed_count < card_count, so this suppresses it, where zeroing
+    // would print "· 0 reviewed" — swapping a leak for a fresh false claim.
+    //
+    // It is the fifth member of this counter family and was the only survivor: added
+    // to the type after this mask was written, so a control-condition concept header
+    // read "12 problems · 5 reviewed" a few pixels under BlackBoxNotice saying
+    // "Progress details are hidden for your account".
+    reviewed_count: concept.card_count,
     mastered: 0,
     reviewing: 0,
     learning: 0,
