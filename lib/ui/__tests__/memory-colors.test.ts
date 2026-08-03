@@ -110,9 +110,30 @@ describe("memoryColorClass", () => {
     expect(memoryColorClass("urgent", "ink", { suppressed: true })).toContain("orange")
   })
 
-  it("suppression only touches ink — bars and chips keep the full ramp", () => {
-    expect(memoryColorClass("urgent", "bar", { suppressed: true })).toContain("rose")
+  it("suppresses filled marks the same way, so a card cannot show two hues", () => {
+    // The risk-strip dots use `bar` and were the last consumer outside the rule: a
+    // 1-review card drew a full-commitment rose dot above an orange belief bar in
+    // its own row. Same ramp as ink — positives mute, trouble stays warm.
+    expect(memoryColorClass("safe", "bar", { suppressed: true })).toContain("muted")
+    expect(memoryColorClass("ok", "bar", { suppressed: true })).toContain("muted")
+    expect(memoryColorClass("warning", "bar", { suppressed: true })).toContain("orange")
+    expect(memoryColorClass("urgent", "bar", { suppressed: true })).toContain("orange")
+  })
+
+  it("agrees between ink and bar, so one card's marks never disagree", () => {
+    // The invariant that matters: whatever hue family a suppressed mark picks, every
+    // suppressed mark for that urgency picks the same one.
+    for (const u of ["safe", "ok", "warning", "urgent"] as const) {
+      const ink = memoryColorClass(u, "ink", { suppressed: true }).replace(/text-/g, "")
+      const bar = memoryColorClass(u, "bar", { suppressed: true }).replace(/bg-/g, "")
+      expect(bar, u).toBe(ink)
+    }
+  })
+
+  it("leaves chips and unsuppressed marks on the full ramp", () => {
+    // Chips carry the band WORD, so the hue is redundant there and may stay committed.
     expect(memoryColorClass("urgent", "chip", { suppressed: true })).toContain("rose")
+    expect(memoryColorClass("urgent", "bar", { suppressed: false })).toContain("rose")
     expect(memoryColorClass("safe", "ink", { suppressed: false })).toContain("emerald")
   })
 
