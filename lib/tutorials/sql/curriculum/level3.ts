@@ -152,35 +152,10 @@ DROP TABLE IF EXISTS stg_order;
       "`status TEXT DEFAULT 'pending'`. String-literal defaults go in single quotes.",
       "Give every table `loaded_at TEXT DEFAULT (datetime('now'))`; the parentheses are required.",
     ],
-    referenceSolution: `DROP TABLE IF EXISTS stg_customer;
-DROP TABLE IF EXISTS stg_product;
-DROP TABLE IF EXISTS stg_order;
-
-CREATE TABLE stg_customer (
-    customer_id  INTEGER,
-    email        TEXT,
-    country_code TEXT,
-    signup_date  TEXT,
-    loaded_at    TEXT DEFAULT (datetime('now'))
-);
-
-CREATE TABLE stg_product (
-    product_id       INTEGER,
-    sku              TEXT,
-    name             TEXT,
-    category         TEXT,
-    unit_price_cents INTEGER DEFAULT 0,
-    loaded_at        TEXT DEFAULT (datetime('now'))
-);
-
-CREATE TABLE stg_order (
-    order_id    INTEGER,
-    customer_id INTEGER,
-    order_ts    TEXT,
-    status      TEXT DEFAULT 'pending',
-    total_cents INTEGER DEFAULT 0,
-    loaded_at   TEXT DEFAULT (datetime('now'))
-);`,
+    // No `referenceSolution`: Practice never renders a reveal control (only Apply and drills pass
+    // `canRevealReference`), so an answer key here would ride unused in the client bundle for anyone
+    // who opens devtools. Every other Practice in the curriculum already omits it; this one is the
+    // exception that `curriculum-conventions.test.ts` now prevents from coming back.
     seedSql: "",
     checkIdempotency: true,
     assertions: [
