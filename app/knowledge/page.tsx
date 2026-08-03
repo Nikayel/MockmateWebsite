@@ -426,7 +426,7 @@ export default function KnowledgePage() {
                 evidence table already use, so a structural label stops competing
                 with the summary's verdict line for weight.
               */}
-              <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+              <h2 className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
                 Patterns
               </h2>
               <div className="divide-border border-border bg-card divide-y overflow-hidden rounded-xl border shadow-sm">
@@ -447,7 +447,7 @@ export default function KnowledgePage() {
 
               {model.systems.length > 0 && (
                 <>
-                  <h2 className="text-muted-foreground pt-4 text-xs font-semibold tracking-wider uppercase">
+                  <h2 className="text-muted-foreground pt-4 text-[11px] font-medium tracking-wider uppercase">
                     Systems
                   </h2>
                   <div className="divide-border border-border bg-card divide-y overflow-hidden rounded-xl border shadow-sm">
