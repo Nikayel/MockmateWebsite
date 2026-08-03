@@ -56,6 +56,10 @@ export function CardBeliefRow({
   const scores = card.scores_history ?? []
   // The authoritative count. scores.length is only the retained window (last ten).
   const reviewCount = card.review_count ?? scores.length
+  // Hoisted: every mark in this row must agree about whether the evidence is thin
+  // enough to withhold the verdict hue. Computed per-mark, the bar and the curve
+  // drifted apart and rendered two colours for one estimate.
+  const suppressed = (card.review_count ?? 0) < MIN_REVIEWS_FOR_VERDICT_HUE
   const expandable = Boolean(onExpandEvidence)
 
   // Days since the last review, recomputed here rather than shipped, so an open tab
@@ -67,11 +71,7 @@ export function CardBeliefRow({
   const bar = (
     // The hue holds its verdict until the estimate has real evidence behind it —
     // "the model won't even commit to a color until it has three data points."
-    <span
-      className={memoryColorClass(card.memory?.urgency ?? null, "ink", {
-        suppressed: (card.review_count ?? 0) < MIN_REVIEWS_FOR_VERDICT_HUE,
-      })}
-    >
+    <span className={memoryColorClass(card.memory?.urgency ?? null, "ink", { suppressed })}>
       <BeliefBar
         value={card.retrievability}
         reviewCount={card.review_count}
@@ -233,6 +233,7 @@ export function CardBeliefRow({
               elapsedDays={elapsedDays}
               crossingDays={card.days_until_forgetting}
               urgency={card.memory?.urgency ?? null}
+              suppressed={suppressed}
               variant="full"
             />
           )}
