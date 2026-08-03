@@ -77,7 +77,14 @@ export function CardBeliefRow({
         reviewCount={card.review_count}
         // The belief sentence is the accessible text for the mark — the one place
         // the full explanation still appears verbatim for screen readers.
-        ariaLabel={card.belief_text ?? undefined}
+        //
+        // The fallback matters more than it looks: belief_text is non-null for EVERY
+        // open-condition card (even an unreviewed one gets "No reviews yet"), so the
+        // only way to reach it is the black-box mask — where BeliefBar's own default
+        // announced "this card has not been reviewed" about cards with a dozen
+        // reviews. That is the page's own rule (see evidenceErrorForStatus) broken in
+        // the accessible name: withheld by design is not a fact about the user.
+        ariaLabel={card.belief_text ?? "Recall estimate hidden for this account."}
       />
     </span>
   )
