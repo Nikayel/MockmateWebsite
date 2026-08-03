@@ -97,11 +97,26 @@ export function EvidenceList({ loading, error, rows }: EvidenceListProps) {
             visible, and announced with the table instead of orphaned above it.
           */}
           <caption className="text-foreground mb-2 text-left text-sm font-medium tabular-nums">
+            {/*
+              Names its own denominator. calibrationOf counts only rows the scheduler
+              scored a prediction against, while the body renders every row, so a
+              card carrying legacy events (written before retention_as_predicted
+              existed, and showing "—" in Predicted and Outcome) gets a caption whose
+              total is smaller than the visible row count. Saying "the N it made a
+              call on" turns an unexplained mismatch into a stated fact — and the
+              rows it skipped are sitting right there, already marked.
+            */}
             {calibration
-              ? `The model called ${calibration.hits} of your last ${calibration.total} review${
+              ? `The model called ${calibration.hits} of the ${calibration.total} review${
                   calibration.total === 1 ? "" : "s"
-                } correctly.`
+                } it made a call on correctly.`
               : null}
+            {calibration && calibration.total < rows.length ? (
+              <span className="text-muted-foreground font-normal">
+                {" "}
+                The other {rows.length - calibration.total} predate its predictions.
+              </span>
+            ) : null}
             <span className="sr-only">
               {" "}
               Review history, oldest first: score, prediction, outcome, interval.
