@@ -282,7 +282,6 @@ export default function KnowledgePage() {
 
   if (!user) return null // redirecting
 
-  // Upgrade prompt for non-Pro users
   // Entitlement could not be determined. Access still fails closed — the page below
   // does not render — but the user is told the check failed and given a retry,
   // rather than being shown an upgrade pitch they may already have paid for.
@@ -481,24 +480,35 @@ export default function KnowledgePage() {
                 evidence table already use, so a structural label stops competing
                 with the summary's verdict line for weight.
               */}
-              <h2 className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
-                Patterns
-              </h2>
-              <div className="divide-border border-border bg-card divide-y overflow-hidden rounded-xl border shadow-sm">
-                {model.concepts.map((concept) => (
-                  <ConceptCard
-                    key={concept.pattern}
-                    concept={concept}
-                    challengesEnabled={model.challenges_enabled}
-                    onChallenge={model.challenges_enabled ? setChallengeCard : undefined}
-                    onExpand={handleConceptExpand}
-                    onExpandEvidence={blackBox ? undefined : handleExpandEvidence}
-                    expandedCardId={expandedCardId}
-                    evidenceSlot={evidenceSlot}
-                    defaultOpen={concept.pattern === defaultOpenPattern}
-                  />
-                ))}
-              </div>
+              {/*
+                Guarded like the Systems block below it. buildLearnerModel routes
+                every case-lab card into `systems`, so a Pro user whose only tracked
+                work is Case Labs has concepts: [] with total_cards > 0 — which
+                passes the gate above and rendered the "Patterns" heading over a
+                childless bordered container: a full-width, ~2px-tall empty lozenge.
+              */}
+              {model.concepts.length > 0 && (
+                <>
+                  <h2 className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
+                    Patterns
+                  </h2>
+                  <div className="divide-border border-border bg-card divide-y overflow-hidden rounded-xl border shadow-sm">
+                    {model.concepts.map((concept) => (
+                      <ConceptCard
+                        key={concept.pattern}
+                        concept={concept}
+                        challengesEnabled={model.challenges_enabled}
+                        onChallenge={model.challenges_enabled ? setChallengeCard : undefined}
+                        onExpand={handleConceptExpand}
+                        onExpandEvidence={blackBox ? undefined : handleExpandEvidence}
+                        expandedCardId={expandedCardId}
+                        evidenceSlot={evidenceSlot}
+                        defaultOpen={concept.pattern === defaultOpenPattern}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
 
               {model.systems.length > 0 && (
                 <>
