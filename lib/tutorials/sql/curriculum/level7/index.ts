@@ -29,7 +29,7 @@ import { level7Module4 } from "./module4"
 export const sqlLevel7: SqlLevel = {
   id: 7,
   slug: "warehouses-lakehouse",
-  title: "Level 7 — Warehouses, Lakehouse & Dimensional Modeling",
+  title: "Level 7: Warehouses, Lakehouse & Dimensional Modeling",
   tagline:
     "Go inside the systems the lake feeds: how a warehouse places and prices your data, how to answer the dimensional modeling questions interviews actually ask, and how Iceberg turns files into transactional tables.",
   defaultExecutionMode: "single-file",

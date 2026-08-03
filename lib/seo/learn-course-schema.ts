@@ -16,6 +16,7 @@
  */
 import type { CourseSchemaInput } from "@/components/seo/JsonLd"
 import { listCourseEntries, listCourseLevels } from "@/lib/tutorials/course-catalog"
+import { levelSubject } from "@/lib/tutorials/level-title"
 import { LEARN_COURSE_LABEL, trackPath } from "@/lib/tutorials/lesson-routes"
 import type { CourseId } from "@/lib/tutorials/types"
 
@@ -31,11 +32,6 @@ const COURSE_DESCRIPTIONS: Record<CourseId, string> = {
     "Free interactive data engineering course in the browser: real queries against seeded tables, graded instantly, from SELECT basics through window functions to the cloud platform, file format, and pipeline patterns data engineering interviews test.",
   "system-design":
     "Free system design course: read each concept, then write your own design answer and compare it against a model answer, from the interview method to distributed systems and case studies.",
-}
-
-/** Strip the numbering prefix from a level title, e.g. "Level 5: Judging Code..." -> "Judging Code...". */
-function levelSubject(levelTitle: string): string {
-  return levelTitle.replace(/^Level\s+\d+\s*[:—-]\s*/i, "").trim()
 }
 
 /** Build the shared `Course` input for one Learn track, from the live corpus. */

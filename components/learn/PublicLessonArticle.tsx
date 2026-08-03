@@ -13,6 +13,7 @@ import {
   publicLessonPath,
   trackPath,
 } from "@/lib/tutorials/lesson-routes"
+import { levelLabel } from "@/lib/tutorials/level-title"
 import type { PublicExercisePreview, PublicLessonPreview } from "@/lib/tutorials/public-preview"
 import type { DifficultyLevel } from "@/lib/scenarios/types"
 
@@ -225,7 +226,7 @@ export function PublicLessonArticle({
 
             <div className="text-muted-foreground mt-4 flex flex-wrap items-center gap-2 text-xs">
               <span className="border-border bg-muted/40 rounded-full border px-2 py-0.5 font-medium">
-                Level {preview.levelId}: {preview.levelTitle}
+                {levelLabel(preview.levelId, preview.levelTitle)}
               </span>
               <span
                 className={`rounded-full border px-2 py-0.5 font-medium capitalize ${DIFFICULTY_CLASS[preview.difficulty]}`}
