@@ -320,7 +320,14 @@ export default function KnowledgePage() {
         <Header />
         <main className="container mx-auto px-4 pt-24 pb-16">
           <div className="mx-auto max-w-lg text-center">
-            <div className="bg-muted mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full">
+            {/*
+              bg-muted on bg-background is 1.03:1 in light (#f3f2ee on #f9f8f5) and
+              1.10:1 in dark, where --muted is the same hex as --card — so this 64px
+              badge did not render in either theme and the lock glyph floated in
+              space. It is the first screen a fresh demo account sees; it gets the
+              page's real surface chrome.
+            */}
+            <div className="border-border bg-card mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border shadow-sm">
               <Lock className="text-muted-foreground h-8 w-8" />
             </div>
             <h1 className="text-foreground mb-3 text-2xl font-bold">
@@ -416,10 +423,16 @@ export default function KnowledgePage() {
           {isLoading && (
             // Shaped like what actually arrives — a summary block then concept cards.
             // Three identical h-28 blocks guaranteed a layout shift on every load.
+            //
+            // Skeleton is bg-muted (components/ui/skeleton.tsx), which is 1.03:1 on
+            // this page's background in light and 1.10:1 in dark, so the load state
+            // was a blank page pulsing on nothing. Borrowing the card surface makes
+            // it visible; the heights are re-measured against what actually arrives
+            // (summary ~310px, a concept block ~136px) rather than guessed.
             <div className="space-y-4">
-              <Skeleton className="h-40 w-full rounded-xl" />
+              <Skeleton className="border-border bg-card h-56 w-full rounded-xl border" />
               {[0, 1, 2].map((i) => (
-                <Skeleton key={i} className="h-24 w-full rounded-xl" />
+                <Skeleton key={i} className="border-border bg-card h-36 w-full rounded-xl border" />
               ))}
             </div>
           )}
