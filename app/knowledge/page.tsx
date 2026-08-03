@@ -127,7 +127,6 @@ export default function KnowledgePage() {
     }
   }, [getAuthToken])
 
-  // Subscription check (same pattern as /practice).
   /**
    * Entitlement check. Three outcomes, not two — the previous version collapsed
    * "not Pro", "the check failed" and "no token" into isPro=false, so a 500 or a
