@@ -37,10 +37,17 @@ interface ConceptRiskStripProps {
 }
 
 /**
- * Vertical offsets (px) cycled through a run of coincident dots. Five lanes, not
- * three: with three, the 4th member of a cluster landed exactly on the 1st —
- * invisible, and its hit target fully occluded. All lanes keep the 10px mark inside
- * the 24px box (12±8 centers span 3-21px).
+ * Maximum vertical amplitude, in px, that `clusterLanes` spreads a run across —
+ * ±8 from the 24px button's 12px centre line.
+ *
+ * NOT a lane list: the cycled-list versions this replaced are described in
+ * `clusterLanes` below, along with why every one of them had a capacity.
+ *
+ * The extremes put a mark's centre at 4px and 20px, so the 10px mark plus its 2px
+ * ring overhangs the button by ~3px at each end. Deliberate: neither the button nor
+ * the h-6 group box clips, and mt-3 leaves 12px of clearance above. Keeping the mark
+ * strictly inside would mean ±7 with no ring, which costs more cluster separation
+ * than the overhang costs anything.
  */
 const MAX_LANE_OFFSET = 8
 /** Dots closer than this (in retrievability points) count as one cluster. */
