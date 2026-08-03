@@ -148,7 +148,7 @@ export function CardBeliefRow({
 
           {!noBelief && scores.length > 0 && (
             <div className="mt-1.5 flex items-center gap-2">
-              <ScoreTrack scores={scores} totalReviews={card.review_count} />
+              <ScoreTrack scores={scores} />
               {/*
                 The count comes from review_count, not scores.length: the scheduler
                 caps scores_history at the last ten while review_count keeps
