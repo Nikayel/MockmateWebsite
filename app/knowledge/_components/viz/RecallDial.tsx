@@ -24,14 +24,30 @@ const ARC_PATH = "M 9.393 30.607 A 15 15 0 1 1 30.607 30.607"
 
 const SIZE_CLASS = {
   sm: "h-7 w-7",
-  md: "h-10 w-10",
+  // 44px, not 40: the arc is r=15 stroke 4, leaving only 26px of clear width across
+  // the label's centre line, and "~65%" sets to ~28.8px at 11px — the tilde and the
+  // percent sign were sitting ON the stroke, in the page's hero row, at every value
+  // the tiles can show.
+  md: "h-11 w-11",
   lg: "h-16 w-16",
 } as const
 
 const LABEL_CLASS = {
   sm: "text-[9px]",
-  md: "text-[11px]",
+  md: "text-[10px]",
   lg: "text-base",
+} as const
+
+/**
+ * One step down when the label runs long. The tiles only ever render at-risk cards
+ * (<70%), so "~65%" is the widest string reachable today — but sizing on that
+ * coupling would break silently the first time a caller passes a high value, and
+ * "~100%" is otherwise 32px inside 28.6px of clearance.
+ */
+const LONG_LABEL_CLASS = {
+  sm: "text-[8px]",
+  md: "text-[9px]",
+  lg: "text-sm",
 } as const
 
 /**
@@ -175,7 +191,7 @@ export function RecallDial({
             // A bold foreground "--" read as a broken value; the null label is
             // muted and unemphasized, like the unknown it reports.
             value === null ? "text-muted-foreground font-normal" : "text-foreground font-medium",
-            LABEL_CLASS[size]
+            label.length > 4 ? LONG_LABEL_CLASS[size] : LABEL_CLASS[size]
           )}
         >
           {label}
