@@ -92,6 +92,19 @@ const SUPPRESSED_INK: Record<MemoryUrgency, string> = {
   urgent: "text-orange-600 dark:text-orange-500",
 }
 
+/**
+ * The same rule for filled marks. The risk-strip dots were the last `bar` consumer
+ * outside suppression, so a 1-review card drew a full-commitment rose dot on the
+ * strip above an orange belief bar in its own row — two verdict hues for one
+ * estimate, on the first mark the page draws.
+ */
+const SUPPRESSED_BAR: Record<MemoryUrgency, string> = {
+  safe: "bg-muted-foreground",
+  ok: "bg-muted-foreground",
+  warning: "bg-orange-600 dark:bg-orange-500",
+  urgent: "bg-orange-600 dark:bg-orange-500",
+}
+
 function isMemoryUrgency(value: string): value is MemoryUrgency {
   return value === "safe" || value === "ok" || value === "warning" || value === "urgent"
 }
@@ -108,5 +121,6 @@ export function memoryColorClass(
 ): string {
   if (!urgency || !isMemoryUrgency(urgency)) return FALLBACK[variant]
   if (opts?.suppressed && variant === "ink") return SUPPRESSED_INK[urgency]
+  if (opts?.suppressed && variant === "bar") return SUPPRESSED_BAR[urgency]
   return TABLE[variant][urgency]
 }
