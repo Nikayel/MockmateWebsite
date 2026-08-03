@@ -69,7 +69,7 @@ export function KnowledgeSummary({ model, now = Date.now() }: KnowledgeSummaryPr
   const hasEstimates = cards.some((c) => c.retrievability !== null)
 
   return (
-    <section className="border-border bg-card mb-6 rounded-xl border p-5 shadow-sm">
+    <section className="border-border bg-card mb-6 rounded-xl border p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           {hasEstimates ? (
