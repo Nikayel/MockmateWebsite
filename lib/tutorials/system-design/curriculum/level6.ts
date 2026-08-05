@@ -2200,6 +2200,29 @@ Reads and writes have opposite pressures. A product catalog might take 50 writes
 
 The write side, on committing a command, emits an event ("ProductPublished"). Projection handlers *consume* those events and update the read models. You can have *many* projections off one event stream: an Elasticsearch index for search, a Redis hash for the product detail page, a Postgres rollup for the admin dashboard, each a different shape for a different query. Handlers must be **idempotent** (processing the same event twice yields the same result), because at-least-once delivery will redeliver. Store the last processed event offset/version per projection so replays are safe.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "At-least-once delivery redelivers a ProductPublished event to your Elasticsearch projection handler. What two properties keep the read model correct?",
+  "options": [
+    {
+      "label": "The handler is idempotent, and it stores the last processed offset per projection so replays are safe",
+      "correct": true,
+      "feedback": "Right: redelivery is guaranteed eventually, so processing the same event twice must yield the same result, and the tracked offset makes deliberate replays safe too."
+    },
+    {
+      "label": "The broker guarantees exactly-once delivery to each projection",
+      "feedback": "The premise is at-least-once; the projection layer, not the broker, absorbs the duplicates."
+    },
+    {
+      "label": "The handler locks the write model's row while it updates the index",
+      "feedback": "Projections never touch the write model; coupling them would reintroduce the single-schema problem CQRS exists to split."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`csdiagram
 {
   "type": "topology",
@@ -2324,13 +2347,82 @@ The write side, on committing a command, emits an event ("ProductPublished"). Pr
 
 The projection updates *after* the write commits, so there is a lag (usually milliseconds, sometimes seconds under load). A user who edits a product and immediately reloads may see stale data. This breaks **read-your-writes** expectations. Fixes: (1) *client echo*, where the client optimistically shows its own just-submitted value without waiting for the read model; (2) *versioned reads*, where the write returns a version and the client polls/reads until the projection has caught up to that version; (3) route the user's own immediately-following read to the write model for a short window. Pick one and state it; hand-waving eventual consistency is a red flag.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A seller edits a product and instantly reloads the page, which reads the Elasticsearch projection. They see the old data. What broke, and which class of fix applies?",
+  "options": [
+    {
+      "label": "Read-your-writes broke because the projection lags the commit; fix with client echo, a versioned read, or briefly routing that user's read to the write model",
+      "correct": true,
+      "feedback": "Right: the projection updates after the commit, so you bridge that lag explicitly rather than hand-waving eventual consistency."
+    },
+    {
+      "label": "The write was lost, so the command pipeline needs retries",
+      "feedback": "The write committed fine; the read simply raced a projection that had not caught up yet."
+    },
+    {
+      "label": "The event stream delivered ProductPublished out of order",
+      "feedback": "Ordering is not the issue for a single edit; the read model is just milliseconds behind the write model."
+    }
+  ]
+}
+\`\`\`
+
 ## Rebuild superpower
 
 Because projections are derived and idempotent, you can drop a read model and **replay** the event log to rebuild it. That is how you add a new read model months later, fix a projection bug, or migrate the read store: reset the offset to 0 and reprocess. This is the strongest operational reason to adopt CQRS.
 
 **Interview nuance:** CQRS and event sourcing are *often taught together but are independent.* You can do CQRS with a plain CRUD write model that emits events (or that a change-data-capture stream like Debezium tails), no event store required. Coupling CQRS to full event sourcing "because they go together" doubles your complexity for no reason if you did not need the event log. Default to CQRS-with-CDC unless audit/temporal needs justify event sourcing too.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A team wants denormalized read models for a read-heavy catalog but has no audit or temporal requirement. What is the default architecture?",
+  "options": [
+    {
+      "label": "CQRS with a plain CRUD write model whose changes are tailed by a CDC stream like Debezium, with no event store",
+      "correct": true,
+      "feedback": "Right: CQRS and event sourcing are independent; adopting the event store without an audit or temporal need doubles complexity for nothing."
+    },
+    {
+      "label": "Full event sourcing, because CQRS requires an event log as the source of truth",
+      "feedback": "CQRS only needs events to feed projections; a CDC stream off a CRUD database provides those without making a log the source of truth."
+    },
+    {
+      "label": "Neither: denormalized reads can only be built by joining the write schema at query time",
+      "feedback": "Forcing one normalized schema to serve 500k reads per second is the exact pressure the pattern relieves."
+    }
+  ]
+}
+\`\`\`
+
 **Recap:** split commands (validated write model) from queries (denormalized projections built by idempotent event handlers), accept eventual consistency and handle read-your-writes explicitly, rebuild read models by replay, and do not drag in event sourcing unless you separately need it.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Six months after launch you need a brand-new admin dashboard rollup that never existed before. Using the CQRS machinery, how do you build it without touching the write model?",
+  "options": [
+    {
+      "label": "Write a new idempotent projection handler and replay the event stream from offset 0 until the rollup catches up",
+      "correct": true,
+      "feedback": "Right: rebuild-by-replay works because projections are derived and handlers are idempotent, which is the strongest operational reason to adopt CQRS."
+    },
+    {
+      "label": "Dual-write the rollup from the command handler going forward, backfilling by hand",
+      "feedback": "Dual-writes couple the write path to every read model and cannot recover history; replaying the stream gives you the backfill for free."
+    },
+    {
+      "label": "Query the write model's tables directly and cache the results",
+      "feedback": "That reintroduces the 8-table-join problem and skips the projection machinery that makes read models cheap and rebuildable."
+    }
+  ]
+}
+\`\`\`
 `.trim()
 
 const schemaEvolutionTeach = `
