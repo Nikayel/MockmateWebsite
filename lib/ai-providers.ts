@@ -18,7 +18,12 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai"
-import { GEMINI_MODELS } from "./ai/model-ids"
+import {
+  DEEPSEEK_MODELS,
+  GEMINI_MODELS,
+  OPENAI_MODELS,
+  type OpenAIReasoningEffort,
+} from "./ai/model-ids"
 import { generateCacheKey, getCachedResponse, setCachedResponse } from "./ai-cache"
 import { trackUsageEvent, calculateCost, PROVIDER_COSTS } from "./usage-tracking"
 import { recordGlobalSpend } from "./global-spend-guard"
@@ -33,7 +38,28 @@ import {
 import { logger } from "./logger"
 
 // Provider types
-export type AIProvider = "gemini" | "gemini-lite" | "deepseek" | "deepseek-chat" | "claude"
+//
+// The four `openai-*` entries are all GPT-5.6 Luna; the suffix is the REASONING
+// EFFORT, not a model tier. Effort is encoded in the provider identity for the
+// same reason `gemini-lite` is its own provider rather than a flag: FALLBACK_ORDER
+// stays the single routing authority, no call signature has to carry it, and the
+// usage events record which effort actually ran, so the admin tables can show what
+// `xhigh` costs against `none`.
+//
+// `deepseek` and `deepseek-chat` keep their historical names on purpose. They are
+// written into `ai_usage` events as the provider field, and `calculateCost` keys
+// off that, so renaming them would silently reprice every stored row. The models
+// behind them moved to V4 (see DEEPSEEK_MODELS); the names did not.
+export type AIProvider =
+  | "openai-none"
+  | "openai-low"
+  | "openai-high"
+  | "openai-xhigh"
+  | "gemini"
+  | "gemini-lite"
+  | "deepseek"
+  | "deepseek-chat"
+  | "claude"
 export type TaskComplexity = "simple" | "standard" | "complex" | "dialogue" | "code" | "critique"
 
 // Response structure
@@ -75,11 +101,88 @@ interface ProviderConfig {
   temperature: number
   costPer1kTokens: number // For cost tracking
   thinkingLevel?: "minimal" | "low" | "medium" | "high" // For Gemini 3.0 thinking mode
+  /**
+   * GPT-5.6 `reasoning_effort`. Always set explicitly on an OpenAI config: the
+   * API defaults to `medium` when omitted, which on a 20-turn interview is both
+   * slower and dearer than anything we would choose deliberately.
+   */
+  reasoningEffort?: OpenAIReasoningEffort
 }
 
-// Provider configurations - Updated Jan 2025 pricing
-// Strategy: Gemini 3.6 Flash for dialogue/complex, 3.5 Flash-Lite for simple, DeepSeek for critique
+/**
+ * Provider configurations.
+ *
+ * Strategy (2026-08-06): GPT-5.6 Luna is primary on every capability, varied by
+ * reasoning effort rather than by model tier, then DeepSeek V4, then Gemini.
+ *
+ * The reason quality is bought with effort instead of a bigger model is purely
+ * arithmetic. Reasoning tokens bill as OUTPUT tokens, so effort raises the token
+ * count while the rate stays Luna's $1.20/1M. Sol charges $30/1M output before it
+ * thinks at all. Luna at `xhigh` therefore lands well under Sol at the default
+ * effort, which is why Sol and Terra are pinned in model-ids but unused here.
+ *
+ * `costPer1kTokens` is a per-provider RATE and is identical across the four Luna
+ * entries — effort changes how many tokens come back, not what they cost each.
+ * The real spend difference shows up through the measured token counts.
+ */
+const OPENAI_BASE_URL = "https://api.openai.com/v1"
+
 const PROVIDERS: Record<AIProvider, ProviderConfig> = {
+  // --- OpenAI GPT-5.6 Luna, one entry per reasoning effort ---
+  "openai-none": {
+    name: "openai-none",
+    enabled: !!process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY,
+    baseUrl: OPENAI_BASE_URL,
+    model: OPENAI_MODELS.luna,
+    maxTokens: 1024,
+    temperature: 0.7,
+    // Hints, diagnosis, complexity analysis: short, mechanical, and on the
+    // user's critical path. Thinking here buys nothing and costs latency.
+    reasoningEffort: "none",
+    costPer1kTokens: 0.0007, // Luna: $0.20 in + $1.20 out per 1M
+  },
+  "openai-low": {
+    name: "openai-low",
+    enabled: !!process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY,
+    baseUrl: OPENAI_BASE_URL,
+    model: OPENAI_MODELS.luna,
+    maxTokens: 4096,
+    temperature: 0.7,
+    // The live interviewer runs ~20 turns per session. Reasoning tokens are
+    // dead air on a conversational path, so this is deliberately the floor that
+    // still reasons at all.
+    reasoningEffort: "low",
+    costPer1kTokens: 0.0007,
+  },
+  "openai-high": {
+    name: "openai-high",
+    enabled: !!process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY,
+    baseUrl: OPENAI_BASE_URL,
+    model: OPENAI_MODELS.luna,
+    maxTokens: 4096,
+    temperature: 0.7,
+    // Feedback generation: one call per session, the user is already waiting on
+    // a results screen, and the output is the most visible artefact we produce.
+    reasoningEffort: "high",
+    costPer1kTokens: 0.0007,
+  },
+  "openai-xhigh": {
+    name: "openai-xhigh",
+    enabled: !!process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY,
+    baseUrl: OPENAI_BASE_URL,
+    model: OPENAI_MODELS.luna,
+    maxTokens: 4096,
+    temperature: 0.7,
+    // The scoring path. A wrong answer here becomes a wrong score on a real
+    // user's session, so this is the one place we buy the most thinking
+    // available below a tier change.
+    reasoningEffort: "xhigh",
+    costPer1kTokens: 0.0007,
+  },
   gemini: {
     name: "gemini",
     enabled: true,
@@ -101,25 +204,28 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     temperature: 0.7,
     costPer1kTokens: 0.00025, // Averaged - very cheap
   },
+  // The V4 tier split finally makes these two entries mean something. Both
+  // pointed at the retired `deepseek-chat` before, so the quality distinction
+  // FALLBACK_ORDER already drew between them was decorative.
   deepseek: {
     name: "deepseek",
     enabled: !!process.env.DEEPSEEK_API_KEY,
     apiKey: process.env.DEEPSEEK_API_KEY,
     baseUrl: "https://api.deepseek.com/v1",
-    model: "deepseek-chat", // V3 model - $0.27/1M input, $1.10/1M output - fast chat fallback
-    maxTokens: 1024,
+    model: DEEPSEEK_MODELS.pro, // V4 Pro - $0.435/1M in, $0.87/1M out - the quality fallback
+    maxTokens: 4096,
     temperature: 0.7,
-    costPer1kTokens: 0.000685, // Averaged - cheaper than reasoner, good for chat
+    costPer1kTokens: 0.00065, // V4 Pro: $0.435 in + $0.87 out per 1M
   },
   "deepseek-chat": {
     name: "deepseek-chat",
     enabled: !!process.env.DEEPSEEK_API_KEY,
     apiKey: process.env.DEEPSEEK_API_KEY,
     baseUrl: "https://api.deepseek.com/v1",
-    model: "deepseek-chat", // V3 model - $0.27/1M input, $1.10/1M output - fast chat fallback
+    model: DEEPSEEK_MODELS.flash, // V4 Flash - $0.14/1M in, $0.28/1M out - the volume fallback
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0.000685, // Averaged - cheaper than reasoner, good for chat
+    costPer1kTokens: 0.00021, // V4 Flash: $0.14 in + $0.28 out per 1M
   },
   claude: {
     name: "claude",
@@ -133,16 +239,61 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
   },
 }
 
-// Fallback order based on task complexity
-// Gemini 3.0 Flash prioritized while free credits available ($300)
-// Flash is smart + fast, use it for everything except where Claude quality is critical
-const FALLBACK_ORDER: Record<TaskComplexity, AIProvider[]> = {
-  simple: ["gemini-lite", "gemini", "deepseek-chat", "claude"], // Chat, hints - cheapest (Flash Lite)
-  standard: ["gemini", "gemini-lite", "deepseek-chat", "claude"], // Interview interactions
-  complex: ["gemini", "claude", "deepseek"], // Feedback generation - Gemini 3.0 Flash is smart enough
-  dialogue: ["gemini", "claude", "deepseek-chat"], // Interviewer conversation - Gemini first now
-  code: ["gemini", "deepseek-chat", "claude"], // Code tasks - Gemini first (good at code)
-  critique: ["gemini", "claude", "deepseek"], // Constitutional AI - Gemini for better reasoning
+/**
+ * Fallback order per capability: OpenAI -> DeepSeek -> Gemini.
+ *
+ * The first entry chooses the REASONING EFFORT for that capability, since every
+ * `openai-*` provider is the same Luna model. Read the table as an effort dial:
+ *
+ *   simple    none    hints, diagnosis, complexity analysis
+ *   dialogue  low     the live interviewer, ~20 turns a session
+ *   code      low     code chat turns
+ *   standard  low     case-lab chat, conversation validation
+ *   complex   high    feedback generation, one call a session
+ *   critique  xhigh   constitutional AI, structured extraction, transcript analysis
+ *
+ * `critique` gets the most thinking because it is the scoring path: its output
+ * becomes a number attached to a real user's session. It stays on Luna rather
+ * than escalating to Terra or Sol on OpenAI's own guidance, which is to escalate
+ * measured failures instead of raising the tier for a whole workload. If a
+ * scoring regression pass ever shows it degrading, promoting just this row to a
+ * Terra-backed provider is a one-line change.
+ *
+ * The DeepSeek rung mirrors the same quality split: V4 Pro (`deepseek`) backs
+ * the two paths that produce scores, V4 Flash (`deepseek-chat`) backs the rest.
+ * Gemini is the third rung everywhere and stays pinned to the models that were
+ * latency-verified in the 2026-07-28 migration.
+ *
+ * Claude is deliberately absent. Three vendors is already a deeper chain than
+ * the outage history justifies, and it is kept configured only so a preferred
+ * provider override can still reach it.
+ */
+export const FALLBACK_ORDER: Record<TaskComplexity, AIProvider[]> = {
+  simple: ["openai-none", "deepseek-chat", "gemini-lite"],
+  standard: ["openai-low", "deepseek-chat", "gemini"],
+  complex: ["openai-high", "deepseek", "gemini"],
+  dialogue: ["openai-low", "deepseek-chat", "gemini"],
+  code: ["openai-low", "deepseek-chat", "gemini"],
+  critique: ["openai-xhigh", "deepseek", "gemini"],
+}
+
+/**
+ * Which environment variable enables each provider.
+ *
+ * Exhaustive by type rather than an if-chain: the previous version fell through
+ * to ANTHROPIC_API_KEY for anything it did not recognise, so a missing OpenAI key
+ * would have told the operator to go set the wrong one.
+ */
+const ENV_KEY_FOR_PROVIDER: Record<AIProvider, string> = {
+  "openai-none": "OPENAI_API_KEY",
+  "openai-low": "OPENAI_API_KEY",
+  "openai-high": "OPENAI_API_KEY",
+  "openai-xhigh": "OPENAI_API_KEY",
+  gemini: "GEMINI_API_KEY",
+  "gemini-lite": "GEMINI_API_KEY",
+  deepseek: "DEEPSEEK_API_KEY",
+  "deepseek-chat": "DEEPSEEK_API_KEY",
+  claude: "ANTHROPIC_API_KEY",
 }
 
 // Retry configuration
@@ -382,6 +533,120 @@ async function callDeepseek(
 }
 
 /**
+ * Call the OpenAI chat completions API.
+ *
+ * Shares the OpenAI-compatible wire format with `callDeepseek`, and differs in
+ * exactly two ways that matter:
+ *
+ * 1. `reasoning_effort` is sent explicitly. Omitting it means `medium`, which is
+ *    not a default we would pick on any of the six capabilities.
+ * 2. Reasoning tokens are billed as output but are NOT part of the returned
+ *    text, so `completion_tokens` (which includes them) is the only honest
+ *    output count. The 4-chars-per-token estimate that the legacy path falls
+ *    back to cannot see thinking at all and would understate `xhigh` badly,
+ *    which is the whole reason provider-reported usage is preferred downstream.
+ */
+async function callOpenAI(
+  systemPrompt: string,
+  userMessage: string,
+  history: Array<{ role: "user" | "model"; content: string }>,
+  config: ProviderConfig
+): Promise<ProviderCallResult> {
+  if (!config.apiKey) {
+    throw new Error("OpenAI API key is not configured")
+  }
+
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...history.map((msg) => ({
+      role: msg.role === "model" ? "assistant" : "user",
+      content: msg.content,
+    })),
+    { role: "user", content: userMessage },
+  ]
+
+  logger.debug("[OpenAI] Calling API", {
+    model: config.model,
+    effort: config.reasoningEffort,
+    messageCount: messages.length,
+  })
+
+  const response = await fetch(`${config.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: config.model,
+      messages,
+      max_completion_tokens: config.maxTokens,
+      temperature: config.temperature,
+      reasoning_effort: config.reasoningEffort,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    let errorData: any = {}
+    try {
+      errorData = JSON.parse(errorText)
+    } catch {
+      errorData = { error: { message: errorText } }
+    }
+
+    const errorMessage = errorData.error?.message || errorData.message || response.statusText
+    logger.error("[OpenAI] API error", {
+      status: response.status,
+      message: errorMessage,
+      model: config.model,
+      effort: config.reasoningEffort,
+    })
+
+    throw {
+      status: response.status,
+      message: `OpenAI API error: ${errorMessage}`,
+      originalError: errorData,
+    }
+  }
+
+  const data = await response.json()
+  const content = data.choices?.[0]?.message?.content || ""
+
+  if (!content) {
+    // A high-effort call that spends its whole budget on thinking returns an
+    // empty message with finish_reason "length". That is a real failure — fall
+    // through to the next provider rather than handing an empty string to a
+    // caller that will try to parse it as feedback or a score.
+    logger.error("[OpenAI] Empty response", {
+      finishReason: data.choices?.[0]?.finish_reason,
+      effort: config.reasoningEffort,
+    })
+    throw {
+      status: 500,
+      message: `OpenAI returned empty response (finish_reason: ${
+        data.choices?.[0]?.finish_reason ?? "unknown"
+      })`,
+      originalResponse: data,
+    }
+  }
+
+  const usage: ProviderTokenUsage | undefined =
+    typeof data.usage?.prompt_tokens === "number" &&
+    typeof data.usage?.completion_tokens === "number"
+      ? { inputTokens: data.usage.prompt_tokens, outputTokens: data.usage.completion_tokens }
+      : undefined
+
+  logger.debug("[OpenAI] Success", {
+    responseLength: content.length,
+    effort: config.reasoningEffort,
+    reasoningTokens: data.usage?.completion_tokens_details?.reasoning_tokens,
+  })
+
+  return { text: content, usage }
+}
+
+/**
  * Call Claude API
  */
 async function callClaude(
@@ -449,6 +714,11 @@ async function callProvider(
   }
 
   switch (provider) {
+    case "openai-none":
+    case "openai-low":
+    case "openai-high":
+    case "openai-xhigh":
+      return callOpenAI(systemPrompt, userMessage, history, config)
     case "gemini":
     case "gemini-lite":
       return callGemini(systemPrompt, userMessage, history, config)
@@ -582,15 +852,7 @@ export async function generateAIResponse(
   if (providerOrder.length === 0) {
     if (userId) recordRequestEnd(userId)
     const missingKeys = disabledProviders
-      .map((p) => {
-        const keyName =
-          p === "gemini" || p === "gemini-lite"
-            ? "GEMINI_API_KEY"
-            : p === "deepseek"
-              ? "DEEPSEEK_API_KEY"
-              : "ANTHROPIC_API_KEY"
-        return `${keyName} (for ${p})`
-      })
+      .map((p) => `${ENV_KEY_FOR_PROVIDER[p]} (for ${p})`)
       .join(", ")
     throw new Error(
       `No AI providers are configured. Please set at least one API key: ${missingKeys}`
@@ -856,20 +1118,27 @@ export async function generateFeedbackResponse(
 /**
  * Get available providers status
  */
-export function getProviderStatus(): Record<AIProvider, { enabled: boolean; model: string }> {
-  return {
-    gemini: { enabled: PROVIDERS.gemini.enabled, model: PROVIDERS.gemini.model },
-    "gemini-lite": {
-      enabled: PROVIDERS["gemini-lite"].enabled,
-      model: PROVIDERS["gemini-lite"].model,
-    },
-    deepseek: { enabled: PROVIDERS.deepseek.enabled, model: PROVIDERS.deepseek.model },
-    "deepseek-chat": {
-      enabled: PROVIDERS["deepseek-chat"].enabled,
-      model: PROVIDERS["deepseek-chat"].model,
-    },
-    claude: { enabled: PROVIDERS.claude.enabled, model: PROVIDERS.claude.model },
-  }
+export function getProviderStatus(): Record<
+  AIProvider,
+  { enabled: boolean; model: string; reasoningEffort?: OpenAIReasoningEffort }
+> {
+  // Derived from PROVIDERS rather than hand-enumerated. The literal version
+  // silently omitted any provider added after it was written, so the startup log
+  // and every status caller would have reported a chain that was missing its own
+  // primary vendor.
+  return Object.fromEntries(
+    (Object.keys(PROVIDERS) as AIProvider[]).map((provider) => [
+      provider,
+      {
+        enabled: PROVIDERS[provider].enabled,
+        model: PROVIDERS[provider].model,
+        reasoningEffort: PROVIDERS[provider].reasoningEffort,
+      },
+    ])
+  ) as Record<
+    AIProvider,
+    { enabled: boolean; model: string; reasoningEffort?: OpenAIReasoningEffort }
+  >
 }
 
 // Log provider status on module load (server-side only, development only via logger)

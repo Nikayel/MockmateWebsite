@@ -7,7 +7,7 @@
  * NEVER hardcode prices elsewhere - always import from here.
  */
 
-import { PRICING_CONFIG, type SubscriptionTier } from './config'
+import { PRICING_CONFIG, type SubscriptionTier } from "./config"
 
 // Re-export types
 export type { SubscriptionTier }
@@ -17,11 +17,11 @@ export type { SubscriptionTier }
  */
 export function getMonthlyPrice(tier: SubscriptionTier): number {
   switch (tier) {
-    case 'free':
+    case "free":
       return PRICING_CONFIG.free.price
-    case 'pro':
+    case "pro":
       return PRICING_CONFIG.pro.website.monthly.price
-    case 'enterprise':
+    case "enterprise":
       // Enterprise is custom pricing - use a default for calculations
       return 100 // Default enterprise price for revenue calculations
     default:
@@ -34,11 +34,11 @@ export function getMonthlyPrice(tier: SubscriptionTier): number {
  */
 export function getAnnualPrice(tier: SubscriptionTier): number {
   switch (tier) {
-    case 'free':
+    case "free":
       return 0
-    case 'pro':
+    case "pro":
       return PRICING_CONFIG.pro.website.yearly.totalPrice
-    case 'enterprise':
+    case "enterprise":
       return 1200 // Default enterprise annual price
     default:
       return 0
@@ -48,18 +48,21 @@ export function getAnnualPrice(tier: SubscriptionTier): number {
 /**
  * Get display price string
  */
-export function getPriceDisplay(tier: SubscriptionTier, period: 'monthly' | 'yearly' = 'monthly'): string {
+export function getPriceDisplay(
+  tier: SubscriptionTier,
+  period: "monthly" | "yearly" = "monthly"
+): string {
   switch (tier) {
-    case 'free':
+    case "free":
       return PRICING_CONFIG.free.priceDisplay
-    case 'pro':
-      return period === 'monthly'
+    case "pro":
+      return period === "monthly"
         ? PRICING_CONFIG.pro.website.monthly.priceDisplay
         : PRICING_CONFIG.pro.website.yearly.priceDisplay
-    case 'enterprise':
+    case "enterprise":
       return PRICING_CONFIG.enterprise.priceDisplay
     default:
-      return '$0'
+      return "$0"
   }
 }
 
@@ -72,11 +75,11 @@ export function getPriceDisplay(tier: SubscriptionTier, period: 'monthly' | 'yea
  */
 export function getSessionsLimitForTier(tier: SubscriptionTier): number {
   switch (tier) {
-    case 'enterprise':
+    case "enterprise":
       return 999 // Effectively unlimited
-    case 'pro':
+    case "pro":
       return PRICING_CONFIG.pro.sessionsPerMonth
-    case 'free':
+    case "free":
     default:
       return PRICING_CONFIG.free.sessionsPerMonth
   }
@@ -87,7 +90,7 @@ export function getSessionsLimitForTier(tier: SubscriptionTier): number {
  * `tier === 'pro'` so enterprise is never treated as unpaid (DUP-2).
  */
 export function isPaidTier(tier: SubscriptionTier): boolean {
-  return tier === 'pro' || tier === 'enterprise'
+  return tier === "pro" || tier === "enterprise"
 }
 
 /**
@@ -102,9 +105,9 @@ export const AI_BUDGET_CAPS = {
   // pathological / $0.15 typical, so free covers ~16 sessions against a quota
   // of 8. Leaving the old $0.50 here after the correction would have started
   // blocking free users partway through their SECOND session.
-  free: 6.50,        // ~16 sessions, quota is 8
-  pro: 28.00,        // ~70 sessions, quota is 35
-  enterprise: 112.00, // 4x pro
+  free: 6.5, // ~16 sessions, quota is 8
+  pro: 28.0, // ~70 sessions, quota is 35
+  enterprise: 112.0, // 4x pro
 } as const
 
 /**
@@ -117,9 +120,13 @@ export function getAIBudgetCap(tier: SubscriptionTier): number {
 /**
  * Calculate MRR (Monthly Recurring Revenue) from user counts
  */
-export function calculateMRR(tierCounts: { free: number; pro: number; enterprise: number }): number {
-  const proRevenue = tierCounts.pro * getMonthlyPrice('pro')
-  const enterpriseRevenue = tierCounts.enterprise * getMonthlyPrice('enterprise')
+export function calculateMRR(tierCounts: {
+  free: number
+  pro: number
+  enterprise: number
+}): number {
+  const proRevenue = tierCounts.pro * getMonthlyPrice("pro")
+  const enterpriseRevenue = tierCounts.enterprise * getMonthlyPrice("enterprise")
   return proRevenue + enterpriseRevenue
 }
 
@@ -143,27 +150,27 @@ export function getAllPricingTiers(): Array<{
 }> {
   return [
     {
-      tier: 'free',
+      tier: "free",
       name: PRICING_CONFIG.free.name,
-      monthlyPrice: getMonthlyPrice('free'),
-      annualPrice: getAnnualPrice('free'),
-      aiBudgetCap: getAIBudgetCap('free'),
+      monthlyPrice: getMonthlyPrice("free"),
+      annualPrice: getAnnualPrice("free"),
+      aiBudgetCap: getAIBudgetCap("free"),
       sessionsPerMonth: PRICING_CONFIG.free.sessionsPerMonth,
     },
     {
-      tier: 'pro',
+      tier: "pro",
       name: PRICING_CONFIG.pro.website.name,
-      monthlyPrice: getMonthlyPrice('pro'),
-      annualPrice: getAnnualPrice('pro'),
-      aiBudgetCap: getAIBudgetCap('pro'),
+      monthlyPrice: getMonthlyPrice("pro"),
+      annualPrice: getAnnualPrice("pro"),
+      aiBudgetCap: getAIBudgetCap("pro"),
       sessionsPerMonth: PRICING_CONFIG.pro.sessionsPerMonth,
     },
     {
-      tier: 'enterprise',
+      tier: "enterprise",
       name: PRICING_CONFIG.enterprise.name,
-      monthlyPrice: getMonthlyPrice('enterprise'),
-      annualPrice: getAnnualPrice('enterprise'),
-      aiBudgetCap: getAIBudgetCap('enterprise'),
+      monthlyPrice: getMonthlyPrice("enterprise"),
+      annualPrice: getAnnualPrice("enterprise"),
+      aiBudgetCap: getAIBudgetCap("enterprise"),
       sessionsPerMonth: null, // Unlimited
     },
   ]
@@ -174,15 +181,21 @@ export function getAllPricingTiers(): Array<{
  * Updated Dec 2025
  */
 export const AI_PROVIDER_COSTS = {
-  gemini: 0.0045,           // Gemini 3.6 Flash: $1.50 in + $7.50 out per 1M
-  'gemini-lite': 0.0014,    // Gemini 3.5 Flash-Lite: $0.30 in + $2.50 out per 1M
-  'deepseek-chat': 0.00021, // Deepseek (provider key, was falling back to gemini)
-  'gemini-pro': 0.003125,   // Gemini 2.5 Pro
-  deepseek: 0.00021,        // Deepseek
-  claude: 0.0024,           // Claude 3.5 Haiku
-  'claude-sonnet': 0.009,   // Claude Sonnet 4
-  'gpt-4o': 0.00625,        // GPT-4o
-  'gpt-4o-mini': 0.000375,  // GPT-4o mini
+  // One key per reasoning effort; all four are GPT-5.6 Luna at the same rate.
+  // See PROVIDER_COSTS in lib/usage-tracking.ts for why they stay separate.
+  "openai-none": 0.0007, // GPT-5.6 Luna: $0.20 in + $1.20 out per 1M
+  "openai-low": 0.0007,
+  "openai-high": 0.0007,
+  "openai-xhigh": 0.0007,
+  gemini: 0.0045, // Gemini 3.6 Flash: $1.50 in + $7.50 out per 1M
+  "gemini-lite": 0.0014, // Gemini 3.5 Flash-Lite: $0.30 in + $2.50 out per 1M
+  "deepseek-chat": 0.00021, // DeepSeek V4 Flash: $0.14 in + $0.28 out per 1M
+  "gemini-pro": 0.003125, // Gemini 2.5 Pro
+  deepseek: 0.00065, // DeepSeek V4 Pro: $0.435 in + $0.87 out per 1M
+  claude: 0.0024, // Claude 3.5 Haiku
+  "claude-sonnet": 0.009, // Claude Sonnet 4
+  "gpt-4o": 0.00625, // GPT-4o
+  "gpt-4o-mini": 0.000375, // GPT-4o mini
 } as const
 
 export type AIProvider = keyof typeof AI_PROVIDER_COSTS
@@ -209,12 +222,32 @@ export function getProviderCostInfo(): Array<{
   displayName: string
 }> {
   return [
-    { provider: 'gemini', costPer1kTokens: AI_PROVIDER_COSTS.gemini, displayName: 'Gemini 2.5 Flash' },
-    { provider: 'gemini-pro', costPer1kTokens: AI_PROVIDER_COSTS['gemini-pro'], displayName: 'Gemini 2.5 Pro' },
-    { provider: 'deepseek', costPer1kTokens: AI_PROVIDER_COSTS.deepseek, displayName: 'Deepseek' },
-    { provider: 'claude', costPer1kTokens: AI_PROVIDER_COSTS.claude, displayName: 'Claude 3.5 Haiku' },
-    { provider: 'claude-sonnet', costPer1kTokens: AI_PROVIDER_COSTS['claude-sonnet'], displayName: 'Claude Sonnet 4' },
-    { provider: 'gpt-4o', costPer1kTokens: AI_PROVIDER_COSTS['gpt-4o'], displayName: 'GPT-4o' },
-    { provider: 'gpt-4o-mini', costPer1kTokens: AI_PROVIDER_COSTS['gpt-4o-mini'], displayName: 'GPT-4o Mini' },
+    {
+      provider: "gemini",
+      costPer1kTokens: AI_PROVIDER_COSTS.gemini,
+      displayName: "Gemini 2.5 Flash",
+    },
+    {
+      provider: "gemini-pro",
+      costPer1kTokens: AI_PROVIDER_COSTS["gemini-pro"],
+      displayName: "Gemini 2.5 Pro",
+    },
+    { provider: "deepseek", costPer1kTokens: AI_PROVIDER_COSTS.deepseek, displayName: "Deepseek" },
+    {
+      provider: "claude",
+      costPer1kTokens: AI_PROVIDER_COSTS.claude,
+      displayName: "Claude 3.5 Haiku",
+    },
+    {
+      provider: "claude-sonnet",
+      costPer1kTokens: AI_PROVIDER_COSTS["claude-sonnet"],
+      displayName: "Claude Sonnet 4",
+    },
+    { provider: "gpt-4o", costPer1kTokens: AI_PROVIDER_COSTS["gpt-4o"], displayName: "GPT-4o" },
+    {
+      provider: "gpt-4o-mini",
+      costPer1kTokens: AI_PROVIDER_COSTS["gpt-4o-mini"],
+      displayName: "GPT-4o Mini",
+    },
   ]
 }
