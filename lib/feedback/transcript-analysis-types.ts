@@ -25,6 +25,26 @@ export interface ProblemContext {
   optimalSpaceComplexity: string
   criticalEdgeCases: string[]
   scenarioType?: string
+  /**
+   * The candidate's final code.
+   *
+   * Optional, and everything degrades without it: the semantic prompt drops its
+   * stated-vs-written complexity instruction entirely rather than asking for a
+   * comparison the model has no data to make.
+   *
+   * This is the whole point of the field. Both analyzers already asked the model
+   * for "stated O(x) but actual is O(y)" while passing only the transcript and
+   * the OPTIMAL complexity, so "actual" was never observable and the check could
+   * only be guessed or silently collapsed into the overclaim-vs-optimal check
+   * that `buildComplexitySilentNotes` already does deterministically.
+   *
+   * Deliberately NOT the regex estimate in lib/interview/code-analysis.ts. That
+   * heuristic reports any two-pointer solution as O(n²) and says so in its own
+   * comments, so a candidate who writes a correct O(n) two-pointer scan and
+   * accurately calls it O(n) would be flagged for overclaiming. Reading the code
+   * is the only way to make this judgement without penalising right answers.
+   */
+  candidateCode?: string | null
 }
 
 export interface AnalysisResult {

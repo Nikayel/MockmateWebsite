@@ -52,7 +52,6 @@ export interface ConversationTracker {
   spaceComplexityMentioned: boolean
   spaceComplexityValue: string | null
   complexityExplanationGiven: boolean
-  complexityIsAccurate?: boolean | null
 
   edgeCasesMentioned: string[]
   edgeCasesAskedByInterviewer: string[]

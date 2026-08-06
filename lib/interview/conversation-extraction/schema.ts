@@ -10,7 +10,6 @@ export const extractionResultSchema = z.object({
   spaceComplexityMentioned: z.boolean(),
   spaceComplexityValue: z.string().nullable(),
   complexityExplanationGiven: z.boolean(),
-  complexityIsAccurate: z.boolean().nullable(),
   edgeCasesMentioned: z.array(z.string()),
   clarifyingQuestionsAsked: z.boolean(),
   answeredInterviewerQuestions: z.number().int().min(0),
@@ -28,7 +27,6 @@ export const EXTRACTION_JSON_EXAMPLE = `{
   "spaceComplexityMentioned": true,
   "spaceComplexityValue": "O(n)",
   "complexityExplanationGiven": true,
-  "complexityIsAccurate": true,
   "edgeCasesMentioned": ["empty array", "duplicates"],
   "clarifyingQuestionsAsked": false,
   "answeredInterviewerQuestions": 2

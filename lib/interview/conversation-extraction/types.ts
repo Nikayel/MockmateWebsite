@@ -10,7 +10,6 @@ export interface ExtractionResult {
   spaceComplexityMentioned: boolean
   spaceComplexityValue: string | null
   complexityExplanationGiven: boolean
-  complexityIsAccurate: boolean | null
   edgeCasesMentioned: string[]
   clarifyingQuestionsAsked: boolean
   answeredInterviewerQuestions: number
@@ -24,7 +23,6 @@ export interface OptimalComplexityContext {
 export interface ExtendedConversationTracker extends ConversationTracker {
   approachQuality?: "none" | "vague" | "specific" | "detailed"
   dominantComplexity?: string | null
-  complexityIsAccurate?: boolean | null
   clarifyingQuestionsAsked?: boolean
   answeredInterviewerQuestions?: number
 }

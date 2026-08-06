@@ -42,7 +42,6 @@ const validExtraction = {
   spaceComplexityMentioned: true,
   spaceComplexityValue: "O(n)",
   complexityExplanationGiven: true,
-  complexityIsAccurate: true,
   edgeCasesMentioned: ["empty array"],
   clarifyingQuestionsAsked: true,
   answeredInterviewerQuestions: 2,
@@ -108,7 +107,6 @@ describe("conversation extraction", () => {
         spaceComplexityMentioned: false,
         spaceComplexityValue: null,
         complexityExplanationGiven: false,
-        complexityIsAccurate: null,
         edgeCasesMentioned: [],
         clarifyingQuestionsAsked: false,
         answeredInterviewerQuestions: 0,
@@ -139,7 +137,6 @@ describe("conversation extraction", () => {
         ...validExtraction,
         timeComplexityValue: "O(1)",
         dominantComplexity: "O(1)",
-        complexityIsAccurate: false,
       },
       createTracker(),
       {

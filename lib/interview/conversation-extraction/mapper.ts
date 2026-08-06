@@ -21,7 +21,6 @@ export function mapExtractionToTrackerUpdates(
     spaceComplexityMentioned: extracted.spaceComplexityMentioned,
     spaceComplexityValue: extracted.spaceComplexityValue,
     complexityExplanationGiven: extracted.complexityExplanationGiven,
-    complexityIsAccurate: extracted.complexityIsAccurate,
     clarifyingQuestionsAsked: extracted.clarifyingQuestionsAsked,
     answeredInterviewerQuestions: extracted.answeredInterviewerQuestions,
   }

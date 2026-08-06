@@ -639,10 +639,7 @@ export async function POST(request: NextRequest) {
         critiqueCommEvidenceLevel
       )
       const cappedOverall = capOverallForCommunicationEvidence(
-        calculatePerformanceScoreForScenario(
-          { ...finalScores, ...cappedSubscores },
-          scenarioType
-        ),
+        calculatePerformanceScoreForScenario({ ...finalScores, ...cappedSubscores }, scenarioType),
         critiqueCommEvidenceLevel
       )
       finalScores = { ...finalScores, ...cappedSubscores, overall: cappedOverall }
@@ -682,6 +679,12 @@ export async function POST(request: NextRequest) {
             optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
             criticalEdgeCases: ["empty input", "single element", "null/undefined values"],
             scenarioType,
+            // Without this the analyzer's prompt asks for "stated O(x) but
+            // actual is O(y)" having only ever been told the OPTIMAL
+            // complexity, which answers whether the candidate matched the
+            // ideal rather than whether they described their own solution
+            // correctly. Mirrors the streaming route.
+            candidateCode: code,
           },
           extractedEvidence
         )

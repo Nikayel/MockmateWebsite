@@ -15,7 +15,7 @@ import {
   getComplexityRank,
   EDGE_CASE_KEYWORDS,
 } from "@/lib/interview/shared-patterns"
-import type { SilentNote, SilentNoteType } from "@/lib/interview/interview-phases"
+import type { SilentNote } from "@/lib/interview/interview-phases"
 import type { ExtractedEvidence } from "./structured-extraction"
 
 // =============================================================================
@@ -23,6 +23,10 @@ import type { ExtractedEvidence } from "./structured-extraction"
 // =============================================================================
 
 import type { TranscriptMessage, ProblemContext, AnalysisResult } from "./transcript-analysis-types"
+import {
+  buildSemanticAnalysisPrompt,
+  parseSemanticAnalysisResponse,
+} from "./transcript-analysis-prompt"
 export type { TranscriptMessage, ProblemContext, AnalysisResult }
 
 // =============================================================================
@@ -502,46 +506,10 @@ async function detectMistakesSemantically(
     .filter((m) => m.role === "user" || m.role === "interviewer")
     .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
     .join("\n\n")
-    .substring(0, 6000) // Limit for API
 
-  const existingTypes = existingNotes.map((n) => n.type).join(", ")
-
-  const prompt = `Analyze this technical interview transcript for UNCORRECTED mistakes.
-
-PROBLEM: ${problemContext.title}
-OPTIMAL TIME COMPLEXITY: ${problemContext.optimalTimeComplexity}
-OPTIMAL SPACE COMPLEXITY: ${problemContext.optimalSpaceComplexity}
-CRITICAL EDGE CASES: ${problemContext.criticalEdgeCases.join(", ")}
-
-Already detected: ${existingTypes || "none"}
-
-TRANSCRIPT:
-${transcriptText}
-
-Find mistakes the CANDIDATE made that the INTERVIEWER did NOT correct. Only include:
-1. Wrong complexity claims (stated O(x) but actual is O(y))
-2. Wrong edge case handling (said X happens, but Y happens)
-3. Claiming solution is optimal when it's not
-4. Confusing different approaches or data structures
-5. Incomplete/vague answers that weren't probed
-
-DO NOT include:
-- Mistakes the interviewer already corrected
-- Types already detected: ${existingTypes}
-- Stylistic preferences
-- Minor clarifications
-
-Return JSON array (max 3 items):
-[
-  {
-    "type": "wrong_complexity|wrong_edge_case|missed_edge_case|wrong_optimality|confused_approach|incomplete_answer",
-    "userSaid": "exact quote or close paraphrase (max 100 chars)",
-    "correct": "what the correct answer would be",
-    "context": "brief context"
-  }
-]
-
-If no uncorrected mistakes found, return empty array: []`
+  // Prompt and parsing are shared with the Edge analyzer so the two cannot
+  // drift on what counts as a mistake. See transcript-analysis-prompt.ts.
+  const prompt = buildSemanticAnalysisPrompt({ transcriptText, problemContext, existingNotes })
 
   try {
     const response = await generateAIResponse(
@@ -550,18 +518,7 @@ If no uncorrected mistakes found, return empty array: []`
       [],
       { complexity: "critique", temperature: 0.1 }
     )
-
-    const jsonMatch = response.text.match(/\[[\s\S]*\]/)
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0])
-      return parsed.map((note: any) => ({
-        type: note.type as SilentNoteType,
-        timestamp: Date.now(),
-        userSaid: note.userSaid || "",
-        correct: note.correct,
-        context: note.context,
-      }))
-    }
+    return parseSemanticAnalysisResponse(response.text, Date.now())
   } catch (error) {
     logger.error("[Transcript Analysis] Semantic detection failed", { error })
   }

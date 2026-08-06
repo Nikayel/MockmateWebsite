@@ -301,6 +301,14 @@ export async function POST(request: NextRequest) {
         optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
         criticalEdgeCases: ["empty input", "single element", "null values"],
         scenarioType: scenarioType || "dsa",
+        // The analyzer's prompt has always asked for "stated O(x) but actual is
+        // O(y)" and was never given anything to determine the actual from. It
+        // received the OPTIMAL complexity, which answers a different question:
+        // whether the candidate matched the ideal, not whether they described
+        // their own solution correctly. Without this the model either guessed
+        // or restated the overclaim check that buildComplexitySilentNotes
+        // already performs deterministically.
+        candidateCode: code,
       }
 
       const [aiValidation, extractedEvidence, silentNotesAnalysis, bugfixSemanticScores] =
