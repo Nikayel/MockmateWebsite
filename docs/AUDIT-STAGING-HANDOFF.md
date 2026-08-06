@@ -92,22 +92,20 @@ firebase deploy --only firestore:indexes         # deploy if missing/undeployed
 ```
 If the query throws `FAILED_PRECONDITION` at runtime, the index isn't deployed.
 
-### 3. API-1 — finish the Deepgram ephemeral key (partial `[~]`)
+### 3. API-1 — Deepgram credential (CLOSED 2026-08-06)
 
-**UPDATE 2026-07-19: the fallback is now FAIL-CLOSED (shipped, pre-launch sweep).**
-`app/api/voice/token/route.ts` returns **503** when ephemeral minting is unavailable
-instead of handing the raw account key to the browser, `lib/voice/deepgram-service.ts`
-surfaces a clear "voice unavailable, keep typing" error, and
-`app/api/voice/token/route.test.ts` locks the ephemeral-only contract. The credential
-leak is closed. (This deliberately reverses the earlier "don't flip until the scope is
-granted" sequencing: launch priorities changed — fail closed now, restore voice via the
-dashboard grant.)
+**UPDATE 2026-08-06: the `keys:write` dependency is gone.** `/api/voice/token` no longer
+mints an API key through the Management API. It grants a short-lived JWT via
+`POST /v1/auth/grant` (`lib/voice/deepgram-auth.ts`), which needs only **Member**
+permission on `DEEPGRAM_API_KEY` — no `keys:write` scope, no `DEEPGRAM_PROJECT_ID`, and
+no key objects left behind in the project. Verified against the live API: 200, a valid
+JWT, `expires_in` 300.
 
-**Remaining (account-owner action, ~5 min):** voice transcription serves 503 in prod
-until `DEEPGRAM_API_KEY` gets the **`keys:write`** scope in the Deepgram dashboard
-(optionally set `DEEPGRAM_PROJECT_ID`). Smoke-test after granting:
-`GET /api/voice/token` should return a key **different** from `DEEPGRAM_API_KEY`, and
-a voice interview should connect end-to-end.
+The route stays **fail-closed**: 503 when the grant fails, never the account key.
+`app/api/voice/token/route.test.ts` locks that contract.
+
+**Remaining (account-owner action):** set `DEEPGRAM_API_KEY` in Vercel Production and
+redeploy. This is an env-var mirror only; the scope requirement no longer applies.
 
 Also: `NEXT_PUBLIC_DEEPGRAM_API_KEY` exists in env but is referenced **nowhere** in
 the codebase — delete it from Vercel + local env files (stale, and `NEXT_PUBLIC_`
