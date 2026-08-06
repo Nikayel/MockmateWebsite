@@ -62,6 +62,8 @@ interface ScenarioUsage {
   cost: number
   avgTokensPerRequest: number
   sessionCount?: number
+  /** Distinct users who ran this problem. Absent on the overview breakdown. */
+  uniqueUsers?: number
   avgCostPerSession?: number
 }
 
@@ -447,6 +449,17 @@ export default function AIUsagePage() {
       label: "Sessions",
       align: "center",
       render: (value) => <span className="text-white">{value || 0}</span>,
+    },
+    {
+      key: "uniqueUsers",
+      label: "Users",
+      align: "center",
+      render: (value) =>
+        typeof value === "number" ? (
+          <span className="text-white">{value}</span>
+        ) : (
+          <span className="text-gray-500">-</span>
+        ),
     },
     {
       key: "requests",

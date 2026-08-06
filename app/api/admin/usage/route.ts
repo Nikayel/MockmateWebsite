@@ -136,8 +136,12 @@ export async function GET(request: NextRequest) {
           return NextResponse.json({ error: "User not found or no usage data" }, { status: 404 })
         }
 
-        // Get user profile and service breakdown
-        const userDoc = await adminDb.collection("users").doc(userId).get()
+        // Get user profile and service breakdown.
+        // Profiles live in `profiles`, not `users` — see createUserProfile in
+        // lib/firestore-helpers.ts. `users/{id}` only holds the usage_summaries
+        // and session_summaries subcollections; the parent document itself
+        // carries no email or tier.
+        const userDoc = await adminDb.collection("profiles").doc(userId).get()
         const profile = userDoc.data()
         const serviceBreakdown = await getUserServiceBreakdown(userId)
 
@@ -240,11 +244,12 @@ export async function GET(request: NextRequest) {
               // usage_events query failed, use 0
             }
 
-            // Get user email
-            let userEmail = "Unknown"
-            if (session.user_id) {
+            // Get user email. Guests have no profile document by design, so
+            // label them rather than reporting the lookup as a failure.
+            let userEmail = session.is_guest ? "Guest" : "Unknown"
+            if (session.user_id && !session.is_guest) {
               try {
-                const userDoc = await adminDb.collection("users").doc(session.user_id).get()
+                const userDoc = await adminDb.collection("profiles").doc(session.user_id).get()
                 userEmail = userDoc.data()?.email || "Unknown"
               } catch {
                 // User lookup failed
@@ -300,6 +305,7 @@ export async function GET(request: NextRequest) {
             pattern: string
             difficulty: string
             sessionCount: number
+            userIds: Set<string>
             totalCost: number
             totalTokens: number
           }
@@ -319,6 +325,7 @@ export async function GET(request: NextRequest) {
               pattern: session.pattern || "unknown",
               difficulty: session.difficulty || "medium",
               sessionCount: 0,
+              userIds: new Set<string>(),
               totalCost: 0,
               totalTokens: 0,
             })
@@ -326,6 +333,11 @@ export async function GET(request: NextRequest) {
 
           const entry = scenarioMap.get(scenarioId)!
           entry.sessionCount++
+          // Distinguishes "one user grinding a problem" from "spend spread
+          // across the user base" without a second query.
+          if (typeof session.user_id === "string" && session.user_id) {
+            entry.userIds.add(session.user_id)
+          }
         }
 
         // Second pass: get costs from usage_events for each scenario
@@ -351,8 +363,11 @@ export async function GET(request: NextRequest) {
               // usage_events query failed
             }
 
+            // Replace userIds rather than spreading it: a Set serialises to {}.
+            const { userIds, ...rest } = scenario
             return {
-              ...scenario,
+              ...rest,
+              uniqueUsers: userIds.size,
               cost,
               tokens,
               requests,
