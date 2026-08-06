@@ -46,6 +46,7 @@ import {
   buildEvidenceSummary,
 } from "@/lib/feedback/edge-utils"
 import { analyzeTranscriptForMistakesEdge } from "@/lib/feedback/transcript-analysis-edge"
+import { reportEdgeUsageInBackground } from "@/lib/usage/edge-reporter"
 import { summarizeBugfixEvidence } from "@/lib/bugfix/evidence"
 import { buildBugfixPostSessionReport } from "@/lib/bugfix/report"
 import {
@@ -483,6 +484,25 @@ export async function POST(request: NextRequest) {
       const aiResponse = await generateFeedbackResponseEdge(systemInstruction, prompt)
 
       const feedback = aiResponse.text
+
+      // Record the spend. This runtime cannot reach Firebase Admin, so without
+      // this the platform's most expensive AI call was invisible to the admin
+      // dashboard AND to the per-user budget cap that reads the same records.
+      // Fire-and-forget by design: accounting must never delay or break the
+      // feedback the user is waiting on.
+      reportEdgeUsageInBackground({
+        userId: authenticatedUserId,
+        eventType: "feedback_generation",
+        provider: aiResponse.provider,
+        promptText: `${systemInstruction}\n${prompt}`,
+        responseText: feedback,
+        latencyMs: aiResponse.latencyMs,
+        sessionId,
+        scenarioId,
+        pattern: scenarioPattern,
+        difficulty: scenarioDifficulty,
+        scenarioTitle,
+      })
 
       // Parse sections
       const parsedSections = parseFeedbackSections(feedback)
