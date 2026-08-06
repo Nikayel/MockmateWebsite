@@ -1,8 +1,13 @@
 /**
  * Admin Usage API
  *
- * Endpoints for viewing and managing user usage data.
+ * Endpoints for viewing and managing user AI usage.
  * Requires admin authentication via Firebase ID token with RBAC.
+ *
+ * This handler parses, authorises, validates and dispatches. The querying and
+ * aggregation live in lib/admin/usage-views.ts and lib/admin/usage-health.ts,
+ * which read through the shared primitives in lib/usage/ so budget caps, scan
+ * limits and cost accumulation are each defined once.
  */
 
 import { NextRequest, NextResponse } from "next/server"
@@ -30,370 +35,198 @@ import {
 } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
 import { logAdminAction } from "@/lib/admin/audit"
-import { sessionTitle, sessionType, sessionStatus } from "@/lib/admin/session-fields"
+import {
+  buildSessionsView,
+  buildScenariosView,
+  buildUserSessionsView,
+} from "@/lib/admin/usage-views"
+import { getUsageHealth } from "@/lib/admin/usage-health"
+import { resolveTier, resolveBudgetCap, hasBudgetOverride } from "@/lib/usage/budget"
+import { anyTruncated } from "@/lib/usage/scan-limits"
+
+/** Views this endpoint can render. */
+const VIEWS = ["overview", "users", "user", "sessions", "scenarios"] as const
+type UsageView = (typeof VIEWS)[number]
+
+/** Rows a single request may ask for. Bounds the work an admin can trigger. */
+const MAX_LIMIT = 200
+const DEFAULT_LIMIT = 50
+
+function parseLimit(raw: string | null): number {
+  const parsed = Number.parseInt(raw ?? "", 10)
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_LIMIT
+  return Math.min(parsed, MAX_LIMIT)
+}
 
 /**
  * GET /api/admin/usage
  *
- * Get usage statistics
- *
  * Query params:
  * - view: 'overview' | 'users' | 'user' | 'sessions' | 'scenarios' (default: 'overview')
  * - userId: string (required if view=user)
- * - limit: number (for pagination, default: 50)
- * - offset: number (for pagination, default: 0)
+ * - limit: number (rows, default 50, max 200)
  */
 export async function GET(request: NextRequest) {
-  // Verify admin access with VIEW_AI_USAGE permission
   const authResult = await requirePermission(request, PERMISSIONS.VIEW_AI_USAGE)
   if (!authResult.authorized) {
     return unauthorizedResponse(authResult.error!, authResult.status || 403)
   }
 
-  const adminContext = authResult.context!
-
   const { searchParams } = new URL(request.url)
-  const view = searchParams.get("view") || "overview"
+  const requestedView = searchParams.get("view") || "overview"
   const userId = searchParams.get("userId")
-  const limit = parseInt(searchParams.get("limit") || "50", 10)
-  const offset = parseInt(searchParams.get("offset") || "0", 10)
+  const limit = parseLimit(searchParams.get("limit"))
+
+  if (!VIEWS.includes(requestedView as UsageView)) {
+    return errorResponse(`Unknown view: ${requestedView}`, 400)
+  }
+  const view = requestedView as UsageView
 
   try {
     switch (view) {
-      case "overview": {
-        // Get all usage data in parallel for performance
-        const [stats, cacheStats, serviceBreakdown, granularBreakdown, dailyTrends] =
-          await Promise.all([
-            getAdminUsageStats(),
-            getCacheStats(),
-            getServiceBreakdown(),
-            getGranularUsageBreakdown(),
-            getDailyUsageTrends(30),
-          ])
-
-        return NextResponse.json({
-          success: true,
-          data: {
-            overview: {
-              totalUsers: stats.totalUsers,
-              totalCost: stats.totalCost,
-              totalRequests: stats.totalRequests,
-              totalTokens: dailyTrends.totals.tokens,
-              averageCostPerUser: stats.totalUsers > 0 ? stats.totalCost / stats.totalUsers : 0,
-              averageTokensPerRequest:
-                dailyTrends.totals.requests > 0
-                  ? Math.round(dailyTrends.totals.tokens / dailyTrends.totals.requests)
-                  : 0,
-            },
-            cache: cacheStats,
-            topUsers: stats.userStats.slice(0, 20),
-            budgetCaps: BUDGET_CAPS,
-            // Service breakdown by type
-            services: serviceBreakdown.byService,
-            providers: serviceBreakdown.byProvider,
-            // Granular breakdown by pattern, difficulty, scenario
-            granular: {
-              byPattern: granularBreakdown.byPattern,
-              byDifficulty: granularBreakdown.byDifficulty,
-              topCostlyScenarios: granularBreakdown.topCostlyScenarios.slice(0, 10),
-              topTokenScenarios: granularBreakdown.topTokenScenarios.slice(0, 10),
-            },
-            // Daily trends for charting
-            trends: {
-              daily: dailyTrends.daily,
-              totals: dailyTrends.totals,
-            },
-            // Cost reference
-            costs: {
-              llm: PROVIDER_COSTS,
-              voice: DEEPGRAM_COSTS,
-              embeddings: EMBEDDING_COSTS,
-            },
-          },
-        })
-      }
+      case "overview":
+        return NextResponse.json({ success: true, data: await buildOverview() })
 
       case "users": {
-        // Get all users with usage
         const stats = await getAdminUsageStats()
-
         return NextResponse.json({
           success: true,
           data: {
             users: stats.userStats,
             total: stats.userStats.length,
+            coverage: stats.coverage,
           },
         })
       }
 
       case "user": {
         if (!userId) {
-          return NextResponse.json({ error: "userId is required for user view" }, { status: 400 })
+          return errorResponse("userId is required for user view", 400)
         }
-
-        const summary = await getUserUsageSummary(userId)
-        if (!summary) {
-          return NextResponse.json({ error: "User not found or no usage data" }, { status: 404 })
+        const data = await buildUserDetail(userId)
+        if (!data) {
+          return errorResponse("User not found or no usage data", 404)
         }
-
-        // Get user profile and service breakdown.
-        // Profiles live in `profiles`, not `users` — see createUserProfile in
-        // lib/firestore-helpers.ts. `users/{id}` only holds the usage_summaries
-        // and session_summaries subcollections; the parent document itself
-        // carries no email or tier.
-        const userDoc = await adminDb.collection("profiles").doc(userId).get()
-        const profile = userDoc.data()
-        const serviceBreakdown = await getUserServiceBreakdown(userId)
-
-        // Get user's sessions with costs
-        let userSessions: any[] = []
-        try {
-          const sessionsSnapshot = await adminDb
-            .collection("interview_sessions")
-            .where("user_id", "==", userId)
-            .orderBy("created_at", "desc")
-            .limit(20)
-            .get()
-
-          userSessions = await Promise.all(
-            sessionsSnapshot.docs.map(async (doc) => {
-              const session = doc.data()
-
-              // Get cost for this session from usage_events
-              let sessionCost = 0
-              let sessionTokens = 0
-
-              try {
-                const eventsSnapshot = await adminDb
-                  .collection("usage_events")
-                  .where("sessionId", "==", doc.id)
-                  .get()
-
-                for (const event of eventsSnapshot.docs) {
-                  sessionCost += event.data().cost || 0
-                  sessionTokens += event.data().totalTokens || 0
-                }
-              } catch {
-                // usage_events query failed
-              }
-
-              return {
-                sessionId: doc.id,
-                scenarioTitle: sessionTitle(session),
-                scenarioType: sessionType(session),
-                difficulty: session.difficulty || "medium",
-                pattern: session.pattern || "unknown",
-                status: sessionStatus(session),
-                cost: sessionCost,
-                tokens: sessionTokens,
-                createdAt:
-                  session.created_at?.toDate?.()?.toISOString() || session.created_at || null,
-              }
-            })
-          )
-        } catch (err) {
-          console.error("[Admin Usage API] Error fetching user sessions:", err)
-        }
-
-        return NextResponse.json({
-          success: true,
-          data: {
-            user: {
-              id: userId,
-              email: profile?.email,
-              tier: profile?.subscription_tier || "free",
-              createdAt: profile?.created_at,
-            },
-            usage: summary,
-            services: serviceBreakdown,
-            sessions: userSessions,
-          },
-        })
+        return NextResponse.json({ success: true, data })
       }
 
-      case "sessions": {
-        // Get recent sessions with their costs
-        // Note: Firestore doesn't support offset, so we use simple limit for now
-        const sessionsSnapshot = await adminDb
-          .collection("interview_sessions")
-          .orderBy("created_at", "desc")
-          .limit(limit)
-          .get()
+      case "sessions":
+        return NextResponse.json({ success: true, data: await buildSessionsView(limit) })
 
-        const sessions = await Promise.all(
-          sessionsSnapshot.docs.map(async (doc) => {
-            const session = doc.data()
-
-            // Get cost for this session from usage_events
-            let cost = 0
-            let tokens = 0
-            let requestCount = 0
-
-            try {
-              const eventsSnapshot = await adminDb
-                .collection("usage_events")
-                .where("sessionId", "==", doc.id)
-                .get()
-
-              for (const event of eventsSnapshot.docs) {
-                cost += event.data().cost || 0
-                tokens += event.data().totalTokens || 0
-                requestCount++
-              }
-            } catch {
-              // usage_events query failed, use 0
-            }
-
-            // Get user email. Guests have no profile document by design, so
-            // label them rather than reporting the lookup as a failure.
-            let userEmail = session.is_guest ? "Guest" : "Unknown"
-            if (session.user_id && !session.is_guest) {
-              try {
-                const userDoc = await adminDb.collection("profiles").doc(session.user_id).get()
-                userEmail = userDoc.data()?.email || "Unknown"
-              } catch {
-                // User lookup failed
-              }
-            }
-
-            return {
-              sessionId: doc.id,
-              userId: session.user_id,
-              userEmail,
-              scenarioTitle: sessionTitle(session),
-              scenarioId: session.scenario_id,
-              scenarioType: sessionType(session),
-              difficulty: session.difficulty || "medium",
-              pattern: session.pattern || "unknown",
-              status: sessionStatus(session),
-              cost,
-              tokens,
-              requestCount,
-              performanceScore: session.performance_score,
-              createdAt:
-                session.created_at?.toDate?.()?.toISOString() || session.created_at || null,
-              completedAt:
-                session.completed_at?.toDate?.()?.toISOString() || session.completed_at || null,
-            }
-          })
-        )
-
-        return NextResponse.json({
-          success: true,
-          data: {
-            sessions,
-            total: sessions.length,
-          },
-        })
-      }
-
-      case "scenarios": {
-        // Get scenario stats from interview_sessions directly
-        // Group by scenario_id and aggregate
-        const sessionsSnapshot = await adminDb
-          .collection("interview_sessions")
-          .orderBy("created_at", "desc")
-          .limit(500)
-          .get()
-
-        // Aggregate by scenario
-        const scenarioMap = new Map<
-          string,
-          {
-            scenarioId: string
-            scenarioTitle: string
-            pattern: string
-            difficulty: string
-            sessionCount: number
-            userIds: Set<string>
-            totalCost: number
-            totalTokens: number
-          }
-        >()
-
-        // First pass: aggregate sessions
-        for (const doc of sessionsSnapshot.docs) {
-          const session = doc.data()
-          const scenarioId = session.scenario_id || "unknown"
-
-          if (!scenarioMap.has(scenarioId)) {
-            scenarioMap.set(scenarioId, {
-              scenarioId,
-              // Sessions with no scenario_id all collapse into one bucket, so
-              // naming it after whichever session landed first would be a lie.
-              scenarioTitle: scenarioId === "unknown" ? "(no scenario id)" : sessionTitle(session),
-              pattern: session.pattern || "unknown",
-              difficulty: session.difficulty || "medium",
-              sessionCount: 0,
-              userIds: new Set<string>(),
-              totalCost: 0,
-              totalTokens: 0,
-            })
-          }
-
-          const entry = scenarioMap.get(scenarioId)!
-          entry.sessionCount++
-          // Distinguishes "one user grinding a problem" from "spend spread
-          // across the user base" without a second query.
-          if (typeof session.user_id === "string" && session.user_id) {
-            entry.userIds.add(session.user_id)
-          }
-        }
-
-        // Second pass: get costs from usage_events for each scenario
-        const scenarioStats = await Promise.all(
-          Array.from(scenarioMap.values()).map(async (scenario) => {
-            let cost = 0
-            let tokens = 0
-            let requests = 0
-
-            try {
-              const eventsSnapshot = await adminDb
-                .collection("usage_events")
-                .where("scenarioId", "==", scenario.scenarioId)
-                .limit(1000)
-                .get()
-
-              for (const event of eventsSnapshot.docs) {
-                cost += event.data().cost || 0
-                tokens += event.data().totalTokens || 0
-                requests++
-              }
-            } catch {
-              // usage_events query failed
-            }
-
-            // Replace userIds rather than spreading it: a Set serialises to {}.
-            const { userIds, ...rest } = scenario
-            return {
-              ...rest,
-              uniqueUsers: userIds.size,
-              cost,
-              tokens,
-              requests,
-              avgTokensPerRequest: requests > 0 ? Math.round(tokens / requests) : 0,
-              avgCostPerSession: scenario.sessionCount > 0 ? cost / scenario.sessionCount : 0,
-            }
-          })
-        )
-
-        // Sort by cost descending
-        scenarioStats.sort((a, b) => b.cost - a.cost)
-
-        return NextResponse.json({
-          success: true,
-          data: {
-            scenarios: scenarioStats.slice(0, 50),
-          },
-        })
-      }
-
-      default:
-        return errorResponse(`Unknown view: ${view}`, 400)
+      case "scenarios":
+        return NextResponse.json({ success: true, data: await buildScenariosView() })
     }
   } catch (error) {
     console.error("[Admin Usage API] Error fetching usage data:", error)
     return errorResponse(error instanceof Error ? error.message : "Failed to fetch usage data", 500)
+  }
+}
+
+/**
+ * The overview panel.
+ *
+ * `averageCostPerUser` divides by the accounts that actually spent something
+ * rather than by every account ever registered, which is what the old figure
+ * did and why it read far lower than reality.
+ */
+async function buildOverview() {
+  const [stats, cacheStats, serviceBreakdown, granularBreakdown, dailyTrends, scenarioView] =
+    await Promise.all([
+      getAdminUsageStats(),
+      getCacheStats(),
+      getServiceBreakdown(),
+      getGranularUsageBreakdown(),
+      getDailyUsageTrends(30),
+      buildScenariosView(),
+    ])
+
+  const sessionsCounted = scenarioView.scenarios.reduce((sum, s) => sum + s.sessionCount, 0)
+
+  const health = await getUsageHealth({
+    totalCost: stats.totalCost,
+    activeUsers: stats.activeUsers,
+    sessionsCounted,
+  })
+
+  return {
+    overview: {
+      totalUsers: stats.totalUsers,
+      activeUsers: stats.activeUsers,
+      totalCost: stats.totalCost,
+      totalRequests: stats.totalRequests,
+      totalTokens: dailyTrends.totals.tokens,
+      averageCostPerUser: health.unitEconomics.costPerActiveUser ?? 0,
+      averageTokensPerRequest:
+        dailyTrends.totals.requests > 0
+          ? Math.round(dailyTrends.totals.tokens / dailyTrends.totals.requests)
+          : 0,
+    },
+    health,
+    cache: cacheStats,
+    topUsers: stats.userStats.slice(0, 20),
+    budgetCaps: BUDGET_CAPS,
+    services: serviceBreakdown.byService,
+    providers: serviceBreakdown.byProvider,
+    granular: {
+      byPattern: granularBreakdown.byPattern,
+      byDifficulty: granularBreakdown.byDifficulty,
+      topCostlyScenarios: granularBreakdown.topCostlyScenarios.slice(0, 10),
+      topTokenScenarios: granularBreakdown.topTokenScenarios.slice(0, 10),
+    },
+    trends: {
+      daily: dailyTrends.daily,
+      totals: dailyTrends.totals,
+    },
+    costs: {
+      llm: PROVIDER_COSTS,
+      voice: DEEPGRAM_COSTS,
+      embeddings: EMBEDDING_COSTS,
+    },
+    // Every total above is built from a bounded scan. When any of them hit its
+    // cap the figures are lower bounds, and the dashboard says so rather than
+    // presenting a partial month as complete.
+    coverage: {
+      events: serviceBreakdown.coverage,
+      granular: granularBreakdown.coverage,
+      trends: dailyTrends.coverage,
+      userSummaries: stats.coverage,
+      sessions: scenarioView.coverage,
+      anyTruncated: anyTruncated(
+        serviceBreakdown.coverage,
+        granularBreakdown.coverage,
+        dailyTrends.coverage,
+        stats.coverage,
+        scenarioView.coverage
+      ),
+    },
+  }
+}
+
+/** One user's spend, budget standing and recent sessions. */
+async function buildUserDetail(userId: string) {
+  const summary = await getUserUsageSummary(userId)
+  if (!summary) return null
+
+  // Profiles live in `profiles`; `users/{id}` holds only subcollections.
+  const [profileDoc, serviceBreakdown, sessions] = await Promise.all([
+    adminDb.collection("profiles").doc(userId).get(),
+    getUserServiceBreakdown(userId),
+    buildUserSessionsView(userId),
+  ])
+  const profile = profileDoc.data()
+
+  return {
+    user: {
+      id: userId,
+      email: profile?.email ?? null,
+      tier: resolveTier(profile),
+      budgetCap: resolveBudgetCap(profile),
+      hasBudgetOverride: hasBudgetOverride(profile),
+      createdAt: profile?.created_at ?? null,
+    },
+    usage: summary,
+    services: serviceBreakdown,
+    sessions,
   }
 }
 
