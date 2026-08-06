@@ -51,6 +51,32 @@ export interface DeepgramConnection {
   mediaStream: MediaStream | null
 }
 
+const DEEPGRAM_LISTEN_URL = "wss://api.deepgram.com/v1/listen"
+
+/**
+ * Build the Deepgram streaming URL for a given config.
+ *
+ * Exported (rather than living on the service as a private method) so the query
+ * string can be asserted in tests without standing up a WebSocket.
+ */
+export function buildListenUrl(config: DeepgramConfig): string {
+  const params = new URLSearchParams({
+    model: config.model || "nova-2",
+    language: config.language || "en-US",
+    punctuate: String(config.punctuate),
+    interim_results: String(config.interimResults),
+    smart_format: String(config.smartFormat),
+    utterance_end_ms: String(config.utteranceEndMs),
+    vad_events: String(config.vadEvents),
+  })
+
+  if (config.endpointing !== false) {
+    params.set("endpointing", String(config.endpointing))
+  }
+
+  return `${DEEPGRAM_LISTEN_URL}?${params.toString()}`
+}
+
 type TranscriptCallback = (transcript: string, isFinal: boolean) => void
 type ErrorCallback = (error: Error) => void
 type StatusCallback = (status: "connecting" | "connected" | "disconnected" | "error") => void
@@ -189,27 +215,6 @@ export class DeepgramVoiceService {
   }
 
   /**
-   * Build Deepgram WebSocket URL with options
-   */
-  private buildWebSocketUrl(): string {
-    const params = new URLSearchParams({
-      model: this.config.model || "nova-2",
-      language: this.config.language || "en-US",
-      punctuate: String(this.config.punctuate),
-      interim_results: String(this.config.interimResults),
-      smart_format: String(this.config.smartFormat),
-      utterance_end_ms: String(this.config.utteranceEndMs),
-      vad_events: String(this.config.vadEvents),
-    })
-
-    if (this.config.endpointing !== false) {
-      params.set("endpointing", String(this.config.endpointing))
-    }
-
-    return `wss://api.deepgram.com/v1/listen?${params.toString()}`
-  }
-
-  /**
    * Start real-time transcription
    */
   async startTranscription(): Promise<void> {
@@ -254,7 +259,7 @@ export class DeepgramVoiceService {
       logger.info("[Deepgram] Connecting with API key", {
         apiKeyPrefix: this.config.apiKey?.substring(0, 8) + "...",
       })
-      const ws = new WebSocket(this.buildWebSocketUrl(), ["token", this.config.apiKey!])
+      const ws = new WebSocket(buildListenUrl(this.config), ["token", this.config.apiKey!])
 
       ws.onopen = () => {
         logger.info("[Deepgram] WebSocket connected")
