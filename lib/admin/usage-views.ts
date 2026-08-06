@@ -11,6 +11,7 @@
  */
 
 import { adminDb } from "../firebase-admin"
+import { logger } from "../logger"
 import { sessionTitle, sessionType, sessionStatus } from "./session-fields"
 import { fetchProfilesById, profileEmail } from "../usage/profile-lookup"
 import { sumUsageEventsByField, totalsFor } from "../usage/event-queries"
@@ -211,6 +212,30 @@ export async function buildScenariosView(): Promise<{
   return {
     scenarios: scenarios.slice(0, 50),
     coverage: describeCoverage(snapshot.docs.length, SESSION_SCAN_LIMIT),
+  }
+}
+
+/**
+ * Sessions started since `since`, as a Firestore count aggregation.
+ *
+ * This is the denominator for cost per session, so it has to cover the same
+ * period as the spend it divides. Deriving it from the bounded scenario scan
+ * would have measured "the last 500 sessions whenever they happened" against
+ * "this month's cost", and would have paid 500 document reads to do it.
+ */
+export async function countSessionsSince(since: Date): Promise<number> {
+  try {
+    const snapshot = await adminDb
+      .collection("interview_sessions")
+      .where("created_at", ">=", since.toISOString())
+      .count()
+      .get()
+    return snapshot.data().count
+  } catch (error) {
+    // A missing index or a mixed created_at type should cost the dashboard one
+    // figure, not the whole overview.
+    logger.error("[Admin Usage] Failed to count sessions", { error })
+    return 0
   }
 }
 
