@@ -14,6 +14,8 @@ export {
   getHintGuidance,
   getSilentNoteDescription,
   HINT_PROGRESSION,
+  PHASE_PROVIDER,
+  providerForPhase,
   updateTrackerFromMessage,
 } from "./phases"
 

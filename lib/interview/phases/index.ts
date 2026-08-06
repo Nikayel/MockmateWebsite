@@ -1,4 +1,5 @@
 export { detectInterviewPhase, detectInterviewPhaseLegacy } from "./detection"
+export { PHASE_PROVIDER, providerForPhase } from "./effort"
 export {
   addSilentNote,
   buildTrackingContext,
