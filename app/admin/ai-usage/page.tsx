@@ -92,7 +92,10 @@ interface UserData {
   tier: string
   cost: number
   requests: number
+  /** The cap actually enforced, which an admin override can move off the tier default. */
+  budgetCap: number
   budgetUsedPercent: number
+  hasBudgetOverride: boolean
 }
 
 /** How much of the underlying data an aggregate actually saw. */
@@ -890,6 +893,13 @@ export default function AIUsagePage() {
                         >
                           {user.tier}
                         </Badge>
+                        {/* An admin override changes the cap this user is
+                            actually held to, which the tier badge alone hides. */}
+                        {user.hasBudgetOverride && (
+                          <Badge className="border-[#c4703f]/30 bg-[#c4703f]/20 text-[#c4703f]">
+                            cap ${user.budgetCap}
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-4">
                         <span className="font-mono text-green-400">{formatCost(user.cost)}</span>
