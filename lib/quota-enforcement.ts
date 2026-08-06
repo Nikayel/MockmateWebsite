@@ -15,7 +15,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb, adminAuth } from "./firebase-admin"
 import { logger } from "./logger"
-import { getSessionsLimitForTier, isPaidTier, AI_BUDGET_CAPS } from "./pricing"
+import { getSessionsLimitForTier, isPaidTier } from "./pricing"
+import { resolveBudgetCap } from "./usage/budget"
 import { CIRCUIT_BREAKER } from "./constants"
 import { PRICING_CONFIG } from "./config"
 import { isGlobalCeilingExceeded } from "./global-spend-guard"
@@ -141,9 +142,10 @@ interface UserQuota {
   periodEnd: string
 }
 
-// Budget limits per tier (in dollars). Canonical table lives in lib/pricing.ts;
-// this used to be a third redeclaration of the same values.
-const BUDGET_LIMITS = AI_BUDGET_CAPS
+// Budget limits per tier (in dollars) resolve through lib/usage/budget.ts, the
+// single owner of the question. Indexing AI_BUDGET_CAPS with the tier directly
+// (as this did) ignores the per-user `custom_budget_cap` an admin can set, so
+// raising someone's budget in the admin UI had no effect on enforcement.
 
 /**
  * Get user ID from request (from Authorization header)
@@ -345,7 +347,7 @@ async function getUserQuota(
       sessionsLimit,
       freeOpensRemaining: quota?.free_opens_remaining || 0,
       budgetUsed,
-      budgetLimit: BUDGET_LIMITS[tier],
+      budgetLimit: resolveBudgetCap(billingProfile),
       periodStart: currentPeriodStart.toISOString(),
       periodEnd: currentPeriodEnd.toISOString(),
     }
