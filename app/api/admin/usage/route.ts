@@ -39,6 +39,7 @@ import {
   buildSessionsView,
   buildScenariosView,
   buildUserSessionsView,
+  countSessionsSince,
 } from "@/lib/admin/usage-views"
 import { getUsageHealth } from "@/lib/admin/usage-health"
 import {
@@ -47,7 +48,7 @@ import {
   hasBudgetOverride,
   MAX_CUSTOM_BUDGET_CAP,
 } from "@/lib/usage/budget"
-import { anyTruncated } from "@/lib/usage/scan-limits"
+import { anyTruncated, describeCoverage } from "@/lib/usage/scan-limits"
 
 /** Views this endpoint can render. */
 const VIEWS = ["overview", "users", "user", "sessions", "scenarios"] as const
@@ -135,17 +136,21 @@ export async function GET(request: NextRequest) {
  * did and why it read far lower than reality.
  */
 async function buildOverview() {
-  const [stats, cacheStats, serviceBreakdown, granularBreakdown, dailyTrends, scenarioView] =
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  const [stats, cacheStats, serviceBreakdown, granularBreakdown, dailyTrends, sessionsCounted] =
     await Promise.all([
       getAdminUsageStats(),
       getCacheStats(),
       getServiceBreakdown(),
       getGranularUsageBreakdown(),
       getDailyUsageTrends(30),
-      buildScenariosView(),
+      // A count aggregation, not a scan. Cost per session must divide this
+      // month's spend by this month's sessions, and paying 500 document reads
+      // to measure a different window would be wrong twice over.
+      countSessionsSince(startOfMonth),
     ])
-
-  const sessionsCounted = scenarioView.scenarios.reduce((sum, s) => sum + s.sessionCount, 0)
 
   const health = await getUsageHealth({
     totalCost: stats.totalCost,
@@ -195,13 +200,14 @@ async function buildOverview() {
       granular: granularBreakdown.coverage,
       trends: dailyTrends.coverage,
       userSummaries: stats.coverage,
-      sessions: scenarioView.coverage,
+      // The session count is an aggregation, not a scan, so it is never
+      // truncated. The scenario table's own scan reports its coverage there.
+      sessions: describeCoverage(sessionsCounted, Number.POSITIVE_INFINITY),
       anyTruncated: anyTruncated(
         serviceBreakdown.coverage,
         granularBreakdown.coverage,
         dailyTrends.coverage,
-        stats.coverage,
-        scenarioView.coverage
+        stats.coverage
       ),
     },
   }
