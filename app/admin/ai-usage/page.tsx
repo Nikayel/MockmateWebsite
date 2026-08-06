@@ -40,6 +40,7 @@ import {
   ChevronRight,
   X,
 } from "lucide-react"
+import { SpendHealthPanel } from "./_components/SpendHealthPanel"
 import { getProviderCostInfo, AI_BUDGET_CAPS } from "@/lib/pricing"
 import { logger } from "@/lib/logger"
 
@@ -94,14 +95,54 @@ interface UserData {
   budgetUsedPercent: number
 }
 
+/** How much of the underlying data an aggregate actually saw. */
+interface ScanCoverage {
+  scanned: number
+  limit: number
+  truncated: boolean
+}
+
+/** Today's platform spend against the kill switch in lib/global-spend-guard.ts. */
+interface GlobalSpendStatus {
+  spendToday: number
+  ceiling: number
+  usedPercent: number | null
+  disabled: boolean
+  exceeded: boolean
+  approaching: boolean
+}
+
+interface UsageHealth {
+  globalSpend: GlobalSpendStatus
+  anomalies: {
+    unacknowledged: number
+    last24Hours: number
+    critical: number
+    estimatedLoss: number
+  } | null
+  unitEconomics: {
+    costPerSession: number | null
+    costPerActiveUser: number | null
+    activeUsers: number
+    sessionsCounted: number
+  }
+}
+
 interface AIUsageData {
   overview: {
     totalUsers: number
+    activeUsers: number
     totalCost: number
     totalRequests: number
     totalTokens: number
     averageCostPerUser: number
     averageTokensPerRequest: number
+  }
+  health?: UsageHealth
+  coverage?: {
+    anyTruncated: boolean
+    events: ScanCoverage
+    sessions: ScanCoverage
   }
   cache: {
     memoryCacheSize: number
@@ -629,6 +670,11 @@ export default function AIUsagePage() {
                   iconColor="text-purple-400"
                 />
               </div>
+
+              {/* Spend health: kill-switch headroom, anomalies, unit economics */}
+              {aiUsage.health && (
+                <SpendHealthPanel health={aiUsage.health} coverage={aiUsage.coverage} />
+              )}
 
               {/* Service Breakdown - Compact */}
               {aiUsage.services && (
