@@ -11,6 +11,7 @@
 
 import { logger } from "@/lib/logger"
 import { INTERVIEW_KEYTERMS } from "./interview-keyterms"
+import { repairInterviewTranscript } from "./transcript-repair"
 
 /**
  * Deepgram speech-to-text models.
@@ -347,7 +348,13 @@ export class DeepgramVoiceService {
           const data = JSON.parse(event.data)
 
           if (data.type === "Results" || data.channel) {
-            const transcript = data.channel?.alternatives?.[0]?.transcript || ""
+            // Repaired here, at the point of arrival, so everything downstream
+            // agrees: the accumulated transcript, the substring arithmetic that
+            // computes new content for auto-send, the textarea, and the text
+            // that reaches the AI interviewer and scoring all see one version.
+            const transcript = repairInterviewTranscript(
+              data.channel?.alternatives?.[0]?.transcript || ""
+            )
             const isFinal = data.is_final || data.speech_final
 
             if (transcript && !this.transcriptMuted) {

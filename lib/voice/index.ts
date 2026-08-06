@@ -19,6 +19,10 @@ export {
   type DeepgramConnection,
 } from "./deepgram-service"
 
+export { INTERVIEW_KEYTERMS } from "./interview-keyterms"
+
+export { repairInterviewTranscript } from "./transcript-repair"
+
 export {
   useDeepgram,
   useVoiceInput,
