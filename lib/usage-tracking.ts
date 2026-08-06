@@ -19,6 +19,21 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { countTokens } from "./token-counter"
 import { logger } from "./logger"
 import { AI_BUDGET_CAPS } from "./pricing"
+import { resolveBudgetCap, resolveTier, hasBudgetOverride, budgetUsedPercent } from "./usage/budget"
+import { fetchProfilesById } from "./usage/profile-lookup"
+import {
+  USAGE_EVENT_SCAN_LIMIT,
+  USER_SUMMARY_SCAN_LIMIT,
+  describeCoverage,
+  type ScanCoverage,
+} from "./usage/scan-limits"
+import {
+  readNumber,
+  emptyUsageTotals,
+  accumulateUsageEvent,
+  averageTokensPerRequest,
+  type UsageTotals,
+} from "./usage/event-totals"
 
 // Cost per 1K tokens for each provider (input + output averaged).
 // Gemini rows verified against ai.google.dev/gemini-api/docs/pricing on
@@ -32,11 +47,20 @@ import { AI_BUDGET_CAPS } from "./pricing"
 // are listed explicitly: without them, flash-lite traffic was billed at 3.2x
 // its real rate and DeepSeek traffic at the Gemini rate.
 export const PROVIDER_COSTS = {
+  // GPT-5.6 Luna, one key per reasoning effort. The RATE is identical across all
+  // four — effort changes how many output tokens come back, not their price —
+  // so the spend difference between `none` and `xhigh` shows up through the
+  // measured token counts, not here. Keeping them separate is what lets the
+  // admin tables attribute spend to an effort level.
+  "openai-none": 0.0007, // Luna: $0.20 in + $1.20 out per 1M
+  "openai-low": 0.0007,
+  "openai-high": 0.0007,
+  "openai-xhigh": 0.0007,
   gemini: 0.0045, // Gemini 3.6 Flash: $1.50 in + $7.50 out per 1M
   "gemini-lite": 0.0014, // Gemini 3.5 Flash-Lite: $0.30 in + $2.50 out per 1M
-  "deepseek-chat": 0.00021, // Deepseek: $0.14 in + $0.28 out per 1M
+  "deepseek-chat": 0.00021, // DeepSeek V4 Flash: $0.14 in + $0.28 out per 1M
   "gemini-pro": 0.003125, // Gemini 2.5 Pro (unverified, not currently called)
-  deepseek: 0.00021, // Deepseek: $0.14 in + $0.28 out per 1M
+  deepseek: 0.00065, // DeepSeek V4 Pro: $0.435 in + $0.87 out per 1M
   claude: 0.0024, // Claude 3.5 Haiku: $0.80 in + $4.00 out per 1M
   "claude-sonnet": 0.009, // Claude Sonnet 4: $3 in + $15 out per 1M
   "gpt-4o": 0.00625, // GPT-4o: $2.50 in + $10 out per 1M
@@ -236,11 +260,10 @@ export async function getUserUsageSummary(userId: string): Promise<UserUsageSumm
       .doc(periodKey)
       .get()
 
-    // Get user's subscription tier for budget cap
+    // Get user's budget cap.
     // IMPORTANT: Use 'profiles' collection for consistency with quota-enforcement.ts
     const profileDoc = await adminDb.collection("profiles").doc(userId).get()
-    const tier = (profileDoc.data()?.subscription_tier || "free") as keyof typeof BUDGET_CAPS
-    const budgetCap = BUDGET_CAPS[tier] || BUDGET_CAPS.free
+    const budgetCap = resolveBudgetCap(profileDoc.data())
 
     if (!summaryDoc.exists) {
       const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -282,7 +305,7 @@ export async function getUserUsageSummary(userId: string): Promise<UserUsageSumm
       averageLatencyMs: totalRequests > 0 ? (data.totalLatencyMs || 0) / totalRequests : 0,
       budgetCap,
       budgetRemaining: Math.max(0, budgetCap - totalCost),
-      budgetUsedPercent: (totalCost / budgetCap) * 100,
+      budgetUsedPercent: budgetUsedPercent(totalCost, budgetCap),
     }
   } catch (error) {
     console.error("[Usage Tracking] Failed to get user summary:", error)
@@ -519,27 +542,32 @@ export async function getAdminUsageStats(options?: {
   endDate?: Date
   userId?: string
 }): Promise<{
+  /** Registered accounts, whether or not they spent anything this period. */
   totalUsers: number
+  /** Accounts that actually consumed AI this period. The unit-economics denominator. */
+  activeUsers: number
   totalCost: number
   totalRequests: number
+  coverage: ScanCoverage
   userStats: Array<{
     userId: string
     email: string
     tier: string
     cost: number
     requests: number
+    budgetCap: number
     budgetUsedPercent: number
+    hasBudgetOverride: boolean
   }>
 }> {
   const now = new Date()
-  const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
 
-  // OPTIMIZATION: Fetch all usage summaries for this period in ONE query
-  // using collectionGroup instead of N individual reads
+  // Fetch all usage summaries for this period in ONE collectionGroup query
+  // rather than N individual reads.
   const summariesSnapshot = await adminDb
     .collectionGroup("usage_summaries")
     .where("periodStart", ">=", new Date(now.getFullYear(), now.getMonth(), 1))
-    .limit(10000)
+    .limit(USER_SUMMARY_SCAN_LIMIT)
     .get()
 
   // Build a map of userId -> summary data
@@ -550,24 +578,22 @@ export async function getAdminUsageStats(options?: {
     if (userId) {
       const data = doc.data()
       summaryMap.set(userId, {
-        totalCost: data.totalCost || 0,
-        totalRequests: data.totalRequests || 0,
+        totalCost: readNumber(data.totalCost),
+        totalRequests: readNumber(data.totalRequests),
       })
     }
   }
 
-  // Get user profiles in a single query (not N individual reads)
-  const profilesSnapshot = await adminDb.collection("profiles").limit(10000).get()
+  // Resolve profiles for the users who actually have usage. This used to read
+  // the whole profiles collection (capped at 10k) to label a handful of active
+  // accounts, so a large user base paid thousands of document reads per
+  // dashboard load to resolve a few dozen emails.
+  const activeUserIds = Array.from(summaryMap.keys())
+  const profileMap = await fetchProfilesById(activeUserIds)
 
-  // Build user map for email and tier lookup
-  const userMap = new Map<string, { email: string; tier: string }>()
-  for (const doc of profilesSnapshot.docs) {
-    const data = doc.data()
-    userMap.set(doc.id, {
-      email: data.email || "Unknown",
-      tier: data.subscription_tier || "free",
-    })
-  }
+  // The registered-account total is a count, so ask Firestore for a count
+  // rather than paging documents in to measure their length.
+  const totalUsers = (await adminDb.collection("profiles").count().get()).data().count
 
   const userStats: Array<{
     userId: string
@@ -575,7 +601,9 @@ export async function getAdminUsageStats(options?: {
     tier: string
     cost: number
     requests: number
+    budgetCap: number
     budgetUsedPercent: number
+    hasBudgetOverride: boolean
   }> = []
 
   let totalCost = 0
@@ -583,9 +611,8 @@ export async function getAdminUsageStats(options?: {
 
   // Combine the data
   for (const [userId, summary] of summaryMap.entries()) {
-    const user = userMap.get(userId)
-    const tier = user?.tier || "free"
-    const budgetCap = BUDGET_CAPS[tier as keyof typeof BUDGET_CAPS] || BUDGET_CAPS.free
+    const profile = profileMap.get(userId)
+    const budgetCap = resolveBudgetCap(profile)
 
     totalCost += summary.totalCost
     totalRequests += summary.totalRequests
@@ -593,11 +620,13 @@ export async function getAdminUsageStats(options?: {
     if (summary.totalCost > 0 || summary.totalRequests > 0) {
       userStats.push({
         userId,
-        email: user?.email || "Unknown",
-        tier,
+        email: typeof profile?.email === "string" && profile.email ? profile.email : "Unknown",
+        tier: resolveTier(profile),
         cost: summary.totalCost,
         requests: summary.totalRequests,
-        budgetUsedPercent: (summary.totalCost / budgetCap) * 100,
+        budgetCap,
+        budgetUsedPercent: budgetUsedPercent(summary.totalCost, budgetCap),
+        hasBudgetOverride: hasBudgetOverride(profile),
       })
     }
   }
@@ -606,9 +635,11 @@ export async function getAdminUsageStats(options?: {
   userStats.sort((a, b) => b.cost - a.cost)
 
   return {
-    totalUsers: profilesSnapshot.size,
+    totalUsers,
+    activeUsers: userStats.length,
     totalCost,
     totalRequests,
+    coverage: describeCoverage(summariesSnapshot.size, USER_SUMMARY_SCAN_LIMIT),
     userStats,
   }
 }
@@ -622,7 +653,8 @@ export async function getServiceBreakdown(): Promise<{
     voice: { requests: number; cost: number; durationSeconds: number }
     embeddings: { requests: number; cost: number; tokens: number; characterCount: number }
   }
-  byProvider: Record<string, { requests: number; cost: number; tokens: number }>
+  byProvider: Record<string, UsageTotals>
+  coverage: ScanCoverage
 }> {
   const now = new Date()
 
@@ -632,46 +664,55 @@ export async function getServiceBreakdown(): Promise<{
       voice: { requests: 0, cost: 0, durationSeconds: 0 },
       embeddings: { requests: 0, cost: 0, tokens: 0, characterCount: 0 },
     },
-    byProvider: {} as Record<string, { requests: number; cost: number; tokens: number }>,
+    byProvider: {} as Record<string, UsageTotals>,
+    coverage: describeCoverage(0, USAGE_EVENT_SCAN_LIMIT),
   }
 
   try {
-    // Query usage_events for current month with limit to prevent unbounded reads
-    // Reduced from 50K to 10K to save on Firestore costs (80% reduction in reads)
+    // Bounded scan: an unbounded read of usage_events is itself a Firestore
+    // cost. `coverage` reports whether the cap was hit, so a partial month is
+    // never presented as a complete total.
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const eventsSnapshot = await adminDb
       .collection("usage_events")
       .where("createdAt", ">=", startOfMonth)
       .orderBy("createdAt", "desc")
-      .limit(10000)
+      .limit(USAGE_EVENT_SCAN_LIMIT)
       .get()
+
+    result.coverage = describeCoverage(eventsSnapshot.size, USAGE_EVENT_SCAN_LIMIT)
 
     for (const doc of eventsSnapshot.docs) {
       const event = doc.data()
       const eventType = event.eventType as UsageEventType
-      const cost = event.cost || 0
-      const tokens = event.totalTokens || 0
-      const provider = event.provider || "unknown"
+      const cost = readNumber(event.cost)
+      const tokens = readNumber(event.totalTokens)
 
-      // Aggregate by provider
+      // Aggregate by provider. Cached hits are recorded without a provider (no
+      // upstream call was made), so they land in their own bucket rather than
+      // being misattributed to whichever provider would have served them.
+      const provider =
+        typeof event.provider === "string" && event.provider
+          ? event.provider
+          : event.cached === true
+            ? "cache"
+            : "unattributed"
       if (!result.byProvider[provider]) {
-        result.byProvider[provider] = { requests: 0, cost: 0, tokens: 0 }
+        result.byProvider[provider] = emptyUsageTotals()
       }
-      result.byProvider[provider].requests++
-      result.byProvider[provider].cost += cost
-      result.byProvider[provider].tokens += tokens
+      accumulateUsageEvent(result.byProvider[provider], event)
 
       // Aggregate by service type
       if (eventType === "voice_transcription") {
         result.byService.voice.requests++
         result.byService.voice.cost += cost
-        result.byService.voice.durationSeconds += event.metadata?.durationSeconds || 0
+        result.byService.voice.durationSeconds += readNumber(event.metadata?.durationSeconds)
       } else if (eventType === "embedding_generation") {
         result.byService.embeddings.requests++
         result.byService.embeddings.cost += cost
         result.byService.embeddings.tokens += tokens
         result.byService.embeddings.characterCount +=
-          event.metadata?.totalCharacters || event.metadata?.characterCount || 0
+          readNumber(event.metadata?.totalCharacters) || readNumber(event.metadata?.characterCount)
       } else {
         // LLM events (chat_message, feedback_generation, etc.)
         result.byService.llm.requests++
@@ -680,7 +721,7 @@ export async function getServiceBreakdown(): Promise<{
       }
     }
   } catch (error) {
-    console.error("[Usage Tracking] Failed to get service breakdown:", error)
+    logger.error("[Usage Tracking] Failed to get service breakdown", { error })
   }
 
   return result
@@ -841,10 +882,11 @@ export interface ScenarioUsage {
 
 export interface GranularUsageBreakdown {
   byPattern: Record<string, PatternUsage>
-  byDifficulty: Record<string, { requests: number; tokens: number; cost: number }>
+  byDifficulty: Record<string, UsageTotals>
   byScenario: ScenarioUsage[]
   topCostlyScenarios: ScenarioUsage[]
   topTokenScenarios: ScenarioUsage[]
+  coverage: ScanCoverage
 }
 
 /**
@@ -867,6 +909,7 @@ export async function getGranularUsageBreakdown(options?: {
     byScenario: [],
     topCostlyScenarios: [],
     topTokenScenarios: [],
+    coverage: describeCoverage(0, USAGE_EVENT_SCAN_LIMIT),
   }
 
   try {
@@ -879,7 +922,8 @@ export async function getGranularUsageBreakdown(options?: {
       query = query.where("userId", "==", options.userId)
     }
 
-    const eventsSnapshot = await query.limit(10000).get()
+    const eventsSnapshot = await query.limit(USAGE_EVENT_SCAN_LIMIT).get()
+    result.coverage = describeCoverage(eventsSnapshot.size, USAGE_EVENT_SCAN_LIMIT)
 
     // Aggregate by pattern, difficulty, and scenario
     const scenarioMap = new Map<string, ScenarioUsage>()
@@ -890,33 +934,25 @@ export async function getGranularUsageBreakdown(options?: {
       const difficulty = event.difficulty || event.metadata?.difficulty || "unknown"
       const scenarioId = event.scenarioId || "unknown"
       const scenarioTitle = event.scenarioTitle || event.metadata?.scenarioTitle || scenarioId
-      const tokens = event.totalTokens || 0
-      const cost = event.cost || 0
 
       // Aggregate by pattern
       if (!result.byPattern[pattern]) {
         result.byPattern[pattern] = {
           pattern,
-          requests: 0,
-          tokens: 0,
-          cost: 0,
+          ...emptyUsageTotals(),
           scenarios: [],
         }
       }
-      result.byPattern[pattern].requests++
-      result.byPattern[pattern].tokens += tokens
-      result.byPattern[pattern].cost += cost
+      accumulateUsageEvent(result.byPattern[pattern], event)
       if (scenarioId !== "unknown" && !result.byPattern[pattern].scenarios.includes(scenarioId)) {
         result.byPattern[pattern].scenarios.push(scenarioId)
       }
 
       // Aggregate by difficulty
       if (!result.byDifficulty[difficulty]) {
-        result.byDifficulty[difficulty] = { requests: 0, tokens: 0, cost: 0 }
+        result.byDifficulty[difficulty] = emptyUsageTotals()
       }
-      result.byDifficulty[difficulty].requests++
-      result.byDifficulty[difficulty].tokens += tokens
-      result.byDifficulty[difficulty].cost += cost
+      accumulateUsageEvent(result.byDifficulty[difficulty], event)
 
       // Aggregate by scenario
       const key = scenarioId
@@ -926,22 +962,17 @@ export async function getGranularUsageBreakdown(options?: {
           scenarioTitle,
           pattern,
           difficulty,
-          requests: 0,
-          tokens: 0,
-          cost: 0,
+          ...emptyUsageTotals(),
           avgTokensPerRequest: 0,
         })
       }
-      const scenario = scenarioMap.get(key)!
-      scenario.requests++
-      scenario.tokens += tokens
-      scenario.cost += cost
+      accumulateUsageEvent(scenarioMap.get(key)!, event)
     }
 
     // Convert scenario map to array and calculate averages
     result.byScenario = Array.from(scenarioMap.values()).map((s) => ({
       ...s,
-      avgTokensPerRequest: s.requests > 0 ? Math.round(s.tokens / s.requests) : 0,
+      avgTokensPerRequest: averageTokensPerRequest(s),
     }))
 
     // Get top costly scenarios
@@ -997,8 +1028,8 @@ export async function getSessionUsageBreakdown(sessionId: string): Promise<{
 
     for (const doc of eventsSnapshot.docs) {
       const event = doc.data()
-      const tokens = event.totalTokens || 0
-      const cost = event.cost || 0
+      const tokens = readNumber(event.totalTokens)
+      const cost = readNumber(event.cost)
 
       result.totalTokens += tokens
       result.totalCost += cost
@@ -1006,12 +1037,12 @@ export async function getSessionUsageBreakdown(sessionId: string): Promise<{
         eventType: event.eventType,
         tokens,
         cost,
-        provider: event.provider || "unknown",
+        provider: event.provider || (event.cached === true ? "cache" : "unattributed"),
         timestamp: event.createdAt?.toDate() || new Date(),
       })
     }
   } catch (error) {
-    console.error("[Usage Tracking] Failed to get session breakdown:", error)
+    logger.error("[Usage Tracking] Failed to get session breakdown", { error })
   }
 
   return result
@@ -1029,6 +1060,7 @@ export async function getDailyUsageTrends(days: number = 30): Promise<{
     uniqueUsers: number
   }>
   totals: { requests: number; tokens: number; cost: number; uniqueUsers: number }
+  coverage: ScanCoverage
 }> {
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - days)
@@ -1043,51 +1075,47 @@ export async function getDailyUsageTrends(days: number = 30): Promise<{
       uniqueUsers: number
     }>,
     totals: { requests: 0, tokens: 0, cost: 0, uniqueUsers: 0 },
+    coverage: describeCoverage(0, USAGE_EVENT_SCAN_LIMIT),
   }
 
   try {
-    // Limit to prevent cost explosion on large date ranges
-    // 10K events is sufficient for trend analysis - saves ~90% on Firestore reads
+    // Bounded scan. Because the order is newest-first, hitting the cap drops
+    // the OLDEST days in the range, which would silently flatten the left edge
+    // of the trend chart; `coverage.truncated` is how the caller knows.
     const eventsSnapshot = await adminDb
       .collection("usage_events")
       .where("createdAt", ">=", startDate)
       .orderBy("createdAt", "desc")
-      .limit(10000)
+      .limit(USAGE_EVENT_SCAN_LIMIT)
       .get()
 
-    const dailyMap = new Map<
-      string,
-      {
-        requests: number
-        tokens: number
-        cost: number
-        users: Set<string>
-      }
-    >()
+    result.coverage = describeCoverage(eventsSnapshot.size, USAGE_EVENT_SCAN_LIMIT)
+
+    const dailyMap = new Map<string, UsageTotals & { users: Set<string> }>()
 
     const allUsers = new Set<string>()
 
     for (const doc of eventsSnapshot.docs) {
       const event = doc.data()
       const date = event.createdAt?.toDate()?.toISOString().split("T")[0] || "unknown"
-      const tokens = event.totalTokens || 0
-      const cost = event.cost || 0
       const userId = event.userId
 
-      if (!dailyMap.has(date)) {
-        dailyMap.set(date, { requests: 0, tokens: 0, cost: 0, users: new Set() })
+      let day = dailyMap.get(date)
+      if (!day) {
+        day = { ...emptyUsageTotals(), users: new Set<string>() }
+        dailyMap.set(date, day)
       }
 
-      const day = dailyMap.get(date)!
-      day.requests++
-      day.tokens += tokens
-      day.cost += cost
-      day.users.add(userId)
-      allUsers.add(userId)
+      accumulateUsageEvent(day, event)
+      accumulateUsageEvent(result.totals, event)
 
-      result.totals.requests++
-      result.totals.tokens += tokens
-      result.totals.cost += cost
+      // Anonymous and internal calls carry no userId; counting undefined once
+      // per day would inflate the unique-user count by one on every day that
+      // had any untracked-caller traffic.
+      if (typeof userId === "string" && userId) {
+        day.users.add(userId)
+        allUsers.add(userId)
+      }
     }
 
     result.totals.uniqueUsers = allUsers.size
