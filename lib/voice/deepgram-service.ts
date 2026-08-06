@@ -59,7 +59,7 @@ const DEEPGRAM_LISTEN_URL = "wss://api.deepgram.com/v1/listen"
  * Exported (rather than living on the service as a private method) so the query
  * string can be asserted in tests without standing up a WebSocket.
  */
-export function buildListenUrl(config: DeepgramConfig): string {
+export function buildListenUrl(config: DeepgramConfig, accessToken?: string): string {
   const params = new URLSearchParams({
     model: config.model || "nova-2",
     language: config.language || "en-US",
@@ -72,6 +72,14 @@ export function buildListenUrl(config: DeepgramConfig): string {
 
   if (config.endpointing !== false) {
     params.set("endpointing", String(config.endpointing))
+  }
+
+  // A browser cannot set an Authorization header on a WebSocket, and a granted
+  // JWT is far too long to pass through Sec-WebSocket-Protocol (it also needs
+  // the Bearer scheme, which that header cannot express), so the token rides on
+  // the query string. It only has to be valid for the upgrade request.
+  if (accessToken) {
+    params.set("access_token", accessToken)
   }
 
   return `${DEEPGRAM_LISTEN_URL}?${params.toString()}`
@@ -102,6 +110,7 @@ export class DeepgramVoiceService {
   private lastSentTranscript: string = ""
   private maxDurationMs: number = 180000 // 3 minutes default
   private authToken: string = ""
+  private accessToken: string = ""
   private transcriptMuted: boolean = false
 
   constructor(config: DeepgramConfig = {}) {
@@ -135,14 +144,15 @@ export class DeepgramVoiceService {
   }
 
   /**
-   * Fetch the Deepgram API key from the server-side proxy
-   * This avoids exposing the key in client-side bundles
+   * Grant a fresh Deepgram access token from the server-side proxy.
+   *
+   * Deliberately not cached for the page session: a granted token is only
+   * guaranteed valid for the WebSocket upgrade, so a cached one would be stale
+   * by the second recording. Granting per connection cannot go stale at all.
    */
-  async fetchApiKey(): Promise<void> {
-    if (this.config.apiKey) return
-
+  private async fetchAccessToken(): Promise<void> {
     if (!this.authToken) {
-      throw new Error("Auth token required to fetch Deepgram API key")
+      throw new Error("Auth token required to fetch a Deepgram access token")
     }
 
     const response = await fetch("/api/voice/token", {
@@ -150,8 +160,8 @@ export class DeepgramVoiceService {
     })
 
     if (!response.ok) {
-      // 503 = the server refused to serve a key (ephemeral minting unavailable);
-      // typing input keeps working, so tell the user that instead of a generic failure.
+      // 503 = the server refused to serve a credential; typing input keeps
+      // working, so tell the user that instead of a generic failure.
       throw new Error(
         response.status === 503
           ? "Voice transcription is temporarily unavailable. You can keep typing your answers."
@@ -160,7 +170,10 @@ export class DeepgramVoiceService {
     }
 
     const data = await response.json()
-    this.config.apiKey = data.apiKey
+    if (typeof data?.accessToken !== "string" || !data.accessToken) {
+      throw new Error("Voice transcription is temporarily unavailable.")
+    }
+    this.accessToken = data.accessToken
   }
 
   /**
@@ -218,11 +231,14 @@ export class DeepgramVoiceService {
    * Start real-time transcription
    */
   async startTranscription(): Promise<void> {
-    // Fetch API key from server if not already set
-    await this.fetchApiKey()
-
+    // An explicitly configured raw API key is a local-dev escape hatch; every
+    // other caller gets a freshly granted token for this connection.
     if (!this.config.apiKey) {
-      throw new Error("Deepgram API key not configured")
+      await this.fetchAccessToken()
+    }
+
+    if (!this.config.apiKey && !this.accessToken) {
+      throw new Error("Deepgram credentials not available")
     }
 
     if (this.connection.isRecording) {
@@ -255,11 +271,15 @@ export class DeepgramVoiceService {
         }
       })
 
-      // Create WebSocket connection to Deepgram
-      logger.info("[Deepgram] Connecting with API key", {
-        apiKeyPrefix: this.config.apiKey?.substring(0, 8) + "...",
+      // Create WebSocket connection to Deepgram. A short raw API key can use the
+      // documented subprotocol form; a granted JWT cannot (wrong auth scheme and
+      // far too long for that header), so it goes on the query string instead.
+      logger.info("[Deepgram] Connecting", {
+        credential: this.config.apiKey ? "configured-api-key" : "granted-token",
       })
-      const ws = new WebSocket(buildListenUrl(this.config), ["token", this.config.apiKey!])
+      const ws = this.config.apiKey
+        ? new WebSocket(buildListenUrl(this.config), ["token", this.config.apiKey])
+        : new WebSocket(buildListenUrl(this.config, this.accessToken))
 
       ws.onopen = () => {
         logger.info("[Deepgram] WebSocket connected")

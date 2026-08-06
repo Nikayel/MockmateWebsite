@@ -51,4 +51,27 @@ describe("buildListenUrl", () => {
 
     expect(params.has("endpointing")).toBe(false)
   })
+
+  describe("access token", () => {
+    // A browser cannot set an Authorization header on a WebSocket, and a granted
+    // JWT is too long for Sec-WebSocket-Protocol, so it has to ride the query string.
+    it("carries a granted token as access_token", () => {
+      const params = new URL(buildListenUrl(resolvedConfig(), "granted.jwt.value")).searchParams
+
+      expect(params.get("access_token")).toBe("granted.jwt.value")
+    })
+
+    it("omits access_token when no token is supplied", () => {
+      const params = new URL(buildListenUrl(resolvedConfig())).searchParams
+
+      expect(params.has("access_token")).toBe(false)
+    })
+
+    it("percent-encodes the token so JWT padding cannot break the query string", () => {
+      const url = buildListenUrl(resolvedConfig(), "a+b/c=")
+
+      expect(url).not.toContain("a+b/c=")
+      expect(new URL(url).searchParams.get("access_token")).toBe("a+b/c=")
+    })
+  })
 })
