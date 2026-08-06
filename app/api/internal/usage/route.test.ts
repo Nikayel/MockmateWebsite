@@ -1,0 +1,167 @@
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { NextRequest } from "next/server"
+
+const trackUsageEvent = vi.fn(() => Promise.resolve())
+
+vi.mock("@/lib/usage-tracking", () => ({
+  trackUsageEvent: (...args: unknown[]) => trackUsageEvent(...(args as [])),
+  // Deliberately a real-shaped calculation rather than a stub returning 0, so a
+  // test asserting the cost is not accepted from the caller means something.
+  calculateCost: (input: number, output: number) => ((input + output) / 1000) * 0.002,
+}))
+
+import { POST } from "./route"
+
+const SECRET = "test-cron-secret"
+
+/**
+ * The global next/server mock in vitest.setup.ts drops headers and stubs json()
+ * to {}, so route tests in this repo stub the request shape directly. Matches
+ * the pattern in app/api/client-error/route.test.ts.
+ */
+function makeRequest(body: unknown, authorization?: string): NextRequest {
+  const invalidJson = typeof body === "string"
+  return {
+    headers: {
+      get: (name: string) =>
+        name.toLowerCase() === "authorization" ? (authorization ?? null) : null,
+    },
+    json: () =>
+      invalidJson ? Promise.reject(new SyntaxError("Unexpected token")) : Promise.resolve(body),
+  } as unknown as NextRequest
+}
+
+const validBody = {
+  userId: "user-1",
+  eventType: "feedback_generation",
+  provider: "gemini",
+  inputTokens: 1000,
+  outputTokens: 500,
+  sessionId: "session-1",
+  scenarioId: "two-sum",
+}
+
+describe("POST /api/internal/usage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.CRON_SECRET = SECRET
+  })
+
+  describe("authorization", () => {
+    it("rejects a request with no bearer", async () => {
+      const response = await POST(makeRequest(validBody))
+      expect(response.status).toBe(401)
+      expect(trackUsageEvent).not.toHaveBeenCalled()
+    })
+
+    it("rejects a wrong bearer", async () => {
+      const response = await POST(makeRequest(validBody, "Bearer wrong-secret-value"))
+      expect(response.status).toBe(401)
+      expect(trackUsageEvent).not.toHaveBeenCalled()
+    })
+
+    it("fails closed when the secret is not configured", async () => {
+      // Without this the endpoint would accept anything on a deployment that
+      // forgot the env var, and it writes to the ledger budget enforcement reads.
+      delete process.env.CRON_SECRET
+      const response = await POST(makeRequest(validBody, `Bearer ${SECRET}`))
+      expect(response.status).toBe(500)
+      expect(trackUsageEvent).not.toHaveBeenCalled()
+    })
+
+    it("accepts the configured bearer", async () => {
+      const response = await POST(makeRequest(validBody, `Bearer ${SECRET}`))
+      expect(response.status).toBe(200)
+      expect(trackUsageEvent).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe("validation", () => {
+    const authorized = (body: unknown) => POST(makeRequest(body, `Bearer ${SECRET}`))
+
+    it("rejects a non-JSON body", async () => {
+      expect((await authorized("not json at all")).status).toBe(400)
+    })
+
+    it("rejects a missing userId", async () => {
+      const { userId, ...withoutUser } = validBody
+      void userId
+      expect((await authorized(withoutUser)).status).toBe(400)
+    })
+
+    it("rejects an event type the Edge path may not report", async () => {
+      // voice_transcription and embedding_generation have their own writers;
+      // accepting them here would let one path double-count the other's spend.
+      expect((await authorized({ ...validBody, eventType: "voice_transcription" })).status).toBe(
+        400
+      )
+      expect((await authorized({ ...validBody, eventType: "nonsense" })).status).toBe(400)
+    })
+
+    it("rejects a missing provider", async () => {
+      const { provider, ...withoutProvider } = validBody
+      void provider
+      expect((await authorized(withoutProvider)).status).toBe(400)
+    })
+  })
+
+  describe("recording", () => {
+    it("records the reported tokens against the user", async () => {
+      await POST(makeRequest(validBody, `Bearer ${SECRET}`))
+      expect(trackUsageEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user-1",
+          eventType: "feedback_generation",
+          provider: "gemini",
+          inputTokens: 1000,
+          outputTokens: 500,
+          totalTokens: 1500,
+          sessionId: "session-1",
+          scenarioId: "two-sum",
+        })
+      )
+    })
+
+    it("computes cost itself rather than accepting it from the caller", async () => {
+      // The caller is the Edge runtime, but this endpoint must stay the
+      // authority on rates: a caller-supplied cost would let the pricing table
+      // be bypassed for the numbers budget enforcement reads.
+      await POST(makeRequest({ ...validBody, cost: 999 }, `Bearer ${SECRET}`))
+      const recorded = trackUsageEvent.mock.calls[0][0] as { cost: number }
+      expect(recorded.cost).toBeCloseTo(0.003)
+    })
+
+    it("clamps an implausible token count instead of writing it", async () => {
+      await POST(
+        makeRequest({ ...validBody, inputTokens: 999_999_999, outputTokens: 0 }, `Bearer ${SECRET}`)
+      )
+      const recorded = trackUsageEvent.mock.calls[0][0] as { inputTokens: number }
+      expect(recorded.inputTokens).toBe(2_000_000)
+    })
+
+    it("treats a negative or non-numeric token count as zero", async () => {
+      await POST(
+        makeRequest({ ...validBody, inputTokens: -50, outputTokens: "many" }, `Bearer ${SECRET}`)
+      )
+      const recorded = trackUsageEvent.mock.calls[0][0] as {
+        inputTokens: number
+        outputTokens: number
+      }
+      expect(recorded.inputTokens).toBe(0)
+      expect(recorded.outputTokens).toBe(0)
+    })
+
+    it("marks estimated token counts as inexact", async () => {
+      await POST(makeRequest({ ...validBody, estimatedTokens: true }, `Bearer ${SECRET}`))
+      const recorded = trackUsageEvent.mock.calls[0][0] as { isExactTokenCount: boolean }
+      expect(recorded.isExactTokenCount).toBe(false)
+    })
+
+    it("tags the record as coming from the Edge path", async () => {
+      // Lets a reconciliation tell Edge-estimated spend from Node-measured spend.
+      await POST(makeRequest(validBody, `Bearer ${SECRET}`))
+      const recorded = trackUsageEvent.mock.calls[0][0] as { metadata: { source: string } }
+      expect(recorded.metadata.source).toBe("edge")
+    })
+  })
+})
