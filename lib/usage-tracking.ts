@@ -67,12 +67,14 @@ export const PROVIDER_COSTS = {
   "gpt-4o-mini": 0.000375, // GPT-4o mini: $0.15 in + $0.60 out per 1M
 } as const
 
-// Deepgram voice costs (per minute of audio)
+// Deepgram voice costs (per minute of audio).
+// Legacy entries are kept so historical usage rows still price correctly.
 export const DEEPGRAM_COSTS = {
-  "nova-2": 0.0043, // Nova-2: $0.0043/min (Pay As You Go)
-  nova: 0.0041, // Nova: $0.0041/min
-  enhanced: 0.0145, // Enhanced: $0.0145/min
-  base: 0.0125, // Base: $0.0125/min
+  "nova-3": 0.0048, // Nova-3 monolingual: $0.0048/min (Pay As You Go) - current model
+  "nova-2": 0.0043, // Nova-2: $0.0043/min (legacy)
+  nova: 0.0041, // Nova: $0.0041/min (legacy)
+  enhanced: 0.0145, // Enhanced: $0.0145/min (legacy)
+  base: 0.0125, // Base: $0.0125/min (legacy)
 } as const
 
 // Embedding costs per 1K tokens
@@ -370,9 +372,9 @@ export function calculateCost(inputTokens: number, outputTokens: number, provide
  */
 export function calculateVoiceCost(
   durationSeconds: number,
-  model: keyof typeof DEEPGRAM_COSTS = "nova-2"
+  model: keyof typeof DEEPGRAM_COSTS = "nova-3"
 ): number {
-  const costPerMinute = DEEPGRAM_COSTS[model] || DEEPGRAM_COSTS["nova-2"]
+  const costPerMinute = DEEPGRAM_COSTS[model] || DEEPGRAM_COSTS["nova-3"]
   const minutes = durationSeconds / 60
   return minutes * costPerMinute
 }
@@ -413,7 +415,7 @@ export async function trackVoiceUsage(params: {
   model?: keyof typeof DEEPGRAM_COSTS
   transcriptLength?: number
 }): Promise<void> {
-  const { userId, sessionId, durationSeconds, model = "nova-2", transcriptLength } = params
+  const { userId, sessionId, durationSeconds, model = "nova-3", transcriptLength } = params
   const cost = calculateVoiceCost(durationSeconds, model)
 
   await trackUsageEvent({

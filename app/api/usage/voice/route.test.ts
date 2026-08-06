@@ -23,6 +23,7 @@ vi.mock("@/lib/firebase-admin", () => ({}))
 vi.mock("@/lib/usage-tracking", () => ({
   trackVoiceUsage: mocks.trackVoiceUsage,
   DEEPGRAM_COSTS: {
+    "nova-3": 0.0048,
     "nova-2": 0.0043,
     nova: 0.0041,
     enhanced: 0.0145,
@@ -37,7 +38,10 @@ vi.mock("@/lib/logger", () => ({
   },
 }))
 
-function createRequest(body: unknown, authHeader: string | null = "Bearer valid-token"): NextRequest {
+function createRequest(
+  body: unknown,
+  authHeader: string | null = "Bearer valid-token"
+): NextRequest {
   return {
     headers: {
       get: (name: string) => (name === "Authorization" ? authHeader : null),
@@ -88,6 +92,18 @@ describe("/api/usage/voice", () => {
 
     expect(response.status).toBe(400)
     expect(mocks.trackVoiceUsage).not.toHaveBeenCalled()
+  })
+
+  // The client reports whichever model the socket used. If the cost table does
+  // not know that model the report is rejected and the spend silently vanishes
+  // from cost accounting, so nova-3 has to be accepted before the client sends it.
+  it("accepts nova-3, the model the voice socket actually uses", async () => {
+    const { POST } = await import("./route")
+
+    const response = await POST(createRequest({ ...validBody, model: "nova-3" }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.trackVoiceUsage).toHaveBeenCalledWith(expect.objectContaining({ model: "nova-3" }))
   })
 
   it("rejects a model outside the Deepgram cost whitelist", async () => {

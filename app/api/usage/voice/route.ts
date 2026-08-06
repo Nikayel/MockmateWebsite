@@ -21,7 +21,7 @@ import { logger } from "@/lib/logger"
 const voiceUsageSchema = z.object({
   sessionId: z.string().max(256).optional(),
   durationSeconds: z.number().positive().max(3600),
-  model: z.string().max(64).optional().default("nova-2"),
+  model: z.string().max(64).optional().default("nova-3"),
   transcriptLength: z.number().int().nonnegative().max(1_000_000).optional(),
 })
 
