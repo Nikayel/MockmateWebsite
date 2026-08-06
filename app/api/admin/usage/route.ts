@@ -41,7 +41,12 @@ import {
   buildUserSessionsView,
 } from "@/lib/admin/usage-views"
 import { getUsageHealth } from "@/lib/admin/usage-health"
-import { resolveTier, resolveBudgetCap, hasBudgetOverride } from "@/lib/usage/budget"
+import {
+  resolveTier,
+  resolveBudgetCap,
+  hasBudgetOverride,
+  MAX_CUSTOM_BUDGET_CAP,
+} from "@/lib/usage/budget"
 import { anyTruncated } from "@/lib/usage/scan-limits"
 
 /** Views this endpoint can render. */
@@ -230,9 +235,11 @@ async function buildUserDetail(userId: string) {
   }
 }
 
-// Budget validation constants
+// Budget validation bounds. The ceiling is the same constant the resolver
+// enforces on read (lib/usage/budget.ts), so a value this route accepts can
+// never be one the resolver silently discards as out of range.
 const MIN_BUDGET = 0
-const MAX_BUDGET = 10000 // $10,000 max budget cap
+const MAX_BUDGET = MAX_CUSTOM_BUDGET_CAP
 
 /**
  * POST /api/admin/usage
