@@ -162,7 +162,9 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     apiKey: process.env.OPENAI_API_KEY,
     baseUrl: OPENAI_BASE_URL,
     model: OPENAI_MODELS.luna,
-    maxTokens: 4096,
+    // 8192, not 4096. See the note on openai-xhigh: this is a CAP, not a
+    // reservation, so headroom is free until it is used.
+    maxTokens: 8192,
     temperature: 0.7,
     // Feedback generation: one call per session, the user is already waiting on
     // a results screen, and the output is the most visible artefact we produce.
@@ -175,7 +177,22 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     apiKey: process.env.OPENAI_API_KEY,
     baseUrl: OPENAI_BASE_URL,
     model: OPENAI_MODELS.luna,
-    maxTokens: 4096,
+    /**
+     * 8192 because reasoning tokens are drawn from THIS budget before any
+     * visible text is produced. Measured live 2026-08-06 against gpt-5.6-luna:
+     *
+     *   bounded grading prompt (1164 in, clear rubric)   67-186 reasoning, ~2.7s
+     *   open-ended algorithms question (short prompt)    2157 reasoning, 16.6s
+     *
+     * The model calibrates to the task, so the realistic critique shape is
+     * cheap. But the spread is 30x, and the failure mode at the top of it is
+     * nasty: if reasoning exhausts the budget the call returns an EMPTY message
+     * with finish_reason "length", which callOpenAI correctly treats as a
+     * failure and degrades to DeepSeek. That path bills the exhausted OpenAI
+     * reasoning AND the DeepSeek retry, so the cheap fix is headroom. A cap is
+     * only charged when spent.
+     */
+    maxTokens: 8192,
     temperature: 0.7,
     // The scoring path. A wrong answer here becomes a wrong score on a real
     // user's session, so this is the one place we buy the most thinking
