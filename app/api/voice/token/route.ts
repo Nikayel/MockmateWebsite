@@ -1,15 +1,15 @@
 /**
  * GET /api/voice/token
  *
- * Returns a short-lived, usage:write-only Deepgram key for authenticated users.
- * Minting an ephemeral key per request keeps the long-lived account key
- * server-side so the browser never receives reusable, full-scope credentials.
+ * Returns a short-lived Deepgram access token for authenticated users. Granting
+ * a token per request keeps the long-lived account key server-side so the
+ * browser never receives reusable, full-scope credentials.
  */
 
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { apiRateLimit } from "@/lib/rate-limit"
-import { mintEphemeralDeepgramKey } from "@/lib/voice/deepgram-management"
+import { grantDeepgramAccessToken } from "@/lib/voice/deepgram-auth"
 import { logger } from "@/lib/logger"
 
 export async function GET(request: NextRequest) {
@@ -26,20 +26,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Voice transcription not configured" }, { status: 503 })
   }
 
-  // Prefer a short-lived, usage:write-only key so the browser never receives
-  // the long-lived account key.
-  const ephemeralKey = await mintEphemeralDeepgramKey(accountKey)
-  if (ephemeralKey) {
-    return NextResponse.json({ apiKey: ephemeralKey })
+  const granted = await grantDeepgramAccessToken(accountKey)
+  if (granted) {
+    return NextResponse.json({
+      accessToken: granted.accessToken,
+      expiresIn: granted.expiresIn,
+    })
   }
 
-  // Minting unavailable (no keys:write scope or the project could not be
-  // resolved). Refuse rather than hand the long-lived account key to the
+  // The grant failed. Refuse rather than hand the long-lived account key to the
   // browser: voice degrades to a visible client error while the credential
   // stays server-side.
   logger.error(
-    "[Voice Token] Ephemeral Deepgram key unavailable; refusing to serve voice. " +
-      "Grant the DEEPGRAM_API_KEY keys:write scope (optionally set DEEPGRAM_PROJECT_ID) to restore voice transcription."
+    "[Voice Token] Deepgram access-token grant failed; refusing to serve voice. " +
+      "DEEPGRAM_API_KEY must be a valid key with at least Member permission."
   )
   return NextResponse.json(
     { error: "Voice transcription temporarily unavailable" },

@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server"
 const mocks = vi.hoisted(() => ({
   apiRateLimit: vi.fn(),
   verifyAuth: vi.fn(),
-  mintEphemeralDeepgramKey: vi.fn(),
+  grantDeepgramAccessToken: vi.fn(),
   loggerWarn: vi.fn(),
   loggerError: vi.fn(),
 }))
@@ -17,8 +17,8 @@ vi.mock("@/lib/auth-helpers", () => ({
   verifyAuth: mocks.verifyAuth,
 }))
 
-vi.mock("@/lib/voice/deepgram-management", () => ({
-  mintEphemeralDeepgramKey: mocks.mintEphemeralDeepgramKey,
+vi.mock("@/lib/voice/deepgram-auth", () => ({
+  grantDeepgramAccessToken: mocks.grantDeepgramAccessToken,
 }))
 
 vi.mock("@/lib/logger", () => ({
@@ -51,25 +51,29 @@ describe("/api/voice/token", () => {
     vi.unstubAllEnvs()
   })
 
-  it("returns the ephemeral key when minting succeeds", async () => {
-    mocks.mintEphemeralDeepgramKey.mockResolvedValue("ephemeral-key")
+  it("returns the granted access token and its lifetime", async () => {
+    mocks.grantDeepgramAccessToken.mockResolvedValue({
+      accessToken: "granted.jwt.value",
+      expiresIn: 300,
+    })
     const { GET } = await import("./route")
 
     const response = (await GET(createRequest())) as unknown as StubResponse
 
     expect(response.status).toBe(200)
-    expect(response.data?.apiKey).toBe("ephemeral-key")
-    expect(mocks.mintEphemeralDeepgramKey).toHaveBeenCalledWith("account-key-secret")
+    expect(response.data?.accessToken).toBe("granted.jwt.value")
+    expect(response.data?.expiresIn).toBe(300)
+    expect(mocks.grantDeepgramAccessToken).toHaveBeenCalledWith("account-key-secret")
   })
 
-  it("returns 503 and NEVER the account key when minting is unavailable", async () => {
-    mocks.mintEphemeralDeepgramKey.mockResolvedValue(null)
+  it("returns 503 and NEVER the account key when the grant fails", async () => {
+    mocks.grantDeepgramAccessToken.mockResolvedValue(null)
     const { GET } = await import("./route")
 
     const response = (await GET(createRequest())) as unknown as StubResponse
 
     expect(response.status).toBe(503)
-    expect(response.data?.apiKey).toBeUndefined()
+    expect(response.data?.accessToken).toBeUndefined()
     expect(JSON.stringify(response.data)).not.toContain("account-key-secret")
     expect(mocks.loggerError).toHaveBeenCalled()
   })
@@ -81,7 +85,7 @@ describe("/api/voice/token", () => {
     const response = await GET(createRequest())
 
     expect(response.status).toBe(503)
-    expect(mocks.mintEphemeralDeepgramKey).not.toHaveBeenCalled()
+    expect(mocks.grantDeepgramAccessToken).not.toHaveBeenCalled()
   })
 
   it("returns 401 for unauthenticated requests", async () => {
@@ -91,7 +95,7 @@ describe("/api/voice/token", () => {
     const response = await GET(createRequest())
 
     expect(response.status).toBe(401)
-    expect(mocks.mintEphemeralDeepgramKey).not.toHaveBeenCalled()
+    expect(mocks.grantDeepgramAccessToken).not.toHaveBeenCalled()
   })
 
   it("short-circuits when the rate limiter blocks the request", async () => {
