@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { buildListenUrl, DEFAULT_DEEPGRAM_MODEL } from "./deepgram-service"
 import { DEEPGRAM_COSTS } from "@/lib/usage-tracking"
+import { INTERVIEW_KEYTERMS } from "./interview-keyterms"
 
 /**
  * The service resolves defaults in its constructor, so these fixtures mirror a
@@ -19,6 +20,27 @@ function resolvedConfig(overrides: Parameters<typeof buildListenUrl>[0] = {}) {
     ...overrides,
   }
 }
+
+describe("INTERVIEW_KEYTERMS", () => {
+  // Deepgram recommends 20-50 terms and caps the total at 500 tokens across all
+  // keyterms. Exceeding the cap fails the request, so guard the budget here
+  // rather than discovering it as a dead microphone.
+  it("stays inside Deepgram's recommended term count", () => {
+    expect(INTERVIEW_KEYTERMS.length).toBeGreaterThanOrEqual(20)
+    expect(INTERVIEW_KEYTERMS.length).toBeLessThanOrEqual(50)
+  })
+
+  it("stays well inside the 500-token keyterm budget", () => {
+    // Deliberately pessimistic: count every whitespace-separated word as a token.
+    const wordCount = INTERVIEW_KEYTERMS.reduce((sum, term) => sum + term.split(/\s+/).length, 0)
+
+    expect(wordCount).toBeLessThan(500)
+  })
+
+  it("has no duplicates, which would waste the budget", () => {
+    expect(new Set(INTERVIEW_KEYTERMS).size).toBe(INTERVIEW_KEYTERMS.length)
+  })
+})
 
 describe("DEFAULT_DEEPGRAM_MODEL", () => {
   // The client reports the model it used to /api/usage/voice, which whitelists
@@ -60,6 +82,34 @@ describe("buildListenUrl", () => {
     const params = new URL(buildListenUrl(resolvedConfig({ endpointing: false }))).searchParams
 
     expect(params.has("endpointing")).toBe(false)
+  })
+
+  describe("keyterm prompting", () => {
+    it("sends one repeated keyterm parameter per term", () => {
+      const url = buildListenUrl(resolvedConfig({ keyterms: ["Dijkstra", "idempotent"] }))
+      const params = new URL(url).searchParams
+
+      expect(params.getAll("keyterm")).toEqual(["Dijkstra", "idempotent"])
+    })
+
+    it("keeps a multi-word term as a single keyterm", () => {
+      const url = buildListenUrl(resolvedConfig({ keyterms: ["adjacency list"] }))
+
+      expect(new URL(url).searchParams.getAll("keyterm")).toEqual(["adjacency list"])
+    })
+
+    // Nova-2 and older reject the parameter outright, which would fail the connection.
+    it("omits keyterms on legacy models that do not support them", () => {
+      const url = buildListenUrl(resolvedConfig({ model: "nova-2", keyterms: ["Dijkstra"] }))
+
+      expect(new URL(url).searchParams.has("keyterm")).toBe(false)
+    })
+
+    it("omits the parameter when there are no keyterms", () => {
+      const url = buildListenUrl(resolvedConfig({ keyterms: [] }))
+
+      expect(new URL(url).searchParams.has("keyterm")).toBe(false)
+    })
   })
 
   describe("access token", () => {

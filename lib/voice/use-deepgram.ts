@@ -127,6 +127,8 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
       utteranceEndMs: options.utteranceEndMs,
       vadEvents: options.vadEvents,
       endpointing: options.endpointing,
+      // Undefined falls back to the default interview vocabulary in the service.
+      keyterms: options.keyterms,
     })
 
     // Pass auth token so the service can fetch the API key from the server

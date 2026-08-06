@@ -10,6 +10,7 @@
  */
 
 import { logger } from "@/lib/logger"
+import { INTERVIEW_KEYTERMS } from "./interview-keyterms"
 
 /**
  * Deepgram speech-to-text models.
@@ -36,6 +37,16 @@ export interface DeepgramConfig {
   utteranceEndMs?: number
   vadEvents?: boolean
   endpointing?: number | boolean
+  /** Vocabulary to bias transcription toward. Nova-3 and newer only. */
+  keyterms?: readonly string[]
+}
+
+/**
+ * Keyterm prompting is a Nova-3 and newer feature. Older models reject the
+ * parameter, so it must not be sent when a legacy model is selected.
+ */
+function supportsKeyterms(model: DeepgramModel): boolean {
+  return model.startsWith("nova-3")
 }
 
 export interface TranscriptEvent {
@@ -75,8 +86,9 @@ const DEEPGRAM_LISTEN_URL = "wss://api.deepgram.com/v1/listen"
  * string can be asserted in tests without standing up a WebSocket.
  */
 export function buildListenUrl(config: DeepgramConfig, accessToken?: string): string {
+  const model = config.model || DEFAULT_DEEPGRAM_MODEL
   const params = new URLSearchParams({
-    model: config.model || DEFAULT_DEEPGRAM_MODEL,
+    model,
     language: config.language || "en-US",
     punctuate: String(config.punctuate),
     interim_results: String(config.interimResults),
@@ -87,6 +99,14 @@ export function buildListenUrl(config: DeepgramConfig, accessToken?: string): st
 
   if (config.endpointing !== false) {
     params.set("endpointing", String(config.endpointing))
+  }
+
+  // Each term is its own repeated `keyterm` parameter; Deepgram treats a single
+  // space-joined value as one phrase rather than as separate terms.
+  if (config.keyterms?.length && supportsKeyterms(model)) {
+    for (const term of config.keyterms) {
+      params.append("keyterm", term)
+    }
   }
 
   // A browser cannot set an Authorization header on a WebSocket, and a granted
@@ -139,6 +159,7 @@ export class DeepgramVoiceService {
       utteranceEndMs: config.utteranceEndMs || 1000,
       vadEvents: config.vadEvents !== false,
       endpointing: config.endpointing ?? 300,
+      keyterms: config.keyterms ?? INTERVIEW_KEYTERMS,
     }
 
     this.connection = {
