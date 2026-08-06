@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { buildListenUrl } from "./deepgram-service"
+import { buildListenUrl, DEFAULT_DEEPGRAM_MODEL } from "./deepgram-service"
+import { DEEPGRAM_COSTS } from "@/lib/usage-tracking"
 
 /**
  * The service resolves defaults in its constructor, so these fixtures mirror a
@@ -8,7 +9,7 @@ import { buildListenUrl } from "./deepgram-service"
 function resolvedConfig(overrides: Parameters<typeof buildListenUrl>[0] = {}) {
   return {
     language: "en-US",
-    model: "nova-2" as const,
+    model: DEFAULT_DEEPGRAM_MODEL,
     punctuate: true,
     interimResults: true,
     smartFormat: true,
@@ -18,6 +19,15 @@ function resolvedConfig(overrides: Parameters<typeof buildListenUrl>[0] = {}) {
     ...overrides,
   }
 }
+
+describe("DEFAULT_DEEPGRAM_MODEL", () => {
+  // The client reports the model it used to /api/usage/voice, which whitelists
+  // it against DEEPGRAM_COSTS. If the default model is missing from that table
+  // every voice session silently fails to record its cost.
+  it("has a rate in the Deepgram cost table", () => {
+    expect(Object.keys(DEEPGRAM_COSTS)).toContain(DEFAULT_DEEPGRAM_MODEL)
+  })
+})
 
 describe("buildListenUrl", () => {
   it("targets the Deepgram streaming endpoint", () => {
@@ -31,7 +41,7 @@ describe("buildListenUrl", () => {
   it("carries the transcription options Deepgram expects", () => {
     const params = new URL(buildListenUrl(resolvedConfig())).searchParams
 
-    expect(params.get("model")).toBe("nova-2")
+    expect(params.get("model")).toBe("nova-3")
     expect(params.get("language")).toBe("en-US")
     expect(params.get("punctuate")).toBe("true")
     expect(params.get("interim_results")).toBe("true")

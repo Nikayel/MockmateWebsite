@@ -11,10 +11,13 @@ export {
   getDeepgramService,
   createDeepgramService,
   isDeepgramAvailable,
+  buildListenUrl,
+  DEFAULT_DEEPGRAM_MODEL,
   type DeepgramConfig,
+  type DeepgramModel,
   type TranscriptEvent,
   type DeepgramConnection,
-} from './deepgram-service'
+} from "./deepgram-service"
 
 export {
   useDeepgram,
@@ -22,4 +25,4 @@ export {
   type UseDeepgramOptions,
   type UseDeepgramReturn,
   type VoiceStatus,
-} from './use-deepgram'
+} from "./use-deepgram"

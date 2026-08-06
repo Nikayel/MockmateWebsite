@@ -11,10 +11,25 @@
 
 import { logger } from "@/lib/logger"
 
+/**
+ * Deepgram speech-to-text models.
+ *
+ * These mirror the keys of DEEPGRAM_COSTS in lib/usage-tracking.ts exactly: the
+ * client reports the model it used to /api/usage/voice, which whitelists it
+ * against that table. Adding a model here without adding its rate there makes
+ * the usage report fail.
+ *
+ * nova-3 is the current model. The rest are Deepgram legacy models, kept so
+ * historical sessions remain expressible.
+ */
+export type DeepgramModel = "nova-3" | "nova-2" | "nova" | "enhanced" | "base"
+
+export const DEFAULT_DEEPGRAM_MODEL: DeepgramModel = "nova-3"
+
 export interface DeepgramConfig {
   apiKey?: string
   language?: string
-  model?: "nova-2" | "nova" | "enhanced" | "base"
+  model?: DeepgramModel
   punctuate?: boolean
   interimResults?: boolean
   smartFormat?: boolean
@@ -61,7 +76,7 @@ const DEEPGRAM_LISTEN_URL = "wss://api.deepgram.com/v1/listen"
  */
 export function buildListenUrl(config: DeepgramConfig, accessToken?: string): string {
   const params = new URLSearchParams({
-    model: config.model || "nova-2",
+    model: config.model || DEFAULT_DEEPGRAM_MODEL,
     language: config.language || "en-US",
     punctuate: String(config.punctuate),
     interim_results: String(config.interimResults),
@@ -117,7 +132,7 @@ export class DeepgramVoiceService {
     this.config = {
       apiKey: config.apiKey || "",
       language: config.language || "en-US",
-      model: config.model || "nova-2",
+      model: config.model || DEFAULT_DEEPGRAM_MODEL,
       punctuate: config.punctuate !== false,
       interimResults: config.interimResults !== false,
       smartFormat: config.smartFormat !== false,

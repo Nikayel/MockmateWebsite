@@ -8,7 +8,7 @@
 "use client"
 
 import { useState, useCallback, useRef, useEffect } from "react"
-import { DeepgramVoiceService, DeepgramConfig } from "./deepgram-service"
+import { DeepgramVoiceService, DeepgramConfig, DEFAULT_DEEPGRAM_MODEL } from "./deepgram-service"
 import { VOICE } from "@/lib/constants"
 import { logger } from "@/lib/logger"
 
@@ -268,7 +268,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
           body: JSON.stringify({
             sessionId: options.sessionId,
             durationSeconds,
-            model: options.model || "nova-2",
+            model: options.model || DEFAULT_DEEPGRAM_MODEL,
             transcriptLength: finalTranscript.length,
           }),
         }).catch((err) => {
