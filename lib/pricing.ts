@@ -214,40 +214,45 @@ export function calculateAICost(
 }
 
 /**
- * Get provider cost info for admin display
+ * Human-readable name per provider key, for admin display.
+ *
+ * The OpenAI entries are all one model; the suffix is the reasoning effort the
+ * routing table buys for that capability, which is what an operator comparing
+ * spend actually wants to see.
+ */
+const PROVIDER_DISPLAY_NAMES: Record<AIProvider, string> = {
+  "openai-none": "GPT-5.6 Luna (effort: none)",
+  "openai-low": "GPT-5.6 Luna (effort: low)",
+  "openai-high": "GPT-5.6 Luna (effort: high)",
+  "openai-xhigh": "GPT-5.6 Luna (effort: xhigh)",
+  gemini: "Gemini 3.6 Flash",
+  "gemini-lite": "Gemini 3.5 Flash-Lite",
+  "gemini-pro": "Gemini 2.5 Pro",
+  deepseek: "DeepSeek V4 Pro",
+  "deepseek-chat": "DeepSeek V4 Flash",
+  claude: "Claude 3.5 Haiku",
+  "claude-sonnet": "Claude Sonnet 4",
+  "gpt-4o": "GPT-4o",
+  "gpt-4o-mini": "GPT-4o Mini",
+}
+
+/**
+ * Get provider cost info for admin display.
+ *
+ * Derived from AI_PROVIDER_COSTS rather than hand-listed. The literal version
+ * had already drifted twice over: it omitted `gemini-lite` and `deepseek-chat`
+ * entirely, and still called the pinned model "Gemini 2.5 Flash" after the
+ * migration to 3.6. Adding four OpenAI providers to a hand-written list would
+ * have made the admin cost breakdown silently exclude the PRIMARY vendor.
  */
 export function getProviderCostInfo(): Array<{
   provider: string
   costPer1kTokens: number
   displayName: string
 }> {
-  return [
-    {
-      provider: "gemini",
-      costPer1kTokens: AI_PROVIDER_COSTS.gemini,
-      displayName: "Gemini 2.5 Flash",
-    },
-    {
-      provider: "gemini-pro",
-      costPer1kTokens: AI_PROVIDER_COSTS["gemini-pro"],
-      displayName: "Gemini 2.5 Pro",
-    },
-    { provider: "deepseek", costPer1kTokens: AI_PROVIDER_COSTS.deepseek, displayName: "Deepseek" },
-    {
-      provider: "claude",
-      costPer1kTokens: AI_PROVIDER_COSTS.claude,
-      displayName: "Claude 3.5 Haiku",
-    },
-    {
-      provider: "claude-sonnet",
-      costPer1kTokens: AI_PROVIDER_COSTS["claude-sonnet"],
-      displayName: "Claude Sonnet 4",
-    },
-    { provider: "gpt-4o", costPer1kTokens: AI_PROVIDER_COSTS["gpt-4o"], displayName: "GPT-4o" },
-    {
-      provider: "gpt-4o-mini",
-      costPer1kTokens: AI_PROVIDER_COSTS["gpt-4o-mini"],
-      displayName: "GPT-4o Mini",
-    },
-  ]
+  return (Object.keys(AI_PROVIDER_COSTS) as AIProvider[]).map((provider) => ({
+    provider,
+    costPer1kTokens: AI_PROVIDER_COSTS[provider],
+    displayName: PROVIDER_DISPLAY_NAMES[provider] ?? provider,
+  }))
 }
