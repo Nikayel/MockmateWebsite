@@ -30,6 +30,7 @@ import {
 } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
 import { logAdminAction } from "@/lib/admin/audit"
+import { sessionTitle, sessionType, sessionStatus } from "@/lib/admin/session-fields"
 
 /**
  * GET /api/admin/usage
@@ -174,11 +175,11 @@ export async function GET(request: NextRequest) {
 
               return {
                 sessionId: doc.id,
-                scenarioTitle: session.scenario_title || "Unknown",
-                scenarioType: session.scenario_type || "dsa",
+                scenarioTitle: sessionTitle(session),
+                scenarioType: sessionType(session),
                 difficulty: session.difficulty || "medium",
                 pattern: session.pattern || "unknown",
-                status: session.status || "in_progress",
+                status: sessionStatus(session),
                 cost: sessionCost,
                 tokens: sessionTokens,
                 createdAt:
@@ -254,12 +255,12 @@ export async function GET(request: NextRequest) {
               sessionId: doc.id,
               userId: session.user_id,
               userEmail,
-              scenarioTitle: session.scenario_title || "Unknown",
+              scenarioTitle: sessionTitle(session),
               scenarioId: session.scenario_id,
-              scenarioType: session.scenario_type || "dsa",
+              scenarioType: sessionType(session),
               difficulty: session.difficulty || "medium",
               pattern: session.pattern || "unknown",
-              status: session.status || "in_progress",
+              status: sessionStatus(session),
               cost,
               tokens,
               requestCount,
@@ -312,7 +313,9 @@ export async function GET(request: NextRequest) {
           if (!scenarioMap.has(scenarioId)) {
             scenarioMap.set(scenarioId, {
               scenarioId,
-              scenarioTitle: session.scenario_title || "Unknown",
+              // Sessions with no scenario_id all collapse into one bucket, so
+              // naming it after whichever session landed first would be a lie.
+              scenarioTitle: scenarioId === "unknown" ? "(no scenario id)" : sessionTitle(session),
               pattern: session.pattern || "unknown",
               difficulty: session.difficulty || "medium",
               sessionCount: 0,
