@@ -38,6 +38,7 @@ import {
   type SessionListRow,
   type SessionRowSource,
 } from "@/lib/admin/session-rows"
+import { assembleSessionPage } from "@/lib/admin/session-page"
 import { logger } from "@/lib/logger"
 
 export const dynamic = "force-dynamic"
@@ -102,11 +103,6 @@ function orderAndBound(query: FirebaseFirestore.Query, plan: SessionQueryPlan) {
   return ordered.limit(scanBudgetFor(plan))
 }
 
-/** A row still open: the whole point of the in-progress and abandoned filters. */
-function isOpenSession(session: SessionRowSource): boolean {
-  return !session.completed_at
-}
-
 interface ListPage {
   rows: SessionListRow[]
   nextCursor: string | null
@@ -119,68 +115,45 @@ interface ListPage {
 async function listSessions(plan: SessionQueryPlan): Promise<ListPage> {
   const snapshot = await orderAndBound(buildSessionQuery(plan), plan).get()
 
-  const scanned = snapshot.docs.length
-  const matching = plan.openOnly
-    ? snapshot.docs.filter((doc) => isOpenSession(doc.data() as SessionRowSource))
-    : snapshot.docs
+  // Which documents belong on the page, and where the next one resumes, is pure
+  // logic over what was read, so it lives in session-page.ts where tests can
+  // exercise every branch without a live Firestore.
+  const page = assembleSessionPage(
+    snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() as SessionRowSource })),
+    plan
+  )
 
-  const pageDocs = matching.slice(0, plan.pageSize)
-
-  // Three different reasons a next page might exist, and they need different
-  // cursors. When the page filled, resume after its last row. When an openOnly
-  // scan hit the ceiling without filling the page, resume after the last document
-  // SCANNED: everything between the last match and there was already inspected and
-  // rejected, so replaying it would only re-read documents to discard them again.
-  let nextCursor: string | null = null
-  const scanCapped = plan.openOnly && scanned >= scanBudgetFor(plan)
-
-  if (matching.length > plan.pageSize) {
-    const last = pageDocs[pageDocs.length - 1]
-    nextCursor = cursorFor(last)
-  } else if (scanCapped) {
-    const last = snapshot.docs[snapshot.docs.length - 1]
-    nextCursor = cursorFor(last)
+  if (page.nextCursor === null && (page.items.length === plan.pageSize || page.scanCapped)) {
+    // Ending pagination here would truncate what the admin can reach, and the
+    // only way to get here is a document whose created_at is not an ISO string.
+    logger.warn("[Admin Sessions] Page ended without a cursor; check created_at shape", {
+      returned: page.items.length,
+      scanned: page.scanned,
+    })
   }
 
   // One batched getAll for the whole page instead of a point read per row.
-  const userIds = pageDocs
-    .map((doc) => (doc.data() as SessionRowSource).user_id)
+  const userIds = page.items
+    .map((row) => row.data.user_id)
     .filter((id): id is string => typeof id === "string" && id !== "")
   const profiles = await fetchProfilesById(userIds)
 
   const now = new Date()
-  const rows = pageDocs.map((doc) => {
-    const session = doc.data() as SessionRowSource
-    const userId = typeof session.user_id === "string" ? session.user_id : null
+  const rows = page.items.map((row) => {
+    const userId = typeof row.data.user_id === "string" ? row.data.user_id : null
     // Only the email is read off the profile. Nothing else from that document
     // belongs in a session list, and a spread here is exactly how the last audit
     // found stripe_customer_id in a table payload.
     const email = userId ? profileEmail(profiles.get(userId), "") : ""
-    return toSessionListRow(doc.id, session, email === "" ? null : email, now)
+    return toSessionListRow(row.id, row.data, email === "" ? null : email, now)
   })
 
-  return { rows, nextCursor, scanned, scanCapped }
-}
-
-/**
- * Build the resume position from a document.
- *
- * Returning null ends pagination, so it is only correct when there is genuinely
- * nothing more. Both writers store `created_at` as an ISO string and the query
- * orders on it, so a returned document without one is a document-shape anomaly
- * rather than the end of the list, and it gets logged as such instead of quietly
- * truncating what the admin can page through.
- */
-function cursorFor(doc: FirebaseFirestore.QueryDocumentSnapshot): string | null {
-  const startedAt = (doc.data() as SessionRowSource).created_at
-  if (typeof startedAt !== "string" || startedAt === "") {
-    logger.warn("[Admin Sessions] Cannot build a cursor: created_at is not an ISO string", {
-      sessionId: doc.id,
-      createdAtType: typeof startedAt,
-    })
-    return null
+  return {
+    rows,
+    nextCursor: page.nextCursor ? encodeSessionCursor(page.nextCursor) : null,
+    scanned: page.scanned,
+    scanCapped: page.scanCapped,
   }
-  return encodeSessionCursor({ startedAt, sessionId: doc.id })
 }
 
 /** Exact row count for this filter set, or null when the plan cannot be counted. */
