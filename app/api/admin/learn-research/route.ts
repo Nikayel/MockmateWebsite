@@ -14,9 +14,10 @@
  * rows whose learner had consented at the time of observation, and it never emits a real
  * uid. Those two rules are what make the extract usable in a study.
  */
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
-import { verifyAdminAccess } from "@/lib/admin/middleware"
+import { withPermission, unauthorizedResponse } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 import {
   deidentify,
   fetchAllProgress,
@@ -43,22 +44,31 @@ function toCsv(rows: Array<Record<string, unknown>>): string {
   ].join("\n")
 }
 
-export async function GET(request: NextRequest) {
+/**
+ * The three readout views are curriculum analytics, so VIEW_ANALYTICS. The
+ * export view leaves the building as a file, so it needs EXPORT_DATA on top;
+ * previously any admin role, support included, could download it. The
+ * infrastructure check moved below the auth check so an unauthenticated caller
+ * cannot probe whether the Admin SDK booted.
+ */
+export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (request, context) => {
   if (!adminDb) {
     return NextResponse.json(
       { success: false, error: "Firebase Admin SDK not initialized." },
-      { status: 500 }
+      { status: 503 }
     )
-  }
-
-  const auth = await verifyAdminAccess(request)
-  if (!auth.authorized) {
-    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 })
   }
 
   const params = request.nextUrl.searchParams
   const view = params.get("view") ?? "checks"
   const since = params.get("since") ?? undefined
+
+  if (view === "export" && !context.permissions.includes(PERMISSIONS.EXPORT_DATA)) {
+    return unauthorizedResponse(
+      `Access denied - missing permission: ${PERMISSIONS.EXPORT_DATA}`,
+      403
+    )
+  }
 
   try {
     if (view === "funnel") {
@@ -90,4 +100,4 @@ export async function GET(request: NextRequest) {
     console.error("[learn-research] failed", error)
     return NextResponse.json({ success: false, error: "Failed to build readout" }, { status: 500 })
   }
-}
+})
