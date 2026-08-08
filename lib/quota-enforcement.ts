@@ -359,6 +359,45 @@ async function getUserQuota(
 }
 
 /**
+ * The refusal returned when the platform-wide daily spend ceiling is reached.
+ *
+ * One definition, because it is produced from two places in checkQuota: an early
+ * gate that covers the guest and anonymous branches (which return before the
+ * quota document is ever loaded) and a later one on the authenticated path that
+ * can fill in real quota numbers. Two hand-written copies of a 503 is how the
+ * two paths drift into telling users different things about the same outage.
+ */
+function ceilingBlockedResult(
+  userId: string,
+  tier: QuotaCheckResult["tier"]
+): QuotaCheckResult & { response: NextResponse } {
+  const response = NextResponse.json(
+    {
+      error: "Service temporarily unavailable",
+      message:
+        "AI features are temporarily paused due to unusually high usage. Please try again later.",
+      code: "GLOBAL_CAPACITY_LIMIT",
+    },
+    { status: 503 }
+  )
+
+  logger.error("Blocked request: global daily spend ceiling reached", { userId, tier })
+
+  return {
+    allowed: false,
+    userId,
+    tier,
+    sessionsUsed: 0,
+    sessionsLimit: 0,
+    budgetUsed: 0,
+    budgetLimit: 0,
+    message: "Service temporarily unavailable",
+    code: "GLOBAL_CAPACITY_LIMIT",
+    response,
+  }
+}
+
+/**
  * Check if user has exceeded their quota
  */
 export async function checkQuota(
@@ -394,6 +433,23 @@ export async function checkQuota(
       code: "AUTH_REQUIRED",
       response,
     }
+  }
+
+  // Global aggregate kill-switch, applied BEFORE the guest and anonymous
+  // branches below.
+  //
+  // Both of those branches return `allowed: true` and return EARLY, so for as
+  // long as the ceiling was only checked further down (on the authenticated
+  // path) a spend emergency stopped signed-in users while leaving guest and
+  // anonymous traffic running. That is backwards: those are the callers with no
+  // per-user budget to exhaust, so they are the ones a platform-wide ceiling is
+  // the only control over.
+  //
+  // Placed after the requireAuth rejection above so an anonymous caller on a
+  // cost-bearing route still gets 401 rather than learning the platform's
+  // operational state from a 503.
+  if (await isGlobalCeilingExceeded()) {
+    return ceilingBlockedResult(userId || "anonymous", "free")
   }
 
   // If no user ID, check for guest ID and enforce guest quota
@@ -680,30 +736,20 @@ export async function checkQuota(
 
     // Global aggregate kill-switch: bound total platform AI spend per day
     // regardless of how many individual (within-budget) users are active.
+    //
+    // Re-checked here rather than relying on the early gate alone: the reads
+    // above (quota document, daily cost) take real time, and a ceiling crossed
+    // during them should still stop this request. The early gate covers the
+    // guest and anonymous branches that never reach this line.
     if (await isGlobalCeilingExceeded()) {
-      const response = NextResponse.json(
-        {
-          error: "Service temporarily unavailable",
-          message:
-            "AI features are temporarily paused due to unusually high usage. Please try again later.",
-          code: "GLOBAL_CAPACITY_LIMIT",
-        },
-        { status: 503 }
-      )
-
-      logger.error("Blocked request: global daily spend ceiling reached", { userId, tier })
-
       return {
-        allowed: false,
-        userId,
-        tier,
+        ...ceilingBlockedResult(userId, tier),
+        // The quota document is loaded by this point, so report the real
+        // numbers rather than the placeholders the early gate has to use.
         sessionsUsed: quota.sessionsUsed,
         sessionsLimit: quota.sessionsLimit,
         budgetUsed: quota.budgetUsed,
         budgetLimit: quota.budgetLimit,
-        message: "Service temporarily unavailable",
-        code: "GLOBAL_CAPACITY_LIMIT",
-        response,
       }
     }
 

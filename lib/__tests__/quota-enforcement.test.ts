@@ -142,6 +142,52 @@ describe("Quota Enforcement", () => {
     })
   })
 
+  describe("Global spend ceiling", () => {
+    // The ceiling used to be checked only on the authenticated path, AFTER the
+    // guest and anonymous branches had already returned `allowed: true`. So a
+    // spend emergency stopped signed-in users while leaving exactly the callers
+    // with no per-user budget running. These pin the gate that closed that.
+    beforeEach(async () => {
+      const guard = await import("../global-spend-guard")
+      vi.mocked(guard.isGlobalCeilingExceeded).mockResolvedValue(true)
+    })
+
+    afterEach(async () => {
+      const guard = await import("../global-spend-guard")
+      vi.mocked(guard.isGlobalCeilingExceeded).mockResolvedValue(false)
+    })
+
+    it("blocks ANONYMOUS callers when the ceiling is reached", async () => {
+      const { checkQuota } = await import("../quota-enforcement")
+
+      const result = await checkQuota(makeRequest())
+
+      expect(result.allowed).toBe(false)
+      expect(result.code).toBe("GLOBAL_CAPACITY_LIMIT")
+      expect(result.response?.status).toBe(503)
+    })
+
+    it("blocks GUEST callers when the ceiling is reached", async () => {
+      const { checkQuota } = await import("../quota-enforcement")
+
+      const result = await checkQuota(makeRequest({ "X-Guest-Id": VALID_GUEST_ID }))
+
+      expect(result.allowed).toBe(false)
+      expect(result.code).toBe("GLOBAL_CAPACITY_LIMIT")
+    })
+
+    it("still rejects an unauthenticated caller on a cost-bearing route with 401, not 503", async () => {
+      const { checkQuota } = await import("../quota-enforcement")
+
+      // The requireAuth gate runs BEFORE the ceiling on purpose: an anonymous
+      // caller should not learn the platform's operational state.
+      const result = await checkQuota(makeRequest(), { requireAuth: true })
+
+      expect(result.allowed).toBe(false)
+      expect(result.response?.status).toBe(401)
+    })
+  })
+
   describe("Error Handling", () => {
     it("should fail open when quota check fails", async () => {
       // Mock a failure
