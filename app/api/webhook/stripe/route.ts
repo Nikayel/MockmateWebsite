@@ -165,6 +165,95 @@ async function releaseIdempotencyMarker(eventKey: string): Promise<void> {
   }
 }
 
+/**
+ * A `processing` claim older than this is assumed dead and may be taken over by a retry.
+ *
+ * This function is capped at 30s (vercel.json `app/api/**` maxDuration), so a LIVE invocation can
+ * never hold a claim for two minutes. Anything older was killed mid-flight (timeout, OOM, deploy) and
+ * its work may be half-done, so Stripe's retry must be allowed to re-run it.
+ */
+const IDEMPOTENCY_STALE_CLAIM_MS = 2 * 60 * 1000
+
+/**
+ * Claim the right to process this event, or report it as a duplicate.
+ *
+ * WHY A CLAIM AND NOT A PLAIN MARKER: the previous version wrote the marker BEFORE handling and only
+ * removed it inside explicit catches. A hard kill (this function's 30s cap, hit by the synchronous
+ * Brevo sends below) left the marker behind with no catch running, so Stripe's retry saw "already
+ * processed" and skipped — the customer was charged and never upgraded, with no 500 and no
+ * dead-letter row to notice it by.
+ *
+ * DESIGN CHOICE — `create()` a `processing` claim, complete it after the handler, and treat a STALE
+ * processing claim as replayable. The alternative (write the marker only on success) was rejected: it
+ * leaves the whole handler window unguarded, so two genuinely concurrent deliveries of the same event
+ * would both run it end to end. Here `create()` fails on the second writer, so concurrent duplicates
+ * still collide, while a dead claim self-heals on the next retry.
+ */
+async function claimIdempotencyMarker(
+  eventKey: string,
+  event: Stripe.Event
+): Promise<"claimed" | "duplicate"> {
+  const markerRef = adminDb.collection("webhook_events").doc(eventKey)
+  const now = Date.now()
+  const claim = {
+    event_id: event.id,
+    idempotency_key: event.request?.idempotency_key || null,
+    event_type: event.type,
+    status: "processing" as const,
+    claimed_at: new Date(now).toISOString(),
+    created: event.created,
+    // TTL for cleanup
+    expires_at: new Date(now + WEBHOOK.IDEMPOTENCY_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+  }
+
+  try {
+    // create() fails if the doc exists, so this is an atomic claim against concurrent deliveries.
+    await markerRef.create(claim)
+    return "claimed"
+  } catch {
+    // Doc already exists (or create() raced). Decide from its state.
+    const existing = (await markerRef.get()).data()
+
+    // Markers written before this change carry no `status`; they only ever existed post-handling
+    // under the old scheme, so treat them as completed.
+    if (!existing || existing.status !== "processing") {
+      return "duplicate"
+    }
+
+    const claimedAt = Date.parse(existing.claimed_at ?? "")
+    const isStale = !Number.isFinite(claimedAt) || now - claimedAt > IDEMPOTENCY_STALE_CLAIM_MS
+    if (!isStale) {
+      return "duplicate"
+    }
+
+    paymentLogger.warn("Taking over a stale webhook claim — previous attempt died mid-flight", {
+      eventKey,
+      eventType: event.type,
+      claimedAt: existing.claimed_at,
+    })
+    await markerRef.set(
+      { ...claim, takeover_count: (existing.takeover_count ?? 0) + 1 },
+      { merge: true }
+    )
+    return "claimed"
+  }
+}
+
+/**
+ * Close the claim so later deliveries of this event are skipped. Best-effort: never throws. If this
+ * write is lost the claim simply goes stale and a retry re-runs the (idempotent) handler.
+ */
+async function completeIdempotencyMarker(eventKey: string): Promise<void> {
+  try {
+    await adminDb
+      .collection("webhook_events")
+      .doc(eventKey)
+      .set({ status: "completed", processed_at: new Date().toISOString() }, { merge: true })
+  } catch (completeError) {
+    paymentLogger.error("Failed to complete idempotency marker", { eventKey, error: completeError })
+  }
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.text()
   const signature = request.headers.get("stripe-signature")
@@ -212,35 +301,22 @@ export async function POST(request: NextRequest) {
   const eventKey = idempotencyKey ? `${event.id}_${idempotencyKey}` : event.id
 
   try {
-    const processedEventRef = adminDb.collection("webhook_events").doc(eventKey)
-    const processedEventSnap = await processedEventRef.get()
+    const claim = await claimIdempotencyMarker(eventKey, event)
 
-    if (processedEventSnap.exists) {
+    if (claim === "duplicate") {
       paymentLogger.info("Event already processed, skipping", {
         eventId: event.id,
         eventType: event.type,
       })
       return NextResponse.json({ received: true, skipped: true })
     }
-
-    // Mark event as being processed (with TTL for cleanup)
-    await processedEventRef.set({
-      event_id: event.id,
-      idempotency_key: idempotencyKey || null,
-      event_type: event.type,
-      processed_at: new Date().toISOString(),
-      created: event.created,
-      // TTL for cleanup
-      expires_at: new Date(
-        Date.now() + WEBHOOK.IDEMPOTENCY_TTL_DAYS * 24 * 60 * 60 * 1000
-      ).toISOString(),
-    })
   } catch (idempotencyError) {
     paymentLogger.error("Error checking event idempotency", {
       eventId: event.id,
       error: idempotencyError,
     })
-    // Continue processing - idempotency check is not critical
+    // Continue processing - idempotency bookkeeping is not critical, and processing an event twice is
+    // safe here (the entitlement mutations are idempotent) while dropping one is not.
   }
 
   paymentLogger.info("Processing webhook event", { eventId: event.id, eventType: event.type })
@@ -1525,6 +1601,10 @@ export async function POST(request: NextRequest) {
       paymentLogger.error("Error handling subscription created", { error })
     }
   }
+
+  // Only now is the event genuinely handled. Closing the claim here (rather than before handling) is
+  // what makes a killed invocation replayable instead of permanently deduplicated.
+  await completeIdempotencyMarker(eventKey)
 
   return NextResponse.json({ received: true })
 }
