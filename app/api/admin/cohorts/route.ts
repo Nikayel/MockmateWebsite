@@ -236,9 +236,16 @@ export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (request) =>
         avgRetention,
         // Additive: same averages when Learn-lesson activity also counts.
         avgRetentionInclLearn,
+        // Zero-based, because period 0 IS the signup period: the loop above starts
+        // at `cohortStart + 0 weeks`, so the first column measures activity in the
+        // week a cohort signed up and is near 100% by construction. Labelling that
+        // column "W1" pushed every subsequent one a week early, so the column a
+        // founder would read as week-4 retention was really week 3, which reads
+        // higher than the truth. This is the number an investor asks for first, so
+        // the off-by-one mattered more than its size suggests.
         periodLabels: cohortType === "weekly"
-          ? ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"]
-          : ["M1", "M2", "M3", "M4", "M5", "M6"],
+          ? ["W0", "W1", "W2", "W3", "W4", "W5", "W6", "W7"]
+          : ["M0", "M1", "M2", "M3", "M4", "M5"],
       },
     })
   } catch (error) {

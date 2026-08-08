@@ -22,7 +22,8 @@ export function CohortHeatmap({
   title,
   subtitle,
   data,
-  periodLabels = ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"],
+  // Zero-based: period 0 is the signup period itself, not the week after it.
+  periodLabels = ["W0", "W1", "W2", "W3", "W4", "W5", "W6", "W7"],
   loading = false,
   icon: Icon,
 }: CohortHeatmapProps) {
