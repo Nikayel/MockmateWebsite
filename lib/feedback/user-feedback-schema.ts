@@ -31,6 +31,13 @@ export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number]
 export const FEEDBACK_PRIORITIES = ["low", "medium", "high", "critical"] as const
 export type FeedbackPriority = (typeof FEEDBACK_PRIORITIES)[number]
 
+/**
+ * Long enough to exclude "hi" and a stray keypress, short enough not to turn a one-line bug report
+ * ("voice cuts out on Safari") into a rejected submission. Exported so the widget can enforce the
+ * same bound it will be judged by, rather than letting the user write and submit something the
+ * server was always going to refuse.
+ */
+export const FEEDBACK_CONTENT_MIN = 10
 export const FEEDBACK_CONTENT_MAX = 4000
 export const FEEDBACK_PATH_MAX = 300
 export const FEEDBACK_TAG_MAX = 24
@@ -62,7 +69,7 @@ export const ADMIN_ONLY_FEEDBACK_FIELDS = [
 export const userFeedbackSubmissionSchema = z
   .object({
     type: z.enum(USER_FEEDBACK_TYPES).default("feedback"),
-    content: z.string().trim().min(10).max(FEEDBACK_CONTENT_MAX),
+    content: z.string().trim().min(FEEDBACK_CONTENT_MIN).max(FEEDBACK_CONTENT_MAX),
     /** The route the user was on. Useful context on a bug report, and never rendered as a link. */
     path: z.string().trim().max(FEEDBACK_PATH_MAX).optional(),
   })
