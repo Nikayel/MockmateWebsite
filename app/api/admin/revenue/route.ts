@@ -36,7 +36,7 @@ import {
   summarizeStripeCharges,
   type PaymentRecordInput,
 } from '@/lib/admin/revenue-metrics'
-import { describeWindow } from '@/lib/admin/funnel-metrics'
+import { buildMetricWindow } from '@/lib/admin/metric-window'
 
 // Initialize Stripe
 const stripe = process.env.STRIPE_SECRET_KEY
@@ -198,12 +198,7 @@ export async function GET(request: NextRequest) {
       success: true,
       timeRange,
       metrics: {
-        window: {
-          timeRange,
-          label: describeWindow(timeRange),
-          startDate: startDate ? startDate.toISOString() : null,
-          endDate: endDate.toISOString(),
-        },
+        window: buildMetricWindow(timeRange, startDate, endDate),
         // Point in time. Independent of `window` above by construction.
         recurring: {
           mrr: centsToDollars(mrr.total),

@@ -26,13 +26,13 @@ import {
   buildFunnelStages,
   buildFunnelTrend,
   computeCohortConversionRates,
-  describeWindow,
   earliestDate,
   ratePercent,
   resolveTrendRange,
   selectSignupCohort,
   summarizeCohortFunnel,
 } from "@/lib/admin/funnel-metrics"
+import { buildMetricWindow } from "@/lib/admin/metric-window"
 import { selectBillingUserIds } from "@/lib/admin/subscription-state"
 import {
   summarizeSessionFunnelCounts,
@@ -177,12 +177,7 @@ export async function GET(request: NextRequest) {
       timeRange,
       funnel: {
         // Every block below is scoped to this window unless it says otherwise.
-        window: {
-          timeRange,
-          label: describeWindow(timeRange),
-          startDate: startDate ? startDate.toISOString() : null,
-          endDate: endDate.toISOString(),
-        },
+        window: buildMetricWindow(timeRange, startDate, endDate),
         stages,
         conversionRates,
         // Cohort members paying today who never completed a round. Reported

@@ -4,7 +4,6 @@ import {
   buildFunnelStages,
   buildFunnelTrend,
   computeCohortConversionRates,
-  describeWindow,
   earliestDate,
   isWithinWindow,
   ratePercent,
@@ -230,15 +229,6 @@ describe("toDate", () => {
     expect(toDate(undefined)).toBeNull()
     expect(toDate({})).toBeNull()
     expect(toDate("nonsense")).toBeNull()
-  })
-})
-
-describe("describeWindow", () => {
-  it("names every selectable range so a stage never renders without its scope", () => {
-    expect(describeWindow("7d")).toBe("last 7 days")
-    expect(describeWindow("30d")).toBe("last 30 days")
-    expect(describeWindow("90d")).toBe("last 90 days")
-    expect(describeWindow("all")).toBe("all time")
   })
 })
 

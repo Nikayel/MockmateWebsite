@@ -197,20 +197,6 @@ export function computeCohortConversionRates(counts: CohortFunnelCounts): Cohort
   }
 }
 
-/** Human-readable window label, so a stage never renders without its scope. */
-export function describeWindow(timeRange: string): string {
-  switch (timeRange) {
-    case "7d":
-      return "last 7 days"
-    case "30d":
-      return "last 30 days"
-    case "90d":
-      return "last 90 days"
-    default:
-      return "all time"
-  }
-}
-
 /**
  * Ceiling on how many daily buckets the trend chart will build. An all-time
  * range on an old account would otherwise allocate one bucket per day since
