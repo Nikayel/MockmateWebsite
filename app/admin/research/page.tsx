@@ -126,6 +126,7 @@ export default function ResearchDashboard() {
   const {
     data: enhancedData,
     loading: enhancedLoading,
+    error: enhancedError,
     exportData: rawExportData,
   } = useEnhancedResearch(firebaseUser)
 
@@ -513,7 +514,24 @@ export default function ResearchDashboard() {
         </Card>
       ) : enhancedData?.experiment ? (
         <ExperimentReadoutPanel readout={enhancedData.experiment} />
-      ) : null}
+      ) : (
+        // A failed analysis used to render nothing at all, so the page simply
+        // lost its verdict and the descriptive cards below became the only
+        // thing on screen. Missing has to look different from "no difference".
+        <Card className="border-2 border-yellow-600/50 bg-yellow-500/10">
+          <CardContent className="flex items-start gap-3 py-6">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-yellow-400" />
+            <div className="space-y-1">
+              <p className="font-medium text-white">The experiment readout could not be computed</p>
+              <p className="text-sm text-gray-300">
+                {enhancedError
+                  ? `The analysis failed: ${enhancedError}. Nothing below this line is a test result, so do not read a winner into it.`
+                  : "The analysis returned no result. Nothing below this line is a test result, so do not read a winner into it."}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Insights Summary */}
       {insights && (
