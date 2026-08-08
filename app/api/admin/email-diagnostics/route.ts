@@ -12,36 +12,41 @@
  * Requires admin authentication
  */
 
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
-import { verifyAdminAccess } from "@/lib/admin/middleware"
+import { withPermission } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 
-export async function GET(request: NextRequest) {
+/**
+ * This is an infrastructure configuration readout, so MANAGE_SETTINGS: admin and
+ * super_admin. It was open to every admin role, including the read-only analyst.
+ */
+export const GET = withPermission(PERMISSIONS.MANAGE_SETTINGS, async () => {
   try {
-    // Verify admin access
-    const authResult = await verifyAdminAccess(request)
-    if (!authResult.authorized) {
+    if (!adminDb) {
       return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status || 403 }
+        { success: false, error: "Database not available" },
+        { status: 503 }
       )
     }
 
-    // Check configuration
+    // Check configuration.
+    //
+    // Only whether each secret is set. This used to return the first eight and
+    // last four characters of BREVO_API_KEY plus its exact length, and the exact
+    // length of CRON_SECRET. A diagnostic never needs key material: knowing the
+    // prefix and length of a secret is a meaningful head start on it, and the
+    // only question the page asks is "is it configured".
     const config = {
       BREVO_API_KEY: {
         configured: !!process.env.BREVO_API_KEY,
-        length: process.env.BREVO_API_KEY?.length || 0,
-        preview: process.env.BREVO_API_KEY
-          ? `${process.env.BREVO_API_KEY.substring(0, 8)}...${process.env.BREVO_API_KEY.substring(process.env.BREVO_API_KEY.length - 4)}`
-          : "Not set",
       },
       CRON_SECRET: {
         configured: !!process.env.CRON_SECRET,
-        length: process.env.CRON_SECRET?.length || 0,
       },
       NEXT_PUBLIC_APP_URL: {
         configured: !!process.env.NEXT_PUBLIC_APP_URL,
+        // NEXT_PUBLIC_ is shipped to every browser already, so this is not a secret.
         value: process.env.NEXT_PUBLIC_APP_URL || "Not set",
       },
     }
@@ -174,17 +179,14 @@ export async function GET(request: NextRequest) {
       recentEmails: recentEmails.slice(0, 20), // Return last 20 for preview
       recommendations: generateRecommendations(config, emailStats, profileStats),
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Email Diagnostics] Error:", error)
     return NextResponse.json(
-      {
-        success: false,
-        error: error.message || "Failed to generate diagnostics",
-      },
+      { success: false, error: "Failed to generate diagnostics" },
       { status: 500 }
     )
   }
-}
+})
 
 function generateRecommendations(config: any, emailStats: any, profileStats: any): string[] {
   const recommendations: string[] = []
