@@ -11,6 +11,13 @@
  * In production: Logs errors to configured external services
  */
 
+// Direct (non-lazy) import: report-client-error.ts imports nothing, so there is
+// no cycle back into this module and no chunk to fetch at error time (a page
+// that is already broken may fail to load a lazy chunk). The module is
+// isomorphic - it touches window/navigator only inside the function body - so
+// pulling it into server and Edge bundles is inert.
+import { reportClientError } from "@/components/monitoring/report-client-error"
+
 type LogLevel = "debug" | "info" | "warn" | "error"
 
 interface LogContext {
@@ -201,6 +208,60 @@ function toSentryLevel(level: LogLevel): "debug" | "info" | "warning" | "error" 
   return level === "warn" ? "warning" : level
 }
 
+/**
+ * The deployment environment as Sentry should label it.
+ *
+ * NODE_ENV is "production" for preview deployments too, which made every
+ * preview error look like a production incident. VERCEL_ENV is the only value
+ * that separates production / preview / development.
+ */
+function resolveEnvironment(): string {
+  return process.env.VERCEL_ENV || process.env.NODE_ENV || "production"
+}
+
+/**
+ * Vercel's request context, published on globalThis under a well-known symbol.
+ * This is the same channel `@vercel/functions`' `waitUntil` reads.
+ */
+const VERCEL_REQUEST_CONTEXT = Symbol.for("@vercel/request-context")
+
+interface VercelRequestContext {
+  get?: () => { waitUntil?: (promise: Promise<unknown>) => void } | undefined
+}
+
+/**
+ * Keep the serverless instance alive until a fire-and-forget delivery settles.
+ *
+ * Vercel freezes a function instance the moment its handler returns and kills
+ * any fetch still in flight, so the errors most likely to be dropped are the
+ * ones logged immediately before returning a 500 - exactly the ones worth
+ * keeping. `@vercel/functions` exports `waitUntil` for this, but it is not a
+ * dependency here and observability does not justify adding one, so we read the
+ * same request context it reads.
+ *
+ * Off-Vercel (local Node, Edge outside a request, the browser, tests) the
+ * symbol is absent and the promise is left floating. That is the correct
+ * degradation: those runtimes do not freeze work mid-flight.
+ */
+function keepAliveUntilSettled(delivery: Promise<unknown>): void {
+  // The logger must never be the thing that crashes a request, so a rejection
+  // is swallowed here rather than escaping as an unhandled rejection.
+  const settled = delivery.catch(() => {})
+
+  try {
+    const context = (globalThis as unknown as Record<symbol, unknown>)[VERCEL_REQUEST_CONTEXT] as
+      | VercelRequestContext
+      | undefined
+    const waitUntil = context?.get?.()?.waitUntil
+    if (typeof waitUntil === "function") {
+      waitUntil(settled)
+    }
+  } catch {
+    // Any surprise in the host's context object leaves `settled` floating,
+    // which is what we would have done anyway.
+  }
+}
+
 interface ParsedDsn {
   ingestUrl: string
   publicKey: string
@@ -262,13 +323,15 @@ async function sendToSentry(
     platform: "node",
     level: toSentryLevel(level),
     logger: "codesparring",
-    environment: process.env.NODE_ENV || "production",
+    environment: resolveEnvironment(),
     release: process.env.VERCEL_GIT_COMMIT_SHA || undefined,
     server_name: process.env.VERCEL_REGION || undefined,
     message: { formatted: redactPIIFromString(message) },
     tags: {
       endpoint: context?.endpoint,
-      statusCode: context?.statusCode,
+      // Sentry rejects non-string tag values and drops the tag, so a numeric
+      // status code never made it onto the event.
+      statusCode: context?.statusCode === undefined ? undefined : String(context.statusCode),
     },
     extra: safeContext,
   }
@@ -292,6 +355,22 @@ async function sendToSentry(
     })
 }
 
+interface ExternalDeliveryOptions {
+  /**
+   * Report to Sentry regardless of level. Revenue events log at `info`, which
+   * the severity gate below would otherwise drop.
+   */
+  alwaysReport?: boolean
+}
+
+/**
+ * Whether an event is severe enough (or important enough) to reach Sentry.
+ * Extracted so the decision is testable without a live transport.
+ */
+function shouldReportToSentry(level: LogLevel, options?: ExternalDeliveryOptions): boolean {
+  return options?.alwaysReport === true || level === "error" || level === "warn"
+}
+
 /**
  * Send error to external monitoring service
  * Configure with environment variables:
@@ -301,7 +380,8 @@ async function sendToSentry(
 async function sendToExternalService(
   level: LogLevel,
   message: string,
-  context?: ErrorContext
+  context?: ErrorContext,
+  options?: ExternalDeliveryOptions
 ): Promise<void> {
   // Skip in development/test
   if (isDev || isTest) return
@@ -309,7 +389,7 @@ async function sendToExternalService(
   try {
     // Sentry integration (active when SENTRY_DSN is configured).
     // Capture errors and warnings; skip lower-severity noise.
-    if (level === "error" || level === "warn") {
+    if (shouldReportToSentry(level, options)) {
       await sendToSentry(level, message, context)
     }
 
@@ -329,7 +409,7 @@ async function sendToExternalService(
                 level,
                 ...context,
                 timestamp: new Date().toISOString(),
-                environment: process.env.NODE_ENV,
+                environment: resolveEnvironment(),
               },
             },
           ],
@@ -356,7 +436,7 @@ async function sendToExternalService(
           message,
           context,
           timestamp: new Date().toISOString(),
-          environment: process.env.NODE_ENV,
+          environment: resolveEnvironment(),
           service: "mockmate-website",
         }),
       }).catch(() => {
@@ -366,6 +446,21 @@ async function sendToExternalService(
   } catch {
     // Never throw from logger - would cause infinite loops
   }
+}
+
+/**
+ * Hand an event to the external transports without blocking the caller, while
+ * still keeping the serverless instance alive long enough to finish the send.
+ * Every fire-and-forget delivery goes through here so the keep-alive is applied
+ * in exactly one place.
+ */
+function deliverExternally(
+  level: LogLevel,
+  message: string,
+  context?: ErrorContext,
+  options?: ExternalDeliveryOptions
+): void {
+  keepAliveUntilSettled(sendToExternalService(level, message, context, options))
 }
 
 export const logger = {
@@ -386,7 +481,7 @@ export const logger = {
       console.warn(formatMessage("warn", message, context))
     }
     // Send warnings to external service in production
-    sendToExternalService("warn", message, context)
+    deliverExternally("warn", message, context)
   },
 
   error(message: string, context?: ErrorContext) {
@@ -407,8 +502,26 @@ export const logger = {
       }
     }
 
+    if (typeof window !== "undefined") {
+      // SENTRY_DSN is not a NEXT_PUBLIC_ var, so it is undefined in the browser
+      // bundle and a direct send from here can never succeed. (LOGFLARE_* and
+      // ERROR_WEBHOOK_URL are server-only for the same reason.) Route through
+      // the beacon the global handlers already use: /api/client-error re-logs
+      // the report server-side, which is the only client -> Sentry path.
+      reportClientError({
+        message,
+        stack: context?.error instanceof Error ? context.error.stack : undefined,
+        // ClientErrorSource has no value for "explicitly logged by app code";
+        // "react-boundary" is the closest existing one (the other two are
+        // automatic global listeners) and the enum is shared with the route's
+        // schema, so inventing a value here would fail validation server-side.
+        source: "react-boundary",
+      })
+      return
+    }
+
     // Always send to external service (they handle deduplication)
-    sendToExternalService("error", message, context)
+    deliverExternally("error", message, context)
   },
 
   /**
@@ -430,7 +543,7 @@ export const logger = {
 
     // Track slow requests
     if (duration > 5000) {
-      sendToExternalService("warn", `Slow request: ${message}`, {
+      deliverExternally("warn", `Slow request: ${message}`, {
         endpoint,
         statusCode,
         duration,
@@ -440,7 +553,7 @@ export const logger = {
 
     // Track errors
     if (statusCode >= 500) {
-      sendToExternalService("error", message, {
+      deliverExternally("error", message, {
         endpoint,
         statusCode,
         duration,
@@ -455,12 +568,16 @@ export const logger = {
   payment(event: string, context: LogContext) {
     const message = `[PAYMENT] ${event}`
 
-    if (shouldLog("info")) {
+    // Revenue events deliberately bypass the production level gate. `info` is
+    // dropped in production, which made this method a total no-op exactly where
+    // upgrades, renewals, failures, refunds and downgrades needed to be
+    // auditable. Ordinary `logger.info` keeps the gate.
+    if (!isTest) {
       console.info(formatMessage("info", message, context))
     }
 
     // Always send payment events to external service
-    sendToExternalService("info", message, context)
+    deliverExternally("info", message, context, { alwaysReport: true })
   },
 
   /**
