@@ -293,7 +293,13 @@ export default function DashboardPage() {
   const isPro = isPaidTier((profile?.subscription_tier ?? "free") as SubscriptionTier)
   const planLabel =
     profile?.subscription_tier === "enterprise" ? "Enterprise" : isPro ? "Pro" : "Free"
-  const usagePercentage = usage ? (usage.used / usage.limit) * 100 : 0
+  // A zero or missing limit produces Infinity (or NaN for 0/0), which reaches
+  // <Progress value={...}> and the >= 80 upgrade prompt. A quota document written
+  // during a partial migration, or any tier row that ends up with a 0 limit, would
+  // render a broken bar and permanently pin the upgrade nudge on. Treat a
+  // non-positive limit as fully consumed, which is what it means.
+  const usagePercentage =
+    usage && usage.limit > 0 ? Math.min((usage.used / usage.limit) * 100, 100) : usage ? 100 : 0
   const userName =
     user?.user_metadata?.full_name?.split(" ")[0] || firebaseUser?.displayName?.split(" ")[0]
 
