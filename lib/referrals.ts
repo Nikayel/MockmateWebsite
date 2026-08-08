@@ -1268,12 +1268,26 @@ export async function getReferralStats(): Promise<ReferralStats> {
       .sort((a, b) => b.week.localeCompare(a.week))
       .slice(0, 12) // Last 12 weeks
 
-    // Count organic vs referred signups
-    const usersSnapshot = await adminDb.collection("users").get()
-    const totalUsers = usersSnapshot.size
+    // Count organic vs referred signups.
+    //
+    // This counted `users`, which is not the user table. `profiles` is the one
+    // document per account that the Stripe webhook, quota, and usage paths all
+    // write and that `lib/usage-tracking.ts` counts for total users; `users`
+    // holds referral codes and per-user subcollections and is created lazily,
+    // so it is a SUBSET of accounts. Dividing referrals by it inflated the
+    // viral coefficient, and subtracting referrals from it could go negative
+    // and render an organic count below zero.
+    //
+    // A count() aggregation also replaces reading every document just to take
+    // .size, which on this collection is the single most expensive read on the
+    // admin growth page.
+    const totalUsers = (await adminDb.collection("profiles").count().get()).data().count
 
     stats.referralsBySource.referred = stats.totalReferrals
-    stats.referralsBySource.organic = totalUsers - stats.totalReferrals
+    // Clamp: a referral whose profile has since been deleted would otherwise
+    // push this below zero. Fewer accounts than referrals is a data problem,
+    // not a negative quantity of organic signups.
+    stats.referralsBySource.organic = Math.max(0, totalUsers - stats.totalReferrals)
 
     // Calculate viral coefficient
     // Viral coefficient = (total referrals / total users)
