@@ -608,7 +608,14 @@ function isStale(timestamp: string, minutes: number): boolean {
 }
 
 /**
- * Calculate additional insights from the comparison data
+ * Descriptive read of the stored cohort averages.
+ *
+ * Everything returned here is descriptive only. No sentence produced by this
+ * function may declare a winner or attach a confidence to one: differences
+ * between two cohort averages say nothing about whether the difference is
+ * larger than the noise. The tested verdict lives in
+ * `lib/research/experiment-readout.ts` and is surfaced by
+ * /api/admin/research/enhanced.
  */
 function calculateInsights(comparison: AlgorithmComparisonAggregate | null) {
   if (!comparison) {
@@ -682,18 +689,33 @@ function calculateInsights(comparison: AlgorithmComparisonAggregate | null) {
     )
   }
 
-  // Overall winner
-  let summary = "Results are inconclusive. Need more data."
-  if (comp.overall_winner && comp.confidence_level) {
-    summary = `${comp.overall_winner.toUpperCase()} appears to be the better algorithm with ${comp.confidence_level}% confidence.`
+  // Summary.
+  //
+  // This used to read "{winner} appears to be the better algorithm with
+  // {confidence_level}% confidence", where confidence_level was produced by
+  // `Math.min(95, 60 + wins * 7)`: a count of how many of five cohort averages
+  // one arm happened to lead on, rescaled to look like a percentage. Nothing in
+  // that number came from the spread of the data or the size of the sample, and
+  // it was the single sentence the founder read first.
+  //
+  // The findings above are DESCRIPTIVE cohort averages and stay that way. The
+  // one place a winner may be declared is the tested readout, which runs at the
+  // user level with an interval, a correction and an SRM check.
+  const leader =
+    comp.fsrs_wins_count > comp.sm2_wins_count
+      ? "FSRS"
+      : comp.sm2_wins_count > comp.fsrs_wins_count
+        ? "SM-2"
+        : null
 
-    if (comp.overall_winner === "fsrs") {
-      recommendations.push("Consider migrating all new users to FSRS algorithm.")
-      recommendations.push("Prepare migration plan for existing SM-2 users.")
-    } else {
-      recommendations.push("Keep SM-2 as the default algorithm.")
-      recommendations.push("Investigate why FSRS is underperforming - may need parameter tuning.")
-    }
+  const summary = leader
+    ? `${leader} leads on ${Math.max(comp.fsrs_wins_count, comp.sm2_wins_count)} of 5 cohort averages. Leading on an average is not a result: see the tested verdict at the top of the page for whether the difference survives a significance test.`
+    : "The two cohorts split the five averages evenly. See the tested verdict at the top of the page for the statistical read."
+
+  if (!comp.sufficient_sample_size) {
+    recommendations.push(
+      "Do not act on the averages above until both arms clear the minimum users per arm."
+    )
   }
 
   return {
