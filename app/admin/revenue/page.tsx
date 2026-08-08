@@ -219,7 +219,7 @@ export default function RevenuePage() {
             />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-3">
               <MetricCard
-                title="MRR"
+                title="MRR at list price"
                 value={usd(metrics.recurring.mrr)}
                 subtitle="Subscriptions billing today"
                 icon={TrendingUp}
@@ -227,7 +227,7 @@ export default function RevenuePage() {
                 iconColor="text-green-400"
               />
               <MetricCard
-                title="ARR"
+                title="ARR at list price"
                 value={usd(metrics.recurring.arr)}
                 subtitle="MRR x 12"
                 icon={DollarSign}
@@ -254,11 +254,17 @@ export default function RevenuePage() {
                 iconColor="text-yellow-400"
               />
             </div>
+            <p className="text-gray-500 text-xs mt-3">
+              Every subscription is priced at the current list price, because the platform does not
+              store what each one is actually charged. Coupons and legacy prices are therefore not
+              reflected here. Stripe holds the billed amounts.
+            </p>
             {metrics.recurring.subscriptions.unknownBillingState > 0 && (
-              <p className="text-gray-500 text-xs mt-3">
-                Those accounts carry a paid tier with no subscription status, so we cannot say
-                whether they are billing. They are excluded from MRR rather than counted at list
-                price.
+              <p className="text-gray-500 text-xs mt-2">
+                {metrics.recurring.subscriptions.unknownBillingState} account
+                {metrics.recurring.subscriptions.unknownBillingState === 1 ? "" : "s"} carry a paid
+                tier with no subscription status, so we cannot say whether they are billing. They
+                are excluded from MRR rather than counted at list price.
               </p>
             )}
           </div>
