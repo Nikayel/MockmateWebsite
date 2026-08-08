@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { generateVSCodeDeepLink, getStoredRedirectPath, resolveSafeRedirect } from "@/lib/auth"
 import { createOrUpdateProfile } from "@/lib/firestore-helpers"
-import { createInAppNotification } from "@/lib/notification-helpers"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle, ExternalLink, Download } from "lucide-react"
@@ -43,23 +42,13 @@ export function AuthCallbackClient() {
             // User can still use the app, profile sync will retry on next auth
           }
 
-          // Create welcome in-app notification for new users
-          if (shouldSendWelcome) {
-            try {
-              await createInAppNotification({
-                userId: firebaseUser.uid,
-                type: "welcome",
-                title: "Welcome to CodeSparring! 🎉",
-                body: `Hey${firebaseUser.displayName ? ` ${firebaseUser.displayName.split(" ")[0]}` : ""}! Ready to ace your next tech interview? Start with a practice problem to see how it works.`,
-                read: false,
-                link: "/interview",
-              })
-              console.log("[Auth] Welcome in-app notification created")
-            } catch (notifError) {
-              console.error("[Auth] Failed to create welcome notification:", notifError)
-              // Non-blocking - continue with the flow
-            }
-          }
+          // The welcome in-app notification is created SERVER-SIDE by
+          // /api/email/welcome, called below. It used to also be attempted here
+          // through the client SDK, which could never work: firestore.rules sets
+          // `allow create: if false` on in_app_notifications, so the write was
+          // rejected every time and the failure was swallowed into a console
+          // line. Two writers for one notification, one of them structurally
+          // impossible, is worse than one that works.
 
           // Send welcome email for new users (non-blocking, authenticated)
           // Note: If this fails, cron job will retry within 24h
