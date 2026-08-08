@@ -245,8 +245,156 @@ collections listed above. Additional structural note: seven admin pages exceed 7
 mixing UI, fetching, formatting and business logic; the worst are `research/page.tsx`
 (1357), `ai-usage/page.tsx` (1177) and `rag/page.tsx` (926).
 
-## Owner actions this audit cannot perform
+## Verification result, 2026-08-08
 
-- Deploy Firestore indexes and rules after the audit-log and feedback changes land.
-- Decide whether the referral reward program is honoured manually or withdrawn.
-- Confirm any AI unit price marked unverified in `lib/usage-tracking.ts`.
+145 ledger rows (several are grouped ranges covering ~180 individual findings).
+
+| Section | FIXED | PARTIAL | OPEN | SUPERSEDED | Rows |
+|---|---|---|---|---|---|
+| NAV | 10 | 1 | 12 | 0 | 23 |
+| CORE | 7 | 4 | 11 | 0 | 22 |
+| REV | 14 | 3 | 5 | 0 | 22 |
+| AI | 4 | 4 | 2 | 0 | 10 |
+| INFRA | 6 | 4 | 7 | 1 | 18 |
+| OPS | 8 | 6 | 2 | 0 | 16 |
+| FB | 4 | 5 | 6 | 2 | 17 |
+| API | 10 | 7 | 0 | 0 | 17 |
+| **Total** | **63** | **34** | **45** | **3** | **145** |
+
+No finding was found `NOT-REAL`. Every P0 in the Revenue, AI-cost, Ops and API sections is
+closed or partially closed; the P0s that remain fully open are all in Core.
+
+### The pattern that survived the sweep
+
+The audit's own dominant defect — a correct module written, tested, and never called — was
+mostly resolved, but not everywhere. Still true at the close:
+
+- `lib/rag/monitoring.ts:608 saveMetricsSnapshot` — 0 callers (INFRA-16).
+- `lib/admin/audit.ts:320 resolveAuditDateRange` — 0 callers; the off-by-one it was written
+  to fix is still live in `audit/route.ts` (FB-12).
+- `lib/admin/api-client.ts:125 loadAdminData` and `components/admin/shared/ExportButton` —
+  0 callers (NAV-6, NAV-9).
+- `components/admin/shared/Skeleton.tsx PageSkeleton` — 0 callers (NAV-16).
+- `lib/pricing.ts cachedInputPer1M` — plumbed through `calculateAICost` but no production
+  caller ever captures cache-hit tokens, so the DeepSeek discount is never applied (AI-13).
+- `AUDIT_ACTIONS.EXPORT_AUDIT_LOG` — declared, never emitted (FB-2).
+- `reopen-ab` — server action with zero client callers (OPS-15).
+- `CACHE_TTL.FUNNEL` / `CACHE_TTL.COHORTS` — declared, unused (API-28).
+
+Two surfaces the previous CTO review named as unreachable were connected by later commits
+and are genuinely live now: `calculateAICost` (`lib/usage-tracking.ts:512`) and the
+experiment readout (`lib/research/analyzer.ts:240` → `app/admin/research/page.tsx:532`).
+
+## Remaining work, by severity
+
+### P0
+
+1. **CORE-1** — `analytics/route.ts:283-290,379-386` still `.get()` all of
+   `interview_sessions` and `analytics_events` and tallies in JS. `timeRange=all` is a live
+   button, so the most expensive query in the admin is one click away.
+2. **CORE-2** — 167 sequential profile batches survive in two copies
+   (`analytics/route.ts:245-253`, `users/route.ts:121-129`).
+3. **CORE-3** — admin delete-user still cancels Stripe before a single unchunked batch
+   (`users/route.ts:252,268,296`). The chunked `deleteAllUserData` exists but is wired only
+   to `/api/delete-account`.
+4. **CORE-4** (PARTIAL) — the admin deleter still queries `analytics_events.userId`
+   (`users/route.ts:60`) while the writer nests under `properties`. Fixed only on the
+   self-serve path.
+5. **API-1** (PARTIAL) — `revenue/route.ts:68` and `funnel/route.ts:57` are the last two bare
+   `verifyAdminAccess` routes, so a read-only `analyst` and a `support` account still read
+   revenue.
+6. **API-22** (PARTIAL) — `user-profile/route.ts:239-250,318-320` still turns Firestore
+   failures into zeros with HTTP 200.
+7. **AI-2** (PARTIAL) — the Edge feedback path still prices from `text.length/4`
+   (`lib/usage/edge-reporter.ts:89-96`); reasoning tokens are still invisible there.
+8. **AI-4** (PARTIAL) — voice (`lib/usage-tracking.ts:566-579`) and every embedding tracker
+   still bypass the daily kill switch.
+9. **INFRA-8/9** — `/admin/errors` still reads a Firestore mirror nothing writes and renders
+   a green "No errors recorded"; Sentry is the real store.
+10. **NAV-11 is closed**, but **NAV-2/3** shipped a new 30s health poll that now fans out to
+    7 outbound vendor probes per poll with no server cache (~20k vendor calls/day per open
+    tab). This is a new P1 the fix created; see `app/admin/health/page.tsx:147`.
+
+### P1
+
+CORE-7, CORE-8, CORE-10, CORE-14, CORE-15 (users metrics fetch), CORE-17, CORE-18, CORE-19,
+CORE-20, CORE-21; REV-4, REV-10, REV-11, REV-12, REV-13, REV-16, REV-19; AI-7, AI-8, AI-9;
+INFRA-12, INFRA-14 (sixth cron external), INFRA-15, INFRA-16/17, INFRA-22, INFRA-23,
+INFRA-24, INFRA-25; OPS-8, OPS-9, OPS-11, OPS-12, OPS-13, OPS-14, OPS-15; FB-2, FB-3, FB-4,
+FB-5, FB-6, FB-7, FB-8, FB-9, FB-23, **FB-34**; API-8..14, API-21, API-24, API-25.
+
+Two to pull forward out of that list:
+
+- **FB-34** is now a crash path. `DataTable` invokes `render(value, row)` while
+  `app/admin/learn-research/page.tsx:81,87` writes `(row) => ...`, and FB-35 just added the
+  page to the nav, so it is reachable by clicking rather than by typing a URL.
+- **FB-7** — `admin_audit_log` has no index declared at all in `firestore.indexes.json`, so
+  the audit log's action filter fails with `FAILED_PRECONDITION` and FB-8 renders that as
+  "No audit logs found".
+
+### P2
+
+NAV-5, NAV-6, NAV-7, NAV-8, NAV-9, NAV-14, NAV-15, NAV-16, NAV-17, NAV-19, NAV-21, NAV-22,
+NAV-23; CORE-22/23/24/26/27; REV-22, REV-24, REV-27, REV-28, REV-30, REV-31, REV-32, REV-33;
+AI-10, AI-11, AI-12, AI-13, AI-14, AI-15, AI-16, AI-18, AI-19, AI-20; INFRA-18..21, 27, 28,
+30..33; OPS-16, OPS-17, OPS-19, OPS-21; FB-10..16, 24, 28, 36..39; API-15, API-18, API-28,
+API-29, API-30, API-31.
+
+## Owner actions
+
+`docs/LAUNCH-CHECKLIST.md` already records: the `firestore:rules,firestore:indexes` deploy
+(including this sweep's 13 `interview_sessions` and 4 `feedback` indexes), every required
+Vercel env var, the Stripe dashboard work, the OAuth/authorized-domain checks, the five
+declared crons, `ERROR_WEBHOOK_URL` plus an uptime monitor and Sentry alert rule,
+provider-side spend caps, and the deliberate decisions on manual referral payout, the
+deferred Edge-to-Node scoring shift, and client-writable `interview_sessions`. Those are not
+repeated here.
+
+New, created by this sweep and not yet in that checklist:
+
+1. **Add and deploy an `admin_audit_log` composite index** (`action` + `timestamp desc`).
+   None is declared today, so the audit log's action filter cannot run (FB-7). The index has
+   to be written in code first; the deploy is yours.
+2. **Confirm the sixth cron.** `vercel.json` declares five. `email-notifications` is
+   deliberately left on cron-job.org and cannot be verified from the repo (INFRA-14).
+3. **Confirm the four AI unit prices still marked UNVERIFIED** at `lib/pricing.ts:267-270`
+   (`gemini-pro`, `claude-sonnet`, `gpt-4o`, `gpt-4o-mini`) and the DeepSeek cache-hit
+   divisor at `lib/pricing.ts:227`, which is derived from a repo comment rather than a vendor
+   price sheet. These now price real calls.
+4. **Decide the fate of `/admin/errors`.** Sentry is the real error store and the Firestore
+   mirror has no writer and will not gain one. Either delete the page or accept a permanently
+   empty one (INFRA-9). Same decision shape for `/admin/rate-limits`, whose writer was
+   deleted in this sweep.
+5. **Create the non-super-admin `admin_roles` documents** you intend to exist. The whole RBAC
+   layer this sweep built is inert until at least one `admin`, `analyst` or `support` record
+   is written; today `ADMIN_USER_ID` short-circuits to `super_admin` before Firestore is
+   touched.
+6. **Set `ADMIN_PROTECTED_EMAILS`** in Vercel Production. Unset, the delete-user route's
+   protection list is empty and any admin account can be deleted through the UI
+   (`app/api/admin/users/route.ts:40-43`).
+7. **Decide whether to set `GLOBAL_DAILY_SPEND_CEILING_USD` explicitly.** It is absent from
+   `.env.example`. The gate now fails closed to the code constant and logs at ERROR, so this
+   is a deliberate-value decision rather than a break.
+8. **Decide on GA4.** `GOOGLE_ANALYTICS_PROPERTY_ID` is not in `.env.example` and the four
+   serial GA4 calls in `analytics/route.ts:506-520` have no consumer (CORE-18). Either wire a
+   consumer or delete the calls; today they are paid latency for nothing.
+9. **Referral payout, unchanged decision.** Kept from the original ledger: whether the reward
+   program is honoured manually or withdrawn. The code now records a redemption reference and
+   audits it, but there is still no payout integration (REV-6).
+
+## Could not be verified either way
+
+- **INFRA-14** — whether `email-notifications` is actually registered on cron-job.org, and
+  whether `CRON_SECRET` is set in Vercel Production. Both are outside the repo. Settled by a
+  screenshot of the cron-job.org dashboard and one 200 in the Vercel cron log.
+- **NAV-19** — the `text-gray-500` classes are unchanged, but the 3.76:1 figure was not
+  re-measured against the current background tokens. Settled by running a contrast checker
+  over the rendered admin shell in both themes.
+- **INFRA-3** — the probes are real and reachable, but no probe has been observed returning
+  `unhealthy` against a live vendor outage. Settled by pointing one probe at an unreachable
+  host in a preview deploy.
+- **OPS-1** — `getFlag` reads Firestore and 14 production call sites exist, but no flag has
+  been observed flipping behaviour end to end in a deployed environment. Settled by toggling
+  `DISABLE_VOICE_MODE` in prod and confirming `/api/voice/token` returns 503.
+- **REV-10** — recorded OPEN because no reconciliation code exists. Whether dropped webhooks
+  are actually occurring is a production-data question, not a code question.
