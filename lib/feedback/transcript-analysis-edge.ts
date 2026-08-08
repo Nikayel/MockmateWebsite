@@ -7,7 +7,7 @@
  * Used by /api/feedback/stream (Edge runtime, no timeout)
  */
 
-import { generateAIResponseEdge } from "@/lib/ai-providers-edge"
+import { generateAIResponseEdge, type EdgeUsageSink } from "@/lib/ai-providers-edge"
 import {
   extractComplexityFromText,
   getComplexityRank,
@@ -36,7 +36,14 @@ export type { TranscriptMessage, ProblemContext, AnalysisResult }
  */
 export async function analyzeTranscriptForMistakesEdge(
   transcript: TranscriptMessage[],
-  problemContext: ProblemContext
+  problemContext: ProblemContext,
+  /**
+   * Where to report what this analysis spent. Optional so existing callers keep
+   * working, but the streaming feedback route passes it: without a sink the LLM
+   * call below bills nobody, and its cost is invisible to the ledger, the per-user
+   * budget and the daily kill switch alike.
+   */
+  onUsage?: EdgeUsageSink
 ): Promise<AnalysisResult> {
   const silentNotes: SilentNote[] = []
   let algorithmicDetections = 0
@@ -72,7 +79,8 @@ export async function analyzeTranscriptForMistakesEdge(
       const semanticNotes = await detectMistakesSemanticallyEdge(
         normalizedTranscript,
         problemContext,
-        algorithmicNotes
+        algorithmicNotes,
+        onUsage
       )
       silentNotes.push(...semanticNotes)
       semanticDetections = semanticNotes.length
@@ -434,7 +442,8 @@ function detectConfusedApproach(userMessage: string): SilentNote | null {
 async function detectMistakesSemanticallyEdge(
   transcript: TranscriptMessage[],
   problemContext: ProblemContext,
-  existingNotes: SilentNote[]
+  existingNotes: SilentNote[],
+  onUsage?: EdgeUsageSink
 ): Promise<SilentNote[]> {
   const transcriptText = transcript
     .filter((m) => m.role === "user" || m.role === "interviewer")
@@ -449,7 +458,7 @@ async function detectMistakesSemanticallyEdge(
     const response = await generateAIResponseEdge(
       "You are a technical interview analyst. Return only valid JSON array.",
       prompt,
-      { maxTokens: 512, temperature: 0.1 }
+      { maxTokens: 512, temperature: 0.1, onUsage }
     )
     return parseSemanticAnalysisResponse(response.text, Date.now())
   } catch (error) {

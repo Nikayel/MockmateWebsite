@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { generateAIResponseEdge } from "@/lib/ai-providers-edge"
+import { generateAIResponseEdge, type EdgeUsageSink } from "@/lib/ai-providers-edge"
 import type { BugfixEvidenceSummary } from "./types"
 import type { BugfixScoreBreakdown } from "./types"
 
@@ -67,7 +67,14 @@ export function fitTranscript(transcript: string, budget = BUGFIX_TRANSCRIPT_BUD
 }
 
 export async function scoreBugfixSemantics(
-  input: BugfixSemanticScorerInput
+  input: BugfixSemanticScorerInput,
+  /**
+   * Where to report what this scoring call spent. Optional so existing callers keep
+   * working, but the streaming feedback route passes it: without a sink this call
+   * bills nobody and stays invisible to the ledger, the per-user budget and the
+   * daily kill switch.
+   */
+  onUsage?: EdgeUsageSink
 ): Promise<BugfixSemanticScores> {
   try {
     const prompt = buildScorerPrompt(input)
@@ -75,7 +82,7 @@ export async function scoreBugfixSemantics(
     const response = await generateAIResponseEdge(
       "You score debugging interviews. Return ONLY valid JSON matching the specified schema. No prose, no markdown.",
       prompt,
-      { maxTokens: 256, temperature: 0 }
+      { maxTokens: 256, temperature: 0, onUsage }
     )
 
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)

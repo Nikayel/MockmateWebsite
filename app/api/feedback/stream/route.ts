@@ -682,7 +682,8 @@ export async function POST(request: NextRequest) {
                   role: m.role,
                   content: m.content,
                 })),
-                problemContext
+                problemContext,
+                trackEdgeSpend()
               ).catch((error) => {
                 // Degrades the feedback rather than the score, so warn rather than
                 // error, but it still needs to leave the Edge log.
@@ -697,26 +698,29 @@ export async function POST(request: NextRequest) {
           bugfixEvidenceSummary &&
           bugfixScoreBreakdownPreSemantic &&
           hasCandidateTurn
-            ? scoreBugfixSemantics({
-                deterministicSubScores: bugfixScoreBreakdownPreSemantic,
-                evidenceSummary: bugfixEvidenceSummary,
-                rootCauseRubric:
-                  sealedRubric ??
-                  (Array.isArray(bugfixRootCauseRubric) ? bugfixRootCauseRubric : []),
-                bugDescription:
-                  sealedGroundTruth ??
-                  (typeof bugfixGroundTruth === "string" ? bugfixGroundTruth : ""),
-                // The transcript is now the ONLY place a candidate states their
-                // hypothesis, root cause, and prevention (the three textareas that
-                // used to carry them are gone). A hypothesis is stated EARLY, so the
-                // last-10-messages window would routinely cut off the very evidence
-                // hypothesisQuality is scored on. Send the whole conversation.
-                conversationExcerpt: fitTranscript(
-                  transcriptMessages
-                    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-                    .join("\n\n")
-                ),
-              }).catch((error) => {
+            ? scoreBugfixSemantics(
+                {
+                  deterministicSubScores: bugfixScoreBreakdownPreSemantic,
+                  evidenceSummary: bugfixEvidenceSummary,
+                  rootCauseRubric:
+                    sealedRubric ??
+                    (Array.isArray(bugfixRootCauseRubric) ? bugfixRootCauseRubric : []),
+                  bugDescription:
+                    sealedGroundTruth ??
+                    (typeof bugfixGroundTruth === "string" ? bugfixGroundTruth : ""),
+                  // The transcript is now the ONLY place a candidate states their
+                  // hypothesis, root cause, and prevention (the three textareas that
+                  // used to carry them are gone). A hypothesis is stated EARLY, so the
+                  // last-10-messages window would routinely cut off the very evidence
+                  // hypothesisQuality is scored on. Send the whole conversation.
+                  conversationExcerpt: fitTranscript(
+                    transcriptMessages
+                      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+                      .join("\n\n")
+                  ),
+                },
+                trackEdgeSpend()
+              ).catch((error) => {
                 // NEUTRAL is reserved for "the scorer itself was unavailable", which
                 // is exactly this branch. Log it so a persistently broken scorer is
                 // distinguishable from sessions that genuinely earned neutral.
