@@ -29,6 +29,7 @@ import {
   Check,
   Clock,
   AlertTriangle,
+  Mail,
 } from "lucide-react"
 import { logger } from "@/lib/logger"
 import {
@@ -127,6 +128,31 @@ function normalizeFeedbackItem(raw: unknown): FeedbackItem {
   }
 }
 
+/**
+ * A stored address is only turned into a mailto link if it looks like a plain address.
+ *
+ * `?` and `&` are excluded deliberately: a stored value of `real@user.com?bcc=someone` would
+ * otherwise smuggle extra headers into the URL the admin's mail client opens.
+ */
+const PLAIN_EMAIL = /^[^\s@,?&]+@[^\s@,?&]+\.[^\s@,?&]+$/
+
+/**
+ * A reply link that opens the admin's own mail client with the user's words quoted.
+ *
+ * Feedback the founder cannot answer is a survey, not a conversation, and the queue held the
+ * submitter's address without ever offering a way to use it.
+ */
+function buildReplyHref(item: FeedbackItem): string | null {
+  if (!item.userEmail || !PLAIN_EMAIL.test(item.userEmail)) return null
+  const subject = `Re: your CodeSparring ${typeConfig[item.type].label.toLowerCase()}`
+  const quoted = item.content
+    .split("\n")
+    .map((line) => `> ${line}`)
+    .join("\n")
+  const body = `Hi,\n\nThank you for writing in. You said:\n\n${quoted}\n\n`
+  return `mailto:${item.userEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+}
+
 function formatDate(value: string | null): string {
   if (!value) return "Unknown date"
   const date = new Date(value)
@@ -141,22 +167,33 @@ export default function FeedbackPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [statusFilter, setStatusFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
   const [selectedItem, setSelectedItem] = useState<FeedbackItem | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [adminNotes, setAdminNotes] = useState("")
 
+  /**
+   * Fetch one page.
+   *
+   * `cursor` null means the first page, which also refreshes the stat cards. Paging deeper appends
+   * and leaves the stats alone, because they describe the whole queue and the server does not
+   * recompute them for later pages.
+   */
   const loadFeedback = useCallback(
-    async (showRefreshing = false) => {
+    async (showRefreshing = false, cursor: string | null = null) => {
       if (!firebaseUser) return
       if (showRefreshing) setRefreshing(true)
+      if (cursor) setLoadingMore(true)
 
       try {
         const token = await firebaseUser.getIdToken()
         const params = new URLSearchParams()
         if (statusFilter !== "all") params.set("status", statusFilter)
         if (typeFilter !== "all") params.set("type", typeFilter)
+        if (cursor) params.set("cursor", cursor)
 
         const response = await fetch(`/api/admin/feedback?${params.toString()}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -180,8 +217,10 @@ export default function FeedbackPage() {
           return
         }
 
-        setFeedback((Array.isArray(data.feedback) ? data.feedback : []).map(normalizeFeedbackItem))
-        setStats(data.stats ? { ...EMPTY_STATS, ...data.stats } : EMPTY_STATS)
+        const page = (Array.isArray(data.feedback) ? data.feedback : []).map(normalizeFeedbackItem)
+        setFeedback((previous) => (cursor ? [...previous, ...page] : page))
+        if (!cursor) setStats(data.stats ? { ...EMPTY_STATS, ...data.stats } : EMPTY_STATS)
+        setNextCursor(typeof data.nextCursor === "string" ? data.nextCursor : null)
         setLoadError(null)
       } catch (error) {
         logger.error("Error loading feedback", { error })
@@ -189,12 +228,15 @@ export default function FeedbackPage() {
       } finally {
         setLoading(false)
         setRefreshing(false)
+        setLoadingMore(false)
       }
     },
     [firebaseUser, statusFilter, typeFilter]
   )
 
+  // Changing a filter starts a new queue, so the old cursor must not survive it.
   useEffect(() => {
+    setNextCursor(null)
     loadFeedback()
   }, [loadFeedback])
 
@@ -227,6 +269,21 @@ export default function FeedbackPage() {
   const handleUpdateStatus = (id: string, status: FeedbackStatus) =>
     updateFeedback({ id, status }, "Could not update that status. Please try again.")
 
+  const handleMarkReplied = async (item: FeedbackItem, replied: boolean) => {
+    const saved = await updateFeedback(
+      { id: item.id, markReplied: replied },
+      "Could not record that. Please try again."
+    )
+    // The dialog stays open, so keep its copy of the row in step with what was just written.
+    if (saved) {
+      setSelectedItem((current) =>
+        current && current.id === item.id
+          ? { ...current, repliedAt: replied ? new Date().toISOString() : null }
+          : current
+      )
+    }
+  }
+
   const handleSaveNotes = async () => {
     if (!selectedItem) return
     const saved = await updateFeedback(
@@ -243,6 +300,8 @@ export default function FeedbackPage() {
     setActionError(null)
     setDialogOpen(true)
   }
+
+  const replyHref = selectedItem ? buildReplyHref(selectedItem) : null
 
   if (loading) {
     return (
@@ -476,6 +535,19 @@ export default function FeedbackPage() {
               })}
             </div>
           )}
+
+          {nextCursor && (
+            <div className="mt-4 flex justify-center">
+              <Button
+                onClick={() => loadFeedback(false, nextCursor)}
+                disabled={loadingMore}
+                variant="outline"
+                className="border-gray-700 text-gray-300"
+              >
+                {loadingMore ? "Loading..." : "Load more"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -502,6 +574,32 @@ export default function FeedbackPage() {
                 <p>From: {selectedItem.userEmail || selectedItem.userId || "Unknown"}</p>
                 <p>Date: {formatDate(selectedItem.createdAt)}</p>
                 {selectedItem.path && <p>Sent from: {selectedItem.path}</p>}
+                {selectedItem.repliedAt && (
+                  <p className="text-green-400">Replied {formatDate(selectedItem.repliedAt)}</p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {replyHref ? (
+                  <Button asChild size="sm" className="bg-[#c4703f] text-black">
+                    <a href={replyHref}>
+                      <Mail className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                      Reply by email
+                    </a>
+                  </Button>
+                ) : (
+                  <p className="text-xs text-gray-500">
+                    No usable email on this report, so it can only be answered in the product.
+                  </p>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-gray-700"
+                  onClick={() => handleMarkReplied(selectedItem, !selectedItem.repliedAt)}
+                >
+                  {selectedItem.repliedAt ? "Clear replied" : "Mark replied"}
+                </Button>
               </div>
               <div className="space-y-2">
                 <label htmlFor="admin-notes" className="text-sm text-gray-400">
