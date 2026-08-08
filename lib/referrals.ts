@@ -1144,6 +1144,14 @@ export async function getUserReferralStats(userId: string): Promise<{
   }
 }
 
+/**
+ * "none" means no reward document exists for that side of the referral yet,
+ * which for the conversion side is the normal state until the referred user
+ * upgrades. Every other value is the reward's real status, carried through
+ * unchanged.
+ */
+export type DetailedRewardStatus = ReferralRewardStatus | "none"
+
 export interface DetailedReferral {
   id: string
   referrerEmail: string
@@ -1154,9 +1162,32 @@ export interface DetailedReferral {
   signupDate: Date
   convertedToPro: boolean
   convertedDate?: Date
-  // Reward status
-  signupRewardStatus: "pending" | "credited" // 1 free month on signup
-  conversionRewardStatus: "pending" | "credited" | "n/a" // $10 + 1 month on Pro upgrade
+  /**
+   * The reward statuses, carried through verbatim.
+   *
+   * These used to be remapped into a private two-value vocabulary here and
+   * then compared against a THIRD vocabulary in the admin page, which is how
+   * the page came to test for a status the service never wrote and render
+   * "Owe $10" forever. There is now one set of status strings, defined once,
+   * from the write all the way to the badge.
+   */
+  signupRewardStatus: DetailedRewardStatus // 1 free month on signup
+  conversionRewardStatus: DetailedRewardStatus // $10 + 1 month on Pro upgrade
+}
+
+/**
+ * Pick the status to show when a referral has several conversion rewards (the
+ * $10 and the free month are separate documents). An outstanding obligation
+ * outranks a settled one: if any conversion reward is still owed, the row
+ * reads as owed.
+ */
+function mergeConversionStatus(
+  current: DetailedRewardStatus,
+  incoming: DetailedRewardStatus
+): DetailedRewardStatus {
+  if (current === "none") return incoming
+  if (current === "pending" || incoming === "pending") return "pending"
+  return current
 }
 
 /**
@@ -1175,24 +1206,27 @@ export async function getAllReferralsDetailed(): Promise<DetailedReferral[]> {
     // Get all rewards to check status
     const rewardsSnapshot = await adminDb.collection("referral_rewards").get()
 
-    // Build a map of rewards by referral
-    const rewardsByReferral = new Map<string, { signup: string; conversion: string }>()
+    // Build a map of rewards by referral, carrying each reward's real status
+    // through rather than collapsing it into a local vocabulary.
+    const rewardsByReferral = new Map<
+      string,
+      { signup: DetailedRewardStatus; conversion: DetailedRewardStatus }
+    >()
     for (const doc of rewardsSnapshot.docs) {
       const data = doc.data()
       const referralId = data.referralId
       if (!rewardsByReferral.has(referralId)) {
-        rewardsByReferral.set(referralId, { signup: "pending", conversion: "n/a" })
+        rewardsByReferral.set(referralId, { signup: "none", conversion: "none" })
       }
       const entry = rewardsByReferral.get(referralId)!
+      const status: DetailedRewardStatus = isReferralRewardStatus(data.status)
+        ? data.status
+        : "none"
+
       if (data.type === "signup_credit") {
-        entry.signup = data.status === "credited" ? "credited" : "pending"
+        entry.signup = status
       } else if (data.type === "conversion_credit" || data.type === "conversion_cash") {
-        // Mark conversion as credited if any conversion reward is processed
-        if (data.status === "credited" || data.status === "paid") {
-          entry.conversion = "credited"
-        } else if (entry.conversion === "n/a") {
-          entry.conversion = "pending"
-        }
+        entry.conversion = mergeConversionStatus(entry.conversion, status)
       }
     }
 
@@ -1203,7 +1237,10 @@ export async function getAllReferralsDetailed(): Promise<DetailedReferral[]> {
     // Build detailed referral list
     for (const doc of referralsSnapshot.docs) {
       const data = doc.data()
-      const rewards = rewardsByReferral.get(doc.id) || { signup: "pending", conversion: "n/a" }
+      const rewards = rewardsByReferral.get(doc.id) || {
+        signup: "none" as DetailedRewardStatus,
+        conversion: "none" as DetailedRewardStatus,
+      }
 
       referrals.push({
         id: doc.id,
@@ -1215,8 +1252,8 @@ export async function getAllReferralsDetailed(): Promise<DetailedReferral[]> {
         signupDate: data.signupDate?.toDate() || new Date(),
         convertedToPro: data.convertedToPro || false,
         convertedDate: data.convertedDate?.toDate(),
-        signupRewardStatus: rewards.signup as "pending" | "credited",
-        conversionRewardStatus: rewards.conversion as "pending" | "credited" | "n/a",
+        signupRewardStatus: rewards.signup,
+        conversionRewardStatus: rewards.conversion,
       })
     }
   } catch (error) {
