@@ -22,7 +22,8 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "Sample Interview Feedback Reports | CodeSparring",
-    description: "See what detailed AI-powered interview feedback looks like. From A+ performances to areas needing improvement.",
+    description:
+      "See what detailed AI-powered interview feedback looks like. From A+ performances to areas needing improvement.",
     url: "/samples",
     type: "website",
   },
@@ -32,10 +33,6 @@ export const metadata: Metadata = {
   },
 }
 
-export default function SamplesLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function SamplesLayout({ children }: { children: React.ReactNode }) {
   return <LenisProvider>{children}</LenisProvider>
 }

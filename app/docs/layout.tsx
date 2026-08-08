@@ -31,10 +31,6 @@ export const metadata: Metadata = {
   },
 }
 
-export default function DocsLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function DocsLayout({ children }: { children: React.ReactNode }) {
   return <LenisProvider>{children}</LenisProvider>
 }
