@@ -181,6 +181,16 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case "migrate": {
         const result = await migrateExistingUsers()
+        await logAdminAction(
+          authResult.context!,
+          RESEARCH_AUDIT_ACTIONS.MIGRATE_ASSIGNMENT,
+          {
+            migrated: result.migrated,
+            sm2Assigned: result.sm2_assigned,
+            fsrsAssigned: result.fsrs_assigned,
+          },
+          { request }
+        )
         return NextResponse.json({
           success: true,
           message: `Migrated ${result.migrated} users (SM-2: ${result.sm2_assigned}, FSRS: ${result.fsrs_assigned})`,
@@ -211,35 +221,40 @@ export async function POST(request: NextRequest) {
       }
 
       case "migrate-notification-preferences": {
-        // Backfill notification preferences for existing users
+        // Backfill notification preferences for existing users.
+        //
+        // This used to stage every profile into ONE WriteBatch. Firestore caps
+        // a batch at 500 writes, so the commit threw INVALID_ARGUMENT the
+        // moment 501 profiles needed the field, and it threw AFTER the whole
+        // collection had been read: the action could never succeed again once
+        // the user base crossed that line, and it failed all-or-nothing with a
+        // message that named neither the cap nor the count.
         const profiles = await adminDb.collection("profiles").get()
-        let migrated = 0
-        const batch = adminDb.batch()
+        const needsPreferences = profiles.docs.filter((doc) => !doc.data().notification_preferences)
 
-        profiles.docs.forEach((doc) => {
-          const data = doc.data()
-          if (!data.notification_preferences) {
-            batch.update(doc.ref, {
-              notification_preferences: {
-                email_notifications_enabled: true,
-                inactivity_reminders: true,
-                spaced_repetition_reminders: true,
-                milestone_celebrations: true,
-                marketing_emails: false,
-              },
-            })
-            migrated++
-          }
+        const result = await commitInChunks(needsPreferences, (batch, doc) => {
+          batch.update(doc.ref, {
+            notification_preferences: {
+              email_notifications_enabled: true,
+              inactivity_reminders: true,
+              spaced_repetition_reminders: true,
+              milestone_celebrations: true,
+              marketing_emails: false,
+            },
+          })
         })
 
-        if (migrated > 0) {
-          await batch.commit()
-        }
+        await logAdminAction(
+          authResult.context!,
+          RESEARCH_AUDIT_ACTIONS.MIGRATE_NOTIFICATION_PREFERENCES,
+          { profilesScanned: profiles.size, migrated: result.written, batches: result.batches },
+          { request }
+        )
 
         return NextResponse.json({
           success: true,
-          message: `Added notification preferences to ${migrated} users`,
-          data: { migrated },
+          message: `Added notification preferences to ${result.written} users in ${result.batches} batches`,
+          data: { migrated: result.written, batches: result.batches },
         })
       }
 
@@ -596,6 +611,38 @@ async function backfillResearchData(): Promise<{
   }
 
   return result
+}
+
+/**
+ * Firestore rejects a WriteBatch with more than 500 operations. Staying under
+ * it with room to spare keeps a single chunk safe even if a future caller adds
+ * a second write per document.
+ */
+const MAX_WRITES_PER_BATCH = 450
+
+/**
+ * Apply one write per item, committing in chunks that respect Firestore's
+ * batch limit. Chunks commit sequentially so a failure part way through leaves
+ * the earlier chunks applied and reports how far it got, rather than throwing
+ * away the whole run.
+ */
+async function commitInChunks<T>(
+  items: T[],
+  stage: (batch: FirebaseFirestore.WriteBatch, item: T) => void
+): Promise<{ written: number; batches: number }> {
+  let written = 0
+  let batches = 0
+
+  for (let start = 0; start < items.length; start += MAX_WRITES_PER_BATCH) {
+    const chunk = items.slice(start, start + MAX_WRITES_PER_BATCH)
+    const batch = adminDb.batch()
+    for (const item of chunk) stage(batch, item)
+    await batch.commit()
+    written += chunk.length
+    batches++
+  }
+
+  return { written, batches }
 }
 
 /**
