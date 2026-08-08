@@ -254,7 +254,10 @@ export default function AdminDashboard() {
           <MetricCard
             title="Weekly Scored Rounds"
             value={metrics.wcsr.currentWeek}
-            subtitle={`North Star · ${metrics.wcsr.total.toLocaleString()} all-time`}
+            // wcsr.total is scoped to the selected range, so calling it "all-time"
+            // put a range-dependent figure directly beside the genuine all-time card
+            // below, under the same label and with a different number.
+            subtitle={`North Star · ${metrics.wcsr.total.toLocaleString()} in ${timeRange.toUpperCase()}`}
             icon={TrendingUp}
             valueColor="text-[#c4703f]"
             iconColor="text-[#c4703f]"
