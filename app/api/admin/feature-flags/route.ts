@@ -108,7 +108,7 @@ function formatZodError(error: z.ZodError): string {
 }
 
 /** Reject a body that names an identity or provenance field. */
-function rejectImmutableFields(body: Record<string, unknown>): string | null {
+export function rejectImmutableFields(body: Record<string, unknown>): string | null {
   const offenders = IMMUTABLE_FLAG_FIELDS.filter(
     (field) => field !== "id" && Object.prototype.hasOwnProperty.call(body, field)
   )
