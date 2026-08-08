@@ -126,58 +126,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Submit feedback (for users) or create feedback (for admins)
-export async function POST(request: NextRequest) {
-  try {
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    if (!adminDb) {
-      return NextResponse.json({ success: false, error: "Database not available" }, { status: 500 })
-    }
-
-    const body = await request.json()
-    const { type = "feedback", content, rating, npsScore, category, priority = "medium" } = body
-
-    if (!content) {
-      return NextResponse.json({ success: false, error: "Content is required" }, { status: 400 })
-    }
-
-    const now = Timestamp.now()
-    const feedbackData = {
-      userId: auth.userId,
-      userEmail: auth.email,
-      type,
-      content,
-      rating,
-      npsScore,
-      category,
-      priority,
-      status: "new",
-      votes: 0,
-      createdAt: now,
-      updatedAt: now,
-    }
-
-    const docRef = await adminDb.collection("feedback").add(feedbackData)
-
-    return NextResponse.json({ success: true, feedbackId: docRef.id })
-  } catch (error) {
-    console.error("[Feedback API] POST Error:", error)
-    return NextResponse.json(
-      { success: false, error: "Failed to submit feedback" },
-      { status: 500 }
-    )
-  }
-}
+// Users submit through POST /api/product-feedback, which is auth-gated, rate limited and
+// schema-validated. There is deliberately no POST here: an unvalidated user-writable handler
+// sitting among role-gated ones is what let a normal account seed this queue with its own
+// status, priority, adminNotes and vote count.
 
 // PUT - Update feedback status/notes (admin only)
 export async function PUT(request: NextRequest) {
