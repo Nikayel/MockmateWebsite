@@ -156,7 +156,7 @@ describe("/api/feedback/stream cost bounds", () => {
     const probing = (ceilingExceeded: boolean) => {
       vi.stubEnv("CRON_SECRET", "probe-secret")
       vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://example.test")
-      const probe = vi.fn(async () => ({
+      const probe = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => ({
         ok: true,
         status: 200,
         json: async () => ({ ceilingExceeded, spendToday: 260, ceiling: 250 }),
@@ -165,8 +165,20 @@ describe("/api/feedback/stream cost bounds", () => {
       return probe
     }
 
+    /** A probe that cannot reach our own origin at all. */
+    const unreachableProbe = () => {
+      vi.stubEnv("CRON_SECRET", "probe-secret")
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://example.test")
+      const probe = vi.fn(async () => {
+        throw new Error("origin unreachable")
+      })
+      vi.stubGlobal("fetch", probe)
+      return probe
+    }
+
     afterEach(() => {
       vi.unstubAllGlobals()
+      vi.useRealTimers()
     })
 
     it("refuses with 503 when the platform ceiling has been reached", async () => {
@@ -208,20 +220,67 @@ describe("/api/feedback/stream cost bounds", () => {
       // side (isGlobalCeilingExceeded returns true, so the probe answers true).
       // What reaches here is "Edge could not reach our own origin", which says
       // nothing about spend, and per-user limits still apply.
-      vi.stubEnv("CRON_SECRET", "probe-secret")
-      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://example.test")
-      vi.stubGlobal(
-        "fetch",
-        vi.fn(async () => {
-          throw new Error("origin unreachable")
-        })
-      )
+      unreachableProbe()
       const { POST } = await import("./route")
 
       const response = await POST(makeRequest())
 
       expect(response.status).toBe(200)
       await drain(response)
+    })
+
+    it("lifts the refusal as soon as the ceiling clears", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] })
+      vi.setSystemTime(new Date("2026-08-08T12:00:00Z"))
+      probing(true)
+      const { POST } = await import("./route")
+
+      expect((await POST(makeRequest())).status).toBe(503)
+
+      // A new day's budget, a raised ceiling, a refund: whatever cleared it, the
+      // next probe past the TTL is what the user is judged on.
+      vi.setSystemTime(new Date("2026-08-08T12:01:01Z"))
+      probing(false)
+
+      const afterClearing = await POST(makeRequest())
+      expect(afterClearing.status).toBe(200)
+      await drain(afterClearing)
+    })
+
+    it("stops replaying a refusal it can no longer confirm", async () => {
+      // The latch: the cache is only written on a SUCCESSFUL probe, so once the
+      // probe starts failing there is nothing left that can clear an "exceeded"
+      // verdict. Every user finishing an interview was refused indefinitely.
+      vi.useFakeTimers({ toFake: ["Date"] })
+      vi.setSystemTime(new Date("2026-08-08T12:00:00Z"))
+      probing(true)
+      const { POST } = await import("./route")
+
+      expect((await POST(makeRequest())).status).toBe(503)
+
+      unreachableProbe()
+
+      // Inside the grace window a tripped ceiling still holds: a blip in our own
+      // origin must not hand out AI spend the ceiling just stopped.
+      vi.setSystemTime(new Date("2026-08-08T12:01:01Z"))
+      expect((await POST(makeRequest())).status).toBe(503)
+
+      // Past it, the verdict has outlived its evidence and is discarded.
+      vi.setSystemTime(new Date("2026-08-08T12:06:00Z"))
+      const recovered = await POST(makeRequest())
+      expect(recovered.status).toBe(200)
+      await drain(recovered)
+    })
+
+    it("bounds the probe so a hung origin cannot stall a finished interview", async () => {
+      const probe = probing(false)
+      const { POST } = await import("./route")
+
+      await drain(await POST(makeRequest()))
+
+      const init = probe.mock.calls[0][1] as RequestInit
+      expect(init.signal).toBeInstanceOf(AbortSignal)
+      expect((init.signal as AbortSignal).aborted).toBe(false)
     })
   })
 

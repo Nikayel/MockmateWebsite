@@ -134,7 +134,58 @@ interface CeilingProbe {
  * a tripped ceiling well under the window in which real money accumulates.
  */
 const CEILING_PROBE_TTL_MS = 60_000
+
+/**
+ * How long a verdict may keep standing in for a refresh that will not complete.
+ *
+ * The cache is only ever WRITTEN on a successful probe, so a verdict of
+ * "exceeded" followed by a probe that can no longer reach our own origin (a lost
+ * CRON_SECRET, a bad NEXT_PUBLIC_SITE_URL, an origin outage) is replayed on
+ * every subsequent request with nothing able to clear it. That is a latch: the
+ * route refuses feedback to every user finishing an interview until the isolate
+ * happens to be recycled, and no amount of the ceiling actually being fine can
+ * release it.
+ *
+ * Five minutes keeps a genuinely tripped ceiling in force well past any
+ * transient blip (and the probe is retried on every request in the meantime, so
+ * recovery is immediate once the origin answers), then expires rather than
+ * latching. What is left after expiry is the documented default below: a probe
+ * we cannot complete says nothing about spend, and per-user rate limits and
+ * budgets still apply.
+ */
+const CEILING_PROBE_MAX_STALE_MS = 5 * 60_000
+
+/**
+ * The probe is an extra hop in front of feedback the user is already waiting on
+ * after a 20-45 minute interview. Unbounded, a hung internal call holds the
+ * request open indefinitely with no error and no feedback. Three seconds is far
+ * above a same-region internal round trip and bounds the worst case to a pause
+ * rather than a hang.
+ */
+const CEILING_PROBE_TIMEOUT_MS = 3_000
+
 let cachedCeilingProbe: CeilingProbe | null = null
+
+/**
+ * The verdict to fall back on when the probe cannot be completed: the last known
+ * one, for as long as it still means something. Beyond CEILING_PROBE_MAX_STALE_MS
+ * it is discarded so a refusal cannot outlive the evidence for it.
+ */
+function lastKnownCeilingVerdict(nowMs: number): boolean {
+  if (!cachedCeilingProbe) return false
+
+  const ageMs = nowMs - cachedCeilingProbe.checkedAtMs
+  if (ageMs > CEILING_PROBE_MAX_STALE_MS) {
+    logger.warn("[Streaming Feedback] Discarding an expired global spend ceiling verdict", {
+      exceeded: cachedCeilingProbe.exceeded,
+      ageMs,
+    })
+    cachedCeilingProbe = null
+    return false
+  }
+
+  return cachedCeilingProbe.exceeded
+}
 
 /**
  * Ask the Node side whether the platform-wide daily ceiling has been reached.
@@ -146,8 +197,8 @@ let cachedCeilingProbe: CeilingProbe | null = null
  * a Firestore error makes isGlobalCeilingExceeded return true, the probe
  * returns ceilingExceeded: true, and this route blocks. The only case that
  * reaches the fallback is "Edge could not reach our own origin", which says
- * nothing about spend — and the cost of guessing wrong is denying a user the
- * feedback for an interview they have just spent 45 minutes on. A stale cached
+ * nothing about spend, and the cost of guessing wrong is denying a user the
+ * feedback for an interview they have just spent 45 minutes on. A recent cached
  * verdict is preferred over a guess, and per-user rate limits and budgets still
  * apply either way.
  */
@@ -166,13 +217,14 @@ async function isGlobalSpendCeilingReached(): Promise<boolean> {
     logger.error("[Streaming Feedback] Cannot check the global spend ceiling: misconfigured", {
       reason: !secret ? "CRON_SECRET unset" : "no NEXT_PUBLIC_SITE_URL or VERCEL_URL",
     })
-    return cachedCeilingProbe?.exceeded ?? false
+    return lastKnownCeilingVerdict(nowMs)
   }
 
   try {
     const response = await fetch(`${origin}/api/internal/usage`, {
       method: "GET",
       headers: { Authorization: `Bearer ${secret}` },
+      signal: AbortSignal.timeout(CEILING_PROBE_TIMEOUT_MS),
     })
     if (!response.ok) {
       throw new Error(`Ceiling probe responded ${response.status}`)
@@ -193,9 +245,10 @@ async function isGlobalSpendCeilingReached(): Promise<boolean> {
     return exceeded
   } catch (error) {
     logger.error("[Streaming Feedback] Global spend ceiling probe failed", { error })
-    // Prefer a stale verdict to a guess; see the note above on why this does
-    // not fail closed the way the Firestore-side guard does.
-    return cachedCeilingProbe?.exceeded ?? false
+    // Prefer a recent verdict to a guess, but only while it is recent; see the
+    // notes above on why this neither fails closed the way the Firestore-side
+    // guard does nor lets a refusal latch.
+    return lastKnownCeilingVerdict(nowMs)
   }
 }
 
