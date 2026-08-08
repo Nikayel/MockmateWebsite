@@ -2,7 +2,7 @@
  * Tests for the end-ab-switch-fsrs admin action.
  *
  * Pins the lifecycle rules that make the switch safe:
- * - admin-gated (403 without auth, no migration side effects)
+ * - permission-gated (403 without MANAGE_SETTINGS, no migration side effects)
  * - dry runs never finalize
  * - finalization (markAbTestEnded) happens only on the LAST non-dry page
  * - every page is audit-logged with counts
@@ -12,14 +12,17 @@ import { describe, it, expect, beforeEach, vi } from "vitest"
 import type { NextRequest } from "next/server"
 
 const h = vi.hoisted(() => ({
-  verifyAdminAccess: vi.fn(),
+  requirePermission: vi.fn(),
   migrateAllUsersToFsrs: vi.fn(),
   markAbTestEnded: vi.fn(() => Promise.resolve()),
   logAdminAction: vi.fn(() => Promise.resolve()),
 }))
 
 vi.mock("@/lib/firebase-admin", () => ({ adminDb: {} }))
-vi.mock("@/lib/admin/middleware", () => ({ verifyAdminAccess: h.verifyAdminAccess }))
+vi.mock("@/lib/admin/middleware", () => ({ requirePermission: h.requirePermission }))
+vi.mock("@/lib/admin/rbac", () => ({
+  PERMISSIONS: { VIEW_ANALYTICS: "view_analytics", MANAGE_SETTINGS: "manage_settings" },
+}))
 vi.mock("@/lib/admin/audit", () => ({
   logAdminAction: h.logAdminAction,
   AUDIT_ACTIONS: { END_AB_SWITCH_FSRS: "end_ab_switch_fsrs" },
@@ -68,19 +71,46 @@ type StubResponse = {
 const asStub = (res: unknown) => res as unknown as StubResponse
 
 beforeEach(() => {
-  h.verifyAdminAccess.mockReset()
+  h.requirePermission.mockReset()
   h.migrateAllUsersToFsrs.mockReset()
   h.markAbTestEnded.mockClear()
   h.logAdminAction.mockClear()
-  h.verifyAdminAccess.mockResolvedValue({
+  h.requirePermission.mockResolvedValue({
     authorized: true,
     context: { userId: "admin-1", email: "a@b.c", role: "super_admin", permissions: [] },
   })
 })
 
+describe("POST /api/admin/algorithm-research permission gate", () => {
+  it("demands MANAGE_SETTINGS, not merely an admin role", async () => {
+    h.migrateAllUsersToFsrs.mockResolvedValue(sweepResult())
+    await POST(postRequest({ action: "end-ab-switch-fsrs" }))
+    expect(h.requirePermission).toHaveBeenCalledWith(expect.anything(), "manage_settings")
+  })
+
+  it.each(["end-ab-switch-fsrs", "backfill-research", "migrate", "regenerate"])(
+    "refuses %s for a role without MANAGE_SETTINGS",
+    async (action) => {
+      // What an `analyst` or `support` admin gets back from requirePermission.
+      h.requirePermission.mockResolvedValue({
+        authorized: false,
+        error: "Access denied - missing permission: manage_settings",
+        status: 403,
+      })
+
+      const res = await POST(postRequest({ action }))
+
+      expect(res.status).toBe(403)
+      expect(h.migrateAllUsersToFsrs).not.toHaveBeenCalled()
+      expect(h.markAbTestEnded).not.toHaveBeenCalled()
+      expect(h.logAdminAction).not.toHaveBeenCalled()
+    }
+  )
+})
+
 describe("POST /api/admin/algorithm-research end-ab-switch-fsrs", () => {
-  it("returns 403 and performs no migration when not admin", async () => {
-    h.verifyAdminAccess.mockResolvedValue({ authorized: false, error: "nope", status: 403 })
+  it("returns 403 and performs no migration when not authorized", async () => {
+    h.requirePermission.mockResolvedValue({ authorized: false, error: "nope", status: 403 })
 
     const res = await POST(postRequest({ action: "end-ab-switch-fsrs" }))
 

@@ -13,7 +13,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { adminDb } from "@/lib/firebase-admin"
-import { verifyAdminAccess } from "@/lib/admin/middleware"
+import { requirePermission } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 import { logAdminAction, AUDIT_ACTIONS } from "@/lib/admin/audit"
 import {
   getAlgorithmDistribution,
@@ -50,8 +51,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Verify admin access
-    const authResult = await verifyAdminAccess(request)
+    // Reading the research data is an analytics view, so an analyst may do it.
+    // Everything that WRITES lives in POST and requires MANAGE_SETTINGS.
+    const authResult = await requirePermission(request, PERMISSIONS.VIEW_ANALYTICS)
     if (!authResult.authorized) {
       return NextResponse.json(
         { success: false, error: authResult.error },
@@ -130,6 +132,14 @@ export async function GET(request: NextRequest) {
  * Actions:
  * - action: 'migrate' - Assign algorithms to users without one
  * - action: 'regenerate' - Force regenerate aggregate comparison
+ * - action: 'end-ab-switch-fsrs' - Migrate every user to FSRS and end the A/B
+ * - action: 'backfill-research' - Derive research summaries from history
+ *
+ * EVERY action here mutates the experiment or the data the experiment's
+ * conclusion rests on, so all of them require MANAGE_SETTINGS. The route
+ * previously used verifyAdminAccess(), which returns true for ANY admin role:
+ * the read-only `analyst` role and the customer-support `support` role could
+ * both end the A/B test and rewrite the research cohorts.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -140,7 +150,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const authResult = await verifyAdminAccess(request)
+    const authResult = await requirePermission(request, PERMISSIONS.MANAGE_SETTINGS)
     if (!authResult.authorized) {
       return NextResponse.json(
         { success: false, error: authResult.error },
