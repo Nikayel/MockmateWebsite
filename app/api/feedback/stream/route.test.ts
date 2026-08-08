@@ -284,6 +284,61 @@ describe("/api/feedback/stream cost bounds", () => {
     })
   })
 
+  describe("refusal labelling", () => {
+    /**
+     * A refusal the user can act on has to survive to the user, and the client
+     * cannot tell one from another off an HTTP status alone. Every non-OK
+     * response therefore carries a machine-readable `code` and a `message`
+     * written for the person reading it, the same contract
+     * lib/quota-enforcement.ts uses.
+     */
+    async function refusalBody(response: Response) {
+      return (await response.json()) as { code?: string; message?: string }
+    }
+
+    it("labels an unauthenticated caller", async () => {
+      mocks.verifyAuthEdge.mockResolvedValue({ authenticated: false })
+      const { POST } = await import("./route")
+
+      const body = await refusalBody(await POST(makeRequest()))
+
+      expect(body.code).toBe("AUTH_REQUIRED")
+      expect(body.message).toContain("sign in")
+    })
+
+    it("labels a rate-limited caller", async () => {
+      const { POST } = await import("./route")
+
+      for (let i = 0; i < 3; i++) await drain(await POST(makeRequest()))
+      const body = await refusalBody(await POST(makeRequest()))
+
+      expect(body.code).toBe("RATE_LIMITED")
+      // Never blame the user for a limit they cannot see, and never imply the
+      // interview they just finished was lost.
+      expect(body.message).toContain("saved")
+    })
+
+    it("labels a platform capacity pause and does not read as a crash", async () => {
+      vi.stubEnv("CRON_SECRET", "probe-secret")
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://example.test")
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: true,
+          status: 200,
+          json: async () => ({ ceilingExceeded: true }),
+        }))
+      )
+      const { POST } = await import("./route")
+
+      const body = await refusalBody(await POST(makeRequest()))
+
+      expect(body.code).toBe("GLOBAL_CAPACITY_LIMIT")
+      expect(body.message).toContain("saved")
+      vi.unstubAllGlobals()
+    })
+  })
+
   describe("input bounds", () => {
     it("caps the number of transcript messages reaching the AI calls", async () => {
       const { POST } = await import("./route")

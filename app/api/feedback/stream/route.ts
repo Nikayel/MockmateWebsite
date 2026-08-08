@@ -328,10 +328,22 @@ export async function POST(request: NextRequest) {
   // the request body stays available for processRequest().
   const auth = await verifyAuthEdge(request)
   if (!auth.authenticated || !auth.userId) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    })
+    // Every refusal this route can return carries a `code` and a `message`
+    // written for the person reading it, matching the contract
+    // lib/quota-enforcement.ts already uses. The client cannot tell a rate
+    // limit from a capacity pause from a crash off an HTTP status alone, and a
+    // user who has just finished a 45-minute interview is owed the difference.
+    return new Response(
+      JSON.stringify({
+        error: "Unauthorized",
+        message: "Please sign in again to see your feedback. Your session is saved.",
+        code: "AUTH_REQUIRED",
+      }),
+      {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      }
+    )
   }
   const authenticatedUserId = auth.userId
 
@@ -353,6 +365,9 @@ export async function POST(request: NextRequest) {
     return new Response(
       JSON.stringify({
         error: "Too many feedback requests. Please wait a moment and try again.",
+        message:
+          "You have asked for feedback several times in a row. Your session is saved, so wait a moment and try again.",
+        code: "RATE_LIMITED",
         retryAfter: retryAfterSeconds,
       }),
       {
@@ -369,11 +384,13 @@ export async function POST(request: NextRequest) {
   // (expensive, remote) AI calls. 503 rather than 429: this is not the caller's
   // fault and retrying with a different account will not help.
   if (await isGlobalSpendCeilingReached()) {
+    const capacityMessage =
+      "AI feedback is paused for everyone right now because the platform hit its daily usage limit. " +
+      "Nothing is wrong with your session and it is saved. Please try again in an hour."
     return new Response(
       JSON.stringify({
-        error:
-          "AI feedback is temporarily paused due to unusually high platform usage. " +
-          "Your session is saved — please try again later.",
+        error: capacityMessage,
+        message: capacityMessage,
         code: "GLOBAL_CAPACITY_LIMIT",
       }),
       {
