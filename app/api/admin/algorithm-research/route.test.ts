@@ -165,7 +165,12 @@ const registryState = (sweep: Record<string, unknown> = {}) => ({
   updatedAt: null,
 })
 
-import { POST } from "./route"
+import {
+  getAggregateComparison,
+  getAlgorithmDistribution,
+  getRecentEvents,
+} from "@/lib/spaced-repetition"
+import { GET, POST } from "./route"
 
 const sweepResult = (overrides: Record<string, unknown> = {}) => ({
   usersScanned: 10,
@@ -508,5 +513,86 @@ describe("sweep lifecycle: resume and rollback", () => {
     ]
     expect(action).toBe("reopen_ab_test")
     expect(details).toMatchObject({ reason: "premature", previousStatus: "ended" })
+  })
+})
+
+/**
+ * The GET is what the founder's page reads first.
+ *
+ * It used to hand the browser `comparison.confidence_level`, and the insights
+ * summary opened with "{winner} appears to be the better algorithm with
+ * {confidence}% confidence". Both came from `Math.min(95, 60 + wins * 7)`: a
+ * count of how many of five cohort averages one arm led on, rescaled to look
+ * like a percentage.
+ */
+describe("GET /api/admin/algorithm-research", () => {
+  const aggregate = (comparison: Record<string, unknown>) => ({
+    last_updated: new Date().toISOString(),
+    data_range: { start_date: "2026-07-09T00:00:00.000Z", end_date: "2026-08-08T00:00:00.000Z" },
+    sm2: { algorithm: "sm2", total_users: 120, average_retention_rate: 61, churn_rate_30d: 20 },
+    fsrs: { algorithm: "fsrs", total_users: 118, average_retention_rate: 66, churn_rate_30d: 19 },
+    comparison,
+  })
+
+  const decisive = {
+    retention_rate_difference: 5,
+    average_score_difference: 4,
+    time_to_mastery_difference_days: 3,
+    engagement_difference: 0.8,
+    interval_efficiency_difference: 6,
+    sufficient_sample_size: true,
+    fsrs_wins_count: 5,
+    sm2_wins_count: 0,
+  }
+
+  beforeEach(() => {
+    vi.mocked(getAlgorithmDistribution).mockResolvedValue({
+      sm2: { total: 120, active_7d: 40 },
+      fsrs: { total: 118, active_7d: 44 },
+    } as never)
+    vi.mocked(getRecentEvents).mockResolvedValue([])
+    vi.mocked(getAggregateComparison).mockResolvedValue(aggregate(decisive) as never)
+  })
+
+  it("serves no confidence and no winner, even when one arm sweeps every average", async () => {
+    const res = asStub(await GET(postRequest({})))
+
+    expect(res.status).toBe(200)
+    // The whole payload, not just the comparison: the number used to reach the
+    // browser through two separate fields.
+    expect(JSON.stringify(res.data)).not.toMatch(/confidence_level|overall_winner/)
+  })
+
+  it("says leading on an average is not a result, instead of naming a winner", async () => {
+    const res = asStub(await GET(postRequest({})))
+    const insights = res.data.data!.insights as { summary: string; keyFindings: string[] }
+
+    expect(insights.summary).toContain("5 of 5 cohort averages")
+    expect(insights.summary).toContain("Leading on an average is not a result")
+    // No percentage anywhere in the sentence the founder reads first.
+    expect(insights.summary).not.toMatch(/\d+% confidence/)
+    expect(insights.summary).not.toMatch(/better algorithm/)
+  })
+
+  it("does not upgrade a descriptive difference into a claim when the sample is thin", async () => {
+    vi.mocked(getAggregateComparison).mockResolvedValue(
+      aggregate({ ...decisive, sufficient_sample_size: false }) as never
+    )
+
+    const res = asStub(await GET(postRequest({})))
+    const insights = res.data.data!.insights as { summary: string; keyFindings: string[] }
+
+    expect(insights.keyFindings.join(" ")).toContain("Sample size insufficient")
+    expect(JSON.stringify(res.data)).not.toMatch(/confidence_level|overall_winner/)
+  })
+
+  it("reports no insights at all when there is no aggregate yet", async () => {
+    vi.mocked(getAggregateComparison).mockResolvedValue(null)
+
+    const res = asStub(await GET(postRequest({})))
+    const insights = res.data.data!.insights as { summary: string; keyFindings: string[] }
+
+    expect(insights.summary).toBe("Not enough data for insights yet.")
+    expect(insights.keyFindings).toEqual([])
   })
 })
