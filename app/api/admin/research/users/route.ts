@@ -15,7 +15,8 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
-import { verifyAdminAccess } from "@/lib/admin/middleware"
+import { requirePermission } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 
 interface UserAlgorithmData {
   id: string
@@ -49,7 +50,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const authResult = await verifyAdminAccess(request)
+    // This response carries per-user email and name beside their algorithm arm,
+    // so it asks for the permission that gates user records rather than for any
+    // admin role at all.
+    const authResult = await requirePermission(request, PERMISSIONS.VIEW_USERS)
     if (!authResult.authorized) {
       return NextResponse.json(
         { success: false, error: authResult.error },

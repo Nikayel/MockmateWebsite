@@ -15,7 +15,8 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
-import { verifyAdminAccess } from "@/lib/admin/middleware"
+import { requirePermission } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 import { analyzeResearchData } from "@/lib/research/analyzer"
 
 export async function GET(request: NextRequest) {
@@ -31,8 +32,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Verify admin access
-    const authResult = await verifyAdminAccess(request)
+    // The statistical read-out is analytics. `support` is a customer support
+    // role with no analytics permission, and verifyAdminAccess() let it through
+    // along with every other role.
+    const authResult = await requirePermission(request, PERMISSIONS.VIEW_ANALYTICS)
     if (!authResult.authorized) {
       return NextResponse.json(
         { success: false, error: authResult.error },
