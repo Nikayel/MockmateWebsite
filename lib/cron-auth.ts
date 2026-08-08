@@ -2,7 +2,7 @@
  * Shared cron-request authorization.
  *
  * Cron routes authenticate with `Authorization: Bearer <CRON_SECRET>`. This is the single
- * owner of that check so the five cron routes cannot drift:
+ * owner of that check so the six cron routes cannot drift:
  *  - fail closed when CRON_SECRET is unset (500 "Server misconfiguration");
  *  - length-guard before timingSafeEqual, which THROWS on unequal-length buffers;
  *  - timing-safe comparison, returning 401 "Unauthorized" on mismatch.

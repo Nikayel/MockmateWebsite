@@ -1,5 +1,4 @@
 import { Metadata } from "next"
-import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, Gift, DollarSign, Clock, Shield, XCircle } from "lucide-react"
@@ -275,13 +274,18 @@ export default function ReferralTermsPage() {
           </CardContent>
         </Card>
 
-        {/* Contact */}
+        {/* Contact. This linked to /contact, which has no route anywhere in the
+            app, so it 404'd from the exact page a user reads before asking about
+            a reward. Points at the support address the rest of the app uses. */}
         <div className="text-center text-sm text-gray-400">
           <p>
             Questions about the referral program?{" "}
-            <Link href="/contact" className="text-[#c4703f] hover:underline">
-              Contact us
-            </Link>
+            <a
+              href="mailto:support@codesparring.dev?subject=Referral%20program%20question"
+              className="text-[#c4703f] hover:underline"
+            >
+              Email support
+            </a>
           </p>
         </div>
       </div>
