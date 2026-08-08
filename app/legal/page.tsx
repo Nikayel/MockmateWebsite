@@ -157,8 +157,8 @@ export default function LegalPage() {
                   <ul className="list-inside list-disc space-y-1 text-sm">
                     <li>
                       Microphone audio captured while you hold or toggle the record control. Your
-                      browser asks for microphone permission first, and nothing is captured until you
-                      grant it and start a recording.
+                      browser asks for microphone permission first, and nothing is captured until
+                      you grant it and start a recording.
                     </li>
                     <li>
                       Audio is streamed live to Deepgram over an encrypted connection for real-time
@@ -167,8 +167,8 @@ export default function LegalPage() {
                     </li>
                     <li>
                       The resulting text transcript becomes an ordinary message in your interview
-                      conversation. It is stored with that session, sent to our AI providers like any
-                      typed message, and follows the interview session retention period below.
+                      conversation. It is stored with that session, sent to our AI providers like
+                      any typed message, and follows the interview session retention period below.
                     </li>
                     <li>
                       Voice mode is entirely optional. If you never enable it, no audio ever leaves
@@ -540,24 +540,50 @@ export default function LegalPage() {
                     limitations may change at any time.
                   </p>
 
-                  <h5 className="mt-4 mb-2 font-medium text-white">Pro Subscription</h5>
+                  <h5 className="mt-4 mb-2 font-medium text-white">
+                    Pro Monthly (a recurring subscription)
+                  </h5>
                   <ul className="list-inside list-disc space-y-1 text-sm">
-                    <li>Pro subscriptions are billed monthly or annually in advance</li>
+                    <li>Billed monthly in advance</li>
                     <li>
-                      <strong className="text-yellow-400">Automatic Renewal:</strong> Your
-                      subscription will automatically renew at the end of each billing period unless
-                      you cancel before the renewal date
+                      <strong className="text-yellow-400">Automatic Renewal:</strong> Pro Monthly
+                      renews automatically at the end of each billing month unless you cancel before
+                      the renewal date. You will be charged using the payment method on file.
                     </li>
-                    <li>You will be charged using your stored payment method on file</li>
+                    <li>Prices are in USD and exclude applicable taxes</li>
+                  </ul>
+
+                  <h5 className="mt-4 mb-2 font-medium text-white">
+                    Pro Yearly (a one-time purchase, not a subscription)
+                  </h5>
+                  <ul className="list-inside list-disc space-y-1 text-sm">
+                    <li>
+                      <strong className="text-white">Pro Yearly does not renew.</strong> It is a
+                      single charge that grants 12 months of Pro access from the date of purchase.
+                    </li>
+                    <li>
+                      We do not store a recurring billing arrangement for it and we will never
+                      charge the card again on our own. There is nothing to cancel, and nothing to
+                      forget to cancel.
+                    </li>
+                    <li>
+                      When the 12 months are up, your account returns to the Free tier. To continue
+                      on Pro you purchase again, by choice, at whatever the price is then.
+                    </li>
                     <li>Prices are in USD and exclude applicable taxes</li>
                   </ul>
 
                   <h5 className="mt-4 mb-2 font-medium text-white">Cancellation</h5>
                   <ul className="list-inside list-disc space-y-1 text-sm">
-                    <li>You may cancel your subscription at any time from your Account Settings</li>
                     <li>
-                      Upon cancellation, you retain Pro access until the end of your current billing
-                      period
+                      <strong className="text-white">Pro Monthly:</strong> cancel at any time from
+                      your Account Settings, which opens the Stripe customer portal. You keep Pro
+                      access until the end of the month you have already paid for.
+                    </li>
+                    <li>
+                      <strong className="text-white">Pro Yearly:</strong> there is no recurring
+                      charge to cancel. Your 12 months of access run to their end date either way.
+                      If you want a refund inside the first 30 days, see the refund policy below.
                     </li>
                     <li>We do not provide prorated refunds for partial months</li>
                   </ul>
