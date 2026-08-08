@@ -28,6 +28,40 @@ export interface EdgeAIResponse {
   latencyMs: number
 }
 
+/**
+ * The facts needed to price and attribute one Edge LLM call.
+ *
+ * The Edge runtime cannot reach Firebase Admin, so spend is reported
+ * server-to-server (see lib/usage/edge-reporter.ts). Only ONE of the five LLM
+ * calls behind /api/feedback/stream was doing that; the other four were free as
+ * far as the cost ledger, the per-user budget cap and the daily kill-switch were
+ * concerned. Every one of them funnels through generateAIResponseEdge, so the
+ * hook belongs here rather than at each call site.
+ */
+export interface EdgeAICallRecord {
+  provider: EdgeAIResponse["provider"]
+  /** Full prompt as sent, for input-token estimation. */
+  promptText: string
+  responseText: string
+  latencyMs: number
+}
+
+/**
+ * Per-call usage sink. Deliberately passed through options rather than
+ * registered on the module: module scope is shared across concurrent requests in
+ * an Edge isolate, and a shared observer would attribute one user's spend to
+ * another user's budget.
+ */
+export type EdgeUsageSink = (record: EdgeAICallRecord) => void
+
+/** Common options for every Edge LLM entry point. */
+export interface EdgeAIOptions {
+  maxTokens?: number
+  temperature?: number
+  /** Invoked once, after a successful call, with what that call actually cost. */
+  onUsage?: EdgeUsageSink
+}
+
 // Initialize Gemini client
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ""
 const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null
@@ -214,10 +248,7 @@ async function generateGeminiResponseEdge(
 export async function generateAIResponseEdge(
   systemPrompt: string,
   userMessage: string,
-  options?: {
-    maxTokens?: number
-    temperature?: number
-  }
+  options?: EdgeAIOptions
 ): Promise<EdgeAIResponse> {
   const chain: Array<{
     provider: EdgeAIResponse["provider"]
@@ -246,7 +277,30 @@ export async function generateAIResponseEdge(
   for (const rung of chain) {
     if (!rung.configured) continue
     try {
-      return await rung.call()
+      const response = await rung.call()
+
+      // Report the spend before returning. Wrapped because accounting must
+      // never break the AI path: a throwing sink would turn a successful,
+      // already-paid-for call into a fallback to the next rung, billing the
+      // user twice for one answer.
+      if (options?.onUsage) {
+        try {
+          options.onUsage({
+            // The rung that ANSWERED, which after a fallback is not the rung we
+            // started on. Pricing is per provider, so attributing to the wrong
+            // one misprices the call.
+            provider: response.provider,
+            promptText: `${systemPrompt}\n${userMessage}`,
+            responseText: response.text,
+            latencyMs: response.latencyMs,
+          })
+        } catch {
+          // Losing a usage record costs accounting accuracy. Losing the user's
+          // feedback costs the user.
+        }
+      }
+
+      return response
     } catch (error) {
       failures.push(`${rung.provider}: ${error instanceof Error ? error.message : String(error)}`)
     }
@@ -265,11 +319,13 @@ export async function generateAIResponseEdge(
  */
 export async function generateFeedbackResponseEdge(
   systemPrompt: string,
-  userMessage: string
+  userMessage: string,
+  onUsage?: EdgeUsageSink
 ): Promise<EdgeAIResponse> {
   return generateAIResponseEdge(systemPrompt, userMessage, {
     maxTokens: 2048,
     temperature: 0.3,
+    onUsage,
   })
 }
 
@@ -299,7 +355,8 @@ export interface EdgeConversationValidation {
 export async function validateConversationEdge(
   transcript: Array<{ role: string; content: string }>,
   code: string | null,
-  complexity: { time?: string; space?: string } | null
+  complexity: { time?: string; space?: string } | null,
+  onUsage?: EdgeUsageSink
 ): Promise<EdgeConversationValidation> {
   const defaultResult: EdgeConversationValidation = {
     isCoherent: true,
@@ -386,7 +443,7 @@ Return JSON only:
     const response = await generateAIResponseEdge(
       "You analyze interview transcripts. Return ONLY valid JSON, no markdown.",
       prompt,
-      { maxTokens: 512, temperature: 0 }
+      { maxTokens: 512, temperature: 0, onUsage }
     )
 
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)
@@ -428,7 +485,8 @@ export async function extractConversationEvidenceEdge(
     optimalTimeComplexity: string
     optimalSpaceComplexity: string
     criticalEdgeCases: string[]
-  }
+  },
+  onUsage?: EdgeUsageSink
 ): Promise<{
   approach: { explained: boolean; quote?: string }
   timeComplexity: { mentioned: boolean; value?: string; isCorrect?: boolean }
@@ -483,7 +541,7 @@ Return JSON only:
     const response = await generateAIResponseEdge(
       "Extract interview evidence. Return ONLY valid JSON.",
       prompt,
-      { maxTokens: 512, temperature: 0 }
+      { maxTokens: 512, temperature: 0, onUsage }
     )
 
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)

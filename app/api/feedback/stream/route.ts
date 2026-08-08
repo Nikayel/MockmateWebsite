@@ -30,6 +30,7 @@ import {
   generateFeedbackResponseEdge,
   validateConversationEdge,
   extractConversationEvidenceEdge,
+  type EdgeUsageSink,
 } from "@/lib/ai-providers-edge"
 // Direct imports to avoid pulling in Node.js dependencies via barrel exports
 import { sanitizeTestCount, sanitizeEfficiencyScore } from "@/lib/feedback/request-schema"
@@ -584,6 +585,37 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Every auxiliary LLM call on this path bills real money and, until now,
+      // reported none of it. Only the main feedback generation below called
+      // reportEdgeUsageInBackground, so validation, evidence extraction, silent
+      // notes and bugfix semantic scoring were all invisible to the cost ledger,
+      // the per-user budget cap and the daily kill-switch at once. Four of the
+      // five LLM calls behind this route spent money nothing could see.
+      //
+      // The sink is built per call so each one is attributed to the provider
+      // that actually answered it, which after a fallback is not the provider
+      // the chain started on.
+      const trackEdgeSpend =
+        (): EdgeUsageSink =>
+        (record): void => {
+          reportEdgeUsageInBackground({
+            userId: authenticatedUserId,
+            // These are part of generating this session's feedback, so they
+            // belong to the same event type as the main call. Splitting them out
+            // would make the per-session cost harder to reconcile, not easier.
+            eventType: "feedback_generation",
+            provider: record.provider,
+            promptText: record.promptText,
+            responseText: record.responseText,
+            latencyMs: record.latencyMs,
+            sessionId,
+            scenarioId,
+            pattern: scenarioPattern,
+            difficulty: scenarioDifficulty,
+            scenarioTitle,
+          })
+        }
+
       // Run validation, extraction, and silent notes analysis in parallel
       const shouldValidateWithAI =
         scenarioType === "system-design" ||
@@ -617,7 +649,8 @@ export async function POST(request: NextRequest) {
                       time: efficiencyMetrics.estimatedTimeComplexity,
                       space: efficiencyMetrics.estimatedSpaceComplexity,
                     }
-                  : null
+                  : null,
+                trackEdgeSpend()
               ).catch((error) => {
                 // A degraded provider silently swaps in neutral defaults, which
                 // changes the score the user is shown. Without a log this is
@@ -630,7 +663,11 @@ export async function POST(request: NextRequest) {
               })
             : Promise.resolve(getDefaultValidation()),
           transcriptMessages.length > 0
-            ? extractConversationEvidenceEdge(transcriptMessages, problemContext).catch((error) => {
+            ? extractConversationEvidenceEdge(
+                transcriptMessages,
+                problemContext,
+                trackEdgeSpend()
+              ).catch((error) => {
                 logger.error("[Streaming Feedback] Evidence extraction failed", {
                   scenarioType,
                   error,

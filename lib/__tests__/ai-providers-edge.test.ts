@@ -187,3 +187,88 @@ describe("ai-providers-edge OpenAI -> DeepSeek -> Gemini chain", () => {
     expect(result.text).toBe("deepseek rescued it")
   })
 })
+
+/**
+ * Four of the five LLM calls behind /api/feedback/stream reported no usage at
+ * all, so their spend was invisible to the cost ledger, the per-user budget cap
+ * and the daily kill-switch simultaneously. Every one of them funnels through
+ * generateAIResponseEdge, so the reporting hook lives there.
+ */
+describe("edge usage sink", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+    vi.stubEnv("OPENAI_API_KEY", "openai-test-key")
+    vi.stubEnv("GEMINI_API_KEY", "gemini-test-key")
+    vi.stubEnv("DEEPSEEK_API_KEY", "deepseek-test-key")
+    vi.stubGlobal("fetch", vi.fn())
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  it("reports one record per successful call, with the full prompt", async () => {
+    mockFetchByHost({ openai: () => okBody("the answer") })
+    const { generateAIResponseEdge } = await import("../ai-providers-edge")
+    const onUsage = vi.fn()
+
+    await generateAIResponseEdge("sys prompt", "user message", { onUsage })
+
+    expect(onUsage).toHaveBeenCalledTimes(1)
+    const record = onUsage.mock.calls[0][0]
+    expect(record.provider).toBe("openai")
+    expect(record.responseText).toBe("the answer")
+    // Both halves of the prompt, or input tokens are under-estimated and the
+    // call is under-billed.
+    expect(record.promptText).toContain("sys prompt")
+    expect(record.promptText).toContain("user message")
+    expect(typeof record.latencyMs).toBe("number")
+  })
+
+  it("attributes spend to the provider that ANSWERED, not the one it started on", async () => {
+    // Pricing is per provider. After a fallback, billing the first rung would
+    // charge OpenAI's rate for a DeepSeek call.
+    mockFetchByHost({
+      openai: () => ({ ok: false, status: 500 }),
+      deepseek: () => okBody("deepseek answered"),
+    })
+    const { generateAIResponseEdge } = await import("../ai-providers-edge")
+    const onUsage = vi.fn()
+
+    await generateAIResponseEdge("sys", "user", { onUsage })
+
+    expect(onUsage).toHaveBeenCalledTimes(1)
+    expect(onUsage.mock.calls[0][0].provider).toBe("deepseek")
+  })
+
+  it("does not report a call that never succeeded", async () => {
+    mockFetchByHost({
+      openai: () => ({ ok: false, status: 500 }),
+      deepseek: () => ({ ok: false, status: 500 }),
+    })
+    mocks.generateContent.mockRejectedValue(new Error("gemini down"))
+    const { generateAIResponseEdge } = await import("../ai-providers-edge")
+    const onUsage = vi.fn()
+
+    await expect(generateAIResponseEdge("sys", "user", { onUsage })).rejects.toThrow()
+    expect(onUsage).not.toHaveBeenCalled()
+  })
+
+  it("never lets a broken sink turn a paid call into a fallback", async () => {
+    // The call has already been billed by the vendor. If a throwing sink
+    // propagated, the chain would degrade to the next rung and the user would
+    // be charged twice for one answer.
+    mockFetchByHost({ openai: () => okBody("the answer") })
+    const { generateAIResponseEdge } = await import("../ai-providers-edge")
+    const onUsage = vi.fn(() => {
+      throw new Error("reporting exploded")
+    })
+
+    const result = await generateAIResponseEdge("sys", "user", { onUsage })
+
+    expect(result.provider).toBe("openai")
+    expect(result.text).toBe("the answer")
+  })
+})
