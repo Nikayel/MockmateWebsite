@@ -59,8 +59,9 @@ interface AnalyticsMetrics {
   /** All-time scored rounds via aggregate count; range-independent. Null when the count failed. */
   scoredRoundsAllTime?: number | null
   revenue: {
-    mrr: number
-    arr: number
+    /** Null when the signed-in admin role does not hold VIEW_REVENUE. */
+    mrr: number | null
+    arr: number | null
   }
   analytics: {
     totalEvents: number
@@ -218,8 +219,16 @@ export default function AdminDashboard() {
         />
         <MetricCard
           title="MRR"
-          value={`$${metrics.revenue.mrr.toLocaleString()}`}
-          subtitle={`ARR: $${metrics.revenue.arr.toLocaleString()}`}
+          // The API returns null here for an admin role without VIEW_REVENUE.
+          // "Hidden" is the honest render; $0 would read as a real number.
+          value={
+            metrics.revenue.mrr === null ? "Hidden" : `$${metrics.revenue.mrr.toLocaleString()}`
+          }
+          subtitle={
+            metrics.revenue.arr === null
+              ? "Requires the revenue permission"
+              : `ARR: $${metrics.revenue.arr.toLocaleString()}`
+          }
           icon={DollarSign}
           valueColor="text-green-400"
           iconColor="text-green-400"

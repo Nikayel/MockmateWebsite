@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { FieldPath } from "firebase-admin/firestore"
 import { adminDb, adminAuth } from "@/lib/firebase-admin"
 import {
@@ -7,7 +7,8 @@ import {
   getFirebaseAnalyticsAcquisition,
   getFirebaseAnalyticsConversions,
 } from "@/lib/firebase-analytics-admin"
-import { verifyAdminAccess, parseAdminQueryParams } from "@/lib/admin/middleware"
+import { withPermission, parseAdminQueryParams } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 import { calculateMRR, calculateARR, getMonthlyPrice } from "@/lib/pricing"
 import { isScoredCompletedSession, summarizeSessionFunnelCounts } from "@/lib/firestore-helpers"
 import { adminCache, getCacheKey, CACHE_TTL } from "@/lib/admin/cache"
@@ -171,38 +172,36 @@ async function generateTimeSeriesData(
 
 /**
  * Admin Analytics API
- * Returns aggregate metrics for admin dashboard
+ * Returns aggregate metrics for admin dashboard.
  *
- * Requires admin authentication via Firebase ID token
+ * VIEW_ANALYTICS to reach it at all, which keeps the support role out of the
+ * platform-wide dashboard it was previously handed. The revenue block carries
+ * MRR and ARR, which is a separate question from "how is the product doing", so
+ * it is filled in only for a caller who also holds VIEW_REVENUE.
  */
 
-export async function GET(request: NextRequest) {
+export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (request, context) => {
   try {
-    // Verify Admin SDK is initialized
+    // Verify Admin SDK is initialized. Below the auth gate so an unauthenticated
+    // caller cannot learn anything about server configuration.
     if (!adminDb) {
       return NextResponse.json(
         {
           success: false,
           error: "Firebase Admin SDK not initialized. Check server configuration.",
         },
-        { status: 500 }
+        { status: 503 }
       )
     }
 
-    // Verify admin access using RBAC middleware
-    const authResult = await verifyAdminAccess(request)
-    if (!authResult.authorized) {
-      return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status || 403 }
-      )
-    }
+    const maySeeRevenue = context.permissions.includes(PERMISSIONS.VIEW_REVENUE)
 
     // Parse query params using middleware helper
     const { timeRange, startDate } = parseAdminQueryParams(request)
 
-    // Check cache first
-    const cacheKey = getCacheKey("analytics", { timeRange })
+    // Check cache first. maySeeRevenue is part of the key: without it, the first
+    // revenue-holding admin to warm the cache would serve MRR to everyone after.
+    const cacheKey = getCacheKey("analytics", { timeRange, revenue: String(maySeeRevenue) })
     const cachedResponse = adminCache.get<any>(cacheKey)
     if (cachedResponse) {
       return NextResponse.json({
@@ -211,7 +210,10 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Fetch all users from Firebase Auth (Google, GitHub, etc.) - matches user list
+    // Fetch all users from Firebase Auth (Google, GitHub, etc.) - matches user list.
+    // A failure here used to be swallowed, so a broken Auth call rendered as
+    // "0 users" with HTTP 200. Rethrow: a dashboard that cannot count is not a
+    // dashboard reading zero.
     const authUsers: import("firebase-admin/auth").UserRecord[] = []
     let pageToken: string | undefined
     try {
@@ -222,6 +224,7 @@ export async function GET(request: NextRequest) {
       } while (pageToken)
     } catch (error) {
       console.error("Error fetching auth users:", error)
+      throw error
     }
 
     const totalUsers = authUsers.length
@@ -258,8 +261,14 @@ export async function GET(request: NextRequest) {
       return { createdAt, tier }
     })
 
-    // Fetch sessions (with time range filter if applicable)
-    let sessionsSnapshot
+    // Fetch sessions (with time range filter if applicable).
+    //
+    // This catch used to assign `{ size: 0, docs: [] } as any`, which turned a
+    // missing index or a permissions failure into "0 sessions" with HTTP 200.
+    // Every downstream number — WCSR, completion rate, the whole session
+    // panel — then rendered as a confident zero. A query that failed has to
+    // reach the client as a failure.
+    let sessionsSnapshot: FirebaseFirestore.QuerySnapshot
     try {
       if (startDate) {
         sessionsSnapshot = await adminDb
@@ -271,7 +280,7 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       console.error("Error fetching sessions:", error)
-      sessionsSnapshot = { size: 0, docs: [] } as any
+      throw error
     }
 
     const totalSessions = sessionsSnapshot.size || 0
@@ -353,8 +362,9 @@ export async function GET(request: NextRequest) {
       console.error("Error counting all-time scored rounds:", error)
     }
 
-    // Fetch analytics events
-    let eventsSnapshot
+    // Fetch analytics events. Same reasoning as the sessions query above: a
+    // failure here used to render as "0 events" rather than as an error.
+    let eventsSnapshot: FirebaseFirestore.QuerySnapshot
     try {
       if (startDate) {
         eventsSnapshot = await adminDb
@@ -366,7 +376,7 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       console.error("Error fetching analytics events:", error)
-      eventsSnapshot = { size: 0, docs: [] } as any
+      throw error
     }
 
     const eventCounts: Record<string, number> = {}
@@ -391,8 +401,9 @@ export async function GET(request: NextRequest) {
     const codeExecutionPassRate =
       totalCodeExecutions > 0 ? Math.round((passedCodeExecutions / totalCodeExecutions) * 100) : 0
 
-    // Calculate revenue metrics using centralized pricing
-    const mrr = calculateMRR(tierCounts)
+    // Calculate revenue metrics using centralized pricing. Only computed for a
+    // caller who may see revenue; everyone else gets null rather than a number.
+    const mrr = maySeeRevenue ? calculateMRR(tierCounts) : null
 
     // Fetch recent errors (last 100) - handle potential index error gracefully
     let recentErrors: Array<{
@@ -507,10 +518,13 @@ export async function GET(request: NextRequest) {
         // Unlike wcsr.total (scoped to the selected time range), this is
         // range-independent — the number the founder quotes.
         scoredRoundsAllTime,
-        revenue: {
-          mrr,
-          arr: calculateARR(mrr),
-        },
+        revenue:
+          mrr === null
+            ? { mrr: null, arr: null }
+            : {
+                mrr,
+                arr: calculateARR(mrr),
+              },
         analytics: {
           totalEvents: eventsSnapshot.size || 0,
           byEventType: eventCounts,
@@ -549,17 +563,17 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(responseData)
   } catch (error) {
+    // The full message and stack stay in the server log. Returning them handed
+    // the client Firestore index URLs, collection names and file paths, and the
+    // dev-only stack branch is one NODE_ENV mistake away from doing it in prod.
     console.error("Admin analytics API error:", error)
-    const errorMessage = error instanceof Error ? error.message : "Failed to fetch analytics"
-    const errorStack = error instanceof Error ? error.stack : undefined
-    console.error("Error details:", { errorMessage, errorStack })
+    console.error("Error details:", {
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : undefined,
+    })
     return NextResponse.json(
-      {
-        success: false,
-        error: errorMessage,
-        details: process.env.NODE_ENV === "development" ? errorStack : undefined,
-      },
+      { success: false, error: "Failed to fetch analytics" },
       { status: 500 }
     )
   }
-}
+})
