@@ -93,8 +93,9 @@ export async function requirePermission(
     return authResult
   }
 
-  const hasAccess = await hasPermission(authResult.context!.userId, permission)
-  if (!hasAccess) {
+  // verifyAdminAccess already resolved this admin's full permission set, so the check
+  // is a local membership test rather than a third read of the same admin_roles doc.
+  if (!authResult.context!.permissions.includes(permission)) {
     return {
       authorized: false,
       error: `Access denied - missing permission: ${permission}`,
