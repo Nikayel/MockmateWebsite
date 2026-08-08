@@ -23,6 +23,7 @@ import { PERMISSIONS } from "@/lib/admin/rbac"
 import { logAdminAction } from "@/lib/admin/audit"
 import { logger } from "@/lib/logger"
 import { PLATFORM_PROBES } from "@/lib/admin/platform-probes"
+import { adminCache } from "@/lib/admin/cache"
 import {
   deriveDependencyAlerts,
   runDependencyProbes,
@@ -137,6 +138,14 @@ async function countProductEvents(since: Date): Promise<number | null> {
   }
 }
 
+const HEALTH_PROBE_CACHE_KEY = "health:dependency-probes"
+
+/**
+ * Shorter than the page's 30 second poll, so a real outage is visible within one
+ * refresh while concurrent viewers share a single round of vendor calls.
+ */
+const HEALTH_PROBE_TTL_MS = 20_000
+
 /**
  * Reading system health is VIEW_ERRORS, which every admin role holds. The
  * hand-rolled preamble this replaces gated on `if (!role)`, which is not a
@@ -148,8 +157,24 @@ export const GET = withPermission(PERMISSIONS.VIEW_ERRORS, async () => {
 
     // Probes are raced against their own timeouts inside runDependencyProbes, so
     // the slowest vendor costs this route one timeout rather than the request.
+    //
+    // Cached, because the page polls every 30 seconds and each poll fans out to
+    // seven third-party endpoints. Uncached, one admin leaving the tab open all day
+    // costs roughly 20,000 vendor calls, which is enough to get rate limited by the
+    // very providers the page is meant to be watching. The TTL is deliberately
+    // shorter than the poll interval so a genuine outage still surfaces within one
+    // refresh, while several open tabs and several admins share one round of probes.
     const [dependencies, productEvents24h] = await Promise.all([
-      runDependencyProbes(PLATFORM_PROBES),
+      (async () => {
+        const cached = adminCache.get<Awaited<ReturnType<typeof runDependencyProbes>>>(
+          HEALTH_PROBE_CACHE_KEY
+        )
+        if (cached) return cached
+
+        const fresh = await runDependencyProbes(PLATFORM_PROBES)
+        adminCache.set(HEALTH_PROBE_CACHE_KEY, fresh, HEALTH_PROBE_TTL_MS)
+        return fresh
+      })(),
       countProductEvents(since),
     ])
 
