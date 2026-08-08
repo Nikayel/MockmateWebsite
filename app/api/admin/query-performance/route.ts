@@ -8,8 +8,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { getQueryPerformanceStats, cleanupQueryMetrics } from "@/lib/query-performance"
 import { requirePermission, errorResponse, unauthorizedResponse } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
+import { parseBoundedInt } from "@/lib/admin/query-params"
 import { logAdminAction } from "@/lib/admin/audit"
 import { logger } from "@/lib/logger"
+
+/** 90 days of query metrics is more than any dashboard charts. */
+const MAX_METRIC_HOURS = 24 * 90
 
 /**
  * GET /api/admin/query-performance
@@ -26,10 +30,18 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url)
-  const hours = parseInt(searchParams.get("hours") || "24", 10)
+  // hours widens a Firestore range scan; unbounded it is a full-collection read.
+  const hoursParam = parseBoundedInt(searchParams.get("hours"), {
+    min: 1,
+    max: MAX_METRIC_HOURS,
+    fallback: 24,
+  })
+  if (!hoursParam.ok) {
+    return errorResponse(`Invalid hours: ${hoursParam.error}`, 400)
+  }
 
   try {
-    const stats = await getQueryPerformanceStats(hours)
+    const stats = await getQueryPerformanceStats(hoursParam.value)
 
     return NextResponse.json({
       success: true,
@@ -37,10 +49,7 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     logger.error("[Admin Query Performance API] Error", { error })
-    return errorResponse(
-      error instanceof Error ? error.message : "Failed to fetch query performance data",
-      500
-    )
+    return errorResponse("Failed to fetch query performance data", 500)
   }
 }
 
@@ -66,7 +75,16 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case "cleanup": {
-        const daysToKeep = body.daysToKeep || 3
+        // Bounded because this deletes: 0 or a negative would sweep everything.
+        const daysParam = parseBoundedInt(String(body.daysToKeep ?? ""), {
+          min: 1,
+          max: 365,
+          fallback: 3,
+        })
+        if (!daysParam.ok) {
+          return errorResponse(`Invalid daysToKeep: ${daysParam.error}`, 400)
+        }
+        const daysToKeep = daysParam.value
         await cleanupQueryMetrics(daysToKeep)
 
         await logAdminAction(adminContext.userId, "cleanup_query_metrics", {
@@ -84,6 +102,6 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     logger.error("[Admin Query Performance API] Error", { error })
-    return errorResponse(error instanceof Error ? error.message : "Failed to perform action", 500)
+    return errorResponse("Failed to perform action", 500)
   }
 }
