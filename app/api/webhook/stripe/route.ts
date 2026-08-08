@@ -745,6 +745,11 @@ export async function POST(request: NextRequest) {
             subscription_current_period_end: oneYearFromNow.toISOString(),
             subscription_type: "yearly",
             last_quota_reset: now.toISOString(), // Track when quota was last reset for monthly resets
+            // Redemption receipt for this one-time purchase. The self-service and cron recovery paths
+            // in lib/stripe-helpers.ts refuse to grant a session that is already recorded here, so
+            // whichever of the webhook or a recovery gets there first, the year is granted exactly
+            // once and the same session can never be redeemed again after the term lapses.
+            yearly_grant_session_id: session.id,
             updated_at: new Date().toISOString(),
           }
 
