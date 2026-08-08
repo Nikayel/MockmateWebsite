@@ -17,7 +17,11 @@ export const PRICING_CONFIG = {
       "8 full interview sessions per month",
       "AI interviewer with real-time feedback",
       "Performance tracking & analytics",
-      "Web-based Monaco code editor",
+      // Do not name an editor vendor here. This string is rendered on the paid
+      // pricing page, so it is a claim about what the buyer receives. It used to
+      // read "Web-based Monaco code editor"; there is no Monaco dependency in
+      // this repo and there has not been one since the switch to CodeMirror 6.
+      "In-browser code editor with per-language syntax highlighting",
     ],
     limitations: [
       "No personalized study roadmap",
