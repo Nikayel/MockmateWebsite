@@ -19,7 +19,13 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { countTokens } from "./token-counter"
 import { logger } from "./logger"
 import { maybeRunHourlyCostSweep } from "./cost-anomaly-detection"
-import { AI_BUDGET_CAPS } from "./pricing"
+import {
+  AI_BUDGET_CAPS,
+  AI_PROVIDER_COSTS,
+  FALLBACK_RATE_PROVIDER,
+  calculateAICost,
+  resolveProviderRate,
+} from "./pricing"
 import { resolveBudgetCap, resolveTier, hasBudgetOverride, budgetUsedPercent } from "./usage/budget"
 import { fetchProfilesById } from "./usage/profile-lookup"
 import {
@@ -36,44 +42,21 @@ import {
   type UsageTotals,
 } from "./usage/event-totals"
 
-// Cost per 1K tokens for each provider (input + output averaged).
-// Gemini rows verified against ai.google.dev/gemini-api/docs/pricing on
-// 2026-08-01 and match the live pins in lib/ai/model-ids.ts. The others are
-// older figures for providers we either do not call or call rarely; treat them
-// as unverified.
-//
-// IMPORTANT: the keys here are PROVIDER names (see AIProvider in
-// lib/ai-providers.ts), not model ids. A provider missing from this table
-// falls back to the gemini rate, which is why gemini-lite and deepseek-chat
-// are listed explicitly: without them, flash-lite traffic was billed at 3.2x
-// its real rate and DeepSeek traffic at the Gemini rate.
-export const PROVIDER_COSTS = {
-  // GPT-5.6 Luna, one key per reasoning effort. The RATE is identical across all
-  // four — effort changes how many output tokens come back, not their price —
-  // so the spend difference between `none` and `xhigh` shows up through the
-  // measured token counts, not here. Keeping them separate is what lets the
-  // admin tables attribute spend to an effort level.
-  "openai-none": 0.0007, // Luna: $0.20 in + $1.20 out per 1M
-  "openai-low": 0.0007,
-  "openai-high": 0.0007,
-  "openai-xhigh": 0.0007,
-  // Bare "openai" is what the EDGE runtime reports: lib/ai-providers-edge.ts
-  // returns provider: "openai" with no effort suffix (its effort is a module
-  // constant, not part of the provider identity). Without this key every
-  // OpenAI-served Edge feedback generation missed the table and was booked at
-  // the gemini rate — 6.4x its real cost — in the ledger, the per-user budget
-  // and the global kill-switch alike. Same Luna rate as the four keys above.
-  openai: 0.0007,
-  gemini: 0.0045, // Gemini 3.6 Flash: $1.50 in + $7.50 out per 1M
-  "gemini-lite": 0.0014, // Gemini 3.5 Flash-Lite: $0.30 in + $2.50 out per 1M
-  "deepseek-chat": 0.00021, // DeepSeek V4 Flash: $0.14 in + $0.28 out per 1M
-  "gemini-pro": 0.003125, // Gemini 2.5 Pro (unverified, not currently called)
-  deepseek: 0.0006525, // DeepSeek V4 Pro: $0.435 in + $0.87 out per 1M
-  claude: 0.003, // Claude Haiku 4.5: $1.00 in + $5.00 out per 1M
-  "claude-sonnet": 0.009, // Claude Sonnet 4: $3 in + $15 out per 1M
-  "gpt-4o": 0.00625, // GPT-4o: $2.50 in + $10 out per 1M
-  "gpt-4o-mini": 0.000375, // GPT-4o mini: $0.15 in + $0.60 out per 1M
-} as const
+/**
+ * Blended (input+output averaged) cost per 1K tokens per provider.
+ *
+ * DISPLAY ONLY. Re-exported from lib/pricing.ts, where it is derived from the
+ * per-direction AI_PROVIDER_RATES, rather than maintained as a second literal
+ * table here. Both copies happened to agree on all 14 rows, but nothing checked
+ * that they agreed on the same KEY SET, and they did not: this table carried the
+ * bare "openai" row and AI_PROVIDER_RATES did not.
+ *
+ * Its only remaining consumer is the admin rate table (app/api/admin/usage),
+ * which shows a headline "what does this provider cost" figure with no token
+ * split to price against. Nothing may price a real call with it: averaging is
+ * exactly what the per-direction table exists to stop.
+ */
+export const PROVIDER_COSTS = AI_PROVIDER_COSTS
 
 // Deepgram voice costs (per minute of audio).
 // Legacy entries are kept so historical usage rows still price correctly.
@@ -491,26 +474,42 @@ export async function checkUserBudget(userId: string): Promise<{
 }
 
 /**
- * Calculate cost from token counts (for LLM providers).
+ * Cost of one LLM call in USD. THE pricing entry point for the platform.
+ *
+ * Every live pricing site reaches this function: the Node AI path
+ * (lib/ai-providers.ts), the Edge ingest (/api/internal/usage), and both
+ * text-counting helpers below. Its output feeds the per-user budget cap, the
+ * global daily kill-switch, cost-anomaly detection and every cost dashboard.
+ *
+ * It now prices PER DIRECTION via calculateAICost. It used to sum the two token
+ * counts and multiply by a single blended (input+output averaged) rate, which is
+ * correct only for a call that happens to split 50/50. Real traffic does not:
+ * a chat turn carries a large system prompt and history against a short reply,
+ * so the blended rate overcharged by 2.4x-3.3x on chat and hints.
+ *
+ * The blended table is still exported as PROVIDER_COSTS for the admin rate
+ * display, where no token split is known. It must never price a call again.
  *
  * An unrecognised provider still prices at the gemini rate (deliberately one of
  * the dearer rows, so an unknown provider over-books rather than under-books and
- * the caps engage sooner) — but it now says so at ERROR level. The silent
+ * the caps engage sooner) — and still says so at ERROR level. The silent
  * fallback is what let a whole runtime's OpenAI spend be mispriced indefinitely:
  * nothing in the system distinguished "priced correctly" from "priced by
  * accident", so the mistake was invisible in every dashboard that used it.
  */
-export function calculateCost(inputTokens: number, outputTokens: number, provider: string): number {
-  const configuredRate = PROVIDER_COSTS[provider as keyof typeof PROVIDER_COSTS]
-  if (configuredRate === undefined) {
+export function calculateCost(
+  inputTokens: number,
+  outputTokens: number,
+  provider: string,
+  options?: { cachedInputTokens?: number }
+): number {
+  if (!resolveProviderRate(provider).matched) {
     logger.error("Unknown AI provider has no cost row; billing at the gemini rate", {
       provider,
-      fallbackRatePer1kTokens: PROVIDER_COSTS.gemini,
+      fallbackRateProvider: FALLBACK_RATE_PROVIDER,
     })
   }
-  const costPer1k = configuredRate ?? PROVIDER_COSTS.gemini
-  const totalTokens = inputTokens + outputTokens
-  return (totalTokens / 1000) * costPer1k
+  return calculateAICost(inputTokens, outputTokens, provider, options)
 }
 
 /**
