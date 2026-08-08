@@ -67,8 +67,8 @@ export const PROVIDER_COSTS = {
   "gemini-lite": 0.0014, // Gemini 3.5 Flash-Lite: $0.30 in + $2.50 out per 1M
   "deepseek-chat": 0.00021, // DeepSeek V4 Flash: $0.14 in + $0.28 out per 1M
   "gemini-pro": 0.003125, // Gemini 2.5 Pro (unverified, not currently called)
-  deepseek: 0.00065, // DeepSeek V4 Pro: $0.435 in + $0.87 out per 1M
-  claude: 0.0024, // Claude 3.5 Haiku: $0.80 in + $4.00 out per 1M
+  deepseek: 0.0006525, // DeepSeek V4 Pro: $0.435 in + $0.87 out per 1M
+  claude: 0.003, // Claude Haiku 4.5: $1.00 in + $5.00 out per 1M
   "claude-sonnet": 0.009, // Claude Sonnet 4: $3 in + $15 out per 1M
   "gpt-4o": 0.00625, // GPT-4o: $2.50 in + $10 out per 1M
   "gpt-4o-mini": 0.000375, // GPT-4o mini: $0.15 in + $0.60 out per 1M
