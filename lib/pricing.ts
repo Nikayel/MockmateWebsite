@@ -235,6 +235,16 @@ export const AI_PROVIDER_RATES = {
   "openai-low": { inputPer1M: 0.2, outputPer1M: 1.2 },
   "openai-high": { inputPer1M: 0.2, outputPer1M: 1.2 },
   "openai-xhigh": { inputPer1M: 0.2, outputPer1M: 1.2 },
+  // Bare "openai" is what the EDGE runtime reports: lib/ai-providers-edge.ts
+  // returns provider: "openai" with no effort suffix, because its effort is a
+  // module constant rather than part of the provider identity. Same Luna rate as
+  // the four keys above.
+  //
+  // This row existed in usage-tracking's PROVIDER_COSTS but NOT here, and this
+  // table is the one that prices calls. Every OpenAI-served Edge feedback
+  // generation would have missed the lookup and billed at the gemini fallback,
+  // which is the exact 6.4x mispricing the effort keys were added to end.
+  openai: { inputPer1M: 0.2, outputPer1M: 1.2 },
   // --- Gemini, matching the live pins in lib/ai/model-ids.ts ---
   gemini: { inputPer1M: 1.5, outputPer1M: 7.5 }, // Gemini 3.6 Flash
   "gemini-lite": { inputPer1M: 0.3, outputPer1M: 2.5 }, // Gemini 3.5 Flash-Lite
@@ -355,6 +365,7 @@ const PROVIDER_DISPLAY_NAMES: Record<AIProvider, string> = {
   "openai-low": "GPT-5.6 Luna (effort: low)",
   "openai-high": "GPT-5.6 Luna (effort: high)",
   "openai-xhigh": "GPT-5.6 Luna (effort: xhigh)",
+  openai: "GPT-5.6 Luna (Edge runtime)",
   gemini: "Gemini 3.6 Flash",
   "gemini-lite": "Gemini 3.5 Flash-Lite",
   "gemini-pro": "Gemini 2.5 Pro",
