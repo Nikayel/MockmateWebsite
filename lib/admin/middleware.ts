@@ -5,8 +5,14 @@
  * Handles authentication, authorization, and common patterns.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { getAdminRole, hasPermission, getUserPermissions, verifyToken, type AdminRole, type Permission } from './rbac'
+import { NextRequest, NextResponse } from "next/server"
+import {
+  getAdminRole,
+  ROLE_PERMISSIONS,
+  verifyToken,
+  type AdminRole,
+  type Permission,
+} from "./rbac"
 
 export interface AdminContext {
   userId: string
@@ -28,23 +34,23 @@ export interface AuthResult {
  */
 export async function verifyAdminAccess(request: NextRequest): Promise<AuthResult> {
   // Extract bearer token
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
+  const authHeader = request.headers.get("authorization")
+  if (!authHeader?.startsWith("Bearer ")) {
     return {
       authorized: false,
-      error: 'Missing authorization header',
+      error: "Missing authorization header",
       status: 401,
     }
   }
 
-  const token = authHeader.replace('Bearer ', '')
+  const token = authHeader.replace("Bearer ", "")
 
   // Verify token
   const tokenResult = await verifyToken(token)
   if (!tokenResult.valid || !tokenResult.userId) {
     return {
       authorized: false,
-      error: tokenResult.error || 'Invalid token',
+      error: tokenResult.error || "Invalid token",
       status: 401,
     }
   }
@@ -54,13 +60,14 @@ export async function verifyAdminAccess(request: NextRequest): Promise<AuthResul
   if (!role) {
     return {
       authorized: false,
-      error: 'Access denied - not an admin',
+      error: "Access denied - not an admin",
       status: 403,
     }
   }
 
-  // Get permissions
-  const permissions = await getUserPermissions(tokenResult.userId)
+  // Derive permissions from the role we already fetched. Calling getUserPermissions()
+  // here would re-read the same admin_roles document for a value that is a pure lookup.
+  const permissions = ROLE_PERMISSIONS[role]
 
   return {
     authorized: true,
@@ -102,20 +109,14 @@ export async function requirePermission(
  * Create unauthorized response
  */
 export function unauthorizedResponse(error: string, status: number = 403): NextResponse {
-  return NextResponse.json(
-    { success: false, error },
-    { status }
-  )
+  return NextResponse.json({ success: false, error }, { status })
 }
 
 /**
  * Create error response
  */
 export function errorResponse(error: string, status: number = 500): NextResponse {
-  return NextResponse.json(
-    { success: false, error },
-    { status }
-  )
+  return NextResponse.json({ success: false, error }, { status })
 }
 
 /**
@@ -167,7 +168,7 @@ export function withPermission<T>(
  * Parse common query parameters for admin APIs
  */
 export function parseAdminQueryParams(request: NextRequest): {
-  timeRange: '7d' | '30d' | '90d' | 'all'
+  timeRange: "7d" | "30d" | "90d" | "all"
   startDate: Date | null
   endDate: Date
   page: number
@@ -175,21 +176,21 @@ export function parseAdminQueryParams(request: NextRequest): {
 } {
   const { searchParams } = new URL(request.url)
 
-  const timeRange = (searchParams.get('timeRange') || '7d') as '7d' | '30d' | '90d' | 'all'
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
-  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10)))
+  const timeRange = (searchParams.get("timeRange") || "7d") as "7d" | "30d" | "90d" | "all"
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10))
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)))
 
   const now = new Date()
   let startDate: Date | null = null
 
   switch (timeRange) {
-    case '7d':
+    case "7d":
       startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
       break
-    case '30d':
+    case "30d":
       startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
       break
-    case '90d':
+    case "90d":
       startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
       break
     default:
@@ -213,16 +214,16 @@ export function getDateRange(timeRange: string): { startDate: Date | null; endDa
   let startDate: Date | null = null
 
   switch (timeRange) {
-    case '7d':
+    case "7d":
       startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
       break
-    case '30d':
+    case "30d":
       startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
       break
-    case '90d':
+    case "90d":
       startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
       break
-    case '1y':
+    case "1y":
       startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
       break
     default:
