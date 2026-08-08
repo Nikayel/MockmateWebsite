@@ -54,9 +54,14 @@ export function HeroSection() {
         animate={reduceMotion ? false : "animate"}
       >
         <motion.div variants={staggerItem} className="mx-auto flex max-w-4xl flex-col items-center">
-          {/* Eyebrow: no-fill, hairline border, specific social proof — not a slogan */}
+          {/* Eyebrow: names the interview formats the product actually covers.
+              It previously read "Used by Palantir & FAANG candidates", which is a
+              usage claim the product cannot substantiate pre-launch. Coverage is
+              verifiable (Palantir FDSE case labs, DSA/system-design loops, SQL/DE
+              rounds all ship today); adoption is not. Swap this for real social
+              proof only when there are real users to point at. */}
           <span className="border-border bg-background/40 text-muted-foreground mb-8 inline-flex rounded-full border px-4 py-1.5 text-[12px] font-medium tracking-[0.02em] backdrop-blur-sm lg:mb-9">
-            Used by Palantir &amp; FAANG candidates
+            Palantir case labs, FAANG loops, and DE rounds
           </span>
 
           {/* Focal point: one mono headline. No inline accent — the copy carries itself. */}
