@@ -40,6 +40,26 @@ describe("buildChatErrorToast", () => {
     expect(result?.showUpgradeAction).toBe(true)
   })
 
+  it("labels a daily budget block as a budget block, not as throttling", () => {
+    // Regression: DAILY_BUDGET_EXCEEDED was missing from the title map, so it
+    // fell through to the plain-429 branch and told a user who had spent their
+    // daily AI allowance that they were clicking too fast. Two refusals with
+    // completely different remedies read as the same one.
+    const result = buildChatErrorToast(429, {
+      error: "Daily AI limit reached",
+      message:
+        "You've used today's AI allowance ($0.25). This resets at midnight UTC. Your monthly allowance is unaffected.",
+      code: "DAILY_BUDGET_EXCEEDED",
+    })
+
+    expect(result?.title).toBe("You've used today's AI allowance")
+    expect(result?.title).not.toBe("Too many requests")
+    expect(result?.description).toContain("midnight UTC")
+    // It clears on its own in hours and the monthly allowance is untouched, so
+    // selling a plan here would be dishonest.
+    expect(result?.showUpgradeAction).toBe(false)
+  })
+
   it.each(["FREE_TRIAL_EXHAUSTED", "SUBSCRIPTION_INACTIVE", "PRO_REQUIRED"])(
     "still toasts %s, which arrives as a 403 and previously showed nothing",
     (code) => {

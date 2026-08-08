@@ -3,6 +3,12 @@ import type { Dispatch, SetStateAction } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { extractTopicsFromMessage } from "@/lib/interview"
+import {
+  REFUSAL_TITLES,
+  UPGRADE_PATH,
+  UPGRADE_RESOLVES,
+  isKnownRefusalCode,
+} from "@/lib/interview/refusal-copy"
 import { trackUserMessage, trackAIMessage } from "@/lib/scoring/track-chat"
 import { getGuidedChatState } from "@/lib/stores/guided-lab-store"
 import type { Scenario } from "@/lib/scenarios"
@@ -144,38 +150,11 @@ export function isSessionConclusionMessage(message: string): boolean {
 // codes (free trial exhausted, subscription lapsed, Pro-only feature) produced
 // no toast at all.
 
-/** Where a user goes to lift a quota or entitlement block. */
-const UPGRADE_PATH = "/upgrade"
-
-/**
- * Titles for the entitlement and capacity codes the API can return.
- *
- * Keep these in sync with the `code` values in lib/quota-enforcement.ts. An
- * unknown code falls back to a neutral title rather than mislabelling the cause.
- */
-const CHAT_ERROR_TITLES: Record<string, string> = {
-  QUOTA_EXCEEDED: "You've used this month's sessions",
-  BUDGET_EXCEEDED: "You've used this month's AI allowance",
-  FREE_TRIAL_EXHAUSTED: "Your free session is finished",
-  SUBSCRIPTION_INACTIVE: "Your Pro subscription needs attention",
-  PRO_REQUIRED: "This one is part of Pro",
-  GLOBAL_CAPACITY_LIMIT: "We're at capacity right now",
-  SERVICE_UNAVAILABLE: "That service is briefly unavailable",
-  AUTH_REQUIRED: "Please sign in to continue",
-}
-
-/**
- * Codes a user can actually resolve by upgrading. Capacity and auth problems are
- * deliberately absent: offering to sell someone a plan that will not fix their
- * problem is worse than offering nothing.
- */
-const UPGRADE_RESOLVES: ReadonlySet<string> = new Set([
-  "QUOTA_EXCEEDED",
-  "BUDGET_EXCEEDED",
-  "FREE_TRIAL_EXHAUSTED",
-  "SUBSCRIPTION_INACTIVE",
-  "PRO_REQUIRED",
-])
+// The titles and the upgrade-resolves set now live in lib/interview/refusal-copy.ts,
+// shared with the post-interview feedback toast. This file used to own its own
+// copy, and it was already missing DAILY_BUDGET_EXCEEDED: that refusal fell
+// through to the plain-429 branch and was titled "Too many requests", telling a
+// user who had spent their daily AI allowance that they were clicking too fast.
 
 export interface ChatErrorToast {
   title: string
@@ -199,9 +178,9 @@ export function buildChatErrorToast(
   const error = typeof data?.error === "string" ? data.error : undefined
 
   // Anything the entitlement layer labelled gets its real message surfaced.
-  if (code && (CHAT_ERROR_TITLES[code] || UPGRADE_RESOLVES.has(code))) {
+  if (isKnownRefusalCode(code)) {
     return {
-      title: CHAT_ERROR_TITLES[code] ?? "We couldn't continue",
+      title: REFUSAL_TITLES[code] ?? "We couldn't continue",
       description: message ?? error ?? "Please try again in a moment.",
       showUpgradeAction: UPGRADE_RESOLVES.has(code),
     }
