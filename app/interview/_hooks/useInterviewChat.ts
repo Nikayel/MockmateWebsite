@@ -1,5 +1,6 @@
 import { useCallback } from "react"
 import type { Dispatch, SetStateAction } from "react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { extractTopicsFromMessage } from "@/lib/interview"
 import { trackUserMessage, trackAIMessage } from "@/lib/scoring/track-chat"
@@ -128,6 +129,97 @@ export function isSessionConclusionMessage(message: string): boolean {
   return PHRASE_CONCLUSION_SIGNALS.some((signal) => normalized.includes(signal))
 }
 
+// =============================================================================
+// Chat error presentation
+// =============================================================================
+// lib/quota-enforcement.ts already does the hard part: it returns a machine
+// readable `code` and a message written for the person reading it ("You've used
+// all 8 free sessions for this month. Upgrade to Pro for 35 sessions per month,
+// a personalized roadmap, and spaced repetition."). The chat hook then threw the
+// code away and rendered every failure as a red toast titled "Rate limit
+// reached", with no link anywhere.
+//
+// That toast fired at the exact moment a user is most willing to pay, and told
+// them they had done something wrong. It also only fired on 429, so the 403
+// codes (free trial exhausted, subscription lapsed, Pro-only feature) produced
+// no toast at all.
+
+/** Where a user goes to lift a quota or entitlement block. */
+const UPGRADE_PATH = "/upgrade"
+
+/**
+ * Titles for the entitlement and capacity codes the API can return.
+ *
+ * Keep these in sync with the `code` values in lib/quota-enforcement.ts. An
+ * unknown code falls back to a neutral title rather than mislabelling the cause.
+ */
+const CHAT_ERROR_TITLES: Record<string, string> = {
+  QUOTA_EXCEEDED: "You've used this month's sessions",
+  BUDGET_EXCEEDED: "You've used this month's AI allowance",
+  FREE_TRIAL_EXHAUSTED: "Your free session is finished",
+  SUBSCRIPTION_INACTIVE: "Your Pro subscription needs attention",
+  PRO_REQUIRED: "This one is part of Pro",
+  GLOBAL_CAPACITY_LIMIT: "We're at capacity right now",
+  SERVICE_UNAVAILABLE: "That service is briefly unavailable",
+  AUTH_REQUIRED: "Please sign in to continue",
+}
+
+/**
+ * Codes a user can actually resolve by upgrading. Capacity and auth problems are
+ * deliberately absent: offering to sell someone a plan that will not fix their
+ * problem is worse than offering nothing.
+ */
+const UPGRADE_RESOLVES: ReadonlySet<string> = new Set([
+  "QUOTA_EXCEEDED",
+  "BUDGET_EXCEEDED",
+  "FREE_TRIAL_EXHAUSTED",
+  "SUBSCRIPTION_INACTIVE",
+  "PRO_REQUIRED",
+])
+
+export interface ChatErrorToast {
+  title: string
+  description: string
+  /** True when the toast should carry a link to the upgrade page. */
+  showUpgradeAction: boolean
+}
+
+/**
+ * Turns a failed /api/chat response into the toast a user should see, or null
+ * when the failure needs no toast (the message already lands in the transcript).
+ *
+ * Pure and exported so the mapping can be tested without a rendered chat.
+ */
+export function buildChatErrorToast(
+  status: number,
+  data: { code?: unknown; message?: unknown; error?: unknown } | null | undefined
+): ChatErrorToast | null {
+  const code = typeof data?.code === "string" ? data.code : undefined
+  const message = typeof data?.message === "string" ? data.message : undefined
+  const error = typeof data?.error === "string" ? data.error : undefined
+
+  // Anything the entitlement layer labelled gets its real message surfaced.
+  if (code && (CHAT_ERROR_TITLES[code] || UPGRADE_RESOLVES.has(code))) {
+    return {
+      title: CHAT_ERROR_TITLES[code] ?? "We couldn't continue",
+      description: message ?? error ?? "Please try again in a moment.",
+      showUpgradeAction: UPGRADE_RESOLVES.has(code),
+    }
+  }
+
+  // Unlabelled 429s are ordinary request-rate throttling, which really is a
+  // "slow down" and really does resolve on its own.
+  if (status === 429) {
+    return {
+      title: "Too many requests",
+      description: message ?? error ?? "Give it a few seconds and try again.",
+      showUpgradeAction: false,
+    }
+  }
+
+  return null
+}
+
 /**
  * Owns the interview chat-send flow: `handleSendMessage` (interviewer + partner
  * chat, POST /api/chat) and the voice `handleAutoSend`. Lifted verbatim from the
@@ -138,6 +230,7 @@ export function isSessionConclusionMessage(message: string): boolean {
  * effects owned by other slices are injected as callbacks.
  */
 export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewChatReturn {
+  const router = useRouter()
   const {
     chatInput,
     interviewerInput,
@@ -303,10 +396,19 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           console.warn("[API] Request failed:", response.status, response.url, data)
           const errorMsg = data?.message || data?.error || "Something went wrong. Please try again."
           setMessages((prev) => [...prev, { type: "ai", message: errorMsg }])
-          if (response.status === 429) {
-            toast.error("Rate limit reached", {
-              description: errorMsg,
-              duration: 6000,
+
+          const errorToast = buildChatErrorToast(response.status, data)
+          if (errorToast) {
+            toast.error(errorToast.title, {
+              description: errorToast.description,
+              // Longer than the usual 6s: these carry a decision, not just news.
+              duration: errorToast.showUpgradeAction ? 12000 : 6000,
+              action: errorToast.showUpgradeAction
+                ? {
+                    label: "See Pro plans",
+                    onClick: () => router.push(UPGRADE_PATH),
+                  }
+                : undefined,
             })
           }
           return
