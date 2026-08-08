@@ -7,6 +7,7 @@
 
 import { adminDb, adminAuth } from "../firebase-admin"
 import { Timestamp } from "firebase-admin/firestore"
+import { logAdminAction, AUDIT_ACTIONS } from "./audit"
 
 /**
  * Admin role definitions
@@ -226,12 +227,22 @@ export async function grantAdminRole(
       active: true,
     })
 
-    // Log admin action
-    await logAdminAction(granterId, "grant_role", {
-      targetUserId,
-      targetEmail,
-      role,
-    })
+    // Log admin action through the shared audit writer so this row carries the
+    // same fields as every other. granterId is all the caller gives us, so the
+    // granter's own email is recorded as explicitly absent rather than omitted.
+    await logAdminAction(
+      granterId,
+      AUDIT_ACTIONS.GRANT_ROLE,
+      { targetUserId, targetEmail, role },
+      {
+        target: { type: "admin_roles", id: targetUserId, label: targetEmail },
+        // The prior document is not read before the set(), so the previous
+        // state is genuinely unknown. Recording a guessed "before" would be
+        // worse than recording none.
+        before: null,
+        after: { role, active: true },
+      }
+    )
 
     return { success: true }
   } catch (error) {
@@ -266,7 +277,16 @@ export async function revokeAdminRole(
       active: false,
     })
 
-    await logAdminAction(revokerId, "revoke_role", { targetUserId })
+    await logAdminAction(
+      revokerId,
+      AUDIT_ACTIONS.REVOKE_ROLE,
+      { targetUserId },
+      {
+        target: { type: "admin_roles", id: targetUserId },
+        before: { active: true },
+        after: { active: false },
+      }
+    )
 
     return { success: true }
   } catch (error) {
@@ -306,29 +326,6 @@ export async function listAdmins(): Promise<AdminRoleDoc[]> {
   } catch (error) {
     console.error("[RBAC] Error listing admins:", error)
     return []
-  }
-}
-
-/**
- * Log admin action for audit trail
- */
-async function logAdminAction(
-  adminId: string,
-  action: string,
-  details: Record<string, any>
-): Promise<void> {
-  if (!adminDb) return
-
-  try {
-    await adminDb.collection("admin_audit_log").add({
-      adminId,
-      action,
-      details,
-      timestamp: Timestamp.now(),
-      ip: "server", // In production, pass IP from request
-    })
-  } catch (error) {
-    console.error("[RBAC] Error logging admin action:", error)
   }
 }
 
