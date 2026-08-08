@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { verifyCronRequest } from "@/lib/cron-auth"
 import { logger } from "@/lib/logger"
 import { trackUsageEvent, calculateCost, type UsageEventType } from "@/lib/usage-tracking"
+import { recordGlobalSpend } from "@/lib/global-spend-guard"
 
 /** Event types the Edge path is allowed to report. */
 const REPORTABLE_EVENT_TYPES: readonly UsageEventType[] = [
@@ -144,6 +145,20 @@ export async function POST(request: NextRequest) {
     isExactTokenCount: !report.estimatedTokens,
     metadata: { source: "edge" },
   })
+
+  // Feed the aggregate daily kill-switch. This was the ONE thing this endpoint
+  // did not do: it wrote the usage_event (so per-user budgets saw the spend) but
+  // never incremented global_usage/{day}, whose only writer was the Node path in
+  // lib/ai-providers.ts. The Edge feedback route serves every scenario type
+  // except system design, so the busiest AI path on the platform contributed
+  // nothing to the $250/day ceiling and the ceiling could never be reached by
+  // the traffic most likely to run it up.
+  //
+  // Awaited, unlike the Node path's fire-and-forget call: nothing is waiting on
+  // this response (the Edge caller already returned to the user), so there is no
+  // latency to protect, and an awaited increment is one that Vercel cannot freeze
+  // out from under us. recordGlobalSpend never throws.
+  await recordGlobalSpend(cost)
 
   logger.info("[Internal Usage] Recorded Edge AI usage", {
     eventType: report.eventType,
