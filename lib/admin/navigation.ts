@@ -84,7 +84,10 @@ export const ADMIN_NAV: readonly AdminNavEntry[] = [
     name: "Infrastructure",
     href: "/admin/infrastructure",
     section: "Technical",
-    permission: "view_errors",
+    // Reads /api/admin/cost-anomalies, which requires VIEW_AI_USAGE. Gated on
+    // view_errors this offered support a link into a 403, since that role holds
+    // view_errors and not view_ai_usage.
+    permission: "view_ai_usage",
   },
   { name: "RAG", href: "/admin/rag", section: "Technical", permission: "view_analytics" },
   { name: "System Health", href: "/admin/health", section: "Technical", permission: "view_errors" },

@@ -116,24 +116,53 @@ describe("activeNavHref", () => {
  * changing the nav fails here.
  */
 describe("nav permissions match the routes they open", () => {
-  // Several pages are not served by a same-named route: the errors page reads the
-  // analytics route, and the overview does too. Mapping is therefore explicit.
-  const NAV_HREF_TO_ROUTE: Record<string, string> = {
+  /**
+   * Every nav destination, mapped to the admin route its page actually calls.
+   *
+   * Deliberately exhaustive: the first version of this test mapped 12 of the 22
+   * entries and missed all four that were wrong, including Infrastructure, whose
+   * page reads cost-anomalies (VIEW_AI_USAGE) while the nav gated it on
+   * view_errors and so invited support into a 403. A test that covers a subset of
+   * a rule cannot enforce the rule, so the completeness check below fails if a new
+   * destination is added without a decision recorded here.
+   *
+   * `null` means the page's route is not permission-gated, so the nav may declare
+   * whatever it likes; the nav is then free to be stricter than the API.
+   */
+  const NAV_HREF_TO_ROUTE: Record<string, string | null> = {
     "/admin": "analytics",
     "/admin/users": "users",
-    "/admin/errors": "analytics",
+    "/admin/sessions": "sessions",
+    "/admin/revenue": "revenue",
+    "/admin/payments": null,
+    "/admin/growth": null,
+    "/admin/funnel": "funnel",
+    "/admin/ai-usage": "usage",
+    "/admin/scoring": "scoring",
+    "/admin/rate-limits": null,
+    "/admin/infrastructure": "cost-anomalies",
+    "/admin/rag": "rag-health",
     "/admin/health": "health",
-    "/admin/audit": "audit",
+    "/admin/errors": "analytics",
+    "/admin/research": null,
+    "/admin/learn-research": "learn-research",
+    "/admin/bugfix-quality": "bugfix-quality",
     "/admin/announcements": "announcements",
     "/admin/feature-flags": "feature-flags",
     "/admin/feedback": "feedback",
-    "/admin/scoring": "scoring",
-    "/admin/rag": "rag-health",
-    "/admin/learn-research": "learn-research",
-    "/admin/bugfix-quality": "bugfix-quality",
+    "/admin/audit": "audit",
+    "/admin/settings": null,
   }
 
+  it("maps every nav destination, so no entry escapes this check", () => {
+    const mapped = new Set(Object.keys(NAV_HREF_TO_ROUTE))
+    const unmapped = ADMIN_NAV.filter((entry) => !mapped.has(entry.href)).map((e) => e.href)
+    expect(unmapped, "add these to NAV_HREF_TO_ROUTE with the route they call").toEqual([])
+  })
+
   for (const [href, routeDir] of Object.entries(NAV_HREF_TO_ROUTE)) {
+    if (routeDir === null) continue
+
     it(`${href} declares the permission ${routeDir} enforces`, () => {
       const source = readFileSync(
         resolve(__dirname, "../../../app/api/admin", routeDir, "route.ts"),
