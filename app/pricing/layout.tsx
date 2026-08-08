@@ -1,10 +1,13 @@
 import type { Metadata } from "next"
+
+import { truncateForDescription } from "@/lib/seo/learn-metadata"
 import { LenisProvider } from "@/components/providers/LenisProvider"
 
 export const metadata: Metadata = {
   title: "Pricing - AI Mock Interview Plans",
-  description:
-    "Choose your coding interview prep plan. Start free with 8 interviews/month or go Pro for 35 interview sessions a month. 29% cheaper than LeetCode Premium with AI-powered feedback.",
+  description: truncateForDescription(
+    "Start free with 8 AI mock interviews a month, or go Pro for 35. Full feedback on every session, 29% cheaper than LeetCode Premium."
+  ),
   keywords: [
     "coding interview pricing",
     "mock interview cost",

@@ -6,6 +6,7 @@ import { Header } from "@/components/header"
 import { LEARN_TRACKS, type LearnTrack } from "@/components/learn/learn-tracks"
 import { BreadcrumbJsonLd, CourseListJsonLd } from "@/components/seo/JsonLd"
 import { learnCourseSchemaInput } from "@/lib/seo/learn-course-schema"
+import { truncateForDescription } from "@/lib/seo/learn-metadata"
 import { COURSE_IDS, listCourseLevels } from "@/lib/tutorials/course-catalog"
 import {
   LEARN_COURSE_LABEL,
@@ -34,8 +35,11 @@ const LEARN_ALL_LESSONS_PATH = "/learn/all"
 export const metadata: Metadata = {
   // No brand here: the root layout's `title.template` appends " | CodeSparring" already.
   title: "Learn Python, Data Engineering, and System Design",
-  description:
-    "Free interactive courses that run in your browser. Read a concept, apply it on a guided exercise, then practice it on an interview-shaped problem with automated grading.",
+  // Every other Learn page's description already runs through `truncateForDescription`; the hub was
+  // the one that hand-wrote its own and overran the budget.
+  description: truncateForDescription(
+    "Free interactive courses that run in your browser. Read a concept, apply it on a guided exercise, then practice it on an interview-shaped problem."
+  ),
   alternates: {
     canonical: "/learn",
   },

@@ -1,9 +1,13 @@
 import type { Metadata } from "next"
+
+import { truncateForDescription } from "@/lib/seo/learn-metadata"
 import { LenisProvider } from "@/components/providers/LenisProvider"
 
 export const metadata: Metadata = {
   title: "Documentation - Getting Started Guide",
-  description: "Complete guide to using CodeSparring for AI-powered coding interview practice. Learn keyboard shortcuts, features, and how to get the most out of your mock interviews.",
+  description: truncateForDescription(
+    "The complete guide to practicing coding interviews with CodeSparring. Keyboard shortcuts, features, and how to get the most from each mock interview."
+  ),
   keywords: [
     "CodeSparring documentation",
     "coding interview tutorial",
@@ -27,10 +31,6 @@ export const metadata: Metadata = {
   },
 }
 
-export default function DocsLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function DocsLayout({ children }: { children: React.ReactNode }) {
   return <LenisProvider>{children}</LenisProvider>
 }

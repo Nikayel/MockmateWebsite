@@ -1,9 +1,13 @@
 import type { Metadata } from "next"
+
+import { truncateForDescription } from "@/lib/seo/learn-metadata"
 import { LenisProvider } from "@/components/providers/LenisProvider"
 
 export const metadata: Metadata = {
   title: "Careers - Join Our Team",
-  description: "Join the CodeSparring team and help developers ace their coding interviews. Open roles in Growth and Fullstack Development. Equity-based compensation for early team members.",
+  description: truncateForDescription(
+    "Join CodeSparring and help developers ace their coding interviews. Open Growth and Fullstack roles, with equity for early team members."
+  ),
   keywords: [
     "CodeSparring careers",
     "startup jobs",
@@ -28,10 +32,6 @@ export const metadata: Metadata = {
   },
 }
 
-export default function CareersLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function CareersLayout({ children }: { children: React.ReactNode }) {
   return <LenisProvider>{children}</LenisProvider>
 }
