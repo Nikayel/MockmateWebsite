@@ -9,7 +9,9 @@ import {
 } from "@/lib/firebase-analytics-admin"
 import { withPermission, parseAdminQueryParams } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
-import { calculateMRR, calculateARR, getMonthlyPrice } from "@/lib/pricing"
+import { getMonthlyPrice } from "@/lib/pricing"
+import { computeMrrCents, computeArrCents, centsToDollars } from "@/lib/admin/revenue-metrics"
+import { countBillingSubscriptions } from "@/lib/admin/subscription-state"
 import { isScoredCompletedSession, summarizeSessionFunnelCounts } from "@/lib/firestore-helpers"
 import { adminCache, getCacheKey, CACHE_TTL } from "@/lib/admin/cache"
 import {
@@ -230,7 +232,15 @@ export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (request, co
     const totalUsers = authUsers.length
 
     // Build profile map for tier data
-    const profileMap = new Map<string, { subscription_tier?: string; created_at?: string }>()
+    const profileMap = new Map<
+      string,
+      {
+        subscription_tier?: string
+        created_at?: string
+        subscription_status?: string
+        subscription_type?: string
+      }
+    >()
     const PROFILE_BATCH = 30
     for (let i = 0; i < authUsers.length; i += PROFILE_BATCH) {
       const batch = authUsers.slice(i, i + PROFILE_BATCH)
@@ -401,9 +411,32 @@ export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (request, co
     const codeExecutionPassRate =
       totalCodeExecutions > 0 ? Math.round((passedCodeExecutions / totalCodeExecutions) * 100) : 0
 
-    // Calculate revenue metrics using centralized pricing. Only computed for a
-    // caller who may see revenue; everyone else gets null rather than a number.
-    const mrr = maySeeRevenue ? calculateMRR(tierCounts) : null
+    // Revenue, computed the same way /admin/revenue computes it.
+    //
+    // This used to be tier headcount times the monthly list price, which disagreed
+    // with the revenue page on two counts: it ignored subscription_status, so a
+    // cancelled or past_due account kept paying on paper, and it priced a yearly
+    // subscriber at the monthly rate rather than amortising the annual charge. The
+    // two pages therefore printed different MRR on the same day, and the overstated
+    // one was the headline card.
+    //
+    // Only computed for a caller who may see revenue; everyone else gets null.
+    const mrrCents = maySeeRevenue
+      ? computeMrrCents(
+          countBillingSubscriptions(
+            authUsers.map((authUser) => {
+              const profile = profileMap.get(authUser.uid)
+              return {
+                userId: authUser.uid,
+                subscription_tier: profile?.subscription_tier,
+                subscription_status: profile?.subscription_status,
+                subscription_type: profile?.subscription_type,
+              }
+            })
+          )
+        ).total
+      : null
+    const mrr = mrrCents === null ? null : centsToDollars(mrrCents)
 
     // Fetch recent errors (last 100) - handle potential index error gracefully
     let recentErrors: Array<{
@@ -523,7 +556,9 @@ export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (request, co
             ? { mrr: null, arr: null }
             : {
                 mrr,
-                arr: calculateARR(mrr),
+                // Derived from the cents figure so ARR and MRR cannot disagree by a
+                // rounding step.
+                arr: centsToDollars(computeArrCents(mrrCents as number)),
               },
         analytics: {
           totalEvents: eventsSnapshot.size || 0,
