@@ -54,7 +54,14 @@ it holds live Stripe keys and a localhost app URL.
 
 **Should be set:** `SENTRY_DSN` (error tracking is silently off without it), `BREVO_API_KEY`
 (all email), `DEEPSEEK_API_KEY` (AI fallback rung), `UPSTASH_REDIS_REST_URL` / `_TOKEN` (rate
-limiting falls back to Firestore).
+limiting falls back to Firestore), `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` (see section 7: without
+it the verification meta tag renders empty and Search Console cannot verify the property).
+
+**Leave unset unless you mean it:** `NEXT_PUBLIC_SITE_URL`. Unset is correct for production, where
+`lib/seo/site.ts` falls back to the canonical `https://www.codesparring.dev`. It exists so preview
+deployments can describe themselves honestly. Setting it to a preview or apex host in Production
+would republish every canonical, every JSON-LD `@id`, and all sitemap URLs against the wrong origin,
+which is the exact defect the SEO pass fixed.
 
 **Delete:** `NEXT_PUBLIC_DEEPGRAM_API_KEY`. It is referenced nowhere and `NEXT_PUBLIC_` variables ship
 to the client bundle.
@@ -122,6 +129,18 @@ dashboard work:
   live keys next to a localhost app URL, so any local checkout test creates real charges.
 - **Push.** Vercel deploys from Git, and local `main` is a long way ahead of `origin/main`.
 - Do a voice interview on the deployed site once `DEEPGRAM_API_KEY` is mirrored.
+- **Google Search Console, in this order.** None of the SEO work is measurable until this is done,
+  and the order matters:
+  1. Push and deploy, so the corrected canonicals and sitemap are actually live.
+  2. Set `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` in Vercel Production and redeploy. The meta tag is
+     rendered from that variable, so it is empty until the variable exists at build time.
+  3. Add the property as **`https://www.codesparring.dev`**, the same host `lib/seo/site.ts`
+     publishes. A property on the apex reports on a host that only ever answers 308.
+  4. Submit `/sitemap.xml`. It is generated from the course catalog at build time, so it grows on
+     its own as lessons land and never needs resubmitting.
+  5. Expect indexing to be partial and slow. The domain is new and has no inbound links, so the
+     several hundred Learn URLs will be crawled well behind the ~30 marketing pages. That is normal
+     and not a defect to chase.
 
 ---
 
