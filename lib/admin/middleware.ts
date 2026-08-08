@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import {
+  AdminRoleUnavailableError,
   getAdminRole,
   ROLE_PERMISSIONS,
   verifyToken,
@@ -45,8 +46,11 @@ export async function verifyAdminAccess(request: NextRequest): Promise<AuthResul
 
   const token = authHeader.replace("Bearer ", "")
 
-  // Verify token
-  const tokenResult = await verifyToken(token)
+  // Verify token. checkRevoked is on for the admin surface: without it, an admin
+  // whose access was revoked keeps working until their ID token expires, about
+  // an hour. The check is rate-limited per token so a dashboard page load costs
+  // one Auth round trip rather than one per panel.
+  const tokenResult = await verifyToken(token, { checkRevoked: true })
   if (!tokenResult.valid || !tokenResult.userId) {
     return {
       authorized: false,
@@ -55,8 +59,23 @@ export async function verifyAdminAccess(request: NextRequest): Promise<AuthResul
     }
   }
 
-  // Check admin role
-  const role = await getAdminRole(tokenResult.userId)
+  // Check admin role. A lookup that could not complete is reported as a fault, not
+  // as a refusal: answering 403 during a Firestore blip tells a real super_admin
+  // they are not an admin, and leaves them nothing to retry.
+  let role: AdminRole | null
+  try {
+    role = await getAdminRole(tokenResult.userId)
+  } catch (error) {
+    if (error instanceof AdminRoleUnavailableError) {
+      return {
+        authorized: false,
+        error: "Could not verify admin access. This is a fault, not a refusal.",
+        status: 503,
+      }
+    }
+    throw error
+  }
+
   if (!role) {
     return {
       authorized: false,

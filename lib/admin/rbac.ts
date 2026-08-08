@@ -8,6 +8,7 @@
 import { adminDb, adminAuth } from "../firebase-admin"
 import { Timestamp } from "firebase-admin/firestore"
 import { logAdminAction, AUDIT_ACTIONS } from "./audit"
+import { verifyIdTokenWithRevocation } from "./token-revocation"
 
 /**
  * Admin role definitions
@@ -24,6 +25,24 @@ export type AdminRole = "super_admin" | "admin" | "analyst" | "support"
  * to every API call in a page load.
  */
 const LAST_ACCESS_THROTTLE_MS = 5 * 60 * 1000
+
+/**
+ * The role could not be determined, as distinct from the caller not being an admin.
+ *
+ * getAdminRole used to swallow a Firestore failure and return null, which every
+ * caller reads as "not an admin". A database blip therefore presented to a real
+ * super_admin as Access Denied, and the admin shell's error state, which exists
+ * precisely for this case, could never be reached because the API answered 403.
+ * Refusing on evidence and refusing because there is no evidence are different
+ * answers and must not share a return value.
+ */
+export class AdminRoleUnavailableError extends Error {
+  constructor(cause?: unknown) {
+    super("Could not determine admin role")
+    this.name = "AdminRoleUnavailableError"
+    this.cause = cause
+  }
+}
 
 /**
  * Permission definitions
@@ -101,8 +120,11 @@ export interface AdminRoleDoc {
 }
 
 /**
- * Get admin role for a user
- * Returns null if user is not an admin
+ * Get admin role for a user.
+ *
+ * Returns null when the user is genuinely not an admin. Throws
+ * AdminRoleUnavailableError when the answer could not be established, so callers can
+ * report a fault instead of denying access to someone who has it.
  */
 export async function getAdminRole(userId: string): Promise<AdminRole | null> {
   // First check environment variable for super admin (bootstrap admin)
@@ -111,8 +133,8 @@ export async function getAdminRole(userId: string): Promise<AdminRole | null> {
     return "super_admin"
   }
 
-  // Check Firestore for additional admins
-  if (!adminDb) return null
+  // No database client is a fault, not evidence that this user lacks a role.
+  if (!adminDb) throw new AdminRoleUnavailableError("Firestore admin client unavailable")
 
   try {
     const adminDoc = await adminDb.collection("admin_roles").doc(userId).get()
@@ -141,7 +163,7 @@ export async function getAdminRole(userId: string): Promise<AdminRole | null> {
     return data.role
   } catch (error) {
     console.error("[RBAC] Error fetching admin role:", error)
-    return null
+    throw new AdminRoleUnavailableError(error)
   }
 }
 
@@ -330,9 +352,17 @@ export async function listAdmins(): Promise<AdminRoleDoc[]> {
 }
 
 /**
- * Verify Firebase ID token and return user info
+ * Verify Firebase ID token and return user info.
+ *
+ * `checkRevoked` is opt-in because this function also serves ordinary
+ * signed-in user routes, where the extra Auth round trip buys little. Admin
+ * callers pass it: see lib/admin/token-revocation.ts for why the check is
+ * rate-limited rather than run on every request.
  */
-export async function verifyToken(token: string): Promise<{
+export async function verifyToken(
+  token: string,
+  options: { checkRevoked?: boolean } = {}
+): Promise<{
   valid: boolean
   userId?: string
   email?: string
@@ -343,7 +373,9 @@ export async function verifyToken(token: string): Promise<{
   }
 
   try {
-    const decodedToken = await adminAuth.verifyIdToken(token)
+    const decodedToken = options.checkRevoked
+      ? await verifyIdTokenWithRevocation(token)
+      : await adminAuth.verifyIdToken(token)
     return {
       valid: true,
       userId: decodedToken.uid,
