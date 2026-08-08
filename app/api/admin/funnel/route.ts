@@ -1,37 +1,59 @@
+/**
+ * Funnel Analytics API
+ *
+ * Returns the conversion funnel for the admin dashboard as a signup cohort:
+ * the users who signed up inside the selected window, then how far that same
+ * set of people got. Every stage counts people, every stage is a subset of the
+ * stage above it, and every stage is scoped to the same window.
+ *
+ * Two things this route deliberately does NOT return:
+ *
+ * 1. A page-views stage. The platform does not measure page views. The stage
+ *    used to be `max(signups * 5, totalProfiles * 3)`, derived from a guessed
+ *    "20% baseline" signup rate, which made the visit-to-signup rate a
+ *    tautology that printed exactly 20.0% forever, and made the hero
+ *    "overall conversion" card a function of that guess. Google Analytics is
+ *    not configured (GOOGLE_ANALYTICS_PROPERTY_ID is unset), so the estimate
+ *    was the only branch that ever ran.
+ * 2. An `estimated` flag. No page read the old one, so a modelled number
+ *    rendered in exactly the same visual language as a measured one.
+ */
+
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { verifyAdminAccess, parseAdminQueryParams } from "@/lib/admin/middleware"
-import { PERMISSIONS } from "@/lib/admin/rbac"
+import {
+  buildFunnelStages,
+  buildFunnelTrend,
+  computeCohortConversionRates,
+  describeWindow,
+  earliestDate,
+  ratePercent,
+  resolveTrendRange,
+  selectSignupCohort,
+  summarizeCohortFunnel,
+} from "@/lib/admin/funnel-metrics"
+import { selectBillingUserIds } from "@/lib/admin/subscription-state"
 import {
   summarizeSessionFunnelCounts,
   summarizeActivationCohort,
   type ActivationCohortSummary,
 } from "@/lib/firestore-helpers"
 
-interface FunnelStage {
-  name: string
-  value: number
-  color?: string
-}
+/** Plain-language provenance rendered next to each block, so no figure appears unsourced. */
+const PROVENANCE = {
+  funnel:
+    "One signup cohort from Firestore profiles, rounds from interview_sessions in the same window. Subscribed counts cohort members with a billing subscription right now.",
+  registered:
+    "interview_sessions in the window, guest rounds excluded. Rates are session counts over session counts.",
+  activation:
+    "Fixed 30-day signup cohort, independent of the range selector. Firestore profiles and interview_sessions.",
+  trend: "Daily buckets from Firestore profiles.created_at and interview_sessions.started_at.",
+  signupsBySource: "First-touch profiles.acquisition_source, within the selected window.",
+} as const
 
-interface FunnelMetrics {
-  stages: FunnelStage[]
-  conversionRates: {
-    visitToSignup: number
-    signupToSession: number
-    sessionToComplete: number
-    completeToSubscribe: number
-    overallConversion: number
-  }
-}
-
-/**
- * Funnel Analytics API
- * Returns conversion funnel metrics for the admin dashboard
- */
 export async function GET(request: NextRequest) {
   try {
-    // Verify admin access
     const authResult = await verifyAdminAccess(request)
     if (!authResult.authorized) {
       return NextResponse.json(
@@ -47,69 +69,69 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { timeRange, startDate } = parseAdminQueryParams(request)
+    const { timeRange, startDate, endDate } = parseAdminQueryParams(request)
 
-    // Get total page views from Firebase Analytics or estimate from profiles
-    // For now, we'll estimate based on profiles (in production, use GA4 Data API)
     const profilesSnapshot = await adminDb.collection("profiles").get()
-    const totalProfiles = profilesSnapshot.size
-
-    // Get signups (users with created_at in time range), broken down by the
-    // persisted first-touch acquisition source so channels are a plain query.
-    let signups = 0
-    const signupsBySource: Record<string, number> = {}
-    profilesSnapshot.docs.forEach((doc) => {
+    const profiles = profilesSnapshot.docs.map((doc) => {
       const profile = doc.data()
-      const createdAt = profile.created_at || profile.createdAt
-
-      if (createdAt) {
-        const date = typeof createdAt === "string"
-          ? new Date(createdAt)
-          : createdAt.toDate?.() || new Date(createdAt)
-
-        if (!startDate || date >= startDate) {
-          signups++
-          const source =
-            typeof profile.acquisition_source === "string" && profile.acquisition_source
-              ? profile.acquisition_source
-              : "direct"
-          signupsBySource[source] = (signupsBySource[source] || 0) + 1
-        }
+      return {
+        userId: doc.id,
+        createdAt: profile.created_at ?? profile.createdAt,
+        acquisitionSource:
+          typeof profile.acquisition_source === "string" && profile.acquisition_source
+            ? profile.acquisition_source
+            : "direct",
+        subscription_tier: profile.subscription_tier,
+        subscription_status: profile.subscription_status,
+        subscription_type: profile.subscription_type,
       }
     })
 
-    // Get session starts
-    let sessionsQuery = adminDb.collection("interview_sessions")
+    // The one population every stage is measured against.
+    const cohort = selectSignupCohort(profiles, startDate)
+
+    // Rounds bounded by the same window. A cohort member cannot start a round
+    // before signing up, so this query sees every round the cohort could run.
+    let sessionsQuery: FirebaseFirestore.Query = adminDb.collection("interview_sessions")
     if (startDate) {
-      sessionsQuery = sessionsQuery.where("started_at", ">=", startDate.toISOString()) as any
+      sessionsQuery = sessionsQuery.where("started_at", ">=", startDate.toISOString())
     }
     const sessionsSnapshot = await sessionsQuery.get()
-    const totalSessions = sessionsSnapshot.size
+    const sessions = sessionsSnapshot.docs.map((doc) => doc.data())
 
-    // Partition sessions into guest vs registered + count scored completions.
-    // The "Completed Session" stage below keeps the guest-inclusive completed
-    // count so the funnel renders identically; the guest/registered/scored splits
-    // are additive fields the UI opts into.
-    const sessionCounts = summarizeSessionFunnelCounts(
-      sessionsSnapshot.docs.map((doc) => doc.data())
-    )
-    const completedSessions = sessionCounts.completed
+    // Point-in-time: who is billing us today. Not scoped to the window, because
+    // no date picker can change who is paying right now, and intersecting it
+    // with the cohort is what keeps every stage inside the stage above it.
+    const billingUserIds = selectBillingUserIds(profiles)
 
-    // Get subscriptions (pro + enterprise users)
-    let subscribers = 0
-    profilesSnapshot.docs.forEach((doc) => {
-      const tier = doc.data().subscription_tier
-      if (tier === "pro" || tier === "enterprise") {
-        subscribers++
-      }
-    })
+    const counts = summarizeCohortFunnel(cohort, sessions, billingUserIds)
+    const stages = buildFunnelStages(counts)
+    const conversionRates = computeCohortConversionRates(counts)
+
+    // Guest vs registered volume, and scored completions. These count rounds,
+    // not people, so they are reported next to the funnel rather than inside it.
+    const sessionCounts = summarizeSessionFunnelCounts(sessions)
+
+    // Both numerator and denominator are registered-session counts, so neither
+    // rate can exceed 100%. The old signup-to-session rate here divided a
+    // session count by a headcount and routinely printed above 100%; the cohort
+    // funnel above carries that conversion honestly instead.
+    const registeredConversionRates = {
+      sessionToComplete: ratePercent(sessionCounts.registeredCompleted, sessionCounts.registered),
+      sessionToScored: ratePercent(sessionCounts.registeredScored, sessionCounts.registered),
+    }
+
+    const signupsBySource: Record<string, number> = {}
+    for (const profile of profiles) {
+      if (!cohort.has(profile.userId)) continue
+      signupsBySource[profile.acquisitionSource] =
+        (signupsBySource[profile.acquisitionSource] || 0) + 1
+    }
 
     // Activation (council-fixed definition): % of the last-30-days signup
     // cohort whose FIRST scored round completed within 24h of signup. The
     // signup window is fixed at 30 days regardless of the page's timeRange
-    // filter so the quoted rate never moves with the range selector. Bounded
-    // session query: a qualifying round can only start after its user signed
-    // up, so sessions started since the window floor see every candidate.
+    // filter so the quoted rate never moves with the range selector.
     const ACTIVATION_SIGNUP_WINDOW_DAYS = 30
     const activationSince = new Date(
       Date.now() - ACTIVATION_SIGNUP_WINDOW_DAYS * 24 * 60 * 60 * 1000
@@ -123,89 +145,58 @@ export async function GET(request: NextRequest) {
       activation = {
         windowDays: ACTIVATION_SIGNUP_WINDOW_DAYS,
         ...summarizeActivationCohort(
-          profilesSnapshot.docs.map((doc) => {
-            const profile = doc.data()
-            return { userId: doc.id, createdAt: profile.created_at || profile.createdAt }
-          }),
+          profiles,
           activationSessionsSnapshot.docs.map((doc) => doc.data()),
           { signupSince: activationSince }
         ),
       }
     } catch (error) {
-      // Additive metric: never let it break the existing funnel payload.
+      // Additive metric: never let it break the funnel payload.
       console.error("Error computing activation metric:", error)
     }
 
-    // Try to get real page view data from Firebase Analytics if available
-    // Otherwise, use an estimate based on signup conversion rates
-    let pageViews: number
-    let pageViewsEstimated = false
-
-    try {
-      // Import and call Firebase Analytics if configured
-      const { getFirebaseAnalyticsOverview } = await import("@/lib/firebase-analytics-admin")
-      const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : timeRange === "90d" ? 90 : 365
-      const analyticsData = await getFirebaseAnalyticsOverview(days)
-
-      if (analyticsData?.pageViews && analyticsData.pageViews > 0) {
-        pageViews = analyticsData.pageViews
-      } else {
-        // Fallback to estimate: B2B SaaS typically sees 15-25% signup rate from visitors
-        // Using 20% as baseline, so page views = signups / 0.20 = signups * 5
-        pageViews = Math.max(signups * 5, totalProfiles * 3)
-        pageViewsEstimated = true
-      }
-    } catch {
-      // Firebase Analytics not configured or errored
-      pageViews = Math.max(signups * 5, totalProfiles * 3)
-      pageViewsEstimated = true
-    }
-
-    // Build funnel stages
-    const stages: FunnelStage[] = [
-      {
-        name: pageViewsEstimated ? "Page Views (est.)" : "Page Views",
-        value: pageViews,
-        color: "#c4703f",
-      },
-      { name: "Sign Ups", value: signups || totalProfiles, color: "#3fb883" },
-      { name: "Started Session", value: totalSessions, color: "#FBBF24" },
-      { name: "Completed Session", value: completedSessions, color: "#F97316" },
-      { name: "Subscribed", value: subscribers, color: "#A855F7" },
-    ]
-
-    // Calculate conversion rates
-    const safeDiv = (a: number, b: number) => (b > 0 ? (a / b) * 100 : 0)
-
-    const conversionRates = {
-      visitToSignup: safeDiv(stages[1].value, stages[0].value),
-      signupToSession: safeDiv(stages[2].value, stages[1].value),
-      sessionToComplete: safeDiv(stages[3].value, stages[2].value),
-      completeToSubscribe: safeDiv(stages[4].value, stages[3].value),
-      overallConversion: safeDiv(stages[4].value, stages[0].value),
-    }
-
-    // Guest-excluded conversion so a pitch can quote real registered-user rates.
-    const registeredConversionRates = {
-      signupToSession: safeDiv(sessionCounts.registered, stages[1].value),
-      sessionToComplete: safeDiv(sessionCounts.registeredCompleted, sessionCounts.registered),
-      sessionToScored: safeDiv(sessionCounts.registeredScored, sessionCounts.registered),
-    }
-
-    // Also return daily funnel data for trends
-    const funnelTrend = await generateFunnelTrend(profilesSnapshot, sessionsSnapshot, startDate, timeRange)
+    // The trend covers the selected window, or all held data on the All range.
+    const trendRange = resolveTrendRange(
+      startDate,
+      startDate
+        ? null
+        : earliestDate([
+            ...profiles.map((profile) => profile.createdAt),
+            ...sessions.map((session) => session.started_at),
+          ]),
+      endDate
+    )
+    const trend = buildFunnelTrend(
+      profiles.map((profile) => profile.createdAt),
+      sessions,
+      trendRange
+    )
 
     return NextResponse.json({
       success: true,
       timeRange,
       funnel: {
+        // Every block below is scoped to this window unless it says otherwise.
+        window: {
+          timeRange,
+          label: describeWindow(timeRange),
+          startDate: startDate ? startDate.toISOString() : null,
+          endDate: endDate.toISOString(),
+        },
         stages,
         conversionRates,
-        trend: funnelTrend,
-        pageViewsEstimated, // Flag indicating if page views are estimated
-        // Additive metrics (admin UI opts in): scored completions separated from
-        // completed_at-only, guest volume as its own input, guest-excluded
-        // registered conversion, and signups broken down by acquisition source.
+        // Cohort members paying today who never completed a round. Reported
+        // beside the funnel because folding them into the Subscribed stage
+        // would let that stage exceed the stage above it.
+        subscribedWithoutCompletedRound: counts.subscribedWithoutCompletedSession,
+        trend,
+        trendWindow: {
+          startDate: trendRange.start.toISOString(),
+          endDate: trendRange.end.toISOString(),
+          days: trendRange.days,
+          truncated: trendRange.truncated,
+        },
+        // Round volume in the window. Counts of rounds, not of people.
         scoredCompletions: sessionCounts.scored,
         registeredSessions: sessionCounts.registered,
         registeredCompletedSessions: sessionCounts.registeredCompleted,
@@ -214,9 +205,8 @@ export async function GET(request: NextRequest) {
         guestCompletedSessions: sessionCounts.guestCompleted,
         registeredConversionRates,
         signupsBySource,
-        // Activation: % of last-30d signups whose first scored round came
-        // within 24h of signup (null when the computation failed).
         activation,
+        provenance: PROVENANCE,
       },
     })
   } catch (error) {
@@ -226,81 +216,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-/**
- * Generate daily funnel trend data
- */
-async function generateFunnelTrend(
-  profilesSnapshot: FirebaseFirestore.QuerySnapshot,
-  sessionsSnapshot: FirebaseFirestore.QuerySnapshot,
-  startDate: Date | null,
-  timeRange: string
-): Promise<Array<{ date: string; signups: number; sessions: number; completed: number }>> {
-  const now = new Date()
-  const start = startDate || new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-
-  // Group by date
-  const dataByDate: Record<string, { signups: number; sessions: number; completed: number }> = {}
-
-  // Initialize dates
-  const days = Math.ceil((now.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
-  for (let i = 0; i <= days; i++) {
-    const date = new Date(start.getTime() + i * 24 * 60 * 60 * 1000)
-    const key = date.toISOString().split("T")[0]
-    dataByDate[key] = { signups: 0, sessions: 0, completed: 0 }
-  }
-
-  // Process profiles for signups
-  profilesSnapshot.docs.forEach((doc) => {
-    const profile = doc.data()
-    const createdAt = profile.created_at || profile.createdAt
-
-    if (createdAt) {
-      try {
-        const date = typeof createdAt === "string"
-          ? new Date(createdAt)
-          : createdAt.toDate?.() || new Date(createdAt)
-
-        const key = date.toISOString().split("T")[0]
-        if (dataByDate[key]) {
-          dataByDate[key].signups++
-        }
-      } catch {
-        // Skip invalid dates
-      }
-    }
-  })
-
-  // Process sessions
-  sessionsSnapshot.docs.forEach((doc) => {
-    const session = doc.data()
-    const startedAt = session.started_at
-
-    if (startedAt) {
-      try {
-        const date = typeof startedAt === "string"
-          ? new Date(startedAt)
-          : startedAt.toDate?.() || new Date(startedAt)
-
-        const key = date.toISOString().split("T")[0]
-        if (dataByDate[key]) {
-          dataByDate[key].sessions++
-          if (session.completed_at) {
-            dataByDate[key].completed++
-          }
-        }
-      } catch {
-        // Skip invalid dates
-      }
-    }
-  })
-
-  // Convert to array
-  return Object.entries(dataByDate)
-    .map(([date, data]) => ({
-      date,
-      ...data,
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date))
 }
