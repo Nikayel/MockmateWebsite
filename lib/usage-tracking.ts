@@ -497,19 +497,14 @@ export async function checkUserBudget(userId: string): Promise<{
  * nothing in the system distinguished "priced correctly" from "priced by
  * accident", so the mistake was invisible in every dashboard that used it.
  */
-export function calculateCost(
-  inputTokens: number,
-  outputTokens: number,
-  provider: string,
-  options?: { cachedInputTokens?: number }
-): number {
+export function calculateCost(inputTokens: number, outputTokens: number, provider: string): number {
   if (!resolveProviderRate(provider).matched) {
     logger.error("Unknown AI provider has no cost row; billing at the gemini rate", {
       provider,
       fallbackRateProvider: FALLBACK_RATE_PROVIDER,
     })
   }
-  return calculateAICost(inputTokens, outputTokens, provider, options)
+  return calculateAICost(inputTokens, outputTokens, provider)
 }
 
 /**

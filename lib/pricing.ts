@@ -324,33 +324,34 @@ export function resolveProviderRate(provider: string): {
 /**
  * Cost of one AI call in USD, priced per direction.
  *
- * `cachedInputTokens` is the subset of `inputTokens` the vendor served from its
- * prompt cache (OpenAI `prompt_tokens_details.cached_tokens`, DeepSeek
- * `prompt_cache_hit_tokens`). It is billed at the provider's cache rate when one
- * is established and at the full input rate otherwise, so passing it can only
- * ever lower or leave the figure unchanged, never raise it.
+ * REMOVED from here: a `cachedInputTokens` option that billed the cache-hit
+ * subset of the prompt at the vendor's prompt-cache rate. The arithmetic was
+ * correct and it had zero callers, which made it worse than absent: this
+ * docstring described the DeepSeek cache discount as handled while every call
+ * was in fact billed at the full input rate.
+ *
+ * To apply that discount the hit count has to come from the vendor's own
+ * response, and the only place that response is in scope is lib/ai-providers.ts,
+ * whose DeepSeek branch already reads `data.usage.prompt_tokens` off the same
+ * object that carries `prompt_cache_hit_tokens` (OpenAI spells it
+ * `prompt_tokens_details.cached_tokens`). Wiring it means extending
+ * ProviderTokenUsage there and passing the count down to calculateCost.
+ *
+ * The two callers in lib/usage-tracking.ts could not have supplied it: both
+ * count tokens from raw text with tiktoken and never see a vendor response, so
+ * any figure they passed would have been invented.
  */
 export function calculateAICost(
   inputTokens: number,
   outputTokens: number,
-  provider: AIProvider | string,
-  options?: { cachedInputTokens?: number }
+  provider: AIProvider | string
 ): number {
   const { rate } = resolveProviderRate(provider)
 
   const safeInput = Math.max(0, inputTokens)
   const safeOutput = Math.max(0, outputTokens)
-  // Clamp to the input total: a vendor can never have cached more prompt tokens
-  // than the prompt contained, and an over-large value would credit us for
-  // tokens we were charged for.
-  const cachedInput = Math.min(Math.max(0, options?.cachedInputTokens ?? 0), safeInput)
-  const uncachedInput = safeInput - cachedInput
-  const cachedRate = rate.cachedInputPer1M ?? rate.inputPer1M
 
-  return (
-    (uncachedInput * rate.inputPer1M + cachedInput * cachedRate + safeOutput * rate.outputPer1M) /
-    1_000_000
-  )
+  return (safeInput * rate.inputPer1M + safeOutput * rate.outputPer1M) / 1_000_000
 }
 
 /**

@@ -113,21 +113,13 @@ describe("calculateCost prices per direction, not blended", () => {
     }
   })
 
-  it("bills cached input at the vendor's cache rate when one is established", async () => {
-    const { calculateCost } = await import("../usage-tracking")
-
-    // DeepSeek prices a prompt-cache hit at 1/50th of a miss. The interview
-    // system prompt is stable across a session, so most input after the first
-    // turn is a cache hit.
-    const full = calculateCost(8000, 300, "deepseek")
-    const cached = calculateCost(8000, 300, "deepseek", { cachedInputTokens: 8000 })
-    expect(cached).toBeLessThan(full)
-
-    // Passing the hit count can only lower the figure, never raise it, and can
-    // never credit more tokens than the prompt contained.
-    const overClaimed = calculateCost(8000, 300, "deepseek", { cachedInputTokens: 999_999 })
-    expect(overClaimed).toBeCloseTo(cached, 10)
-  })
+  /**
+   * A cached-input test used to live here, asserting that DeepSeek cache hits
+   * bill at 1/50th of a miss. It passed while no production caller ever supplied
+   * a hit count, so it certified a discount the platform never took. The option
+   * it exercised has been removed; see calculateAICost in lib/pricing.ts for
+   * where the count would have to come from to restore it.
+   */
 })
 
 describe("calculateCost provider attribution", () => {
