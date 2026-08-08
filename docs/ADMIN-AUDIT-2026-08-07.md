@@ -303,6 +303,10 @@ experiment readout (`lib/research/analyzer.ts:240` → `app/admin/research/page.
 
 ## Remaining work, by severity
 
+Three P0 rows below are struck through: they were closed after this list was compiled, in
+the post-verification round recorded at the end of this file. Everything not struck through
+was still live at the last check.
+
 ### P0
 
 1. **CORE-1** — `analytics/route.ts:283-290,379-386` still `.get()` all of
@@ -316,21 +320,22 @@ experiment readout (`lib/research/analyzer.ts:240` → `app/admin/research/page.
 4. **CORE-4** (PARTIAL) — the admin deleter still queries `analytics_events.userId`
    (`users/route.ts:60`) while the writer nests under `properties`. Fixed only on the
    self-serve path.
-5. **API-1** (PARTIAL) — `revenue/route.ts:68` and `funnel/route.ts:57` are the last two bare
-   `verifyAdminAccess` routes, so a read-only `analyst` and a `support` account still read
-   revenue.
+5. ~~**API-1**~~ — CLOSED after this list was written (commit `86811773`). `revenue` now
+   requires `VIEW_REVENUE` and `funnel` `VIEW_ANALYTICS`, and the `NOT_MINE` exemption that
+   was hiding both from `route-permissions.test.ts` is gone.
 6. **API-22** (PARTIAL) — `user-profile/route.ts:239-250,318-320` still turns Firestore
    failures into zeros with HTTP 200.
 7. **AI-2** (PARTIAL) — the Edge feedback path still prices from `text.length/4`
    (`lib/usage/edge-reporter.ts:89-96`); reasoning tokens are still invisible there.
 8. **AI-4** (PARTIAL) — voice (`lib/usage-tracking.ts:566-579`) and every embedding tracker
    still bypass the daily kill switch.
-9. **INFRA-8/9** — `/admin/errors` still reads a Firestore mirror nothing writes and renders
-   a green "No errors recorded"; Sentry is the real store.
-10. **New, created by the INFRA-3 fix.** `/admin/health` still force-polls every 30s
-    (`app/admin/health/page.tsx:147`) and each poll now fans out to 7 outbound vendor probes
-    with no server-side cache: roughly 20k vendor calls a day per open tab. The audit's own
-    fix text specified a 60s cache; it was not implemented.
+9. ~~**INFRA-8/9**~~ — CLOSED after this list was written (commit `21defbe0`). The dead
+   pipeline is gone and the page now gives the same verdict as the health page, that error
+   volume lives in Sentry and is not collected here.
+10. ~~**New, created by the INFRA-3 fix.**~~ CLOSED after this list was written (commit
+    `edbccf04`). The probe results are cached server-side for 20s, deliberately shorter than
+    the page's 30s poll so a real outage still surfaces within one refresh while several tabs
+    and several admins share one round of vendor calls.
 
 ### P1
 
