@@ -5,9 +5,7 @@ import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { TimeSeriesChart } from "@/components/admin/charts"
 import {
-  HeartPulse,
   RefreshCw,
   CheckCircle,
   AlertTriangle,
@@ -16,7 +14,6 @@ import {
   Server,
   Shield,
   HardDrive,
-  Clock,
   Activity,
   Zap,
   AlertCircle,
@@ -45,7 +42,6 @@ interface HealthData {
     errorCount: number
     warningCount: number
     requestVolume: number
-    avgLatency: number
   }
   memory: {
     used: number
@@ -59,12 +55,6 @@ interface HealthData {
     message: string
     timestamp: string
     acknowledged: boolean
-  }>
-  performanceHistory: Array<{
-    hour: string
-    latency: number
-    requests: number
-    errors: number
   }>
 }
 
@@ -207,8 +197,8 @@ export default function SystemHealthPage() {
               </div>
             </div>
             <div className="text-right">
-              <p className="text-3xl font-bold text-white">{health.metrics.avgLatency}ms</p>
-              <p className="text-gray-400">Avg Response Time</p>
+              <p className="text-3xl font-bold text-white">{health.metrics.errorCount}</p>
+              <p className="text-gray-400">Errors in window</p>
             </div>
           </div>
         </CardContent>
@@ -336,20 +326,6 @@ export default function SystemHealthPage() {
         <Card className="border-gray-800 bg-gray-900/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-yellow-500/20 p-3">
-                <Clock className="h-6 w-6 text-yellow-400" />
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-white">{health.metrics.avgLatency}ms</p>
-                <p className="text-sm text-gray-400">Avg Latency</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-gray-800 bg-gray-900/50">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
               <div className="rounded-lg bg-green-500/20 p-3">
                 <Zap className="h-6 w-6 text-green-400" />
               </div>
@@ -396,24 +372,10 @@ export default function SystemHealthPage() {
         </CardContent>
       </Card>
 
-      {/* Performance History */}
-      {health.performanceHistory && health.performanceHistory.length > 0 && (
-        <TimeSeriesChart
-          title="Performance History"
-          subtitle="Last 24 hours"
-          data={health.performanceHistory.map((p) => ({
-            date: new Date(p.hour).toLocaleTimeString([], { hour: "2-digit" }),
-            latency: p.latency,
-            requests: p.requests,
-            errors: p.errors,
-          }))}
-          series={[
-            { key: "latency", name: "Latency (ms)", color: "#c4703f" },
-            { key: "errors", name: "Errors", color: "#EF4444" },
-          ]}
-          icon={Activity}
-        />
-      )}
+      {/* No performance history is charted here. The 24 points this panel used to draw were
+          generated with Math.random() on every request, so the trend line moved constantly and
+          meant nothing. Restoring it needs a real time series, which is a monitoring provider
+          or a scheduled snapshot job, not a shape invented at render time. */}
     </div>
   )
 }

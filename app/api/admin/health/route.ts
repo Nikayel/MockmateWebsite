@@ -141,14 +141,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Performance metrics over time (placeholder - would come from monitoring)
-    const performanceHistory = Array.from({ length: 24 }, (_, i) => ({
-      hour: new Date(Date.now() - (23 - i) * 60 * 60 * 1000).toISOString(),
-      latency: Math.floor(Math.random() * 100) + 100,
-      requests: Math.floor(Math.random() * 1000) + 500,
-      errors: Math.floor(Math.random() * 5),
-    }))
-
     // Overall health status
     const overallStatus = alerts.some((a) => a.type === "error")
       ? "unhealthy"
@@ -167,13 +159,9 @@ export async function GET(request: NextRequest) {
           errorCount,
           warningCount,
           requestVolume,
-          avgLatency: Math.round(
-            performanceHistory.reduce((s, p) => s + p.latency, 0) / performanceHistory.length
-          ),
         },
         memory: memoryUsage,
         alerts,
-        performanceHistory,
       },
     })
   } catch (error) {
