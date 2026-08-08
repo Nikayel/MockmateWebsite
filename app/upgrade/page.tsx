@@ -311,11 +311,12 @@ function UpgradePageContent() {
             </div>
           )}
 
-          {/* Trust - Single line */}
+          {/* Trust line. The third clause used to read "Used by engineers at
+              Google, Meta, Amazon", an unsubstantiated endorsement on the checkout
+              path. The two guarantees are real; the claim was not. */}
           {!isProUser && (
             <p className="text-muted-foreground text-center text-xs">
-              30-day money-back guarantee · Cancel anytime · Used by engineers at Google, Meta,
-              Amazon
+              30-day money-back guarantee · Cancel anytime · No card required to start
             </p>
           )}
 

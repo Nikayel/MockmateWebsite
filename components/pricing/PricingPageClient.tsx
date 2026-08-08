@@ -156,9 +156,12 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
             </div>
           </div>
 
-          {/* Trust - Single line */}
+          {/* Trust line. The third clause used to read "Used by Palantir & FAANG
+              candidates", an unsubstantiated usage claim sitting directly above a
+              purchase button. The two guarantees are real and verifiable, so the
+              line keeps those and drops the claim until there are users to cite. */}
           <p className="mb-8 text-center text-xs text-gray-600">
-            30-day money-back guarantee · Cancel anytime · Used by Palantir &amp; FAANG candidates
+            30-day money-back guarantee · Cancel anytime · No card required to start
           </p>
         </div>
       </section>
