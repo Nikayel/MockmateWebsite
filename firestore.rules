@@ -62,6 +62,33 @@ service cloud.firestore {
      *
      * `custom_budget_cap` is honored by lib/usage/budget.ts up to $10,000.
      */
+    /**
+     * A session's performance_score must at least be a number in range.
+     *
+     * This deliberately VALIDATES rather than forbids. The client genuinely
+     * writes this field: lib/firestore-helpers.ts sets performance_score when a
+     * session completes, because scores round-trip through the browser on their
+     * way to Firestore (Edge cannot use the Admin SDK, hence
+     * /api/feedback/persist). Blocking it outright would break session
+     * completion, so the honest boundary is the range, not the field.
+     *
+     * What this buys: a forged score is now confined to a plausible 0-100 value
+     * instead of a negative number, 10^9, or a string. Those are what actually
+     * corrupt admin averages and the research corpus, since one absurd row moves
+     * an aggregate far more than one optimistic one.
+     *
+     * What it does NOT buy: a user can still claim 100 on a session they failed.
+     * Closing that needs the scores to stop travelling through the client at all,
+     * which is the Edge-to-Node consolidation tracked in
+     * docs/EDGE-TO-NODE-CONSOLIDATION.md.
+     */
+    function hasSaneSessionScore() {
+      return !('performance_score' in request.resource.data)
+             || (request.resource.data.performance_score is number
+                 && request.resource.data.performance_score >= 0
+                 && request.resource.data.performance_score <= 100);
+    }
+
     function serverOnlyProfileFields() {
       return [
         'subscription_tier',
@@ -134,13 +161,15 @@ service cloud.firestore {
 
       // Users can create their own sessions
       allow create: if isAuthenticated()
-                    && request.resource.data.user_id == request.auth.uid;
+                    && request.resource.data.user_id == request.auth.uid
+                    && hasSaneSessionScore();
 
       // Users can update their own sessions
       allow update: if isAuthenticated()
                     && documentExists()
                     && resource.data.user_id == request.auth.uid
-                    && request.resource.data.user_id == request.auth.uid;
+                    && request.resource.data.user_id == request.auth.uid
+                    && hasSaneSessionScore();
 
       // Users can delete their own sessions
       allow delete: if isAuthenticated()

@@ -257,3 +257,83 @@ describe("users subcollections", () => {
     await assertFails(getDoc(doc(db, "users", USER, "usage_summaries", "2026-01")))
   })
 })
+
+describe("interview_sessions: score sanity", () => {
+  /** The document lib/firestore-helpers.ts actually creates when a session starts. */
+  function newSession(userId: string, extra: Record<string, unknown> = {}) {
+    return {
+      id: "s1",
+      user_id: userId,
+      topic: "Two Sum",
+      type: "dsa",
+      pattern: "arrays-hashing",
+      difficulty: "easy",
+      started_at: "2026-01-01T00:00:00.000Z",
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+      ...extra,
+    }
+  }
+
+  it("allows the ordinary session create", async () => {
+    const db = testEnv.authenticatedContext(USER).firestore()
+
+    await assertSucceeds(setDoc(doc(db, "interview_sessions", "s1"), newSession(USER)))
+  })
+
+  // Scores round-trip through the browser by design, so completion MUST work.
+  it("allows a completion carrying an in-range score", async () => {
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertSucceeds(setDoc(doc(db, "interview_sessions", "s1"), newSession(USER)))
+
+    await assertSucceeds(
+      updateDoc(doc(db, "interview_sessions", "s1"), {
+        performance_score: 87,
+        completed_at: "2026-01-01T01:00:00.000Z",
+        feedback_status: "complete",
+      })
+    )
+  })
+
+  it.each([0, 100])("allows the boundary score %i", async (score) => {
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertSucceeds(setDoc(doc(db, "interview_sessions", "s1"), newSession(USER)))
+
+    await assertSucceeds(
+      updateDoc(doc(db, "interview_sessions", "s1"), { performance_score: score })
+    )
+  })
+
+  // These are the values that wreck an average, far more than an optimistic one.
+  it.each([
+    ["negative", -5],
+    ["above 100", 101],
+    ["absurd", 1_000_000_000],
+  ])("REJECTS an out-of-range score (%s)", async (_label, score) => {
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertSucceeds(setDoc(doc(db, "interview_sessions", "s1"), newSession(USER)))
+
+    await assertFails(updateDoc(doc(db, "interview_sessions", "s1"), { performance_score: score }))
+  })
+
+  it("REJECTS a non-numeric score", async () => {
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertSucceeds(setDoc(doc(db, "interview_sessions", "s1"), newSession(USER)))
+
+    await assertFails(updateDoc(doc(db, "interview_sessions", "s1"), { performance_score: "100" }))
+  })
+
+  it("REJECTS an out-of-range score smuggled in at CREATE time", async () => {
+    const db = testEnv.authenticatedContext(USER).firestore()
+
+    await assertFails(
+      setDoc(doc(db, "interview_sessions", "s2"), newSession(USER, { performance_score: 999 }))
+    )
+  })
+
+  it("still REJECTS writing a session owned by someone else", async () => {
+    const db = testEnv.authenticatedContext(OTHER).firestore()
+
+    await assertFails(setDoc(doc(db, "interview_sessions", "s3"), newSession(USER)))
+  })
+})
