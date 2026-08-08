@@ -698,7 +698,7 @@ export async function checkQuota(
             error: "Daily AI limit reached",
             message:
               `You've used today's AI allowance ($${dailyBudgetCap.toFixed(2)}). ` +
-              `This resets at midnight UTC — your monthly allowance is unaffected.`,
+              `It resets at midnight UTC, and your monthly allowance is unaffected.`,
             code: "DAILY_BUDGET_EXCEEDED",
             quota: {
               dailyCostUsed,
