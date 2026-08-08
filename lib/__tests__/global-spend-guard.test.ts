@@ -226,3 +226,65 @@ describe("global-spend-guard", () => {
     })
   })
 })
+
+/**
+ * A transient read failure is not the same as spend being invisible.
+ *
+ * The gate fails closed by design, and that argument is sound: a brake that
+ * releases itself when it cannot read its gauge is not a brake. But it had no
+ * memory, so one Firestore blip refused every AI turn on the platform, mid
+ * interview, for users nowhere near any budget. A successful reading taken
+ * moments earlier is real evidence and now answers the failure, provided it
+ * showed enough headroom that the ceiling cannot have been crossed since.
+ */
+describe("isGlobalCeilingExceeded, read failure with a recent reading", () => {
+  const CEILING = "100"
+
+  beforeEach(async () => {
+    process.env[CEILING_ENV] = CEILING
+    const { __resetSpendReadingForTests } = await import("../global-spend-guard")
+    __resetSpendReadingForTests()
+    mockGet.mockReset()
+  })
+
+  it("blocks when the read fails and nothing was ever read", async () => {
+    const { isGlobalCeilingExceeded } = await import("../global-spend-guard")
+    mockGet.mockRejectedValue(new Error("firestore unavailable"))
+
+    expect(await isGlobalCeilingExceeded()).toBe(true)
+  })
+
+  it("allows when a recent reading showed real headroom", async () => {
+    const { isGlobalCeilingExceeded } = await import("../global-spend-guard")
+
+    mockGet.mockResolvedValueOnce({ data: () => ({ totalCost: 5 }) })
+    expect(await isGlobalCeilingExceeded()).toBe(false)
+
+    mockGet.mockRejectedValue(new Error("firestore blip"))
+    expect(await isGlobalCeilingExceeded()).toBe(false)
+  })
+
+  it("still blocks when the recent reading was close to the ceiling", async () => {
+    // 85 of 100 is inside the headroom margin, so the ceiling could plausibly
+    // have been crossed while the gauge was unreadable.
+    const { isGlobalCeilingExceeded } = await import("../global-spend-guard")
+
+    mockGet.mockResolvedValueOnce({ data: () => ({ totalCost: 85 }) })
+    expect(await isGlobalCeilingExceeded()).toBe(false)
+
+    mockGet.mockRejectedValue(new Error("firestore blip"))
+    expect(await isGlobalCeilingExceeded()).toBe(true)
+  })
+
+  it("stops trusting a reading once it is older than the grace window", async () => {
+    const { isGlobalCeilingExceeded } = await import("../global-spend-guard")
+
+    const start = new Date("2026-08-08T12:00:00Z")
+    mockGet.mockResolvedValueOnce({ data: () => ({ totalCost: 5 }) })
+    expect(await isGlobalCeilingExceeded(start)).toBe(false)
+
+    mockGet.mockRejectedValue(new Error("firestore blip"))
+    const wellPast = new Date(start.getTime() + 5 * 60 * 1000)
+    expect(await isGlobalCeilingExceeded(wellPast)).toBe(true)
+  })
+})

@@ -119,12 +119,40 @@ export async function getGlobalDailySpend(now: Date = new Date()): Promise<numbe
  * open by design (bounded per user, unbounded across users) — which is the very
  * hole an aggregate ceiling exists to close.
  */
+interface SpendReading {
+  spendUsd: number
+  atMs: number
+}
+
+/**
+ * The last reading that actually came back, per instance.
+ *
+ * Fail-closed is right when spend is genuinely invisible, but a single transient
+ * Firestore error is not the same as spend being invisible: it discards the fact
+ * that we successfully read the gauge moments ago. Without this, one blip refused
+ * every AI turn on the platform, mid-interview, for users nowhere near any budget.
+ */
+let lastGoodReading: SpendReading | null = null
+
+/** How long a successful reading stays good enough to answer a failed one. */
+const READING_GRACE_MS = 120_000
+
+/**
+ * How far below the ceiling a cached reading must sit to be trusted through an
+ * error. At 80% the remaining headroom cannot plausibly be consumed inside the
+ * grace window, so this concedes nothing to the correlated-failure argument
+ * above: under the load that breaks Firestore, spend climbs, the cached reading
+ * crosses this line, and the gate closes exactly as designed.
+ */
+const CACHED_READING_HEADROOM = 0.8
+
 export async function isGlobalCeilingExceeded(now: Date = new Date()): Promise<boolean> {
   const ceiling = getGlobalDailyCeiling()
   if (ceiling <= 0) return false // gate disabled
 
   try {
     const spend = await getGlobalDailySpend(now)
+    lastGoodReading = { spendUsd: spend, atMs: now.getTime() }
     if (spend >= ceiling) {
       logger.error("CRITICAL: Global daily AI spend ceiling reached", {
         spend,
@@ -135,13 +163,44 @@ export async function isGlobalCeilingExceeded(now: Date = new Date()): Promise<b
     }
     return false
   } catch (error) {
+    // A recent reading that showed real headroom answers this failure. The spend
+    // it measured cannot have reached the ceiling inside the grace window, so
+    // refusing here would be an outage justified by nothing.
+    const reading = lastGoodReading
+    const isFresh = reading !== null && now.getTime() - reading.atMs < READING_GRACE_MS
+    if (isFresh && reading!.spendUsd < ceiling * CACHED_READING_HEADROOM) {
+      logger.error(
+        "Global spend ceiling check failed - allowing AI on a recent reading that showed headroom.",
+        {
+          error,
+          ceiling,
+          lastKnownSpend: reading!.spendUsd,
+          readingAgeMs: now.getTime() - reading!.atMs,
+          day: utcDayKey(now),
+        }
+      )
+      return false
+    }
+
     logger.error(
-      "CRITICAL: Global spend ceiling check failed - blocking AI (failing closed). " +
-        "Set GLOBAL_DAILY_SPEND_CEILING_USD=0 to disable the gate if this is a false positive.",
-      { error, ceiling, day: utcDayKey(now) }
+      "CRITICAL: Global spend ceiling check failed with no recent reading showing headroom - " +
+        "blocking AI (failing closed). Set GLOBAL_DAILY_SPEND_CEILING_USD=0 to disable the gate " +
+        "if this is a false positive.",
+      {
+        error,
+        ceiling,
+        lastKnownSpend: reading?.spendUsd ?? null,
+        readingAgeMs: reading ? now.getTime() - reading.atMs : null,
+        day: utcDayKey(now),
+      }
     )
     return true
   }
+}
+
+/** Test seam: drop the cached reading so a case starts with no memory. */
+export function __resetSpendReadingForTests(): void {
+  lastGoodReading = null
 }
 
 /**
