@@ -47,6 +47,11 @@ import {
 } from "@/lib/feedback/edge-utils"
 import { analyzeTranscriptForMistakesEdge } from "@/lib/feedback/transcript-analysis-edge"
 import { reportEdgeUsageInBackground } from "@/lib/usage/edge-reporter"
+// lib/logger has zero imports and touches no Node builtins, so it is safe in the
+// Edge runtime. This route previously used console.* only, which meant every
+// failure on the path that scores DSA, bugfix, optimization, security, and
+// add-functionality sessions landed in a short-retention Edge log and nowhere else.
+import { logger } from "@/lib/logger"
 import { summarizeBugfixEvidence } from "@/lib/bugfix/evidence"
 import { buildBugfixPostSessionReport } from "@/lib/bugfix/report"
 import {
@@ -94,7 +99,12 @@ export async function POST(request: NextRequest) {
     await writer.write(encoder.encode(payload))
   }
 
-  // Process in background while streaming
+  // Process in background while streaming.
+  // Hoisted out of the try so the terminal catch can still name the session even
+  // when request.json() is what threw, which is when the body is least knowable.
+  let loggedScenarioId: unknown
+  let loggedScenarioType: unknown
+
   const processRequest = async () => {
     try {
       const body = await request.json()
@@ -124,6 +134,9 @@ export async function POST(request: NextRequest) {
         bugfixRootCauseRubric,
         bugfixGroundTruth,
       } = body
+
+      loggedScenarioId = scenarioId
+      loggedScenarioType = scenarioType
 
       // The session owner in the body must be present AND match the verified
       // token. The client always sends it; requiring it closes the gap where an
@@ -284,8 +297,16 @@ export async function POST(request: NextRequest) {
                   : null
             }
           }
-        } catch {
-          // Sealed content unavailable — fall back to the client-supplied values.
+        } catch (error) {
+          // Sealed content unavailable, so grading falls back to the values the
+          // CLIENT supplied. That is a scoring-integrity regression, not a cosmetic
+          // degradation: the candidate is graded against a rubric they posted. It
+          // was previously swallowed silently, so it could run indefinitely.
+          logger.error("[Streaming Feedback] Sealed grading content unavailable", {
+            scenarioId,
+            scenarioType,
+            error,
+          })
         }
       }
 
@@ -323,10 +344,25 @@ export async function POST(request: NextRequest) {
                       space: efficiencyMetrics.estimatedSpaceComplexity,
                     }
                   : null
-              ).catch(() => getDefaultValidation())
+              ).catch((error) => {
+                // A degraded provider silently swaps in neutral defaults, which
+                // changes the score the user is shown. Without a log this is
+                // indistinguishable from a genuinely neutral session.
+                logger.error("[Streaming Feedback] Conversation validation failed", {
+                  scenarioType,
+                  error,
+                })
+                return getDefaultValidation()
+              })
             : Promise.resolve(getDefaultValidation()),
           transcriptMessages.length > 0
-            ? extractConversationEvidenceEdge(transcriptMessages, problemContext).catch(() => null)
+            ? extractConversationEvidenceEdge(transcriptMessages, problemContext).catch((error) => {
+                logger.error("[Streaming Feedback] Evidence extraction failed", {
+                  scenarioType,
+                  error,
+                })
+                return null
+              })
             : Promise.resolve(null),
           // Generate silent notes if we don't have existing ones and have transcript
           !existingSilentNotes?.length && transcriptMessages.length >= 2
@@ -336,8 +372,13 @@ export async function POST(request: NextRequest) {
                   content: m.content,
                 })),
                 problemContext
-              ).catch((err) => {
-                console.warn("[Streaming Feedback] Silent notes analysis failed:", err)
+              ).catch((error) => {
+                // Degrades the feedback rather than the score, so warn rather than
+                // error, but it still needs to leave the Edge log.
+                logger.warn("[Streaming Feedback] Silent notes analysis failed", {
+                  scenarioType,
+                  error,
+                })
                 return { silentNotes: [], analysisMetadata: null }
               })
             : Promise.resolve({ silentNotes: existingSilentNotes || [], analysisMetadata: null }),
@@ -364,7 +405,16 @@ export async function POST(request: NextRequest) {
                     .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
                     .join("\n\n")
                 ),
-              }).catch(() => BUGFIX_SEMANTIC_NEUTRAL)
+              }).catch((error) => {
+                // NEUTRAL is reserved for "the scorer itself was unavailable", which
+                // is exactly this branch. Log it so a persistently broken scorer is
+                // distinguishable from sessions that genuinely earned neutral.
+                logger.error("[Streaming Feedback] Bugfix semantic scorer failed", {
+                  scenarioId,
+                  error,
+                })
+                return BUGFIX_SEMANTIC_NEUTRAL
+              })
             : // No candidate turn is EARNED silence (hypothesis/root cause/prevention
               // provably never stated) — score those dimensions low. NEUTRAL stays
               // reserved for "the scorer itself was unavailable".
@@ -378,7 +428,7 @@ export async function POST(request: NextRequest) {
       // Use generated silent notes or existing ones
       const finalSilentNotes = silentNotesAnalysis.silentNotes || existingSilentNotes || []
       if (silentNotesAnalysis.analysisMetadata) {
-        console.log("[Streaming Feedback] Silent notes generated:", {
+        logger.debug("[Streaming Feedback] Silent notes generated", {
           count: finalSilentNotes.length,
           algorithmicDetections: silentNotesAnalysis.analysisMetadata.algorithmicDetections,
           semanticDetections: silentNotesAnalysis.analysisMetadata.semanticDetections,
@@ -556,7 +606,14 @@ export async function POST(request: NextRequest) {
 
       await sendEvent("done", { success: true })
     } catch (error) {
-      console.error("[Streaming Feedback] Error", error)
+      // Terminal failure: the user has just finished a full interview and will get
+      // no feedback at all. This was console-only, so the most user-visible failure
+      // in the product produced no durable signal anywhere.
+      logger.error("[Streaming Feedback] Feedback generation failed", {
+        scenarioId: loggedScenarioId,
+        scenarioType: loggedScenarioType,
+        error,
+      })
       await sendEvent("error", {
         message: error instanceof Error ? error.message : "Failed to generate feedback",
       })
