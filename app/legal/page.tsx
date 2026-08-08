@@ -23,7 +23,10 @@ export const metadata = {
 }
 
 export default function LegalPage() {
-  const lastUpdated = "December 2025"
+  // Bump `lastUpdated` whenever anything on this page changes. A privacy policy
+  // whose date is older than its own contents misstates when the terms changed,
+  // and the Terms below commit us to telling users about material changes.
+  const lastUpdated = "August 2026"
   const effectiveDate = "December 27, 2025"
 
   return (
@@ -46,6 +49,13 @@ export default function LegalPage() {
             </p>
             <p className="text-sm text-gray-500">
               Last updated: {lastUpdated} | Effective: {effectiveDate}
+            </p>
+            <p className="mx-auto mt-4 max-w-2xl text-sm text-gray-400">
+              <strong className="text-gray-300">What changed in this update:</strong> we now name
+              every third-party service that processes your data, including OpenAI, Sentry, and
+              Upstash. We describe voice and audio handling for spoken interviews. We state plainly
+              which of your details reach our AI providers. And we corrected the billing section:
+              the yearly plan is a one-time purchase and does not renew.
             </p>
           </div>
         </div>
@@ -562,9 +572,9 @@ export default function LegalPage() {
                       single charge that grants 12 months of Pro access from the date of purchase.
                     </li>
                     <li>
-                      We do not store a recurring billing arrangement for it and we will never charge
-                      the card again on our own. There is nothing to cancel, and nothing to forget to
-                      cancel.
+                      We do not store a recurring billing arrangement for it and we will never
+                      charge the card again on our own. There is nothing to cancel, and nothing to
+                      forget to cancel.
                     </li>
                     <li>
                       When the 12 months are up, your account returns to the Free tier. To continue
@@ -582,8 +592,8 @@ export default function LegalPage() {
                     </li>
                     <li>
                       <strong className="text-white">Pro Yearly:</strong> there is no recurring
-                      charge to cancel. Your 12 months of access run to their end date either way. If
-                      you want a refund inside the first 30 days, see the refund policy below.
+                      charge to cancel. Your 12 months of access run to their end date either way.
+                      If you want a refund inside the first 30 days, see the refund policy below.
                     </li>
                     <li>We do not provide prorated refunds for partial months</li>
                   </ul>
