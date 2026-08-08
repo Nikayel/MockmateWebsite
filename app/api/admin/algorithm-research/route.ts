@@ -2,12 +2,14 @@
  * Admin Algorithm Research API
  *
  * GET /api/admin/algorithm-research
- * Returns comprehensive A/B testing comparison between SM-2 and FSRS algorithms
+ * Returns the stored A/B comparison between SM-2 and FSRS. READ ONLY: it never
+ * regenerates or writes the aggregate. When the stored aggregate is older than
+ * AGGREGATE_MAX_AGE_MIN the response carries `comparisonStale: true` and the UI
+ * offers the explicit `regenerate` action, which is permission gated and
+ * audited. Requires VIEW_ANALYTICS.
  *
- * Query params:
- * - refresh: boolean - Force regenerate aggregate comparison
- *
- * Requires admin authentication
+ * POST /api/admin/algorithm-research
+ * Every mutating action. Requires MANAGE_SETTINGS.
  */
 
 import { NextRequest, NextResponse } from "next/server"
@@ -31,6 +33,25 @@ import type { AlgorithmComparisonAggregate } from "@/lib/types"
 // The end-ab-switch-fsrs sweep does per-user subcollection reads; give the
 // route headroom beyond the default function timeout.
 export const maxDuration = 300
+
+/** How old the stored aggregate may be before the UI is told it is stale. */
+const AGGREGATE_MAX_AGE_MIN = 60
+
+/**
+ * Audit action names for the research mutations.
+ *
+ * `AUDIT_ACTIONS` in lib/admin/audit.ts is the shared registry and already
+ * names END_AB_SWITCH_FSRS. The names below cover research mutations it does
+ * not name yet and follow the same snake_case convention, so folding them into
+ * the registry later needs no data migration. They are constants rather than
+ * inline strings so a typo cannot silently create a second action name.
+ */
+const RESEARCH_AUDIT_ACTIONS = {
+  REGENERATE_AGGREGATE: "regenerate_research_aggregate",
+  BACKFILL_RESEARCH: "backfill_research_data",
+  MIGRATE_ASSIGNMENT: "migrate_algorithm_assignment",
+  MIGRATE_NOTIFICATION_PREFERENCES: "migrate_notification_preferences",
+} as const
 
 const endAbSchema = z.object({
   action: z.literal("end-ab-switch-fsrs"),
@@ -61,26 +82,20 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Parse query params
-    const { searchParams } = new URL(request.url)
-    const forceRefresh = searchParams.get("refresh") === "true"
-
     // Get algorithm distribution
     const distribution = await getAlgorithmDistribution()
 
-    // Get or generate aggregate comparison
-    let comparison: AlgorithmComparisonAggregate | null = null
-
-    if (forceRefresh) {
-      comparison = await generateAggregateComparison()
-    } else {
-      comparison = await getAggregateComparison()
-
-      // If no comparison exists or it's older than 1 hour, regenerate
-      if (!comparison || isStale(comparison.last_updated, 60)) {
-        comparison = await generateAggregateComparison()
-      }
-    }
+    // Read the stored aggregate. A GET never regenerates it.
+    //
+    // Before, `?refresh=true` and any read of an aggregate older than an hour
+    // both called generateAggregateComparison(), which scans up to 20k summary
+    // documents and WRITES the result. A page load therefore mutated the very
+    // document the founder was reading, two admins refreshing at once raced
+    // each other, and the write happened on a path with no audit entry. The
+    // aggregate is now regenerated only by the explicit `regenerate` POST
+    // action, which is permission-gated and logged.
+    const comparison: AlgorithmComparisonAggregate | null = await getAggregateComparison()
+    const comparisonStale = !comparison || isStale(comparison.last_updated, AGGREGATE_MAX_AGE_MIN)
 
     // Get recent events for detailed analysis
     const recentEvents = await getRecentEvents(50)
@@ -97,6 +112,8 @@ export async function GET(request: NextRequest) {
         abStatus,
         distribution,
         comparison,
+        /** True when the stored aggregate is older than AGGREGATE_MAX_AGE_MIN. */
+        comparisonStale,
         recentEvents: recentEvents.map((event) => ({
           id: event.id || "",
           algorithm: event.algorithm || "sm2",
@@ -172,7 +189,20 @@ export async function POST(request: NextRequest) {
       }
 
       case "regenerate": {
+        // The only path that writes algorithm_research_aggregate/comparison.
+        // It used to also run on any stale GET, so the document could change
+        // under a reader with nothing in the audit trail to explain it.
         const comparison = await generateAggregateComparison()
+        await logAdminAction(
+          authResult.context!,
+          RESEARCH_AUDIT_ACTIONS.REGENERATE_AGGREGATE,
+          {
+            sm2Users: comparison.sm2.total_users,
+            fsrsUsers: comparison.fsrs.total_users,
+            lastUpdated: comparison.last_updated,
+          },
+          { request, target: { type: "algorithm_research_aggregate", id: "comparison" } }
+        )
         return NextResponse.json({
           success: true,
           message: "Aggregate comparison regenerated",
