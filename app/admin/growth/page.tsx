@@ -5,6 +5,11 @@ import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+// Type-only import: erased at compile time, so this client component never
+// pulls lib/referrals (and firebase-admin) into the browser bundle. It buys
+// compile-time exhaustiveness over the status union without a runtime import.
+import type { DetailedRewardStatus } from "@/lib/referrals"
 import { MetricCard } from "@/components/admin/charts"
 import { PageHeader } from "@/components/admin/shared"
 import { Progress } from "@/components/ui/progress"
@@ -70,8 +75,12 @@ interface DetailedReferral {
   signupDate: string
   convertedToPro: boolean
   convertedDate?: string
-  signupRewardStatus: "pending" | "paid"
-  conversionRewardStatus: "pending" | "credited" | "n/a"
+  // Raw status drives the badge colour; the words come from the server so the
+  // page cannot invent a vocabulary the service never writes.
+  signupRewardStatus: DetailedRewardStatus
+  conversionRewardStatus: DetailedRewardStatus
+  signupRewardLabel: string
+  conversionRewardLabel: string
 }
 
 interface ReferralData {
@@ -101,12 +110,15 @@ interface RewardItem {
   id: string
   referrerId: string
   referredUserId: string
-  type: "signup_credit" | "conversion_cash" | "conversion_credit"
+  type: string
   amount: number
   status: string
   createdAt: string
   referrerEmail: string
   referredEmail: string
+  /** Rendered server-side from the reward's own type, so a $10 row can never print as months. */
+  amountLabel: string
+  typeLabel: string
 }
 
 interface RewardsData {
@@ -118,6 +130,66 @@ interface RewardsData {
   }
 }
 
+interface RedemptionActionProps {
+  reference: string
+  onReferenceChange: (value: string) => void
+  onRecord: () => void
+  processing: boolean
+  error?: string
+  accentClassName: string
+}
+
+/**
+ * The reference input is not optional decoration. Without it the record
+ * reconciles against nothing and the button is pure self-attestation, so the
+ * action stays disabled until one is entered and the server rejects a blank
+ * one independently.
+ */
+function RedemptionAction({
+  reference,
+  onReferenceChange,
+  onRecord,
+  processing,
+  error,
+  accentClassName,
+}: RedemptionActionProps) {
+  return (
+    <div className="flex flex-col items-end gap-2">
+      <div className="flex items-center justify-end gap-2">
+        <Input
+          value={reference}
+          onChange={(event) => onReferenceChange(event.target.value)}
+          placeholder="Payout or credit reference"
+          aria-label="Redemption reference"
+          disabled={processing}
+          className="h-8 w-52 border-gray-700 bg-gray-900 text-xs"
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onRecord}
+          disabled={processing || !reference.trim()}
+          className={accentClassName}
+        >
+          {processing ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <>
+              <Check className="mr-1 h-4 w-4" />
+              Record
+            </>
+          )}
+        </Button>
+      </div>
+      {error && (
+        <p role="alert" className="max-w-xs text-right text-xs text-red-400">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
 export default function GrowthPage() {
   const { firebaseUser } = useAuth()
   const [npsData, setNpsData] = useState<NPSData | null>(null)
@@ -127,6 +199,11 @@ export default function GrowthPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [processingReward, setProcessingReward] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Per-row redemption reference and per-row failure. The action used to
+  // discard non-2xx responses entirely, so a rejected request looked exactly
+  // like a successful one.
+  const [referenceDrafts, setReferenceDrafts] = useState<Record<string, string>>({})
+  const [rewardErrors, setRewardErrors] = useState<Record<string, string>>({})
 
   const loadData = useCallback(async () => {
     if (!firebaseUser) return
@@ -174,10 +251,33 @@ export default function GrowthPage() {
     loadData()
   }, [loadData])
 
-  const processReward = async (rewardId: string, notes?: string) => {
+  /**
+   * Record that a reward was redeemed out of band.
+   *
+   * This does NOT pay anyone or grant anything. There is no payout integration
+   * and no subscription-granting path in the product, so the button writes a
+   * bookkeeping record against a reference and the reward stays on the books
+   * as owed until a human actually delivers it.
+   */
+  const recordRedemption = async (rewardId: string) => {
     if (!firebaseUser) return
 
+    const reference = (referenceDrafts[rewardId] || "").trim()
+    if (!reference) {
+      setRewardErrors((prev) => ({
+        ...prev,
+        [rewardId]: "Enter the payout or credit reference before recording this.",
+      }))
+      return
+    }
+
     setProcessingReward(rewardId)
+    setRewardErrors((prev) => {
+      const next = { ...prev }
+      delete next[rewardId]
+      return next
+    })
+
     try {
       const token = await firebaseUser.getIdToken()
       const res = await fetch("/api/admin/referrals/rewards", {
@@ -186,18 +286,49 @@ export default function GrowthPage() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ rewardId, notes }),
+        body: JSON.stringify({ rewardId, reference }),
       })
 
-      if (res.ok) {
-        // Refresh rewards data
-        loadData()
+      const payload = await res.json().catch(() => null)
+
+      if (!res.ok || !payload?.success) {
+        setRewardErrors((prev) => ({
+          ...prev,
+          [rewardId]: payload?.error || `Request failed (${res.status})`,
+        }))
+        return
       }
+
+      setReferenceDrafts((prev) => {
+        const next = { ...prev }
+        delete next[rewardId]
+        return next
+      })
+      await loadData()
     } catch (error) {
-      console.error("Failed to process reward:", error)
+      setRewardErrors((prev) => ({
+        ...prev,
+        [rewardId]: error instanceof Error ? error.message : "Failed to record redemption",
+      }))
     } finally {
       setProcessingReward(null)
     }
+  }
+
+  /**
+   * Colour only. The words come from the server. Keyed by the full status
+   * union so a new status is a compile error here rather than a blank badge.
+   */
+  const rewardStatusBadge: Record<DetailedRewardStatus, string> = {
+    none: badgeVariants.muted,
+    pending: badgeVariants.warning,
+    redemption_recorded: badgeVariants.success,
+    expired: badgeVariants.muted,
+    voided: badgeVariants.error,
+    // Closed by the old action, which recorded no reference and delivered
+    // nothing. Deliberately not green.
+    credited: badgeVariants.orange,
+    paid: badgeVariants.orange,
   }
 
   const getNPSColor = (nps: number) => {
@@ -234,6 +365,15 @@ export default function GrowthPage() {
       </div>
     )
   }
+
+  // Share of signups that came through a referral. The old inline expression
+  // substituted 1 for an organic count of 0, so a real zero silently became a
+  // denominator of 1 and skewed the percentage. Null means there is nothing to
+  // divide, which is a different fact from 0%.
+  const organicSignups = referralData?.referralsBySource.organic ?? 0
+  const referredSignups = referralData?.referralsBySource.referred ?? 0
+  const totalSignups = organicSignups + referredSignups
+  const referredShare = totalSignups > 0 ? (referredSignups / totalSignups) * 100 : null
 
   const totalResponses = npsData?.stats.totalResponses || 0
   const promoterPercent =
@@ -431,7 +571,7 @@ export default function GrowthPage() {
           />
           <MetricCard
             title="Organic vs Referred"
-            value={`${(((referralData?.referralsBySource.referred || 0) / ((referralData?.referralsBySource.organic || 1) + (referralData?.referralsBySource.referred || 0))) * 100).toFixed(0)}%`}
+            value={referredShare === null ? "No data" : `${referredShare.toFixed(0)}%`}
             subtitle="% from referrals"
             icon={ArrowUpRight}
           />
@@ -519,7 +659,8 @@ export default function GrowthPage() {
           <CardHeader className="pb-4">
             <CardTitle className={typography.cardTitle}>All Referrals</CardTitle>
             <CardDescription className={typography.cardDescription}>
-              Who referred who, signup status, and reward tracking
+              Who referred who, signup status, and reward tracking. The signup reward is 1 free
+              month. The $10 is earned only when a referred user upgrades to Pro.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -555,12 +696,12 @@ export default function GrowthPage() {
                     <th
                       className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-center`}
                     >
-                      $10 Owed
+                      Signup reward
                     </th>
                     <th
                       className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-center`}
                     >
-                      Free Month
+                      Upgrade reward
                     </th>
                   </tr>
                 </thead>
@@ -591,20 +732,14 @@ export default function GrowthPage() {
                         )}
                       </td>
                       <td className={`${spacing.tableCellPadding} text-center`}>
-                        {ref.signupRewardStatus === "paid" ? (
-                          <Badge className={badgeVariants.success}>Paid</Badge>
-                        ) : (
-                          <Badge className={badgeVariants.warning}>Owe $10</Badge>
-                        )}
+                        <Badge className={rewardStatusBadge[ref.signupRewardStatus]}>
+                          {ref.signupRewardLabel}
+                        </Badge>
                       </td>
                       <td className={`${spacing.tableCellPadding} text-center`}>
-                        {ref.conversionRewardStatus === "credited" ? (
-                          <Badge className={badgeVariants.purple}>Credited</Badge>
-                        ) : ref.conversionRewardStatus === "pending" ? (
-                          <Badge className={badgeVariants.warning}>Pending</Badge>
-                        ) : (
-                          <span className="text-gray-600">—</span>
-                        )}
+                        <Badge className={rewardStatusBadge[ref.conversionRewardStatus]}>
+                          {ref.conversionRewardLabel}
+                        </Badge>
                       </td>
                     </tr>
                   ))}
@@ -646,19 +781,38 @@ export default function GrowthPage() {
           Rewards Management
         </h2>
 
+        {/* What this surface can and cannot do. The buttons below used to read
+            as fulfilment; nothing in the product applies a free month or sends
+            money, so saying so here is what stops an operator believing a
+            reward has been delivered. */}
+        <Card className="border-yellow-500/30 bg-yellow-500/10">
+          <CardContent className="flex items-start gap-4 pt-6">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-yellow-400" />
+            <div className="space-y-1">
+              <p className="font-medium text-yellow-400">Recording is bookkeeping, not payment</p>
+              <p className="text-sm text-gray-300">
+                CodeSparring has no payout integration and no path that applies a subscription
+                credit. Pay the referrer or extend their subscription by hand first, then record it
+                here with the reference so the two can be reconciled. Recording does not settle the
+                balance, and the reward stays counted as owed until redemption is automated.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Rewards Summary */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <MetricCard
-            title="Pending Cash Payouts"
+            title="Cash Owed to Referrers"
             value={`$${rewardsData?.totals.pendingCash || 0}`}
-            subtitle={`${rewardsData?.cashRewards.length || 0} rewards waiting`}
+            subtitle={`${rewardsData?.cashRewards.length || 0} awaiting manual payout`}
             icon={DollarSign}
             valueColor="text-green-400"
           />
           <MetricCard
-            title="Pending Free Months"
+            title="Free Months Owed"
             value={rewardsData?.totals.pendingCredits || 0}
-            subtitle={`${rewardsData?.creditRewards.length || 0} credits waiting`}
+            subtitle={`${rewardsData?.creditRewards.length || 0} awaiting manual credit`}
             icon={Gift}
             valueColor="text-purple-400"
           />
@@ -669,10 +823,10 @@ export default function GrowthPage() {
           <CardHeader className="pb-4">
             <CardTitle className={typography.cardTitle}>
               <DollarSign className="h-5 w-5 text-green-400" />
-              Pending Cash Rewards ($10 per signup)
+              Cash Rewards Owed
             </CardTitle>
             <CardDescription className={typography.cardDescription}>
-              Manual PayPal payouts to referrers
+              $10 earned when a referred user upgrades to Pro. Paid by hand, then recorded here.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -719,28 +873,22 @@ export default function GrowthPage() {
                       <td
                         className={`${spacing.tableCellPadding} text-right font-medium text-green-400 tabular-nums`}
                       >
-                        ${reward.amount}
+                        {reward.amountLabel}
                       </td>
                       <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                         {new Date(reward.createdAt).toLocaleDateString()}
                       </td>
                       <td className={`${spacing.tableCellPadding} text-right`}>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => processReward(reward.id)}
-                          disabled={processingReward === reward.id}
-                          className="border-green-600 text-green-400 hover:bg-green-600/20"
-                        >
-                          {processingReward === reward.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <>
-                              <Check className="mr-1 h-4 w-4" />
-                              Mark Paid
-                            </>
-                          )}
-                        </Button>
+                        <RedemptionAction
+                          reference={referenceDrafts[reward.id] || ""}
+                          onReferenceChange={(value) =>
+                            setReferenceDrafts((prev) => ({ ...prev, [reward.id]: value }))
+                          }
+                          onRecord={() => recordRedemption(reward.id)}
+                          processing={processingReward === reward.id}
+                          error={rewardErrors[reward.id]}
+                          accentClassName="border-green-600 text-green-400 hover:bg-green-600/20"
+                        />
                       </td>
                     </tr>
                   ))}
@@ -758,10 +906,11 @@ export default function GrowthPage() {
           <CardHeader className="pb-4">
             <CardTitle className={typography.cardTitle}>
               <Gift className="h-5 w-5 text-purple-400" />
-              Pending Free Month Credits
+              Free Months Owed
             </CardTitle>
             <CardDescription className={typography.cardDescription}>
-              1 free month when referred user upgrades to Pro
+              1 free month per signup, plus 1 more when that user upgrades to Pro. Applied by hand,
+              then recorded here.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -777,7 +926,12 @@ export default function GrowthPage() {
                     <th
                       className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
                     >
-                      Converted User
+                      Referred User
+                    </th>
+                    <th
+                      className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                    >
+                      Earned for
                     </th>
                     <th
                       className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}
@@ -805,31 +959,30 @@ export default function GrowthPage() {
                       <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                         {reward.referredEmail}
                       </td>
+                      {/* Both signup and upgrade credits land in this table, and
+                          they are earned for different things. */}
+                      <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
+                        {reward.typeLabel}
+                      </td>
                       <td
                         className={`${spacing.tableCellPadding} text-right font-medium text-purple-400 tabular-nums`}
                       >
-                        {reward.amount} month{reward.amount > 1 ? "s" : ""}
+                        {reward.amountLabel}
                       </td>
                       <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                         {new Date(reward.createdAt).toLocaleDateString()}
                       </td>
                       <td className={`${spacing.tableCellPadding} text-right`}>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => processReward(reward.id)}
-                          disabled={processingReward === reward.id}
-                          className="border-purple-600 text-purple-400 hover:bg-purple-600/20"
-                        >
-                          {processingReward === reward.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <>
-                              <Check className="mr-1 h-4 w-4" />
-                              Mark Credited
-                            </>
-                          )}
-                        </Button>
+                        <RedemptionAction
+                          reference={referenceDrafts[reward.id] || ""}
+                          onReferenceChange={(value) =>
+                            setReferenceDrafts((prev) => ({ ...prev, [reward.id]: value }))
+                          }
+                          onRecord={() => recordRedemption(reward.id)}
+                          processing={processingReward === reward.id}
+                          error={rewardErrors[reward.id]}
+                          accentClassName="border-purple-600 text-purple-400 hover:bg-purple-600/20"
+                        />
                       </td>
                     </tr>
                   ))}
