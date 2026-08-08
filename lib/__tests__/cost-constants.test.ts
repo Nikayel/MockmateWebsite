@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { PROVIDER_COSTS } from "../usage-tracking"
-import { AI_PROVIDER_COSTS, AI_BUDGET_CAPS } from "../pricing"
+import { AI_PROVIDER_COSTS, AI_PROVIDER_RATES, AI_BUDGET_CAPS } from "../pricing"
 import { COST_PROTECTION } from "../constants"
 import { GEMINI_MODELS } from "../ai/model-ids"
 
@@ -29,9 +29,61 @@ describe("AI cost constants", () => {
   })
 
   it("keeps the two cost tables in agreement", () => {
+    // PROVIDER_COSTS is now a re-export of AI_PROVIDER_COSTS rather than a
+    // second literal table, so agreement is structural. Assert the KEY SETS
+    // match as well as the values: this test only ever iterated one table's
+    // keys, which is how the bare "openai" row came to exist in one table and
+    // not the other without anything noticing.
+    expect(Object.keys(PROVIDER_COSTS).sort()).toEqual(Object.keys(AI_PROVIDER_COSTS).sort())
     for (const key of Object.keys(AI_PROVIDER_COSTS) as Array<keyof typeof AI_PROVIDER_COSTS>) {
       expect(PROVIDER_COSTS[key as keyof typeof PROVIDER_COSTS]).toBe(AI_PROVIDER_COSTS[key])
     }
+  })
+
+  // The blended figures above are DISPLAY ONLY. These are the numbers that
+  // actually charge money, and until now nothing pinned them: cost-constants
+  // asserted only the averaged values, so either side of a direction could have
+  // moved without a single test objecting as long as the average held.
+  it("pins the per-direction rates that price every live call", () => {
+    const expected: Record<string, { inputPer1M: number; outputPer1M: number }> = {
+      // GPT-5.6 Luna. Identical across every effort key and the bare Edge key:
+      // effort changes how many output tokens come back, not their price.
+      "openai-none": { inputPer1M: 0.2, outputPer1M: 1.2 },
+      "openai-low": { inputPer1M: 0.2, outputPer1M: 1.2 },
+      "openai-high": { inputPer1M: 0.2, outputPer1M: 1.2 },
+      "openai-xhigh": { inputPer1M: 0.2, outputPer1M: 1.2 },
+      openai: { inputPer1M: 0.2, outputPer1M: 1.2 },
+      gemini: { inputPer1M: 1.5, outputPer1M: 7.5 },
+      "gemini-lite": { inputPer1M: 0.3, outputPer1M: 2.5 },
+      deepseek: { inputPer1M: 0.435, outputPer1M: 0.87 },
+      "deepseek-chat": { inputPer1M: 0.14, outputPer1M: 0.28 },
+      claude: { inputPer1M: 1.0, outputPer1M: 5.0 },
+    }
+
+    for (const [provider, rate] of Object.entries(expected)) {
+      const actual = AI_PROVIDER_RATES[provider as keyof typeof AI_PROVIDER_RATES]
+      expect(actual, `missing rate row for ${provider}`).toBeDefined()
+      expect(actual.inputPer1M, `${provider} input rate`).toBe(rate.inputPer1M)
+      expect(actual.outputPer1M, `${provider} output rate`).toBe(rate.outputPer1M)
+    }
+  })
+
+  it("prices output at or above input on every routed provider", () => {
+    // Not a vendor fact but a structural one: if these ever invert, the
+    // direction of every over/under-charge in the pricing tests flips, and the
+    // reasoning-call undercount that the kill-switch cares about changes sign.
+    for (const provider of ["openai", "gemini", "gemini-lite", "deepseek", "deepseek-chat"]) {
+      const rate = AI_PROVIDER_RATES[provider as keyof typeof AI_PROVIDER_RATES]
+      expect(rate.outputPer1M, `${provider}`).toBeGreaterThan(rate.inputPer1M)
+    }
+  })
+
+  it("covers the bare 'openai' key the Edge runtime stamps on its responses", () => {
+    // lib/ai-providers-edge.ts returns provider: "openai" with no effort
+    // suffix. Missing from the RATE table it would fall back to gemini and
+    // overbook the platform's most expensive call by 6.4x.
+    expect(AI_PROVIDER_RATES).toHaveProperty("openai")
+    expect(AI_PROVIDER_RATES.openai).toEqual(AI_PROVIDER_RATES["openai-high"])
   })
 
   it("covers every provider the fallback chains can select", () => {
