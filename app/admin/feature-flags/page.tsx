@@ -37,8 +37,13 @@ import {
   Power,
   Users,
   Percent,
+  AlertCircle,
+  Loader2,
 } from "lucide-react"
 import { logger } from "@/lib/logger"
+
+type FlagType = "release" | "experiment" | "ops" | "permission" | "kill_switch"
+type FlagEnvironment = "all" | "production" | "staging" | "development"
 
 interface FeatureFlag {
   id: string
@@ -46,13 +51,41 @@ interface FeatureFlag {
   name: string
   description: string
   enabled: boolean
-  type: "release" | "experiment" | "ops" | "permission" | "kill_switch"
+  type: FlagType
   rolloutPercentage: number
   targetTiers: string[]
-  environment: "all" | "production" | "staging" | "development"
+  environment: FlagEnvironment
   createdAt: string
   updatedAt: string
   expiresAt?: string
+  /** Whether any code path reads this key. False means toggling it changes nothing. */
+  wired: boolean
+}
+
+/**
+ * Read a response from the flags API, turning a non-OK status or a
+ * `{ success: false }` body into a thrown error carrying the server's message.
+ *
+ * Every call here used to ignore the response entirely: a 403 from a missing
+ * permission and a 400 from a rejected field both looked exactly like success,
+ * because the page reloaded the list and the row simply stayed as it was. An
+ * operator flipping a kill switch had no way to tell "saved" from "refused".
+ */
+async function readFlagResponse<T>(response: Response): Promise<T> {
+  let payload: (T & { success?: boolean; error?: string }) | null = null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok || payload?.success === false) {
+    throw new Error(
+      payload?.error || `Request failed with status ${response.status}. Nothing was changed.`
+    )
+  }
+
+  return payload as T
 }
 
 const typeConfig = {
@@ -72,10 +105,10 @@ const defaultFlag: {
   name: string
   description: string
   enabled: boolean
-  type: "release" | "experiment" | "ops" | "permission" | "kill_switch"
+  type: FlagType
   rolloutPercentage: number
   targetTiers: string[]
-  environment: "all" | "production" | "staging" | "development"
+  environment: FlagEnvironment
   expiresAt: string
 } = {
   key: "",
@@ -99,6 +132,9 @@ export default function FeatureFlagsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingFlag, setEditingFlag] = useState<FeatureFlag | null>(null)
   const [formData, setFormData] = useState(defaultFlag)
+  /** The flag whose toggle is mid-flight, so only that row shows a spinner. */
+  const [pendingFlagId, setPendingFlagId] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const loadFlags = useCallback(
     async (showRefreshing = false) => {
@@ -111,15 +147,18 @@ export default function FeatureFlagsPage() {
           headers: { Authorization: `Bearer ${token}` },
         })
 
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success) {
-            setFlags(data.flags)
-            setStats(data.stats)
-          }
-        }
+        const data = await readFlagResponse<{
+          flags: FeatureFlag[]
+          stats: typeof stats
+        }>(response)
+        setFlags(data.flags)
+        setStats(data.stats)
+        setErrorMessage(null)
       } catch (error) {
         logger.error("Error loading feature flags", { error })
+        setErrorMessage(
+          error instanceof Error ? error.message : "Could not load feature flags."
+        )
       } finally {
         setLoading(false)
         setRefreshing(false)
@@ -157,11 +196,15 @@ export default function FeatureFlagsPage() {
   const handleSave = async () => {
     if (!firebaseUser) return
     setSaving(true)
+    setErrorMessage(null)
 
     try {
       const token = await firebaseUser.getIdToken()
       const method = editingFlag ? "PUT" : "POST"
-      const body = editingFlag ? { id: editingFlag.id, ...formData } : formData
+      // `key` is immutable server-side, so an edit sends only what can change.
+      // Sending it anyway is now a 400 rather than a silently ignored field.
+      const { key: _immutableKey, ...mutable } = formData
+      const body = editingFlag ? { id: editingFlag.id, ...mutable } : formData
 
       const response = await fetch("/api/admin/feature-flags", {
         method,
@@ -172,23 +215,26 @@ export default function FeatureFlagsPage() {
         body: JSON.stringify(body),
       })
 
-      if (response.ok) {
-        setDialogOpen(false)
-        loadFlags(true)
-      }
+      await readFlagResponse(response)
+      setDialogOpen(false)
+      loadFlags(true)
     } catch (error) {
       logger.error("Error saving feature flag", { error })
+      setErrorMessage(error instanceof Error ? error.message : "Could not save the flag.")
     } finally {
       setSaving(false)
     }
   }
 
-  const handleToggle = async (flag: FeatureFlag) => {
+  /** Apply a toggle. Callers decide whether it needed confirming first. */
+  const applyToggle = async (flag: FeatureFlag) => {
     if (!firebaseUser) return
+    setPendingFlagId(flag.id)
+    setErrorMessage(null)
 
     try {
       const token = await firebaseUser.getIdToken()
-      await fetch("/api/admin/feature-flags", {
+      const response = await fetch("/api/admin/feature-flags", {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -196,24 +242,38 @@ export default function FeatureFlagsPage() {
         },
         body: JSON.stringify({ id: flag.id, enabled: !flag.enabled }),
       })
-      loadFlags(true)
+
+      await readFlagResponse(response)
+      await loadFlags(true)
     } catch (error) {
       logger.error("Error toggling flag", { error })
+      setErrorMessage(
+        error instanceof Error ? error.message : `Could not change ${flag.name}.`
+      )
+    } finally {
+      setPendingFlagId(null)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!firebaseUser || !confirm("Delete this feature flag?")) return
+  const handleDelete = async (flag: FeatureFlag) => {
+    if (!firebaseUser || !confirm(`Delete the flag "${flag.name}"?`)) return
+    setPendingFlagId(flag.id)
+    setErrorMessage(null)
 
     try {
       const token = await firebaseUser.getIdToken()
-      await fetch(`/api/admin/feature-flags?id=${id}`, {
+      const response = await fetch(`/api/admin/feature-flags?id=${flag.id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       })
-      loadFlags(true)
+
+      await readFlagResponse(response)
+      await loadFlags(true)
     } catch (error) {
       logger.error("Error deleting flag", { error })
+      setErrorMessage(error instanceof Error ? error.message : "Could not delete the flag.")
+    } finally {
+      setPendingFlagId(null)
     }
   }
 
@@ -254,6 +314,24 @@ export default function FeatureFlagsPage() {
           </Button>
         </div>
       </div>
+
+      {errorMessage && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-900/20 p-3"
+        >
+          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-400" />
+          <span className="text-sm text-red-300">{errorMessage}</span>
+          <Button
+            onClick={() => setErrorMessage(null)}
+            variant="ghost"
+            size="sm"
+            className="ml-auto text-red-400 hover:text-red-300"
+          >
+            Dismiss
+          </Button>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
@@ -375,20 +453,34 @@ export default function FeatureFlagsPage() {
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <Switch checked={flag.enabled} onCheckedChange={() => handleToggle(flag)} />
+                        {pendingFlagId === flag.id && (
+                          <Loader2
+                            className="h-4 w-4 animate-spin text-[#c4703f]"
+                            aria-label={`Saving ${flag.name}`}
+                          />
+                        )}
+                        <Switch
+                          checked={flag.enabled}
+                          disabled={pendingFlagId === flag.id}
+                          onCheckedChange={() => applyToggle(flag)}
+                          aria-label={`${flag.enabled ? "Disable" : "Enable"} ${flag.name}`}
+                        />
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleOpenEdit(flag)}
                           className="text-gray-400 hover:text-white"
+                          aria-label={`Edit ${flag.name}`}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(flag.id)}
+                          disabled={pendingFlagId === flag.id}
+                          onClick={() => handleDelete(flag)}
                           className="text-gray-400 hover:text-red-400"
+                          aria-label={`Delete ${flag.name}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -455,7 +547,7 @@ export default function FeatureFlagsPage() {
                 <Label>Type</Label>
                 <Select
                   value={formData.type}
-                  onValueChange={(value: any) => setFormData({ ...formData, type: value })}
+                  onValueChange={(value) => setFormData({ ...formData, type: value as FlagType })}
                 >
                   <SelectTrigger className="border-gray-700 bg-gray-800 text-white">
                     <SelectValue />
@@ -484,7 +576,7 @@ export default function FeatureFlagsPage() {
                 <Label>Environment</Label>
                 <Select
                   value={formData.environment}
-                  onValueChange={(value: any) => setFormData({ ...formData, environment: value })}
+                  onValueChange={(value) => setFormData({ ...formData, environment: value as FlagEnvironment })}
                 >
                   <SelectTrigger className="border-gray-700 bg-gray-800 text-white">
                     <SelectValue />
