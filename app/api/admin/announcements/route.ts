@@ -10,6 +10,7 @@ import { adminDb } from "@/lib/firebase-admin"
 import { withPermission } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
 import { parseBoundedInt } from "@/lib/admin/query-params"
+import { AUDIT_ACTIONS, logAdminAction } from "@/lib/admin/audit"
 import { Timestamp } from "firebase-admin/firestore"
 import type { FullAnnouncement } from "@/lib/types/announcements"
 
@@ -17,6 +18,29 @@ export const dynamic = "force-dynamic"
 
 // Re-export for backwards compatibility
 export type Announcement = FullAnnouncement
+
+/** The audit target type for every announcement row, matching the collection. */
+const AUDIT_TARGET_TYPE = "announcements"
+
+/**
+ * Render an announcement document for the audit trail's before/after fields.
+ *
+ * A Firestore `Timestamp` survives audit sanitisation as a `{_seconds,
+ * _nanoseconds}` pair, which nobody reading a forensics log can date at a
+ * glance. Timestamps become ISO strings; everything else passes through.
+ */
+function toAuditSnapshot(
+  data: FirebaseFirestore.DocumentData | undefined
+): Record<string, unknown> | null {
+  if (!data) return null
+
+  const snapshot: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(data)) {
+    snapshot[key] =
+      value instanceof Timestamp ? value.toDate().toISOString() : (value as unknown)
+  }
+  return snapshot
+}
 
 /**
  * Fields a PUT may change. `views`, `dismissals`, `createdBy` and `createdAt`
@@ -170,13 +194,18 @@ export const POST = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request, 
 
     const docRef = await adminDb.collection("announcements").add(announcementData)
 
-    // Log the action
-    await adminDb.collection("admin_audit_log").add({
-      adminId: context.userId,
-      action: "create_announcement",
-      details: { announcementId: docRef.id, title },
-      timestamp: now,
-    })
+    await logAdminAction(
+      context,
+      AUDIT_ACTIONS.CREATE_ANNOUNCEMENT,
+      { announcementId: docRef.id, title },
+      {
+        request,
+        target: { type: AUDIT_TARGET_TYPE, id: docRef.id, label: title },
+        // Nothing existed before a create; the published message is the after.
+        before: null,
+        after: toAuditSnapshot(announcementData),
+      }
+    )
 
     return NextResponse.json({
       success: true,
@@ -234,16 +263,23 @@ export const PUT = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request, c
       updateData.endDate = Timestamp.fromDate(new Date(updates.endDate))
     }
 
+    const before = doc.data()
     await docRef.update(updateData)
 
-    // Log the action
-    await adminDb.collection("admin_audit_log").add({
-      adminId: context.userId,
-      action: "update_announcement",
+    await logAdminAction(
+      context,
+      AUDIT_ACTIONS.UPDATE_ANNOUNCEMENT,
       // What was applied, not what was asked for.
-      details: { announcementId: id, updates: Object.keys(updateData) },
-      timestamp: Timestamp.now(),
-    })
+      { announcementId: id, updates: Object.keys(updateData) },
+      {
+        request,
+        target: { type: AUDIT_TARGET_TYPE, id, label: before?.title ?? null },
+        before: toAuditSnapshot(before),
+        // The applied update merged over the stored document: an edit to a
+        // message every user sees is only reviewable against what it replaced.
+        after: toAuditSnapshot({ ...before, ...updateData }),
+      }
+    )
 
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -279,15 +315,21 @@ export const DELETE = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request
       return NextResponse.json({ success: false, error: "Announcement not found" }, { status: 404 })
     }
 
+    const before = doc.data()
     await docRef.delete()
 
-    // Log the action
-    await adminDb.collection("admin_audit_log").add({
-      adminId: context.userId,
-      action: "delete_announcement",
-      details: { announcementId: id },
-      timestamp: Timestamp.now(),
-    })
+    await logAdminAction(
+      context,
+      AUDIT_ACTIONS.DELETE_ANNOUNCEMENT,
+      { announcementId: id },
+      {
+        request,
+        target: { type: AUDIT_TARGET_TYPE, id, label: before?.title ?? null },
+        // The deleted document is the only remaining record of what was published.
+        before: toAuditSnapshot(before),
+        after: null,
+      }
+    )
 
     return NextResponse.json({ success: true })
   } catch (error) {
