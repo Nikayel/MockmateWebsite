@@ -88,9 +88,7 @@ export interface SessionCursor {
 }
 
 /** An indexed equality filter on `feedback_status`. */
-export type FeedbackStatusFilter =
-  | { op: "=="; value: string }
-  | { op: "in"; values: string[] }
+export type FeedbackStatusFilter = { op: "=="; value: string } | { op: "in"; values: string[] }
 
 /** A validated, fully bounded description of one session-list query. */
 export interface SessionQueryPlan {
@@ -118,9 +116,7 @@ export interface SessionQueryPlan {
   includeTotal: boolean
 }
 
-export type SessionQueryParse =
-  | { ok: true; plan: SessionQueryPlan }
-  | { ok: false; error: string }
+export type SessionQueryParse = { ok: true; plan: SessionQueryPlan } | { ok: false; error: string }
 
 /** Firestore ids and scenario types; deliberately narrow so nothing odd reaches a query. */
 const ID_PATTERN = /^[A-Za-z0-9_.:-]{1,128}$/
