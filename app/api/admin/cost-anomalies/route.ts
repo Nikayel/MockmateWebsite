@@ -18,6 +18,7 @@ import {
   unauthorizedResponse,
 } from '@/lib/admin/middleware'
 import { PERMISSIONS } from '@/lib/admin/rbac'
+import { parseBoundedInt } from '@/lib/admin/query-params'
 import { logAdminAction } from '@/lib/admin/audit'
 
 /**
@@ -37,7 +38,16 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const view = searchParams.get('view') || 'overview'
-  const limit = parseInt(searchParams.get('limit') || '50', 10)
+  // Reaches a Firestore .limit(); parseInt("abc") is NaN, which is no bound.
+  const limitParam = parseBoundedInt(searchParams.get('limit'), {
+    min: 1,
+    max: 200,
+    fallback: 50,
+  })
+  if (!limitParam.ok) {
+    return errorResponse(`Invalid limit: ${limitParam.error}`, 400)
+  }
+  const limit = limitParam.value
 
   try {
     switch (view) {
@@ -70,10 +80,7 @@ export async function GET(request: NextRequest) {
     }
   } catch (error) {
     console.error('[Admin Cost Anomalies API] Error:', error)
-    return errorResponse(
-      error instanceof Error ? error.message : 'Failed to fetch anomaly data',
-      500
-    )
+    return errorResponse('Failed to fetch anomaly data', 500)
   }
 }
 
@@ -151,9 +158,6 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('[Admin Cost Anomalies API] Error:', error)
-    return errorResponse(
-      error instanceof Error ? error.message : 'Failed to perform action',
-      500
-    )
+    return errorResponse('Failed to perform action', 500)
   }
 }
