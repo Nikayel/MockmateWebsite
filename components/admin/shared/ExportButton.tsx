@@ -26,41 +26,49 @@ export function ExportButton({
   className = "",
 }: ExportButtonProps) {
   const [exporting, setExporting] = useState(false)
+  const [failed, setFailed] = useState(false)
 
   const handleExport = async () => {
-    if (data.length === 0) {
-      alert("No data to export")
-      return
-    }
-
+    // No empty-data guard here: the button below is already disabled at zero rows,
+    // so the alert that used to sit here could never fire.
     setExporting(true)
+    setFailed(false)
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 100))
       exportToCSV(data, filename)
     } catch (error) {
       logger.error("Export failed", { error, filename, rowCount: data.length })
-      alert("Export failed. Please try again.")
+      // Reported next to the button rather than through alert(), which blocks the
+      // page and loses the context of which export failed.
+      setFailed(true)
     } finally {
       setExporting(false)
     }
   }
 
   return (
-    <Button
-      onClick={handleExport}
-      variant={variant}
-      size={size}
-      disabled={disabled || exporting || data.length === 0}
-      className={className}
-    >
-      {exporting ? (
-        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-      ) : (
-        <Download className="h-4 w-4 mr-2" />
+    <div className="flex flex-col items-start gap-1">
+      <Button
+        onClick={handleExport}
+        variant={variant}
+        size={size}
+        disabled={disabled || exporting || data.length === 0}
+        className={className}
+      >
+        {exporting ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          <Download className="mr-2 h-4 w-4" />
+        )}
+        {label}
+      </Button>
+      {failed && (
+        <span role="alert" className="text-xs text-red-400">
+          Export failed. Nothing was downloaded.
+        </span>
       )}
-      {label}
-    </Button>
+    </div>
   )
 }
 

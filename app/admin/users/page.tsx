@@ -74,6 +74,7 @@ export default function UsersPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [authToken, setAuthToken] = useState<string | null>(null)
@@ -185,13 +186,21 @@ export default function UsersPage() {
         await loadData()
         setDeleteDialogOpen(false)
         setUserToDelete(null)
+        setDeleteError(null)
       } else {
-        const data = await response.json()
-        alert(`Failed to delete user: ${data.error || "Unknown error"}`)
+        const data = await response.json().catch(() => ({}))
+        // Reported in the dialog rather than through alert(), so the failure stays
+        // attached to the action that caused it and the confirmation stays open with
+        // the account still selected.
+        setDeleteError(
+          response.status === 403
+            ? "Your role does not have permission to delete accounts."
+            : data.error || `The server returned ${response.status}.`
+        )
       }
     } catch (error) {
       logger.error("Error deleting user", { error, userId: userToDelete?.id })
-      alert("Failed to delete user")
+      setDeleteError("Could not reach the server. The account was not deleted.")
     } finally {
       setDeleting(false)
     }
@@ -493,6 +502,7 @@ export default function UsersPage() {
                                 size="sm"
                                 onClick={() => {
                                   setUserToDelete(user)
+                                  setDeleteError(null)
                                   setDeleteDialogOpen(true)
                                 }}
                                 className="text-red-400 hover:bg-red-900/20 hover:text-red-300"
@@ -564,6 +574,14 @@ export default function UsersPage() {
               <strong className="text-red-400">This action cannot be undone.</strong>
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteError && (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+            >
+              {deleteError}
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel className="border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700">
               Cancel
