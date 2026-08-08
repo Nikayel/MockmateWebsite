@@ -278,6 +278,87 @@ export async function logAdminAction(
 }
 
 /**
+ * A resolved audit date filter. `from` is inclusive and `until` is EXCLUSIVE,
+ * which is what makes the final day of a range actually appear: an inclusive
+ * `<= "2026-08-07"` resolves to midnight and silently drops every entry from
+ * the day the operator asked for.
+ */
+export interface AuditDateRange {
+  from: Date | null
+  until: Date | null
+}
+
+export type AuditDateRangeResult =
+  | { ok: true; range: AuditDateRange }
+  | { ok: false; field: "startDate" | "endDate" | "range"; message: string }
+
+/** Matches the YYYY-MM-DD that an `<input type="date">` produces. */
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000
+
+function parseInstant(raw: string): Date | null {
+  const parsed = new Date(raw)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+/**
+ * Resolve the `startDate` / `endDate` query parameters into a half-open range.
+ *
+ * Two things were wrong before and both are fixed here:
+ *
+ *  - `new Date(input)` was handed straight to Firestore. An unparseable value
+ *    produced an Invalid Date, which Firestore rejects, which surfaced to the
+ *    operator as an opaque 500. Bad input is now a 400 that names the field.
+ *  - `endDate` was applied as `timestamp <= new Date("2026-08-07")`, and a
+ *    date-only string parses to 00:00:00 UTC, so the entire final day was
+ *    excluded. A date-only bound now extends to the end of that day.
+ *
+ * Bounds are interpreted in UTC, matching how `new Date("YYYY-MM-DD")` parses,
+ * so the range does not shift with the server's timezone.
+ */
+export function resolveAuditDateRange(
+  startDate: string | null | undefined,
+  endDate: string | null | undefined
+): AuditDateRangeResult {
+  let from: Date | null = null
+  let until: Date | null = null
+
+  const rawStart = startDate?.trim()
+  if (rawStart) {
+    const parsed = parseInstant(rawStart)
+    if (!parsed) {
+      return { ok: false, field: "startDate", message: "startDate is not a valid date" }
+    }
+    from = parsed
+  }
+
+  const rawEnd = endDate?.trim()
+  if (rawEnd) {
+    const parsed = parseInstant(rawEnd)
+    if (!parsed) {
+      return { ok: false, field: "endDate", message: "endDate is not a valid date" }
+    }
+    // endDate is inclusive for the operator; the query bound is exclusive.
+    // A date-only bound covers the whole named day; a full timestamp covers
+    // the named instant itself.
+    until = DATE_ONLY_PATTERN.test(rawEnd)
+      ? new Date(parsed.getTime() + ONE_DAY_MS)
+      : new Date(parsed.getTime() + 1)
+  }
+
+  if (from && until && from.getTime() >= until.getTime()) {
+    return {
+      ok: false,
+      field: "range",
+      message: "startDate must be on or before endDate",
+    }
+  }
+
+  return { ok: true, range: { from, until } }
+}
+
+/**
  * Common audit action types
  */
 export const AUDIT_ACTIONS = {
