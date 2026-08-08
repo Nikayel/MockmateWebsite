@@ -47,6 +47,16 @@ unprefixed `w-64` with `ml-64` on main and no drawer. `DataTable`'s sort set sta
 flipped the arrow while rendering the unsorted prop, so every sortable column in the admin
 was a placebo.
 
+**Where the four themes stand after the sweep.** Theme 1 is largely closed: the funnel's
+invented top stage, the `Math.random()` latency chart, the hardcoded uptime and memory, and
+the `60 + wins*7` confidence are all gone, and Overview and Revenue now share one MRR. What
+survives is Overview's own historical MRR series (`analytics/route.ts:169`), which is still
+status-blind headcount times list price. Theme 2 was closed by deletion more than by
+instrumentation: `trackError`, `trackQuery`, `trackRateLimitEvent` and the whole insights
+dashboard were removed rather than wired, which is honest, but `/admin/errors` was left
+behind reading the mirror those trackers would have filled. Theme 3 is closed except for two
+routes (`revenue`, `funnel`). Theme 4 is closed.
+
 ## Ledger
 
 ### Shell, navigation, information architecture (`01-nav-ia.md`)
@@ -245,6 +255,12 @@ collections listed above. Additional structural note: seven admin pages exceed 7
 mixing UI, fetching, formatting and business logic; the worst are `research/page.tsx`
 (1357), `ai-usage/page.tsx` (1177) and `rag/page.tsx` (926).
 
+Status at the closing pass: **OPEN.** No admin page was split. Both orphan pages were wired
+into the nav (NAV-1, FB-35) and `/admin/insights` was deleted, but the size and mixed-concern
+problem is untouched. `app/admin/rag/page.tsx` and `app/admin/audit/page.tsx` have no commits
+at all since `fec28bc8`, which is why every page-side finding on those two surfaces is still
+live even where the matching route was rewritten.
+
 ## Verification result, 2026-08-08
 
 145 ledger rows (several are grouped ranges covering ~180 individual findings).
@@ -311,9 +327,10 @@ experiment readout (`lib/research/analyzer.ts:240` → `app/admin/research/page.
    still bypass the daily kill switch.
 9. **INFRA-8/9** — `/admin/errors` still reads a Firestore mirror nothing writes and renders
    a green "No errors recorded"; Sentry is the real store.
-10. **NAV-11 is closed**, but **NAV-2/3** shipped a new 30s health poll that now fans out to
-    7 outbound vendor probes per poll with no server cache (~20k vendor calls/day per open
-    tab). This is a new P1 the fix created; see `app/admin/health/page.tsx:147`.
+10. **New, created by the INFRA-3 fix.** `/admin/health` still force-polls every 30s
+    (`app/admin/health/page.tsx:147`) and each poll now fans out to 7 outbound vendor probes
+    with no server-side cache: roughly 20k vendor calls a day per open tab. The audit's own
+    fix text specified a 60s cache; it was not implemented.
 
 ### P1
 
