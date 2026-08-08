@@ -25,7 +25,7 @@ import {
   type OpenAIReasoningEffort,
 } from "./ai/model-ids"
 import { generateCacheKey, getCachedResponse, setCachedResponse } from "./ai-cache"
-import { trackUsageEvent, calculateCost, PROVIDER_COSTS } from "./usage-tracking"
+import { trackUsageEvent, calculateCost } from "./usage-tracking"
 import { recordGlobalSpend } from "./global-spend-guard"
 import { checkRequestCostAnomaly } from "./cost-anomaly-detection"
 import {
@@ -116,7 +116,6 @@ interface ProviderConfig {
   model: string
   maxTokens: number
   temperature: number
-  costPer1kTokens: number // For cost tracking
   thinkingLevel?: "minimal" | "low" | "medium" | "high" // For Gemini 3.0 thinking mode
   /**
    * GPT-5.6 `reasoning_effort`. Always set explicitly on an OpenAI config: the
@@ -138,9 +137,8 @@ interface ProviderConfig {
  * thinks at all. Luna at `xhigh` therefore lands well under Sol at the default
  * effort, which is why Sol and Terra are pinned in model-ids but unused here.
  *
- * `costPer1kTokens` is a per-provider RATE and is identical across the four Luna
- * entries — effort changes how many tokens come back, not what they cost each.
- * The real spend difference shows up through the measured token counts.
+ * These configs carry NO cost figures. Rates live in exactly one place,
+ * AI_PROVIDER_RATES in lib/pricing.ts, keyed by these same provider names.
  */
 const OPENAI_BASE_URL = "https://api.openai.com/v1"
 
@@ -157,7 +155,6 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     // Hints, diagnosis, complexity analysis: short, mechanical, and on the
     // user's critical path. Thinking here buys nothing and costs latency.
     reasoningEffort: "none",
-    costPer1kTokens: 0.0007, // Luna: $0.20 in + $1.20 out per 1M
   },
   "openai-low": {
     name: "openai-low",
@@ -171,7 +168,6 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     // dead air on a conversational path, so this is deliberately the floor that
     // still reasons at all.
     reasoningEffort: "low",
-    costPer1kTokens: 0.0007,
   },
   "openai-high": {
     name: "openai-high",
@@ -186,7 +182,6 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     // Feedback generation: one call per session, the user is already waiting on
     // a results screen, and the output is the most visible artefact we produce.
     reasoningEffort: "high",
-    costPer1kTokens: 0.0007,
   },
   "openai-xhigh": {
     name: "openai-xhigh",
@@ -215,7 +210,6 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     // user's session, so this is the one place we buy the most thinking
     // available below a tier change.
     reasoningEffort: "xhigh",
-    costPer1kTokens: 0.0007,
   },
   gemini: {
     name: "gemini",
@@ -227,7 +221,6 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     // gemini-3.6-flash always thinks and rejects a 0 budget; "low" caps the
     // spend at 1024 thought tokens so interview latency stays bounded.
     thinkingLevel: "low",
-    costPer1kTokens: 0.00015, // $0.10/1M input, $0.40/1M output averaged
   },
   "gemini-lite": {
     name: "gemini-lite",
@@ -236,7 +229,6 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     model: GEMINI_MODELS.flashLite, // Gemini 3.5 Flash-Lite: cheapest tier, no default thinking
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0.00025, // Averaged - very cheap
   },
   // The V4 tier split finally makes these two entries mean something. Both
   // pointed at the retired `deepseek-chat` before, so the quality distinction
@@ -249,7 +241,6 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     model: DEEPSEEK_MODELS.pro, // V4 Pro - $0.435/1M in, $0.87/1M out - the quality fallback
     maxTokens: 4096,
     temperature: 0.7,
-    costPer1kTokens: 0.00065, // V4 Pro: $0.435 in + $0.87 out per 1M
   },
   "deepseek-chat": {
     name: "deepseek-chat",
@@ -259,7 +250,6 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     model: DEEPSEEK_MODELS.flash, // V4 Flash - $0.14/1M in, $0.28/1M out - the volume fallback
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0.00021, // V4 Flash: $0.14 in + $0.28 out per 1M
   },
   claude: {
     name: "claude",
@@ -269,7 +259,6 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     model: "claude-haiku-4-5-20251001", // $1/1M input, $5/1M output - quality fallback
     maxTokens: 1024,
     temperature: 0.7,
-    costPer1kTokens: 0.0024, // Averaged - more expensive but best quality
   },
 }
 
