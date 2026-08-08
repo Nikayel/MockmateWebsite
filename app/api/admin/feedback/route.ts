@@ -16,9 +16,10 @@
  *    dashboard grew with the amount of feedback the product had ever received.
  */
 
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
-import { verifyToken, getAdminRole } from "@/lib/admin/rbac"
+import { withPermission } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 import { Timestamp } from "firebase-admin/firestore"
 import type { Query } from "firebase-admin/firestore"
 import {
@@ -108,30 +109,18 @@ async function loadStats(): Promise<FeedbackStats> {
   return { total, new: brandNew, inProgress, resolved, featureRequests, bugReports }
 }
 
-// GET - List feedback (one page at a time)
-export async function GET(request: NextRequest) {
+/**
+ * GET - List feedback (one page at a time).
+ *
+ * Each row carries a named user's email and their free-text message, so this is
+ * VIEW_USER_DETAILS: super_admin, admin and support, the roles that answer
+ * people. It keeps the read-only analyst out, which the old `if (!role)` gate
+ * did not, since that admits any role the lookup returns.
+ */
+export const GET = withPermission(PERMISSIONS.VIEW_USER_DETAILS, async (request) => {
   try {
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    const role = await getAdminRole(auth.userId)
-    if (!role) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permissions" },
-        { status: 403 }
-      )
-    }
-
     if (!adminDb) {
-      return NextResponse.json({ success: false, error: "Database not available" }, { status: 500 })
+      return NextResponse.json({ success: false, error: "Database not available" }, { status: 503 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -196,34 +185,17 @@ export async function GET(request: NextRequest) {
     console.error("[Feedback API] GET Error:", error)
     return NextResponse.json({ success: false, error: "Failed to fetch feedback" }, { status: 500 })
   }
-}
+})
 
-// PUT - Update feedback status/notes (admin only)
-export async function PUT(request: NextRequest) {
+/**
+ * PUT - Update feedback status/notes. Editing feedback is a mutation, and the
+ * [super_admin, admin] list it used is exactly the MANAGE_SETTINGS holders, so
+ * naming the permission keeps the same audience without a role literal.
+ */
+export const PUT = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request) => {
   try {
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    // Editing feedback is a mutation, so it takes the same gate as DELETE below. A truthy-role
-    // check would admit `analyst` (documented read-only) and `support`.
-    const role = await getAdminRole(auth.userId)
-    if (!role || !["super_admin", "admin"].includes(role)) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permissions" },
-        { status: 403 }
-      )
-    }
-
     if (!adminDb) {
-      return NextResponse.json({ success: false, error: "Database not available" }, { status: 500 })
+      return NextResponse.json({ success: false, error: "Database not available" }, { status: 503 })
     }
 
     let body: unknown
@@ -266,32 +238,13 @@ export async function PUT(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
 
-// DELETE - Delete feedback (admin only)
-export async function DELETE(request: NextRequest) {
+// DELETE - Delete feedback. Same audience as PUT: MANAGE_SETTINGS.
+export const DELETE = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request) => {
   try {
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    const role = await getAdminRole(auth.userId)
-    if (!role || !["super_admin", "admin"].includes(role)) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permissions" },
-        { status: 403 }
-      )
-    }
-
     if (!adminDb) {
-      return NextResponse.json({ success: false, error: "Database not available" }, { status: 500 })
+      return NextResponse.json({ success: false, error: "Database not available" }, { status: 503 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -314,4 +267,4 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
