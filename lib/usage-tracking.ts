@@ -56,6 +56,13 @@ export const PROVIDER_COSTS = {
   "openai-low": 0.0007,
   "openai-high": 0.0007,
   "openai-xhigh": 0.0007,
+  // Bare "openai" is what the EDGE runtime reports: lib/ai-providers-edge.ts
+  // returns provider: "openai" with no effort suffix (its effort is a module
+  // constant, not part of the provider identity). Without this key every
+  // OpenAI-served Edge feedback generation missed the table and was booked at
+  // the gemini rate — 6.4x its real cost — in the ledger, the per-user budget
+  // and the global kill-switch alike. Same Luna rate as the four keys above.
+  openai: 0.0007,
   gemini: 0.0045, // Gemini 3.6 Flash: $1.50 in + $7.50 out per 1M
   "gemini-lite": 0.0014, // Gemini 3.5 Flash-Lite: $0.30 in + $2.50 out per 1M
   "deepseek-chat": 0.00021, // DeepSeek V4 Flash: $0.14 in + $0.28 out per 1M
@@ -357,10 +364,24 @@ export async function checkUserBudget(userId: string): Promise<{
 }
 
 /**
- * Calculate cost from token counts (for LLM providers)
+ * Calculate cost from token counts (for LLM providers).
+ *
+ * An unrecognised provider still prices at the gemini rate (deliberately one of
+ * the dearer rows, so an unknown provider over-books rather than under-books and
+ * the caps engage sooner) — but it now says so at ERROR level. The silent
+ * fallback is what let a whole runtime's OpenAI spend be mispriced indefinitely:
+ * nothing in the system distinguished "priced correctly" from "priced by
+ * accident", so the mistake was invisible in every dashboard that used it.
  */
 export function calculateCost(inputTokens: number, outputTokens: number, provider: string): number {
-  const costPer1k = PROVIDER_COSTS[provider as keyof typeof PROVIDER_COSTS] || PROVIDER_COSTS.gemini
+  const configuredRate = PROVIDER_COSTS[provider as keyof typeof PROVIDER_COSTS]
+  if (configuredRate === undefined) {
+    logger.error("Unknown AI provider has no cost row; billing at the gemini rate", {
+      provider,
+      fallbackRatePer1kTokens: PROVIDER_COSTS.gemini,
+    })
+  }
+  const costPer1k = configuredRate ?? PROVIDER_COSTS.gemini
   const totalTokens = inputTokens + outputTokens
   return (totalTokens / 1000) * costPer1k
 }
