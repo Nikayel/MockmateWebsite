@@ -26,6 +26,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Flag,
   RefreshCw,
   Plus,
@@ -71,6 +81,28 @@ interface FeatureFlag {
  * because the page reloaded the list and the row simply stayed as it was. An
  * operator flipping a kill switch had no way to tell "saved" from "refused".
  */
+/**
+ * How long a change takes to reach every running server. Mirrors
+ * FLAG_CACHE_TTL_MS in lib/feature-flags.ts. An operator flipping a kill
+ * switch mid-incident has to know this number, because the switch looks
+ * instant here and is not instant in production.
+ */
+const PROPAGATION_NOTE =
+  "Changes reach running servers within about 30 seconds. Other server instances keep serving the previous value until their own cache expires."
+
+/**
+ * Whether a toggle is consequential enough to confirm.
+ *
+ * Confirmed: any kill switch in either direction, and turning OFF a flag that
+ * is currently on. Both take a working feature away from live users, and both
+ * were previously one stray click on a switch with no undo and no prompt.
+ * Turning a non-kill-switch flag on is not confirmed: it is the additive,
+ * reversible direction.
+ */
+function toggleNeedsConfirmation(flag: FeatureFlag): boolean {
+  return flag.type === "kill_switch" || flag.enabled
+}
+
 async function readFlagResponse<T>(response: Response): Promise<T> {
   let payload: (T & { success?: boolean; error?: string }) | null = null
   try {
@@ -135,6 +167,8 @@ export default function FeatureFlagsPage() {
   /** The flag whose toggle is mid-flight, so only that row shows a spinner. */
   const [pendingFlagId, setPendingFlagId] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  /** The flag awaiting confirmation, if the requested toggle needs one. */
+  const [flagToConfirm, setFlagToConfirm] = useState<FeatureFlag | null>(null)
 
   const loadFlags = useCallback(
     async (showRefreshing = false) => {
@@ -255,6 +289,21 @@ export default function FeatureFlagsPage() {
     }
   }
 
+  /** Route a toggle through confirmation when it takes something away from users. */
+  const requestToggle = (flag: FeatureFlag) => {
+    if (toggleNeedsConfirmation(flag)) {
+      setFlagToConfirm(flag)
+      return
+    }
+    void applyToggle(flag)
+  }
+
+  const confirmToggle = async () => {
+    const flag = flagToConfirm
+    setFlagToConfirm(null)
+    if (flag) await applyToggle(flag)
+  }
+
   const handleDelete = async (flag: FeatureFlag) => {
     if (!firebaseUser || !confirm(`Delete the flag "${flag.name}"?`)) return
     setPendingFlagId(flag.id)
@@ -292,6 +341,7 @@ export default function FeatureFlagsPage() {
         <div>
           <h1 className="font-heading text-3xl font-bold text-white">Feature Flags</h1>
           <p className="mt-1 text-gray-400">Control feature rollouts and experiments</p>
+          <p className="mt-1 text-sm text-gray-500">{PROPAGATION_NOTE}</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -462,7 +512,7 @@ export default function FeatureFlagsPage() {
                         <Switch
                           checked={flag.enabled}
                           disabled={pendingFlagId === flag.id}
-                          onCheckedChange={() => applyToggle(flag)}
+                          onCheckedChange={() => requestToggle(flag)}
                           aria-label={`${flag.enabled ? "Disable" : "Enable"} ${flag.name}`}
                         />
                         <Button
@@ -493,6 +543,47 @@ export default function FeatureFlagsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Confirm a toggle that takes a working feature away from live users */}
+      <AlertDialog
+        open={flagToConfirm !== null}
+        onOpenChange={(open) => !open && setFlagToConfirm(null)}
+      >
+        <AlertDialogContent className="border-gray-800 bg-gray-900">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">
+              {flagToConfirm?.enabled ? "Turn off" : "Turn on"} {flagToConfirm?.name}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 text-gray-400">
+              <span className="block">
+                {flagToConfirm?.type === "kill_switch"
+                  ? "This is a kill switch. Flipping it changes what live users can do."
+                  : "This flag is on. Turning it off removes the feature for live users."}
+              </span>
+              <span className="block">
+                Key: <code className="text-[#c4703f]">{flagToConfirm?.key}</code>
+              </span>
+              {flagToConfirm && !flagToConfirm.wired && (
+                <span className="block text-yellow-400">
+                  No code reads this key, so this change will not affect anything.
+                </span>
+              )}
+              <span className="block">{PROPAGATION_NOTE}</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmToggle}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {flagToConfirm?.enabled ? "Turn off" : "Turn on"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
