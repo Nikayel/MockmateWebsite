@@ -321,3 +321,17 @@ export function parseSessionListQuery(
 export function scanBudgetFor(plan: SessionQueryPlan): number {
   return plan.openOnly ? SESSION_SCAN_CEILING : plan.pageSize + 1
 }
+
+/**
+ * Whether a `.count()` over this plan's filters would be the real number of rows.
+ *
+ * It would not be for an `openOnly` plan: the aggregation runs in the index, and
+ * the index cannot see the "no completed_at" predicate, so it would count the
+ * very documents the post-read check is about to discard. Reporting that number
+ * as the total would tell an admin there are 400 abandoned sessions on a page
+ * showing 12. A total nobody can trust is worse than no total, so those plans
+ * report none.
+ */
+export function canCountExactly(plan: SessionQueryPlan): boolean {
+  return plan.includeTotal && !plan.openOnly
+}

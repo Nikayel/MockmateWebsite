@@ -5,6 +5,7 @@ import {
   decodeSessionCursor,
   parseDateBound,
   scanBudgetFor,
+  canCountExactly,
   ABANDONED_AFTER_HOURS,
   SESSION_PAGE_SIZE_DEFAULT,
   SESSION_PAGE_SIZE_MAX,
@@ -15,6 +16,8 @@ import {
 const NOW = new Date("2026-08-08T12:00:00.000Z")
 /** NOW minus ABANDONED_AFTER_HOURS. */
 const CUTOFF = new Date(NOW.getTime() - ABANDONED_AFTER_HOURS * 3600_000).toISOString()
+/** A valid position, used wherever a test needs to be past the first page. */
+const CURSOR = { startedAt: "2026-08-01T10:00:00.000Z", sessionId: "sess_42" }
 
 function plan(query: string) {
   const result = parseSessionListQuery(new URLSearchParams(query), NOW)
@@ -168,7 +171,7 @@ describe("parseSessionListQuery: ordering", () => {
 })
 
 describe("session cursors", () => {
-  const cursor = { startedAt: "2026-08-01T10:00:00.000Z", sessionId: "sess_42" }
+  const cursor = CURSOR
 
   it("round-trips through the opaque token", () => {
     expect(decodeSessionCursor(encodeSessionCursor(cursor))).toEqual(cursor)
@@ -208,6 +211,24 @@ describe("session cursors", () => {
 
   it("counts only on the first page", () => {
     expect(plan("").includeTotal).toBe(true)
+  })
+})
+
+describe("canCountExactly", () => {
+  it("counts a fully indexed first page", () => {
+    expect(canCountExactly(plan(""))).toBe(true)
+    expect(canCountExactly(plan("status=completed&type=dsa"))).toBe(true)
+  })
+
+  it("does not count again once the admin has paged past the first page", () => {
+    expect(canCountExactly(plan(`cursor=${encodeSessionCursor(CURSOR)}`))).toBe(false)
+  })
+
+  it("refuses to count a status the index cannot see", () => {
+    // The aggregation would include every completed round in the window and
+    // report 400 next to a page of 12.
+    expect(canCountExactly(plan("status=in_progress"))).toBe(false)
+    expect(canCountExactly(plan("status=abandoned"))).toBe(false)
   })
 })
 
