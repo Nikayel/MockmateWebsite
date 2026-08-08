@@ -4,9 +4,11 @@
  * Provides access to admin action audit logs with filtering, pagination, and export
  */
 
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
-import { verifyToken, getAdminRole, PERMISSIONS, hasPermission } from "@/lib/admin/rbac"
+import { withPermission } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
+import { parseBoundedInt } from "@/lib/admin/query-params"
 
 export const dynamic = "force-dynamic"
 
@@ -21,36 +23,33 @@ interface AuditLogEntry {
   userAgent?: string
 }
 
-export async function GET(request: NextRequest) {
+/**
+ * Reading the audit log stays with super_admin and admin, the same two roles the
+ * hand-rolled `["super_admin", "admin"].includes(role)` list allowed. That set is
+ * exactly the MANAGE_SETTINGS holders, so the check now names the permission and
+ * survives a change to the role table.
+ */
+export const GET = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request) => {
   try {
-    // Verify auth
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
+    if (!adminDb) {
+      return NextResponse.json({ success: false, error: "Database not available" }, { status: 503 })
     }
 
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    // Check admin role (only admins and super_admins can view audit logs)
-    const role = await getAdminRole(auth.userId)
-    if (!role || !["super_admin", "admin"].includes(role)) {
+    // Parse query params. Math.min(parseInt("abc"), 200) is NaN, which reached
+    // query.limit() as an unbounded page size.
+    const { searchParams } = new URL(request.url)
+    const limitParam = parseBoundedInt(searchParams.get("limit"), {
+      min: 1,
+      max: 200,
+      fallback: 50,
+    })
+    if (!limitParam.ok) {
       return NextResponse.json(
-        { success: false, error: "Insufficient permissions" },
-        { status: 403 }
+        { success: false, error: `Invalid limit: ${limitParam.error}` },
+        { status: 400 }
       )
     }
-
-    if (!adminDb) {
-      return NextResponse.json({ success: false, error: "Database not available" }, { status: 500 })
-    }
-
-    // Parse query params
-    const { searchParams } = new URL(request.url)
-    const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 200)
+    const limit = limitParam.value
     const cursor = searchParams.get("cursor")
     const action = searchParams.get("action")
     const adminId = searchParams.get("adminId")
@@ -151,34 +150,18 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
 
-// Export audit logs as CSV
-export async function POST(request: NextRequest) {
+/**
+ * Export audit logs as CSV. Deliberately NOT EXPORT_DATA, which analyst and
+ * admin both hold: exporting who did what to the platform is an
+ * admin-governance act, and the previous `role !== "super_admin"` check is
+ * preserved exactly by MANAGE_ADMINS, which only super_admin has.
+ */
+export const POST = withPermission(PERMISSIONS.MANAGE_ADMINS, async (request) => {
   try {
-    // Verify auth
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    // Only super_admin can export audit logs
-    const role = await getAdminRole(auth.userId)
-    if (role !== "super_admin") {
-      return NextResponse.json(
-        { success: false, error: "Only super admins can export audit logs" },
-        { status: 403 }
-      )
-    }
-
     if (!adminDb) {
-      return NextResponse.json({ success: false, error: "Database not available" }, { status: 500 })
+      return NextResponse.json({ success: false, error: "Database not available" }, { status: 503 })
     }
 
     const body = await request.json()
@@ -251,4 +234,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
