@@ -4,34 +4,21 @@
  * Monitor system health, performance metrics, and alerts
  */
 
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
-import { verifyToken, getAdminRole } from "@/lib/admin/rbac"
+import { withPermission } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 import { Timestamp } from "firebase-admin/firestore"
 
 export const dynamic = "force-dynamic"
 
-export async function GET(request: NextRequest) {
+/**
+ * Reading system health is VIEW_ERRORS, which every admin role holds. The
+ * hand-rolled preamble this replaces gated on `if (!role)`, which is not a
+ * permission check at all: it passed anyone the role lookup returned truthy for.
+ */
+export const GET = withPermission(PERMISSIONS.VIEW_ERRORS, async () => {
   try {
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    const role = await getAdminRole(auth.userId)
-    if (!role) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permissions" },
-        { status: 403 }
-      )
-    }
-
     const startTime = Date.now()
 
     // Service health checks
@@ -178,30 +165,15 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
 
-// POST - Acknowledge alert
-export async function POST(request: NextRequest) {
+/**
+ * POST - Acknowledge alert. The hard-coded ["super_admin", "admin"] list is the
+ * same set as MANAGE_SETTINGS, so this states the permission instead of the
+ * roles and stays correct if the role table changes.
+ */
+export const POST = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request) => {
   try {
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    const role = await getAdminRole(auth.userId)
-    if (!role || !["super_admin", "admin"].includes(role)) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permissions" },
-        { status: 403 }
-      )
-    }
-
     const body = await request.json()
     const { alertId, acknowledged } = body
 
@@ -216,4 +188,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
