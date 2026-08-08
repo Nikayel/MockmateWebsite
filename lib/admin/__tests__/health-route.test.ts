@@ -172,7 +172,7 @@ describe("GET /api/admin/health", () => {
     expect((await getHealth()).status).toBe("degraded")
   })
 
-  it("never counts unknown as healthy", async () => {
+  it("reports an unverifiable dependency as unknown without blocking green", async () => {
     useProbes(
       { id: "firestore", critical: true, run: healthy },
       { id: "sentry", run: async () => ({ status: "unknown", detail: "cannot be verified for free" }) }
@@ -180,7 +180,10 @@ describe("GET /api/admin/health", () => {
 
     const health = await getHealth()
 
-    expect(health.status).toBe("unknown")
+    // Sentry cannot be verified for free, so it is unknown on a working platform.
+    // It must not be counted as healthy, and it must not hold the aggregate below
+    // green either, or the indicator could never be green at all.
+    expect(health.status).toBe("healthy")
     expect(health.summary.healthy).toBe(1)
     expect(health.summary.unknown).toBe(1)
     // Nothing was measured, so nothing is reported as measured.

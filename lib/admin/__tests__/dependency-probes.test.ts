@@ -151,12 +151,33 @@ describe("summarizeProbes", () => {
     expect(summary.healthy).toBe(2)
   })
 
-  it("never counts unknown as healthy", () => {
+  it("never counts an unknown dependency among the healthy ones", () => {
     const summary = summarizeProbes([
       result({ id: "a" }),
       result({ id: "b", status: "unknown", latencyMs: null }),
     ])
+    expect(summary.unknown).toBe(1)
+    expect(summary.healthy).toBe(1)
+  })
+
+  it("an unknown CRITICAL dependency makes the platform unknown", () => {
+    const summary = summarizeProbes([
+      result({ id: "a" }),
+      result({ id: "firestore", critical: true, status: "unknown", latencyMs: null }),
+    ])
     expect(summary.status).toBe("unknown")
+  })
+
+  it("an unknown non-critical dependency does not block green", () => {
+    // Sentry reports unknown even when correctly configured, because delivery
+    // cannot be proven without sending a paid event. Letting that hold the
+    // aggregate below healthy forever produced an indicator that could never be
+    // green, which teaches its reader to ignore it.
+    const summary = summarizeProbes([
+      result({ id: "firestore", critical: true }),
+      result({ id: "sentry", status: "unknown", latencyMs: null }),
+    ])
+    expect(summary.status).toBe("healthy")
     expect(summary.unknown).toBe(1)
   })
 

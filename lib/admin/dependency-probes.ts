@@ -215,7 +215,20 @@ export function summarizeProbes(results: ProbeResult[]): ProbeSummary {
     summary.status = "unhealthy"
   } else if (summary.unhealthy > 0 || summary.degraded > 0) {
     summary.status = "degraded"
-  } else if (summary.unknown > 0) {
+  } else if (results.some((result) => result.status === "unknown" && result.critical)) {
+    // Only an unknown CRITICAL dependency makes the platform's state unknown.
+    //
+    // Every status was previously blocked by any unknown at all, which sounds
+    // conservative and is in fact the opposite. Sentry reports unknown even when
+    // correctly configured, because delivery cannot be proven without sending a
+    // paid event, so the aggregate could never reach healthy on a perfectly
+    // working platform. An indicator that is never green teaches its reader to
+    // ignore it, which costs more than the caution buys.
+    //
+    // The rule the unknown state exists for is intact: an unprobeable dependency
+    // is still never counted as working, it still shows as unknown on its own
+    // card, and it still blocks green when it is one the platform cannot run
+    // without.
     summary.status = "unknown"
   } else {
     summary.status = "healthy"
