@@ -415,3 +415,58 @@ New, created by this sweep and not yet in that checklist:
   `DISABLE_VOICE_MODE` in prod and confirming `/api/voice/token` returns 503.
 - **REV-10** — recorded OPEN because no reconciliation code exists. Whether dropped webhooks
   are actually occurring is a production-data question, not a code question.
+
+## Post-verification round, 2026-08-08
+
+The closing CTO review ran against the tree after the verification pass above and found
+items the ledger's own status column could not have caught, because they were introduced by
+the sweep or were fixes that had been renamed rather than made. All of the following landed
+after the counts above were taken, so treat those counts as a floor rather than the final
+state.
+
+**Regressions the sweep itself introduced, now fixed.** Worth recording because they are the
+cost of a change of this size, and two of them were invisible to a green test suite.
+
+- The global spend ceiling was moved above the fail-open circuit breaker while still failing
+  closed on any read error, so one transient Firestore error refused every AI turn on the
+  platform, mid interview, for users nowhere near a budget. Fail-closed is retained; the gate
+  now keeps a last-known-good reading and honours one taken within two minutes that showed
+  spend below 80% of the ceiling.
+- The health page polls every 30 seconds and the new probes fan out to seven third-party
+  endpoints, uncached, which is roughly 20,000 vendor calls a day per open tab. Cached at 20s.
+- Any `unknown` dependency held the aggregate below healthy, and Sentry reports `unknown` even
+  when correctly configured, so the platform could never show green. Only an unknown critical
+  dependency does that now.
+
+**Fabrication renamed rather than removed.** `calculateResearchQualityScore` produced a
+"Research Quality Score /100" from a hand-assigned point ladder, and awarded points for a
+test coming back significant, so finding a result raised the reported quality of the
+experiment. That is the shape of the `60 + wins * 7` confidence this sweep deleted. Removed
+and replaced by `lib/research/readiness.ts`, which reports only facts: users per arm, the
+required n, power, the sample-ratio result, and how many declared metrics were testable.
+
+**Tests that certified the holes they existed to catch.** Both were caused by scope
+boundaries leaking into test files: agents excluded files they did not own from the tests as
+well as from the code, so the tests inherited the ownership map instead of the truth.
+
+- `route-permissions.test.ts` carried a `NOT_MINE` exemption list whose only justification was
+  that another agent owned the file. `revenue` sat in it while the same file asserted that
+  support cannot read revenue. Both `revenue` and `funnel` are now gated and the list now
+  carries reasons about code.
+- The nav invariant test mapped 12 of 22 destinations and missed all four that were wrong,
+  including Infrastructure, which reads a `VIEW_AI_USAGE` route while the nav gated it on
+  `view_errors` and so offered support a link into a 403. All 22 are mapped, with a
+  completeness check that fails when a destination is added without a decision.
+
+**Also closed:** the audit date filter dropped the final day from both the view and the CSV
+export; announcements bypassed the single audit writer, so those rows had no actor email, IP
+or before/after; `delete_user` passed a bare uid, so the most sensitive action on the platform
+recorded a null actor; the errors page rendered a green "No errors recorded" over a dead
+pipeline while the health page called the same pipeline "not collected"; and every refusal on
+the post-interview feedback path now reaches the user with its own copy instead of "something
+went wrong, please try again".
+
+**One gap found while fixing that last item, not yet closed:** `/api/feedback/stream` is Edge
+and never calls `checkQuota`, so per-user monthly and daily budgets are not enforced on
+post-interview feedback at all. The client now maps those refusal codes correctly if the route
+ever emits them. Enforcing them needs a Node-side probe.
