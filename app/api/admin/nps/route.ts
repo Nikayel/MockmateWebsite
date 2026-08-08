@@ -9,6 +9,7 @@ import { adminDb } from "@/lib/firebase-admin"
 import { getNPSStats } from "@/lib/nps"
 import { requirePermission, errorResponse, unauthorizedResponse } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
+import { parseBoundedInt } from "@/lib/admin/query-params"
 import { logger } from "@/lib/logger"
 
 async function getRecentNPSResponses(limit: number = 50) {
@@ -57,8 +58,16 @@ export async function GET(request: NextRequest) {
       }
 
       case "responses": {
-        const limit = parseInt(searchParams.get("limit") || "50", 10)
-        const responses = await getRecentNPSResponses(limit)
+        // Reaches a Firestore .limit(); parseInt("abc") is NaN, which is no bound.
+        const limitParam = parseBoundedInt(searchParams.get("limit"), {
+          min: 1,
+          max: 200,
+          fallback: 50,
+        })
+        if (!limitParam.ok) {
+          return errorResponse(`Invalid limit: ${limitParam.error}`, 400)
+        }
+        const responses = await getRecentNPSResponses(limitParam.value)
 
         return NextResponse.json({
           success: true,
@@ -71,6 +80,6 @@ export async function GET(request: NextRequest) {
     }
   } catch (error) {
     logger.error("[Admin NPS API] Error", { error })
-    return errorResponse(error instanceof Error ? error.message : "Failed to fetch NPS data", 500)
+    return errorResponse("Failed to fetch NPS data", 500)
   }
 }
