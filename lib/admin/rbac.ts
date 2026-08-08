@@ -5,8 +5,8 @@
  * Supports multiple admin roles with granular permissions.
  */
 
-import { adminDb, adminAuth } from '../firebase-admin'
-import { Timestamp } from 'firebase-admin/firestore'
+import { adminDb, adminAuth } from "../firebase-admin"
+import { Timestamp } from "firebase-admin/firestore"
 
 /**
  * Admin role definitions
@@ -15,33 +15,40 @@ import { Timestamp } from 'firebase-admin/firestore'
  * - analyst: Read-only analytics access
  * - support: User management only (for customer support)
  */
-export type AdminRole = 'super_admin' | 'admin' | 'analyst' | 'support'
+export type AdminRole = "super_admin" | "admin" | "analyst" | "support"
+
+/**
+ * How stale lastAccess may get before getAdminRole() refreshes it. Chosen so the
+ * field still answers "when was this admin last active" without charging a write
+ * to every API call in a page load.
+ */
+const LAST_ACCESS_THROTTLE_MS = 5 * 60 * 1000
 
 /**
  * Permission definitions
  */
 export const PERMISSIONS = {
   // Analytics permissions
-  VIEW_ANALYTICS: 'view_analytics',
-  VIEW_REVENUE: 'view_revenue',
-  EXPORT_DATA: 'export_data',
+  VIEW_ANALYTICS: "view_analytics",
+  VIEW_REVENUE: "view_revenue",
+  EXPORT_DATA: "export_data",
 
   // User management permissions
-  VIEW_USERS: 'view_users',
-  MANAGE_USERS: 'manage_users',
-  VIEW_USER_DETAILS: 'view_user_details',
+  VIEW_USERS: "view_users",
+  MANAGE_USERS: "manage_users",
+  VIEW_USER_DETAILS: "view_user_details",
 
   // System permissions
-  VIEW_ERRORS: 'view_errors',
-  MANAGE_SETTINGS: 'manage_settings',
-  MANAGE_ADMINS: 'manage_admins',
+  VIEW_ERRORS: "view_errors",
+  MANAGE_SETTINGS: "manage_settings",
+  MANAGE_ADMINS: "manage_admins",
 
   // AI/Usage permissions
-  VIEW_AI_USAGE: 'view_ai_usage',
-  MANAGE_BUDGETS: 'manage_budgets',
+  VIEW_AI_USAGE: "view_ai_usage",
+  MANAGE_BUDGETS: "manage_budgets",
 } as const
 
-export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS]
+export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]
 
 /**
  * Role to permissions mapping
@@ -100,28 +107,39 @@ export async function getAdminRole(userId: string): Promise<AdminRole | null> {
   // First check environment variable for super admin (bootstrap admin)
   const envAdminId = process.env.ADMIN_USER_ID
   if (envAdminId && userId === envAdminId) {
-    return 'super_admin'
+    return "super_admin"
   }
 
   // Check Firestore for additional admins
   if (!adminDb) return null
 
   try {
-    const adminDoc = await adminDb.collection('admin_roles').doc(userId).get()
+    const adminDoc = await adminDb.collection("admin_roles").doc(userId).get()
 
     if (!adminDoc.exists) return null
 
     const data = adminDoc.data() as AdminRoleDoc
     if (!data.active) return null
 
-    // Update last access time (fire and forget)
-    adminDb.collection('admin_roles').doc(userId).update({
-      lastAccess: Timestamp.now(),
-    }).catch(() => { /* ignore */ })
+    // Stamp lastAccess only when it is meaningfully stale. A single admin page view
+    // fans out to many API routes, and an unconditional write here turned every one
+    // of them into a Firestore write for a field nobody reads at that resolution.
+    const lastAccessMs = data.lastAccess?.toMillis() ?? 0
+    if (Date.now() - lastAccessMs > LAST_ACCESS_THROTTLE_MS) {
+      adminDb
+        .collection("admin_roles")
+        .doc(userId)
+        .update({
+          lastAccess: Timestamp.now(),
+        })
+        .catch(() => {
+          /* ignore */
+        })
+    }
 
     return data.role
   } catch (error) {
-    console.error('[RBAC] Error fetching admin role:', error)
+    console.error("[RBAC] Error fetching admin role:", error)
     return null
   }
 }
@@ -139,23 +157,29 @@ export async function hasPermission(userId: string, permission: Permission): Pro
 /**
  * Check if a user has any of the specified permissions
  */
-export async function hasAnyPermission(userId: string, permissions: Permission[]): Promise<boolean> {
+export async function hasAnyPermission(
+  userId: string,
+  permissions: Permission[]
+): Promise<boolean> {
   const role = await getAdminRole(userId)
   if (!role) return false
 
   const userPermissions = ROLE_PERMISSIONS[role]
-  return permissions.some(p => userPermissions.includes(p))
+  return permissions.some((p) => userPermissions.includes(p))
 }
 
 /**
  * Check if a user has all of the specified permissions
  */
-export async function hasAllPermissions(userId: string, permissions: Permission[]): Promise<boolean> {
+export async function hasAllPermissions(
+  userId: string,
+  permissions: Permission[]
+): Promise<boolean> {
   const role = await getAdminRole(userId)
   if (!role) return false
 
   const userPermissions = ROLE_PERMISSIONS[role]
-  return permissions.every(p => userPermissions.includes(p))
+  return permissions.every((p) => userPermissions.includes(p))
 }
 
 /**
@@ -179,21 +203,21 @@ export async function grantAdminRole(
 ): Promise<{ success: boolean; error?: string }> {
   // Verify granter is super_admin
   const granterRole = await getAdminRole(granterId)
-  if (granterRole !== 'super_admin') {
-    return { success: false, error: 'Only super admins can grant admin roles' }
+  if (granterRole !== "super_admin") {
+    return { success: false, error: "Only super admins can grant admin roles" }
   }
 
   // Cannot grant super_admin role
-  if (role === 'super_admin') {
-    return { success: false, error: 'Super admin role cannot be granted through API' }
+  if (role === "super_admin") {
+    return { success: false, error: "Super admin role cannot be granted through API" }
   }
 
   if (!adminDb) {
-    return { success: false, error: 'Database not available' }
+    return { success: false, error: "Database not available" }
   }
 
   try {
-    await adminDb.collection('admin_roles').doc(targetUserId).set({
+    await adminDb.collection("admin_roles").doc(targetUserId).set({
       userId: targetUserId,
       email: targetEmail,
       role,
@@ -203,7 +227,7 @@ export async function grantAdminRole(
     })
 
     // Log admin action
-    await logAdminAction(granterId, 'grant_role', {
+    await logAdminAction(granterId, "grant_role", {
       targetUserId,
       targetEmail,
       role,
@@ -211,8 +235,8 @@ export async function grantAdminRole(
 
     return { success: true }
   } catch (error) {
-    console.error('[RBAC] Error granting admin role:', error)
-    return { success: false, error: 'Failed to grant admin role' }
+    console.error("[RBAC] Error granting admin role:", error)
+    return { success: false, error: "Failed to grant admin role" }
   }
 }
 
@@ -224,30 +248,30 @@ export async function revokeAdminRole(
   targetUserId: string
 ): Promise<{ success: boolean; error?: string }> {
   const revokerRole = await getAdminRole(revokerId)
-  if (revokerRole !== 'super_admin') {
-    return { success: false, error: 'Only super admins can revoke admin roles' }
+  if (revokerRole !== "super_admin") {
+    return { success: false, error: "Only super admins can revoke admin roles" }
   }
 
   // Cannot revoke env-based super admin
   if (targetUserId === process.env.ADMIN_USER_ID) {
-    return { success: false, error: 'Cannot revoke environment-configured super admin' }
+    return { success: false, error: "Cannot revoke environment-configured super admin" }
   }
 
   if (!adminDb) {
-    return { success: false, error: 'Database not available' }
+    return { success: false, error: "Database not available" }
   }
 
   try {
-    await adminDb.collection('admin_roles').doc(targetUserId).update({
+    await adminDb.collection("admin_roles").doc(targetUserId).update({
       active: false,
     })
 
-    await logAdminAction(revokerId, 'revoke_role', { targetUserId })
+    await logAdminAction(revokerId, "revoke_role", { targetUserId })
 
     return { success: true }
   } catch (error) {
-    console.error('[RBAC] Error revoking admin role:', error)
-    return { success: false, error: 'Failed to revoke admin role' }
+    console.error("[RBAC] Error revoking admin role:", error)
+    return { success: false, error: "Failed to revoke admin role" }
   }
 }
 
@@ -258,23 +282,20 @@ export async function listAdmins(): Promise<AdminRoleDoc[]> {
   if (!adminDb) return []
 
   try {
-    const snapshot = await adminDb
-      .collection('admin_roles')
-      .where('active', '==', true)
-      .get()
+    const snapshot = await adminDb.collection("admin_roles").where("active", "==", true).get()
 
-    const admins = snapshot.docs.map(doc => doc.data() as AdminRoleDoc)
+    const admins = snapshot.docs.map((doc) => doc.data() as AdminRoleDoc)
 
     // Add env-based super admin if set
     const envAdminId = process.env.ADMIN_USER_ID
     if (envAdminId) {
       // Check if already in list
-      if (!admins.find(a => a.userId === envAdminId)) {
+      if (!admins.find((a) => a.userId === envAdminId)) {
         admins.unshift({
           userId: envAdminId,
-          email: 'Environment Admin',
-          role: 'super_admin',
-          grantedBy: 'system',
+          email: "Environment Admin",
+          role: "super_admin",
+          grantedBy: "system",
           grantedAt: Timestamp.now(),
           active: true,
         })
@@ -283,7 +304,7 @@ export async function listAdmins(): Promise<AdminRoleDoc[]> {
 
     return admins
   } catch (error) {
-    console.error('[RBAC] Error listing admins:', error)
+    console.error("[RBAC] Error listing admins:", error)
     return []
   }
 }
@@ -299,15 +320,15 @@ async function logAdminAction(
   if (!adminDb) return
 
   try {
-    await adminDb.collection('admin_audit_log').add({
+    await adminDb.collection("admin_audit_log").add({
       adminId,
       action,
       details,
       timestamp: Timestamp.now(),
-      ip: 'server', // In production, pass IP from request
+      ip: "server", // In production, pass IP from request
     })
   } catch (error) {
-    console.error('[RBAC] Error logging admin action:', error)
+    console.error("[RBAC] Error logging admin action:", error)
   }
 }
 
@@ -321,7 +342,7 @@ export async function verifyToken(token: string): Promise<{
   error?: string
 }> {
   if (!adminAuth) {
-    return { valid: false, error: 'Auth not initialized' }
+    return { valid: false, error: "Auth not initialized" }
   }
 
   try {
@@ -332,6 +353,6 @@ export async function verifyToken(token: string): Promise<{
       email: decodedToken.email,
     }
   } catch (error) {
-    return { valid: false, error: 'Invalid token' }
+    return { valid: false, error: "Invalid token" }
   }
 }
