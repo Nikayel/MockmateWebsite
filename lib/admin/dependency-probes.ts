@@ -72,6 +72,23 @@ export interface ProbeSummary {
 }
 
 /**
+ * An alert raised by a probe result. Alerts are derived, never stored: the only
+ * thing persisted about them is whether an admin acknowledged one.
+ */
+export interface DependencyAlert {
+  /** Stable across polls, so an acknowledgement can be keyed to it. */
+  id: string
+  type: "error" | "warning" | "info"
+  title: string
+  message: string
+  /**
+   * The exact state that was alerted on. An acknowledgement only silences the
+   * state it was given, so a dependency that fails again in a new way speaks up.
+   */
+  signature: string
+}
+
+/**
  * Three seconds. Long enough that a healthy vendor never trips it, short enough
  * that a wedged one does not stall a 30 second dashboard poll.
  */
@@ -205,4 +222,39 @@ export function summarizeProbes(results: ProbeResult[]): ProbeSummary {
   }
 
   return summary
+}
+
+/**
+ * Turn probe results into the alert list the dashboard shows.
+ *
+ * A healthy dependency raises nothing. Everything else raises exactly one alert
+ * whose id is derived from the probe, so the same outage produces the same id on
+ * every poll and an acknowledgement can outlive a page refresh.
+ */
+export function deriveDependencyAlerts(results: ProbeResult[]): DependencyAlert[] {
+  const alerts: DependencyAlert[] = []
+
+  for (const result of results) {
+    if (result.status === "healthy") continue
+
+    const type = result.status === "unhealthy" ? "error" : result.status === "degraded" ? "warning" : "info"
+    const title =
+      result.status === "unhealthy"
+        ? `${result.label} is failing`
+        : result.status === "degraded"
+          ? `${result.label} is degraded`
+          : `${result.label} is unverified`
+
+    alerts.push({
+      id: `dependency-${result.id}`,
+      type,
+      title,
+      message: result.detail,
+      signature: `${result.status}:${result.detail}`,
+    })
+  }
+
+  // Loudest first, so an outage is never below a card that says "unverified".
+  const order = { error: 0, warning: 1, info: 2 } as const
+  return alerts.sort((a, b) => order[a.type] - order[b.type])
 }
