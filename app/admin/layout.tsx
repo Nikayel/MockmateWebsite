@@ -109,9 +109,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
 
       try {
-        // Check admin access by calling the analytics API
+        // Identity only. /api/admin/me reads one admin_roles document and returns,
+        // which is all this gate ever needed.
         const token = await firebaseUser.getIdToken()
-        const response = await fetch("/api/admin/analytics?timeRange=7d", {
+        const response = await fetch("/api/admin/me", {
           headers: { Authorization: `Bearer ${token}` },
         })
 
