@@ -35,6 +35,7 @@ import {
   EXPERIMENT_DESIGN,
   type ExperimentReadout,
 } from "./experiment-readout"
+import { summarizeReadiness, type ExperimentReadiness } from "./readiness"
 import { getAggregateComparison } from "../spaced-repetition/research-tracker"
 
 // ============================================
@@ -102,15 +103,11 @@ export interface EnhancedResearchAnalysis {
     fsrsScore: ConfidenceInterval
   }
 
-  // Research quality score (0-100)
-  qualityScore: {
-    overall: number
-    sampleSize: number // 0-25
-    statisticalPower: number // 0-25
-    dataQuality: number // 0-25
-    consistency: number // 0-25
-    interpretation: string
-  }
+  /**
+   * Whether the experiment can be read yet, as individual measured figures.
+   * There is no composite score here on purpose: see readiness.ts.
+   */
+  readiness: ExperimentReadiness
 
   // Actionable recommendations
   recommendations: ResearchRecommendation[]
@@ -275,20 +272,15 @@ export async function analyzeResearchData(): Promise<EnhancedResearchAnalysis> {
   // Confidence intervals (safe with empty arrays)
   const confidenceIntervals = calculateConfidenceIntervals(observations)
 
-  // Calculate quality score
-  const qualityScore = calculateResearchQualityScore(
-    sampleAnalysis,
-    significanceTests,
-    predictionAccuracy,
-    events.length
-  )
+  // Readiness: the measured figures that say whether this can be read yet.
+  const readiness = summarizeReadiness(experiment, sampleAnalysis)
 
   // Generate recommendations
   const recommendations = generateRecommendations(
     experiment,
     sampleAnalysis,
     predictionAccuracy,
-    qualityScore
+    readiness
   )
 
   return {
@@ -299,7 +291,7 @@ export async function analyzeResearchData(): Promise<EnhancedResearchAnalysis> {
     sampleAnalysis,
     trends,
     confidenceIntervals,
-    qualityScore,
+    readiness,
     recommendations,
     metadata: {
       analysisTimestamp: now.toISOString(),
@@ -355,6 +347,26 @@ async function fetchAssignmentCounts(): Promise<{
  * Create a default analysis response when data is unavailable
  */
 function createDefaultAnalysis(now: Date, windowStart: Date): EnhancedResearchAnalysis {
+  // With no database there is no experiment to read, so the readout is built
+  // from empty arms and lands on "not enough data" rather than inventing one.
+  const experiment = buildExperimentReadout({
+    observations: {
+      sm2: [],
+      fsrs: [],
+      eventsUsed: 0,
+      usersWithMixedAssignment: 0,
+      eventsDiscarded: 0,
+    },
+    assignedControl: 0,
+    assignedTreatment: 0,
+    window: {
+      start: windowStart.toISOString(),
+      end: now.toISOString(),
+      eventsAnalyzed: 0,
+      truncated: false,
+    },
+  })
+
   const defaultSampleAnalysis: SampleSizeAnalysis = {
     currentSampleSm2: 0,
     currentSampleFsrs: 0,
@@ -369,38 +381,13 @@ function createDefaultAnalysis(now: Date, windowStart: Date): EnhancedResearchAn
 
   return {
     comparison: null,
-    // With no database there is no experiment to read, so the readout is built
-    // from empty arms and lands on "not enough data" rather than inventing one.
-    experiment: buildExperimentReadout({
-      observations: {
-        sm2: [],
-        fsrs: [],
-        eventsUsed: 0,
-        usersWithMixedAssignment: 0,
-        eventsDiscarded: 0,
-      },
-      assignedControl: 0,
-      assignedTreatment: 0,
-      window: {
-        start: windowStart.toISOString(),
-        end: now.toISOString(),
-        eventsAnalyzed: 0,
-        truncated: false,
-      },
-    }),
+    experiment,
     significanceTests: DEFAULT_SIGNIFICANCE_TESTS,
     predictionAccuracy: DEFAULT_PREDICTION_ACCURACY,
     sampleAnalysis: defaultSampleAnalysis,
     trends: DEFAULT_TRENDS,
     confidenceIntervals: DEFAULT_CONFIDENCE_INTERVALS,
-    qualityScore: {
-      overall: 0,
-      sampleSize: 0,
-      statisticalPower: 0,
-      dataQuality: 0,
-      consistency: 0,
-      interpretation: "No data available - research tracking needs to be set up",
-    },
+    readiness: summarizeReadiness(experiment, defaultSampleAnalysis),
     recommendations: [
       {
         priority: "high",
@@ -644,73 +631,11 @@ function calculateConfidenceIntervals(
   }
 }
 
-function calculateResearchQualityScore(
-  sampleAnalysis: SampleSizeAnalysis,
-  significanceTests: EnhancedResearchAnalysis["significanceTests"],
-  predictionAccuracy: EnhancedResearchAnalysis["predictionAccuracy"],
-  totalEvents: number
-): EnhancedResearchAnalysis["qualityScore"] {
-  // Sample size score (0-25)
-  let sampleScore = 0
-  if (sampleAnalysis.isSufficient) sampleScore += 15
-  if (sampleAnalysis.totalSample >= 100) sampleScore += 5
-  if (sampleAnalysis.totalSample >= 500) sampleScore += 5
-
-  // Statistical power score (0-25)
-  let powerScore = 0
-  if (sampleAnalysis.powerWithCurrentSample >= 0.8) powerScore += 25
-  else if (sampleAnalysis.powerWithCurrentSample >= 0.6) powerScore += 15
-  else if (sampleAnalysis.powerWithCurrentSample >= 0.4) powerScore += 10
-  else powerScore += 5
-
-  // Data quality score (0-25)
-  let dataQualityScore = 0
-  if (totalEvents >= 100) dataQualityScore += 10
-  if (totalEvents >= 500) dataQualityScore += 5
-  if (totalEvents >= 1000) dataQualityScore += 5
-  // Check prediction accuracy
-  if (predictionAccuracy.fsrs.accuracy > 0.7 || predictionAccuracy.sm2.accuracy > 0.7) {
-    dataQualityScore += 5
-  }
-
-  // Consistency score (0-25)
-  let consistencyScore = 0
-  const testsWithResults = [
-    significanceTests.retention,
-    significanceTests.score,
-    significanceTests.intervalAccuracy,
-  ].filter((t) => t !== null)
-  if (testsWithResults.length >= 2) consistencyScore += 10
-  if (testsWithResults.length >= 3) consistencyScore += 5
-  // Check if results are consistent (all pointing same direction)
-  const significantTests = testsWithResults.filter((t) => t?.significant)
-  if (significantTests.length > 0) consistencyScore += 10
-
-  const overall = sampleScore + powerScore + dataQualityScore + consistencyScore
-
-  // Interpretation
-  let interpretation = "Insufficient data for reliable conclusions"
-  if (overall >= 80) interpretation = "Research-grade quality - results are highly reliable"
-  else if (overall >= 60) interpretation = "Good quality - results are statistically meaningful"
-  else if (overall >= 40)
-    interpretation = "Moderate quality - results should be interpreted with caution"
-  else if (overall >= 20) interpretation = "Low quality - preliminary results only"
-
-  return {
-    overall,
-    sampleSize: sampleScore,
-    statisticalPower: powerScore,
-    dataQuality: dataQualityScore,
-    consistency: consistencyScore,
-    interpretation,
-  }
-}
-
 function generateRecommendations(
   experiment: ExperimentReadout,
   sampleAnalysis: SampleSizeAnalysis,
   predictionAccuracy: EnhancedResearchAnalysis["predictionAccuracy"],
-  qualityScore: EnhancedResearchAnalysis["qualityScore"]
+  readiness: ExperimentReadiness
 ): ResearchRecommendation[] {
   const recommendations: ResearchRecommendation[] = []
 
@@ -788,14 +713,17 @@ function generateRecommendations(
     })
   }
 
-  // Data quality recommendations
-  if (qualityScore.dataQuality < 15) {
+  // Declared metrics that could not be tested. This used to fire on a
+  // `dataQuality < 15` bucket from the composite score; the honest signal is
+  // simply which of the planned tests the data could not support.
+  if (readiness.testsRun < readiness.declaredTests) {
+    const untested = readiness.declaredTests - readiness.testsRun
     recommendations.push({
       priority: "medium",
       category: "data_quality",
-      title: "Improve Data Collection",
-      description: "Limited data points for analysis. Need more review events.",
-      action: "Encourage user engagement to generate more practice data.",
+      title: `${untested} of ${readiness.declaredTests} declared metrics could not be tested`,
+      description: `A metric needs ${experiment.sample.minUsersPerArm} users per arm with that metric recorded before it is tested. SM-2 has ${readiness.usersControl} users in the window and FSRS has ${readiness.usersTreatment}.`,
+      action: "Keep collecting, and check that every review writes all three metrics.",
     })
   }
 
@@ -810,24 +738,29 @@ function generateRecommendations(
     })
   }
 
-  // Action recommendations based on current state
-  if (
-    qualityScore.overall >= 70 &&
-    (experiment.verdict === "fsrs_better" || experiment.verdict === "sm2_better")
-  ) {
+  // Whether this is ready to act on, gated on the DECLARED stopping rule rather
+  // than on a composite score crossing an invented threshold: both arms at the
+  // planned sample, a split that passed its ratio check, and a primary metric
+  // that is significant after correction.
+  const stoppingRuleMet = readiness.meetsRequiredSample && !readiness.sampleRatioMismatch
+  const hasWinner = experiment.verdict === "fsrs_better" || experiment.verdict === "sm2_better"
+
+  if (stoppingRuleMet && hasWinner) {
     recommendations.push({
       priority: "high",
       category: "action",
       title: "Ready for Decision",
-      description: `Research quality is sufficient (${qualityScore.overall}/100) and the primary metric is significant after correction.`,
+      description: `Both arms reached the planned ${readiness.requiredUsersPerArm} users, the split passed its ratio check, and the primary metric is significant after correction.`,
       action: "Consider presenting findings to stakeholders and planning rollout.",
     })
-  } else if (qualityScore.overall < 40) {
+  } else if (!readiness.meetsRequiredSample) {
     recommendations.push({
       priority: "low",
       category: "action",
       title: "Continue Monitoring",
-      description: "Research is still in early stages. Avoid premature conclusions.",
+      description: readiness.requiredUsersPerArm
+        ? `The design is fixed horizon and asks for ${readiness.requiredUsersPerArm} users per arm. SM-2 has ${readiness.usersControl} and FSRS has ${readiness.usersTreatment}. Reading the result before then inflates the false positive rate.`
+        : "Not enough users yet to compute the sample the design needs. Avoid premature conclusions.",
       action: "Check back in 1-2 weeks as more data accumulates.",
     })
   }

@@ -6,7 +6,6 @@ import { Progress } from "@/components/ui/progress"
 import {
   BarChart3,
   TrendingUp,
-  TrendingDown,
   Minus,
   AlertTriangle,
   CheckCircle,
@@ -14,6 +13,7 @@ import {
   Info,
 } from "lucide-react"
 import type { TTestResult, PredictionMetrics, SampleSizeAnalysis } from "@/lib/research/statistics"
+import type { ExperimentReadiness } from "@/lib/research/readiness"
 import type { EnhancedResearchAnalysis } from "@/lib/research/analyzer"
 
 // ============================================
@@ -382,64 +382,128 @@ export function SampleSizeAnalysisPanel({ analysis }: SampleSizeAnalysisPanelPro
 }
 
 // ============================================
-// Research Quality Score Panel
+// Experiment Readiness Panel
 // ============================================
 
-interface QualityScorePanelProps {
-  qualityScore: EnhancedResearchAnalysis["qualityScore"]
+/**
+ * The panel that replaced "Research Quality Score /100".
+ *
+ * That score was a hand-assigned point ladder with a prose verdict on top
+ * ("Research-grade quality - results are highly reliable"), and one of its
+ * terms added 10 points whenever a test came back significant, so finding a
+ * result raised the reported quality of the experiment that found it.
+ *
+ * Every row below is a single measured figure a reader can check against the
+ * design. There is no total, because a total would need weights and there are
+ * no defensible weights.
+ */
+interface ExperimentReadinessPanelProps {
+  readiness: ExperimentReadiness
 }
 
-export function QualityScorePanel({ qualityScore }: QualityScorePanelProps) {
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-400"
-    if (score >= 60) return "text-blue-400"
-    if (score >= 40) return "text-yellow-400"
-    return "text-red-400"
-  }
-
-  const categories = [
-    { name: "Sample Size", score: qualityScore.sampleSize, max: 25 },
-    { name: "Statistical Power", score: qualityScore.statisticalPower, max: 25 },
-    { name: "Data Quality", score: qualityScore.dataQuality, max: 25 },
-    { name: "Consistency", score: qualityScore.consistency, max: 25 },
-  ]
+export function ExperimentReadinessPanel({ readiness }: ExperimentReadinessPanelProps) {
+  const required = readiness.requiredUsersPerArm
+  const powerPercent = readiness.powerAtCurrentSample * 100
+  const observedShare = (readiness.observedControlShare * 100).toFixed(1)
+  const expectedShare = (readiness.expectedControlShare * 100).toFixed(0)
+  const formatP = (p: number) => (p < 0.0001 ? "< 0.0001" : p.toFixed(4))
 
   return (
     <Card className="border-gray-800 bg-gray-900/50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <CheckCircle className="h-4 w-4 text-[#c4703f]" />
-          Research Quality Score
+          <BarChart3 className="h-4 w-4 text-[#c4703f]" />
+          Experiment Readiness
         </CardTitle>
+        <CardDescription>
+          The measured figures that say whether this can be read yet. No composite score, because
+          there is no defensible way to weight these against each other.
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Overall Score */}
-        <div className="text-center">
-          <p className={`text-5xl font-bold ${getScoreColor(qualityScore.overall)}`}>
-            {qualityScore.overall}
-          </p>
-          <p className="text-sm text-gray-400">out of 100</p>
-        </div>
+      <CardContent className="space-y-3 text-sm">
+        <ReadinessRow
+          label="Users with data in the window"
+          value={`${readiness.usersControl} SM-2, ${readiness.usersTreatment} FSRS`}
+        />
 
-        {/* Category Breakdown */}
-        <div className="space-y-2">
-          {categories.map((cat) => (
-            <div key={cat.name}>
-              <div className="mb-1 flex justify-between text-xs">
-                <span className="text-gray-400">{cat.name}</span>
-                <span className="text-gray-300">
-                  {cat.score}/{cat.max}
-                </span>
-              </div>
-              <Progress value={(cat.score / cat.max) * 100} className="h-1.5" />
-            </div>
-          ))}
-        </div>
+        <ReadinessRow
+          label="Users needed per arm"
+          value={required === null ? "Not computable yet" : String(required)}
+          status={required === null ? "unknown" : readiness.meetsRequiredSample ? "ok" : "waiting"}
+          note={
+            required === null
+              ? "The design's target effect has not produced a sample size."
+              : readiness.meetsRequiredSample
+                ? "Both arms have reached the planned sample."
+                : `Short by ${Math.max(0, required - readiness.usersControl)} SM-2 and ${Math.max(0, required - readiness.usersTreatment)} FSRS users.`
+          }
+        />
 
-        {/* Interpretation */}
-        <p className="text-sm text-gray-300">{qualityScore.interpretation}</p>
+        <ReadinessRow
+          label="Power at the current sample"
+          value={`${powerPercent.toFixed(0)}%`}
+          status={readiness.powerAtCurrentSample >= 0.8 ? "ok" : "waiting"}
+          note="The chance this sample would detect the effect the experiment was sized for."
+        />
+
+        <ReadinessRow
+          label="Sample ratio check"
+          value={readiness.sampleRatioMismatch ? "Mismatch" : "Passed"}
+          status={readiness.sampleRatioMismatch ? "bad" : "ok"}
+          note={`Assignment sent ${observedShare}% of users to SM-2 where the design says ${expectedShare}% (p = ${formatP(readiness.sampleRatioPValue)}).`}
+        />
+
+        <ReadinessRow
+          label="Declared metrics tested"
+          value={`${readiness.testsRun} of ${readiness.declaredTests}`}
+          status={
+            readiness.testsRun === readiness.declaredTests
+              ? "ok"
+              : readiness.testsRun === 0
+                ? "bad"
+                : "waiting"
+          }
+          note="A metric is only tested once both arms clear the minimum users per arm."
+        />
       </CardContent>
     </Card>
+  )
+}
+
+function ReadinessRow({
+  label,
+  value,
+  status,
+  note,
+}: {
+  label: string
+  value: string
+  status?: "ok" | "waiting" | "bad" | "unknown"
+  note?: string
+}) {
+  const tone =
+    status === "ok"
+      ? "text-green-400"
+      : status === "bad"
+        ? "text-red-400"
+        : status === "waiting"
+          ? "text-yellow-400"
+          : "text-gray-300"
+
+  const StatusIcon =
+    status === "ok" ? CheckCircle : status === "bad" ? XCircle : status ? AlertTriangle : null
+
+  return (
+    <div className="rounded bg-gray-800/40 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-gray-400">{label}</span>
+        <span className={`flex items-center gap-1.5 font-medium ${tone}`}>
+          {StatusIcon && <StatusIcon className="h-4 w-4 shrink-0" aria-hidden="true" />}
+          {value}
+        </span>
+      </div>
+      {note && <p className="mt-1 text-xs text-gray-500">{note}</p>}
+    </div>
   )
 }
 

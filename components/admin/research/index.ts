@@ -6,7 +6,7 @@ export {
   SignificanceTestCard,
   PredictionAccuracyPanel,
   SampleSizeAnalysisPanel,
-  QualityScorePanel,
+  ExperimentReadinessPanel,
   RecommendationsPanel,
 } from "./StatisticalPanel"
 

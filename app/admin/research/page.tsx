@@ -30,7 +30,7 @@ import {
   SignificanceTestCard,
   PredictionAccuracyPanel,
   SampleSizeAnalysisPanel,
-  QualityScorePanel,
+  ExperimentReadinessPanel,
   RecommendationsPanel,
   UserAlgorithmBreakdown,
   LearnerModelPanel,
@@ -681,7 +681,7 @@ export default function ResearchDashboard() {
           </TabsList>
         </div>
 
-        {/* Overview Tab - Research Quality & Recommendations */}
+        {/* Overview Tab - Readiness & Recommendations */}
         <TabsContent value="overview" className="space-y-4">
           {enhancedLoading ? (
             <div className="flex items-center justify-center py-12">
@@ -691,7 +691,7 @@ export default function ResearchDashboard() {
           ) : enhancedData ? (
             <>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <QualityScorePanel qualityScore={enhancedData.qualityScore} />
+                <ExperimentReadinessPanel readiness={enhancedData.readiness} />
                 <SampleSizeAnalysisPanel analysis={enhancedData.sampleAnalysis} />
               </div>
               <RecommendationsPanel recommendations={enhancedData.recommendations} />
