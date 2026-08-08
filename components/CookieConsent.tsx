@@ -80,13 +80,13 @@ export function CookieConsent() {
     setShowBanner(false)
     setShowSettings(false)
 
-    // Dispatch event for analytics to pick up
+    // Dispatch event for analytics to pick up. ConsentAnalytics listens for this
+    // and starts (or stops) both Vercel Analytics and Firebase Analytics in
+    // place, so no reload is needed. The reload that used to run here existed
+    // only because Firebase Analytics was initialized at module load and could
+    // not be switched on any other way; it threw away whatever the visitor was
+    // in the middle of doing, which is a harsh price for clicking "Accept All".
     window.dispatchEvent(new CustomEvent("consentUpdated", { detail: updated }))
-
-    // Reload to apply consent changes to analytics
-    if (updated.analytics) {
-      window.location.reload()
-    }
   }
 
   const acceptAll = () => {

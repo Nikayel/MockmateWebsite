@@ -5,7 +5,7 @@
  * Respects user cookie consent preferences (GDPR/CCPA compliant)
  */
 
-import { analytics } from "./firebase"
+import { setAnalyticsEnabled, startAnalytics } from "./firebase"
 import { logEvent as firebaseLogEvent } from "firebase/analytics"
 import { hasAnalyticsConsent } from "@/components/CookieConsent"
 import { getAttributionParams } from "./attribution"
@@ -19,16 +19,38 @@ function isAnalyticsAllowed(): boolean {
 }
 
 /**
+ * Brings GA4 into line with the visitor's current cookie choice and returns the
+ * live instance, or null when analytics must not run.
+ *
+ * This is the single consent gate for Firebase Analytics. `startAnalytics()` is
+ * what loads gtag.js and sets the `_ga` cookies, so it is reached only on the
+ * consented branch. On the declining branch we also push the "off" switch, which
+ * matters when consent is withdrawn part-way through a session: gtag.js is
+ * already in the page by then and cannot be taken back out, so disabling
+ * collection is the only way to actually stop.
+ */
+export function syncAnalyticsConsent(): ReturnType<typeof startAnalytics> {
+  if (typeof window === "undefined") return null
+
+  if (!isAnalyticsAllowed()) {
+    setAnalyticsEnabled(false)
+    return null
+  }
+
+  const instance = startAnalytics()
+  if (instance) setAnalyticsEnabled(true)
+  return instance
+}
+
+/**
  * Track a custom event (only if user has consented)
  */
 export function trackEvent(eventName: string, params?: Record<string, any>) {
+  // Starts GA4 on the first consented event and returns null otherwise, so an
+  // unconsented visitor never loads gtag.js at all.
+  const analytics = syncAnalyticsConsent()
   if (!analytics) {
-    // Analytics not available (SSR or disabled)
-    return
-  }
-
-  // Check user consent before tracking
-  if (!isAnalyticsAllowed()) {
+    // Analytics not available (SSR, not configured, or consent not given)
     return
   }
 
