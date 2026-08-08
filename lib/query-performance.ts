@@ -1,17 +1,29 @@
 /**
- * Database Query Performance Tracking
+ * Database Query Performance Reporting
  *
- * Monitors Firestore query performance to identify:
- * - Slow queries that need optimization
- * - Missing indexes
- * - Expensive queries (high document reads)
- * - Query patterns that could be optimized
+ * Reads whatever query timings have been recorded in `query_metrics` and
+ * `query_performance_aggregates` and turns them into the admin view.
+ *
+ * NOTHING CURRENTLY WRITES THOSE COLLECTIONS. This module used to export
+ * `trackQuery`, a wrapper meant to be wound around every Firestore call, and it
+ * was never wound around a single one. A wrapper nobody wraps does not collect
+ * data, it just makes the dashboard look instrumented: the admin page rendered
+ * "0 slow queries" in green, which is what perfect health also looks like.
+ *
+ * The wrapper is gone rather than left uncalled. Re-instrumenting means putting
+ * timing at the real call sites (or, better, one shared Firestore accessor) and
+ * pointing it at these collections. Until then the reader below reports zeros,
+ * and every surface that renders it must say the metric is not collected.
  */
 
 import { adminDb } from './firebase-admin'
-import { FieldValue } from 'firebase-admin/firestore'
 import { logger } from './logger'
 
+/**
+ * Shape of a `query_metrics` document. Kept because the reader below still
+ * parses documents in this shape, and because it is the contract any future
+ * instrumentation has to write.
+ */
 export interface QueryMetric {
   id?: string
   collection: string
@@ -58,173 +70,12 @@ export interface QueryPerformanceStats {
   recommendations: string[]
 }
 
-// Thresholds
-const SLOW_QUERY_THRESHOLD_MS = 1000
-const COSTLY_QUERY_THRESHOLD_DOCS = 100
-const SAMPLE_RATE = 0.1 // Only store 10% of queries to save space
-
 /**
- * Track a query's performance
- * Call this wrapper around Firestore operations
- */
-export async function trackQuery<T>(
-  collection: string,
-  operation: QueryMetric['operation'],
-  queryFn: () => Promise<T>,
-  options?: {
-    filters?: string[]
-    orderBy?: string
-    limit?: number
-    endpoint?: string
-    userId?: string
-  }
-): Promise<T> {
-  const startTime = Date.now()
-  let documentCount = 0
-
-  try {
-    const result = await queryFn()
-
-    // Count documents if result is a snapshot
-    if (result && typeof result === 'object') {
-      if ('docs' in result && Array.isArray((result as any).docs)) {
-        documentCount = (result as any).docs.length
-      } else if ('exists' in result) {
-        documentCount = (result as any).exists ? 1 : 0
-      }
-    }
-
-    const durationMs = Date.now() - startTime
-    const isSlowQuery = durationMs > SLOW_QUERY_THRESHOLD_MS
-    const isCostlyQuery = documentCount > COSTLY_QUERY_THRESHOLD_DOCS
-
-    // Always log slow/costly queries, sample others
-    const shouldStore = isSlowQuery || isCostlyQuery || Math.random() < SAMPLE_RATE
-
-    if (shouldStore) {
-      await storeQueryMetric({
-        collection,
-        operation,
-        durationMs,
-        documentCount,
-        filters: options?.filters,
-        orderBy: options?.orderBy,
-        limit: options?.limit,
-        endpoint: options?.endpoint,
-        userId: options?.userId,
-        isSlowQuery,
-        isCostlyQuery,
-        timestamp: new Date(),
-      })
-    }
-
-    // Always log slow queries
-    if (isSlowQuery) {
-      logger.warn('Slow query detected', {
-        collection,
-        operation,
-        durationMs,
-        documentCount,
-        filters: options?.filters,
-      })
-    }
-
-    return result
-  } catch (error) {
-    const durationMs = Date.now() - startTime
-
-    logger.error('Query failed', {
-      collection,
-      operation,
-      durationMs,
-      error,
-    })
-
-    throw error
-  }
-}
-
-/**
- * Store query metric
- */
-async function storeQueryMetric(metric: Omit<QueryMetric, 'id'>): Promise<void> {
-  try {
-    await adminDb.collection('query_metrics').add({
-      ...metric,
-      timestamp: FieldValue.serverTimestamp(),
-    })
-
-    // Update hourly aggregates
-    const now = new Date()
-    const hourKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}`
-
-    const aggregateRef = adminDb.collection('query_performance_aggregates').doc(hourKey)
-
-    await adminDb.runTransaction(async (transaction) => {
-      const doc = await transaction.get(aggregateRef)
-
-      if (!doc.exists) {
-        transaction.set(aggregateRef, {
-          hour: hourKey,
-          totalQueries: 1,
-          totalDurationMs: metric.durationMs,
-          totalDocuments: metric.documentCount,
-          slowQueries: metric.isSlowQuery ? 1 : 0,
-          costlyQueries: metric.isCostlyQuery ? 1 : 0,
-          byCollection: {
-            [metric.collection]: {
-              count: 1,
-              totalDurationMs: metric.durationMs,
-              totalDocuments: metric.documentCount,
-              slowCount: metric.isSlowQuery ? 1 : 0,
-            },
-          },
-          byOperation: {
-            [metric.operation]: {
-              count: 1,
-              totalDurationMs: metric.durationMs,
-            },
-          },
-          createdAt: FieldValue.serverTimestamp(),
-        })
-      } else {
-        const data = doc.data()!
-        const byCollection = data.byCollection || {}
-        const byOperation = data.byOperation || {}
-
-        if (!byCollection[metric.collection]) {
-          byCollection[metric.collection] = { count: 0, totalDurationMs: 0, totalDocuments: 0, slowCount: 0 }
-        }
-        byCollection[metric.collection].count++
-        byCollection[metric.collection].totalDurationMs += metric.durationMs
-        byCollection[metric.collection].totalDocuments += metric.documentCount
-        if (metric.isSlowQuery) byCollection[metric.collection].slowCount++
-
-        if (!byOperation[metric.operation]) {
-          byOperation[metric.operation] = { count: 0, totalDurationMs: 0 }
-        }
-        byOperation[metric.operation].count++
-        byOperation[metric.operation].totalDurationMs += metric.durationMs
-
-        transaction.update(aggregateRef, {
-          totalQueries: FieldValue.increment(1),
-          totalDurationMs: FieldValue.increment(metric.durationMs),
-          totalDocuments: FieldValue.increment(metric.documentCount),
-          slowQueries: FieldValue.increment(metric.isSlowQuery ? 1 : 0),
-          costlyQueries: FieldValue.increment(metric.isCostlyQuery ? 1 : 0),
-          byCollection,
-          byOperation,
-        })
-      }
-    })
-  } catch (error) {
-    // Don't let tracking break the app
-    logger.error('Failed to store query metric', { error, collection: metric.collection })
-  }
-}
-
-/**
- * Get query performance statistics
+ * Get query performance statistics.
+ *
+ * Reports zeros until something writes the underlying collections. See the file
+ * header: the wrapper that was supposed to write them had no call sites and has
+ * been removed.
  */
 export async function getQueryPerformanceStats(hours: number = 24): Promise<QueryPerformanceStats> {
   const stats: QueryPerformanceStats = {
