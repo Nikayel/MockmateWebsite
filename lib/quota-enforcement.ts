@@ -20,6 +20,7 @@ import { resolveBudgetCap } from "./usage/budget"
 import { CIRCUIT_BREAKER } from "./constants"
 import { PRICING_CONFIG } from "./config"
 import { isGlobalCeilingExceeded } from "./global-spend-guard"
+import { getUserDailyCost, resolveDailyBudgetCap } from "./usage-tracking"
 import { billingPeriodFromProfile, type BillingProfileFields } from "./quota/billing-period"
 
 /**
@@ -612,6 +613,68 @@ export async function checkQuota(
         budgetLimit: quota.budgetLimit,
         message: "Budget limit exceeded",
         response,
+      }
+    }
+
+    // Per-user DAILY spend cap. The monthly budget above bounds the total but
+    // says nothing about the rate, so a whole month's allowance could be burned
+    // in one afternoon with nothing objecting. That is not hypothetical: the
+    // session quota increments once per session start while cost accrues per AI
+    // call, so a single long session (or a client stuck in a loop inside one)
+    // can drain the month without ever consuming a second session.
+    //
+    // Sized at half the monthly cap so it does not bind before the session
+    // quota does — a user can still spend their whole monthly session
+    // allowance in one sitting — while halving the blast radius of any single
+    // account on any single day.
+    const dailyBudgetCap = resolveDailyBudgetCap(quota.budgetLimit)
+    if (dailyBudgetCap > 0) {
+      // Deliberately NOT wrapped in its own try/catch. getUserDailyCost throws
+      // rather than reporting 0 on a read failure, and letting that reach the
+      // outer handler routes it through the circuit breaker, which is the one
+      // place in this file that decides how to behave when Firestore is
+      // unreadable. Swallowing it here would silently disable the cap instead.
+      const dailyCostUsed = await getUserDailyCost(userId)
+
+      if (dailyCostUsed >= dailyBudgetCap) {
+        const response = NextResponse.json(
+          {
+            error: "Daily AI limit reached",
+            message:
+              `You've used today's AI allowance ($${dailyBudgetCap.toFixed(2)}). ` +
+              `This resets at midnight UTC — your monthly allowance is unaffected.`,
+            code: "DAILY_BUDGET_EXCEEDED",
+            quota: {
+              dailyCostUsed,
+              dailyBudgetCap,
+              budgetUsed: quota.budgetUsed,
+              budgetLimit: quota.budgetLimit,
+              tier,
+            },
+          },
+          { status: 429 }
+        )
+
+        logger.warn("Quota exceeded - daily budget", {
+          userId,
+          tier,
+          dailyCostUsed,
+          dailyBudgetCap,
+          monthlyBudgetUsed: quota.budgetUsed,
+        })
+
+        return {
+          allowed: false,
+          userId,
+          tier,
+          sessionsUsed: quota.sessionsUsed,
+          sessionsLimit: quota.sessionsLimit,
+          budgetUsed: quota.budgetUsed,
+          budgetLimit: quota.budgetLimit,
+          message: "Daily AI limit reached",
+          code: "DAILY_BUDGET_EXCEEDED",
+          response,
+        }
       }
     }
 

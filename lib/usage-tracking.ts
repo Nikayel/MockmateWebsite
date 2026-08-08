@@ -185,6 +185,7 @@ export async function trackUsageEvent(event: Omit<UsageEvent, "id" | "createdAt"
 
     // Also update the user's aggregate usage for the current period
     await updateUserAggregateUsage(event)
+    await updateUserDailyUsage(event)
   } catch (error) {
     logger.error("Failed to track usage event", { error, eventType: event.eventType })
     // Don't throw - usage tracking failures shouldn't break the app
@@ -251,6 +252,103 @@ async function updateUserAggregateUsage(
       })
     }
   })
+}
+
+// =============================================================================
+// DAILY SPEND DIMENSION
+// =============================================================================
+//
+// The budget cap was keyed by calendar month alone, so a user could burn an
+// entire month's AI allowance in one afternoon with nothing to object. That is
+// not a theoretical shape: session quota increments once per session start,
+// while cost accrues per AI call, so a single long-running session can spend the
+// whole monthly allowance without ever consuming a second session.
+//
+// A daily dimension bounds the BURN RATE rather than the total, which is the
+// thing an unbounded-bill incident actually needs. It is a second, independent
+// key — deliberately NOT stored in the usage_summaries subcollection, because
+// getAdminUsageStats runs collectionGroup("usage_summaries") filtered on
+// periodStart and would sum daily docs alongside monthly ones, double-counting
+// platform spend.
+
+const DAILY_USAGE_COLLECTION = "daily_usage"
+
+/**
+ * Fraction of the monthly allowance any single UTC day may consume.
+ *
+ * 0.5 is chosen so it does not bind before the session quota does. At the
+ * calibrated ~$0.40 pathological / ~$0.15 typical session cost, half of free's
+ * $6.50 still covers all 8 of its monthly sessions in one day at the
+ * pathological rate, and half of pro's $28 covers all 35. So a user who wants
+ * to spend their whole month's quota in one sitting still can.
+ *
+ * What it does remove is the ability to spend a month's allowance in a day
+ * WITHOUT consuming sessions — the runaway-loop and long-session cases, where
+ * cost accrues per AI call and the session counter never moves.
+ */
+export const DAILY_BUDGET_FRACTION = 0.5
+
+/** The daily ceiling implied by a period budget cap. */
+export function resolveDailyBudgetCap(monthlyCap: number): number {
+  if (!Number.isFinite(monthlyCap) || monthlyCap <= 0) return 0
+  return monthlyCap * DAILY_BUDGET_FRACTION
+}
+
+/**
+ * UTC day key, matching lib/global-spend-guard.ts. UTC rather than local time so
+ * the window is deterministic and a user cannot get two allowances by moving
+ * timezone.
+ */
+export function utcDayKey(now: Date = new Date()): string {
+  return now.toISOString().slice(0, 10)
+}
+
+/**
+ * Increment the user's spend for today.
+ *
+ * A standalone merge+increment rather than part of updateUserAggregateUsage's
+ * transaction: it touches a different document, needs no read, and keeping it
+ * out of the transaction means a contended monthly summary cannot make the daily
+ * counter retry.
+ */
+async function updateUserDailyUsage(event: Omit<UsageEvent, "id" | "createdAt">): Promise<void> {
+  const dayKey = utcDayKey()
+  await adminDb
+    .collection("users")
+    .doc(event.userId)
+    .collection(DAILY_USAGE_COLLECTION)
+    .doc(dayKey)
+    .set(
+      {
+        userId: event.userId,
+        day: dayKey,
+        totalCost: FieldValue.increment(event.cost || 0),
+        totalTokens: FieldValue.increment(event.totalTokens || 0),
+        totalRequests: FieldValue.increment(1),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    )
+}
+
+/**
+ * What this user has spent today (UTC). Returns 0 when there is no record.
+ *
+ * Throws on a read failure rather than returning 0. A caller enforcing a cap
+ * must be able to tell "spent nothing" from "cannot see", because those two
+ * demand opposite decisions and quietly conflating them is how a cap stops
+ * capping.
+ */
+export async function getUserDailyCost(userId: string, now: Date = new Date()): Promise<number> {
+  const doc = await adminDb
+    .collection("users")
+    .doc(userId)
+    .collection(DAILY_USAGE_COLLECTION)
+    .doc(utcDayKey(now))
+    .get()
+
+  const total = doc.data()?.totalCost
+  return typeof total === "number" && Number.isFinite(total) ? total : 0
 }
 
 /**
