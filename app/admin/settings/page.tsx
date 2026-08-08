@@ -24,7 +24,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
-  Settings,
   DollarSign,
   Cpu,
   Shield,
@@ -32,24 +31,52 @@ import {
   CheckCircle,
   Plus,
   Trash2,
-  RefreshCw,
   Loader2,
   User,
-  Calendar,
   Clock,
 } from "lucide-react"
 import { getAllPricingTiers, getProviderCostInfo, AI_BUDGET_CAPS } from "@/lib/pricing"
 import { PageHeader, SettingsCardSkeleton } from "@/components/admin/shared"
 import { logger } from "@/lib/logger"
 
+type AdminRoleName = "super_admin" | "admin" | "analyst" | "support"
+
 interface AdminUser {
   userId: string
   email: string
-  role: "super_admin" | "admin" | "analyst" | "support"
+  role: AdminRoleName
   grantedBy: string
   grantedAt: string | null
   lastAccess: string | null
   active: boolean
+}
+
+/**
+ * Mirrors the shape returned by /api/admin/providers. Declared here rather than
+ * imported so a server route's module graph never reaches this client bundle.
+ */
+interface ProviderStatus {
+  id: string
+  label: string
+  envVar: string
+  role: string
+  configured: boolean
+}
+
+/** The roles shown as columns, in the order the matrix reads best. */
+const MATRIX_ROLES: { role: AdminRoleName; label: string; color: string }[] = [
+  { role: "super_admin", label: "Super Admin", color: "text-purple-400" },
+  { role: "admin", label: "Admin", color: "text-blue-400" },
+  { role: "analyst", label: "Analyst", color: "text-green-400" },
+  { role: "support", label: "Support", color: "text-yellow-400" },
+]
+
+/** Turn `view_user_details` into `View User Details` for display. */
+function humanizePermission(permission: string): string {
+  return permission
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
 }
 
 const ROLE_LABELS: Record<string, { label: string; color: string }> = {
@@ -66,6 +93,11 @@ export default function AdminSettingsPage() {
   const { firebaseUser } = useAuth()
   const [activeTab, setActiveTab] = useState<"pricing" | "ai" | "admins">("admins")
   const [admins, setAdmins] = useState<AdminUser[]>([])
+  /** The real RBAC table, served by the API from ROLE_PERMISSIONS itself. */
+  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]> | null>(null)
+  const [allPermissions, setAllPermissions] = useState<string[]>([])
+  const [providers, setProviders] = useState<ProviderStatus[] | null>(null)
+  const [providerEnvironment, setProviderEnvironment] = useState<string>("")
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -104,6 +136,8 @@ export default function AdminSettingsPage() {
           const data = await response.json()
           if (data.success) {
             setAdmins(data.admins)
+            setRolePermissions(data.rolePermissions ?? null)
+            setAllPermissions(data.permissions ?? [])
           }
         } else if (response.status === 403) {
           // Not super_admin, just show env admin info
@@ -119,9 +153,37 @@ export default function AdminSettingsPage() {
     [firebaseUser]
   )
 
+  /**
+   * Provider configuration is a separate read because it is a different
+   * question: not who may act, but what this deployment can actually reach.
+   */
+  const loadProviders = useCallback(async () => {
+    if (!firebaseUser) return
+
+    try {
+      const token = await firebaseUser.getIdToken()
+      const response = await fetch("/api/admin/providers", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!response.ok) {
+        setProviders([])
+        return
+      }
+
+      const data = await response.json()
+      setProviders(data.providers ?? [])
+      setProviderEnvironment(data.environment ?? "")
+    } catch (error) {
+      logger.error("Error loading provider status", { error })
+      setProviders([])
+    }
+  }, [firebaseUser])
+
   useEffect(() => {
     loadAdmins()
-  }, [loadAdmins])
+    loadProviders()
+  }, [loadAdmins, loadProviders])
 
   const handleAddAdmin = async () => {
     if (!firebaseUser || !newAdminEmail || !newAdminUserId) return
@@ -433,52 +495,65 @@ export default function AdminSettingsPage() {
           <Card className="border-gray-800 bg-gray-900/50">
             <CardHeader>
               <CardTitle className="text-white">Permission Matrix</CardTitle>
-              <CardDescription className="text-gray-400">What each role can access</CardDescription>
+              <CardDescription className="text-gray-400">
+                What each role can access. Read from the ROLE_PERMISSIONS table the API
+                middleware enforces, so this cannot drift from real behaviour.
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-800">
-                      <th className="px-4 py-3 text-left text-gray-400">Permission</th>
-                      <th className="px-4 py-3 text-center text-purple-400">Super Admin</th>
-                      <th className="px-4 py-3 text-center text-blue-400">Admin</th>
-                      <th className="px-4 py-3 text-center text-green-400">Analyst</th>
-                      <th className="px-4 py-3 text-center text-yellow-400">Support</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { name: "View Analytics", roles: [true, true, true, false] },
-                      { name: "View Revenue", roles: [true, true, true, false] },
-                      { name: "Export Data", roles: [true, true, true, false] },
-                      { name: "View Users", roles: [true, true, true, true] },
-                      { name: "Manage Users", roles: [true, true, false, true] },
-                      { name: "View AI Usage", roles: [true, true, true, false] },
-                      { name: "Manage Budgets", roles: [true, true, false, false] },
-                      { name: "View Errors", roles: [true, true, true, true] },
-                      { name: "Manage Settings", roles: [true, true, false, false] },
-                      { name: "Manage Admins", roles: [true, false, false, false] },
-                    ].map((perm) => (
-                      <tr
-                        key={perm.name}
-                        className="border-b border-gray-800/50 hover:bg-gray-800/30"
-                      >
-                        <td className="px-4 py-3 text-white">{perm.name}</td>
-                        {perm.roles.map((has, i) => (
-                          <td key={i} className="px-4 py-3 text-center">
-                            {has ? (
-                              <CheckCircle className="mx-auto h-4 w-4 text-green-400" />
-                            ) : (
-                              <span className="text-gray-600">-</span>
-                            )}
-                          </td>
+              {!rolePermissions ? (
+                <p className="py-6 text-center text-sm text-gray-500">
+                  Permission table unavailable. Managing admins requires the Manage Admins
+                  permission.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-800">
+                        <th className="px-4 py-3 text-left text-gray-400">Permission</th>
+                        {MATRIX_ROLES.map((column) => (
+                          <th
+                            key={column.role}
+                            className={`px-4 py-3 text-center ${column.color}`}
+                          >
+                            {column.label}
+                          </th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {allPermissions.map((permission) => (
+                        <tr
+                          key={permission}
+                          className="border-b border-gray-800/50 hover:bg-gray-800/30"
+                        >
+                          <td className="px-4 py-3 text-white">
+                            {humanizePermission(permission)}
+                          </td>
+                          {MATRIX_ROLES.map((column) => {
+                            const has = rolePermissions[column.role]?.includes(permission)
+                            return (
+                              <td key={column.role} className="px-4 py-3 text-center">
+                                {has ? (
+                                  <CheckCircle
+                                    className="mx-auto h-4 w-4 text-green-400"
+                                    aria-label="allowed"
+                                  />
+                                ) : (
+                                  <span className="text-gray-600" aria-label="not allowed">
+                                    -
+                                  </span>
+                                )}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -622,57 +697,59 @@ export default function AdminSettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Provider Status */}
+          {/* Provider Configuration */}
           <Card className="border-gray-800 bg-gray-900/50">
             <CardHeader>
-              <CardTitle className="text-white">Provider Status</CardTitle>
+              <CardTitle className="text-white">Provider Configuration</CardTitle>
               <CardDescription className="text-gray-400">
-                Active AI providers in your environment
+                Whether each provider&apos;s API key is present in this deployment
+                {providerEnvironment && (
+                  <span className="text-gray-500"> ({providerEnvironment})</span>
+                )}
+                . Presence only: this checks that a key is set, not that the provider is
+                currently reachable.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                {["Gemini", "Claude", "OpenAI", "Deepseek"].map((provider) => (
-                  <div
-                    key={provider}
-                    className="flex items-center gap-3 rounded-lg border border-gray-700/50 bg-gray-800/30 p-4"
-                  >
-                    <div className="h-2 w-2 animate-pulse rounded-full bg-green-400" />
-                    <span className="text-white">{provider}</span>
-                    <Badge className="ml-auto border-green-600/30 bg-green-600/20 text-xs text-green-400">
-                      Active
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Environment Variables */}
-          <Card className="border-gray-800 bg-gray-900/50">
-            <CardHeader>
-              <CardTitle className="text-white">Required Environment Variables</CardTitle>
-              <CardDescription className="text-gray-400">
-                API keys needed for AI providers
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {[
-                  { key: "GOOGLE_AI_API_KEY", provider: "Gemini" },
-                  { key: "ANTHROPIC_API_KEY", provider: "Claude" },
-                  { key: "OPENAI_API_KEY", provider: "OpenAI" },
-                  { key: "DEEPSEEK_API_KEY", provider: "Deepseek" },
-                ].map((env) => (
-                  <div
-                    key={env.key}
-                    className="flex items-center justify-between rounded-lg bg-gray-800/30 p-3"
-                  >
-                    <code className="font-mono text-sm text-[#c4703f]">{env.key}</code>
-                    <span className="text-sm text-gray-500">{env.provider}</span>
-                  </div>
-                ))}
-              </div>
+              {providers === null ? (
+                <div className="flex items-center gap-2 py-6 text-gray-400">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Checking provider configuration
+                </div>
+              ) : providers.length === 0 ? (
+                <p className="py-6 text-center text-sm text-gray-500">
+                  Could not read provider configuration.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {providers.map((provider) => (
+                    <div
+                      key={provider.id}
+                      className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-700/50 bg-gray-800/30 p-4"
+                    >
+                      <div
+                        className={`h-2 w-2 rounded-full ${
+                          provider.configured ? "bg-green-400" : "bg-gray-600"
+                        }`}
+                      />
+                      <div>
+                        <span className="text-white">{provider.label}</span>
+                        <span className="block text-xs text-gray-500">{provider.role}</span>
+                      </div>
+                      <code className="font-mono text-xs text-[#c4703f]">{provider.envVar}</code>
+                      <Badge
+                        className={
+                          provider.configured
+                            ? "ml-auto border-green-600/30 bg-green-600/20 text-xs text-green-400"
+                            : "ml-auto border-gray-600/30 bg-gray-700/40 text-xs text-gray-300"
+                        }
+                      >
+                        {provider.configured ? "Key set" : "Not set"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
