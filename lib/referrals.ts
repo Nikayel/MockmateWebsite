@@ -927,67 +927,128 @@ export async function getPendingRewards(): Promise<{
   return result
 }
 
-/**
- * Mark a cash reward as paid (admin action)
- */
-export async function markRewardPaid(
-  rewardId: string,
-  adminUserId: string,
+/** The audit action name for the one admin-driven reward transition. */
+export const RECORD_REDEMPTION_AUDIT_ACTION = "record_referral_reward_redemption"
+
+export interface RecordRedemptionInput {
+  rewardId: string
+  adminUserId: string
+  /** How the redemption can be reconciled: PayPal transaction id, Stripe credit note, support thread. */
+  reference: string
   notes?: string
-): Promise<boolean> {
-  try {
-    const rewardRef = adminDb.collection("referral_rewards").doc(rewardId)
-    const rewardDoc = await rewardRef.get()
+  /** True when the admin bypassed the eligibility gate to record this. */
+  eligibilityOverridden: boolean
+}
 
-    if (!rewardDoc.exists) return false
-    if (rewardDoc.data()?.status !== "pending") return false
+/** A snapshot of the reward doc, for the audit trail's before/after. */
+export interface RewardSnapshot {
+  rewardId: string
+  referrerId: string
+  referredUserId: string
+  type: string
+  amount: number
+  status: string
+  redemptionReference: string | null
+}
 
-    const { referrerId, amount, type } = rewardDoc.data()!
-
-    // Determine the new status based on reward type
-    // - conversion_cash: "paid" (actual cash payout)
-    // - signup_credit, conversion_credit: "credited" (free months applied)
-    const newStatus = type === "conversion_cash" ? "paid" : "credited"
-
-    await rewardRef.update({
-      status: newStatus,
-      processedAt: FieldValue.serverTimestamp(),
-      processedBy: adminUserId,
-      notes: notes || undefined,
-    })
-
-    // Update user's pending and earned amounts based on reward type
-    if (type === "conversion_cash") {
-      // Cash rewards - decrement pending cash, increment earned cash
-      await adminDb
-        .collection("users")
-        .doc(referrerId)
-        .update({
-          pendingCashRewards: FieldValue.increment(-amount),
-          totalCashEarned: FieldValue.increment(amount),
-        })
-    } else {
-      // Credit rewards (signup_credit, conversion_credit) - handle free months
-      await adminDb
-        .collection("users")
-        .doc(referrerId)
-        .update({
-          pendingFreeMonths: FieldValue.increment(-amount),
-          totalFreeMonthsEarned: FieldValue.increment(amount),
-        })
+export type RecordRedemptionResult =
+  | { ok: true; before: RewardSnapshot; after: RewardSnapshot }
+  | {
+      ok: false
+      code: RedemptionRefusalCode | "not_found" | "write_failed"
+      message: string
     }
 
-    logger.info("Reward marked as processed", {
-      rewardId,
-      type,
-      amount,
-      adminUserId,
-    })
+/**
+ * Record that an admin redeemed a referral reward out of band.
+ *
+ * WHAT THIS DOES NOT DO, deliberately:
+ *
+ * This platform has no payout integration and no path that grants a
+ * subscription entitlement. `lib/stripe-helpers.ts` only reads subscription
+ * state back from Stripe; nothing creates a customer balance credit, applies a
+ * coupon, or extends a period. So there is no honest way for this function to
+ * "apply the free month" or "send the $10", and inventing one would be worse
+ * than admitting it.
+ *
+ * The previous version pretended otherwise. It flipped the reward to
+ * "credited", decremented the referrer's `pendingFreeMonths`, and incremented
+ * `totalFreeMonthsEarned`. Since nothing reads `pendingFreeMonths` to grant
+ * anything, the net effect of an admin clicking the button was that a reward
+ * someone earned stopped being recorded as owed while never being delivered.
+ * That is destruction of a claim dressed up as fulfilment.
+ *
+ * So: the referrer's pending balances are LEFT ALONE. The obligation stays on
+ * the books, because the platform has not discharged it. What changes is that
+ * the reward now carries a reference to the human action taken elsewhere, so a
+ * real redemption can be reconciled against it and a future automated
+ * redemption path can draw the balance down against these rows.
+ *
+ * The transaction is what makes the transition safe against two admins
+ * clicking at once: the status is re-read inside it, so the second writer sees
+ * `redemption_recorded` and is refused instead of double-recording.
+ */
+export async function recordRewardRedemption(
+  input: RecordRedemptionInput
+): Promise<RecordRedemptionResult> {
+  const { rewardId, adminUserId, notes, eligibilityOverridden } = input
 
-    return true
+  try {
+    const rewardRef = adminDb.collection("referral_rewards").doc(rewardId)
+
+    return await adminDb.runTransaction<RecordRedemptionResult>(async (transaction) => {
+      const rewardDoc = await transaction.get(rewardRef)
+
+      if (!rewardDoc.exists) {
+        return { ok: false, code: "not_found", message: "Reward not found" }
+      }
+
+      const data = rewardDoc.data()!
+      const check = canRecordRedemption(data.status, input.reference)
+
+      if (!check.allowed) {
+        return { ok: false, code: check.code, message: check.message }
+      }
+
+      const before: RewardSnapshot = {
+        rewardId,
+        referrerId: data.referrerId,
+        referredUserId: data.referredUserId,
+        type: data.type,
+        amount: data.amount,
+        status: data.status,
+        redemptionReference: data.redemptionReference ?? null,
+      }
+
+      transaction.update(rewardRef, {
+        status: "redemption_recorded",
+        processedAt: FieldValue.serverTimestamp(),
+        processedBy: adminUserId,
+        redemptionReference: check.reference,
+        redemptionMethod: "manual_out_of_band",
+        redemptionEligibilityOverridden: eligibilityOverridden,
+        // Firestore rejects `undefined`, and the old code passed
+        // `notes || undefined` straight into update().
+        notes: notes?.trim() || null,
+      })
+
+      return {
+        ok: true,
+        before,
+        after: {
+          ...before,
+          status: "redemption_recorded",
+          redemptionReference: check.reference,
+        },
+      }
+    })
   } catch (error) {
-    logger.error("Failed to mark reward paid", { error, rewardId })
-    return false
+    logger.error("Failed to record reward redemption", { error, rewardId })
+    return {
+      ok: false,
+      code: "write_failed",
+      message: "Failed to record the redemption",
+    }
   }
 }
 
