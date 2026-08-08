@@ -29,20 +29,35 @@
 /** Environments a Firestore flag can be scoped to. */
 export type FlagEnvironment = "all" | "production" | "staging" | "development"
 
+/**
+ * Every flag, and whether anything reads it.
+ *
+ * A flag listed here with no reader is an ORPHAN: it appears on the admin page,
+ * it toggles, it saves, and it changes nothing. That is the exact illusion this
+ * module was rebuilt to end, so orphans are labelled rather than left to be
+ * discovered by an operator relying on one during an incident. Delete an orphan
+ * or wire it; do not invent behaviour to justify it.
+ *
+ * Readers verified by grep over lib/ and app/ (excluding tests).
+ */
 export const FLAGS = {
-  // Phase 2: Extraction service wrapper
+  // Phase 2: Extraction service wrapper. Read by app/api/chat/route.ts.
   USE_EXTRACTION_SERVICE: false,
 
-  // Phase 3: Phase detection service
+  // Phase 3: Phase detection service. Read by app/api/chat/route.ts.
   USE_PHASE_SERVICE: false,
 
-  // Future phases
+  // ORPHANS: reserved for later phases of the service extraction. No code path
+  // reads any of these four, so toggling them on the admin page does nothing.
   USE_CONTEXT_SERVICES: false,
   USE_VALIDATION_SERVICE: false,
   USE_ORCHESTRATOR: false,
   USE_MULTI_AGENT: false,
 
-  // Debug mode: Run both old and new, compare results
+  // ORPHAN. `isShadowModeEnabled()` and `logShadowComparison()` below read it,
+  // but nothing outside this file calls either, so the flag reaches no
+  // behaviour. The helpers are kept because the comparison harness they support
+  // is the intended use of the extraction-service flags above.
   SHADOW_MODE: false,
 
   // Pack interviewer 10-state machine. UNWIRED and quarantined OFF: no client drives the
@@ -51,7 +66,7 @@ export const FLAGS = {
   PACK_INTERVIEWER: false,
 
   // Open learner model ("What CodeSparring Thinks You Know") — /knowledge page +
-  // challenge/correct APIs. Kill switch: FEATURE_FLAG_OPEN_LEARNER_MODEL=false.
+  // challenge/correct APIs. Read by all five app/api/learner-model routes.
   OPEN_LEARNER_MODEL: true,
 
   // Study-control condition: when ON for a user, the learner model page lists
