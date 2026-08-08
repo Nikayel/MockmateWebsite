@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
+import { isGlobalCeilingExceeded } from "@/lib/global-spend-guard"
 import { verifyAdminAccess } from "@/lib/admin/middleware"
 import {
   getAdvancedRetriever,
@@ -105,6 +106,22 @@ export async function POST(request: NextRequest) {
     )
     if (rateLimitResponse) {
       return rateLimitResponse
+    }
+
+    // The $250/day global ceiling lived only inside checkQuota, which this route
+    // never calls. generate-embedding in particular bills per call, so a runaway
+    // client could spend all day here with the kill switch reading near zero. A
+    // rate limit bounds one caller's pace; the ceiling bounds everyone's total.
+    if (await isGlobalCeilingExceeded()) {
+      return NextResponse.json(
+        {
+          error: "AI features are temporarily paused",
+          message:
+            "We have hit today's platform-wide AI spend limit. This will be available again shortly.",
+          code: "GLOBAL_CEILING_EXCEEDED",
+        },
+        { status: 503 }
+      )
     }
 
     switch (action) {

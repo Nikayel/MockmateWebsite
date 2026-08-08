@@ -19,6 +19,7 @@ import { validateProblemText, validateUserCode, withTimeout, TimeoutError } from
 import { embedAndStoreHint, getSimilarHintsFromRAG } from "@/lib/rag"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import { verifyAuth } from "@/lib/auth-helpers"
+import { isGlobalCeilingExceeded } from "@/lib/global-spend-guard"
 import { logger } from "@/lib/logger"
 
 // Rate limit: 15 requests per minute for hint generation (AI-intensive)
@@ -54,6 +55,22 @@ export async function POST(request: NextRequest) {
     const rateLimitResponse = await hintRateLimit(request)
     if (rateLimitResponse) {
       return rateLimitResponse
+    }
+
+    // The $250/day global ceiling lived only inside checkQuota, which this route
+    // never calls, so a spend emergency could not stop hint generation or the
+    // embedding writes behind it. A rate limit bounds one caller's pace; the
+    // ceiling bounds everyone's total, and they are not substitutes.
+    if (await isGlobalCeilingExceeded()) {
+      return NextResponse.json(
+        {
+          error: "AI features are temporarily paused",
+          message:
+            "We have hit today's platform-wide AI spend limit. Hints will be available again shortly.",
+          code: "GLOBAL_CEILING_EXCEEDED",
+        },
+        { status: 503 }
+      )
     }
 
     const body = (await request.json()) as HintApiRequestBody

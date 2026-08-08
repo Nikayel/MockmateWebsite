@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
+import { isGlobalCeilingExceeded } from "@/lib/global-spend-guard"
 import { logger } from "@/lib/logger"
 import {
   handleGetHints,
@@ -67,6 +68,24 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Authentication required" }, { status: 401 })
       }
       params.userId = verifiedUserId
+
+      // The $250/day global ceiling lived only inside checkQuota, which this
+      // route never calls. Every action in authRequiredActions is on that list
+      // precisely because it generates paid work (an LLM call or an embedded
+      // vector search), so those are exactly the ones a spend emergency must be
+      // able to stop. A rate limit bounds one caller's pace; the ceiling bounds
+      // everyone's total, and they are not substitutes.
+      if (await isGlobalCeilingExceeded()) {
+        return NextResponse.json(
+          {
+            error: "AI features are temporarily paused",
+            message:
+              "We have hit today's platform-wide AI spend limit. This will be available again shortly.",
+            code: "GLOBAL_CEILING_EXCEEDED",
+          },
+          { status: 503 }
+        )
+      }
     }
 
     switch (action) {
