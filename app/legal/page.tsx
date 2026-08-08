@@ -344,8 +344,12 @@ export default function LegalPage() {
                       text transcript is kept, and it follows the interview session period above
                     </li>
                     <li>
-                      <strong className="text-white">Payment records:</strong> 7 years (required for
-                      tax/legal compliance)
+                      <strong className="text-white">Payment records:</strong> 7 years, held by our
+                      payment processor (Stripe), which is the record of the transaction itself and
+                      is what tax and accounting rules require us to be able to produce. Our own
+                      copy of your billing history is deleted with the rest of your data when you
+                      delete your account, so deleting your account does remove it from CodeSparring
+                      even though the transaction record remains with Stripe.
                     </li>
                     <li>
                       <strong className="text-white">Analytics data:</strong> 26 months (anonymized
@@ -603,7 +607,7 @@ export default function LegalPage() {
                     We offer a <strong className="text-white">30-day money-back guarantee</strong>{" "}
                     on all new subscriptions. If you&apos;re not satisfied with CodeSparring within
                     the first 30 days of your initial purchase, contact support@codesparring.dev for
-                    a full refund—no questions asked.
+                    a full refund, no questions asked.
                   </p>
                 </div>
 
