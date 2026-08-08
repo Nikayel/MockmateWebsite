@@ -5,29 +5,26 @@
  * Challenge/correction/verification aggregates for the open learner model — the
  * co-regulation study's dependent variables. Admin-gated and audit-logged.
  *
- * Thin by design: verify admin, call the service, respond.
+ * Thin by design: check the permission, call the service, respond.
+ *
+ * Gated on VIEW_ANALYTICS rather than "is an admin": these are study dependent
+ * variables aggregated from per-user challenge history, which the support role
+ * has no reason to read.
  */
 
-import { NextRequest, NextResponse } from "next/server"
-import { verifyAdminAccess } from "@/lib/admin/middleware"
+import { NextResponse } from "next/server"
+import { withPermission } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 import { logAdminAction, AUDIT_ACTIONS } from "@/lib/admin/audit"
 import { getLearnerModelAdminStats } from "@/lib/learner-model/admin-stats"
 import { logger } from "@/lib/logger"
 
-export async function GET(request: NextRequest) {
-  const authResult = await verifyAdminAccess(request)
-  if (!authResult.authorized) {
-    return NextResponse.json(
-      { success: false, error: authResult.error },
-      { status: authResult.status || 403 }
-    )
-  }
-
+export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (_request, context) => {
   try {
     const stats = await getLearnerModelAdminStats()
 
     // Reading per-user challenge history is a privileged action; record it.
-    await logAdminAction(authResult.context!.userId, AUDIT_ACTIONS.VIEW_LEARNER_MODEL_STATS, {
+    await logAdminAction(context.userId, AUDIT_ACTIONS.VIEW_LEARNER_MODEL_STATS, {
       challengesScanned: stats.challenges.total,
     })
 
@@ -39,4 +36,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
