@@ -22,6 +22,15 @@ from the browser console.
 The same deploy ships the missing `user_misconceptions` composite index, without which a signed-in
 user hits a 500 on the RAG misconception path.
 
+It also ships the indexes the admin sweep of 2026-08-07 added. Until they are live:
+
+- **`interview_sessions`, 13 indexes.** Every filter on `/admin/sessions` fails. The page names
+  undeployed indexes as a likely cause rather than showing an empty list, so the symptom is legible,
+  but the feature does not work.
+- **`feedback`, 4 indexes.** The triage queue on `/admin/feedback` and the per-account daily
+  submission cap both fail with `FAILED_PRECONDITION`. The cap is what stops one account flooding
+  the queue, so this one gates the feedback feature going live at all.
+
 Verify afterwards: `pnpm test:integration` runs `firestore-rules.integration.test.ts` against a local
 emulator using the same rules file. It should stay at 23 passing.
 
