@@ -8,15 +8,39 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { requirePermission } from "@/lib/admin/middleware"
 import {
   PERMISSIONS,
+  ROLE_PERMISSIONS,
   listAdmins,
   grantAdminRole,
   revokeAdminRole,
-  AdminRole,
 } from "@/lib/admin/rbac"
-import { adminDb } from "@/lib/firebase-admin"
+import { adminDb, adminAuth } from "@/lib/firebase-admin"
+
+/**
+ * super_admin is deliberately absent: `grantAdminRole()` refuses it, so
+ * offering it here would only produce a confusing round trip.
+ */
+const grantAdminSchema = z.object({
+  // Firebase uids are 1-128 characters. This field is typed by hand, so the
+  // real check is the account lookup below; the schema only rejects shapes
+  // that cannot be a uid at all.
+  userId: z.string().trim().min(1).max(128),
+  email: z.string().trim().email("Enter the account's email address"),
+  role: z.enum(["admin", "analyst", "support"]),
+})
+
+const revokeAdminSchema = z.object({
+  userId: z.string().trim().min(1).max(128),
+})
+
+function formatZodError(error: z.ZodError): string {
+  return error.issues
+    .map((issue) => `${issue.path.join(".") || "body"}: ${issue.message}`)
+    .join("; ")
+}
 
 // GET: List all admins
 export async function GET(request: NextRequest) {
@@ -63,6 +87,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       admins: enrichedAdmins,
+      // The real table, not a copy of it. The settings page rendered a
+      // hand-maintained matrix that had already drifted from ROLE_PERMISSIONS,
+      // so it told operators that roles could do things the middleware refuses.
+      // Serving the source of truth means the two cannot disagree again.
+      rolePermissions: ROLE_PERMISSIONS,
+      permissions: Object.values(PERMISSIONS),
     })
   } catch (error) {
     console.error("[Admin API] Error listing admins:", error)
@@ -82,26 +112,56 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json()
-    const { userId, email, role } = body
-
-    if (!userId || !email || !role) {
+    const parsed = grantAdminSchema.safeParse(await request.json())
+    if (!parsed.success) {
       return NextResponse.json(
-        { success: false, error: "Missing required fields: userId, email, role" },
+        { success: false, error: formatZodError(parsed.error) },
         { status: 400 }
       )
     }
 
-    // Validate role
-    const validRoles: AdminRole[] = ["admin", "analyst", "support"]
-    if (!validRoles.includes(role)) {
+    const { userId, email, role } = parsed.data
+
+    // The uid is typed by hand from another screen, so it is checked against a
+    // real account before a role is written. A mistyped character previously
+    // created an admin_roles document for a user that does not exist: it looked
+    // like it worked, granted nothing, and left a phantom row that only the
+    // intended admin's continued lack of access would ever reveal.
+    if (!adminAuth) {
       return NextResponse.json(
-        { success: false, error: `Invalid role. Must be one of: ${validRoles.join(", ")}` },
+        { success: false, error: "Auth not available; cannot verify the user id" },
+        { status: 503 }
+      )
+    }
+
+    let account
+    try {
+      account = await adminAuth.getUser(userId)
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "No account exists with that user id" },
         { status: 400 }
       )
     }
 
-    const result = await grantAdminRole(authResult.context!.userId, userId, email, role)
+    // Requiring the email to match the account catches the more dangerous
+    // version of the same mistake: a valid uid belonging to somebody else.
+    // Comparison is case-insensitive because Firebase preserves the case a user
+    // signed up with.
+    const accountEmail = account.email ?? ""
+    if (accountEmail.toLowerCase() !== email.toLowerCase()) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: accountEmail
+            ? `That user id belongs to ${accountEmail}, not ${email}. Check the id before granting access.`
+            : "That account has no email address on file, so the grant cannot be verified.",
+        },
+        { status: 400 }
+      )
+    }
+
+    const result = await grantAdminRole(authResult.context!.userId, userId, accountEmail, role)
 
     if (!result.success) {
       return NextResponse.json({ success: false, error: result.error }, { status: 400 })
@@ -133,16 +193,16 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get("userId")
+    const parsed = revokeAdminSchema.safeParse({ userId: searchParams.get("userId") ?? undefined })
 
-    if (!userId) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { success: false, error: "Missing userId parameter" },
+        { success: false, error: "Missing or malformed userId parameter" },
         { status: 400 }
       )
     }
 
-    const result = await revokeAdminRole(authResult.context!.userId, userId)
+    const result = await revokeAdminRole(authResult.context!.userId, parsed.data.userId)
 
     if (!result.success) {
       return NextResponse.json({ success: false, error: result.error }, { status: 400 })
