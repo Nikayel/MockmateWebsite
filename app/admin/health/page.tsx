@@ -15,7 +15,6 @@ import {
   Shield,
   HardDrive,
   Activity,
-  Zap,
   AlertCircle,
   Bell,
   Check,
@@ -30,7 +29,6 @@ interface ServiceHealth {
 
 interface HealthData {
   status: "healthy" | "degraded" | "unhealthy"
-  uptime: number
   lastChecked: string
   services: {
     database: ServiceHealth
@@ -193,7 +191,9 @@ export default function SystemHealthPage() {
                 <h2 className={`text-2xl font-bold ${statusConfig[health.status].color}`}>
                   System {statusConfig[health.status].label}
                 </h2>
-                <p className="text-gray-400">Uptime: {health.uptime}%</p>
+                <p className="text-gray-400">
+                  Checked {new Date(health.lastChecked).toLocaleTimeString()}
+                </p>
               </div>
             </div>
             <div className="text-right">
@@ -322,20 +322,6 @@ export default function SystemHealthPage() {
             </div>
           </CardContent>
         </Card>
-
-        <Card className="border-gray-800 bg-gray-900/50">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-green-500/20 p-3">
-                <Zap className="h-6 w-6 text-green-400" />
-              </div>
-              <div>
-                <p className="text-3xl font-bold text-white">{health.uptime}%</p>
-                <p className="text-sm text-gray-400">Uptime</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Memory Usage */}
@@ -350,7 +336,7 @@ export default function SystemHealthPage() {
           <div className="space-y-4">
             <div>
               <div className="mb-2 flex justify-between">
-                <span className="text-gray-400">Memory</span>
+                <span className="text-gray-400">V8 heap, instance serving this request</span>
                 <span className="text-white">
                   {health.memory.used}MB / {health.memory.total}MB
                 </span>

@@ -85,14 +85,22 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Calculate uptime (simplified - in production use a real monitoring service)
-    const uptime = 99.9 // Placeholder
+    // Uptime is deliberately absent. It was a hardcoded 99.9 that no measurement could ever
+    // move, which is the worst kind of health indicator: it reads as a hard-won SLO and is a
+    // literal. Real uptime needs an external prober recording availability over time, since a
+    // process cannot observe the windows in which it was not running.
 
-    // Memory usage (not available in serverless, use placeholder)
+    // V8 heap of the instance serving this request. The previous 256/512 literal was justified
+    // by a comment claiming memory is unavailable in serverless, which is not true of the Node
+    // runtime. This is per-instance rather than platform-wide, and labelled as such in the UI,
+    // but it is measured: a leak shows up here as a heap that climbs and does not come back.
+    const heap = process.memoryUsage()
+    const usedMb = Math.round(heap.heapUsed / 1024 / 1024)
+    const totalMb = Math.round(heap.heapTotal / 1024 / 1024)
     const memoryUsage = {
-      used: 256,
-      total: 512,
-      percentage: 50,
+      used: usedMb,
+      total: totalMb,
+      percentage: totalMb > 0 ? Math.round((usedMb / totalMb) * 100) : 0,
     }
 
     // Active alerts
@@ -152,7 +160,6 @@ export async function GET(request: NextRequest) {
       success: true,
       health: {
         status: overallStatus,
-        uptime,
         lastChecked: new Date().toISOString(),
         services,
         metrics: {
