@@ -1,5 +1,5 @@
 # CodeSparring
-# https://codesparring.dev
+# https://www.codesparring.dev
 
 > CodeSparring is two things: a free, public curriculum that teaches Python, SQL, and system design
 > the way interviews actually ask about them, and an AI mock-interview room where you practice
@@ -56,27 +56,37 @@ learning to program for the first time. It concentrates on the behaviour that tr
   code, property-based testing, shrinking a failure, and reviewing AI-generated code that looks
   right and is not.
 
-### Track: SQL (`/learn/sql`, 6 levels)
+### Track: Data Engineering (`/learn/data-engineering`, 11 levels)
 
-Written for data-engineering and analytics interviews. Exercises run against a real SQLite engine in
-the browser and are graded on the result set they return.
+Written for data-engineering and analytics interviews. This track was previously called the SQL
+track; `/learn/sql` and `/learn/sql/*` now permanently redirect to `/learn/data-engineering`.
+Exercises run against a real SQLite engine in the browser and are graded on the result set they
+return.
 
-- **Level 1: SQL Foundations** (`/learn/sql/foundations`). SELECT, WHERE, ORDER BY, types, NULL
-  semantics, dates.
-- **Level 2: Aggregation and Joins** (`/learn/sql/aggregation`). Aggregates, GROUP BY and HAVING,
-  every join flavour, subqueries, CTEs.
-- **Level 3: Data Modeling and Schema Design** (`/learn/sql/modeling`). DDL, keys, constraints,
-  cardinality, normalization.
-- **Level 4: Data Engineering with SQL** (`/learn/sql/engineering`). Window functions, recursive
-  CTEs, slowly changing dimensions, idempotent merges, data-quality checks.
-- **Level 5: Advanced and Company-Specific SQL** (`/learn/sql/advanced-company-sql`). The four
-  rounds of a data-engineering loop rehearsed as graded SQL: power screen, modeling, pipeline, and
-  system-design reasoning. Includes sessionization, join fan-out and skew, CDC changelog apply, and
-  write-audit-publish quality gates.
-- **Level 6: Cloud and Data Engineering Foundations** (`/learn/sql/cloud-data-foundations`). The
-  platform underneath the query: object storage, columnar files and row groups, partitioning and
-  pruning, bucketing, distributed execution, skew, orchestration. Taught as graded queries against
-  simulated platform metadata. Beginner friendly; it can be started right after Level 2.
+- **Level 1: SQL Foundations** (`/learn/data-engineering/foundations`). SELECT, WHERE, ORDER BY,
+  types, NULL semantics, dates.
+- **Level 2: Aggregation and Joins** (`/learn/data-engineering/aggregation`). Aggregates, GROUP BY
+  and HAVING, every join flavour, subqueries, CTEs.
+- **Level 3: Data Modeling and Schema Design** (`/learn/data-engineering/modeling`). DDL, keys,
+  constraints, cardinality, normalization.
+- **Level 4: Data Engineering with SQL** (`/learn/data-engineering/engineering`). Window functions,
+  recursive CTEs, slowly changing dimensions, idempotent merges, data-quality checks.
+- **Level 5: Advanced and Company-Specific SQL** (`/learn/data-engineering/advanced-company-sql`).
+  The four rounds of a data-engineering loop rehearsed as graded SQL: power screen, modeling,
+  pipeline, and system-design reasoning. Includes sessionization, join fan-out and skew, CDC
+  changelog apply, and write-audit-publish quality gates.
+- **Level 6: Cloud and Data Engineering Foundations**
+  (`/learn/data-engineering/cloud-data-foundations`). The platform underneath the query: object
+  storage, columnar files and row groups, partitioning and pruning, bucketing, distributed
+  execution, skew, orchestration. Taught as graded queries against simulated platform metadata.
+  Beginner friendly; it can be started right after Level 2.
+- **Level 7: Warehouses, Lakehouse and Dimensional Modeling**
+  (`/learn/data-engineering/warehouses-lakehouse`).
+- **Level 8: Batch Pipelines and Orchestration** (`/learn/data-engineering/batch-pipelines`).
+- **Level 9: Streaming and Change Data Capture** (`/learn/data-engineering/streaming-cdc`).
+- **Level 10: Distributed Compute and Data Operations**
+  (`/learn/data-engineering/spark-and-operations`).
+- **Level 11: Data Engineering for AI** (`/learn/data-engineering/data-for-ai`).
 
 ### Track: System Design (`/learn/system-design`, 12 levels)
 
@@ -165,10 +175,10 @@ The Learn curriculum's reading half is free on every plan and requires no accoun
 
 ## Crawling
 
-- Sitemap: https://codesparring.dev/sitemap.xml
-- robots.txt: https://codesparring.dev/robots.txt
-- The canonical host is the apex, `https://codesparring.dev`. Requests to `www.codesparring.dev`
-  are permanently redirected to it, so cite the apex.
+- Sitemap: https://www.codesparring.dev/sitemap.xml
+- robots.txt: https://www.codesparring.dev/robots.txt
+- The canonical host is `https://www.codesparring.dev`. Requests to the apex `codesparring.dev`
+  are permanently redirected to it, so cite the `www` host.
 - AI crawlers are explicitly welcome. GPTBot, ClaudeBot, Claude-User, Claude-SearchBot, and
   Google-Extended are allowed everything a general crawler is allowed.
 - Authenticated surfaces (`/practice`, `/sessions`, `/dashboard`, `/account`, `/admin`, `/api/`) are
@@ -176,20 +186,20 @@ The Learn curriculum's reading half is free on every plan and requires no accoun
 
 ## Links
 
-- Website: https://codesparring.dev
-- Learn hub: https://codesparring.dev/learn
-- Python track: https://codesparring.dev/learn/python
-- SQL track: https://codesparring.dev/learn/sql
-- System Design track: https://codesparring.dev/learn/system-design
-- Pricing: https://codesparring.dev/pricing
-- Why CodeSparring: https://codesparring.dev/why-codesparring
-- Company prep: https://codesparring.dev/interview-prep
-- Sample graded interviews: https://codesparring.dev/samples
-- Interview rounds: https://codesparring.dev/rounds
-- Case labs: https://codesparring.dev/labs
-- Guides: https://codesparring.dev/guides/how-to-talk-through-coding-interviews
-- Docs: https://codesparring.dev/docs
-- Blog: https://codesparring.dev/blog
+- Website: https://www.codesparring.dev
+- Learn hub: https://www.codesparring.dev/learn
+- Python track: https://www.codesparring.dev/learn/python
+- Data Engineering track: https://www.codesparring.dev/learn/data-engineering
+- System Design track: https://www.codesparring.dev/learn/system-design
+- Pricing: https://www.codesparring.dev/pricing
+- Why CodeSparring: https://www.codesparring.dev/why-codesparring
+- Company prep: https://www.codesparring.dev/interview-prep
+- Sample graded interviews: https://www.codesparring.dev/samples
+- Interview rounds: https://www.codesparring.dev/rounds
+- Case labs: https://www.codesparring.dev/labs
+- Guides: https://www.codesparring.dev/guides/how-to-talk-through-coding-interviews
+- Docs: https://www.codesparring.dev/docs
+- Blog: https://www.codesparring.dev/blog
 
 ## Founder
 
