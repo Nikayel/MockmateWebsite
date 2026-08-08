@@ -19,6 +19,7 @@ import { getSessionsLimitForTier } from "./pricing"
 import { calculateBillingPeriod } from "./quota/billing-period"
 import { calculateTechnicalScoreFromBreakdown, SESSION } from "./constants"
 import type { Attribution } from "./attribution"
+import { logger } from "./logger"
 
 /**
  * Stringify a test value for Firestore, mapping absent values to null.
@@ -86,17 +87,31 @@ export async function createOrUpdateProfile(
 
   const profileRef = doc(db, "profiles", userId)
 
-  // Check if profile exists first
-  let profileSnap
+  // Check if profile exists first.
+  //
+  // A read failure here must NOT be swallowed. getDoc resolves with
+  // `exists() === false` for a document that is simply absent, so a throw is
+  // always an infrastructure error, never "new user". The old code caught it and
+  // substituted a fake empty snapshot, which made isNewProfile true and then wrote
+  // `subscription_tier: "free"` and a fresh `created_at` over the real profile:
+  // a transient Firestore blip on sign-in downgraded a paying customer and reset
+  // the signup date that calculateBillingPeriod derives billing periods from.
+  //
+  // Absent evidence is not evidence. If we cannot read the profile we cannot know
+  // whether writing "free" is safe, so refuse rather than guess. The caller can
+  // retry; a failed sign-in is recoverable, a destroyed entitlement is not.
   let existingProfile: Profile | null = null
   try {
-    profileSnap = await getDoc(profileRef)
+    const profileSnap = await getDoc(profileRef)
     if (profileSnap.exists()) {
       existingProfile = profileSnap.data() as Profile
     }
-  } catch {
-    // Continue anyway - we'll try to create it
-    profileSnap = { exists: () => false, data: () => null } as any
+  } catch (error) {
+    logger.error("[Profile] Could not read profile before write; refusing to overwrite", {
+      userId,
+      error,
+    })
+    throw new Error("Could not load your profile. Please try again.")
   }
 
   // Only set subscription_tier to "free" for NEW profiles
@@ -157,9 +172,8 @@ export async function createOrUpdateProfile(
   // is independent of GA4 and cookie consent, so signups-by-channel stays a plain
   // Firestore query even for users who decline analytics. Values are re-clamped
   // here as a defensive trust boundary.
-  const existingAcquisitionSource = (
-    existingProfile as { acquisition_source?: string } | null
-  )?.acquisition_source
+  const existingAcquisitionSource = (existingProfile as { acquisition_source?: string } | null)
+    ?.acquisition_source
   if (attribution && !existingAcquisitionSource && (attribution.source || attribution.campaign)) {
     const clampAttribution = (value?: string): string | undefined =>
       value ? value.slice(0, 200) : undefined
