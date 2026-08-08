@@ -1207,7 +1207,13 @@ export async function createGuestInterviewSession(
 }
 
 /**
- * Get a guest session by ID
+ * Get a guest session by ID.
+ *
+ * Returns null for three very different situations: the document does not exist, it belongs to
+ * someone else, or the read itself failed. The first two are ordinary and expected. The third is an
+ * outage, and every caller below treats it as "no such session" and gives up quietly, which is how
+ * a Firestore blip turns into a guest losing their interview. The null return is kept because the
+ * callers depend on it; the log is what separates the three cases after the fact.
  */
 export async function getGuestSession(sessionId: string, guestId: string): Promise<any | null> {
   try {
@@ -1224,7 +1230,11 @@ export async function getGuestSession(sessionId: string, guestId: string): Promi
     }
 
     return data
-  } catch {
+  } catch (error) {
+    logger.error("Guest session read failed; callers will see this as a missing session", {
+      sessionId,
+      error,
+    })
     return null
   }
 }
@@ -1274,7 +1284,11 @@ export async function updateGuestInterviewSession(
 
     await setDoc(sessionRef, data, { merge: true })
     return true
-  } catch {
+  } catch (error) {
+    // This is the write that persists a guest's finished interview: their code, their score, their
+    // feedback. Returning false discards all of it, and the caller has no way to distinguish that
+    // from "this session was not yours".
+    logger.error("Guest interview result was not saved", { sessionId, error })
     return false
   }
 }
@@ -1307,7 +1321,14 @@ export async function migrateGuestSession(
     )
 
     return true
-  } catch {
+  } catch (error) {
+    // Signup-time ownership transfer. A failure here means a user who just created an account keeps
+    // none of the work that convinced them to create it.
+    logger.error("Guest session could not be transferred to the new account", {
+      sessionId,
+      userId: newUserId,
+      error,
+    })
     return false
   }
 }
@@ -1338,13 +1359,26 @@ export async function findGuestSessions(
     })
 
     return sessions
-  } catch {
+  } catch (error) {
+    // The worst of the three, because an empty array is a completely normal result. A query failure
+    // and "this guest has nothing to migrate" are the same value, so `migrateAllGuestSessions`
+    // below reports { migrated: 0, failed: 0 } - a clean success - while silently abandoning
+    // everything the guest did.
+    logger.error("Guest session lookup failed; migration will report nothing to migrate", {
+      guestId,
+      error,
+    })
     return []
   }
 }
 
 /**
- * Migrate all guest sessions to an authenticated user
+ * Migrate all guest sessions to an authenticated user.
+ *
+ * Note the asymmetry this reports: `failed` counts sessions found but not transferred. Sessions
+ * that were never found because the query itself failed are invisible here by construction, which
+ * is why {@link findGuestSessions} logs rather than returning a sentinel. The counts are the
+ * caller's contract and are not changed.
  */
 export async function migrateAllGuestSessions(
   guestId: string,
@@ -1361,6 +1395,17 @@ export async function migrateAllGuestSessions(
     } else {
       failed++
     }
+  }
+
+  if (failed > 0) {
+    // The per-session errors are already logged; this one names the user-visible outcome, which is
+    // the number that matters when someone reports losing work after signing up.
+    logger.error("Guest sessions were lost during signup migration", {
+      userId: newUserId,
+      guestId,
+      migrated,
+      failed,
+    })
   }
 
   return { migrated, failed }
