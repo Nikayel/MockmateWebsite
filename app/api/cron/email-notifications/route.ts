@@ -43,6 +43,37 @@ import { checkStreakAtRisk, sendDailyReminderIfNeeded } from "@/lib/services/ses
 
 const db = adminDb
 
+/** The subset of the run's result accumulator that failure reporting needs. */
+interface CronErrorSink {
+  errors: string[]
+}
+
+/**
+ * Record a failed duplicate-prevention pre-fetch.
+ *
+ * Each `process*` function starts by querying `email_notifications` for everything it already sent
+ * in the last 24 hours, so it can skip those users. When that query fails the run continues with an
+ * EMPTY skip set, which means every eligible user looks like someone who has not been emailed yet.
+ *
+ * That was logged at `warn` with the message "index may be building", which describes a plausible
+ * cause and says nothing about the consequence. The consequence is duplicate sends: the per-user
+ * rate limiter still applies (3 per day, 4 hours apart) but the cron runs every 3 hours, so the same
+ * reminder goes out up to three times a day instead of once, to the whole eligible population, every
+ * day the query stays broken. For a product whose email templates are built around staying out of
+ * the spam folder, that is a deliverability incident, not a warning.
+ *
+ * Escalated to `error` and pushed onto the run's error list so it also surfaces in the response body
+ * rather than only in the log stream.
+ */
+function reportDedupFailure(emailKind: string, error: unknown, results: CronErrorSink): void {
+  const detail = error instanceof Error ? error.message : String(error)
+  logger.error(
+    `[Cron Email] ${emailKind} dedup query failed; this run may re-send to every eligible user`,
+    { emailKind, error }
+  )
+  results.errors.push(`${emailKind} dedup query failed (duplicate sends possible): ${detail}`)
+}
+
 /**
  * Check if we can send an email to a user based on their timezone
  * Returns false if it's outside 9 AM - 9 PM in their local time
@@ -283,11 +314,8 @@ async function processInactivityReminders(now: Date, results: any): Promise<void
     usersWithRecentInactivityEmail = new Set(
       recentInactivityEmailsSnap.docs.map((doc) => doc.data().user_id)
     )
-  } catch (indexError: any) {
-    // Index may not exist yet - continue without deduplication
-    logger.warn("[Cron Email] Inactivity dedup query failed (index may be building)", {
-      error: indexError.message,
-    })
+  } catch (indexError) {
+    reportDedupFailure("Inactivity", indexError, results)
   }
 
   // Get learning states where last_session_at is before 24h ago
@@ -434,11 +462,8 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
       .get()
 
     usersWithRecentSREmail = new Set(recentSREmailsSnap.docs.map((doc) => doc.data().user_id))
-  } catch (indexError: any) {
-    // Index may not exist yet - continue without deduplication
-    logger.warn("[Cron Email] SR dedup query failed (index may be building)", {
-      error: indexError.message,
-    })
+  } catch (indexError) {
+    reportDedupFailure("Spaced repetition", indexError, results)
   }
 
   // Find users with problem mastery data (new system)
@@ -717,11 +742,8 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
     usersWithRecentRoadmapEmail = new Set(
       recentRoadmapEmailsSnap.docs.map((doc) => doc.data().user_id)
     )
-  } catch (indexError: any) {
-    // Index may not exist yet - continue without deduplication
-    logger.warn("[Cron Email] Roadmap dedup query failed (index may be building)", {
-      error: indexError.message,
-    })
+  } catch (indexError) {
+    reportDedupFailure("Roadmap", indexError, results)
   }
 
   // Get all active roadmaps
