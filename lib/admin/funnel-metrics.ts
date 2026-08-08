@@ -210,3 +210,109 @@ export function describeWindow(timeRange: string): string {
       return "all time"
   }
 }
+
+/**
+ * Ceiling on how many daily buckets the trend chart will build. An all-time
+ * range on an old account would otherwise allocate one bucket per day since
+ * the first signup. When the cap bites, the returned range says so, so the
+ * chart can be labelled with the span it actually covers.
+ */
+export const MAX_TREND_DAYS = 365
+
+/** The span the trend chart covers, always reported alongside the points. */
+export interface TrendRange {
+  start: Date
+  end: Date
+  /** Inclusive day count, so a same-day range is 1. */
+  days: number
+  /** True when MAX_TREND_DAYS shortened the span that was asked for. */
+  truncated: boolean
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Decide what span the trend chart covers.
+ *
+ * The "All" range used to fall back to `now - 7 days`, so selecting all time
+ * silently charted a week while every headline number above it covered all
+ * time. All time now means from the first event we hold.
+ */
+export function resolveTrendRange(
+  startDate: Date | null,
+  earliestEvent: Date | null,
+  now: Date
+): TrendRange {
+  const requested = startDate ?? earliestEvent ?? now
+  const floor = new Date(now.getTime() - (MAX_TREND_DAYS - 1) * DAY_MS)
+  const truncated = requested.getTime() < floor.getTime()
+  const start = truncated ? floor : requested
+  const clampedStart = start.getTime() > now.getTime() ? now : start
+  const days = Math.floor((now.getTime() - clampedStart.getTime()) / DAY_MS) + 1
+  return { start: clampedStart, end: now, days, truncated }
+}
+
+/** One day of the funnel trend chart. */
+export interface FunnelTrendPoint {
+  date: string
+  signups: number
+  sessions: number
+  completed: number
+}
+
+/** Loose read model over an `interview_sessions` document, for the trend chart. */
+export interface TrendSessionInput {
+  started_at?: unknown
+  completed_at?: unknown
+}
+
+function dayKey(date: Date): string {
+  return date.toISOString().split("T")[0]
+}
+
+/**
+ * Daily signups, session starts, and completions across `range`. Events outside
+ * the range are dropped rather than folded into the nearest bucket, so the
+ * chart totals never exceed the window they are labelled with.
+ */
+export function buildFunnelTrend(
+  signupDates: Iterable<unknown>,
+  sessions: Iterable<TrendSessionInput>,
+  range: TrendRange
+): FunnelTrendPoint[] {
+  const buckets = new Map<string, FunnelTrendPoint>()
+  for (let index = 0; index < range.days; index++) {
+    const date = new Date(range.start.getTime() + index * DAY_MS)
+    const key = dayKey(date)
+    buckets.set(key, { date: key, signups: 0, sessions: 0, completed: 0 })
+  }
+
+  for (const value of signupDates) {
+    const date = toDate(value)
+    if (!date) continue
+    const bucket = buckets.get(dayKey(date))
+    if (bucket) bucket.signups++
+  }
+
+  for (const session of sessions) {
+    const startedAt = toDate(session.started_at)
+    if (!startedAt) continue
+    const bucket = buckets.get(dayKey(startedAt))
+    if (!bucket) continue
+    bucket.sessions++
+    if (session.completed_at) bucket.completed++
+  }
+
+  return [...buckets.values()].sort((a, b) => a.date.localeCompare(b.date))
+}
+
+/** Earliest of a set of loose date values, or null when none parse. */
+export function earliestDate(values: Iterable<unknown>): Date | null {
+  let earliest: Date | null = null
+  for (const value of values) {
+    const date = toDate(value)
+    if (!date) continue
+    if (!earliest || date < earliest) earliest = date
+  }
+  return earliest
+}
