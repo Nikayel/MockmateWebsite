@@ -38,6 +38,7 @@ interface LoadOptions {
   nodeEnv?: string
   vercelEnv?: string
   sentryDsn?: string
+  warnSampleRate?: string
 }
 
 /**
@@ -49,6 +50,8 @@ async function loadLogger(options: LoadOptions = {}) {
   vi.stubEnv("NODE_ENV", options.nodeEnv ?? "production")
   vi.stubEnv("VERCEL_ENV", options.vercelEnv)
   vi.stubEnv("SENTRY_DSN", options.sentryDsn ?? TEST_DSN)
+  // Warn sampling is probabilistic; pin it so delivery assertions are deterministic.
+  vi.stubEnv("SENTRY_WARN_SAMPLE_RATE", options.warnSampleRate ?? "1")
   // Keep the other transports out of the way so fetch calls are Sentry's alone.
   vi.stubEnv("LOGFLARE_API_KEY", undefined)
   vi.stubEnv("LOGFLARE_SOURCE_ID", undefined)
@@ -245,5 +248,65 @@ describe("logger.error in the browser", () => {
       stack: undefined,
       source: "react-boundary",
     })
+  })
+})
+
+describe("Sentry quota protection", () => {
+  it("never samples errors away", async () => {
+    const { logger } = await loadLogger({ warnSampleRate: "0" })
+
+    logger.error("Checkout failed", { userId: "u_1" })
+
+    await flushDeliveries()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("drops warns entirely at a zero sample rate", async () => {
+    const { logger } = await loadLogger({ warnSampleRate: "0" })
+
+    for (let i = 0; i < 25; i++) logger.warn("Rate limit exceeded", { ip: "1.2.3.4" })
+
+    await flushDeliveries()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("still delivers payment events when warns are sampled out", async () => {
+    const { logger } = await loadLogger({ warnSampleRate: "0" })
+
+    logger.payment("subscription.upgraded", { userId: "u_1" })
+
+    await flushDeliveries()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("samples only a fraction of warns at the default rate", async () => {
+    const { logger } = await loadLogger()
+    // The rate is read per call, not at module scope, so unsetting it here
+    // exercises the built-in default rather than the harness's pinned value.
+    vi.stubEnv("SENTRY_WARN_SAMPLE_RATE", undefined)
+    // Default is 0.1, so a deterministic "random" of 0.5 must fall outside it.
+    vi.spyOn(Math, "random").mockReturnValue(0.5)
+
+    logger.warn("Auth verification failed", { reason: "expired" })
+
+    await flushDeliveries()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("reports an exhausted Sentry quota once rather than on every dropped event", async () => {
+    fetchMock = vi.fn(async () => ({ ok: false, status: 429, text: async () => "" }))
+    vi.stubGlobal("fetch", fetchMock)
+    const { logger } = await loadLogger()
+
+    logger.error("first")
+    logger.error("second")
+    logger.error("third")
+    await flushDeliveries()
+
+    const quotaNotices = vi
+      .mocked(console.error)
+      .mock.calls.filter((call) => String(call[0]).includes("Quota exhausted"))
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(quotaNotices).toHaveLength(1)
   })
 })

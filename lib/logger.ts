@@ -262,6 +262,9 @@ function keepAliveUntilSettled(delivery: Promise<unknown>): void {
   }
 }
 
+/** Latched so the quota-exhausted notice is printed once per instance, not per dropped event. */
+let sentryQuotaExhaustedReported = false
+
 interface ParsedDsn {
   ingestUrl: string
   publicKey: string
@@ -345,7 +348,22 @@ async function sendToSentry(
     body: JSON.stringify(event),
   })
     .then(async (res) => {
-      if (!res.ok && res.status !== 429) {
+      // A 429 means the Sentry plan's quota is exhausted and every event from
+      // here on is being discarded. That used to be ignored entirely, so the
+      // pipeline could be silently dead for the rest of the billing period with
+      // nothing anywhere saying so. Report it once per instance: repeating it on
+      // every dropped event would itself become the noise that hid the notice.
+      if (res.status === 429) {
+        if (!sentryQuotaExhaustedReported) {
+          sentryQuotaExhaustedReported = true
+          console.error(
+            "[Sentry] Quota exhausted (429). Events are being DROPPED until the quota resets. " +
+              "Raise the plan limit or lower SENTRY_WARN_SAMPLE_RATE."
+          )
+        }
+        return
+      }
+      if (!res.ok) {
         const body = await res.text().catch(() => "")
         console.error(`[Sentry] Failed to send event (${res.status}): ${body}`)
       }
@@ -368,7 +386,32 @@ interface ExternalDeliveryOptions {
  * Extracted so the decision is testable without a live transport.
  */
 function shouldReportToSentry(level: LogLevel, options?: ExternalDeliveryOptions): boolean {
-  return options?.alwaysReport === true || level === "error" || level === "warn"
+  if (options?.alwaysReport === true) return true
+  if (level === "error") return true
+  if (level !== "warn") return false
+  return Math.random() < warnSampleRate()
+}
+
+/**
+ * Fraction of `warn` events forwarded to Sentry. Errors are never sampled.
+ *
+ * There are ~113 warn call sites against ~293 error ones, and the loudest warns
+ * are routine rather than exceptional: lib/rate-limit.ts warns on every rate-limit
+ * hit and lib/auth-helpers.ts warns on every expired token. Unsampled, ordinary
+ * traffic burns the Sentry quota, and once the plan's ceiling is hit Sentry
+ * answers 429 and every subsequent event is discarded — including the errors this
+ * pipeline exists to deliver. Sampling the routine tier is what keeps room for the
+ * exceptional one.
+ *
+ * Override with SENTRY_WARN_SAMPLE_RATE (0 disables warn forwarding entirely,
+ * 1 restores the old behavior).
+ */
+function warnSampleRate(): number {
+  const raw = process.env.SENTRY_WARN_SAMPLE_RATE
+  if (raw === undefined) return 0.1
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed)) return 0.1
+  return Math.min(Math.max(parsed, 0), 1)
 }
 
 /**
