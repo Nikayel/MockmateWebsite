@@ -2,22 +2,37 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { FunnelChart, TimeSeriesChart, CohortHeatmap } from "@/components/admin/charts"
 import { TrendingUp, RefreshCw, AlertCircle, Users } from "lucide-react"
 import { logger } from "@/lib/logger"
 
 interface FunnelData {
+  /** The window every block is scoped to unless it says otherwise. */
+  window?: {
+    timeRange: string
+    label: string
+    startDate: string | null
+    endDate: string
+  }
   stages: Array<{ name: string; value: number; color?: string }>
   conversionRates: {
-    visitToSignup: number
     signupToSession: number
     sessionToComplete: number
     completeToSubscribe: number
     overallConversion: number
   }
+  /** Cohort members paying today who never completed a round. */
+  subscribedWithoutCompletedRound?: number
   trend?: Array<{ date: string; signups: number; sessions: number; completed: number }>
+  /** The span the trend chart really covers, which is not always the selected range. */
+  trendWindow?: {
+    startDate: string
+    endDate: string
+    days: number
+    truncated: boolean
+  }
   scoredCompletions?: number
   registeredSessions?: number
   registeredCompletedSessions?: number
@@ -25,7 +40,6 @@ interface FunnelData {
   guestSessions?: number
   guestCompletedSessions?: number
   registeredConversionRates?: {
-    signupToSession: number
     sessionToComplete: number
     sessionToScored: number
   }
@@ -37,6 +51,28 @@ interface FunnelData {
     activated: number
     rate: number
   } | null
+  /** Where each block's numbers come from, rendered so no figure appears unsourced. */
+  provenance?: {
+    funnel: string
+    registered: string
+    activation: string
+    trend: string
+    signupsBySource: string
+  }
+}
+
+/** One short line under a heading naming the window and the source of the numbers below it. */
+function MetricProvenance({ window, source }: { window: string; source?: string }) {
+  return (
+    <p className="text-gray-500 text-xs mb-3">
+      {window}
+      {source ? ` · ${source}` : ""}
+    </p>
+  )
+}
+
+function formatDay(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" })
 }
 
 interface CohortData {
@@ -105,13 +141,19 @@ export default function FunnelPage() {
     )
   }
 
+  // Named by the API so the page never invents a label for a window it did not choose.
+  const windowLabel = funnel?.window?.label ?? (timeRange === "all" ? "all time" : `last ${timeRange}`)
+
   return (
     <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-heading font-bold text-white">Conversion Funnel</h1>
-          <p className="text-gray-400 mt-1">User journey analysis and retention cohorts</p>
+          <p className="text-gray-400 mt-1">
+            Measured user journey and retention cohorts. Page views are not measured, so there is
+            no visits stage.
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -146,14 +188,22 @@ export default function FunnelPage() {
         </div>
       </div>
 
-      {/* Main Funnel */}
+      {/* Signup-cohort funnel: one window, one population, every stage a subset of the one above. */}
       {funnel ? (
-        <FunnelChart
-          title="User Conversion Funnel"
-          subtitle={`${timeRange.toUpperCase()} period`}
-          stages={funnel.stages}
-          icon={TrendingUp}
-        />
+        <div>
+          <FunnelChart
+            title="Signup cohort"
+            subtitle={`People who signed up in the ${windowLabel}, and how far they got`}
+            stages={funnel.stages}
+            icon={TrendingUp}
+          />
+          <div className="mt-2">
+            <MetricProvenance
+              window={`Signed up in the ${windowLabel}`}
+              source={funnel.provenance?.funnel}
+            />
+          </div>
+        </div>
       ) : (
         <Card className="bg-gray-900/50 border-gray-800">
           <CardContent className="p-8 text-center">
@@ -165,44 +215,63 @@ export default function FunnelPage() {
 
       {/* Conversion Rates */}
       {funnel && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {[
-            { label: "Visit → Signup", value: funnel.conversionRates.visitToSignup },
-            { label: "Signup → Session", value: funnel.conversionRates.signupToSession },
-            { label: "Session → Complete", value: funnel.conversionRates.sessionToComplete },
-            { label: "Complete → Subscribe", value: funnel.conversionRates.completeToSubscribe },
-            { label: "Overall", value: funnel.conversionRates.overallConversion, highlight: true },
-          ].map((rate) => (
-            <Card
-              key={rate.label}
-              className={`border-gray-800 ${rate.highlight ? "bg-[#c4703f]/10 border-[#c4703f]/30" : "bg-gray-900/50"}`}
-            >
-              <CardContent className="p-4 text-center">
-                <div className={`text-2xl font-bold ${rate.highlight ? "text-[#c4703f]" : "text-white"}`}>
-                  {rate.value.toFixed(1)}%
-                </div>
-                <p className="text-xs text-gray-400 mt-1">{rate.label}</p>
-              </CardContent>
-            </Card>
-          ))}
+        <div>
+          <h2 className="text-xl font-bold text-white mb-1">Conversion within the cohort</h2>
+          <MetricProvenance
+            window={`Signed up in the ${windowLabel}`}
+            source="Each rate is a subset of the stage above it, so none can exceed 100%."
+          />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: "Signup → started a round", value: funnel.conversionRates.signupToSession },
+              { label: "Started → completed", value: funnel.conversionRates.sessionToComplete },
+              { label: "Completed → paying", value: funnel.conversionRates.completeToSubscribe },
+              {
+                label: "Signup → paying",
+                value: funnel.conversionRates.overallConversion,
+                highlight: true,
+              },
+            ].map((rate) => (
+              <Card
+                key={rate.label}
+                className={`border-gray-800 ${rate.highlight ? "bg-[#c4703f]/10 border-[#c4703f]/30" : "bg-gray-900/50"}`}
+              >
+                <CardContent className="p-4 text-center">
+                  <div className={`text-2xl font-bold ${rate.highlight ? "text-[#c4703f]" : "text-white"}`}>
+                    {rate.value.toFixed(1)}%
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{rate.label}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          {funnel.subscribedWithoutCompletedRound !== undefined &&
+            funnel.subscribedWithoutCompletedRound > 0 && (
+              <p className="text-gray-500 text-xs mt-3">
+                {funnel.subscribedWithoutCompletedRound.toLocaleString()} cohort{" "}
+                {funnel.subscribedWithoutCompletedRound === 1 ? "member is" : "members are"} paying
+                today without ever completing a round. They sit outside the funnel above, because
+                counting them in a stage would make it larger than the stage feeding it.
+              </p>
+            )}
         </div>
       )}
 
-      {/* Registered-only conversion (guest trials excluded) — the honest rates to quote in a pitch. */}
+      {/* Round volume, registered only. These count rounds, not people, so they sit outside the funnel. */}
       {funnel?.registeredConversionRates && (
         <div>
-          <h2 className="text-xl font-bold text-white mb-1">Registered users only</h2>
-          <p className="text-gray-400 text-sm mb-3">
-            Guest trials are excluded, so these are the real registered-user conversion rates.
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <h2 className="text-xl font-bold text-white mb-1">Rounds run, registered users only</h2>
+          <MetricProvenance
+            window={`Rounds started in the ${windowLabel}`}
+            source={funnel.provenance?.registered}
+          />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: "Guest sessions", value: funnel.guestSessions ?? 0, isCount: true },
-              { label: "Registered sessions", value: funnel.registeredSessions ?? 0, isCount: true },
-              { label: "Signup → Session", value: funnel.registeredConversionRates.signupToSession },
-              { label: "Session → Complete", value: funnel.registeredConversionRates.sessionToComplete },
+              { label: "Guest rounds", value: funnel.guestSessions ?? 0, isCount: true },
+              { label: "Registered rounds", value: funnel.registeredSessions ?? 0, isCount: true },
+              { label: "Round → completed", value: funnel.registeredConversionRates.sessionToComplete },
               {
-                label: "Session → Scored",
+                label: "Round → scored",
                 value: funnel.registeredConversionRates.sessionToScored,
                 highlight: true,
               },
@@ -231,10 +300,14 @@ export default function FunnelPage() {
           <h2 className="text-xl font-bold text-white mb-1">
             Activation (last {funnel.activation.windowDays} days)
           </h2>
-          <p className="text-gray-400 text-sm mb-3">
+          <p className="text-gray-400 text-sm mb-1">
             Users who signed up in the last {funnel.activation.windowDays} days and completed
             their first scored round within 24 hours of signup.
           </p>
+          <MetricProvenance
+            window={`Fixed ${funnel.activation.windowDays}-day signup window, not the range above`}
+            source={funnel.provenance?.activation}
+          />
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {[
               { label: "Signups", value: funnel.activation.signups, isCount: true },
@@ -262,7 +335,11 @@ export default function FunnelPage() {
       {/* Signups by acquisition source (first-touch src/ref) — measures which channels drive signups. */}
       {funnel?.signupsBySource && Object.keys(funnel.signupsBySource).length > 0 && (
         <div>
-          <h2 className="text-xl font-bold text-white mb-3">Signups by source</h2>
+          <h2 className="text-xl font-bold text-white mb-1">Signups by source</h2>
+          <MetricProvenance
+            window={`Signed up in the ${windowLabel}`}
+            source={funnel.provenance?.signupsBySource}
+          />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {Object.entries(funnel.signupsBySource)
               .sort(([, a], [, b]) => b - a)
@@ -280,19 +357,35 @@ export default function FunnelPage() {
         </div>
       )}
 
-      {/* Funnel Trend */}
+      {/* Funnel Trend. The charted span is stated, because All time is capped at a year. */}
       {funnel?.trend && funnel.trend.length > 0 && (
-        <TimeSeriesChart
-          title="Funnel Trend"
-          subtitle="Daily signups, sessions, and completions"
-          data={funnel.trend}
-          series={[
-            { key: "signups", name: "Signups", color: "#c4703f" },
-            { key: "sessions", name: "Sessions", color: "#FBBF24" },
-            { key: "completed", name: "Completed", color: "#3fb883" },
-          ]}
-          icon={TrendingUp}
-        />
+        <div>
+          <TimeSeriesChart
+            title="Funnel Trend"
+            subtitle={
+              funnel.trendWindow
+                ? `Daily signups, rounds, and completions from ${formatDay(funnel.trendWindow.startDate)} to ${formatDay(funnel.trendWindow.endDate)}`
+                : "Daily signups, rounds, and completions"
+            }
+            data={funnel.trend}
+            series={[
+              { key: "signups", name: "Signups", color: "#c4703f" },
+              { key: "sessions", name: "Rounds", color: "#FBBF24" },
+              { key: "completed", name: "Completed", color: "#3fb883" },
+            ]}
+            icon={TrendingUp}
+          />
+          <div className="mt-2">
+            <MetricProvenance
+              window={
+                funnel.trendWindow
+                  ? `${funnel.trendWindow.days} days${funnel.trendWindow.truncated ? ", capped at one year" : ""}`
+                  : windowLabel
+              }
+              source={funnel.provenance?.trend}
+            />
+          </div>
+        </div>
       )}
 
       {/* Cohort Selector */}
