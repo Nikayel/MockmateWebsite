@@ -7,10 +7,13 @@
  * - Unusual usage patterns
  *
  * Alerts:
- * - Single request cost > $1
- * - Hourly cost > 3x average
- * - Daily cost > budget threshold
- * - Single user cost spike
+ * - Single request cost > $1 (per request, on the AI path)
+ * - Hourly cost > budget, or > 3x the 7-day average (swept automatically)
+ *
+ * Per-user cost spikes are no longer detected here. They are ENFORCED instead,
+ * by the daily spend cap in lib/quota-enforcement.ts, which reads one
+ * pre-aggregated document rather than scanning a user's events. See the note on
+ * maybeRunHourlyCostSweep.
  */
 
 import { adminDb } from "./firebase-admin"
@@ -20,9 +23,17 @@ import { logger } from "./logger"
 // Query limits to prevent Firestore cost explosion
 const QUERY_LIMITS = {
   hourlyEvents: 5000, // Max events to read for hourly check
-  userHourlyEvents: 1000, // Max events per user per hour
   weeklyEvents: 10000, // Max events for 7-day average calculation
 } as const
+
+// How often the hourly sweep may run, platform-wide.
+const HOURLY_SWEEP_INTERVAL_MS = 60 * 60 * 1000
+const HOURLY_SWEEP_CLAIM_DOC = "cost_anomaly_hourly_sweep"
+
+// Per-instance throttle. Cheap first gate so the overwhelming majority of AI
+// calls cost nothing at all to filter; the Firestore claim below is what makes
+// the interval hold across instances.
+let lastLocalSweepAttemptMs = 0
 
 const COST_AVERAGES_CONFIG_DOC = "cost_averages"
 const COST_AVERAGES_STALE_MS = 2 * 60 * 60 * 1000 // 2 hours
@@ -42,6 +53,8 @@ export interface CostAnomaly {
     | "high_single_request"
     | "hourly_spike"
     | "daily_budget_exceeded"
+    // No longer written. Retained so anomalies already stored in Firestore
+    // still parse, and so getAnomalyStats can bucket them.
     | "user_cost_spike"
     | "unusual_pattern"
   severity: "warning" | "critical"
@@ -66,7 +79,6 @@ export interface CostAnomalyConfig {
   singleRequestThreshold: number // Alert if single request costs more than this
   hourlyBudget: number // Alert if hourly cost exceeds this
   dailyBudget: number // Alert if daily cost exceeds this
-  userHourlyThreshold: number // Alert if single user spends more than this per hour
   spikeMultiplier: number // Alert if cost is X times the average
 }
 
@@ -83,7 +95,6 @@ const DEFAULT_CONFIG: CostAnomalyConfig = {
   singleRequestThreshold: 1.0, // $1 per request is suspicious
   hourlyBudget: 50.0, // $50/hour max
   dailyBudget: 500.0, // $500/day max
-  userHourlyThreshold: 5.0, // $5/hour per user max
   spikeMultiplier: 3, // 3x normal is a spike
 }
 
@@ -190,48 +201,58 @@ export async function checkHourlyCostAnomaly(): Promise<CostAnomaly | null> {
 }
 
 /**
- * Check user-level cost anomaly
+ * Claim the right to run the hourly sweep, platform-wide.
+ *
+ * Without this, "run at most once an hour" would mean once an hour PER warm
+ * serverless instance, and the sweep reads up to 5,000 documents. A single
+ * config doc read+write in a transaction is a rounding error against that, and
+ * it turns N scans an hour into one.
  */
-export async function checkUserCostAnomaly(userId: string): Promise<CostAnomaly | null> {
-  const config = await getAnomalyConfig()
+async function claimHourlySweep(nowMs: number): Promise<boolean> {
+  const claimRef = adminDb.collection("config").doc(HOURLY_SWEEP_CLAIM_DOC)
+
+  return adminDb.runTransaction(async (transaction) => {
+    const doc = await transaction.get(claimRef)
+    const lastRunAtMs = doc.data()?.lastRunAtMs
+    if (typeof lastRunAtMs === "number" && nowMs - lastRunAtMs < HOURLY_SWEEP_INTERVAL_MS) {
+      return false
+    }
+    transaction.set(
+      claimRef,
+      { lastRunAtMs: nowMs, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true }
+    )
+    return true
+  })
+}
+
+/**
+ * Run the hourly cost sweep if it is due. Safe to call on every AI call.
+ *
+ * checkHourlyCostAnomaly was only reachable from an admin "check now" button,
+ * which means the only detector that ran automatically was the per-request one
+ * — and that fires at $1 for a SINGLE request. A runaway loop of thousands of
+ * ordinary-sized calls never trips it: each call is a few cents, entirely
+ * unremarkable on its own, and the bill only exists in the aggregate that
+ * nothing was looking at. This is the aggregate detector, running on its own.
+ *
+ * Two-level throttle: an in-memory timestamp filters essentially every call for
+ * free, and a Firestore claim holds the interval across instances. Never
+ * throws — it is called from a fire-and-forget accounting path.
+ */
+export async function maybeRunHourlyCostSweep(now: Date = new Date()): Promise<void> {
+  const nowMs = now.getTime()
+  if (nowMs - lastLocalSweepAttemptMs < HOURLY_SWEEP_INTERVAL_MS) return
+  // Set before the await so concurrent calls on this instance do not all race
+  // into the claim transaction.
+  lastLocalSweepAttemptMs = nowMs
 
   try {
-    const now = new Date()
-    const hourAgo = new Date(now.getTime() - 60 * 60 * 1000)
-
-    // Limit per-user query to prevent abuse or runaway reads
-    const eventsSnapshot = await adminDb
-      .collection("usage_events")
-      .where("userId", "==", userId)
-      .where("createdAt", ">=", hourAgo)
-      .orderBy("createdAt", "desc")
-      .limit(QUERY_LIMITS.userHourlyEvents)
-      .get()
-
-    let userHourlyCost = 0
-    for (const doc of eventsSnapshot.docs) {
-      userHourlyCost += doc.data().cost || 0
-    }
-
-    if (userHourlyCost > config.userHourlyThreshold) {
-      const anomaly: Omit<CostAnomaly, "id" | "timestamp"> = {
-        type: "user_cost_spike",
-        severity: userHourlyCost > config.userHourlyThreshold * 3 ? "critical" : "warning",
-        description: `User ${userId} hourly cost $${userHourlyCost.toFixed(2)} exceeds threshold of $${config.userHourlyThreshold.toFixed(2)}`,
-        cost: userHourlyCost,
-        threshold: config.userHourlyThreshold,
-        context: { userId },
-        acknowledged: false,
-      }
-
-      await recordAnomaly(anomaly)
-      return { ...anomaly, timestamp: new Date() }
-    }
+    if (!(await claimHourlySweep(nowMs))) return
+    await checkHourlyCostAnomaly()
   } catch (error) {
-    logger.error("Failed to check user cost anomaly", { error, userId })
+    logger.error("Hourly cost sweep failed", { error })
   }
-
-  return null
 }
 
 /**

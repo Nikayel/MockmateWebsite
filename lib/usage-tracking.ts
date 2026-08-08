@@ -18,6 +18,7 @@ import { adminDb } from "./firebase-admin"
 import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { countTokens } from "./token-counter"
 import { logger } from "./logger"
+import { maybeRunHourlyCostSweep } from "./cost-anomaly-detection"
 import { AI_BUDGET_CAPS } from "./pricing"
 import { resolveBudgetCap, resolveTier, hasBudgetOverride, budgetUsedPercent } from "./usage/budget"
 import { fetchProfilesById } from "./usage/profile-lookup"
@@ -186,6 +187,16 @@ export async function trackUsageEvent(event: Omit<UsageEvent, "id" | "createdAt"
     // Also update the user's aggregate usage for the current period
     await updateUserAggregateUsage(event)
     await updateUserDailyUsage(event)
+
+    // Drive the aggregate cost detector from here, because this is the single
+    // funnel every AI cost passes through — both the Node path and the Edge
+    // path's ingest reach it — which is exactly what an automatic detector
+    // needs. It self-throttles to once an hour platform-wide, so the cost of
+    // asking on every call is one integer comparison.
+    //
+    // Not awaited: the sweep reads up to 5,000 documents and nothing on the
+    // request path should wait for a detector. It never throws.
+    void maybeRunHourlyCostSweep().catch(() => {})
   } catch (error) {
     logger.error("Failed to track usage event", { error, eventType: event.eventType })
     // Don't throw - usage tracking failures shouldn't break the app
