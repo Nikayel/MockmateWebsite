@@ -1,18 +1,17 @@
-import { NextRequest } from "next/server"
 import { buildBugfixScenarioAuditRows } from "@/lib/bugfix"
 import { realWorldBugFixScenarios } from "@/lib/scenarios-realworld"
 import { hydrateSealedLegacyBugfix } from "@/lib/scenarios/sealed/legacy-registry.server"
-import { successResponse, unauthorizedResponse, verifyAdminAccess } from "@/lib/admin/middleware"
+import { successResponse, withPermission } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 
 export const dynamic = "force-dynamic"
 
-export async function GET(request: NextRequest) {
-  const authResult = await verifyAdminAccess(request)
-
-  if (!authResult.authorized) {
-    return unauthorizedResponse(authResult.error || "Unauthorized", authResult.status)
-  }
-
+/**
+ * Curriculum quality readout, so VIEW_ANALYTICS. It was gated on "is an admin at
+ * all", which let the support role pull every sealed scenario's rubric and
+ * reference solution.
+ */
+export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async () => {
   // Re-merge the sealed answer content (bug description, rubric, reference files)
   // server-side before auditing. The client modules no longer carry it, so the
   // quality gate would otherwise flag every scenario for a missing reference
@@ -34,4 +33,4 @@ export async function GET(request: NextRequest) {
       seedSet: true,
     },
   })
-}
+})
