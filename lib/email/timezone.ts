@@ -4,6 +4,8 @@
  * Ensures emails are only sent during reasonable hours in the user's local timezone
  */
 
+import { logger } from "@/lib/logger"
+
 // Default timezone if user hasn't set one
 export const DEFAULT_TIMEZONE = "America/Los_Angeles"
 
@@ -18,17 +20,40 @@ export const REASONABLE_HOURS = {
  */
 export function getCurrentHourInTimezone(timezone: string): number {
   try {
-    const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone,
-      hour: "numeric",
-      hour12: false,
-    })
-    return parseInt(formatter.format(new Date()), 10)
+    return hourIn(timezone)
   } catch (error) {
-    // Invalid timezone - fall back to UTC
-    console.warn(`[Timezone] Invalid timezone "${timezone}", falling back to UTC`)
-    return new Date().getUTCHours()
+    // An invalid timezone used to fall back to UTC, which quietly turned the
+    // "9am to 9pm local" guarantee into "9am to 9pm UTC". For a user at UTC+8
+    // that puts the tail of the window at 4am local: the send looks compliant to
+    // every check above it and still wakes someone up.
+    //
+    // A missing timezone already falls back to DEFAULT_TIMEZONE, so an invalid
+    // one now does the same. That is still a guess, but it is the SAME
+    // deliberate guess made everywhere else rather than an accidental second
+    // policy, and its window is one a human chose.
+    logger.error("[Timezone] Invalid timezone; falling back to the default", {
+      timezone,
+      fallback: DEFAULT_TIMEZONE,
+      error,
+    })
+    try {
+      return hourIn(DEFAULT_TIMEZONE)
+    } catch {
+      // DEFAULT_TIMEZONE is a literal IANA zone, so this is unreachable unless
+      // the runtime has no timezone database at all.
+      return new Date().getUTCHours()
+    }
   }
+}
+
+/** Current hour (0-23) in an IANA zone. Throws on an invalid zone, by design. */
+function hourIn(timezone: string): number {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "numeric",
+    hour12: false,
+  })
+  return parseInt(formatter.format(new Date()), 10)
 }
 
 /**
