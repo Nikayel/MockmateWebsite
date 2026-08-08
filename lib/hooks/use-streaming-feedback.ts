@@ -24,6 +24,7 @@ import { useState, useCallback, useRef } from "react"
 import { logger } from "@/lib/logger"
 import { getGuidedLabMasterySummary } from "@/lib/stores/guided-lab-store"
 import { getCurrentUserToken } from "@/lib/firebase-lazy"
+import { REFUSAL_TITLES, isKnownRefusalCode } from "@/lib/interview/refusal-copy"
 
 export interface StreamingScores {
   understanding: number
@@ -52,6 +53,95 @@ export interface StreamingFeedback {
   bugfixScoreBreakdown?: unknown
   bugfixPostSessionReport?: unknown
   scores: StreamingScores
+}
+
+/**
+ * A refusal the server DECIDED on, as opposed to a failure it suffered.
+ *
+ * /api/feedback/stream returns meaningful 401, 429, and 503 bodies (sign in
+ * again, rate limited, platform capacity paused), and the entitlement layer
+ * behind it can add quota and budget blocks. All of them are legitimate, all are
+ * temporary, and each has a different thing the user should do next. The hook
+ * used to throw the response away and render every one as "Something went wrong
+ * generating feedback. Please try again." A user who had just spent 20 to 45
+ * minutes on an interview was told nothing about why, so they retried, which is
+ * the one thing that makes a rate limit or a spend ceiling worse.
+ */
+export interface FeedbackRefusal {
+  /** Machine-readable reason, e.g. GLOBAL_CAPACITY_LIMIT. */
+  code: string
+  /** Short label naming the cause, from lib/interview/refusal-copy.ts. */
+  title: string
+  /** The server's own explanation, which knows the numbers and the reset time. */
+  message: string
+}
+
+/** Statuses that are a designed refusal even when the body carries no code. */
+const STATUS_FALLBACK_CODES: Record<number, string> = {
+  401: "AUTH_REQUIRED",
+  429: "RATE_LIMITED",
+  503: "SERVICE_UNAVAILABLE",
+}
+
+/**
+ * What to say when a refusal arrives correctly labelled but with no prose. Never
+ * blame the user, always say the session survived, always say what happens next.
+ */
+const FALLBACK_MESSAGES: Record<string, string> = {
+  AUTH_REQUIRED: "Please sign in again to see your feedback. Your session is saved.",
+  RATE_LIMITED: "Wait a moment and try again. Your session is saved.",
+  SERVICE_UNAVAILABLE: "Please try again in a few minutes. Your session is saved.",
+}
+
+const GENERIC_REFUSAL_MESSAGE = "Please try again in a little while. Your session is saved."
+
+/**
+ * Turn a non-OK feedback response into the refusal a user should see, or null
+ * when the failure is not a refusal at all (a 500, a dropped connection) and the
+ * existing generic handling is the honest answer.
+ *
+ * Pure and exported so the mapping can be tested without a rendered interview.
+ */
+export function buildFeedbackRefusal(
+  status: number,
+  body: { code?: unknown; message?: unknown; error?: unknown } | null | undefined
+): FeedbackRefusal | null {
+  const code = typeof body?.code === "string" ? body.code : undefined
+  const message = typeof body?.message === "string" ? body.message : undefined
+  const error = typeof body?.error === "string" ? body.error : undefined
+  const serverText = message ?? error
+
+  // The server labelled it: its own wording knows the tier, the cap, and when
+  // the block lifts, so prefer it over anything written here.
+  if (isKnownRefusalCode(code)) {
+    return {
+      code,
+      title: REFUSAL_TITLES[code] ?? "We couldn't finish your feedback",
+      message: serverText ?? FALLBACK_MESSAGES[code] ?? GENERIC_REFUSAL_MESSAGE,
+    }
+  }
+
+  // No usable code, but the status alone still separates three different
+  // remedies. Only a status that says nothing falls through to generic.
+  const fallbackCode = STATUS_FALLBACK_CODES[status]
+  if (fallbackCode) {
+    return {
+      code: fallbackCode,
+      title: REFUSAL_TITLES[fallbackCode],
+      message: serverText ?? FALLBACK_MESSAGES[fallbackCode] ?? GENERIC_REFUSAL_MESSAGE,
+    }
+  }
+
+  return null
+}
+
+/** Read a refusal body without letting a malformed one mask the refusal. */
+async function readRefusalBody(response: Response): Promise<Record<string, unknown> | null> {
+  try {
+    return (await response.json()) as Record<string, unknown>
+  } catch {
+    return null
+  }
 }
 
 export interface StreamingFeedbackState {
@@ -89,6 +179,13 @@ export interface StreamingFeedbackState {
 
   // Error
   error: string | null
+
+  /**
+   * Set only when the server refused for a reason it named. Null for ordinary
+   * failures, which is what lets a presenter keep its generic handling for a
+   * genuine crash while giving a quota or capacity block its real words.
+   */
+  refusal: FeedbackRefusal | null
 }
 
 export interface StreamingFeedbackRequest {
@@ -136,6 +233,7 @@ export function useStreamingFeedback() {
     masteryScore: null,
     technicalScore: null,
     error: null,
+    refusal: null,
   })
 
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -263,6 +361,7 @@ export function useStreamingFeedback() {
         masteryScore: null,
         technicalScore: null,
         error: null,
+        refusal: null,
       })
 
       const abortController = new AbortController()
@@ -272,10 +371,32 @@ export function useStreamingFeedback() {
       let finalScores: StreamingScores | null = null
       let finalFeedback: StreamingFeedback | null = null
 
+      /** End the run on a named refusal instead of the generic failure. */
+      const failWithRefusal = (refusal: FeedbackRefusal) => {
+        logger.warn("[StreamingFeedback] Feedback refused:", {
+          code: refusal.code,
+        })
+        setState((prev) => ({
+          ...prev,
+          isConnected: false,
+          phase: "error",
+          refusal,
+          error: refusal.message,
+        }))
+      }
+
       try {
         const idToken = await getCurrentUserToken()
         if (!idToken) {
-          throw new Error("You must be signed in to generate feedback.")
+          // A token that has gone away mid-interview is a sign-in problem with a
+          // sign-in remedy, not a crash. Throwing here routed it to the generic
+          // catch below and told the user to "try again", which never worked.
+          failWithRefusal({
+            code: "AUTH_REQUIRED",
+            title: REFUSAL_TITLES.AUTH_REQUIRED,
+            message: FALLBACK_MESSAGES.AUTH_REQUIRED,
+          })
+          return
         }
         const response = await fetch("/api/feedback/stream", {
           method: "POST",
@@ -288,6 +409,16 @@ export function useStreamingFeedback() {
         })
 
         if (!response.ok) {
+          // The route answers a refusal as an ordinary HTTP error precisely so
+          // the caller can surface it. Reading the body here is the whole point:
+          // a rate limit, a quota, and a platform-wide capacity pause all arrive
+          // with different remedies, and the throw below flattened them into one
+          // "something went wrong" that invited an immediate retry.
+          const refusal = buildFeedbackRefusal(response.status, await readRefusalBody(response))
+          if (refusal) {
+            failWithRefusal(refusal)
+            return
+          }
           throw new Error(`Stream failed: ${response.status}`)
         }
 
@@ -482,6 +613,7 @@ export function useStreamingFeedback() {
       masteryScore: null,
       technicalScore: null,
       error: null,
+      refusal: null,
     })
   }, [cancel])
 
