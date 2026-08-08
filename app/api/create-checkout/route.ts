@@ -11,6 +11,12 @@ import { PRICING_CONFIG } from "@/lib/config"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { logger } from "@/lib/logger"
 import { sensitiveOperationRateLimit } from "@/lib/rate-limit"
+// Stripe redirects the customer back here after payment. The old inline
+// `NEXT_PUBLIC_APP_URL || "http://localhost:3000"` fallback meant that if the var
+// was ever unset in production, every paying customer was sent to localhost and
+// the post-payment sync never ran. getAppBaseUrl falls back to the canonical
+// SITE_ORIGIN instead, so the worst case is the right site.
+import { getAppBaseUrl } from "@/lib/site-url"
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required")
@@ -237,8 +243,8 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/upgrade?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/upgrade?canceled=true`,
+      success_url: `${getAppBaseUrl()}/upgrade?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${getAppBaseUrl()}/upgrade?canceled=true`,
       client_reference_id: userId,
       metadata: {
         userId,
@@ -282,9 +288,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     logger.error("Stripe checkout error", { error })
-    return NextResponse.json(
-      { error: "Failed to create checkout session" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Failed to create checkout session" }, { status: 500 })
   }
 }

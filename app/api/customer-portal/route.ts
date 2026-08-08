@@ -12,6 +12,9 @@ import Stripe from "stripe"
 import { logger } from "@/lib/logger"
 import { syncSubscriptionFromStripe } from "@/lib/stripe-helpers"
 import { sensitiveOperationRateLimit } from "@/lib/rate-limit"
+// See create-checkout: the inline localhost fallback would strand a customer on
+// localhost after managing their billing. getAppBaseUrl falls back to SITE_ORIGIN.
+import { getAppBaseUrl } from "@/lib/site-url"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-12-15.clover" as any,
@@ -101,11 +104,42 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // STEP 2: Validate customer ID exists in Stripe before using it
+    // STEP 2: Validate the customer ID exists in Stripe AND belongs to this caller.
+    //
+    // Existence alone is not authorization. This step used to check only that the
+    // customer resolved, so any stripe_customer_id sitting in the profile was
+    // honored, and a Billing Portal session exposes invoices, card last-4, billing
+    // address, and a cancel button. firestore.rules now blocks the client from
+    // writing stripe_customer_id at all, which closes the way that field could be
+    // forged, but the server should not depend on a rules file for authorization
+    // of a billing surface.
+    //
+    // create-checkout stamps metadata.userId on every customer it creates or
+    // adopts, so that is the ownership record. Absent metadata is treated as
+    // not-owned rather than trusted: for a billing portal the safe default is to
+    // refuse. The email-lookup path further down is the recovery route, and it
+    // does verify identity.
     if (stripeCustomerId) {
       try {
-        // Verify customer exists in Stripe
-        await stripe.customers.retrieve(stripeCustomerId)
+        const customer = await stripe.customers.retrieve(stripeCustomerId)
+        const ownerId =
+          "deleted" in customer && customer.deleted ? undefined : customer.metadata?.userId
+
+        if (ownerId !== userId) {
+          logger.error("Customer portal: stripe_customer_id does not belong to the caller", {
+            userId,
+            stripeCustomerId,
+            hasOwnerMetadata: !!ownerId,
+          })
+          return NextResponse.json(
+            {
+              error: "Billing account mismatch",
+              message:
+                "We could not verify this billing account belongs to you. Please contact support@codesparring.dev.",
+            },
+            { status: 403 }
+          )
+        }
       } catch (stripeError: any) {
         // Customer doesn't exist - clear it from profile
         if (stripeError?.code === "resource_missing") {
@@ -308,7 +342,7 @@ export async function POST(request: NextRequest) {
     // Create customer portal session
     const session = await stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/profile`,
+      return_url: `${getAppBaseUrl()}/profile`,
     })
 
     return NextResponse.json({
