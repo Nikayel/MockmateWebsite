@@ -24,9 +24,25 @@ interface SignificanceTestCardProps {
   title: string
   test: TTestResult | null
   description?: string
+  /**
+   * The family-wise correction for this metric, from the same readout that
+   * drives the verdict banner.
+   *
+   * Without it this card called a metric "Significant" from its own
+   * uncorrected p-value. Three metrics are tested together, so at alpha = 0.05
+   * per test there is roughly a 14% chance that at least one of these badges
+   * turns green on noise, and it could turn green while the banner above it
+   * said no difference was detected. One page must not hold two answers.
+   */
+  correction?: { adjustedPValue: number | null; significant: boolean }
 }
 
-export function SignificanceTestCard({ title, test, description }: SignificanceTestCardProps) {
+export function SignificanceTestCard({
+  title,
+  test,
+  description,
+  correction,
+}: SignificanceTestCardProps) {
   if (!test) {
     return (
       <Card className="border-gray-800 bg-gray-900/50">
@@ -35,14 +51,16 @@ export function SignificanceTestCard({ title, test, description }: SignificanceT
             <Info className="h-4 w-4" />
             <span className="text-sm font-medium">{title}</span>
           </div>
-          <p className="mt-2 text-xs text-gray-500">Insufficient data</p>
+          <p className="mt-2 text-xs text-gray-500">Not enough data yet</p>
         </CardContent>
       </Card>
     )
   }
 
-  const isSignificant = test.significant
-  const pValueFormatted = test.pValue < 0.001 ? "< 0.001" : test.pValue.toFixed(4)
+  const formatP = (p: number) => (p < 0.001 ? "< 0.001" : p.toFixed(4))
+  // The corrected answer wins whenever it is available.
+  const isSignificant = correction ? correction.significant : test.significant
+  const pValueFormatted = formatP(test.pValue)
 
   return (
     <Card
@@ -63,11 +81,24 @@ export function SignificanceTestCard({ title, test, description }: SignificanceT
 
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-400">p-value</span>
-            <span className={isSignificant ? "text-green-400" : "text-gray-300"}>
+            <span className="text-gray-400">p-value{correction ? " (raw)" : ""}</span>
+            <span
+              className={
+                correction ? "text-gray-300" : isSignificant ? "text-green-400" : "text-gray-300"
+              }
+            >
               {pValueFormatted}
             </span>
           </div>
+
+          {correction && (
+            <div className="flex justify-between">
+              <span className="text-gray-400">Holm adjusted</span>
+              <span className={isSignificant ? "text-green-400" : "text-gray-300"}>
+                {correction.adjustedPValue === null ? "n/a" : formatP(correction.adjustedPValue)}
+              </span>
+            </div>
+          )}
 
           <div className="flex justify-between">
             <span className="text-gray-400">Effect Size</span>

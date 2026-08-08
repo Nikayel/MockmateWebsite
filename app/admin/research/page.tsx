@@ -130,6 +130,22 @@ export default function ResearchDashboard() {
     exportData: rawExportData,
   } = useEnhancedResearch(firebaseUser)
 
+  /**
+   * The Holm correction for one metric, taken from the same readout that drives
+   * the verdict banner. The Statistics tab used to decide "Significant" from
+   * its own uncorrected p-value, which could contradict the banner directly on
+   * the same screen.
+   */
+  const correctionFor = (key: "retention" | "score" | "intervalAccuracy") => {
+    const experiment = enhancedData?.experiment
+    if (!experiment) return undefined
+    const readout = [experiment.primary, ...experiment.secondary].find(
+      (metric) => metric.key === key
+    )
+    if (!readout) return undefined
+    return { adjustedPValue: readout.adjustedPValue, significant: readout.significant }
+  }
+
   // Wrap export to show status
   const exportData = async (
     format: "csv" | "json",
@@ -745,8 +761,9 @@ export default function ResearchDashboard() {
                   </h3>
                   <p className="text-sm text-gray-400">
                     Welch t-tests on one value per user, because the A/B randomizes users rather
-                    than reviews. These are the raw per-metric p-values. The verdict at the top of
-                    the page applies the Holm correction across all three before calling a winner.
+                    than reviews. Each card shows its raw p-value and the Holm adjusted one, and the
+                    Significant badge follows the adjusted value, so these cards and the verdict at
+                    the top of the page always agree.
                   </p>
                 </div>
                 {enhancedData.metadata && (
@@ -761,16 +778,19 @@ export default function ResearchDashboard() {
                 <SignificanceTestCard
                   title="Retention Rate"
                   test={enhancedData.significanceTests.retention}
+                  correction={correctionFor("retention")}
                   description="Per user: share of their reviews recalled correctly"
                 />
                 <SignificanceTestCard
                   title="Average Score"
                   test={enhancedData.significanceTests.score}
+                  correction={correctionFor("score")}
                   description="Per user: mean score across their reviews"
                 />
                 <SignificanceTestCard
                   title="Interval Accuracy"
                   test={enhancedData.significanceTests.intervalAccuracy}
+                  correction={correctionFor("intervalAccuracy")}
                   description="Per user: share of reviews the schedule predicted correctly"
                 />
               </div>
