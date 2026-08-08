@@ -83,7 +83,6 @@ interface AnalyticsMetrics {
   timeSeries?: {
     users: Array<{ date: string; total: number; free: number; pro: number; enterprise: number }>
     sessions: Array<{ date: string; total: number; completed: number }>
-    revenue: Array<{ date: string; mrr: number }>
   }
 }
 
@@ -232,8 +231,6 @@ export default function AdminDashboard() {
           icon={DollarSign}
           valueColor="text-green-400"
           iconColor="text-green-400"
-          sparklineData={metrics.timeSeries?.revenue.slice(-7).map((r) => r.mrr)}
-          sparklineColor="#3fb883"
         />
         <MetricCard
           title="Sessions"
@@ -321,17 +318,8 @@ export default function AdminDashboard() {
           />
         )}
 
-        {/* Revenue Chart */}
-        {metrics.timeSeries?.revenue && metrics.timeSeries.revenue.length > 0 && (
-          <TimeSeriesChart
-            title="Revenue Trend"
-            subtitle="MRR over time"
-            data={metrics.timeSeries.revenue}
-            series={[{ key: "mrr", name: "MRR", color: "#3fb883" }]}
-            icon={DollarSign}
-            valueFormatter={(v) => `$${v.toLocaleString()}`}
-          />
-        )}
+        {/* No revenue trend. The series it charted was the cumulative signup curve
+            priced at today's list rate, which is not a revenue history. */}
       </div>
 
       {/* Charts Row 2 */}

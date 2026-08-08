@@ -9,7 +9,6 @@ import {
 } from "@/lib/firebase-analytics-admin"
 import { withPermission, parseAdminQueryParams } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
-import { getMonthlyPrice } from "@/lib/pricing"
 import { computeMrrCents, computeArrCents, centsToDollars } from "@/lib/admin/revenue-metrics"
 import { countBillingSubscriptions } from "@/lib/admin/subscription-state"
 import { isScoredCompletedSession, summarizeSessionFunnelCounts } from "@/lib/firestore-helpers"
@@ -39,7 +38,6 @@ async function generateTimeSeriesData(
 ): Promise<{
   users: Array<{ date: string; total: number; free: number; pro: number; enterprise: number }>
   sessions: Array<{ date: string; total: number; completed: number }>
-  revenue: Array<{ date: string; mrr: number }>
 }> {
   const now = new Date()
   const start = startDate || new Date(now.getFullYear() - 1, 0, 1)
@@ -163,13 +161,17 @@ async function generateTimeSeriesData(
     }
   })
 
-  // Calculate revenue based on cumulative pro/enterprise users
-  const revenue = users.map((u) => ({
-    date: u.date,
-    mrr: u.pro * getMonthlyPrice("pro") + u.enterprise * getMonthlyPrice("enterprise"),
-  }))
-
-  return { users, sessions, revenue }
+  // No revenue series. It used to be built here by taking the cumulative count of
+  // pro and enterprise accounts at each point and multiplying by TODAY's list price,
+  // which is not a history of anything: it ignores subscription_status, prices a
+  // yearly subscriber at the monthly rate, and back-projects current pricing over a
+  // past that may have been billed differently. It rendered as "Revenue Trend" and
+  // as the sparkline beneath the MRR headline, so the one corrected number on the
+  // page sat on top of the second, wrong definition it had just been rid of.
+  //
+  // A real MRR history needs a periodic snapshot of billing state; it cannot be
+  // reconstructed from a signup curve.
+  return { users, sessions }
 }
 
 /**
