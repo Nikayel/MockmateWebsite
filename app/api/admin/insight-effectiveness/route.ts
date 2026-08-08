@@ -4,8 +4,9 @@
  * Returns metrics on how effective our AI insights and recommendations are
  */
 
-import { NextRequest, NextResponse } from "next/server"
-import { verifyAdminAccess } from "@/lib/admin/middleware"
+import { NextResponse } from "next/server"
+import { withPermission } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 import { adminDb } from "@/lib/firebase-admin"
 import {
   getGlobalInsightStats,
@@ -37,16 +38,20 @@ interface InsightEffectivenessResponse {
   }
 }
 
-export async function GET(request: NextRequest) {
+/**
+ * Effectiveness of AI insights: VIEW_ANALYTICS.
+ *
+ * The top-users table carries real emails, which is user PII rather than
+ * analytics, so the email column is only filled in for a caller who also holds
+ * VIEW_USER_DETAILS. An analyst still gets the whole ranking, keyed by user id.
+ */
+export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (_request, context) => {
   try {
-    // Verify admin access
-    const adminCheck = await verifyAdminAccess(request)
-    if (!adminCheck.authorized) {
-      return NextResponse.json(
-        { error: adminCheck.error || "Unauthorized" },
-        { status: adminCheck.status || 403 }
-      )
+    if (!adminDb) {
+      return NextResponse.json({ error: "Database not available" }, { status: 503 })
     }
+
+    const maySeeEmails = context.permissions.includes(PERMISSIONS.VIEW_USER_DETAILS)
 
     // Get global stats
     const globalStats = await getGlobalInsightStats()
@@ -74,11 +79,13 @@ export async function GET(request: NextRequest) {
       if (userStats) {
         // Try to get user email
         let email: string | undefined
-        try {
-          const userDoc = await adminDb.collection("profiles").doc(userId).get()
-          email = userDoc.data()?.email
-        } catch {
-          // Ignore
+        if (maySeeEmails) {
+          try {
+            const userDoc = await adminDb.collection("profiles").doc(userId).get()
+            email = userDoc.data()?.email
+          } catch {
+            // Ignore
+          }
         }
 
         // Calculate completion rate
@@ -159,4 +166,4 @@ export async function GET(request: NextRequest) {
     console.error("[Admin InsightEffectiveness] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-}
+})
