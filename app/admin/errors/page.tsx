@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { TimeSeriesChart } from "@/components/admin/charts"
-import { AlertCircle, RefreshCw, ExternalLink, Bug, AlertTriangle } from "lucide-react"
+import { AlertCircle, RefreshCw, Bug, AlertTriangle } from "lucide-react"
 import { logger } from "@/lib/logger"
 
 interface ErrorEvent {
@@ -28,6 +28,14 @@ export default function ErrorsPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [timeRange, setTimeRange] = useState("7d")
+  /**
+   * Why the last load failed, or null if it succeeded. Without this the page treats a
+   * failed request exactly like a clean bill of health: state stays empty and the
+   * card below reports "running smoothly". On an error dashboard that inverts the
+   * meaning of the screen, because the worse the backend is doing the healthier it
+   * looks.
+   */
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const loadErrors = useCallback(async (showRefreshing = false) => {
     if (!firebaseUser) return
@@ -40,38 +48,49 @@ export default function ErrorsPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.metrics) {
-          setErrors(data.metrics.errors.recent || [])
-
-          // Group errors by date for trend
-          const errorsByDate: Record<string, number> = {}
-          data.metrics.errors.recent.forEach((err: ErrorEvent) => {
-            if (err.timestamp) {
-              const date = new Date(err.timestamp).toISOString().split("T")[0]
-              errorsByDate[date] = (errorsByDate[date] || 0) + 1
-            }
-          })
-
-          // Group errors by type
-          const errorsByType: Record<string, number> = {}
-          data.metrics.errors.recent.forEach((err: ErrorEvent) => {
-            const type = err.errorType || "Unknown"
-            errorsByType[type] = (errorsByType[type] || 0) + 1
-          })
-
-          setErrorStats({
-            total: data.metrics.errors.total,
-            byType: errorsByType,
-            trend: Object.entries(errorsByDate)
-              .map(([date, count]) => ({ date, count }))
-              .sort((a, b) => a.date.localeCompare(b.date)),
-          })
-        }
+      if (!response.ok) {
+        setLoadError(
+          `The analytics service returned ${response.status}. These figures are not current.`
+        )
+        return
       }
+
+      const data = await response.json()
+      if (!data.success || !data.metrics) {
+        setLoadError("The analytics service returned a response this page could not read.")
+        return
+      }
+
+      const recent: ErrorEvent[] = data.metrics.errors.recent || []
+      setErrors(recent)
+
+      // Group errors by date for trend
+      const errorsByDate: Record<string, number> = {}
+      recent.forEach((err) => {
+        if (err.timestamp) {
+          const date = new Date(err.timestamp).toISOString().split("T")[0]
+          errorsByDate[date] = (errorsByDate[date] || 0) + 1
+        }
+      })
+
+      // Group errors by type
+      const errorsByType: Record<string, number> = {}
+      recent.forEach((err) => {
+        const type = err.errorType || "Unknown"
+        errorsByType[type] = (errorsByType[type] || 0) + 1
+      })
+
+      setErrorStats({
+        total: data.metrics.errors.total,
+        byType: errorsByType,
+        trend: Object.entries(errorsByDate)
+          .map(([date, count]) => ({ date, count }))
+          .sort((a, b) => a.date.localeCompare(b.date)),
+      })
+      setLoadError(null)
     } catch (error) {
       logger.error("Error loading admin errors", { error, timeRange })
+      setLoadError("Could not reach the analytics service. These figures are not current.")
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -248,11 +267,27 @@ export default function ErrorsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {errors.length === 0 ? (
-            <div className="text-center py-8">
-              <AlertCircle className="h-12 w-12 text-green-400 mx-auto mb-4" />
-              <p className="text-green-400 font-medium">No errors recorded</p>
-              <p className="text-gray-500 text-sm mt-1">Your application is running smoothly</p>
+          {loadError ? (
+            <div className="py-8 text-center">
+              <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-yellow-400" />
+              <p className="font-medium text-yellow-400">Could not load errors</p>
+              <p className="mx-auto mt-1 max-w-md text-sm text-gray-400">{loadError}</p>
+              <Button
+                onClick={() => loadErrors(true)}
+                variant="outline"
+                size="sm"
+                className="mt-4 border-gray-700 text-gray-300"
+              >
+                Try again
+              </Button>
+            </div>
+          ) : errors.length === 0 ? (
+            <div className="py-8 text-center">
+              <AlertCircle className="mx-auto mb-4 h-12 w-12 text-green-400" />
+              <p className="font-medium text-green-400">No errors recorded</p>
+              <p className="mt-1 text-sm text-gray-400">
+                Nothing was reported in the selected window.
+              </p>
             </div>
           ) : (
             <div className="space-y-3 max-h-[500px] overflow-y-auto">
