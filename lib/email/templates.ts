@@ -13,22 +13,41 @@
  */
 
 import { calculateRetention } from "./brevo"
+import { getAppBaseUrl } from "../site-url"
 
 // Email type determines footer behavior
 type EmailType = "transactional" | "reminder" | "marketing"
 
+/**
+ * The preferences link every reminder and marketing email carries in its footer.
+ *
+ * These two were the last hardcoded apex-host URLs in the email system. `www` is canonical (see
+ * `lib/seo/site.ts`) and the apex answers with a 308, so every one of these clicks paid for an extra
+ * round trip before the account page even started loading - on the one link a recipient clicks when
+ * they are already annoyed enough to want the emails to stop. Every other URL in an email already
+ * flows through `getAppBaseUrl` via `notifications.ts`; these did not.
+ *
+ * Resolved per call rather than at module load so a deployment that sets `NEXT_PUBLIC_APP_URL`
+ * later in the boot sequence is still honoured.
+ */
+function accountPreferencesUrl(): string {
+  return `${getAppBaseUrl()}/account`
+}
+
 // Clean email wrapper with tasteful styling
 const emailWrapper = (content: string, emailType: EmailType = "transactional") => {
+  const preferencesUrl = accountPreferencesUrl()
+
   // Footer varies by email type
   const footer =
     emailType === "reminder"
       ? `<p style="margin-top: 32px; font-size: 13px; color: #888;">
-        <a href="https://codesparring.dev/account" style="color: #888;">change email preferences</a>
+        <a href="${preferencesUrl}" style="color: #888;">change email preferences</a>
        </p>`
       : emailType === "marketing"
         ? `<p style="margin-top: 32px; font-size: 13px; color: #888;">
         You signed up for CodeSparring updates.<br>
-        <a href="https://codesparring.dev/account" style="color: #888;">unsubscribe</a>
+        <a href="${preferencesUrl}" style="color: #888;">unsubscribe</a>
        </p>`
         : "" // transactional emails don't need unsubscribe
 
