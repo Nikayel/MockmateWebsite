@@ -45,6 +45,12 @@ interface CohortStats {
   }>
 }
 
+/**
+ * Descriptive differences between the two cohort averages. No winner and no
+ * confidence: those come from the tested readout on
+ * /api/admin/research/enhanced, which is the only place a significance claim is
+ * allowed to originate.
+ */
 interface Comparison {
   retention_rate_difference: number
   average_score_difference: number
@@ -52,8 +58,6 @@ interface Comparison {
   engagement_difference: number
   interval_efficiency_difference: number
   sufficient_sample_size: boolean
-  overall_winner: string | null
-  confidence_level: number | null
   fsrs_wins_count: number
   sm2_wins_count: number
 }

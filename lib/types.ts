@@ -715,6 +715,11 @@ export interface AlgorithmResearchSummary {
 /**
  * Aggregate comparison between algorithms
  * Stored in: algorithm_research_aggregate/comparison
+ *
+ * DESCRIPTIVE ONLY. This document holds differences between two cohort
+ * averages. It carries no p-value, no winner and no confidence, because it has
+ * no variance, no per-arm sample size and no analysis window to compute one
+ * from. The tested verdict lives in `lib/research/experiment-readout.ts`.
  */
 export interface AlgorithmComparisonAggregate {
   last_updated: string
@@ -726,24 +731,19 @@ export interface AlgorithmComparisonAggregate {
   sm2: AlgorithmCohortStats
   fsrs: AlgorithmCohortStats
 
-  // Statistical Analysis
   comparison: {
-    retention_rate_difference: number // FSRS - SM2 (positive = FSRS better)
+    retention_rate_difference: number // FSRS - SM2 (positive = FSRS higher)
     average_score_difference: number
     time_to_mastery_difference_days: number
     engagement_difference: number // Average daily reviews difference
     interval_efficiency_difference: number
 
-    // Significance Testing
-    retention_p_value?: number
-    score_p_value?: number
     sufficient_sample_size: boolean
 
-    // Winner determination
-    overall_winner: SpacedRepetitionAlgorithm | null // null if no clear winner
-    confidence_level: number | null // 0-100%, null if insufficient data
-    fsrs_wins_count: number // Count of metrics where FSRS is better
-    sm2_wins_count: number // Count of metrics where SM-2 is better
+    // How many of the five averages above each arm leads on. A true fact about
+    // the averages, and nothing more: leading on an average is not winning.
+    fsrs_wins_count: number
+    sm2_wins_count: number
   }
 }
 

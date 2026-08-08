@@ -598,7 +598,28 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
   const sm2Stats = calculateCohortStats("sm2", sm2Users, thirtyDaysAgo, distribution.sm2.total)
   const fsrsStats = calculateCohortStats("fsrs", fsrsUsers, thirtyDaysAgo, distribution.fsrs.total)
 
-  // Calculate comparison
+  // Differences between two cohort averages. DESCRIPTIVE ONLY.
+  //
+  // Nothing here is a test. A difference between two averages says nothing on
+  // its own about whether it is larger than the noise, and this document is
+  // built from lifetime per-user summaries with no variance, no per-arm sample
+  // size and no window. Every significance claim on /admin/research comes from
+  // `lib/research/experiment-readout.ts`, which runs user-level tests over a
+  // fixed window and reports an interval, n per arm and an SRM check.
+  //
+  // Two fields used to live here and no longer do:
+  //
+  //   overall_winner    - set to an arm whenever it led 4 of the 5 averages
+  //                       below. Leading on an average is not winning.
+  //   confidence_level  - `Math.min(95, 60 + wins * 7)`. It counted those same
+  //                       leads and rescaled the count to look like a
+  //                       percentage. It could not go below 74, it never
+  //                       touched the spread of the data or the size of the
+  //                       sample, and it was written to Firestore, rendered to
+  //                       the founder and exported to CSV as "confidence".
+  //
+  // The per-metric lead counts stay because a count of leads is a true fact
+  // about the averages. They are labelled as such wherever they surface.
   const comparison: {
     retention_rate_difference: number
     average_score_difference: number
@@ -606,8 +627,6 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
     engagement_difference: number
     interval_efficiency_difference: number
     sufficient_sample_size: boolean
-    overall_winner: SpacedRepetitionAlgorithm | null
-    confidence_level: number | null
     fsrs_wins_count: number
     sm2_wins_count: number
   } = {
@@ -618,13 +637,11 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
     engagement_difference: fsrsStats.average_daily_reviews - sm2Stats.average_daily_reviews,
     interval_efficiency_difference: fsrsStats.interval_accuracy - sm2Stats.interval_accuracy,
     sufficient_sample_size: sm2Users.length >= 30 && fsrsUsers.length >= 30,
-    overall_winner: null, // Use null instead of undefined for Firestore compatibility
-    confidence_level: null,
     fsrs_wins_count: 0,
     sm2_wins_count: 0,
   }
 
-  // Count wins for each algorithm across metrics
+  // Count, per metric, which cohort average is higher.
   const metricComparisons = [
     { name: "retention", fsrsBetter: comparison.retention_rate_difference > 0 },
     { name: "score", fsrsBetter: comparison.average_score_difference > 0 },
@@ -634,22 +651,9 @@ export async function generateAggregateComparison(): Promise<AlgorithmComparison
   ]
 
   const fsrsWins = metricComparisons.filter((m) => m.fsrsBetter).length
-  const sm2Wins = 5 - fsrsWins
 
   comparison.fsrs_wins_count = fsrsWins
-  comparison.sm2_wins_count = sm2Wins
-
-  // Determine winner if sample size is sufficient
-  if (comparison.sufficient_sample_size) {
-    if (fsrsWins >= 4) {
-      comparison.overall_winner = "fsrs"
-      comparison.confidence_level = Math.min(95, 60 + fsrsWins * 7)
-    } else if (fsrsWins <= 1) {
-      comparison.overall_winner = "sm2"
-      comparison.confidence_level = Math.min(95, 60 + sm2Wins * 7)
-    }
-    // If 2-3 wins each, no clear winner - leave as null
-  }
+  comparison.sm2_wins_count = metricComparisons.length - fsrsWins
 
   const aggregate: AlgorithmComparisonAggregate = {
     last_updated: now.toISOString(),
