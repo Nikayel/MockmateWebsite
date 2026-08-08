@@ -213,6 +213,19 @@ export function ReferralWidget() {
             <span className="text-green-400">$10</span> &{" "}
             <span className="text-purple-400">1 extra month</span> when they upgrade to Pro
           </p>
+          {/* Redemption is manual today: referrals.ts accrues the credits but no
+              Stripe or entitlement path reads them. Saying so here stops the
+              counter above from reading as an automatic payout that never lands. */}
+          <p className="text-muted-foreground mt-1.5 text-[10px] leading-relaxed">
+            Rewards are paid out manually for now. Email{" "}
+            <a
+              href="mailto:support@codesparring.dev?subject=Referral%20reward%20claim"
+              className="underline"
+            >
+              support@codesparring.dev
+            </a>{" "}
+            to claim yours.
+          </p>
           <a
             href="/referral-terms"
             className="text-muted-foreground hover:text-muted-foreground mt-1 block text-[10px] underline"
