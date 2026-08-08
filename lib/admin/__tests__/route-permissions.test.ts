@@ -58,6 +58,7 @@ const ROUTE_RULES: RouteRule[] = [
   { route: "learn-research", method: "GET?view=export", permission: PERMISSIONS.EXPORT_DATA, roles: ANALYTICS_READERS },
   { route: "learner-model", method: "GET", permission: PERMISSIONS.VIEW_ANALYTICS, roles: ANALYTICS_READERS },
   { route: "nps", method: "GET", permission: PERMISSIONS.VIEW_ANALYTICS, roles: ANALYTICS_READERS },
+  { route: "providers", method: "GET", permission: PERMISSIONS.MANAGE_SETTINGS, roles: SETTINGS_MANAGERS },
   { route: "query-performance", method: "GET", permission: PERMISSIONS.VIEW_ANALYTICS, roles: ANALYTICS_READERS },
   { route: "query-performance", method: "POST", permission: PERMISSIONS.MANAGE_USERS, roles: PEOPLE_HANDLERS },
   { route: "rag-health", method: "GET", permission: PERMISSIONS.VIEW_ANALYTICS, roles: ANALYTICS_READERS },
