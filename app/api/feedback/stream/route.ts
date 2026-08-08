@@ -221,13 +221,10 @@ async function checkFeedbackRateLimit(userId: string): Promise<EdgeRateLimitVerd
     try {
       allowed = await checkUpstashWindow(key, window, nowMs)
     } catch (error) {
-      logger.error(
-        "[Streaming Feedback] Distributed rate limit unavailable, using isolate counter",
-        {
-          window: window.name,
-          error,
-        }
-      )
+      logger.error("[Streaming Feedback] Distributed rate limit unavailable, using isolate counter", {
+        window: window.name,
+        error,
+      })
       allowed = undefined
     }
 
@@ -433,7 +430,9 @@ export async function POST(request: NextRequest) {
         // Only reachable from a synthetic session, so it is worth seeing.
         logger.warn("[Streaming Feedback] Transcript exceeded the message cap", {
           userId: authenticatedUserId,
-          received: Array.isArray(rawConversationTranscript) ? rawConversationTranscript.length : 0,
+          received: Array.isArray(rawConversationTranscript)
+            ? rawConversationTranscript.length
+            : 0,
           cap: MAX_TRANSCRIPT_MESSAGES,
           scenarioId,
         })

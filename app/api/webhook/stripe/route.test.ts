@@ -191,8 +191,7 @@ afterEach(() => {
 })
 
 describe("stripe webhook idempotency", () => {
-  const event = () =>
-    stripeEvent("customer.subscription.created", { id: "sub_1", customer: "cus_1" })
+  const event = () => stripeEvent("customer.subscription.created", { id: "sub_1", customer: "cus_1" })
 
   it("claims the event, processes it, and closes the claim as completed", async () => {
     const { POST } = await importRoute()

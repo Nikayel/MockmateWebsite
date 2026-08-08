@@ -218,9 +218,7 @@ describe("deleteAllUserData", () => {
   })
 
   it("keeps going after one collection fails, and names the one that did", async () => {
-    const { db, recursivelyDeleted } = scriptedDb({
-      failingCollections: ["user_stats", "feedback"],
-    })
+    const { db, recursivelyDeleted } = scriptedDb({ failingCollections: ["user_stats", "feedback"] })
 
     const result = await deleteAllUserData(db, USER_ID)
 

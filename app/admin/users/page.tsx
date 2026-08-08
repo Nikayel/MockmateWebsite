@@ -49,6 +49,19 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [usersLoading, setUsersLoading] = useState(false)
   const [timeRange, setTimeRange] = useState("30d")
+  /**
+   * What the box shows, updated on every keystroke so typing stays responsive.
+   */
+  const [searchInput, setSearchInput] = useState("")
+  /**
+   * What the server is actually asked for, updated only once typing pauses.
+   *
+   * These were a single value, and it was a fetch dependency, so every character
+   * fired a request. The route behind it scans up to 5000 accounts and issues one
+   * profile query per 30 of them, so typing an eight-character email cost eight
+   * full scans and well over a thousand Firestore reads, of which only the last
+   * result was ever rendered.
+   */
   const [searchQuery, setSearchQuery] = useState("")
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -113,6 +126,17 @@ export default function UsersPage() {
       setUsersLoading(false)
     }
   }, [firebaseUser, page, searchQuery])
+
+  // Settle the search term before asking the server for it. 350ms is below the
+  // threshold where a pause feels like lag and above a fast typist's gap between
+  // keystrokes, so a burst of typing produces one query rather than one per letter.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput.trim())
+      setPage(1)
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [searchInput])
 
   useEffect(() => {
     loadData()
@@ -309,10 +333,10 @@ export default function UsersPage() {
                 <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400" />
                 <Input
                   placeholder="Search users..."
-                  value={searchQuery}
+                  aria-label="Search users by email or ID"
+                  value={searchInput}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    setSearchQuery(e.target.value)
-                    setPage(1)
+                    setSearchInput(e.target.value)
                   }}
                   className="w-64 border-gray-700 bg-gray-800 pl-10 text-white"
                 />
