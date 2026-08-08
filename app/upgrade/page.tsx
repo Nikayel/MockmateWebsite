@@ -82,7 +82,12 @@ function UpgradePageContent() {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                   },
-                  body: JSON.stringify({ userId: currentUserId }),
+                  // The session id is what makes this retry able to rescue a YEARLY purchase. Yearly
+                  // is a one-time payment with no Stripe subscription behind it, so without the
+                  // session the sync has nothing to find and a failed webhook leaves a paying
+                  // customer on Free with no way out. The server re-verifies the session's owner and
+                  // payment status against Stripe before granting anything.
+                  body: JSON.stringify({ userId: currentUserId, sessionId }),
                 })
 
                 if (syncResponse.ok) {
