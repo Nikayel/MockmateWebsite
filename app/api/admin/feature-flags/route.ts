@@ -4,12 +4,30 @@
  * Manage feature flags for gradual rollouts, A/B testing, and kill switches
  */
 
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
-import { verifyToken, getAdminRole } from "@/lib/admin/rbac"
+import { withPermission } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 import { Timestamp } from "firebase-admin/firestore"
 
 export const dynamic = "force-dynamic"
+
+/**
+ * Fields a PUT may change. Everything outside this list is identity or
+ * provenance: `key` is what application code looks a flag up by, and
+ * `createdBy`/`createdAt` are the audit trail for who introduced it.
+ */
+const MUTABLE_FLAG_FIELDS = [
+  "name",
+  "description",
+  "enabled",
+  "type",
+  "rolloutPercentage",
+  "targetTiers",
+  "targetUserIds",
+  "environment",
+  "expiresAt",
+] as const
 
 export interface FeatureFlag {
   id: string
@@ -28,30 +46,18 @@ export interface FeatureFlag {
   expiresAt?: string
 }
 
-// GET - List feature flags
-export async function GET(request: NextRequest) {
+/**
+ * GET - List feature flags.
+ *
+ * The old gate was `if (!role)`, which admits every admin role including the
+ * read-only analyst and support. Flags are operational configuration and this
+ * listing exposes kill switches and rollout targeting, so it belongs with the
+ * roles that can change them: MANAGE_SETTINGS.
+ */
+export const GET = withPermission(PERMISSIONS.MANAGE_SETTINGS, async () => {
   try {
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    const role = await getAdminRole(auth.userId)
-    if (!role) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permissions" },
-        { status: 403 }
-      )
-    }
-
     if (!adminDb) {
-      return NextResponse.json({ success: false, error: "Database not available" }, { status: 500 })
+      return NextResponse.json({ success: false, error: "Database not available" }, { status: 503 })
     }
 
     const snapshot = await adminDb.collection("feature_flags").orderBy("createdAt", "desc").get()
@@ -91,32 +97,13 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
 
-// POST - Create feature flag
-export async function POST(request: NextRequest) {
+// POST - Create feature flag. [super_admin, admin] is exactly MANAGE_SETTINGS.
+export const POST = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request, context) => {
   try {
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    const role = await getAdminRole(auth.userId)
-    if (!role || !["super_admin", "admin"].includes(role)) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permissions" },
-        { status: 403 }
-      )
-    }
-
     if (!adminDb) {
-      return NextResponse.json({ success: false, error: "Database not available" }, { status: 500 })
+      return NextResponse.json({ success: false, error: "Database not available" }, { status: 503 })
     }
 
     const body = await request.json()
@@ -161,7 +148,7 @@ export async function POST(request: NextRequest) {
       targetTiers,
       targetUserIds,
       environment,
-      createdBy: auth.userId,
+      createdBy: context.userId,
       createdAt: now,
       updatedAt: now,
       expiresAt: expiresAt ? Timestamp.fromDate(new Date(expiresAt)) : null,
@@ -170,7 +157,7 @@ export async function POST(request: NextRequest) {
     const docRef = await adminDb.collection("feature_flags").add(flagData)
 
     await adminDb.collection("admin_audit_log").add({
-      adminId: auth.userId,
+      adminId: context.userId,
       action: "create_feature_flag",
       details: { flagId: docRef.id, key, name },
       timestamp: now,
@@ -184,32 +171,13 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
 
 // PUT - Update feature flag
-export async function PUT(request: NextRequest) {
+export const PUT = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request, context) => {
   try {
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    const role = await getAdminRole(auth.userId)
-    if (!role || !["super_admin", "admin"].includes(role)) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permissions" },
-        { status: 403 }
-      )
-    }
-
     if (!adminDb) {
-      return NextResponse.json({ success: false, error: "Database not available" }, { status: 500 })
+      return NextResponse.json({ success: false, error: "Database not available" }, { status: 503 })
     }
 
     const body = await request.json()
@@ -226,9 +194,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Feature flag not found" }, { status: 404 })
     }
 
-    const updateData: Record<string, any> = {
-      ...updates,
-      updatedAt: Timestamp.now(),
+    // Allowlist rather than `{ ...updates }`. Spreading the request body into
+    // update() is mass assignment: it let a caller rewrite `key`, which is what
+    // application code looks the flag up by, so pointing an existing flag's key
+    // at another flag silently rewires whatever that key gates, and it let them
+    // forge `createdBy` and `createdAt`.
+    const updateData: Record<string, unknown> = { updatedAt: Timestamp.now() }
+    for (const field of MUTABLE_FLAG_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(updates, field)) {
+        updateData[field] = updates[field]
+      }
     }
 
     if (updates.expiresAt) {
@@ -238,9 +213,10 @@ export async function PUT(request: NextRequest) {
     await docRef.update(updateData)
 
     await adminDb.collection("admin_audit_log").add({
-      adminId: auth.userId,
+      adminId: context.userId,
       action: "update_feature_flag",
-      details: { flagId: id, updates: Object.keys(updates) },
+      // Record what was actually applied, not what was asked for.
+      details: { flagId: id, updates: Object.keys(updateData) },
       timestamp: Timestamp.now(),
     })
 
@@ -252,32 +228,17 @@ export async function PUT(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
 
-// DELETE - Delete feature flag
-export async function DELETE(request: NextRequest) {
+/**
+ * DELETE - Delete feature flag. Was super_admin only, and MANAGE_ADMINS is the
+ * only permission with that exact audience, so this preserves the existing
+ * restriction rather than widening deletion to every settings manager.
+ */
+export const DELETE = withPermission(PERMISSIONS.MANAGE_ADMINS, async (request, context) => {
   try {
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    const role = await getAdminRole(auth.userId)
-    if (role !== "super_admin") {
-      return NextResponse.json(
-        { success: false, error: "Only super admins can delete feature flags" },
-        { status: 403 }
-      )
-    }
-
     if (!adminDb) {
-      return NextResponse.json({ success: false, error: "Database not available" }, { status: 500 })
+      return NextResponse.json({ success: false, error: "Database not available" }, { status: 503 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -290,7 +251,7 @@ export async function DELETE(request: NextRequest) {
     await adminDb.collection("feature_flags").doc(id).delete()
 
     await adminDb.collection("admin_audit_log").add({
-      adminId: auth.userId,
+      adminId: context.userId,
       action: "delete_feature_flag",
       details: { flagId: id },
       timestamp: Timestamp.now(),
@@ -304,4 +265,4 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
