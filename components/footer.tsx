@@ -38,13 +38,44 @@ const FOOTER_TRACK_LINKS: Record<CourseId, FooterTrackLink> = {
   },
 }
 
+/**
+ * The standalone SEO landing pages and long-form guides.
+ *
+ * Every path below was submitted in `app/sitemap.ts` and linked from nowhere on the site. A URL a
+ * crawler can only reach through the sitemap is the textbook shape of "Discovered, currently not
+ * indexed": Google learns the URL exists, finds no internal link telling it the page matters, and
+ * declines to spend crawl budget on it. Eight pages sat in that state.
+ *
+ * A site-wide footer column is the cheapest fix available, because it puts every one of them
+ * exactly one hop from every page on the site rather than zero hops from anywhere.
+ *
+ * Exported so `components/__tests__/footer-links.test.tsx` can assert the column still covers the
+ * pages it was created for. Adding a landing page means adding it here as well as to the sitemap.
+ */
+export const FOOTER_GUIDE_LINKS: readonly FooterTrackLink[] = [
+  { label: "AI coding interview practice", href: "/ai-coding-interview-practice" },
+  { label: "System design interviews", href: "/system-design-interview-practice" },
+  { label: "Software engineer interviews", href: "/software-engineer-interview-practice" },
+  { label: "New grad interviews", href: "/new-grad-coding-interview-practice" },
+  { label: "Free AI mock interview", href: "/free-ai-coding-interview" },
+  { label: "Best AI interview tools", href: "/best-ai-coding-interview-tools" },
+  { label: "Talking through a problem", href: "/guides/how-to-talk-through-coding-interviews" },
+  {
+    label: "Real-world interview rounds",
+    href: "/guides/what-is-a-real-world-coding-interview-round",
+  },
+]
+
 export function Footer() {
   return (
     <footer className="bg-background border-border border-t">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5">
+        {/* The brand block sits on its own row rather than inside the link grid. With six link
+            columns a sixth-width brand paragraph wraps to a dozen lines; pulling it out keeps both
+            halves readable at every breakpoint. */}
+        <div className="flex flex-col gap-10 lg:flex-row lg:gap-12">
           {/* Brand */}
-          <div className="space-y-4">
+          <div className="space-y-4 lg:w-64 lg:shrink-0">
             <div className="flex items-center space-x-2">
               <Logo size={24} className="text-accent" />
               <span className="font-heading text-xl font-bold tracking-tight">
@@ -64,170 +95,190 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Product Links */}
-          <div>
-            <h3 className="text-foreground mb-4 font-semibold">Product</h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <a
-                  href="/pricing"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Pricing
-                </a>
-              </li>
-              <li>
-                <a
-                  href="/interview"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Try It Free
-                </a>
-              </li>
-              <li>
-                <a
-                  href="/samples"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Sample Reports
-                </a>
-              </li>
-              <li>
-                <Link
-                  href="/blog"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Blog
-                </Link>
-              </li>
-              <li>
-                <a
-                  href="/docs"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Documentation
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          {/* Learn — the free curriculum. Every entry is a plain anchor so it is crawlable. */}
-          <div>
-            <h3 className="text-foreground mb-4 font-semibold">Learn</h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link
-                  href={LEARN_HUB_PATH}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  All courses
-                </Link>
-              </li>
-              {Object.values(FOOTER_TRACK_LINKS).map((track) => (
-                <li key={track.href}>
-                  <Link
-                    href={track.href}
+          <div className="grid flex-1 grid-cols-2 gap-8 md:grid-cols-3 lg:grid-cols-5">
+            {/* Product Links */}
+            <div>
+              <h3 className="text-foreground mb-4 font-semibold">Product</h3>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <a
+                    href="/pricing"
                     className="text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    {track.label}
+                    Pricing
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="/interview"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Try It Free
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="/samples"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Sample Reports
+                  </a>
+                </li>
+                <li>
+                  <Link
+                    href="/blog"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Blog
                   </Link>
                 </li>
-              ))}
-              <li>
-                <Link
-                  href={LEARN_ALL_LESSONS_PATH}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Lesson index
-                </Link>
-              </li>
-            </ul>
-          </div>
+                <li>
+                  <a
+                    href="/docs"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Documentation
+                  </a>
+                </li>
+              </ul>
+            </div>
 
-          {/* Legal */}
-          <div>
-            <h3 className="text-foreground mb-4 font-semibold">Legal</h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <a
-                  href="/legal#privacy-policy"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Privacy Policy
-                </a>
-              </li>
-              <li>
-                <a
-                  href="/legal#terms-of-service"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Terms of Service
-                </a>
-              </li>
-              <li>
-                <a
-                  href="/legal#cookie-policy"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Cookie Policy
-                </a>
-              </li>
-              <li>
-                <a
-                  href="/legal#data-processing"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Your Data Rights
-                </a>
-              </li>
-              <li>
-                <a
-                  href="mailto:security@codesparring.dev"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Security
-                </a>
-              </li>
-            </ul>
-          </div>
+            {/* Learn — the free curriculum. Every entry is a plain anchor so it is crawlable. */}
+            <div>
+              <h3 className="text-foreground mb-4 font-semibold">Learn</h3>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <Link
+                    href={LEARN_HUB_PATH}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    All courses
+                  </Link>
+                </li>
+                {Object.values(FOOTER_TRACK_LINKS).map((track) => (
+                  <li key={track.href}>
+                    <Link
+                      href={track.href}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {track.label}
+                    </Link>
+                  </li>
+                ))}
+                <li>
+                  <Link
+                    href={LEARN_ALL_LESSONS_PATH}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Lesson index
+                  </Link>
+                </li>
+              </ul>
+            </div>
 
-          {/* Support */}
-          <div>
-            <h3 className="text-foreground mb-4 font-semibold">Support</h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <a
-                  href="/docs"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Help Center
-                </a>
-              </li>
-              <li>
-                <a
-                  href="mailto:support@codesparring.dev"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Contact Support
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://github.com/nikayel/codesparring/issues"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Report Issues
-                </a>
-              </li>
-              <li>
-                <a
-                  href="/careers"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Careers
-                </a>
-              </li>
-            </ul>
+            {/* Guides & comparisons — the SEO landing pages, previously reachable only via the
+              sitemap. Plain crawlable links, no JS gate, on every page of the site. */}
+            <div>
+              <h3 className="text-foreground mb-4 font-semibold">Guides &amp; comparisons</h3>
+              <ul className="space-y-2 text-sm">
+                {FOOTER_GUIDE_LINKS.map((guide) => (
+                  <li key={guide.href}>
+                    <Link
+                      href={guide.href}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {guide.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Legal */}
+            <div>
+              <h3 className="text-foreground mb-4 font-semibold">Legal</h3>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <a
+                    href="/legal#privacy-policy"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Privacy Policy
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="/legal#terms-of-service"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Terms of Service
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="/legal#cookie-policy"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Cookie Policy
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="/legal#data-processing"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Your Data Rights
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="mailto:security@codesparring.dev"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Security
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Support */}
+            <div>
+              <h3 className="text-foreground mb-4 font-semibold">Support</h3>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <a
+                    href="/docs"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Help Center
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="mailto:support@codesparring.dev"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Contact Support
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://github.com/nikayel/codesparring/issues"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Report Issues
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="/careers"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Careers
+                  </a>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
 
