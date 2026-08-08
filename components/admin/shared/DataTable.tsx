@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Search, RefreshCw, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
-import { ReactNode, useState } from "react"
+import { ReactNode, useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
+import { sortRows, type SortDirection } from "@/lib/admin/table-sort"
 
 export interface Column<T> {
   key: string
@@ -38,6 +39,13 @@ interface DataTableProps<T> {
   emptyMessage?: string
   actions?: ReactNode
   rowClassName?: (row: T) => string
+  /**
+   * Sort server-side instead of in the browser. Supply this whenever the table is
+   * paginated: sorting only the rows on the current page looks like a full sort
+   * but silently reorders a slice, which is worse than not offering it. When set,
+   * the table renders `data` exactly as given and reports the requested order.
+   */
+  onSort?: (columnKey: string, direction: SortDirection) => void
 }
 
 export function DataTable<T>({
@@ -57,10 +65,11 @@ export function DataTable<T>({
   emptyMessage = "No data found",
   actions,
   rowClassName,
+  onSort,
 }: DataTableProps<T>) {
   const [searchQuery, setSearchQuery] = useState("")
   const [sortColumn, setSortColumn] = useState<string | null>(null)
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
 
   const handleSearch = (query: string) => {
     setSearchQuery(query)
@@ -68,42 +77,46 @@ export function DataTable<T>({
   }
 
   const handleSort = (columnKey: string) => {
-    if (sortColumn === columnKey) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
-    } else {
-      setSortColumn(columnKey)
-      setSortDirection("asc")
-    }
+    const direction: SortDirection =
+      sortColumn === columnKey && sortDirection === "asc" ? "desc" : "asc"
+    setSortColumn(columnKey)
+    setSortDirection(direction)
+    onSort?.(columnKey, direction)
   }
 
+  // Without this the header arrow flipped while the rows below it never moved.
+  // A parent that sorts server-side owns the order, so leave its data alone.
+  const rows = useMemo(
+    () => (onSort ? data : sortRows(data, sortColumn, sortDirection)),
+    [data, sortColumn, sortDirection, onSort]
+  )
+
   return (
-    <Card className="bg-gray-900/50 border-gray-800">
+    <Card className="border-gray-800 bg-gray-900/50">
       {(title || description || searchable || onRefresh || actions) && (
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex-1">
               {title && (
-                <CardTitle className="text-white flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-white">
                   {Icon && <Icon className="h-5 w-5 text-[#c4703f]" />}
                   {title}
                 </CardTitle>
               )}
               {description && (
-                <CardDescription className="text-gray-400 mt-1">
-                  {description}
-                </CardDescription>
+                <CardDescription className="mt-1 text-gray-400">{description}</CardDescription>
               )}
             </div>
 
             <div className="flex items-center gap-2">
               {searchable && (
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400" />
                   <Input
                     placeholder={searchPlaceholder}
                     value={searchQuery}
                     onChange={(e) => handleSearch(e.target.value)}
-                    className="pl-10 w-64 bg-gray-800 border-gray-700 text-white"
+                    className="w-64 border-gray-700 bg-gray-800 pl-10 text-white"
                   />
                 </div>
               )}
@@ -118,9 +131,7 @@ export function DataTable<T>({
                   disabled={refreshing}
                   className="border-gray-700 text-gray-400 hover:text-white"
                 >
-                  <RefreshCw
-                    className={cn("h-4 w-4 mr-2", refreshing && "animate-spin")}
-                  />
+                  <RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />
                   Refresh
                 </Button>
               )}
@@ -135,7 +146,7 @@ export function DataTable<T>({
             <Loader2 className="h-8 w-8 animate-spin text-[#c4703f]" />
           </div>
         ) : data.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">{emptyMessage}</div>
+          <div className="py-12 text-center text-gray-400">{emptyMessage}</div>
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -146,29 +157,54 @@ export function DataTable<T>({
                       <th
                         key={column.key}
                         className={cn(
-                          "py-3 px-4 text-gray-400 font-medium text-sm",
+                          "px-4 py-3 text-sm font-medium text-gray-400",
                           column.align === "center" && "text-center",
                           column.align === "right" && "text-right",
                           column.align !== "center" && column.align !== "right" && "text-left",
                           column.sortable && "cursor-pointer hover:text-white"
                         )}
                         style={column.width ? { width: column.width } : undefined}
-                        onClick={() => column.sortable && handleSort(column.key)}
+                        aria-sort={
+                          !column.sortable
+                            ? undefined
+                            : sortColumn === column.key
+                              ? sortDirection === "asc"
+                                ? "ascending"
+                                : "descending"
+                              : "none"
+                        }
                       >
-                        <div className="flex items-center gap-1">
-                          {column.label}
-                          {column.sortable && sortColumn === column.key && (
-                            <span className="text-[#c4703f]">
-                              {sortDirection === "asc" ? "↑" : "↓"}
+                        {column.sortable ? (
+                          <button
+                            type="button"
+                            onClick={() => handleSort(column.key)}
+                            className={cn(
+                              "flex w-full items-center gap-1 rounded-sm transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-[#c4703f] focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 focus-visible:outline-none",
+                              column.align === "center" && "justify-center",
+                              column.align === "right" && "justify-end"
+                            )}
+                          >
+                            {column.label}
+                            <span
+                              aria-hidden="true"
+                              className={cn(
+                                sortColumn === column.key
+                                  ? "text-[#c4703f]"
+                                  : "text-gray-600 opacity-0 group-hover:opacity-100"
+                              )}
+                            >
+                              {sortColumn === column.key && sortDirection === "desc" ? "↓" : "↑"}
                             </span>
-                          )}
-                        </div>
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-1">{column.label}</div>
+                        )}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((row) => (
+                  {rows.map((row) => (
                     <tr
                       key={keyExtractor(row)}
                       className={cn(
@@ -182,7 +218,7 @@ export function DataTable<T>({
                           <td
                             key={column.key}
                             className={cn(
-                              "py-3 px-4",
+                              "px-4 py-3",
                               column.align === "center" && "text-center",
                               column.align === "right" && "text-right"
                             )}
@@ -198,7 +234,7 @@ export function DataTable<T>({
             </div>
 
             {pagination && pagination.totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-800">
+              <div className="mt-4 flex items-center justify-between border-t border-gray-800 pt-4">
                 <div className="text-sm text-gray-400">
                   Page {pagination.page} of {pagination.totalPages}
                 </div>
@@ -210,7 +246,7 @@ export function DataTable<T>({
                     disabled={pagination.page === 1}
                     className="border-gray-700 text-gray-400 hover:text-white"
                   >
-                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    <ChevronLeft className="mr-1 h-4 w-4" />
                     Previous
                   </Button>
                   <Button
@@ -221,7 +257,7 @@ export function DataTable<T>({
                     className="border-gray-700 text-gray-400 hover:text-white"
                   >
                     Next
-                    <ChevronRight className="h-4 w-4 ml-1" />
+                    <ChevronRight className="ml-1 h-4 w-4" />
                   </Button>
                 </div>
               </div>
