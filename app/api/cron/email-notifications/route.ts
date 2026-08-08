@@ -75,6 +75,33 @@ function reportDedupFailure(emailKind: string, error: unknown, results: CronErro
 }
 
 /**
+ * Record a single user's email failing to send.
+ *
+ * Every one of these sites incremented a counter and pushed a string onto `results.errors`, and
+ * called nothing else. `results` is returned in the HTTP response body, and this cron is triggered
+ * by cron-job.org, which does not read response bodies. So a Brevo outage, an expired API key, or a
+ * malformed profile produced a run where every send failed and the only record of it was a JSON
+ * document that went straight into the void.
+ *
+ * The counters and the strings are unchanged, because they are what a manual invocation reads. The
+ * log line is what makes the same information reach Sentry, where a spike is actually visible.
+ *
+ * `reason` covers both shapes this is called with: a thrown error, and a provider result that
+ * reported `success: false` without throwing. The second is the more dangerous of the two precisely
+ * because nothing about it looks like an exception.
+ */
+function reportSendFailure(
+  emailKind: string,
+  userId: string,
+  reason: unknown,
+  results: CronErrorSink
+): void {
+  const detail = reason instanceof Error ? reason.message : String(reason)
+  logger.error(`[Cron Email] ${emailKind} email failed to send`, { emailKind, userId, reason })
+  results.errors.push(`${emailKind} email failed for ${userId}: ${detail}`)
+}
+
+/**
  * Check if we can send an email to a user based on their timezone
  * Returns false if it's outside 9 AM - 9 PM in their local time
  */
@@ -283,11 +310,11 @@ async function processWelcomeEmails(now: Date, results: any): Promise<void> {
           })
         } else {
           results.welcomeEmails.failed++
-          results.errors.push(`Welcome email failed for ${userId}: ${result.error}`)
+          reportSendFailure("Welcome", userId, result.error, results)
         }
       } catch (error: any) {
         results.welcomeEmails.failed++
-        results.errors.push(`Error sending welcome email to ${userId}: ${error.message}`)
+        reportSendFailure("Welcome", userId, error, results)
       }
     }
   } catch (error: any) {
@@ -441,11 +468,11 @@ async function processInactivityReminders(now: Date, results: any): Promise<void
         })
       } else {
         results.inactivityEmails.failed++
-        results.errors.push(`Inactivity email failed for ${userId}: ${result.error}`)
+        reportSendFailure("Inactivity", userId, result.error, results)
       }
     } catch (error: any) {
       results.inactivityEmails.failed++
-      results.errors.push(`Error processing ${userId}: ${error.message}`)
+      reportSendFailure("Inactivity", userId, error, results)
     }
   }
 }
@@ -588,11 +615,11 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
         })
       } else {
         results.spacedRepetitionEmails.failed++
-        results.errors.push(`SR email failed for ${userId}: ${result.error}`)
+        reportSendFailure("Spaced repetition", userId, result.error, results)
       }
     } catch (error: any) {
       results.spacedRepetitionEmails.failed++
-      results.errors.push(`Error processing problem mastery for ${userId}: ${error.message}`)
+      reportSendFailure("Spaced repetition (problem mastery)", userId, error, results)
     }
   }
 
@@ -719,11 +746,11 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
         })
       } else {
         results.spacedRepetitionEmails.failed++
-        results.errors.push(`SR email failed for ${userId}: ${result.error}`)
+        reportSendFailure("Spaced repetition", userId, result.error, results)
       }
     } catch (error: any) {
       results.spacedRepetitionEmails.failed++
-      results.errors.push(`Error processing ${userId}: ${error.message}`)
+      reportSendFailure("Spaced repetition (legacy topics)", userId, error, results)
     }
   }
 }
@@ -853,7 +880,15 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
             continue
           }
           if (isNaN(planDate.getTime())) continue
-        } catch {
+        } catch (planDateError) {
+          // Dropping a plan day silently means the user's daily roadmap email either goes out with
+          // the wrong questions or does not go out at all, and the roadmap looks empty for that day
+          // with nothing anywhere explaining why. The `continue` stays, so one bad day cannot break
+          // the rest of the roadmap, but it no longer happens invisibly.
+          logger.warn("[Cron Email] Skipping a roadmap day with an unparseable date", {
+            userId,
+            error: planDateError,
+          })
           continue
         }
 
@@ -911,7 +946,7 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
           await logEmailNotification(userId, "interview_countdown", now)
         } else {
           results.roadmapEmails.failed++
-          results.errors.push(`Countdown email failed for ${userId}: ${result.error}`)
+          reportSendFailure("Interview countdown", userId, result.error, results)
         }
         continue
       }
@@ -946,7 +981,7 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
             await logEmailNotification(userId, "behind_schedule", now)
           } else {
             results.roadmapEmails.failed++
-            results.errors.push(`Behind schedule email failed for ${userId}: ${result.error}`)
+            reportSendFailure("Behind schedule", userId, result.error, results)
           }
           continue
         }
@@ -972,12 +1007,12 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
           await logEmailNotification(userId, "daily_roadmap", now)
         } else {
           results.roadmapEmails.failed++
-          results.errors.push(`Daily roadmap email failed for ${userId}: ${result.error}`)
+          reportSendFailure("Daily roadmap", userId, result.error, results)
         }
       }
     } catch (error: any) {
       results.roadmapEmails.failed++
-      results.errors.push(`Error processing roadmap for ${userId}: ${error.message}`)
+      reportSendFailure("Roadmap", userId, error, results)
     }
   }
 }
@@ -1035,8 +1070,17 @@ async function processStreakAlerts(results: {
           const profile = profileDoc.data() as Profile
           userTimezone = profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
         }
-      } catch {
-        // Use default timezone if profile fetch fails
+      } catch (timezoneError) {
+        // Falling back to America/Los_Angeles is the right behaviour, but it is not free: this
+        // timezone decides whether the user "already practiced today". For someone far enough east
+        // the fallback puts them on the wrong calendar day, so they get a streak-at-risk alert on a
+        // day they already practiced, or none on a day they did not. Silently guessing at a user's
+        // timezone is worth a log line.
+        logger.warn("[Cron Email] Timezone read failed; falling back to the default timezone", {
+          userId,
+          fallback: DEFAULT_TIMEZONE,
+          error: timezoneError,
+        })
       }
 
       // Skip if they already practiced today (in THEIR timezone)
