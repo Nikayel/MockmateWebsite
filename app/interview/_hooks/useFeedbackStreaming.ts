@@ -176,8 +176,18 @@ export function useFeedbackStreaming(
           description: "Results may not be saved to history.",
         })
       } else {
-        toast.error("Feedback generation failed", {
-          description: "Applying automated fallback scoring.",
+        // This is the only place a feedback failure reaches the screen, and it
+        // used to say the same thing whatever happened. A refusal the server
+        // NAMED (a rate limit, a monthly or daily budget, a platform-wide
+        // capacity pause) is temporary and has its own remedy, so it gets its
+        // own words. Only an unnamed failure is genuinely "something went
+        // wrong", and that is the case the fallback-scoring line belongs to.
+        // Fallback scoring runs either way, so the user still gets scores.
+        const refusal = feedbackState.refusal
+        toast.error(refusal?.title ?? "Feedback generation failed", {
+          description: refusal?.message ?? "Applying automated fallback scoring.",
+          // Longer than the usual 6s: a refusal carries a decision, not news.
+          duration: refusal ? 12000 : 6000,
         })
         if (lastFeedbackRequestRef.current) {
           applyFallbackFeedback(lastFeedbackRequestRef.current)
