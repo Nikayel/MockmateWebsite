@@ -26,6 +26,10 @@
  */
 
 import { estimateTokensFromText } from "./token-estimate"
+// lib/logger is Edge-safe (the route that calls this already uses it) and is the
+// only path from this runtime to Sentry. console.* here landed in a
+// short-retention Edge log and nowhere else.
+import { logger } from "../logger"
 
 /** One AI call to report. */
 export interface EdgeUsageReport {
@@ -74,10 +78,11 @@ export async function reportEdgeUsage(report: EdgeUsageReport): Promise<boolean>
   // does mean this deployment silently under-reports, so say so once per call
   // in the logs rather than failing quietly.
   if (!secret || !origin) {
-    console.warn(
-      "[Edge Usage] Not reporting AI usage: " +
-        (!secret ? "CRON_SECRET unset" : "no NEXT_PUBLIC_SITE_URL or VERCEL_URL")
-    )
+    logger.error("[Edge Usage] Cannot report AI usage: reporting is misconfigured", {
+      reason: !secret ? "CRON_SECRET unset" : "no NEXT_PUBLIC_SITE_URL or VERCEL_URL",
+      eventType: report.eventType,
+      endpoint: "/api/internal/usage",
+    })
     return false
   }
 
@@ -114,9 +119,36 @@ export async function reportEdgeUsage(report: EdgeUsageReport): Promise<boolean>
         estimatedTokens: report.inputTokens === undefined || report.outputTokens === undefined,
       }),
     })
-    return response.ok
-  } catch {
-    // Never let usage accounting break a user-facing response.
+
+    if (!response.ok) {
+      // A rejected report means this call's spend is missing from the ledger,
+      // the per-user budget cap and the global daily ceiling. Returning
+      // `response.ok` to a caller that discards it made a 401 (rotated
+      // CRON_SECRET) or a 400 (schema drift) indistinguishable from success,
+      // so the Edge path could stop being metered entirely without a signal.
+      const body = await response.text().catch(() => "")
+      logger.error("[Edge Usage] Usage ingest rejected the report", {
+        status: response.status,
+        // Bounded: the ingest returns short JSON errors, but this is untrusted.
+        body: body.slice(0, 500),
+        eventType: report.eventType,
+        provider: report.provider,
+        endpoint: "/api/internal/usage",
+        statusCode: response.status,
+      })
+      return false
+    }
+
+    return true
+  } catch (error) {
+    // Never let usage accounting break a user-facing response — but never let
+    // it vanish either. A transport failure here is unrecorded spend.
+    logger.error("[Edge Usage] Could not reach the usage ingest", {
+      error,
+      eventType: report.eventType,
+      provider: report.provider,
+      endpoint: "/api/internal/usage",
+    })
     return false
   }
 }
