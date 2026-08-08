@@ -65,17 +65,192 @@ export interface ReferralRecord {
   conversionRewardCreditedAt?: Date
 }
 
+// ---------------------------------------------------------------------------
+// Reward state machine
+//
+// The units and the legal status transitions live here, as data, because the
+// admin surface used to re-derive both by hand and got both wrong: it printed
+// a cash reward's amount with a "months" unit, and it tested for a status
+// string the service never writes. Anything that needs to label a reward or
+// decide whether it can still be actioned reads these tables.
+// ---------------------------------------------------------------------------
+
+/**
+ * The three reward kinds this file actually writes.
+ *
+ * `signup_credit` is ONE FREE MONTH, not cash. The $10 is earned only when a
+ * referred user upgrades (`conversion_cash`). Any value outside this union is
+ * a legacy or mistaken row and must be rendered as unknown rather than guessed
+ * into a unit.
+ */
+export const REWARD_TYPES = ["signup_credit", "conversion_cash", "conversion_credit"] as const
+
+export type ReferralRewardType = (typeof REWARD_TYPES)[number]
+
+export function isReferralRewardType(value: unknown): value is ReferralRewardType {
+  return typeof value === "string" && (REWARD_TYPES as readonly string[]).includes(value)
+}
+
+/** What a reward's `amount` is denominated in. Derived from the type, never from the table a row happens to be rendered in. */
+export type RewardUnit = "usd" | "months"
+
+const REWARD_TYPE_UNITS: Record<ReferralRewardType, RewardUnit> = {
+  signup_credit: "months",
+  conversion_cash: "usd",
+  conversion_credit: "months",
+}
+
+export const REWARD_TYPE_LABELS: Record<ReferralRewardType, string> = {
+  signup_credit: "Free month (signup)",
+  conversion_cash: "$10 cash (upgrade)",
+  conversion_credit: "Free month (upgrade)",
+}
+
+export function rewardTypeLabel(type: unknown): string {
+  return isReferralRewardType(type)
+    ? REWARD_TYPE_LABELS[type]
+    : `Unknown reward type (${String(type)})`
+}
+
+/**
+ * Render an amount with the unit its own type dictates. A `conversion_cash`
+ * row is dollars even when it is listed beside credits, which is exactly the
+ * confusion that made a voided $10 clawback read as "10 mo".
+ */
+export function describeRewardAmount(type: unknown, amount: number): string {
+  if (!isReferralRewardType(type)) {
+    return `${amount} (unknown reward type)`
+  }
+  if (REWARD_TYPE_UNITS[type] === "usd") {
+    return `$${amount}`
+  }
+  return `${amount} free month${amount === 1 ? "" : "s"}`
+}
+
+/**
+ * Reward lifecycle.
+ *
+ *   pending             earned, nothing has happened to it yet. The ONLY state
+ *                       in which a reward is an open obligation, and the only
+ *                       state the void/expire sweeps act on.
+ *   redemption_recorded an admin recorded an out-of-band redemption against a
+ *                       reference. This is a bookkeeping record of something a
+ *                       human did elsewhere; the platform did NOT apply an
+ *                       entitlement or move any money.
+ *   expired / voided    the obligation went away.
+ *   credited / paid     LEGACY. Written by the pre-fix admin action, which
+ *                       decremented the referrer's pending balance without
+ *                       anything ever being delivered. Never written again;
+ *                       kept in the union so historical rows still render, and
+ *                       labelled so an operator can see they are not evidence
+ *                       of a delivered reward.
+ */
+export const REWARD_STATUSES = [
+  "pending",
+  "redemption_recorded",
+  "expired",
+  "voided",
+  "credited",
+  "paid",
+] as const
+
+export type ReferralRewardStatus = (typeof REWARD_STATUSES)[number]
+
+export function isReferralRewardStatus(value: unknown): value is ReferralRewardStatus {
+  return typeof value === "string" && (REWARD_STATUSES as readonly string[]).includes(value)
+}
+
+/**
+ * Operator-facing wording. Exported so the admin page cannot invent its own
+ * vocabulary and drift out of sync with what the service writes, which is how
+ * the referral table came to read "Owe $10" forever.
+ */
+export const REWARD_STATUS_LABELS: Record<ReferralRewardStatus, string> = {
+  pending: "Owed",
+  redemption_recorded: "Redemption recorded",
+  expired: "Expired",
+  voided: "Voided",
+  credited: "Closed before audit trail",
+  paid: "Closed before audit trail",
+}
+
+export function rewardStatusLabel(status: unknown): string {
+  return isReferralRewardStatus(status) ? REWARD_STATUS_LABELS[status] : "Unknown"
+}
+
+/** A reward the referrer is still owed. Only `pending` counts. */
+export function isRewardOpen(status: unknown): boolean {
+  return status === "pending"
+}
+
+/** The statuses reached by the deliberate legacy path, which recorded nothing reconcilable. */
+export function isLegacyClosedStatus(status: unknown): boolean {
+  return status === "paid" || status === "credited"
+}
+
+export const MAX_REDEMPTION_REFERENCE_LENGTH = 200
+
+/**
+ * A redemption reference is the only thing that makes a manual redemption
+ * reconcilable later: a PayPal transaction id, a Stripe credit note, a support
+ * thread id. An empty one turns the whole record back into self-attestation,
+ * so it is rejected rather than stored blank.
+ */
+export function normalizeRedemptionReference(raw: unknown): string | null {
+  if (typeof raw !== "string") return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  return trimmed.slice(0, MAX_REDEMPTION_REFERENCE_LENGTH)
+}
+
+export type RedemptionRefusalCode = "not_pending" | "missing_reference"
+
+export type RedemptionCheck =
+  | { allowed: true; reference: string }
+  | { allowed: false; code: RedemptionRefusalCode; message: string }
+
+/**
+ * The single gate on the only admin-driven transition in the machine:
+ * `pending -> redemption_recorded`. Pure, so the rule can be asserted without
+ * a Firestore instance and cannot be re-implemented differently in the route.
+ */
+export function canRecordRedemption(status: unknown, rawReference: unknown): RedemptionCheck {
+  const reference = normalizeRedemptionReference(rawReference)
+  if (!reference) {
+    return {
+      allowed: false,
+      code: "missing_reference",
+      message:
+        "A redemption reference is required so the record can be reconciled against the actual payout or credit.",
+    }
+  }
+
+  if (!isRewardOpen(status)) {
+    return {
+      allowed: false,
+      code: "not_pending",
+      message: `Reward is ${rewardStatusLabel(status).toLowerCase()}, so there is nothing left to record.`,
+    }
+  }
+
+  return { allowed: true, reference }
+}
+
 export interface ReferralReward {
   id?: string
   referrerId: string
   referredUserId: string
-  type: "signup_credit" | "conversion_cash" | "conversion_credit"
+  type: ReferralRewardType
   amount: number // $ for cash, months for credit
-  status: "pending" | "paid" | "credited" | "expired" | "voided"
+  status: ReferralRewardStatus
   createdAt: Date
   processedAt?: Date
   processedBy?: string // Admin who processed it
   notes?: string
+  // Manual redemption bookkeeping. Present only on `redemption_recorded` rows.
+  redemptionReference?: string
+  redemptionMethod?: "manual_out_of_band"
+  redemptionEligibilityOverridden?: boolean
   // Eligibility tracking
   eligibleAt?: Date // When reward becomes eligible for payout
   expiresAt?: Date // When reward expires if not claimed

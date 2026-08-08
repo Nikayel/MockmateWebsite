@@ -562,9 +562,9 @@ export default function LegalPage() {
                       single charge that grants 12 months of Pro access from the date of purchase.
                     </li>
                     <li>
-                      We do not store a recurring billing arrangement for it and we will never
-                      charge the card again on our own. There is nothing to cancel, and nothing to
-                      forget to cancel.
+                      We do not store a recurring billing arrangement for it and we will never charge
+                      the card again on our own. There is nothing to cancel, and nothing to forget to
+                      cancel.
                     </li>
                     <li>
                       When the 12 months are up, your account returns to the Free tier. To continue
@@ -582,8 +582,8 @@ export default function LegalPage() {
                     </li>
                     <li>
                       <strong className="text-white">Pro Yearly:</strong> there is no recurring
-                      charge to cancel. Your 12 months of access run to their end date either way.
-                      If you want a refund inside the first 30 days, see the refund policy below.
+                      charge to cancel. Your 12 months of access run to their end date either way. If
+                      you want a refund inside the first 30 days, see the refund policy below.
                     </li>
                     <li>We do not provide prorated refunds for partial months</li>
                   </ul>
