@@ -45,6 +45,38 @@ service cloud.firestore {
       return resource != null;
     }
 
+    /**
+     * Profile fields the client may never write.
+     *
+     * `profiles.subscription_tier` IS the entitlement store: it is read directly by
+     * lib/quota-enforcement.ts and lib/quota/session-start-admin.ts, so a client
+     * write to any of these is a billing decision. Every legitimate writer
+     * (lib/stripe-helpers.ts, the Stripe webhook, the cron routes) goes through the
+     * Admin SDK, which bypasses these rules entirely, so nothing real is blocked.
+     *
+     * `created_at` is here because it is the anniversary input to
+     * lib/quota/billing-period.ts. Rolling it forward moves the billing window so no
+     * existing profile_quota doc matches, and sessionsUsed reads 0 again. The
+     * "most-conservative doc wins" defense in quota-enforcement only picks the max
+     * among docs already IN the window, so moving the window sidesteps it.
+     *
+     * `custom_budget_cap` is honored by lib/usage/budget.ts up to $10,000.
+     */
+    function serverOnlyProfileFields() {
+      return [
+        'subscription_tier',
+        'subscription_status',
+        'subscription_type',
+        'subscription_platform',
+        'subscription_start_date',
+        'subscription_current_period_end',
+        'stripe_customer_id',
+        'stripe_subscription_id',
+        'custom_budget_cap',
+        'created_at'
+      ];
+    }
+
     // ============================================================================
     // USER PROFILES
     // ============================================================================
@@ -53,22 +85,41 @@ service cloud.firestore {
       // Users can read their own profile
       allow read: if isOwner(userId);
 
-      // Users can create their own profile
-      // Document ID must match user ID, and id field must match document ID
+      // Users can create their own profile.
+      //
+      // The create rule previously validated only that three fields were PRESENT,
+      // never what they contained, while delete was open to the owner. Together
+      // those let any signed-in user delete their profile and recreate it with
+      // subscription_tier: 'pro' straight from the browser console, using the
+      // public Firebase config that ships in the bundle by design. Neither
+      // self-heal catches it: lib/firestore-helpers.ts only syncs when a Stripe id
+      // is present, and the subscription-reconcile cron only scans profiles that
+      // already carry stripe_subscription_id. The forged entitlement was permanent
+      // and silent.
+      //
+      // A profile can therefore only ever be born on the free tier. The app's own
+      // createOrUpdateProfile writes exactly this shape, so nothing legitimate breaks.
       allow create: if isAuthenticated()
                     && request.auth.uid == userId
                     && request.resource.data.id == userId
-                    && hasRequiredFields(['id', 'email', 'created_at']);
+                    && hasRequiredFields(['id', 'email', 'created_at'])
+                    && (!('subscription_tier' in request.resource.data)
+                        || request.resource.data.subscription_tier == 'free')
+                    && !request.resource.data.keys().hasAny(
+                         serverOnlyProfileFields().removeAll(['subscription_tier', 'created_at']));
 
-      // Users can update their own profile (but not change id or subscription tier/status/stripe fields)
+      // Users can update their own profile, but never the billing-controlled fields.
       allow update: if isOwner(userId)
                     && request.resource.data.id == userId
                     && resource.data.id == userId
                     && !request.resource.data.diff(resource.data).affectedKeys()
-                        .hasAny(['subscription_tier', 'subscription_status', 'stripe_customer_id', 'stripe_subscription_id']);
+                        .hasAny(serverOnlyProfileFields());
 
-      // Users can delete their own profile
-      allow delete: if isOwner(userId);
+      // Deletion is server-side only. app/api/delete-account/route.ts performs it
+      // through the Admin SDK, which bypasses these rules, and no client code path
+      // deletes a profile. Leaving this open to the owner was half of the
+      // delete-and-recreate entitlement forgery described above.
+      allow delete: if false;
     }
 
     // ============================================================================
