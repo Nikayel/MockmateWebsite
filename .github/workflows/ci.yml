@@ -83,10 +83,21 @@ jobs:
       - name: Build
         run: pnpm build
         env:
-          # Minimal env vars for build to succeed
+          # Minimal env vars for build to succeed.
+          #
+          # app/api/create-checkout/route.ts throws at MODULE EVAL when
+          # STRIPE_SECRET_KEY is absent, so every build here failed on it and this
+          # job was red 100 times out of 100. A permanently-red gate trains you to
+          # ignore it, which is worse than having no gate: the only thing actually
+          # protecting production was tsc inside next build.
+          #
+          # These are structurally valid dummies, never real keys. Stripe is never
+          # called during a build; only the module-eval guard is being satisfied.
           NEXT_PUBLIC_FIREBASE_API_KEY: dummy
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: dummy.firebaseapp.com
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: dummy
           NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: dummy.appspot.com
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: 123456789
           NEXT_PUBLIC_FIREBASE_APP_ID: 1:123456789:web:abc123
+          STRIPE_SECRET_KEY: sk_test_dummy_ci_build_only
+          STRIPE_WEBHOOK_SECRET: whsec_dummy_ci_build_only
