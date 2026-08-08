@@ -27,11 +27,14 @@ import { isLessonWorkspacePath } from "@/lib/tutorials/lesson-routes"
 // drift apart.
 const PROTECTED_ROUTES = ["/admin"]
 
-// Routes that should redirect authenticated users away
-const AUTH_ROUTES = ["/login", "/signup"]
-
-// Public routes that never require auth
-const PUBLIC_ROUTES = ["/", "/pricing", "/blog", "/about", "/privacy", "/terms"]
+// PUBLIC_ROUTES, AUTH_ROUTES and isAuthRoute used to live here. None of them
+// were reachable: PUBLIC_ROUTES was never referenced at all, and isAuthRoute
+// appeared only inside a commented-out block. Between them they named four
+// routes that do not exist in this app (/about, /privacy, /terms, /signup — the
+// legal content lives at /legal with anchors, and sign-up is OAuth through
+// /login), so the file described a routing model the product never had. That is
+// worse than no description, because the next person to read it starts from a
+// false map.
 
 /**
  * Check if user APPEARS to be authenticated — a presence check, spoofable by
@@ -74,13 +77,6 @@ function isProtectedRoute(pathname: string): boolean {
   return PROTECTED_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))
 }
 
-/**
- * Check if path is an auth route (login/signup)
- */
-function isAuthRoute(pathname: string): boolean {
-  return AUTH_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))
-}
-
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -109,12 +105,6 @@ export function proxy(request: NextRequest) {
       return response
     }
   }
-
-  // Optionally redirect authenticated users away from auth pages
-  // Uncomment if you want this behavior:
-  // if (isAuthRoute(pathname) && isAuthenticated) {
-  //   return NextResponse.redirect(new URL('/dashboard', request.url))
-  // }
 
   return NextResponse.next()
 }
