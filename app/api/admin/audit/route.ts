@@ -9,8 +9,28 @@ import { adminDb } from "@/lib/firebase-admin"
 import { withPermission } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
 import { parseBoundedInt } from "@/lib/admin/query-params"
+import { resolveAuditDateRange } from "@/lib/admin/audit"
 
 export const dynamic = "force-dynamic"
+
+/**
+ * Read a date bound off the untyped export body.
+ *
+ * A non-string bound is a client bug, not a date. Coercing it would invent a
+ * range the operator never asked for, so it is rejected by name instead.
+ */
+function readBodyDate(
+  value: unknown,
+  field: "startDate" | "endDate"
+): { ok: true; value: string | null } | { ok: false; message: string } {
+  if (value === undefined || value === null || value === "") {
+    return { ok: true, value: null }
+  }
+  if (typeof value !== "string") {
+    return { ok: false, message: `${field} must be a date string` }
+  }
+  return { ok: true, value }
+}
 
 interface AuditLogEntry {
   id: string
@@ -56,6 +76,20 @@ export const GET = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request) =
     const startDate = searchParams.get("startDate")
     const endDate = searchParams.get("endDate")
 
+    // The filter UI sends YYYY-MM-DD from an <input type="date">, which parses
+    // to midnight. Applied here as an inclusive `<=` upper bound it excluded
+    // every entry from the final day the operator actually asked for, and an
+    // unparseable value reached Firestore as an Invalid Date and surfaced as an
+    // opaque 500. resolveAuditDateRange resolves both.
+    const dateRange = resolveAuditDateRange(startDate, endDate)
+    if (!dateRange.ok) {
+      return NextResponse.json(
+        { success: false, error: dateRange.message, field: dateRange.field },
+        { status: 400 }
+      )
+    }
+    const { from, until } = dateRange.range
+
     // Build query
     let query = adminDb.collection("admin_audit_log").orderBy("timestamp", "desc")
 
@@ -67,12 +101,12 @@ export const GET = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request) =
       query = query.where("adminId", "==", adminId)
     }
 
-    // Date range filtering
-    if (startDate) {
-      query = query.where("timestamp", ">=", new Date(startDate))
+    // Half-open range: `from` inclusive, `until` exclusive.
+    if (from) {
+      query = query.where("timestamp", ">=", from)
     }
-    if (endDate) {
-      query = query.where("timestamp", "<=", new Date(endDate))
+    if (until) {
+      query = query.where("timestamp", "<", until)
     }
 
     // Pagination
@@ -165,16 +199,37 @@ export const POST = withPermission(PERMISSIONS.MANAGE_ADMINS, async (request) =>
     }
 
     const body = await request.json()
-    const { startDate, endDate, format = "csv" } = body
+    const { format = "csv" } = body
+
+    // Same half-open range as the filtered view above. An export that silently
+    // omits the final day is the worse of the two failures: the CSV leaves the
+    // building and is read as the complete record for the period.
+    const startDate = readBodyDate(body.startDate, "startDate")
+    if (!startDate.ok) {
+      return NextResponse.json({ success: false, error: startDate.message }, { status: 400 })
+    }
+    const endDate = readBodyDate(body.endDate, "endDate")
+    if (!endDate.ok) {
+      return NextResponse.json({ success: false, error: endDate.message }, { status: 400 })
+    }
+
+    const dateRange = resolveAuditDateRange(startDate.value, endDate.value)
+    if (!dateRange.ok) {
+      return NextResponse.json(
+        { success: false, error: dateRange.message, field: dateRange.field },
+        { status: 400 }
+      )
+    }
+    const { from, until } = dateRange.range
 
     // Build query
     let query = adminDb.collection("admin_audit_log").orderBy("timestamp", "desc")
 
-    if (startDate) {
-      query = query.where("timestamp", ">=", new Date(startDate))
+    if (from) {
+      query = query.where("timestamp", ">=", from)
     }
-    if (endDate) {
-      query = query.where("timestamp", "<=", new Date(endDate))
+    if (until) {
+      query = query.where("timestamp", "<", until)
     }
 
     // Limit export to 10000 records
