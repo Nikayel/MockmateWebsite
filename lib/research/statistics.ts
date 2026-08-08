@@ -7,7 +7,19 @@
  * - Confidence intervals
  * - Prediction accuracy metrics (Log Loss, RMSE, Calibration)
  * - Sample size calculations
+ *
+ * Distribution functions live in `experiment-stats.ts` and are imported here.
+ * This file used to carry its own normal CDF and incomplete beta, which meant
+ * two implementations of the same p-value could disagree with each other on the
+ * same screen. The imported ones are pinned against scipy in tests.
  */
+
+import {
+  inverseNormalCdf,
+  normalCdf,
+  requiredSampleSizePerArm,
+  studentTTwoTailedPValue,
+} from "./experiment-stats"
 
 // ============================================
 // Basic Statistical Functions
@@ -70,7 +82,13 @@ export interface TTestResult {
 
 /**
  * Two-sample independent t-test (Welch's t-test)
- * Used for comparing SM-2 vs FSRS metrics
+ * Used for comparing SM-2 vs FSRS metrics.
+ *
+ * IMPORTANT: pass one value PER USER. The A/B randomizes users, not reviews, so
+ * a group array built from review events reports a sample size that the
+ * experiment never had. `lib/research/user-observations.ts` does that
+ * collapsing; `welchTTest` in `experiment-stats.ts` is the leaner version of
+ * this function used by the decision path.
  */
 export function tTest(group1: number[], group2: number[], alpha = 0.05): TTestResult {
   const n1 = group1.length
@@ -132,8 +150,9 @@ export function tTest(group1: number[], group2: number[], alpha = 0.05): TTestRe
   // Welch-Satterthwaite degrees of freedom
   const df = Math.pow(se1 + se2, 2) / (Math.pow(se1, 2) / (n1 - 1) + Math.pow(se2, 2) / (n2 - 1))
 
-  // Calculate p-value using t-distribution approximation
-  const pValue = tDistributionPValue(Math.abs(tStatistic), df) * 2 // two-tailed
+  // Two-tailed p-value from the t distribution (exact via the regularized
+  // incomplete beta, not a normal approximation).
+  const pValue = studentTTwoTailedPValue(tStatistic, df)
 
   // Calculate Cohen's d effect size
   const pooledStd = Math.sqrt(((n1 - 1) * var1 + (n2 - 1) * var2) / (n1 + n2 - 2))
@@ -180,119 +199,6 @@ export function tTest(group1: number[], group2: number[], alpha = 0.05): TTestRe
   }
 }
 
-/**
- * Approximate t-distribution p-value using normal approximation
- */
-function tDistributionPValue(t: number, df: number): number {
-  // For large df, t-distribution approaches normal
-  // Using Abramowitz and Stegun approximation for CDF
-  if (df > 100) {
-    // Use normal approximation
-    return 1 - normalCDF(t)
-  }
-
-  // For smaller df, use a more accurate approximation
-  const x = df / (df + t * t)
-  return 0.5 * incompleteBeta(df / 2, 0.5, x)
-}
-
-/**
- * Standard normal CDF approximation
- */
-function normalCDF(x: number): number {
-  const a1 = 0.254829592
-  const a2 = -0.284496736
-  const a3 = 1.421413741
-  const a4 = -1.453152027
-  const a5 = 1.061405429
-  const p = 0.3275911
-
-  const sign = x < 0 ? -1 : 1
-  x = Math.abs(x) / Math.sqrt(2)
-
-  const t = 1.0 / (1.0 + p * x)
-  const y = 1.0 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x)
-
-  return 0.5 * (1.0 + sign * y)
-}
-
-/**
- * Incomplete beta function approximation
- */
-function incompleteBeta(a: number, b: number, x: number): number {
-  // Simple approximation for small values
-  if (x === 0) return 0
-  if (x === 1) return 1
-
-  // Use continued fraction for better accuracy
-  const bt = Math.exp(
-    lnGamma(a + b) - lnGamma(a) - lnGamma(b) + a * Math.log(x) + b * Math.log(1 - x)
-  )
-
-  if (x < (a + 1) / (a + b + 2)) {
-    return (bt * betaContinuedFraction(a, b, x)) / a
-  }
-  return 1 - (bt * betaContinuedFraction(b, a, 1 - x)) / b
-}
-
-function betaContinuedFraction(a: number, b: number, x: number): number {
-  const maxIterations = 100
-  const eps = 1e-10
-
-  const m = 1
-  let am = 1
-  let bm = 1
-  let az = 1
-
-  const qab = a + b
-  const qap = a + 1
-  const qam = a - 1
-  let bz = 1 - (qab * x) / qap
-
-  for (let i = 1; i <= maxIterations; i++) {
-    const em = i
-    const tem = em + em
-    let d = (em * (b - em) * x) / ((qam + tem) * (a + tem))
-
-    const ap = az + d * am
-    const bp = bz + d * bm
-    d = (-(a + em) * (qab + em) * x) / ((a + tem) * (qap + tem))
-
-    const app = ap + d * az
-    const bpp = bp + d * bz
-
-    const aOld = az
-    am = ap / bpp
-    bm = bp / bpp
-    az = app / bpp
-    bz = 1
-
-    if (Math.abs(az - aOld) < eps * Math.abs(az)) {
-      return az
-    }
-  }
-
-  return az
-}
-
-function lnGamma(x: number): number {
-  const cof = [
-    76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155,
-    0.1208650973866179e-2, -0.5395239384953e-5,
-  ]
-
-  let y = x
-  let tmp = x + 5.5
-  tmp -= (x + 0.5) * Math.log(tmp)
-  let ser = 1.000000000190015
-
-  for (let j = 0; j < 6; j++) {
-    ser += cof[j] / ++y
-  }
-
-  return -tmp + Math.log((2.5066282746310005 * ser) / x)
-}
-
 function interpretEffectSize(
   d: number
 ): "negligible" | "small" | "medium" | "large" | "very large" {
@@ -310,21 +216,20 @@ function calculatePower(effectSize: number, n1: number, n2: number, alpha: numbe
   if (effectSize === 0) return alpha // Power equals alpha when effect is 0
   const harmonicN = (2 * n1 * n2) / (n1 + n2)
   const ncp = effectSize * Math.sqrt(harmonicN / 2) // Non-centrality parameter
-  const criticalValue = 1.96 // Approximate for alpha = 0.05
-  const power = 1 - normalCDF(criticalValue - ncp) + normalCDF(-criticalValue - ncp)
+  // Critical value for the requested alpha rather than a hardcoded 1.96, so a
+  // caller asking for a stricter alpha is not quietly given the 0.05 answer.
+  const criticalValue = inverseNormalCdf(1 - alpha / 2)
+  const power = 1 - normalCdf(criticalValue - ncp) + normalCdf(-criticalValue - ncp)
   return Math.max(0, Math.min(1, power))
 }
 
 /**
- * Calculate required sample size per group for desired power
+ * Calculate required sample size per group for desired power.
+ * Delegates to the shared implementation so the sample size the page displays
+ * and the sample size the decision path uses can never diverge.
  */
 function calculateRequiredSampleSize(effectSize: number, power: number, alpha: number): number {
-  if (effectSize === 0) return Infinity
-  // Using approximation: n = 2 * ((z_alpha + z_beta) / d)^2
-  const zAlpha = 1.96 // For alpha = 0.05, two-tailed
-  const zBeta = power === 0.8 ? 0.84 : power === 0.95 ? 1.645 : 1.28
-  const n = 2 * Math.pow((zAlpha + zBeta) / effectSize, 2)
-  return Math.ceil(n)
+  return requiredSampleSizePerArm(effectSize, alpha, power) ?? Infinity
 }
 
 // ============================================
@@ -589,12 +494,14 @@ export interface SampleSizeAnalysis {
 }
 
 /**
- * Analyze sample size sufficiency for the research
+ * Analyze sample size sufficiency for the research.
  *
- * NOTE: the SM-2/FSRS A/B (and its 50/50-split assumption below) applies to
- * the HISTORICAL experiment period only — the A/B was ended via the admin
- * end-ab-switch-fsrs action and all users now run FSRS. This analysis stays
- * for interpreting the archived comparison data.
+ * NOTE ON THE A/B's STATE: this comment previously asserted that the A/B "was
+ * ended and all users now run FSRS". That is not true in production. The switch
+ * is an admin action (`end-ab-switch-fsrs`) that has not been run, so the
+ * 50/50 assumption below is live, not historical. The authoritative answer is
+ * `research_config/algorithm.ab_ended`, read via `getAlgorithmConfig()`; never
+ * infer the experiment's state from a comment.
  */
 export function analyzeSampleSize(
   sm2Count: number,
