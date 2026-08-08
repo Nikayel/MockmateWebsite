@@ -1,0 +1,239 @@
+import { describe, it, expect } from "vitest"
+import {
+  buildFunnelStages,
+  computeCohortConversionRates,
+  describeWindow,
+  isWithinWindow,
+  ratePercent,
+  selectSignupCohort,
+  summarizeCohortFunnel,
+  toDate,
+} from "../funnel-metrics"
+
+/**
+ * The funnel used to mix windows: signups and sessions were scoped to the
+ * selected range while "Subscribed" counted every pro profile ever created,
+ * status-agnostic. That let "complete to subscribe" print above 100%, which is
+ * the tell that the numerator was drawn from a larger population than the
+ * denominator. These tests pin the single-population rule.
+ */
+
+const HOUR = 60 * 60 * 1000
+const DAY = 24 * HOUR
+
+describe("selectSignupCohort", () => {
+  const now = new Date("2026-08-07T00:00:00.000Z")
+  const startDate = new Date(now.getTime() - 30 * DAY)
+
+  it("keeps only profiles created inside the window", () => {
+    const cohort = selectSignupCohort(
+      [
+        { userId: "recent", createdAt: new Date(now.getTime() - 2 * DAY).toISOString() },
+        { userId: "old", createdAt: new Date(now.getTime() - 90 * DAY).toISOString() },
+      ],
+      startDate
+    )
+    expect([...cohort]).toEqual(["recent"])
+  })
+
+  it("takes every profile when the window is all time", () => {
+    const cohort = selectSignupCohort(
+      [
+        { userId: "recent", createdAt: new Date(now.getTime() - 2 * DAY).toISOString() },
+        { userId: "old", createdAt: new Date(now.getTime() - 900 * DAY).toISOString() },
+      ],
+      null
+    )
+    expect(cohort.size).toBe(2)
+  })
+
+  it("drops profiles with no usable created_at instead of dating them to 1970", () => {
+    const cohort = selectSignupCohort(
+      [
+        { userId: "undated" },
+        { userId: "garbage", createdAt: "not-a-date" },
+        { userId: "ok", createdAt: new Date(now.getTime() - DAY).toISOString() },
+      ],
+      startDate
+    )
+    expect([...cohort]).toEqual(["ok"])
+  })
+
+  it("accepts Firestore Timestamp objects as well as ISO strings", () => {
+    const stamp = { toDate: () => new Date(now.getTime() - DAY) }
+    const cohort = selectSignupCohort([{ userId: "stamped", createdAt: stamp }], startDate)
+    expect(cohort.has("stamped")).toBe(true)
+  })
+})
+
+describe("summarizeCohortFunnel", () => {
+  it("counts people once, not sessions, at every stage", () => {
+    const counts = summarizeCohortFunnel(
+      ["a", "b"],
+      [
+        { user_id: "a", completed_at: "2026-08-01T00:00:00.000Z" },
+        { user_id: "a", completed_at: "2026-08-02T00:00:00.000Z" },
+        { user_id: "a" },
+        { user_id: "b" },
+      ],
+      []
+    )
+    expect(counts.signups).toBe(2)
+    expect(counts.startedSession).toBe(2)
+    expect(counts.completedSession).toBe(1)
+  })
+
+  it("ignores sessions from users outside the cohort, including guests", () => {
+    const counts = summarizeCohortFunnel(
+      ["a"],
+      [
+        { user_id: "a", completed_at: "2026-08-01T00:00:00.000Z" },
+        { user_id: "outsider", completed_at: "2026-08-01T00:00:00.000Z" },
+        { completed_at: "2026-08-01T00:00:00.000Z" },
+      ],
+      ["a", "outsider"]
+    )
+    expect(counts.startedSession).toBe(1)
+    expect(counts.completedSession).toBe(1)
+    expect(counts.subscribed).toBe(1)
+  })
+
+  it("keeps a subscriber who never completed a round out of the nested funnel", () => {
+    // This is the exact shape that used to push complete-to-subscribe over
+    // 100%: a paying user with no completed round in the window.
+    const counts = summarizeCohortFunnel(
+      ["payer", "finisher"],
+      [{ user_id: "finisher" }],
+      ["payer", "finisher"]
+    )
+    expect(counts.completedSession).toBe(0)
+    expect(counts.subscribed).toBe(0)
+    expect(counts.subscribedWithoutCompletedSession).toBe(2)
+  })
+
+  it("never lets a stage exceed the stage above it", () => {
+    const cohort = ["u1", "u2", "u3", "u4", "u5"]
+    const counts = summarizeCohortFunnel(
+      cohort,
+      [
+        { user_id: "u1", completed_at: "2026-08-01T00:00:00.000Z" },
+        { user_id: "u2" },
+        { user_id: "u3", completed_at: "2026-08-01T00:00:00.000Z" },
+        { user_id: "ghost", completed_at: "2026-08-01T00:00:00.000Z" },
+      ],
+      ["u1", "u3", "u4", "ghost"]
+    )
+    expect(counts.signups).toBeGreaterThanOrEqual(counts.startedSession)
+    expect(counts.startedSession).toBeGreaterThanOrEqual(counts.completedSession)
+    expect(counts.completedSession).toBeGreaterThanOrEqual(counts.subscribed)
+  })
+})
+
+describe("computeCohortConversionRates", () => {
+  it("cannot produce a rate above 100% for any nested cohort", () => {
+    // Exhaustive over a small grid of nested counts: if the summarizer keeps
+    // the nesting, no ratio can break the ceiling.
+    for (let signups = 0; signups <= 6; signups++) {
+      for (let started = 0; started <= signups; started++) {
+        for (let completed = 0; completed <= started; completed++) {
+          for (let subscribed = 0; subscribed <= completed; subscribed++) {
+            const rates = computeCohortConversionRates({
+              signups,
+              startedSession: started,
+              completedSession: completed,
+              subscribed,
+              subscribedWithoutCompletedSession: 0,
+            })
+            for (const value of Object.values(rates)) {
+              expect(value).toBeGreaterThanOrEqual(0)
+              expect(value).toBeLessThanOrEqual(100)
+            }
+          }
+        }
+      }
+    }
+  })
+
+  it("returns 0 rather than NaN or Infinity on an empty cohort", () => {
+    const rates = computeCohortConversionRates({
+      signups: 0,
+      startedSession: 0,
+      completedSession: 0,
+      subscribed: 0,
+      subscribedWithoutCompletedSession: 0,
+    })
+    expect(rates).toEqual({
+      signupToSession: 0,
+      sessionToComplete: 0,
+      completeToSubscribe: 0,
+      overallConversion: 0,
+    })
+  })
+
+  it("measures overall conversion against signups, not against a modelled top stage", () => {
+    const rates = computeCohortConversionRates({
+      signups: 200,
+      startedSession: 100,
+      completedSession: 50,
+      subscribed: 10,
+      subscribedWithoutCompletedSession: 0,
+    })
+    expect(rates.signupToSession).toBe(50)
+    expect(rates.sessionToComplete).toBe(50)
+    expect(rates.completeToSubscribe).toBe(20)
+    expect(rates.overallConversion).toBe(5)
+  })
+})
+
+describe("buildFunnelStages", () => {
+  it("emits four measured stages and no visits stage", () => {
+    const stages = buildFunnelStages({
+      signups: 10,
+      startedSession: 8,
+      completedSession: 5,
+      subscribed: 1,
+      subscribedWithoutCompletedSession: 0,
+    })
+    expect(stages.map((stage) => stage.name)).toEqual([
+      "Signed up",
+      "Started a round",
+      "Completed a round",
+      "Subscribed",
+    ])
+    expect(stages.every((stage) => !/view|visit/i.test(stage.name))).toBe(true)
+    expect(stages.map((stage) => stage.value)).toEqual([10, 8, 5, 1])
+  })
+})
+
+describe("ratePercent", () => {
+  it("treats a zero or negative denominator as no data", () => {
+    expect(ratePercent(5, 0)).toBe(0)
+    expect(ratePercent(5, -1)).toBe(0)
+  })
+})
+
+describe("isWithinWindow", () => {
+  it("includes the boundary instant", () => {
+    const start = new Date("2026-08-01T00:00:00.000Z")
+    expect(isWithinWindow("2026-08-01T00:00:00.000Z", start)).toBe(true)
+    expect(isWithinWindow("2026-07-31T23:59:59.000Z", start)).toBe(false)
+  })
+})
+
+describe("toDate", () => {
+  it("returns null for values that are not dates", () => {
+    expect(toDate(null)).toBeNull()
+    expect(toDate(undefined)).toBeNull()
+    expect(toDate({})).toBeNull()
+    expect(toDate("nonsense")).toBeNull()
+  })
+})
+
+describe("describeWindow", () => {
+  it("names every selectable range so a stage never renders without its scope", () => {
+    expect(describeWindow("7d")).toBe("last 7 days")
+    expect(describeWindow("30d")).toBe("last 30 days")
+    expect(describeWindow("90d")).toBe("last 90 days")
+    expect(describeWindow("all")).toBe("all time")
+  })
+})

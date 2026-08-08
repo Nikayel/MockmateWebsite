@@ -177,40 +177,170 @@ export function getAllPricingTiers(): Array<{
 }
 
 /**
- * AI Provider costs per 1K tokens (input + output averaged)
- * Updated Dec 2025
+ * THE AI cost table. Every path that prices an LLM call reads this and nothing
+ * else: lib/usage-tracking (billing + budget enforcement), the admin cost
+ * dashboards, the global daily kill-switch, and cost-anomaly detection.
+ *
+ * Rates are the vendor-quoted dollars per 1M tokens, kept SEPARATE per
+ * direction. They used to be stored pre-averaged as one blended number per
+ * provider, which is only correct when a call happens to be a 50/50 input/output
+ * split. Real traffic is nothing like that: a chat turn carries a large system
+ * prompt and history against a short reply, so the blended rate overcharged the
+ * chat path roughly 2.1x while the measured inputTokens/outputTokens needed to
+ * price it correctly were already being stored on every usage event.
+ *
+ * KEYS ARE PROVIDER IDENTIFIERS, not model ids (see AIProvider in
+ * lib/ai-providers.ts and EdgeAIResponse in lib/ai-providers-edge.ts). Every key
+ * that can be written onto a usage event must have a row here: an unknown key
+ * falls back to the Gemini rate, which is the most expensive row in the table.
+ *
+ * Verified 2026-08-01/2026-08-07 against the model pins in lib/ai/model-ids.ts.
+ * Rows marked UNVERIFIED are pre-existing figures for providers we do not
+ * currently route to; they are carried forward unchanged and need human
+ * confirmation before anything starts calling them.
  */
-export const AI_PROVIDER_COSTS = {
-  // One key per reasoning effort; all four are GPT-5.6 Luna at the same rate.
-  // See PROVIDER_COSTS in lib/usage-tracking.ts for why they stay separate.
-  "openai-none": 0.0007, // GPT-5.6 Luna: $0.20 in + $1.20 out per 1M
-  "openai-low": 0.0007,
-  "openai-high": 0.0007,
-  "openai-xhigh": 0.0007,
-  gemini: 0.0045, // Gemini 3.6 Flash: $1.50 in + $7.50 out per 1M
-  "gemini-lite": 0.0014, // Gemini 3.5 Flash-Lite: $0.30 in + $2.50 out per 1M
-  "deepseek-chat": 0.00021, // DeepSeek V4 Flash: $0.14 in + $0.28 out per 1M
-  "gemini-pro": 0.003125, // Gemini 2.5 Pro
-  deepseek: 0.00065, // DeepSeek V4 Pro: $0.435 in + $0.87 out per 1M
-  claude: 0.0024, // Claude 3.5 Haiku
-  "claude-sonnet": 0.009, // Claude Sonnet 4
-  "gpt-4o": 0.00625, // GPT-4o
-  "gpt-4o-mini": 0.000375, // GPT-4o mini
-} as const
-
-export type AIProvider = keyof typeof AI_PROVIDER_COSTS
+export interface AIProviderRate {
+  /** USD per 1M input (prompt) tokens. */
+  inputPer1M: number
+  /**
+   * USD per 1M output (completion) tokens. For reasoning models this covers
+   * thinking tokens too: they bill as output but produce no visible text.
+   */
+  outputPer1M: number
+  /**
+   * USD per 1M input tokens served from the vendor's prompt cache, when the
+   * vendor prices cache hits separately. Omitted means "no separate cache rate
+   * established" and cached input bills at the full input rate.
+   */
+  cachedInputPer1M?: number
+}
 
 /**
- * Calculate AI cost from token counts
+ * DeepSeek prices a prompt-cache hit at roughly 1/50th of the miss rate (see
+ * lib/ai/model-ids.ts). That matters here because the interview system prompt is
+ * stable across every turn of a session, so most input tokens after the first
+ * turn are cache hits.
+ *
+ * UNVERIFIED: derived from the "~1/50th" ratio documented in the repo, not from
+ * a vendor price sheet. Needs human confirmation.
+ */
+const DEEPSEEK_CACHE_HIT_DIVISOR = 50
+
+export const AI_PROVIDER_RATES = {
+  // --- GPT-5.6 Luna, one key per reasoning effort ---
+  // The RATE is identical across all four: effort changes how many output tokens
+  // come back, not their price. Keeping them separate is what lets the admin
+  // tables attribute spend to an effort level.
+  "openai-none": { inputPer1M: 0.2, outputPer1M: 1.2 },
+  "openai-low": { inputPer1M: 0.2, outputPer1M: 1.2 },
+  "openai-high": { inputPer1M: 0.2, outputPer1M: 1.2 },
+  "openai-xhigh": { inputPer1M: 0.2, outputPer1M: 1.2 },
+  // --- Gemini, matching the live pins in lib/ai/model-ids.ts ---
+  gemini: { inputPer1M: 1.5, outputPer1M: 7.5 }, // Gemini 3.6 Flash
+  "gemini-lite": { inputPer1M: 0.3, outputPer1M: 2.5 }, // Gemini 3.5 Flash-Lite
+  // --- DeepSeek V4 ---
+  deepseek: {
+    inputPer1M: 0.435,
+    outputPer1M: 0.87,
+    cachedInputPer1M: 0.435 / DEEPSEEK_CACHE_HIT_DIVISOR,
+  }, // V4 Pro
+  "deepseek-chat": {
+    inputPer1M: 0.14,
+    outputPer1M: 0.28,
+    cachedInputPer1M: 0.14 / DEEPSEEK_CACHE_HIT_DIVISOR,
+  }, // V4 Flash
+  // --- Configured but not routed to by FALLBACK_ORDER ---
+  // Priced from the model actually pinned in lib/ai-providers.ts
+  // (claude-haiku-4-5-20251001, documented there as $1 in / $5 out per 1M).
+  claude: { inputPer1M: 1.0, outputPer1M: 5.0 },
+  // --- Legacy keys, retained so historical usage rows still price correctly ---
+  "gemini-pro": { inputPer1M: 1.25, outputPer1M: 5.0 }, // Gemini 2.5 Pro (UNVERIFIED)
+  "claude-sonnet": { inputPer1M: 3.0, outputPer1M: 15.0 }, // Claude Sonnet 4 (UNVERIFIED)
+  "gpt-4o": { inputPer1M: 2.5, outputPer1M: 10.0 }, // (UNVERIFIED)
+  "gpt-4o-mini": { inputPer1M: 0.15, outputPer1M: 0.6 }, // (UNVERIFIED)
+} as const satisfies Record<string, AIProviderRate>
+
+export type AIProvider = keyof typeof AI_PROVIDER_RATES
+
+/**
+ * Round to 10 decimal places. Rate arithmetic in binary floating point produces
+ * values like 0.0007000000000000001 where the vendor quotes 0.0007; the extra
+ * digits are noise that would leak into displayed rates and exact comparisons.
+ */
+function roundRate(value: number): number {
+  return Math.round(value * 1e10) / 1e10
+}
+
+/** Blended (input+output averaged) rate per 1K tokens for one provider. */
+function blendedPer1k(rate: AIProviderRate): number {
+  return roundRate((rate.inputPer1M + rate.outputPer1M) / 2 / 1000)
+}
+
+/**
+ * Blended per-1K rate per provider, DERIVED from AI_PROVIDER_RATES.
+ *
+ * Display and back-compat only. Never price a call with this: averaging is what
+ * AI_PROVIDER_RATES exists to stop. It is still the honest headline number for a
+ * "what does this provider cost" table, where no token split is known.
+ */
+export const AI_PROVIDER_COSTS: Record<AIProvider, number> = Object.fromEntries(
+  (Object.keys(AI_PROVIDER_RATES) as AIProvider[]).map((provider) => [
+    provider,
+    blendedPer1k(AI_PROVIDER_RATES[provider]),
+  ])
+) as Record<AIProvider, number>
+
+/** Fallback used when a usage record names a provider with no row. */
+export const FALLBACK_RATE_PROVIDER: AIProvider = "gemini"
+
+/**
+ * Look up a provider's rate, reporting whether it was actually found.
+ *
+ * Callers must surface `matched: false` rather than swallowing it. An unmatched
+ * key bills at the Gemini rate, the most expensive row in the table, which is
+ * how the Edge feedback path came to be billed at ~6.4x its real cost while
+ * every dashboard presented the figure as fact.
+ */
+export function resolveProviderRate(provider: string): {
+  rate: AIProviderRate
+  matched: boolean
+} {
+  const rate = AI_PROVIDER_RATES[provider as AIProvider]
+  return rate
+    ? { rate, matched: true }
+    : { rate: AI_PROVIDER_RATES[FALLBACK_RATE_PROVIDER], matched: false }
+}
+
+/**
+ * Cost of one AI call in USD, priced per direction.
+ *
+ * `cachedInputTokens` is the subset of `inputTokens` the vendor served from its
+ * prompt cache (OpenAI `prompt_tokens_details.cached_tokens`, DeepSeek
+ * `prompt_cache_hit_tokens`). It is billed at the provider's cache rate when one
+ * is established and at the full input rate otherwise, so passing it can only
+ * ever lower or leave the figure unchanged, never raise it.
  */
 export function calculateAICost(
   inputTokens: number,
   outputTokens: number,
-  provider: AIProvider | string
+  provider: AIProvider | string,
+  options?: { cachedInputTokens?: number }
 ): number {
-  const costPer1k = AI_PROVIDER_COSTS[provider as AIProvider] ?? AI_PROVIDER_COSTS.gemini
-  const totalTokens = inputTokens + outputTokens
-  return (totalTokens / 1000) * costPer1k
+  const { rate } = resolveProviderRate(provider)
+
+  const safeInput = Math.max(0, inputTokens)
+  const safeOutput = Math.max(0, outputTokens)
+  // Clamp to the input total: a vendor can never have cached more prompt tokens
+  // than the prompt contained, and an over-large value would credit us for
+  // tokens we were charged for.
+  const cachedInput = Math.min(Math.max(0, options?.cachedInputTokens ?? 0), safeInput)
+  const uncachedInput = safeInput - cachedInput
+  const cachedRate = rate.cachedInputPer1M ?? rate.inputPer1M
+
+  return (
+    (uncachedInput * rate.inputPer1M + cachedInput * cachedRate + safeOutput * rate.outputPer1M) /
+    1_000_000
+  )
 }
 
 /**
@@ -230,7 +360,9 @@ const PROVIDER_DISPLAY_NAMES: Record<AIProvider, string> = {
   "gemini-pro": "Gemini 2.5 Pro",
   deepseek: "DeepSeek V4 Pro",
   "deepseek-chat": "DeepSeek V4 Flash",
-  claude: "Claude 3.5 Haiku",
+  // Named for the model actually pinned in lib/ai-providers.ts. It said
+  // "Claude 3.5 Haiku" while the pin was claude-haiku-4-5-20251001.
+  claude: "Claude Haiku 4.5",
   "claude-sonnet": "Claude Sonnet 4",
   "gpt-4o": "GPT-4o",
   "gpt-4o-mini": "GPT-4o Mini",
@@ -239,20 +371,35 @@ const PROVIDER_DISPLAY_NAMES: Record<AIProvider, string> = {
 /**
  * Get provider cost info for admin display.
  *
- * Derived from AI_PROVIDER_COSTS rather than hand-listed. The literal version
+ * Derived from AI_PROVIDER_RATES rather than hand-listed. The literal version
  * had already drifted twice over: it omitted `gemini-lite` and `deepseek-chat`
  * entirely, and still called the pinned model "Gemini 2.5 Flash" after the
  * migration to 3.6. Adding four OpenAI providers to a hand-written list would
  * have made the admin cost breakdown silently exclude the PRIMARY vendor.
+ *
+ * `costPer1kTokens` is the blended headline rate; the input/output pair beside
+ * it is what calls are actually priced with, and the two differ by more than 2x
+ * on real traffic.
  */
 export function getProviderCostInfo(): Array<{
   provider: string
   costPer1kTokens: number
+  inputPer1kTokens: number
+  outputPer1kTokens: number
+  cachedInputPer1kTokens?: number
   displayName: string
 }> {
-  return (Object.keys(AI_PROVIDER_COSTS) as AIProvider[]).map((provider) => ({
-    provider,
-    costPer1kTokens: AI_PROVIDER_COSTS[provider],
-    displayName: PROVIDER_DISPLAY_NAMES[provider] ?? provider,
-  }))
+  return (Object.keys(AI_PROVIDER_RATES) as AIProvider[]).map((provider) => {
+    const rate: AIProviderRate = AI_PROVIDER_RATES[provider]
+    return {
+      provider,
+      costPer1kTokens: AI_PROVIDER_COSTS[provider],
+      inputPer1kTokens: roundRate(rate.inputPer1M / 1000),
+      outputPer1kTokens: roundRate(rate.outputPer1M / 1000),
+      ...(rate.cachedInputPer1M !== undefined
+        ? { cachedInputPer1kTokens: roundRate(rate.cachedInputPer1M / 1000) }
+        : {}),
+      displayName: PROVIDER_DISPLAY_NAMES[provider] ?? provider,
+    }
+  })
 }
