@@ -24,8 +24,25 @@ import {
   buildRetrievalEvalResult,
   summarizeRetrievalEval,
 } from "@/lib/rag/evaluation/metrics"
+import { rateLimit } from "@/lib/rate-limit"
+import { logger } from "@/lib/logger"
 
 const QUICK_EVAL_K_VALUES = [1, 3, 5, 10]
+
+/**
+ * The expensive jobs on this route fan out to the embedding provider: the quick
+ * eval embeds every fixture case, and seeding or vectorizing walks the whole
+ * corpus. A permission check answers "may you", not "how often", and a
+ * double-clicked button or a stuck retry can start a second sweep while the
+ * first is still running. Three per five minutes is far more than the page can
+ * legitimately need and still bounds the spend an authorised admin can trigger.
+ */
+const ragJobRateLimit = rateLimit({
+  interval: 5 * 60 * 1000,
+  uniqueTokenPerInterval: 100,
+  maxRequests: 3,
+  prefix: "rl:admin-rag-job",
+})
 
 /**
  * Reading RAG health is analytics. Running the quick eval is not: every fixture
@@ -38,11 +55,19 @@ export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (request, co
     const searchParams = request.nextUrl.searchParams
     const action = searchParams.get("action") || "health"
 
-    if (action === "quick-eval" && !context.permissions.includes(PERMISSIONS.MANAGE_SETTINGS)) {
-      return unauthorizedResponse(
-        `Access denied - missing permission: ${PERMISSIONS.MANAGE_SETTINGS}`,
-        403
-      )
+    if (action === "quick-eval") {
+      if (!context.permissions.includes(PERMISSIONS.MANAGE_SETTINGS)) {
+        return unauthorizedResponse(
+          `Access denied - missing permission: ${PERMISSIONS.MANAGE_SETTINGS}`,
+          403
+        )
+      }
+
+      const limited = await ragJobRateLimit(request)
+      if (limited) {
+        logger.warn("Rate limit exceeded for RAG quick eval", { adminId: context.userId })
+        return limited
+      }
     }
 
     switch (action) {
@@ -143,10 +168,20 @@ export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (request, co
  * base and vectorizing all problems both fan out to the embedding provider.
  * MANAGE_SETTINGS, so admin and super_admin only.
  */
-export const POST = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request) => {
+export const POST = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request, context) => {
   try {
     const body = await request.json()
     const { action } = body
+
+    // get-status only reads; the other two walk the corpus through the
+    // embedding provider, so they are the ones worth bounding.
+    if (action === "seed-knowledge-base" || action === "vectorize-scenarios") {
+      const limited = await ragJobRateLimit(request)
+      if (limited) {
+        logger.warn("Rate limit exceeded for RAG job", { adminId: context.userId, action })
+        return limited
+      }
+    }
 
     switch (action) {
       case "seed-knowledge-base": {
