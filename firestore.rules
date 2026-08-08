@@ -22,16 +22,6 @@ service cloud.firestore {
     }
 
     /**
-     * Check if the user is creating their own document
-     * Note: This is a generic helper - specific collections may use different field names
-     */
-    function isCreatingOwnDocument(userId) {
-      return isAuthenticated()
-        && request.auth.uid == userId
-        && (request.resource.data.userId == userId || request.resource.data.user_id == userId || request.resource.data.id == userId);
-    }
-
-    /**
      * Validate that required fields exist in the document
      */
     function hasRequiredFields(fields) {
