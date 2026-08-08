@@ -96,6 +96,12 @@ const h = vi.hoisted(() => {
     migrateAllUsersToFsrs: vi.fn(),
     markAbTestEnded: vi.fn(() => Promise.resolve()),
     logAdminAction: vi.fn(() => Promise.resolve()),
+    getExperimentRegistry: vi.fn(),
+    recordSweepPage: vi.fn(() => Promise.resolve(null)),
+    recordSweepFailure: vi.fn(() => Promise.resolve()),
+    reopenAbTest: vi.fn(() =>
+      Promise.resolve({ reopenedAt: "2026-08-08T00:00:00.000Z", previousStatus: "ended" })
+    ),
     adminDb,
     writes,
   }
@@ -122,6 +128,42 @@ vi.mock("@/lib/spaced-repetition", () => ({
 vi.mock("@/lib/spaced-repetition/fsrs-migration", () => ({
   migrateAllUsersToFsrs: h.migrateAllUsersToFsrs,
 }))
+vi.mock("@/lib/research/experiment-registry", () => ({
+  getExperimentRegistry: h.getExperimentRegistry,
+  recordSweepPage: h.recordSweepPage,
+  recordSweepFailure: h.recordSweepFailure,
+  reopenAbTest: h.reopenAbTest,
+}))
+
+const registryState = (sweep: Record<string, unknown> = {}) => ({
+  experimentId: "sm2-vs-fsrs-v1",
+  status: "running",
+  startedAt: null,
+  endedAt: null,
+  endedBy: null,
+  rolledBackAt: null,
+  rolledBackBy: null,
+  rollbackReason: null,
+  design: {
+    primaryMetric: "retention",
+    alpha: 0.05,
+    targetEffectSize: 0.3,
+    minUsersPerArm: 30,
+    stoppingRule: "Fixed horizon.",
+  },
+  sweep: {
+    inProgress: false,
+    cursor: null,
+    pagesCompleted: 0,
+    usersFlipped: 0,
+    cardsConverted: 0,
+    startedAt: null,
+    updatedAt: null,
+    lastError: null,
+    ...sweep,
+  },
+  updatedAt: null,
+})
 
 import { POST } from "./route"
 
@@ -162,6 +204,11 @@ beforeEach(() => {
     authorized: true,
     context: { userId: "admin-1", email: "a@b.c", role: "super_admin", permissions: [] },
   })
+  h.getExperimentRegistry.mockReset()
+  h.getExperimentRegistry.mockResolvedValue(registryState())
+  h.recordSweepPage.mockClear()
+  h.recordSweepFailure.mockClear()
+  h.reopenAbTest.mockClear()
 })
 
 describe("POST /api/admin/algorithm-research permission gate", () => {
@@ -360,5 +407,106 @@ describe("POST /api/admin/algorithm-research backfill-research", () => {
       destination: "algorithm_research_backfill",
       usersSkippedUnassigned: 1,
     })
+  })
+})
+
+describe("sweep lifecycle: resume and rollback", () => {
+  it("resumes from the stored cursor when the client sends none", async () => {
+    // A tab closed mid-sweep: ab_ended is still false and the browser's cursor
+    // is gone, but the server remembers where the sweep stopped.
+    h.getExperimentRegistry.mockResolvedValue(
+      registryState({ inProgress: true, cursor: "u-500", pagesCompleted: 5 })
+    )
+    h.migrateAllUsersToFsrs.mockResolvedValue(sweepResult({ nextCursor: "u-600" }))
+
+    await POST(postRequest({ action: "end-ab-switch-fsrs" }))
+
+    expect(h.migrateAllUsersToFsrs).toHaveBeenCalledWith({
+      dryRun: false,
+      cursor: "u-500",
+      maxUsers: 100,
+    })
+  })
+
+  it("prefers an explicit cursor over the stored one", async () => {
+    h.getExperimentRegistry.mockResolvedValue(registryState({ inProgress: true, cursor: "u-500" }))
+    h.migrateAllUsersToFsrs.mockResolvedValue(sweepResult({ nextCursor: "u-900" }))
+
+    await POST(postRequest({ action: "end-ab-switch-fsrs", cursor: "u-800" }))
+
+    expect(h.migrateAllUsersToFsrs).toHaveBeenCalledWith({
+      dryRun: false,
+      cursor: "u-800",
+      maxUsers: 100,
+    })
+  })
+
+  it("never resumes a dry run from the live sweep cursor", async () => {
+    h.getExperimentRegistry.mockResolvedValue(registryState({ inProgress: true, cursor: "u-500" }))
+    h.migrateAllUsersToFsrs.mockResolvedValue(sweepResult({ dryRun: true, nextCursor: null }))
+
+    await POST(postRequest({ action: "end-ab-switch-fsrs", dryRun: true }))
+
+    expect(h.migrateAllUsersToFsrs).toHaveBeenCalledWith({
+      dryRun: true,
+      cursor: undefined,
+      maxUsers: 100,
+    })
+  })
+
+  it("records every live page so the sweep can be picked up again", async () => {
+    h.migrateAllUsersToFsrs.mockResolvedValue(sweepResult({ nextCursor: "u-700" }))
+
+    await POST(postRequest({ action: "end-ab-switch-fsrs" }))
+
+    expect(h.recordSweepPage).toHaveBeenCalledWith("admin-1", {
+      dryRun: false,
+      nextCursor: "u-700",
+      usersFlipped: 4,
+      cardsConverted: 42,
+      errorCount: 0,
+    })
+  })
+
+  it("keeps the resume point when a page throws", async () => {
+    h.migrateAllUsersToFsrs.mockRejectedValue(new Error("firestore deadline exceeded"))
+
+    const res = await POST(postRequest({ action: "end-ab-switch-fsrs" }))
+
+    expect(res.status).toBe(500)
+    expect(h.recordSweepFailure).toHaveBeenCalledWith("firestore deadline exceeded")
+  })
+
+  it("reopens the A/B only with the confirmation and a reason", async () => {
+    const noConfirm = await POST(postRequest({ action: "reopen-ab", reason: "ended too early" }))
+    expect(noConfirm.status).toBe(400)
+
+    const wrongToken = await POST(
+      postRequest({ action: "reopen-ab", confirm: "yes", reason: "ended too early" })
+    )
+    expect(wrongToken.status).toBe(400)
+
+    const noReason = await POST(postRequest({ action: "reopen-ab", confirm: "REOPEN" }))
+    expect(noReason.status).toBe(400)
+    expect(h.reopenAbTest).not.toHaveBeenCalled()
+
+    const res = asStub(
+      await POST(postRequest({ action: "reopen-ab", confirm: "REOPEN", reason: "ended too early" }))
+    )
+    expect(res.status).toBe(200)
+    expect(h.reopenAbTest).toHaveBeenCalledWith("admin-1", "ended too early")
+    expect(res.data.message).toContain("randomized again")
+  })
+
+  it("audits a rollback with its reason", async () => {
+    await POST(postRequest({ action: "reopen-ab", confirm: "REOPEN", reason: "premature" }))
+
+    const [, action, details] = h.logAdminAction.mock.calls[0] as unknown as [
+      unknown,
+      string,
+      Record<string, unknown>,
+    ]
+    expect(action).toBe("reopen_ab_test")
+    expect(details).toMatchObject({ reason: "premature", previousStatus: "ended" })
   })
 })

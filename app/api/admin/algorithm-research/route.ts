@@ -28,6 +28,12 @@ import {
   markAbTestEnded,
 } from "@/lib/spaced-repetition"
 import { migrateAllUsersToFsrs } from "@/lib/spaced-repetition/fsrs-migration"
+import {
+  getExperimentRegistry,
+  recordSweepPage,
+  recordSweepFailure,
+  reopenAbTest,
+} from "@/lib/research/experiment-registry"
 import type { AlgorithmComparisonAggregate } from "@/lib/types"
 
 // The end-ab-switch-fsrs sweep does per-user subcollection reads; give the
@@ -51,7 +57,19 @@ const RESEARCH_AUDIT_ACTIONS = {
   BACKFILL_RESEARCH: "backfill_research_data",
   MIGRATE_ASSIGNMENT: "migrate_algorithm_assignment",
   MIGRATE_NOTIFICATION_PREFERENCES: "migrate_notification_preferences",
+  REOPEN_AB: "reopen_ab_test",
 } as const
+
+/** Typed by the operator to undo the end of the A/B. */
+const REOPEN_CONFIRM_TOKEN = "REOPEN"
+
+const reopenAbSchema = z.object({
+  action: z.literal("reopen-ab"),
+  confirm: z.string(),
+  // A rollback of an experiment lifecycle is exactly the kind of event whose
+  // reason nobody remembers three months later, so it is required.
+  reason: z.string().min(3).max(500),
+})
 
 const endAbSchema = z.object({
   action: z.literal("end-ab-switch-fsrs"),
@@ -144,10 +162,15 @@ export async function GET(request: NextRequest) {
     // A/B lifecycle status (drives the "ended" banner + button visibility)
     const abStatus = await getAlgorithmConfig()
 
+    // Lifecycle record: status, start date, and the cursor of any sweep that
+    // was interrupted, so the UI can offer "resume" instead of "start again".
+    const experimentRegistry = await getExperimentRegistry()
+
     return NextResponse.json({
       success: true,
       data: {
         abStatus,
+        experimentRegistry,
         distribution,
         comparison,
         /** True when the stored aggregate is older than AGGREGATE_MAX_AGE_MIN. */
@@ -307,7 +330,29 @@ export async function POST(request: NextRequest) {
         const { dryRun, cursor } = parsed.data
         const adminId = authResult.context!.userId
 
-        const result = await migrateAllUsersToFsrs({ dryRun, cursor, maxUsers: 100 })
+        // Resume support: with no cursor in the request, pick up where a
+        // previous interrupted sweep stopped. The cursor used to live only in
+        // the browser driving the loop, so a closed tab or a failed page left
+        // the migration half applied with ab_ended still false and no way to
+        // continue except restarting the entire scan.
+        const registryBefore = await getExperimentRegistry()
+        const resumeCursor =
+          cursor ??
+          (!dryRun && registryBefore.sweep.inProgress ? registryBefore.sweep.cursor : null)
+
+        let result: Awaited<ReturnType<typeof migrateAllUsersToFsrs>>
+        try {
+          result = await migrateAllUsersToFsrs({
+            dryRun,
+            cursor: resumeCursor ?? undefined,
+            maxUsers: 100,
+          })
+        } catch (sweepError) {
+          // Keep the resume point before surfacing the failure.
+          const message = sweepError instanceof Error ? sweepError.message : "Unknown sweep error"
+          if (!dryRun) await recordSweepFailure(message)
+          throw sweepError
+        }
 
         // Finalize only when the whole sweep is done and this wasn't a dry run:
         // the coin flip must not stop while sm2 users still hold unconverted cards.
@@ -315,6 +360,16 @@ export async function POST(request: NextRequest) {
         if (finalized) {
           await markAbTestEnded(adminId)
         }
+
+        // Persist the page outcome so the next call can resume without the
+        // client having to remember anything.
+        const sweepState = await recordSweepPage(adminId, {
+          dryRun,
+          nextCursor: result.nextCursor,
+          usersFlipped: result.usersFlippedToFsrs,
+          cardsConverted: result.cardsConverted,
+          errorCount: result.errors.length,
+        })
 
         // Audit every page (dry runs included) — this is an irreversible,
         // all-users action and the trail should show the full sequence.
@@ -324,6 +379,7 @@ export async function POST(request: NextRequest) {
           {
             dryRun,
             cursor: cursor ?? null,
+            resumedFromCursor: cursor ? null : (resumeCursor ?? null),
             nextCursor: result.nextCursor,
             finalized,
             usersScanned: result.usersScanned,
@@ -347,8 +403,47 @@ export async function POST(request: NextRequest) {
             ? `Dry run: would flip ${result.usersFlippedToFsrs} users and convert ${result.cardsConverted} cards${overriddenNote}`
             : finalized
               ? `A/B ended: flipped ${result.usersFlippedToFsrs} users, converted ${result.cardsConverted} cards${overriddenNote}. New users now always get FSRS.`
-              : `Page done: flipped ${result.usersFlippedToFsrs} users, converted ${result.cardsConverted} cards${overriddenNote}. Continue with cursor.`,
-          data: result,
+              : `Page done: flipped ${result.usersFlippedToFsrs} users, converted ${result.cardsConverted} cards${overriddenNote}. Continue with cursor, or call again with no cursor to resume from the saved one.`,
+          data: { ...result, sweepState },
+        })
+      }
+
+      case "reopen-ab": {
+        const parsed = reopenAbSchema.safeParse(body)
+        if (!parsed.success) {
+          return NextResponse.json(
+            { success: false, error: "Invalid request", details: parsed.error.flatten() },
+            { status: 400 }
+          )
+        }
+        if (parsed.data.confirm !== REOPEN_CONFIRM_TOKEN) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Reopening the A/B requires confirm: "${REOPEN_CONFIRM_TOKEN}".`,
+            },
+            { status: 400 }
+          )
+        }
+
+        // The undo for end-ab-switch-fsrs, which had none: `ab_ended` could
+        // only ever be set to true, so an accidental or premature end was
+        // permanent as far as the admin surface was concerned.
+        const adminId = authResult.context!.userId
+        const reopened = await reopenAbTest(adminId, parsed.data.reason)
+
+        await logAdminAction(
+          authResult.context!,
+          RESEARCH_AUDIT_ACTIONS.REOPEN_AB,
+          { reason: parsed.data.reason, previousStatus: reopened.previousStatus },
+          { request, target: { type: "research_config", id: "algorithm" } }
+        )
+
+        return NextResponse.json({
+          success: true,
+          message:
+            "A/B reopened. New users are randomized again. Users already converted to FSRS keep their converted schedules, so treat data from before the reopen as a separate period.",
+          data: reopened,
         })
       }
 
