@@ -19,18 +19,69 @@ import { COST_PROTECTION } from "./constants"
 const GLOBAL_USAGE_COLLECTION = "global_usage"
 
 /**
+ * One-shot latches so a misconfigured or deliberately disabled ceiling is
+ * reported loudly but not once per request. The env cannot change within a
+ * process lifetime, so a repeat log carries no new information.
+ */
+let warnedAboutInvalidCeiling = false
+let warnedAboutDisabledGate = false
+
+/**
  * Resolve the configured ceiling (env override wins, else constant).
- * Returns 0 when the gate is disabled.
+ * Returns 0 only when an operator has EXPLICITLY disabled the gate.
+ *
+ * The parsing is deliberately strict about what counts as an override, because
+ * `Number("")` is 0 and 0 means "kill-switch off". Under the old
+ * `Number.isFinite(parsed) && parsed >= 0` check, setting
+ * GLOBAL_DAILY_SPEND_CEILING_USD to an empty string — which is what a Vercel env
+ * var declared with no value, or a cleared secret, evaluates to — silently
+ * disarmed the platform's last line of defence against unbounded COGS. There
+ * would have been no error, no log, and no difference visible anywhere: the
+ * dashboards would look identical right up to the bill.
+ *
+ * So an empty, whitespace-only, non-numeric or negative value is treated as
+ * "not configured" and falls back to the constant, which leaves the gate ARMED
+ * (fails closed) and logs at ERROR. Only a value that genuinely parses to 0
+ * turns the gate off, and that says so at ERROR too, because a disabled
+ * kill-switch is a state nobody should have to read the env to discover.
  */
 export function getGlobalDailyCeiling(): number {
   const raw = process.env.GLOBAL_DAILY_SPEND_CEILING_USD
-  if (raw !== undefined) {
+
+  if (raw !== undefined && raw.trim() !== "") {
     const parsed = Number(raw)
     if (Number.isFinite(parsed) && parsed >= 0) {
+      if (parsed === 0 && !warnedAboutDisabledGate) {
+        warnedAboutDisabledGate = true
+        logger.error(
+          "CRITICAL: global daily AI spend ceiling is DISABLED " +
+            "(GLOBAL_DAILY_SPEND_CEILING_USD=0). Platform-wide COGS are unbounded. " +
+            "Unset the variable to restore the default ceiling.",
+          { defaultCeiling: COST_PROTECTION.GLOBAL_DAILY_SPEND_CEILING_USD }
+        )
+      }
       return parsed
     }
   }
+
+  // Set-but-unusable is a broken deploy, not a request to disable the gate.
+  if (raw !== undefined && !warnedAboutInvalidCeiling) {
+    warnedAboutInvalidCeiling = true
+    logger.error(
+      "GLOBAL_DAILY_SPEND_CEILING_USD is set but not a usable non-negative number; " +
+        "keeping the gate ARMED at the default ceiling. An empty value would " +
+        "otherwise parse as 0 and silently disable the kill-switch.",
+      { raw, fallbackCeiling: COST_PROTECTION.GLOBAL_DAILY_SPEND_CEILING_USD }
+    )
+  }
+
   return COST_PROTECTION.GLOBAL_DAILY_SPEND_CEILING_USD
+}
+
+/** Test-only: clear the one-shot log latches. */
+export function resetGlobalCeilingWarnings(): void {
+  warnedAboutInvalidCeiling = false
+  warnedAboutDisabledGate = false
 }
 
 /** UTC day key, e.g. "2026-06-27". Deterministic and timezone-stable. */

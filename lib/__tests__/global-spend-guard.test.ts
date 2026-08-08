@@ -75,6 +75,73 @@ describe("global-spend-guard", () => {
       const { COST_PROTECTION } = await import("../constants")
       expect(getGlobalDailyCeiling()).toBe(COST_PROTECTION.GLOBAL_DAILY_SPEND_CEILING_USD)
     })
+
+    // An env var declared with no value, or a cleared secret, arrives as "".
+    // Number("") is 0, and 0 means "gate off", so the old parse disarmed the
+    // platform's last cost defence with no error and no log. These pin that
+    // every unusable value leaves the gate ARMED instead.
+    it.each([
+      ["empty string", ""],
+      ["whitespace only", "   "],
+      ["negative", "-1"],
+      ["non-numeric", "not-a-number"],
+    ])("keeps the gate armed when the env value is %s", async (_label, value) => {
+      process.env[CEILING_ENV] = value
+      const { getGlobalDailyCeiling } = await import("../global-spend-guard")
+      const { COST_PROTECTION } = await import("../constants")
+      expect(getGlobalDailyCeiling()).toBe(COST_PROTECTION.GLOBAL_DAILY_SPEND_CEILING_USD)
+      // Specifically NOT 0, which is what silently turns the kill-switch off.
+      expect(getGlobalDailyCeiling()).not.toBe(0)
+    })
+
+    it("logs at ERROR when the env value is set but unusable", async () => {
+      process.env[CEILING_ENV] = ""
+      const { getGlobalDailyCeiling, resetGlobalCeilingWarnings } = await import(
+        "../global-spend-guard"
+      )
+      const { logger } = await import("../logger")
+      resetGlobalCeilingWarnings()
+      vi.mocked(logger.error).mockClear()
+
+      getGlobalDailyCeiling()
+
+      expect(logger.error).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(logger.error).mock.calls[0][0]).toContain(
+        "GLOBAL_DAILY_SPEND_CEILING_USD is set but not a usable"
+      )
+
+      // Latched: a per-request log on the hot path carries no new information.
+      getGlobalDailyCeiling()
+      expect(logger.error).toHaveBeenCalledTimes(1)
+    })
+
+    it("logs at ERROR when an operator deliberately disables the gate", async () => {
+      // 0 remains the documented escape hatch from a fail-closed block, but a
+      // disabled kill-switch must never be a silent state.
+      process.env[CEILING_ENV] = "0"
+      const { getGlobalDailyCeiling, resetGlobalCeilingWarnings } = await import(
+        "../global-spend-guard"
+      )
+      const { logger } = await import("../logger")
+      resetGlobalCeilingWarnings()
+      vi.mocked(logger.error).mockClear()
+
+      expect(getGlobalDailyCeiling()).toBe(0)
+      expect(logger.error).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(logger.error).mock.calls[0][0]).toContain("DISABLED")
+    })
+  })
+
+  describe("empty env does not disarm the kill-switch end to end", () => {
+    it("still blocks over-ceiling spend when the env var is empty", async () => {
+      // The whole point. Before this fix an empty value produced ceiling 0,
+      // isGlobalCeilingExceeded returned false on the `ceiling <= 0` line, and
+      // spend of any size was waved through.
+      process.env[CEILING_ENV] = ""
+      mockGet.mockResolvedValueOnce({ data: () => ({ totalCost: 999999 }) })
+      const { isGlobalCeilingExceeded } = await import("../global-spend-guard")
+      expect(await isGlobalCeilingExceeded()).toBe(true)
+    })
   })
 
   describe("getGlobalDailySpend", () => {
