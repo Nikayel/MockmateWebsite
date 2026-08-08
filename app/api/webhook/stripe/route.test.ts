@@ -6,7 +6,7 @@
  * first declined card revoking access, and a refund that downgrades but keeps charging.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 // ---------------------------------------------------------------------------
 // Minimal in-memory Firestore, sufficient for the paths under test.
@@ -191,7 +191,8 @@ afterEach(() => {
 })
 
 describe("stripe webhook idempotency", () => {
-  const event = () => stripeEvent("customer.subscription.created", { id: "sub_1", customer: "cus_1" })
+  const event = () =>
+    stripeEvent("customer.subscription.created", { id: "sub_1", customer: "cus_1" })
 
   it("claims the event, processes it, and closes the claim as completed", async () => {
     const { POST } = await importRoute()
