@@ -381,6 +381,12 @@ export const AUDIT_ACTIONS = {
   // Settings
   UPDATE_SETTINGS: "update_settings",
 
+  // Announcements. Every user sees these, so who published one, from where, and
+  // what the message said before an edit are all forensic facts.
+  CREATE_ANNOUNCEMENT: "create_announcement",
+  UPDATE_ANNOUNCEMENT: "update_announcement",
+  DELETE_ANNOUNCEMENT: "delete_announcement",
+
   // Algorithm research
   END_AB_SWITCH_FSRS: "end_ab_switch_fsrs",
 
