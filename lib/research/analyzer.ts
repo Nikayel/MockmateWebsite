@@ -10,31 +10,56 @@ import type {
   AlgorithmComparisonAggregate,
   AlgorithmResearchEvent,
   AlgorithmDailyMetrics,
-  SpacedRepetitionAlgorithm,
 } from "../types"
 import {
   tTest,
   TTestResult,
   calculatePredictionMetrics,
   PredictionMetrics,
-  CalibrationBin,
   analyzeSampleSize,
   SampleSizeAnalysis,
   analyzeTrend,
   TrendAnalysis,
   mean,
-  standardDeviation,
-  proportionConfidenceInterval,
+  meanConfidenceInterval,
   ConfidenceInterval,
 } from "./statistics"
+import {
+  aggregateEventsByUser,
+  metricValues,
+  type UserObservation,
+  type UserObservationSet,
+} from "./user-observations"
+import {
+  buildExperimentReadout,
+  EXPERIMENT_DESIGN,
+  type ExperimentReadout,
+} from "./experiment-readout"
 
 // ============================================
 // Types
 // ============================================
 
+/** How far back the analysis looks. A time range, not "the last N events". */
+export const ANALYSIS_WINDOW_DAYS = 30
+
+/**
+ * Hard cap on documents read in one analysis, purely to bound cost. The window
+ * above is what defines the sample; if this cap is ever hit the readout says so
+ * rather than quietly analysing an arbitrary slice.
+ */
+const MAX_EVENTS_PER_ANALYSIS = 20000
+
 export interface EnhancedResearchAnalysis {
   // Basic comparison data
   comparison: AlgorithmComparisonAggregate | null
+
+  /**
+   * The answer to "which algorithm is winning": user-level tests, a declared
+   * primary metric, an SRM check and an explicit not-enough-data state. This is
+   * the field the UI should read for any claim about a winner.
+   */
+  experiment: ExperimentReadout
 
   // Statistical significance tests
   significanceTests: {
@@ -95,6 +120,10 @@ export interface EnhancedResearchAnalysis {
     dataRange: { start: string; end: string }
     totalEventsAnalyzed: number
     totalUsersAnalyzed: number
+    /** True when the cost cap truncated the window. */
+    windowTruncated: boolean
+    /** Users assigned to each arm, the denominator of the SRM check. */
+    assignedUsers: { sm2: number; fsrs: number; unassigned: number }
   }
 }
 
@@ -148,13 +177,13 @@ const DEFAULT_CONFIDENCE_INTERVALS: EnhancedResearchAnalysis["confidenceInterval
  */
 export async function analyzeResearchData(): Promise<EnhancedResearchAnalysis> {
   const now = new Date()
-  const thirtyDaysAgo = new Date(now)
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  const windowStart = new Date(now)
+  windowStart.setDate(windowStart.getDate() - ANALYSIS_WINDOW_DAYS)
 
   // Check if adminDb is initialized
   if (!adminDb) {
     console.warn("Research analyzer: adminDb not initialized, returning defaults")
-    return createDefaultAnalysis(now, thirtyDaysAgo)
+    return createDefaultAnalysis(now, windowStart)
   }
 
   let comparison: AlgorithmComparisonAggregate | null = null
@@ -176,12 +205,19 @@ export async function analyzeResearchData(): Promise<EnhancedResearchAnalysis> {
     // Continue with null comparison
   }
 
-  // Fetch recent events for detailed analysis
+  // Fetch the events INSIDE THE WINDOW.
+  //
+  // This used to be "the most recent 5000 events" with no time bound. With one
+  // arm reviewing more than the other, the busier arm consumed most of those
+  // 5000 slots and the quieter arm was silently squeezed out of its own
+  // experiment, so the comparison covered two different date ranges. A fixed
+  // time range gives both arms the same window by construction.
   try {
     const eventsSnapshot = await adminDb
       .collection("algorithm_research_events")
+      .where("timestamp", ">=", windowStart.toISOString())
       .orderBy("timestamp", "desc")
-      .limit(5000) // Analyze last 5000 events
+      .limit(MAX_EVENTS_PER_ANALYSIS)
       .get()
 
     events = eventsSnapshot.docs.map((doc) => doc.data() as AlgorithmResearchEvent)
@@ -192,30 +228,52 @@ export async function analyzeResearchData(): Promise<EnhancedResearchAnalysis> {
     // Continue with empty events
   }
 
+  const windowTruncated = events.length >= MAX_EVENTS_PER_ANALYSIS
+
+  // Collapse to one observation per user: the unit the experiment randomizes.
+  const observations = aggregateEventsByUser(events)
+
+  // Assignment counts drive the SRM check, so they come from the profiles
+  // collection rather than from the (possibly stale) aggregate document.
+  const assignedUsers = await fetchAssignmentCounts()
+
+  const experiment = buildExperimentReadout({
+    observations,
+    assignedControl: assignedUsers.sm2,
+    assignedTreatment: assignedUsers.fsrs,
+    window: {
+      start: windowStart.toISOString(),
+      end: now.toISOString(),
+      eventsAnalyzed: events.length,
+      truncated: windowTruncated,
+    },
+  })
+
   // Calculate significance tests (safe with empty arrays)
-  const significanceTests = calculateSignificanceTests(sm2Events, fsrsEvents)
+  const significanceTests = calculateSignificanceTests(observations)
 
   // Calculate prediction accuracy (safe with empty arrays)
   const predictionAccuracy = calculatePredictionAccuracyComparison(sm2Events, fsrsEvents)
 
-  // Sample size analysis
+  // Sample size analysis. The denominator is USERS in each arm, not events.
   const sampleAnalysis = analyzeSampleSize(
-    comparison?.sm2.total_users || 0,
-    comparison?.fsrs.total_users || 0,
-    estimateDailyNewUsers(events)
+    assignedUsers.sm2,
+    assignedUsers.fsrs,
+    estimateDailyNewUsers(events),
+    EXPERIMENT_DESIGN.targetEffectSize
   )
 
   // Trend analysis with error handling
   let trends: EnhancedResearchAnalysis["trends"]
   try {
-    trends = await calculateTrends(thirtyDaysAgo)
+    trends = await calculateTrends(windowStart)
   } catch (error) {
     console.error("Research analyzer: Failed to calculate trends:", error)
     trends = DEFAULT_TRENDS
   }
 
   // Confidence intervals (safe with empty arrays)
-  const confidenceIntervals = calculateConfidenceIntervals(sm2Events, fsrsEvents)
+  const confidenceIntervals = calculateConfidenceIntervals(observations)
 
   // Calculate quality score
   const qualityScore = calculateResearchQualityScore(
@@ -227,15 +285,15 @@ export async function analyzeResearchData(): Promise<EnhancedResearchAnalysis> {
 
   // Generate recommendations
   const recommendations = generateRecommendations(
-    comparison,
+    experiment,
     sampleAnalysis,
-    significanceTests,
     predictionAccuracy,
     qualityScore
   )
 
   return {
     comparison,
+    experiment,
     significanceTests,
     predictionAccuracy,
     sampleAnalysis,
@@ -246,19 +304,57 @@ export async function analyzeResearchData(): Promise<EnhancedResearchAnalysis> {
     metadata: {
       analysisTimestamp: now.toISOString(),
       dataRange: {
-        start: thirtyDaysAgo.toISOString(),
+        start: windowStart.toISOString(),
         end: now.toISOString(),
       },
       totalEventsAnalyzed: events.length,
-      totalUsersAnalyzed: new Set(events.map((e) => e.user_id)).size,
+      totalUsersAnalyzed: observations.sm2.length + observations.fsrs.length,
+      windowTruncated,
+      assignedUsers,
     },
+  }
+}
+
+/**
+ * Users assigned to each arm, plus the ones with no assignment at all.
+ *
+ * Unassigned users are counted separately and NOT folded into SM-2. They were
+ * never randomized, so counting them as control both fakes an SM-2 majority and
+ * makes the sample ratio check fire on a problem that does not exist.
+ */
+async function fetchAssignmentCounts(): Promise<{
+  sm2: number
+  fsrs: number
+  unassigned: number
+}> {
+  const empty = { sm2: 0, fsrs: 0, unassigned: 0 }
+  if (!adminDb) return empty
+
+  try {
+    const profiles = adminDb.collection("profiles")
+    const [total, sm2, fsrs] = await Promise.all([
+      profiles.count().get(),
+      profiles.where("spaced_repetition_algorithm", "==", "sm2").count().get(),
+      profiles.where("spaced_repetition_algorithm", "==", "fsrs").count().get(),
+    ])
+
+    const sm2Count = sm2.data().count
+    const fsrsCount = fsrs.data().count
+    return {
+      sm2: sm2Count,
+      fsrs: fsrsCount,
+      unassigned: Math.max(0, total.data().count - sm2Count - fsrsCount),
+    }
+  } catch (error) {
+    console.error("Research analyzer: Failed to count algorithm assignments:", error)
+    return empty
   }
 }
 
 /**
  * Create a default analysis response when data is unavailable
  */
-function createDefaultAnalysis(now: Date, thirtyDaysAgo: Date): EnhancedResearchAnalysis {
+function createDefaultAnalysis(now: Date, windowStart: Date): EnhancedResearchAnalysis {
   const defaultSampleAnalysis: SampleSizeAnalysis = {
     currentSampleSm2: 0,
     currentSampleFsrs: 0,
@@ -273,6 +369,25 @@ function createDefaultAnalysis(now: Date, thirtyDaysAgo: Date): EnhancedResearch
 
   return {
     comparison: null,
+    // With no database there is no experiment to read, so the readout is built
+    // from empty arms and lands on "not enough data" rather than inventing one.
+    experiment: buildExperimentReadout({
+      observations: {
+        sm2: [],
+        fsrs: [],
+        eventsUsed: 0,
+        usersWithMixedAssignment: 0,
+        eventsDiscarded: 0,
+      },
+      assignedControl: 0,
+      assignedTreatment: 0,
+      window: {
+        start: windowStart.toISOString(),
+        end: now.toISOString(),
+        eventsAnalyzed: 0,
+        truncated: false,
+      },
+    }),
     significanceTests: DEFAULT_SIGNIFICANCE_TESTS,
     predictionAccuracy: DEFAULT_PREDICTION_ACCURACY,
     sampleAnalysis: defaultSampleAnalysis,
@@ -298,11 +413,13 @@ function createDefaultAnalysis(now: Date, thirtyDaysAgo: Date): EnhancedResearch
     metadata: {
       analysisTimestamp: now.toISOString(),
       dataRange: {
-        start: thirtyDaysAgo.toISOString(),
+        start: windowStart.toISOString(),
         end: now.toISOString(),
       },
       totalEventsAnalyzed: 0,
       totalUsersAnalyzed: 0,
+      windowTruncated: false,
+      assignedUsers: { sm2: 0, fsrs: 0, unassigned: 0 },
     },
   }
 }
@@ -311,45 +428,49 @@ function createDefaultAnalysis(now: Date, thirtyDaysAgo: Date): EnhancedResearch
 // Helper Functions
 // ============================================
 
+/**
+ * Significance tests for the Statistics tab, computed at the USER level.
+ *
+ * Every array below holds one number per user. The previous version built these
+ * arrays from raw review events, so a single user practising daily contributed
+ * dozens of rows, n was reported in the thousands when the experiment had
+ * hundreds of users, and the resulting p-values were far too small to believe.
+ *
+ * The minimum of `minUsersPerArm` per arm is the same bar the verdict uses, so
+ * the tab and the banner cannot tell different stories.
+ */
 function calculateSignificanceTests(
-  sm2Events: AlgorithmResearchEvent[],
-  fsrsEvents: AlgorithmResearchEvent[]
+  observations: UserObservationSet
 ): EnhancedResearchAnalysis["significanceTests"] {
-  // Extract metrics for each algorithm
-  const sm2Scores = sm2Events.map((e) => e.score || 0)
-  const fsrsScores = fsrsEvents.map((e) => e.score || 0)
+  const minimum = EXPERIMENT_DESIGN.minUsersPerArm
 
-  const sm2Retention = sm2Events.map((e) => (e.actual_retention ? 1 : 0))
-  const fsrsRetention = fsrsEvents.map((e) => (e.actual_retention ? 1 : 0))
-
-  const sm2Intervals = sm2Events
-    .map((e) => e.post_review?.new_interval_days || 0)
-    .filter((v) => v > 0)
-  const fsrsIntervals = fsrsEvents
-    .map((e) => e.post_review?.new_interval_days || 0)
-    .filter((v) => v > 0)
-
-  const sm2Time = sm2Events.map((e) => e.time_spent_minutes || 0).filter((v) => v > 0)
-  const fsrsTime = fsrsEvents.map((e) => e.time_spent_minutes || 0).filter((v) => v > 0)
+  const testMetric = (
+    metric: "retentionRate" | "meanScore" | "intervalAccuracy"
+  ): TTestResult | null => {
+    const control = metricValues(observations.sm2, metric)
+    const treatment = metricValues(observations.fsrs, metric)
+    if (control.length < minimum || treatment.length < minimum) return null
+    // Argument order matches the rest of the dashboard: SM-2 first, FSRS second,
+    // so a positive mean difference always reads as "FSRS higher".
+    return tTest(treatment, control)
+  }
 
   return {
-    retention:
-      sm2Retention.length >= 10 && fsrsRetention.length >= 10
-        ? tTest(sm2Retention, fsrsRetention)
-        : null,
-    score: sm2Scores.length >= 10 && fsrsScores.length >= 10 ? tTest(sm2Scores, fsrsScores) : null,
-    timeToMastery: null, // Requires different data structure
-    dailyReviews: null, // Requires aggregation by user-day
-    intervalAccuracy:
-      sm2Events.length >= 10 && fsrsEvents.length >= 10
-        ? tTest(
-            sm2Events.map((e) => (e.retention_as_predicted ? 1 : 0)),
-            fsrsEvents.map((e) => (e.retention_as_predicted ? 1 : 0))
-          )
-        : null,
+    retention: testMetric("retentionRate"),
+    score: testMetric("meanScore"),
+    timeToMastery: null, // Needs mastery timestamps, which events do not carry
+    dailyReviews: null, // Needs a per-user-day aggregation
+    intervalAccuracy: testMetric("intervalAccuracy"),
   }
 }
 
+/**
+ * Prediction quality (log loss, Brier, calibration) is deliberately computed
+ * per REVIEW, not per user: each review carries its own retention prediction,
+ * so the review is the thing being scored. No significance claim is attached to
+ * these numbers for exactly that reason. Anything that compares the two ARMS
+ * goes through the user-level path instead.
+ */
 function calculatePredictionAccuracyComparison(
   sm2Events: AlgorithmResearchEvent[],
   fsrsEvents: AlgorithmResearchEvent[]
@@ -500,38 +621,26 @@ async function calculateTrends(startDate: Date): Promise<EnhancedResearchAnalysi
   }
 }
 
+/**
+ * Intervals around each arm's mean, at the user level.
+ *
+ * The retention interval used to be a proportion interval over EVENTS
+ * (successes / total reviews), which is an interval for "the next review",
+ * not for "the average user", and it was roughly sqrt(reviews per user) times
+ * too narrow for the question the page asks. Each arm's interval is now the
+ * interval around the mean of its per-user rates.
+ */
 function calculateConfidenceIntervals(
-  sm2Events: AlgorithmResearchEvent[],
-  fsrsEvents: AlgorithmResearchEvent[]
+  observations: UserObservationSet
 ): EnhancedResearchAnalysis["confidenceIntervals"] {
-  // Retention confidence intervals
-  const sm2RetainedCount = sm2Events.filter((e) => e.actual_retention).length
-  const fsrsRetainedCount = fsrsEvents.filter((e) => e.actual_retention).length
-
-  const sm2Scores = sm2Events.map((e) => e.score || 0)
-  const fsrsScores = fsrsEvents.map((e) => e.score || 0)
+  const interval = (arm: UserObservation[], metric: "retentionRate" | "meanScore") =>
+    meanConfidenceInterval(metricValues(arm, metric))
 
   return {
-    sm2Retention: proportionConfidenceInterval(sm2RetainedCount, sm2Events.length),
-    fsrsRetention: proportionConfidenceInterval(fsrsRetainedCount, fsrsEvents.length),
-    sm2Score: {
-      point: mean(sm2Scores),
-      lower:
-        mean(sm2Scores) - (1.96 * standardDeviation(sm2Scores)) / Math.sqrt(sm2Scores.length || 1),
-      upper:
-        mean(sm2Scores) + (1.96 * standardDeviation(sm2Scores)) / Math.sqrt(sm2Scores.length || 1),
-      confidenceLevel: 0.95,
-    },
-    fsrsScore: {
-      point: mean(fsrsScores),
-      lower:
-        mean(fsrsScores) -
-        (1.96 * standardDeviation(fsrsScores)) / Math.sqrt(fsrsScores.length || 1),
-      upper:
-        mean(fsrsScores) +
-        (1.96 * standardDeviation(fsrsScores)) / Math.sqrt(fsrsScores.length || 1),
-      confidenceLevel: 0.95,
-    },
+    sm2Retention: interval(observations.sm2, "retentionRate"),
+    fsrsRetention: interval(observations.fsrs, "retentionRate"),
+    sm2Score: interval(observations.sm2, "meanScore"),
+    fsrsScore: interval(observations.fsrs, "meanScore"),
   }
 }
 
@@ -598,13 +707,24 @@ function calculateResearchQualityScore(
 }
 
 function generateRecommendations(
-  comparison: AlgorithmComparisonAggregate | null,
+  experiment: ExperimentReadout,
   sampleAnalysis: SampleSizeAnalysis,
-  significanceTests: EnhancedResearchAnalysis["significanceTests"],
   predictionAccuracy: EnhancedResearchAnalysis["predictionAccuracy"],
   qualityScore: EnhancedResearchAnalysis["qualityScore"]
 ): ResearchRecommendation[] {
   const recommendations: ResearchRecommendation[] = []
+
+  // A broken split invalidates everything else, so it is said first and loudest.
+  if (experiment.verdict === "invalid_split") {
+    recommendations.push({
+      priority: "high",
+      category: "data_quality",
+      title: "Sample ratio mismatch: stop reading these results",
+      description: experiment.detail,
+      action:
+        "Check assignment: users created while the A/B config was unreachable, a migration that rewrote one arm, or a filter that drops users unevenly.",
+    })
+  }
 
   // Sample size recommendations
   if (!sampleAnalysis.isSufficient) {
@@ -625,29 +745,33 @@ function generateRecommendations(
     })
   }
 
-  // Algorithm recommendations
-  if (
-    comparison?.comparison.overall_winner &&
-    (comparison.comparison.confidence_level ?? 0) >= 90
-  ) {
-    const winner = comparison.comparison.overall_winner.toUpperCase()
+  // Algorithm recommendation, driven by the corrected primary metric.
+  //
+  // This used to key off `confidence_level >= 90`, a number produced by
+  // `60 + wins * 7`. A metric-counting heuristic cannot support a migration
+  // decision, so the recommendation now follows the same test the banner shows.
+  if (experiment.verdict === "fsrs_better" || experiment.verdict === "sm2_better") {
+    const winner = experiment.verdict === "fsrs_better" ? "FSRS" : "SM-2"
     recommendations.push({
       priority: "high",
       category: "algorithm",
-      title: `${winner} is Significantly Better`,
-      description: `${winner} wins on ${winner === "FSRS" ? comparison.comparison.fsrs_wins_count : comparison.comparison.sm2_wins_count}/5 key metrics with ${comparison.comparison.confidence_level}% confidence.`,
-      action: `Consider migrating all users to ${winner}.`,
+      title: `${winner} wins the primary metric`,
+      description: experiment.detail,
+      action:
+        experiment.window.truncated || experiment.sample.usersWithMixedAssignment > 0
+          ? `Confirm on a clean window before migrating everyone to ${winner}.`
+          : `Plan the migration to ${winner}, then re-check the guardrail metrics after the switch.`,
     })
-  } else if (
-    comparison?.comparison.overall_winner &&
-    (comparison.comparison.confidence_level ?? 0) >= 70
-  ) {
+  } else if (experiment.verdict === "no_difference_detected") {
+    const mde = experiment.sample.minimumDetectableEffect
     recommendations.push({
       priority: "medium",
       category: "algorithm",
-      title: `${comparison.comparison.overall_winner.toUpperCase()} Shows Promise`,
-      description: `Early indicators favor ${comparison.comparison.overall_winner.toUpperCase()}, but more data needed for definitive conclusion.`,
-      action: "Continue A/B test to strengthen statistical confidence.",
+      title: "No difference detected on the primary metric",
+      description: experiment.detail,
+      action: mde
+        ? `The current sample could only have detected an effect of d = ${mde.toFixed(2)} or larger. Keep collecting, or accept that anything smaller does not matter commercially.`
+        : "Keep collecting.",
     })
   }
 
@@ -675,13 +799,27 @@ function generateRecommendations(
     })
   }
 
+  // Users who appeared in both arms break the randomization and must be chased.
+  if (experiment.sample.usersWithMixedAssignment > 0) {
+    recommendations.push({
+      priority: "medium",
+      category: "data_quality",
+      title: "Users recorded under both algorithms",
+      description: `${experiment.sample.usersWithMixedAssignment} users produced events under both SM-2 and FSRS inside the window and were excluded from the comparison. A randomized user is supposed to stay in one arm.`,
+      action: "Check for algorithm overrides or a partial migration during the window.",
+    })
+  }
+
   // Action recommendations based on current state
-  if (qualityScore.overall >= 70 && comparison?.comparison.overall_winner) {
+  if (
+    qualityScore.overall >= 70 &&
+    (experiment.verdict === "fsrs_better" || experiment.verdict === "sm2_better")
+  ) {
     recommendations.push({
       priority: "high",
       category: "action",
       title: "Ready for Decision",
-      description: `Research quality is sufficient (${qualityScore.overall}/100). Results are actionable.`,
+      description: `Research quality is sufficient (${qualityScore.overall}/100) and the primary metric is significant after correction.`,
       action: "Consider presenting findings to stakeholders and planning rollout.",
     })
   } else if (qualityScore.overall < 40) {
