@@ -123,10 +123,11 @@ async function listSessions(plan: SessionQueryPlan): Promise<ListPage> {
     plan
   )
 
-  if (page.nextCursor === null && (page.items.length === plan.pageSize || page.scanCapped)) {
-    // Ending pagination here would truncate what the admin can reach, and the
-    // only way to get here is a document whose created_at is not an ISO string.
-    logger.warn("[Admin Sessions] Page ended without a cursor; check created_at shape", {
+  if (page.hasMore && page.nextCursor === null) {
+    // More matches exist but no resume position could be built from the last row,
+    // which only happens when its created_at is not the ISO string both writers
+    // produce. The admin silently loses everything past here, so it is logged.
+    logger.warn("[Admin Sessions] More results exist but no cursor could be built", {
       returned: page.items.length,
       scanned: page.scanned,
     })

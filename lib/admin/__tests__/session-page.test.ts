@@ -46,6 +46,24 @@ describe("assembleSessionPage: fully indexed plans", () => {
     const page = assembleSessionPage(scan(10), plan)
     expect(page.items).toHaveLength(10)
     // Exactly a page and no more: a cursor here would page forever.
+    expect(page.hasMore).toBe(false)
+    expect(page.nextCursor).toBeNull()
+  })
+
+  it("reports more results and a cursor together when both are true", () => {
+    const page = assembleSessionPage(scan(11), plan)
+    expect(page.hasMore).toBe(true)
+    expect(page.nextCursor).not.toBeNull()
+  })
+
+  it("still reports more results when no cursor could be built from the last row", () => {
+    // A document whose created_at is not an ISO string. Reporting no more results
+    // here would silently truncate the list; the two flags disagreeing is what
+    // lets the caller notice and log it.
+    const scanned = scan(11)
+    scanned[9].data = { created_at: 1723118400000 }
+    const page = assembleSessionPage(scanned, plan)
+    expect(page.hasMore).toBe(true)
     expect(page.nextCursor).toBeNull()
   })
 

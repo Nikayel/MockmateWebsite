@@ -30,7 +30,15 @@ export interface ScannedSession {
 export interface SessionPage {
   /** The documents that belong on this page, at most `plan.pageSize` of them. */
   items: ScannedSession[]
-  /** Where the next page resumes, or null at the end of the list. */
+  /**
+   * Whether anything follows this page.
+   *
+   * Separate from `nextCursor` on purpose. They normally agree, and where they
+   * do not, more exists but no resume position could be built from it, which is
+   * a document-shape problem worth reporting rather than an end of list.
+   */
+  hasMore: boolean
+  /** Where the next page resumes, or null when nothing follows or none could be built. */
   nextCursor: SessionCursor | null
   /** Documents read to produce this page. */
   scanned: number
@@ -72,12 +80,19 @@ export function assembleSessionPage(
   // probe, not a cap.
   const scanCapped = plan.openOnly && scanned.length >= budget
 
+  let hasMore = false
   let nextCursor: SessionCursor | null = null
+
   if (matching.length > plan.pageSize) {
+    // The page filled and there was at least one more match behind it.
+    hasMore = true
     nextCursor = cursorForSession(items[items.length - 1])
   } else if (scanCapped && scanned.length > 0) {
+    // The page did not fill, but the scan stopped at its ceiling rather than at
+    // the end of the collection, so there is more to look through.
+    hasMore = true
     nextCursor = cursorForSession(scanned[scanned.length - 1])
   }
 
-  return { items, nextCursor, scanned: scanned.length, scanCapped }
+  return { items, hasMore, nextCursor, scanned: scanned.length, scanCapped }
 }
