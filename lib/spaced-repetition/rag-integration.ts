@@ -5,47 +5,47 @@
  * based on user's weak areas, failed problems, and roadmap goals.
  */
 
-import { advancedRetrieve } from '../rag/retrieval/advanced-retrieval';
-import { adminDb } from '../firebase-admin';
-import { getScenarioById, scenarios } from '../scenarios';
-import type { DSAPattern } from '../types/dsa-patterns';
-import type { Difficulty } from './sm2-algorithm';
-import { getWeakPatterns, getUserMasteryStats } from './mastery-calculator';
-import { getAllUserProblems, getCompletedProblemIds, type ProblemMastery } from './scheduler';
+import { advancedRetrieve } from "../rag/retrieval/advanced-retrieval"
+import { adminDb } from "../firebase-admin"
+import { getScenarioById, scenarios } from "../scenarios"
+import type { DSAPattern } from "../types/dsa-patterns"
+import type { Difficulty } from "./sm2-algorithm"
+import { getWeakPatterns, getUserMasteryStats } from "./mastery-calculator"
+import { getAllUserProblems, getCompletedProblemIds, type ProblemMastery } from "./scheduler"
 
 /**
  * Get canonical difficulty from scenario definition
  */
 function getCanonicalDifficulty(scenarioId: string, fallback: Difficulty): Difficulty {
-  const scenario = getScenarioById(scenarioId);
-  return (scenario?.difficulty as Difficulty) || fallback;
+  const scenario = getScenarioById(scenarioId)
+  return (scenario?.difficulty as Difficulty) || fallback
 }
 
 export type RecommendationType =
-  | 'review'
-  | 'practice_weakness'
-  | 'similar_to_failed'
-  | 'company_relevant'
-  | 'next_in_roadmap'
-  | 'strengthen_pattern';
+  | "review"
+  | "practice_weakness"
+  | "similar_to_failed"
+  | "company_relevant"
+  | "next_in_roadmap"
+  | "strengthen_pattern"
 
 export interface SmartRecommendation {
-  type: RecommendationType;
-  scenario_id: string;
-  title: string;
-  pattern: DSAPattern;
-  difficulty: Difficulty;
-  reason: string;
-  priority: number; // 0-100, higher = more important
-  estimated_minutes: number;
-  companies?: string[];
+  type: RecommendationType
+  scenario_id: string
+  title: string
+  pattern: DSAPattern
+  difficulty: Difficulty
+  reason: string
+  priority: number // 0-100, higher = more important
+  estimated_minutes: number
+  companies?: string[]
 }
 
 interface RecentlyFailedProblem {
-  problem_id: string;
-  title: string;
-  pattern: DSAPattern;
-  score: number;
+  problem_id: string
+  title: string
+  pattern: DSAPattern
+  score: number
 }
 
 /**
@@ -55,15 +55,15 @@ async function getRecentlyFailedProblems(
   userId: string,
   limit: number = 5
 ): Promise<RecentlyFailedProblem[]> {
-  const problems = await getAllUserProblems(userId);
+  const problems = await getAllUserProblems(userId)
 
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
   const failed = problems
     .filter((p) => {
-      const reviewedAt = new Date(p.last_reviewed_at);
-      return reviewedAt >= sevenDaysAgo && p.last_score < 60;
+      const reviewedAt = new Date(p.last_reviewed_at)
+      return reviewedAt >= sevenDaysAgo && p.last_score < 60
     })
     .sort((a, b) => a.last_score - b.last_score) // Worst first
     .slice(0, limit)
@@ -72,9 +72,9 @@ async function getRecentlyFailedProblems(
       title: p.title,
       pattern: p.pattern,
       score: p.last_score,
-    }));
+    }))
 
-  return failed;
+  return failed
 }
 
 /**
@@ -84,18 +84,32 @@ async function getActiveRoadmap(
   userId: string
 ): Promise<{ targetCompany?: string; targetRole?: string } | null> {
   try {
-    const roadmapRef = adminDb.collection('user_roadmaps').doc(userId);
-    const doc = await roadmapRef.get();
+    // A roadmap document is keyed by a GENERATED id and carries `userId` as a
+    // field, which is how every other reader finds it (app/api/roadmap/*, the
+    // email cron, the admin user view, the deletion map). This function used
+    // `.doc(userId)`, so `doc.exists` was false for every user who has ever had
+    // a roadmap and it returned null unconditionally. Its field names were wrong
+    // too: the writer nests the answers under `assessment` in camelCase, never
+    // `target_company` at the top level.
+    const snapshot = await adminDb
+      .collection("user_roadmaps")
+      .where("userId", "==", userId)
+      .where("status", "==", "active")
+      .limit(1)
+      .get()
 
-    if (!doc.exists) return null;
+    if (snapshot.empty) return null
 
-    const data = doc.data();
+    const data = snapshot.docs[0].data()
+    const assessment = data?.assessment ?? {}
     return {
-      targetCompany: data?.target_company,
-      targetRole: data?.target_role,
-    };
+      targetCompany: assessment.targetCompany,
+      // The assessment records the track the candidate is preparing for; there
+      // is no separate role field on the document.
+      targetRole: assessment.targetTrack,
+    }
   } catch {
-    return null;
+    return null
   }
 }
 
@@ -107,34 +121,34 @@ async function getSimilarProblems(
   excludeIds: string[],
   limit: number = 3
 ): Promise<SmartRecommendation[]> {
-  const scenario = getScenarioById(failedProblem.problem_id);
+  const scenario = getScenarioById(failedProblem.problem_id)
 
-  if (!scenario) return [];
+  if (!scenario) return []
 
   // Use RAG to find similar problems
   const results = await advancedRetrieve({
     query: `${scenario.title} ${scenario.description}`,
     limit,
-    types: ['problem'],
+    types: ["problem"],
     patterns: [failedProblem.pattern],
     excludeIds: [failedProblem.problem_id, ...excludeIds],
     enableQueryExpansion: true,
     enableReranking: true,
-  });
+  })
 
   return results.map((result, index) => {
     const matchedScenario = scenarios.find(
       (s) => s.id === result.id || s.title === result.metadata?.title
-    );
+    )
 
     // Use canonical difficulty from scenario definition
     const canonicalDifficulty = getCanonicalDifficulty(
       result.id,
-      (result.metadata?.difficulty as Difficulty) || 'medium'
-    );
+      (result.metadata?.difficulty as Difficulty) || "medium"
+    )
 
     return {
-      type: 'similar_to_failed' as RecommendationType,
+      type: "similar_to_failed" as RecommendationType,
       scenario_id: result.id,
       title: (result.metadata?.title as string) || result.id,
       pattern: failedProblem.pattern,
@@ -143,8 +157,8 @@ async function getSimilarProblems(
       priority: 80 - index * 5, // Decrease priority for each subsequent result
       estimated_minutes: matchedScenario?.estimatedTime || 20,
       companies: result.metadata?.companies as string[],
-    };
-  });
+    }
+  })
 }
 
 /**
@@ -159,32 +173,30 @@ async function getCompanyRelevantProblems(
   // Find problems commonly asked at the target company
   const relevantScenarios = scenarios
     .filter((s) => {
-      if (excludeIds.includes(s.id)) return false;
-      if (!s.companies.includes(targetCompany as any)) return false;
-      if (s.type !== 'dsa') return false;
+      if (excludeIds.includes(s.id)) return false
+      if (!s.companies.includes(targetCompany as any)) return false
+      if (s.type !== "dsa") return false
       // Prefer problems from weak patterns
-      if (weakPatterns.length > 0 && 'pattern' in s) {
-        return weakPatterns.includes((s as any).pattern);
+      if (weakPatterns.length > 0 && "pattern" in s) {
+        return weakPatterns.includes((s as any).pattern)
       }
-      return true;
+      return true
     })
-    .slice(0, limit);
+    .slice(0, limit)
 
   return relevantScenarios.map((scenario, index) => ({
-    type: 'company_relevant' as RecommendationType,
+    type: "company_relevant" as RecommendationType,
     scenario_id: scenario.id,
     title: scenario.title,
-    pattern: (scenario as any).pattern || 'arrays-hashing',
+    pattern: (scenario as any).pattern || "arrays-hashing",
     difficulty: scenario.difficulty,
     reason: `Commonly asked at ${targetCompany}${
-      weakPatterns.includes((scenario as any).pattern)
-        ? ' and matches your weak pattern'
-        : ''
+      weakPatterns.includes((scenario as any).pattern) ? " and matches your weak pattern" : ""
     }`,
     priority: 70 - index * 5,
     estimated_minutes: scenario.estimatedTime,
     companies: scenario.companies,
-  }));
+  }))
 }
 
 /**
@@ -195,25 +207,25 @@ async function getPatternStrengtheningProblems(
   completedIds: string[],
   limit: number = 3
 ): Promise<SmartRecommendation[]> {
-  const recommendations: SmartRecommendation[] = [];
+  const recommendations: SmartRecommendation[] = []
 
   for (const weak of weakPatterns.slice(0, 2)) {
     // Find unseen problems for this pattern, sorted by difficulty (start easier)
     const patternProblems = scenarios
       .filter((s) => {
-        if (completedIds.includes(s.id)) return false;
-        if (s.type !== 'dsa') return false;
-        return (s as any).pattern === weak.pattern;
+        if (completedIds.includes(s.id)) return false
+        if (s.type !== "dsa") return false
+        return (s as any).pattern === weak.pattern
       })
       .sort((a, b) => {
-        const diffOrder = { easy: 0, medium: 1, hard: 2 };
-        return diffOrder[a.difficulty] - diffOrder[b.difficulty];
+        const diffOrder = { easy: 0, medium: 1, hard: 2 }
+        return diffOrder[a.difficulty] - diffOrder[b.difficulty]
       })
-      .slice(0, 2);
+      .slice(0, 2)
 
     patternProblems.forEach((scenario, index) => {
       recommendations.push({
-        type: 'strengthen_pattern',
+        type: "strengthen_pattern",
         scenario_id: scenario.id,
         title: scenario.title,
         pattern: weak.pattern,
@@ -222,11 +234,11 @@ async function getPatternStrengtheningProblems(
         priority: 75 - index * 5,
         estimated_minutes: scenario.estimatedTime,
         companies: scenario.companies,
-      });
-    });
+      })
+    })
   }
 
-  return recommendations.slice(0, limit);
+  return recommendations.slice(0, limit)
 }
 
 /**
@@ -237,44 +249,59 @@ async function getNextInRoadmap(
   completedIds: string[]
 ): Promise<SmartRecommendation | null> {
   try {
-    // Check if user has an active roadmap
-    const roadmapRef = adminDb.collection('user_roadmaps').doc(userId);
-    const doc = await roadmapRef.get();
+    // Same two defects as getActiveRoadmap above: the document is keyed by a
+    // generated id with `userId` as a field, and the schema this read against
+    // never existed. A roadmap has no `phases` or `current_phase`; it has
+    // `dailyPlans`, each with a `questions` array. So this returned null for
+    // every user, and "next in your roadmap" was silently absent from every
+    // recommendation set the product has ever produced.
+    const snapshot = await adminDb
+      .collection("user_roadmaps")
+      .where("userId", "==", userId)
+      .where("status", "==", "active")
+      .limit(1)
+      .get()
 
-    if (!doc.exists) return null;
+    if (snapshot.empty) return null
 
-    const data = doc.data();
-    const currentPhase = data?.current_phase || 0;
-    const phases = data?.phases || [];
+    const dailyPlans = (snapshot.docs[0].data()?.dailyPlans ?? []) as Array<{
+      dayNumber?: number
+      theme?: string
+      questions?: Array<{ scenarioId?: string }>
+    }>
 
-    if (phases.length <= currentPhase) return null;
+    // Plans are stored in curriculum order, so the first uncompleted question is
+    // the next one due. Sorted defensively by dayNumber because "the next
+    // problem" is only meaningful if the walk is in day order.
+    const orderedPlans = [...dailyPlans].sort((a, b) => (a.dayNumber ?? 0) - (b.dayNumber ?? 0))
 
-    const currentPhaseData = phases[currentPhase];
-    const phaseProblems = currentPhaseData?.problems || [];
+    for (const plan of orderedPlans) {
+      for (const question of plan.questions ?? []) {
+        const scenarioId = question?.scenarioId
+        if (!scenarioId || completedIds.includes(scenarioId)) continue
 
-    // Find first uncompleted problem in current phase
-    for (const problemId of phaseProblems) {
-      if (!completedIds.includes(problemId)) {
-        const scenario = getScenarioById(problemId);
-        if (scenario) {
-          return {
-            type: 'next_in_roadmap',
-            scenario_id: scenario.id,
-            title: scenario.title,
-            pattern: (scenario as any).pattern || 'arrays-hashing',
-            difficulty: scenario.difficulty,
-            reason: `Next in your roadmap: ${currentPhaseData.name || 'Current Phase'}`,
-            priority: 85,
-            estimated_minutes: scenario.estimatedTime,
-            companies: scenario.companies,
-          };
+        // The roadmap may still name a scenario that has since been removed, so
+        // the registry stays the authority on whether it is offerable.
+        const scenario = getScenarioById(scenarioId)
+        if (!scenario) continue
+
+        return {
+          type: "next_in_roadmap",
+          scenario_id: scenario.id,
+          title: scenario.title,
+          pattern: (scenario as any).pattern || "arrays-hashing",
+          difficulty: scenario.difficulty,
+          reason: `Next in your roadmap: ${plan.theme || `Day ${plan.dayNumber ?? 1}`}`,
+          priority: 85,
+          estimated_minutes: scenario.estimatedTime,
+          companies: scenario.companies,
         }
       }
     }
 
-    return null;
+    return null
   } catch {
-    return null;
+    return null
   }
 }
 
@@ -287,7 +314,7 @@ export async function getSmartRecommendations(
 ): Promise<SmartRecommendation[]> {
   // Get user's completed/seen problem IDs. Uses an id-only Firestore projection
   // instead of pulling every full mastery document just to read problem_id.
-  const completedIds = await getCompletedProblemIds(userId);
+  const completedIds = await getCompletedProblemIds(userId)
 
   // Stage 1: the four lookups that only depend on completedIds are independent
   // of each other, so run them in parallel instead of sequentially.
@@ -296,23 +323,19 @@ export async function getSmartRecommendations(
     getRecentlyFailedProblems(userId),
     getWeakPatterns(userId, 3),
     getActiveRoadmap(userId),
-  ]);
+  ])
 
   // Exclude everything the user has already seen, plus the roadmap pick that is
   // already resolved. Overlaps between the stage-2 generators themselves are
   // removed by the de-dup pass after the join below, so the generators do not
   // need to observe each other's output.
-  const baseExcludeIds = nextRoadmap
-    ? [...completedIds, nextRoadmap.scenario_id]
-    : completedIds;
+  const baseExcludeIds = nextRoadmap ? [...completedIds, nextRoadmap.scenario_id] : completedIds
 
   // Stage 2: generators that depend on stage 1 also run in parallel, including
   // the per-failed-problem similarity lookups (previously an awaited loop).
   const [similarGroups, patternProblems, companyProblems] = await Promise.all([
     Promise.all(
-      failedProblems
-        .slice(0, 2)
-        .map((failed) => getSimilarProblems(failed, baseExcludeIds, 2))
+      failedProblems.slice(0, 2).map((failed) => getSimilarProblems(failed, baseExcludeIds, 2))
     ),
     getPatternStrengtheningProblems(
       weakPatterns.map((p) => ({
@@ -330,31 +353,29 @@ export async function getSmartRecommendations(
           2
         )
       : Promise.resolve<SmartRecommendation[]>([]),
-  ]);
+  ])
 
   // Assemble in the same priority-type order as before: roadmap, similar,
   // pattern, then company.
-  const recommendations: SmartRecommendation[] = [];
+  const recommendations: SmartRecommendation[] = []
   if (nextRoadmap) {
-    recommendations.push(nextRoadmap);
+    recommendations.push(nextRoadmap)
   }
-  recommendations.push(...similarGroups.flat());
-  recommendations.push(...patternProblems);
-  recommendations.push(...companyProblems);
+  recommendations.push(...similarGroups.flat())
+  recommendations.push(...patternProblems)
+  recommendations.push(...companyProblems)
 
   // Sort by priority and deduplicate. The exclusion of already-recommended
   // scenario IDs is applied here, AFTER the parallel join, so a problem that
   // more than one generator surfaced still appears at most once.
-  const seen = new Set<string>();
+  const seen = new Set<string>()
   const unique = recommendations.filter((r) => {
-    if (seen.has(r.scenario_id)) return false;
-    seen.add(r.scenario_id);
-    return true;
-  });
+    if (seen.has(r.scenario_id)) return false
+    seen.add(r.scenario_id)
+    return true
+  })
 
-  return unique
-    .sort((a, b) => b.priority - a.priority)
-    .slice(0, limit);
+  return unique.sort((a, b) => b.priority - a.priority).slice(0, limit)
 }
 
 /**
@@ -365,24 +386,24 @@ export async function getPatternRecommendations(
   pattern: DSAPattern,
   limit: number = 5
 ): Promise<SmartRecommendation[]> {
-  const problems = await getAllUserProblems(userId);
-  const completedIds = problems.map((p) => p.problem_id);
+  const problems = await getAllUserProblems(userId)
+  const completedIds = problems.map((p) => p.problem_id)
 
   // Get problems for this pattern that user hasn't completed
   const patternScenarios = scenarios
     .filter((s) => {
-      if (completedIds.includes(s.id)) return false;
-      if (s.type !== 'dsa') return false;
-      return (s as any).pattern === pattern;
+      if (completedIds.includes(s.id)) return false
+      if (s.type !== "dsa") return false
+      return (s as any).pattern === pattern
     })
     .sort((a, b) => {
-      const diffOrder = { easy: 0, medium: 1, hard: 2 };
-      return diffOrder[a.difficulty] - diffOrder[b.difficulty];
+      const diffOrder = { easy: 0, medium: 1, hard: 2 }
+      return diffOrder[a.difficulty] - diffOrder[b.difficulty]
     })
-    .slice(0, limit);
+    .slice(0, limit)
 
   return patternScenarios.map((scenario, index) => ({
-    type: 'practice_weakness' as RecommendationType,
+    type: "practice_weakness" as RecommendationType,
     scenario_id: scenario.id,
     title: scenario.title,
     pattern,
@@ -391,7 +412,7 @@ export async function getPatternRecommendations(
     priority: 80 - index * 5,
     estimated_minutes: scenario.estimatedTime,
     companies: scenario.companies,
-  }));
+  }))
 }
 
 /**
@@ -400,6 +421,6 @@ export async function getPatternRecommendations(
 export async function getNextPracticeRecommendation(
   userId: string
 ): Promise<SmartRecommendation | null> {
-  const recommendations = await getSmartRecommendations(userId, 1);
-  return recommendations[0] || null;
+  const recommendations = await getSmartRecommendations(userId, 1)
+  return recommendations[0] || null
 }
