@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 
-const trackUsageEvent = vi.fn(() => Promise.resolve())
+const trackUsageEvent = vi.fn(() => Promise.resolve(true))
 const recordGlobalSpend = vi.fn(() => Promise.resolve())
 const isGlobalCeilingExceeded = vi.fn(() => Promise.resolve(false))
 const getGlobalDailySpend = vi.fn(() => Promise.resolve(12.5))
@@ -56,6 +56,7 @@ describe("POST /api/internal/usage", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.CRON_SECRET = SECRET
+    trackUsageEvent.mockResolvedValue(true)
   })
 
   describe("authorization", () => {
@@ -194,6 +195,36 @@ describe("POST /api/internal/usage", () => {
 
     it("does not record spend for a rejected body", async () => {
       await POST(makeRequest({ ...validBody, provider: undefined }, `Bearer ${SECRET}`))
+      expect(recordGlobalSpend).not.toHaveBeenCalled()
+    })
+  })
+
+  describe("reporting a failed write", () => {
+    it("returns 500 rather than claiming success when the ledger write failed", async () => {
+      // The Edge reporter only logs on a non-OK response, so a 200 over a failed
+      // write is how the whole Edge runtime could go unmetered while every
+      // signal read healthy.
+      trackUsageEvent.mockResolvedValue(false)
+
+      const response = await POST(makeRequest(validBody, `Bearer ${SECRET}`))
+
+      expect(response.status).toBe(500)
+    })
+
+    it("survives a throw from usage tracking instead of 500ing unhandled", async () => {
+      trackUsageEvent.mockRejectedValue(new Error("firestore exploded"))
+
+      const response = await POST(makeRequest(validBody, `Bearer ${SECRET}`))
+
+      expect(response.status).toBe(500)
+      expect(response.data).toMatchObject({ error: "Failed to record usage" })
+    })
+
+    it("does not credit the kill-switch counter for spend that was not recorded", async () => {
+      trackUsageEvent.mockResolvedValue(false)
+
+      await POST(makeRequest(validBody, `Bearer ${SECRET}`))
+
       expect(recordGlobalSpend).not.toHaveBeenCalled()
     })
   })

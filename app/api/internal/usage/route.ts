@@ -132,24 +132,52 @@ export async function POST(request: NextRequest) {
   // caller, so the pricing table stays the single authority on rates.
   const cost = calculateCost(report.inputTokens, report.outputTokens, report.provider)
 
-  await trackUsageEvent({
-    userId: report.userId,
-    eventType: report.eventType,
-    provider: report.provider,
-    inputTokens: report.inputTokens,
-    outputTokens: report.outputTokens,
-    totalTokens,
-    cost,
-    latencyMs: report.latencyMs,
-    cached: false,
-    sessionId: report.sessionId,
-    scenarioId: report.scenarioId,
-    pattern: report.pattern,
-    difficulty: report.difficulty,
-    scenarioTitle: report.scenarioTitle,
-    isExactTokenCount: !report.estimatedTokens,
-    metadata: { source: "edge" },
-  })
+  // Wrapped, and the result checked, because this endpoint is the ONLY place
+  // Edge AI spend enters the ledger, the per-user budget and the daily
+  // kill-switch. Reporting success for spend that did not land is worse than an
+  // error: the caller (lib/usage/edge-reporter.ts) only logs on a non-OK
+  // response, so a 200 over a failed write is how the entire Edge runtime could
+  // go silently unmetered while every signal read healthy.
+  let recorded: boolean
+  try {
+    recorded = await trackUsageEvent({
+      userId: report.userId,
+      eventType: report.eventType,
+      provider: report.provider,
+      inputTokens: report.inputTokens,
+      outputTokens: report.outputTokens,
+      totalTokens,
+      cost,
+      latencyMs: report.latencyMs,
+      cached: false,
+      sessionId: report.sessionId,
+      scenarioId: report.scenarioId,
+      pattern: report.pattern,
+      difficulty: report.difficulty,
+      scenarioTitle: report.scenarioTitle,
+      isExactTokenCount: !report.estimatedTokens,
+      metadata: { source: "edge" },
+    })
+  } catch (error) {
+    // trackUsageEvent swallows its own failures today, so this is defence
+    // against that changing, not a path we expect to take.
+    logger.error("[Internal Usage] Usage tracking threw", {
+      error,
+      eventType: report.eventType,
+      provider: report.provider,
+    })
+    recorded = false
+  }
+
+  if (!recorded) {
+    logger.error("[Internal Usage] Edge AI spend was NOT recorded", {
+      eventType: report.eventType,
+      provider: report.provider,
+      totalTokens,
+      cost,
+    })
+    return NextResponse.json({ error: "Failed to record usage" }, { status: 500 })
+  }
 
   // Feed the aggregate daily kill-switch. This was the ONE thing this endpoint
   // did not do: it wrote the usage_event (so per-user budgets saw the spend) but

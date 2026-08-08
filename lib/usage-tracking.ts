@@ -167,9 +167,19 @@ export interface UsageStats {
 }
 
 /**
- * Track a usage event
+ * Track a usage event.
+ *
+ * Returns whether the spend was actually recorded. Still never throws — a
+ * tracking failure must not break a user's request — but "did not throw" and
+ * "recorded" are different facts, and callers that can act on the difference
+ * need to be able to tell. /api/internal/usage is one: it was returning
+ * { success: true } for spend that had just failed to land, which combined with
+ * the Edge reporter discarding its own result to make a silent, total loss of
+ * metering look exactly like a healthy system.
  */
-export async function trackUsageEvent(event: Omit<UsageEvent, "id" | "createdAt">): Promise<void> {
+export async function trackUsageEvent(
+  event: Omit<UsageEvent, "id" | "createdAt">
+): Promise<boolean> {
   try {
     const usageRef = adminDb.collection("usage_events")
 
@@ -197,9 +207,17 @@ export async function trackUsageEvent(event: Omit<UsageEvent, "id" | "createdAt"
     // Not awaited: the sweep reads up to 5,000 documents and nothing on the
     // request path should wait for a detector. It never throws.
     void maybeRunHourlyCostSweep().catch(() => {})
+
+    return true
   } catch (error) {
-    logger.error("Failed to track usage event", { error, eventType: event.eventType })
+    logger.error("Failed to track usage event", {
+      error,
+      eventType: event.eventType,
+      userId: event.userId,
+      cost: event.cost,
+    })
     // Don't throw - usage tracking failures shouldn't break the app
+    return false
   }
 }
 
