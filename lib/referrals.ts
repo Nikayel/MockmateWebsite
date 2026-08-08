@@ -905,16 +905,32 @@ async function fetchUserEmails(userIds: Iterable<string>): Promise<Map<string, s
 }
 
 /**
+ * A pending reward as the admin surface consumes it.
+ *
+ * `amountLabel` and `typeLabel` are rendered SERVER-SIDE from the reward's own
+ * type. The admin page is a client component and cannot import this module
+ * (it pulls in firebase-admin), so if the words were left to the page they
+ * would be a second, drifting copy of the mapping. Sending the rendered string
+ * is what keeps one source of truth for what a reward is worth.
+ */
+export type AdminPendingReward = ReferralReward & {
+  referrerEmail: string
+  referredEmail: string
+  amountLabel: string
+  typeLabel: string
+}
+
+/**
  * Get pending rewards for admin to process
  */
 export async function getPendingRewards(): Promise<{
-  cashRewards: Array<ReferralReward & { referrerEmail: string; referredEmail: string }>
-  creditRewards: Array<ReferralReward & { referrerEmail: string; referredEmail: string }>
+  cashRewards: AdminPendingReward[]
+  creditRewards: AdminPendingReward[]
   totals: { pendingCash: number; pendingCredits: number }
 }> {
   const result = {
-    cashRewards: [] as Array<ReferralReward & { referrerEmail: string; referredEmail: string }>,
-    creditRewards: [] as Array<ReferralReward & { referrerEmail: string; referredEmail: string }>,
+    cashRewards: [] as AdminPendingReward[],
+    creditRewards: [] as AdminPendingReward[],
     totals: { pendingCash: 0, pendingCredits: 0 },
   }
 
@@ -940,7 +956,9 @@ export async function getPendingRewards(): Promise<{
         createdAt: data.createdAt?.toDate() || new Date(),
         referrerEmail: emails.get(data.referrerId) || "Unknown",
         referredEmail: emails.get(data.referredUserId) || "Unknown",
-      } as ReferralReward & { referrerEmail: string; referredEmail: string }
+        amountLabel: describeRewardAmount(data.type, data.amount),
+        typeLabel: rewardTypeLabel(data.type),
+      } as AdminPendingReward
 
       if (data.type === "conversion_cash") {
         result.cashRewards.push(reward)
@@ -1173,6 +1191,14 @@ export interface DetailedReferral {
    */
   signupRewardStatus: DetailedRewardStatus // 1 free month on signup
   conversionRewardStatus: DetailedRewardStatus // $10 + 1 month on Pro upgrade
+  /** Rendered server-side from the status, for the same reason as AdminPendingReward. */
+  signupRewardLabel: string
+  conversionRewardLabel: string
+}
+
+/** Words for a reward slot, including the case where no reward exists yet. */
+export function detailedRewardStatusLabel(status: DetailedRewardStatus): string {
+  return status === "none" ? "Not earned" : rewardStatusLabel(status)
 }
 
 /**
@@ -1254,6 +1280,8 @@ export async function getAllReferralsDetailed(): Promise<DetailedReferral[]> {
         convertedDate: data.convertedDate?.toDate(),
         signupRewardStatus: rewards.signup,
         conversionRewardStatus: rewards.conversion,
+        signupRewardLabel: detailedRewardStatusLabel(rewards.signup),
+        conversionRewardLabel: detailedRewardStatusLabel(rewards.conversion),
       })
     }
   } catch (error) {
