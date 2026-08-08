@@ -170,10 +170,17 @@ export function PublicLessonArticle({
       <Header />
       <div className="mx-auto max-w-3xl px-4 pt-28 pb-16 sm:px-6 sm:pt-32">
         {/* The BreadcrumbList JSON-LD and the visible breadcrumb are built side by side from the
-            same four values, so the structured data always describes links a human can actually
-            see and click on this exact page. */}
+            same five values, so the structured data always describes links a human can actually
+            see and click on this exact page.
+
+            The trail starts at Home. Every other breadcrumb on the site does - the level pages, the
+            Learn hub, blog posts, interview-prep - and a lesson trail that began at "Learn" made the
+            deepest pages on the site the only ones claiming no parent above their section. In a
+            rendered rich result that is the difference between "CodeSparring > Learn > Python > ..."
+            and a trail that starts mid-site. */}
         <BreadcrumbJsonLd
           items={[
+            { name: "Home", url: "/" },
             { name: "Learn", url: LEARN_HUB_PATH },
             { name: courseLabel, url: coursePath },
             { name: preview.levelTitle, url: levelHref },
@@ -185,6 +192,15 @@ export function PublicLessonArticle({
         />
         <nav aria-label="Breadcrumb" className="mb-6">
           <ol className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
+            <li>
+              <Link
+                href="/"
+                className="hover:text-foreground focus-visible:ring-accent/50 rounded-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              >
+                Home
+              </Link>
+            </li>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-50" aria-hidden="true" />
             <li>
               <Link
                 href={LEARN_HUB_PATH}
