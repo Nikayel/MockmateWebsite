@@ -47,6 +47,11 @@ import { absoluteUrl } from "@/lib/seo/site"
  *
  * `/roadmap$` uses the end-of-URL anchor so the authenticated `/roadmap` index is excluded while the
  * public `/roadmap/preview` marketing page stays crawlable.
+ *
+ * `/knowledge` and `/metrics` belong here for a reason worth stating: both redirect signed-out
+ * visitors on the client, so what a crawler actually receives is a 200 carrying a loading skeleton
+ * under the root layout's title. That is a near-duplicate of the homepage, served from two more
+ * URLs, with nothing behind it a searcher could want.
  */
 const PRIVATE_PATHS = [
   "/admin",
@@ -63,6 +68,8 @@ const PRIVATE_PATHS = [
   "/login",
   "/roadmap$",
   "/roadmap/new",
+  "/knowledge",
+  "/metrics",
 ]
 
 /**

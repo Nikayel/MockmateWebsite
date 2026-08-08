@@ -37,7 +37,8 @@ import type { CourseId } from "@/lib/tutorials/types"
  */
 
 export const metadata: Metadata = {
-  title: "All lessons — CodeSparring Learn",
+  // No brand here: the root layout's `title.template` appends " | CodeSparring" already.
+  title: "All Learn lessons",
   description:
     "The complete index of every free CodeSparring lesson, grouped by course and level. Python, SQL, and System Design, all readable in the browser.",
   alternates: {

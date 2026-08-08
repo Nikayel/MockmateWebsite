@@ -36,16 +36,18 @@ import {
 } from "@/lib/tutorials/lesson-routes"
 import { getAllBlogPosts } from "@/lib/mdx"
 import { ALL_COMPANIES } from "@/lib/data/company-questions"
+import { listCaseLabs } from "@/lib/labs/case-labs"
 
 /**
  * Hand-listed non-Learn pages in `app/sitemap.ts`: marketing, guides, comparisons, the interview-prep
- * index, the roadmap preview, the blog index, samples, and the secondary pages. Company pages and
- * blog posts are excluded here because both are derived and counted separately.
+ * index, the roadmap preview, the blog index, samples, and the secondary pages. Company pages, blog
+ * posts, and Case Lab detail pages are excluded here because all three are derived and counted
+ * separately.
  *
  * This is intentionally a literal. Adding a marketing page should be a deliberate act that shows up
  * as a one-line diff here, not something that silently changes the shape of the sitemap.
  */
-const STATIC_PAGE_COUNT = 27
+const STATIC_PAGE_COUNT = 31
 
 /** Learn URLs only, so the derived half can be checked independently of the hand-listed half. */
 function learnUrls(urls: string[]): string[] {
@@ -142,9 +144,59 @@ describe("sitemap", () => {
     // 2 = the hub plus the flat /learn/all lesson index.
     const expectedLearn = 2 + COURSE_IDS.length + listAllCourseLevels().length
     const expectedLessons = listAllCatalogEntries().length
-    const expectedStatic = STATIC_PAGE_COUNT + ALL_COMPANIES.length + getAllBlogPosts().length
+    const expectedStatic =
+      STATIC_PAGE_COUNT + ALL_COMPANIES.length + getAllBlogPosts().length + listCaseLabs().length
 
     expect(urls.length).toBe(expectedLearn + expectedLessons + expectedStatic)
+  })
+
+  it("lists the public product pages that were previously missing", () => {
+    // `/rounds` and `/labs` are linked from the homepage hero and carry real marketing metadata, but
+    // neither was ever submitted, so neither had a path into the index that did not depend on Google
+    // discovering it by crawl. `/python-executor` and `/referral-terms` are the same class of
+    // omission, lower value.
+    const present = new Set(urls)
+    const missing = ["/rounds", "/labs", "/python-executor", "/referral-terms"].filter(
+      (path) => !present.has(`${SITE_ORIGIN}${path}`)
+    )
+    expect(missing).toEqual([])
+  })
+
+  it("lists every Case Lab detail page, derived from the registry", () => {
+    // Derived, not hand-listed: authoring a lab must be enough to get it submitted. A literal list
+    // here would be stale the first time someone adds a fifth lab.
+    const present = new Set(urls)
+    const missing = listCaseLabs()
+      .map((lab) => `${SITE_ORIGIN}/labs/${lab.id}`)
+      .filter((url) => !present.has(url))
+    expect(missing).toEqual([])
+  })
+
+  it("actually loaded the Case Lab registry", () => {
+    // Guards the two assertions above from passing vacuously on an empty registry import.
+    expect(listCaseLabs().length).toBeGreaterThan(0)
+  })
+
+  it("submits no URL that robots.txt disallows", () => {
+    // The contradiction that motivated this pass: a sitemap says "index this", a robots disallow says
+    // "do not fetch this". Google reports it as an error and the URL stays in limbo. `/knowledge` and
+    // `/metrics` were just added to the disallow list, so this pins the two files against each other.
+    const config = robots()
+    const rules = Array.isArray(config.rules) ? config.rules : [config.rules]
+    const disallowed = rules.flatMap((rule) => {
+      const list = rule.disallow
+      if (!list) return []
+      return Array.isArray(list) ? list : [list]
+    })
+
+    const conflicts = urls.filter((url) => {
+      const path = url.slice(SITE_ORIGIN.length) || "/"
+      return disallowed.some((pattern) =>
+        // `$` anchors the pattern to the end of the URL, exactly as robots.txt defines it.
+        pattern.endsWith("$") ? path === pattern.slice(0, -1) : path.startsWith(pattern)
+      )
+    })
+    expect(conflicts).toEqual([])
   })
 
   it("actually loaded the curriculum registries", () => {

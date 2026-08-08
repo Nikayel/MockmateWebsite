@@ -17,15 +17,15 @@
  *    the page's own identity and let the template add the brand exactly once.
  * 2. The root layout deliberately sets no `alternates.canonical` (a root canonical is inherited and
  *    would point every page at the homepage), so each page must declare its own. Absolute URLs come
- *    from {@link absoluteUrl} rather than from a relative path, so the emitted canonical cannot pick
- *    up a preview host or a redirecting `www`.
+ *    from {@link canonicalPageMetadata} rather than from a relative path, so the emitted canonical
+ *    cannot pick up a preview host or a redirecting `www`.
  *
  * Nothing here reads the curriculum: callers pass already-resolved content. That keeps the module
  * importable from any route without dragging the multi-megabyte registries behind it.
  */
 import type { Metadata } from "next"
 
-import { absoluteUrl } from "./site"
+import { canonicalPageMetadata } from "./page-metadata"
 import {
   LEARN_COURSE_LABEL,
   levelPath,
@@ -54,30 +54,14 @@ export function truncateForDescription(text: string, max: number = DESCRIPTION_M
 }
 
 /**
- * The shared head block: canonical plus the social cards that mirror it.
+ * The Learn corpus head block.
  *
- * `openGraph.url` repeats the canonical on purpose. A scraper that only reads OG tags (Slack,
- * LinkedIn) never sees `rel=canonical`, so leaving it to inherit the root layout's site URL would
- * attribute every shared lesson link to the homepage.
+ * The canonical-plus-social-cards shape now lives in `page-metadata.ts`, because the same three tags
+ * are what every public route outside Learn was missing. Learn's only local decision is the Open
+ * Graph type: a lesson is `article`, not `website`.
  */
 function headFor(args: { path: string; title: string; description: string }): Metadata {
-  const url = absoluteUrl(args.path)
-  return {
-    title: args.title,
-    description: args.description,
-    alternates: { canonical: url },
-    openGraph: {
-      type: "article",
-      url,
-      title: args.title,
-      description: args.description,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: args.title,
-      description: args.description,
-    },
-  }
+  return canonicalPageMetadata({ ...args, openGraphType: "article" })
 }
 
 /** `/learn/{track}` — the course landing. Title is the course label alone; the template adds the brand. */

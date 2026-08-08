@@ -36,6 +36,7 @@
 import type { MetadataRoute } from "next"
 import { getAllBlogPosts } from "@/lib/mdx"
 import { ALL_COMPANIES } from "@/lib/data/company-questions"
+import { listCaseLabs } from "@/lib/labs/case-labs"
 import { absoluteUrl } from "@/lib/seo/site"
 import {
   COURSE_IDS,
@@ -214,7 +215,30 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.9,
     },
+    // Product pages linked from the homepage hero. Both carry real metadata and real marketing copy
+    // and were simply never listed here, so neither had a submitted path into the index.
+    {
+      url: absoluteUrl("/rounds"),
+      lastModified: currentDate,
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    {
+      url: absoluteUrl("/labs"),
+      lastModified: currentDate,
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
   ]
+
+  // Case Lab detail pages, derived from the registry for the same reason blog posts are derived from
+  // their front matter: authoring a lab should put it in the sitemap, not require a second edit here.
+  const caseLabPages: MetadataRoute.Sitemap = listCaseLabs().map((lab) => ({
+    url: absoluteUrl(`/labs/${lab.id}`),
+    lastModified: currentDate,
+    changeFrequency: "monthly" as const,
+    priority: 0.8,
+  }))
 
   // Interview prep pages - high SEO value
   const interviewPrepPages: MetadataRoute.Sitemap = [
@@ -304,6 +328,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "yearly",
       priority: 0.3,
     },
+    {
+      url: absoluteUrl("/python-executor"),
+      lastModified: currentDate,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: absoluteUrl("/referral-terms"),
+      lastModified: currentDate,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
   ]
 
   return [
@@ -313,6 +349,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...blogListPage,
     ...blogPostPages,
     ...samplePages,
+    ...caseLabPages,
     ...secondaryPages,
     ...buildLearnPages(),
   ]

@@ -32,7 +32,8 @@ import type { CourseId } from "@/lib/tutorials/types"
 const LEARN_ALL_LESSONS_PATH = "/learn/all"
 
 export const metadata: Metadata = {
-  title: "Learn Python, Data Engineering, and System Design — CodeSparring",
+  // No brand here: the root layout's `title.template` appends " | CodeSparring" already.
+  title: "Learn Python, Data Engineering, and System Design",
   description:
     "Free interactive courses that run in your browser. Read a concept, apply it on a guided exercise, then practice it on an interview-shaped problem with automated grading.",
   alternates: {

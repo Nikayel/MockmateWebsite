@@ -28,7 +28,20 @@ import { HomepagePositioningFAQJsonLd } from "@/components/seo/JsonLd"
  */
 // The homepage owns the "/" canonical (moved off the root layout so it is not
 // inherited by every route).
+//
+// It now owns its title and description too. Declaring only a canonical meant
+// both fell through to the root layout's site-wide defaults, which are written
+// to describe the product across every page and run 95 and 257 characters — a
+// truncated title and a truncated snippet on the one result that matters most.
+// These are sized for the SERP and say what the hero says.
+//
+// openGraph is deliberately NOT set here: a child openGraph block replaces the
+// parent's outright, and the root layout's carries siteName and locale that the
+// homepage would silently lose. Its copy already describes the site correctly.
 export const metadata: Metadata = {
+  title: "Practice the Interview Rounds LeetCode Skips",
+  description:
+    "Mock interviews with an AI that reacts as you work: a failing test to debug, a real-world case to design, and honest feedback on how you explained it.",
   alternates: {
     canonical: "/",
   },
