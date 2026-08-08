@@ -4,8 +4,9 @@
  * Provides RAG system health, metrics, and quick eval results
  */
 
-import { NextRequest, NextResponse } from "next/server"
-import { verifyAdminAccess } from "@/lib/admin/middleware"
+import { NextResponse } from "next/server"
+import { withPermission, unauthorizedResponse } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 import { checkRAGHealth, getRAGMetrics } from "@/lib/rag/monitoring"
 import {
   isKnowledgeBaseSeeded,
@@ -26,16 +27,23 @@ import {
 
 const QUICK_EVAL_K_VALUES = [1, 3, 5, 10]
 
-export async function GET(request: NextRequest) {
+/**
+ * Reading RAG health is analytics. Running the quick eval is not: every fixture
+ * case issues real embedding and retrieval calls, so it spends money and is
+ * gated a second time on MANAGE_SETTINGS. Both used to accept any admin role,
+ * which meant a read-only analyst could bill the platform for an eval sweep.
+ */
+export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (request, context) => {
   try {
-    // Verify admin access
-    const adminCheck = await verifyAdminAccess(request)
-    if (!adminCheck.authorized) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 })
-    }
-
     const searchParams = request.nextUrl.searchParams
     const action = searchParams.get("action") || "health"
+
+    if (action === "quick-eval" && !context.permissions.includes(PERMISSIONS.MANAGE_SETTINGS)) {
+      return unauthorizedResponse(
+        `Access denied - missing permission: ${PERMISSIONS.MANAGE_SETTINGS}`,
+        403
+      )
+    }
 
     switch (action) {
       case "health": {
@@ -124,24 +132,19 @@ export async function GET(request: NextRequest) {
     }
   } catch (error) {
     console.error("[Admin RAG Health] Error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Internal error",
-      },
-      { status: 500 }
-    )
+    // Detail stays server-side: this catch wraps Pinecone and embedding
+    // providers, whose messages carry index names and endpoints.
+    return NextResponse.json({ success: false, error: "Internal error" }, { status: 500 })
   }
-}
+})
 
-// POST for actions like seeding, clearing cache, etc.
-export async function POST(request: NextRequest) {
+/**
+ * Every POST action here is a write or an expensive job: seeding the knowledge
+ * base and vectorizing all problems both fan out to the embedding provider.
+ * MANAGE_SETTINGS, so admin and super_admin only.
+ */
+export const POST = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request) => {
   try {
-    const adminCheck = await verifyAdminAccess(request)
-    if (!adminCheck.authorized) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 })
-    }
-
     const body = await request.json()
     const { action } = body
 
@@ -180,12 +183,6 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error("[Admin RAG Health] POST Error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Internal error",
-      },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, error: "Internal error" }, { status: 500 })
   }
-}
+})
