@@ -52,6 +52,7 @@ import { reportEdgeUsageInBackground } from "@/lib/usage/edge-reporter"
 // failure on the path that scores DSA, bugfix, optimization, security, and
 // add-functionality sessions landed in a short-retention Edge log and nowhere else.
 import { logger } from "@/lib/logger"
+import { checkEdgeRateLimit, type EdgeRateWindow } from "@/lib/rate-limit-edge"
 import { summarizeBugfixEvidence } from "@/lib/bugfix/evidence"
 import { buildBugfixPostSessionReport } from "@/lib/bugfix/report"
 import {
@@ -85,24 +86,11 @@ export const runtime = "edge"
 // extraction, silent-notes analysis, bugfix semantic scoring, feedback
 // generation) at high reasoning effort.
 //
-// lib/rate-limit.ts is unusable from here, which is why this is local rather
-// than imported. Its store selection prefers FirestoreRateLimitStore in
-// production, and that store's `increment` dynamically imports firebase-admin —
-// unavailable in the Edge runtime. The import would reject, `increment` would
-// hit its "fail open" catch, and every request would be allowed. A rate limiter
-// that is a silent no-op is worse than none, because it looks like coverage.
-// Its module init can also THROW in production when no distributed store is
-// configured, which in Edge would 500 the route instead of degrading.
-//
-// TODO: this belongs in lib/rate-limit-edge.ts once the file is in scope to
-// create; it is inline here purely to keep this change to the routes it fixes.
-
-/** One fixed-window limit. Both windows must pass. */
-interface EdgeRateWindow {
-  name: string
-  windowSeconds: number
-  maxRequests: number
-}
+// The limiter itself now lives in lib/rate-limit-edge.ts. lib/rate-limit.ts is
+// still unusable from here: its store selection prefers FirestoreRateLimitStore
+// in production, whose `increment` dynamically imports firebase-admin, which
+// does not exist in Edge. That import rejects, `increment` hits its fail-open
+// catch, and every request is allowed.
 
 /**
  * Two windows, because one cannot express both shapes of abuse.
@@ -112,7 +100,7 @@ interface EdgeRateWindow {
  * retry twice after a failed stream and is far above any human rate.
  *
  * The sustained window is what stops a patient script. A 60-second window alone
- * would permit 4,320 requests/day — up to ~21,600 AI calls — while never once
+ * would permit 4,320 requests/day - up to ~21,600 AI calls - while never once
  * appearing to burst. 20/hour is roughly 6x the busiest plausible human
  * (interviews take 20-45 minutes) and caps a single account at ~480 feedback
  * runs a day rather than an unbounded number.
@@ -121,125 +109,6 @@ const FEEDBACK_RATE_WINDOWS: readonly EdgeRateWindow[] = [
   { name: "burst", windowSeconds: 60, maxRequests: 3 },
   { name: "sustained", windowSeconds: 60 * 60, maxRequests: 20 },
 ]
-
-/**
- * Per-isolate fallback counters. Not distributed — an attacker spread across
- * isolates gets one bucket each — but it is a real bound on a single runaway
- * client, which is the failure this is most likely to meet. Used only when
- * Upstash is unconfigured or unreachable.
- */
-const isolateRateCounters = new Map<string, { count: number; resetAtMs: number }>()
-
-/** Bounded so a key-space flood cannot grow the isolate's memory without limit. */
-const MAX_ISOLATE_COUNTERS = 10_000
-
-function checkIsolateWindow(key: string, window: EdgeRateWindow, nowMs: number): boolean {
-  const existing = isolateRateCounters.get(key)
-  if (!existing || existing.resetAtMs <= nowMs) {
-    if (isolateRateCounters.size >= MAX_ISOLATE_COUNTERS) {
-      for (const [k, v] of isolateRateCounters) {
-        if (v.resetAtMs <= nowMs) isolateRateCounters.delete(k)
-      }
-      // Still full of live entries: refuse rather than grow without bound.
-      if (isolateRateCounters.size >= MAX_ISOLATE_COUNTERS) return false
-    }
-    isolateRateCounters.set(key, { count: 1, resetAtMs: nowMs + window.windowSeconds * 1000 })
-    return true
-  }
-  existing.count++
-  return existing.count <= window.maxRequests
-}
-
-/** One Upstash REST command. Returns undefined when Upstash is not usable. */
-async function upstashCommand(command: string[]): Promise<unknown | undefined> {
-  const url = process.env.UPSTASH_REDIS_REST_URL
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN
-  if (!url || !token) return undefined
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(command),
-  })
-  if (!response.ok) throw new Error(`Upstash responded ${response.status}`)
-  const data = (await response.json()) as { result?: unknown }
-  return data.result
-}
-
-/**
- * Distributed fixed-window counter.
- *
- * The window is baked into the KEY (bucket index = floor(now / window)) so the
- * counter is a plain INCR with no read-modify-write, and therefore atomic across
- * concurrent instances. That matters: a check-then-set limiter is exactly what a
- * parallel client defeats.
- */
-async function checkUpstashWindow(
-  key: string,
-  window: EdgeRateWindow,
-  nowMs: number
-): Promise<boolean | undefined> {
-  const bucket = Math.floor(nowMs / (window.windowSeconds * 1000))
-  const bucketKey = `${key}:${bucket}`
-
-  const count = await upstashCommand(["INCR", bucketKey])
-  if (typeof count !== "number") return undefined
-
-  if (count === 1) {
-    // First hit in this bucket: give the key a TTL so buckets self-collect.
-    // +10s of slack so a clock skew cannot expire a bucket still in use.
-    await upstashCommand(["EXPIRE", bucketKey, String(window.windowSeconds + 10)])
-  }
-
-  return count <= window.maxRequests
-}
-
-interface EdgeRateLimitVerdict {
-  allowed: boolean
-  /** Which window rejected, for the log and the Retry-After hint. */
-  window?: EdgeRateWindow
-}
-
-/**
- * Rate limit one user across every configured window.
- *
- * Keyed by the VERIFIED user id rather than by IP. The route is auth-gated, so
- * the account is the thing that spends money, and an IP key would both punish
- * shared networks (a lecture hall behind one NAT) and be trivially rotated.
- *
- * On an Upstash failure this degrades to the per-isolate counter instead of
- * failing open. A limiter guarding five reasoning-model calls should not
- * evaporate because a cache was briefly unreachable.
- */
-async function checkFeedbackRateLimit(userId: string): Promise<EdgeRateLimitVerdict> {
-  const nowMs = Date.now()
-
-  for (const window of FEEDBACK_RATE_WINDOWS) {
-    const key = `rl:fbstream:${userId}:${window.windowSeconds}`
-    let allowed: boolean | undefined
-
-    try {
-      allowed = await checkUpstashWindow(key, window, nowMs)
-    } catch (error) {
-      logger.error(
-        "[Streaming Feedback] Distributed rate limit unavailable, using isolate counter",
-        {
-          window: window.name,
-          error,
-        }
-      )
-      allowed = undefined
-    }
-
-    if (allowed === undefined) {
-      allowed = checkIsolateWindow(key, window, nowMs)
-    }
-
-    if (!allowed) return { allowed: false, window }
-  }
-
-  return { allowed: true }
-}
 
 // ============================================================================
 // Global daily spend ceiling (Edge)
@@ -415,7 +284,11 @@ export async function POST(request: NextRequest) {
   // Rate limit BEFORE the stream is opened. Once the SSE response is returned
   // the client renders a progress UI, so a refusal has to be an ordinary HTTP
   // error the caller can surface, not an `error` event mid-stream.
-  const rateVerdict = await checkFeedbackRateLimit(authenticatedUserId)
+  const rateVerdict = await checkEdgeRateLimit({
+    keyPrefix: "rl:fbstream",
+    identifier: authenticatedUserId,
+    windows: FEEDBACK_RATE_WINDOWS,
+  })
   if (!rateVerdict.allowed) {
     const retryAfterSeconds = rateVerdict.window?.windowSeconds ?? 60
     logger.warn("[Streaming Feedback] Rate limit exceeded", {
