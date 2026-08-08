@@ -12,7 +12,11 @@ import {
   unauthorizedResponse,
 } from '@/lib/admin/middleware'
 import { PERMISSIONS } from '@/lib/admin/rbac'
+import { parseBoundedInt } from '@/lib/admin/query-params'
 import { logAdminAction } from '@/lib/admin/audit'
+
+/** 90 days of hourly rate-limit metrics is more than any dashboard charts. */
+const MAX_METRIC_HOURS = 24 * 90
 
 /**
  * GET /api/admin/rate-limits
@@ -29,10 +33,18 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url)
-  const hours = parseInt(searchParams.get('hours') || '24', 10)
+  // hours widens a Firestore range scan, so ?hours=1000000 is a bill, not a chart.
+  const hoursParam = parseBoundedInt(searchParams.get('hours'), {
+    min: 1,
+    max: MAX_METRIC_HOURS,
+    fallback: 24,
+  })
+  if (!hoursParam.ok) {
+    return errorResponse(`Invalid hours: ${hoursParam.error}`, 400)
+  }
 
   try {
-    const metrics = await getRateLimitMetrics(hours)
+    const metrics = await getRateLimitMetrics(hoursParam.value)
 
     return NextResponse.json({
       success: true,
@@ -40,10 +52,7 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('[Admin Rate Limits API] Error:', error)
-    return errorResponse(
-      error instanceof Error ? error.message : 'Failed to fetch rate limit data',
-      500
-    )
+    return errorResponse('Failed to fetch rate limit data', 500)
   }
 }
 
@@ -69,7 +78,17 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'cleanup': {
-        const daysToKeep = body.daysToKeep || 7
+        // Bounded because this deletes: daysToKeep: 0 or a negative would sweep
+        // the whole collection, and a non-numeric one reached the query as NaN.
+        const daysParam = parseBoundedInt(String(body.daysToKeep ?? ''), {
+          min: 1,
+          max: 365,
+          fallback: 7,
+        })
+        if (!daysParam.ok) {
+          return errorResponse(`Invalid daysToKeep: ${daysParam.error}`, 400)
+        }
+        const daysToKeep = daysParam.value
         await cleanupRateLimitData(daysToKeep)
 
         await logAdminAction(adminContext.userId, 'cleanup_rate_limit_data', {
@@ -87,9 +106,6 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('[Admin Rate Limits API] Error:', error)
-    return errorResponse(
-      error instanceof Error ? error.message : 'Failed to perform action',
-      500
-    )
+    return errorResponse('Failed to perform action', 500)
   }
 }
