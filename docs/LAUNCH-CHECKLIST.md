@@ -21,20 +21,25 @@ One index exists in the project that is not in `firestore.indexes.json`. It was 
 rather than deleted, since `--force` is the only way to remove it and an index nobody declared
 is more likely to be one somebody added from a console error link than one that is safe to drop.
 
-**Rules are still NOT deployed, and this is the most important line in this document.**
+Rules are **DONE** too, deployed 2026-08-08. The free-Pro hole is closed in production: a
+signed-in user can no longer delete their profile and recreate it as
+`subscription_tier: "pro"` from the browser console.
 
-```bash
-firebase deploy --only firestore:rules
-```
+What was verified before that deploy, and what to repeat before the next one:
 
-`firestore.rules` is deployed by hand, so the security fix that closed the free-Pro hole is
-still only in the repo. Until you run this, any signed-in user can delete their profile and
-recreate it as `subscription_tier: "pro"` straight from the browser console.
-
-The file compiles clean as of 2026-08-08 (it previously emitted five warnings, all from one
-unused helper, now removed). Run `pnpm test:integration` first: it exercises
-`firestore-rules.integration.test.ts` against a local emulator using this same file, and should
-stay at 23 passing.
+- `pnpm test:integration` runs `firestore-rules.integration.test.ts` against a local emulator
+  using this exact file. It covers 59 cases, up from 33: the profile entitlement boundary plus
+  the rest of the money surface (subscriptions, payment_history, profile_quota,
+  promo_code_usage, the two spend ledgers, the admin and system trees, research_config, and
+  the catch-all).
+- The suite was mutation-checked, which is the only thing that makes it a gate. Opening
+  `subscriptions` to its owner fails exactly 3 cases; reopening the profile delete that is half
+  of the free-Pro exploit fails exactly 2. A rules suite that has never been seen to fail is
+  not evidence of anything.
+- **Deploy order still matters for `profile_quota`.** These rules set client writes to
+  `write:false`, so the app must ship first. Confirmed satisfied: `lib/firestore-helpers.ts`
+  resolves quota read-only and its own comment already assumes `write:false`. If you ever
+  revert that client change, deploy the app before the rules or session starts break.
 
 Verify afterwards: `pnpm test:integration` runs `firestore-rules.integration.test.ts` against a local
 emulator using the same rules file. It should stay at 23 passing.
