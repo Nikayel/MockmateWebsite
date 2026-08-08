@@ -75,6 +75,243 @@ import type {
 // CRITICAL: Edge runtime for no timeout on streaming
 export const runtime = "edge"
 
+// ============================================================================
+// Rate limiting (Edge)
+// ============================================================================
+//
+// This route was gated by verifyAuthEdge alone: no rate limit, no quota check,
+// no budget check. One authenticated account could call it in a loop, and each
+// call makes up to FIVE AI requests (conversation validation, evidence
+// extraction, silent-notes analysis, bugfix semantic scoring, feedback
+// generation) at high reasoning effort.
+//
+// lib/rate-limit.ts is unusable from here, which is why this is local rather
+// than imported. Its store selection prefers FirestoreRateLimitStore in
+// production, and that store's `increment` dynamically imports firebase-admin —
+// unavailable in the Edge runtime. The import would reject, `increment` would
+// hit its "fail open" catch, and every request would be allowed. A rate limiter
+// that is a silent no-op is worse than none, because it looks like coverage.
+// Its module init can also THROW in production when no distributed store is
+// configured, which in Edge would 500 the route instead of degrading.
+//
+// TODO: this belongs in lib/rate-limit-edge.ts once the file is in scope to
+// create; it is inline here purely to keep this change to the routes it fixes.
+
+/** One fixed-window limit. Both windows must pass. */
+interface EdgeRateWindow {
+  name: string
+  windowSeconds: number
+  maxRequests: number
+}
+
+/**
+ * Two windows, because one cannot express both shapes of abuse.
+ *
+ * The burst window is what stops a runaway client loop: a completed interview
+ * produces exactly one feedback request, so 3/minute already allows a user to
+ * retry twice after a failed stream and is far above any human rate.
+ *
+ * The sustained window is what stops a patient script. A 60-second window alone
+ * would permit 4,320 requests/day — up to ~21,600 AI calls — while never once
+ * appearing to burst. 20/hour is roughly 6x the busiest plausible human
+ * (interviews take 20-45 minutes) and caps a single account at ~480 feedback
+ * runs a day rather than an unbounded number.
+ */
+const FEEDBACK_RATE_WINDOWS: readonly EdgeRateWindow[] = [
+  { name: "burst", windowSeconds: 60, maxRequests: 3 },
+  { name: "sustained", windowSeconds: 60 * 60, maxRequests: 20 },
+]
+
+/**
+ * Per-isolate fallback counters. Not distributed — an attacker spread across
+ * isolates gets one bucket each — but it is a real bound on a single runaway
+ * client, which is the failure this is most likely to meet. Used only when
+ * Upstash is unconfigured or unreachable.
+ */
+const isolateRateCounters = new Map<string, { count: number; resetAtMs: number }>()
+
+/** Bounded so a key-space flood cannot grow the isolate's memory without limit. */
+const MAX_ISOLATE_COUNTERS = 10_000
+
+function checkIsolateWindow(key: string, window: EdgeRateWindow, nowMs: number): boolean {
+  const existing = isolateRateCounters.get(key)
+  if (!existing || existing.resetAtMs <= nowMs) {
+    if (isolateRateCounters.size >= MAX_ISOLATE_COUNTERS) {
+      for (const [k, v] of isolateRateCounters) {
+        if (v.resetAtMs <= nowMs) isolateRateCounters.delete(k)
+      }
+      // Still full of live entries: refuse rather than grow without bound.
+      if (isolateRateCounters.size >= MAX_ISOLATE_COUNTERS) return false
+    }
+    isolateRateCounters.set(key, { count: 1, resetAtMs: nowMs + window.windowSeconds * 1000 })
+    return true
+  }
+  existing.count++
+  return existing.count <= window.maxRequests
+}
+
+/** One Upstash REST command. Returns undefined when Upstash is not usable. */
+async function upstashCommand(command: string[]): Promise<unknown | undefined> {
+  const url = process.env.UPSTASH_REDIS_REST_URL
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN
+  if (!url || !token) return undefined
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(command),
+  })
+  if (!response.ok) throw new Error(`Upstash responded ${response.status}`)
+  const data = (await response.json()) as { result?: unknown }
+  return data.result
+}
+
+/**
+ * Distributed fixed-window counter.
+ *
+ * The window is baked into the KEY (bucket index = floor(now / window)) so the
+ * counter is a plain INCR with no read-modify-write, and therefore atomic across
+ * concurrent instances. That matters: a check-then-set limiter is exactly what a
+ * parallel client defeats.
+ */
+async function checkUpstashWindow(
+  key: string,
+  window: EdgeRateWindow,
+  nowMs: number
+): Promise<boolean | undefined> {
+  const bucket = Math.floor(nowMs / (window.windowSeconds * 1000))
+  const bucketKey = `${key}:${bucket}`
+
+  const count = await upstashCommand(["INCR", bucketKey])
+  if (typeof count !== "number") return undefined
+
+  if (count === 1) {
+    // First hit in this bucket: give the key a TTL so buckets self-collect.
+    // +10s of slack so a clock skew cannot expire a bucket still in use.
+    await upstashCommand(["EXPIRE", bucketKey, String(window.windowSeconds + 10)])
+  }
+
+  return count <= window.maxRequests
+}
+
+interface EdgeRateLimitVerdict {
+  allowed: boolean
+  /** Which window rejected, for the log and the Retry-After hint. */
+  window?: EdgeRateWindow
+}
+
+/**
+ * Rate limit one user across every configured window.
+ *
+ * Keyed by the VERIFIED user id rather than by IP. The route is auth-gated, so
+ * the account is the thing that spends money, and an IP key would both punish
+ * shared networks (a lecture hall behind one NAT) and be trivially rotated.
+ *
+ * On an Upstash failure this degrades to the per-isolate counter instead of
+ * failing open. A limiter guarding five reasoning-model calls should not
+ * evaporate because a cache was briefly unreachable.
+ */
+async function checkFeedbackRateLimit(userId: string): Promise<EdgeRateLimitVerdict> {
+  const nowMs = Date.now()
+
+  for (const window of FEEDBACK_RATE_WINDOWS) {
+    const key = `rl:fbstream:${userId}:${window.windowSeconds}`
+    let allowed: boolean | undefined
+
+    try {
+      allowed = await checkUpstashWindow(key, window, nowMs)
+    } catch (error) {
+      logger.error(
+        "[Streaming Feedback] Distributed rate limit unavailable, using isolate counter",
+        {
+          window: window.name,
+          error,
+        }
+      )
+      allowed = undefined
+    }
+
+    if (allowed === undefined) {
+      allowed = checkIsolateWindow(key, window, nowMs)
+    }
+
+    if (!allowed) return { allowed: false, window }
+  }
+
+  return { allowed: true }
+}
+
+// ============================================================================
+// Input bounds
+// ============================================================================
+//
+// conversationTranscript was mapped verbatim into the payload of up to five AI
+// calls. Nothing bounded the number of messages or their length, so the cost of
+// a single request was a function of what the caller chose to send.
+
+/**
+ * 400 messages. A 45-minute interview at a message every ten seconds is ~270,
+ * so this does not touch a real session; it stops a synthetic one. When it does
+ * bite, the HEAD and TAIL are kept rather than a prefix: the approach is stated
+ * at the start and the complexity discussion at the end, and both are scored.
+ */
+const MAX_TRANSCRIPT_MESSAGES = 400
+
+/**
+ * 4,000 characters per message (~1,000 tokens). Roughly 20x a long human chat
+ * turn, and code lives in its own field rather than in the transcript. The
+ * downstream helpers already truncate for their own prompts, but they do so
+ * AFTER building the full joined string, so an unbounded message was still
+ * materialised (and, for the bugfix path, still priced) before anything trimmed.
+ */
+const MAX_MESSAGE_CHARS = 4_000
+
+/** ~30k characters. The prompt only ever shows the first 1,500. */
+const MAX_CODE_CHARS = 30_000
+
+/** AI partner turns feed the copy-detection overlap scan, which is O(code x messages). */
+const MAX_PARTNER_MESSAGES = 200
+
+interface RawTranscriptMessage {
+  type?: string
+  role?: string
+  message?: string
+  content?: string
+}
+
+/** Clamp one message's text, preserving its shape for every downstream reader. */
+function boundMessageText(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined
+  return value.length > MAX_MESSAGE_CHARS ? value.slice(0, MAX_MESSAGE_CHARS) : value
+}
+
+/**
+ * Bound an untrusted transcript ONCE, at the edge of the handler, so every
+ * later reader (message counts, pre-screening, the AI payloads) sees the same
+ * bounded value and no unbounded copy survives anywhere.
+ */
+function boundTranscript(raw: unknown): { messages: RawTranscriptMessage[]; truncated: boolean } {
+  if (!Array.isArray(raw)) return { messages: [], truncated: false }
+
+  const kept =
+    raw.length <= MAX_TRANSCRIPT_MESSAGES
+      ? raw
+      : [
+          ...raw.slice(0, Math.floor(MAX_TRANSCRIPT_MESSAGES / 2)),
+          ...raw.slice(-Math.ceil(MAX_TRANSCRIPT_MESSAGES / 2)),
+        ]
+
+  return {
+    messages: kept.map((entry: RawTranscriptMessage) => ({
+      type: entry?.type,
+      role: entry?.role,
+      message: boundMessageText(entry?.message),
+      content: boundMessageText(entry?.content),
+    })),
+    truncated: raw.length > MAX_TRANSCRIPT_MESSAGES,
+  }
+}
+
 export async function POST(request: NextRequest) {
   // Verify the caller before streaming any paid AI output. Header-only check so
   // the request body stays available for processRequest().
@@ -86,6 +323,32 @@ export async function POST(request: NextRequest) {
     })
   }
   const authenticatedUserId = auth.userId
+
+  // Rate limit BEFORE the stream is opened. Once the SSE response is returned
+  // the client renders a progress UI, so a refusal has to be an ordinary HTTP
+  // error the caller can surface, not an `error` event mid-stream.
+  const rateVerdict = await checkFeedbackRateLimit(authenticatedUserId)
+  if (!rateVerdict.allowed) {
+    const retryAfterSeconds = rateVerdict.window?.windowSeconds ?? 60
+    logger.warn("[Streaming Feedback] Rate limit exceeded", {
+      userId: authenticatedUserId,
+      window: rateVerdict.window?.name,
+      limit: rateVerdict.window?.maxRequests,
+    })
+    return new Response(
+      JSON.stringify({
+        error: "Too many feedback requests. Please wait a moment and try again.",
+        retryAfter: retryAfterSeconds,
+      }),
+      {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": String(retryAfterSeconds),
+        },
+      }
+    )
+  }
 
   const encoder = new TextEncoder()
 
@@ -111,7 +374,7 @@ export async function POST(request: NextRequest) {
       const {
         sessionId,
         userId,
-        code,
+        code: rawCode,
         language,
         testsPassed: rawTestsPassed,
         testsTotal: rawTestsTotal,
@@ -120,8 +383,8 @@ export async function POST(request: NextRequest) {
         scenarioId,
         scenarioDifficulty,
         scenarioPattern,
-        conversationTranscript,
-        partnerMessages,
+        conversationTranscript: rawConversationTranscript,
+        partnerMessages: rawPartnerMessages,
         phaseTracking,
         silentNotes: existingSilentNotes,
         efficiencyMetrics,
@@ -151,6 +414,30 @@ export async function POST(request: NextRequest) {
       // testsTotal would make it >100% and trip every perfect-pass floor.
       const testsTotal = sanitizeTestCount(rawTestsTotal)
       const testsPassed = Math.min(sanitizeTestCount(rawTestsPassed), testsTotal)
+
+      // Bound the free-text inputs ONCE, here, before anything reads them. Every
+      // reader below (message counts, pre-screening, the five AI payloads) uses
+      // these bounded values, so no unbounded copy of a caller-controlled string
+      // survives into a priced call.
+      const { messages: conversationTranscript, truncated: transcriptTruncated } =
+        boundTranscript(rawConversationTranscript)
+      const code =
+        typeof rawCode === "string" && rawCode.length > MAX_CODE_CHARS
+          ? rawCode.slice(0, MAX_CODE_CHARS)
+          : rawCode
+      const partnerMessages = Array.isArray(rawPartnerMessages)
+        ? rawPartnerMessages.slice(0, MAX_PARTNER_MESSAGES)
+        : rawPartnerMessages
+
+      if (transcriptTruncated) {
+        // Only reachable from a synthetic session, so it is worth seeing.
+        logger.warn("[Streaming Feedback] Transcript exceeded the message cap", {
+          userId: authenticatedUserId,
+          received: Array.isArray(rawConversationTranscript) ? rawConversationTranscript.length : 0,
+          cap: MAX_TRANSCRIPT_MESSAGES,
+          scenarioId,
+        })
+      }
 
       // ========================================
       // PHASE 1: Instant Scores (< 100ms, no AI)
@@ -216,7 +503,15 @@ export async function POST(request: NextRequest) {
       await sendEvent("phase", { phase: "analyzing", message: "Analyzing your interview..." })
 
       const passRate = testsTotal > 0 ? (testsPassed / testsTotal) * 100 : 0
-      const preScreen = preScreenConversation(conversationTranscript)
+      // preScreenConversation declares { role, content } but has always been
+      // handed the raw body shape, which for some clients carries `type` /
+      // `message` instead. Bounding the transcript gave the value a real type
+      // and surfaced the mismatch; normalising it here would change what
+      // pre-screening counts, and pre-screening feeds the scores users see.
+      // Preserved exactly as-is — worth fixing, but not inside a cost change.
+      const preScreen = preScreenConversation(
+        conversationTranscript as unknown as Array<{ role: string; content: string }>
+      )
       const aiCodeOverlap = analyzeAICodeOverlap(code, partnerMessages)
       const hasBlindCopying = aiCodeOverlap.hasHighOverlap && !aiCodeOverlap.modificationsMade
       const bugfixEvidenceSummary: BugfixEvidenceSummary | null =
