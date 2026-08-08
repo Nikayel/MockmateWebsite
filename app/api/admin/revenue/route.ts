@@ -1,14 +1,22 @@
 /**
  * Admin Revenue API
  *
- * Returns accurate revenue metrics from actual Stripe payments.
- * Uses payment_history collection (populated by webhooks) and can optionally
- * fetch live data from Stripe.
+ * Two different kinds of number live here, and the response keeps them apart:
+ *
+ * - Point in time: how much recurring revenue the subscriptions billing us
+ *   today represent. This does NOT move with the time picker. It used to: MRR
+ *   was headcount times list price plus (range-limited yearly revenue) / 12, so
+ *   switching from 90d to 7d "lowered MRR".
+ * - Windowed: money that actually moved inside the selected range, read from
+ *   the payment_history collection the Stripe webhook writes.
+ *
+ * Money is handled in cents end to end and converted once, at the response
+ * boundary, because payment_history stores cents and refunds as negative cents.
  *
  * GET /api/admin/revenue
  * Query params:
  * - timeRange: '7d' | '30d' | '90d' | 'all'
- * - live: 'true' to fetch fresh data from Stripe (slower)
+ * - live: 'true' to also fetch fresh charge totals from Stripe (slower)
  *
  * Requires admin authentication
  */
@@ -18,65 +26,33 @@ import Stripe from 'stripe'
 import { adminDb } from '@/lib/firebase-admin'
 import { verifyAdminAccess, parseAdminQueryParams } from '@/lib/admin/middleware'
 import { adminCache, getCacheKey, CACHE_TTL } from '@/lib/admin/cache'
-import { getMonthlyPrice, getAnnualPrice } from '@/lib/pricing'
+import { countBillingSubscriptions } from '@/lib/admin/subscription-state'
+import {
+  buildRevenueTimeSeries,
+  centsToDollars,
+  computeArrCents,
+  computeMrrCents,
+  summarizePaymentWindow,
+  summarizeStripeCharges,
+  type PaymentRecordInput,
+} from '@/lib/admin/revenue-metrics'
+import { describeWindow } from '@/lib/admin/funnel-metrics'
 
 // Initialize Stripe
 const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-12-15.clover' as any })
   : null
 
-interface RevenueMetrics {
-  // Actual revenue from payments
-  actual: {
-    total_collected: number // Total collected in time range
-    mrr_equivalent: number // Estimated MRR from actual payments
-    refunds: number
-    net_revenue: number
-  }
-  // Calculated revenue (for comparison)
-  calculated: {
-    mrr: number // Based on subscriber counts
-    arr: number
-  }
-  // Breakdown by subscription type
-  byType: {
-    monthly: {
-      subscribers: number
-      revenue: number
-      avgPayment: number
-    }
-    yearly: {
-      subscribers: number
-      revenue: number
-      avgPayment: number
-      mrrEquivalent: number
-    }
-  }
-  // Payments with discounts
-  discounts: {
-    paymentsWithDiscount: number
-    totalDiscountAmount: number
-    avgDiscountPercent: number
-  }
-  // Recent payments
-  recentPayments: Array<{
-    id: string
-    user_id: string
-    amount: number
-    currency: string
-    type: 'subscription' | 'one_time'
-    status: string
-    description?: string
-    created_at: string
-  }>
-  // Time series for charts
-  timeSeries: Array<{
-    date: string
-    revenue: number
-    payments: number
-    refunds: number
-  }>
-}
+/** Plain-language provenance rendered next to each block, so no figure appears unsourced. */
+const PROVENANCE = {
+  recurring:
+    'Point in time. Subscriptions billing us today, priced from the live list prices. Does not move with the range selector.',
+  collected: 'Firestore payment_history, written by the Stripe webhook. Amounts stored in cents.',
+  stripe: 'Live Stripe API. Charges created inside the range, all pages fetched.',
+} as const
+
+/** Hard ceiling on charges pulled from Stripe in one request, so the route cannot run away. */
+const MAX_STRIPE_CHARGES = 1000
 
 export async function GET(request: NextRequest) {
   try {
@@ -98,182 +74,120 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const { timeRange, startDate } = parseAdminQueryParams(request)
+    const { timeRange, startDate, endDate } = parseAdminQueryParams(request)
     const fetchLive = searchParams.get('live') === 'true'
 
     // Check cache (skip if fetching live data)
     const cacheKey = getCacheKey('revenue', { timeRange })
     if (!fetchLive) {
-      const cached = adminCache.get<any>(cacheKey)
+      const cached = adminCache.get<unknown>(cacheKey)
       if (cached) {
-        return NextResponse.json({ ...cached, cached: true })
+        return NextResponse.json({ ...(cached as object), cached: true })
       }
     }
 
-    // Fetch payment history from Firestore
-    let paymentsQuery = adminDb.collection('payment_history')
+    // Payments inside the selected window.
+    let paymentsQuery: FirebaseFirestore.Query = adminDb.collection('payment_history')
     if (startDate) {
-      paymentsQuery = paymentsQuery.where('created_at', '>=', startDate.toISOString()) as any
+      paymentsQuery = paymentsQuery.where('created_at', '>=', startDate.toISOString())
     }
     const paymentsSnapshot = await paymentsQuery.orderBy('created_at', 'desc').get()
+    const payments = paymentsSnapshot.docs.map((doc) => doc.data() as PaymentRecordInput)
 
-    // Fetch profiles to count subscribers by type
+    // Subscriptions billing us right now. Not scoped to the window, because no
+    // date picker can change who is paying today.
     const profilesSnapshot = await adminDb.collection('profiles').get()
-
-    // Calculate subscriber breakdown
-    const subscribersByType = {
-      monthly: { count: 0, totalRevenue: 0 },
-      yearly: { count: 0, totalRevenue: 0 },
-    }
-
-    profilesSnapshot.docs.forEach((doc) => {
-      const profile = doc.data()
-      if (profile.subscription_tier === 'pro' && profile.subscription_status === 'active') {
-        if (profile.subscription_type === 'yearly') {
-          subscribersByType.yearly.count++
-        } else {
-          subscribersByType.monthly.count++
+    const subscriptions = countBillingSubscriptions(
+      profilesSnapshot.docs.map((doc) => {
+        const profile = doc.data()
+        return {
+          userId: doc.id,
+          subscription_tier: profile.subscription_tier,
+          subscription_status: profile.subscription_status,
+          subscription_type: profile.subscription_type,
         }
-      }
-    })
+      })
+    )
+    const mrr = computeMrrCents(subscriptions)
 
-    // Process payment history
-    let totalCollected = 0
-    let totalRefunds = 0
-    let paymentsWithDiscount = 0
-    let totalDiscountAmount = 0
+    const collected = summarizePaymentWindow(payments)
 
-    const monthlyPayments: number[] = []
-    const yearlyPayments: number[] = []
-    const recentPayments: RevenueMetrics['recentPayments'] = []
-    const dailyRevenue: Record<string, { revenue: number; payments: number; refunds: number }> = {}
+    // Payments split by what the webhook recorded them as. `one_time` is what a
+    // yearly checkout writes. The old split also sniffed the description string
+    // for the word "yearly", which classified refund and proration rows by
+    // whatever text Stripe happened to send.
+    const monthlyPayments = summarizePaymentWindow(
+      payments.filter((payment) => payment.type === 'subscription')
+    )
+    const yearlyPayments = summarizePaymentWindow(
+      payments.filter((payment) => payment.type === 'one_time')
+    )
 
-    paymentsSnapshot.docs.forEach((doc) => {
+    // There is deliberately no "discounts applied" block. It used to infer a
+    // discount from any payment below list price and report the shortfall as a
+    // discount amount, which counted prorations, partial periods, currency
+    // differences, and plan changes as discounts. payment_history stores no
+    // coupon or discount field, so the platform does not measure this. Stripe
+    // does, and the dashboard link below goes there.
+
+    const timeSeries = buildRevenueTimeSeries(payments).map((point) => ({
+      date: point.date,
+      revenue: centsToDollars(point.revenueCents),
+      payments: point.payments,
+      refunds: centsToDollars(point.refundsCents),
+    }))
+
+    const recentPayments = paymentsSnapshot.docs.slice(0, 50).map((doc) => {
       const payment = doc.data()
-      const amountInDollars = (payment.amount || 0) / 100
-
-      // Track by date
-      const dateKey = payment.created_at?.split('T')[0] || 'unknown'
-      if (!dailyRevenue[dateKey]) {
-        dailyRevenue[dateKey] = { revenue: 0, payments: 0, refunds: 0 }
-      }
-
-      if (payment.status === 'succeeded') {
-        totalCollected += amountInDollars
-        dailyRevenue[dateKey].revenue += amountInDollars
-        dailyRevenue[dateKey].payments++
-
-        // Track by type
-        if (payment.type === 'one_time' || payment.description?.toLowerCase().includes('yearly')) {
-          yearlyPayments.push(amountInDollars)
-          subscribersByType.yearly.totalRevenue += amountInDollars
-        } else {
-          monthlyPayments.push(amountInDollars)
-          subscribersByType.monthly.totalRevenue += amountInDollars
-        }
-
-        // Check for discounts (if payment is less than standard price)
-        const expectedMonthly = getMonthlyPrice('pro')
-        const expectedYearly = getAnnualPrice('pro')
-        if (payment.type === 'subscription' && amountInDollars < expectedMonthly && amountInDollars > 0) {
-          paymentsWithDiscount++
-          totalDiscountAmount += expectedMonthly - amountInDollars
-        } else if (payment.type === 'one_time' && amountInDollars < expectedYearly && amountInDollars > 0) {
-          paymentsWithDiscount++
-          totalDiscountAmount += expectedYearly - amountInDollars
-        }
-      } else if (payment.status === 'refunded') {
-        totalRefunds += Math.abs(amountInDollars)
-        dailyRevenue[dateKey].refunds += Math.abs(amountInDollars)
-      }
-
-      // Add to recent payments (first 50)
-      if (recentPayments.length < 50) {
-        recentPayments.push({
-          id: doc.id,
-          user_id: payment.user_id,
-          amount: amountInDollars,
-          currency: payment.currency || 'usd',
-          type: payment.type,
-          status: payment.status,
-          description: payment.description,
-          created_at: payment.created_at,
-        })
+      return {
+        id: doc.id,
+        user_id: typeof payment.user_id === 'string' ? payment.user_id : '',
+        amount: centsToDollars(typeof payment.amount === 'number' ? payment.amount : 0),
+        currency: typeof payment.currency === 'string' ? payment.currency : 'usd',
+        type: payment.type,
+        status: payment.status,
+        description: payment.description,
+        created_at: payment.created_at,
       }
     })
-
-    // Calculate MRR equivalent from actual payments
-    // Monthly payments contribute directly
-    // Yearly payments contribute 1/12 per month
-    const monthlyMRR = subscribersByType.monthly.count * getMonthlyPrice('pro')
-    const yearlyMRREquivalent = (subscribersByType.yearly.totalRevenue / 12) || 0
-
-    // Calculate averages
-    const avgMonthlyPayment = monthlyPayments.length > 0
-      ? monthlyPayments.reduce((a, b) => a + b, 0) / monthlyPayments.length
-      : 0
-    const avgYearlyPayment = yearlyPayments.length > 0
-      ? yearlyPayments.reduce((a, b) => a + b, 0) / yearlyPayments.length
-      : 0
-    const avgDiscountPercent = paymentsWithDiscount > 0
-      ? (totalDiscountAmount / paymentsWithDiscount) / getMonthlyPrice('pro') * 100
-      : 0
-
-    // Create time series
-    const timeSeries = Object.entries(dailyRevenue)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, data]) => ({
-        date,
-        revenue: Math.round(data.revenue * 100) / 100,
-        payments: data.payments,
-        refunds: Math.round(data.refunds * 100) / 100,
-      }))
-
-    // Calculated revenue (for comparison)
-    const tierCounts = { free: 0, pro: 0, enterprise: 0 }
-    profilesSnapshot.docs.forEach((doc) => {
-      const tier = doc.data().subscription_tier || 'free'
-      if (tier in tierCounts) {
-        tierCounts[tier as keyof typeof tierCounts]++
-      }
-    })
-
-    const calculatedMRR = tierCounts.pro * getMonthlyPrice('pro') +
-      tierCounts.enterprise * getMonthlyPrice('enterprise')
 
     // Optionally fetch live data from Stripe
-    let stripeData = null
+    let stripeData: {
+      available: number
+      pending: number
+      totalCharges: number
+      refundedAgainstTheseCharges: number
+      chargeCount: number
+      truncated: boolean
+    } | null = null
     if (fetchLive && stripe) {
       try {
         const now = Math.floor(Date.now() / 1000)
         const rangeStart = startDate ? Math.floor(startDate.getTime() / 1000) : now - 30 * 24 * 60 * 60
 
-        // Get balance
         const balance = await stripe.balance.retrieve()
 
-        // Get recent charges
-        const charges = await stripe.charges.list({
-          created: { gte: rangeStart },
-          limit: 100,
-        })
+        // Every page inside the range, not the first hundred charges. The old
+        // call passed limit:100 with no pagination, so a busy range silently
+        // reported a fraction of itself as the total.
+        const charges = await stripe.charges
+          .list({ created: { gte: rangeStart }, limit: 100 })
+          .autoPagingToArray({ limit: MAX_STRIPE_CHARGES })
 
-        let stripeTotal = 0
-        let stripeRefunds = 0
-        charges.data.forEach((charge) => {
-          if (charge.status === 'succeeded') {
-            stripeTotal += charge.amount
-          }
-          if (charge.refunded) {
-            stripeRefunds += charge.amount_refunded
-          }
-        })
+        const chargeSummary = summarizeStripeCharges(charges)
 
         stripeData = {
-          available: balance.available.reduce((sum, b) => sum + b.amount, 0) / 100,
-          pending: balance.pending.reduce((sum, b) => sum + b.amount, 0) / 100,
-          totalCharges: stripeTotal / 100,
-          totalRefunds: stripeRefunds / 100,
-          chargeCount: charges.data.length,
+          available: centsToDollars(balance.available.reduce((sum, b) => sum + b.amount, 0)),
+          pending: centsToDollars(balance.pending.reduce((sum, b) => sum + b.amount, 0)),
+          totalCharges: centsToDollars(chargeSummary.collectedCents),
+          // Named for what it is: refunds booked against charges created in the
+          // range, whenever the refund itself happened. It is not "refunds in
+          // the range", and calling it that was the bug.
+          refundedAgainstTheseCharges: centsToDollars(
+            chargeSummary.refundedAgainstTheseChargesCents
+          ),
+          chargeCount: chargeSummary.chargeCount,
+          truncated: chargeSummary.chargeCount >= MAX_STRIPE_CHARGES,
         }
       } catch (stripeError) {
         console.error('Error fetching Stripe data:', stripeError)
@@ -284,37 +198,47 @@ export async function GET(request: NextRequest) {
       success: true,
       timeRange,
       metrics: {
-        actual: {
-          total_collected: Math.round(totalCollected * 100) / 100,
-          mrr_equivalent: Math.round((monthlyMRR + yearlyMRREquivalent) * 100) / 100,
-          refunds: Math.round(totalRefunds * 100) / 100,
-          net_revenue: Math.round((totalCollected - totalRefunds) * 100) / 100,
+        window: {
+          timeRange,
+          label: describeWindow(timeRange),
+          startDate: startDate ? startDate.toISOString() : null,
+          endDate: endDate.toISOString(),
         },
-        calculated: {
-          mrr: calculatedMRR,
-          arr: calculatedMRR * 12,
+        // Point in time. Independent of `window` above by construction.
+        recurring: {
+          mrr: centsToDollars(mrr.total),
+          arr: centsToDollars(computeArrCents(mrr.total)),
+          breakdown: {
+            proMonthly: centsToDollars(mrr.proMonthly),
+            proYearly: centsToDollars(mrr.proYearly),
+            enterprise: centsToDollars(mrr.enterprise),
+          },
+          subscriptions,
+        },
+        // Money that moved inside `window`.
+        collected: {
+          total: centsToDollars(collected.collectedCents),
+          refunds: centsToDollars(collected.refundedCents),
+          net: centsToDollars(collected.netCents),
+          paymentCount: collected.succeededCount,
+          refundCount: collected.refundedCount,
+          refundShareOfEventsPercent:
+            Math.round(collected.refundShareOfEventsPercent * 10) / 10,
         },
         byType: {
           monthly: {
-            subscribers: subscribersByType.monthly.count,
-            revenue: Math.round(subscribersByType.monthly.totalRevenue * 100) / 100,
-            avgPayment: Math.round(avgMonthlyPayment * 100) / 100,
+            collected: centsToDollars(monthlyPayments.collectedCents),
+            paymentCount: monthlyPayments.succeededCount,
           },
           yearly: {
-            subscribers: subscribersByType.yearly.count,
-            revenue: Math.round(subscribersByType.yearly.totalRevenue * 100) / 100,
-            avgPayment: Math.round(avgYearlyPayment * 100) / 100,
-            mrrEquivalent: Math.round(yearlyMRREquivalent * 100) / 100,
+            collected: centsToDollars(yearlyPayments.collectedCents),
+            paymentCount: yearlyPayments.succeededCount,
           },
-        },
-        discounts: {
-          paymentsWithDiscount,
-          totalDiscountAmount: Math.round(totalDiscountAmount * 100) / 100,
-          avgDiscountPercent: Math.round(avgDiscountPercent * 10) / 10,
         },
         recentPayments,
         timeSeries,
         stripe: stripeData,
+        provenance: PROVENANCE,
       },
     }
 

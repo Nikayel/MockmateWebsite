@@ -12,10 +12,8 @@ import {
   TrendingUp,
   Users,
   CreditCard,
-  RefreshCw,
   ExternalLink,
   Calendar,
-  Loader2,
   AlertCircle,
   Percent,
   Receipt,
@@ -23,33 +21,43 @@ import {
 import { logger } from "@/lib/logger"
 
 interface RevenueData {
-  actual: {
-    total_collected: number
-    mrr_equivalent: number
-    refunds: number
-    net_revenue: number
+  /** The window the `collected` block is scoped to. `recurring` ignores it. */
+  window: {
+    timeRange: string
+    label: string
+    startDate: string | null
+    endDate: string
   }
-  calculated: {
+  /** Point in time: what the subscriptions billing us today are worth. */
+  recurring: {
     mrr: number
     arr: number
+    breakdown: {
+      proMonthly: number
+      proYearly: number
+      enterprise: number
+    }
+    subscriptions: {
+      proMonthly: number
+      proYearly: number
+      enterprise: number
+      total: number
+      /** Paid tier with no subscription_status, so its billing state is unknown. */
+      unknownBillingState: number
+    }
+  }
+  /** Money that actually moved inside the window. */
+  collected: {
+    total: number
+    refunds: number
+    net: number
+    paymentCount: number
+    refundCount: number
+    refundShareOfEventsPercent: number
   }
   byType: {
-    monthly: {
-      subscribers: number
-      revenue: number
-      avgPayment: number
-    }
-    yearly: {
-      subscribers: number
-      revenue: number
-      avgPayment: number
-      mrrEquivalent: number
-    }
-  }
-  discounts: {
-    paymentsWithDiscount: number
-    totalDiscountAmount: number
-    avgDiscountPercent: number
+    monthly: { collected: number; paymentCount: number }
+    yearly: { collected: number; paymentCount: number }
   }
   recentPayments: Array<{
     id: string
@@ -71,10 +79,30 @@ interface RevenueData {
     available: number
     pending: number
     totalCharges: number
-    totalRefunds: number
+    /** Refunds booked against charges created in the range, whenever they happened. */
+    refundedAgainstTheseCharges: number
     chargeCount: number
+    truncated: boolean
+  } | null
+  provenance?: {
+    recurring: string
+    collected: string
+    stripe: string
   }
 }
+
+/** One short line naming the window and the source of the numbers above it. */
+function MetricProvenance({ window, source }: { window: string; source?: string }) {
+  return (
+    <p className="text-gray-500 text-xs">
+      {window}
+      {source ? ` · ${source}` : ""}
+    </p>
+  )
+}
+
+const usd = (value: number) =>
+  value.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 })
 
 export default function RevenuePage() {
   const { firebaseUser } = useAuth()
@@ -148,18 +176,20 @@ export default function RevenuePage() {
   }
 
   const typeDistribution = metrics ? [
-    { name: "Monthly", value: metrics.byType.monthly.subscribers, color: "#c4703f" },
-    { name: "Yearly", value: metrics.byType.yearly.subscribers, color: "#A855F7" },
+    { name: "Pro monthly", value: metrics.recurring.subscriptions.proMonthly, color: "#c4703f" },
+    { name: "Pro yearly", value: metrics.recurring.subscriptions.proYearly, color: "#A855F7" },
+    { name: "Enterprise", value: metrics.recurring.subscriptions.enterprise, color: "#3fb883" },
   ] : []
 
-  const totalSubscribers = (metrics?.byType.monthly.subscribers || 0) + (metrics?.byType.yearly.subscribers || 0)
+  const totalSubscribers = metrics?.recurring.subscriptions.total || 0
+  const windowLabel = metrics?.window.label ?? (timeRange === "all" ? "all time" : `last ${timeRange}`)
 
   return (
     <div className="space-y-8">
       {/* Header */}
       <PageHeader
         title="Revenue"
-        subtitle="Actual revenue from Stripe payments"
+        subtitle="Recurring revenue as of today, and money collected in the selected window"
         timeRange={timeRange}
         onTimeRangeChange={setTimeRange}
         onRefresh={() => loadData(true)}
@@ -178,68 +208,134 @@ export default function RevenuePage() {
         }
       />
 
-      {/* Key Metrics - Actual Revenue */}
       {metrics && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <MetricCard
-              title="Net Revenue"
-              value={`$${metrics.actual.net_revenue.toLocaleString()}`}
-              subtitle={`${timeRange === "all" ? "All time" : `Last ${timeRange}`}`}
-              icon={DollarSign}
-              valueColor="text-green-400"
-              iconColor="text-green-400"
-              sparklineData={metrics.timeSeries?.slice(-7).map((r) => r.revenue)}
-              sparklineColor="#3fb883"
+          {/* Point in time. These do not move when the range selector moves. */}
+          <div>
+            <h2 className="text-xl font-bold text-white mb-1">Recurring revenue, as of today</h2>
+            <MetricProvenance
+              window="Point in time, not the selected range"
+              source={metrics.provenance?.recurring}
             />
-            <MetricCard
-              title="MRR (Actual)"
-              value={`$${metrics.actual.mrr_equivalent.toLocaleString()}`}
-              subtitle="Based on actual payments"
-              icon={TrendingUp}
-              valueColor="text-green-400"
-            />
-            <MetricCard
-              title="Total Subscribers"
-              value={totalSubscribers}
-              subtitle={`${metrics.byType.monthly.subscribers} monthly, ${metrics.byType.yearly.subscribers} yearly`}
-              icon={Users}
-              iconColor="text-[#c4703f]"
-            />
-            <MetricCard
-              title="Refunds"
-              value={`$${metrics.actual.refunds.toLocaleString()}`}
-              subtitle={`${timeRange === "all" ? "All time" : `Last ${timeRange}`}`}
-              icon={Receipt}
-              iconColor="text-red-400"
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-3">
+              <MetricCard
+                title="MRR"
+                value={usd(metrics.recurring.mrr)}
+                subtitle="Subscriptions billing today"
+                icon={TrendingUp}
+                valueColor="text-green-400"
+                iconColor="text-green-400"
+              />
+              <MetricCard
+                title="ARR"
+                value={usd(metrics.recurring.arr)}
+                subtitle="MRR x 12"
+                icon={DollarSign}
+                valueColor="text-green-400"
+                iconColor="text-green-400"
+              />
+              <MetricCard
+                title="Paying subscribers"
+                value={totalSubscribers}
+                subtitle={`${metrics.recurring.subscriptions.proMonthly} monthly, ${metrics.recurring.subscriptions.proYearly} yearly, ${metrics.recurring.subscriptions.enterprise} enterprise`}
+                icon={Users}
+                iconColor="text-[#c4703f]"
+              />
+              <MetricCard
+                title="Unresolved accounts"
+                value={metrics.recurring.subscriptions.unknownBillingState}
+                subtitle="Paid tier, no subscription status"
+                icon={AlertCircle}
+                valueColor={
+                  metrics.recurring.subscriptions.unknownBillingState > 0
+                    ? "text-yellow-400"
+                    : "text-white"
+                }
+                iconColor="text-yellow-400"
+              />
+            </div>
+            {metrics.recurring.subscriptions.unknownBillingState > 0 && (
+              <p className="text-gray-500 text-xs mt-3">
+                Those accounts carry a paid tier with no subscription status, so we cannot say
+                whether they are billing. They are excluded from MRR rather than counted at list
+                price.
+              </p>
+            )}
           </div>
 
-          {/* Subscription Type Breakdown */}
+          {/* Windowed. Money that actually moved. */}
+          <div>
+            <h2 className="text-xl font-bold text-white mb-1">Collected in the {windowLabel}</h2>
+            <MetricProvenance
+              window={`Payments dated in the ${windowLabel}`}
+              source={metrics.provenance?.collected}
+            />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-3">
+              <MetricCard
+                title="Net collected"
+                value={usd(metrics.collected.net)}
+                subtitle="Payments less refunds"
+                icon={DollarSign}
+                valueColor="text-green-400"
+                iconColor="text-green-400"
+                sparklineData={metrics.timeSeries?.slice(-7).map((r) => r.revenue)}
+                sparklineColor="#3fb883"
+              />
+              <MetricCard
+                title="Payments"
+                value={usd(metrics.collected.total)}
+                subtitle={`${metrics.collected.paymentCount} succeeded`}
+                icon={CreditCard}
+                iconColor="text-[#c4703f]"
+              />
+              <MetricCard
+                title="Refunds"
+                value={usd(metrics.collected.refunds)}
+                subtitle={`${metrics.collected.refundCount} refunded`}
+                icon={Receipt}
+                valueColor="text-red-400"
+                iconColor="text-red-400"
+              />
+              <MetricCard
+                title="Refund share"
+                value={`${metrics.collected.refundShareOfEventsPercent.toFixed(1)}%`}
+                subtitle="Of payment events in the window"
+                icon={Percent}
+                iconColor="text-yellow-400"
+              />
+            </div>
+          </div>
+
+          {/* Subscription Type Breakdown. Head counts are point in time; collected is windowed. */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Monthly vs Yearly Cards */}
             <Card className="bg-gray-900/50 border-gray-800">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-[#c4703f]" />
-                  Monthly Subscriptions
+                  Pro monthly
                 </CardTitle>
-                <CardDescription>$25/month recurring</CardDescription>
+                <CardDescription>Billed every month</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-gray-800/50 rounded-lg p-4 text-center">
-                    <p className="text-3xl font-bold text-white">{metrics.byType.monthly.subscribers}</p>
-                    <p className="text-xs text-gray-400 mt-1">Subscribers</p>
+                    <p className="text-3xl font-bold text-white">
+                      {metrics.recurring.subscriptions.proMonthly}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">Billing today</p>
                   </div>
                   <div className="bg-gray-800/50 rounded-lg p-4 text-center">
-                    <p className="text-3xl font-bold text-green-400">${metrics.byType.monthly.revenue.toLocaleString()}</p>
-                    <p className="text-xs text-gray-400 mt-1">Total Revenue</p>
+                    <p className="text-3xl font-bold text-green-400">
+                      {usd(metrics.byType.monthly.collected)}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">Collected, {windowLabel}</p>
                   </div>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gray-800/30 rounded-lg">
-                  <span className="text-gray-400">Avg Payment</span>
-                  <span className="text-white font-medium">${metrics.byType.monthly.avgPayment.toFixed(2)}</span>
+                  <span className="text-gray-400">Contributes to MRR</span>
+                  <span className="text-white font-medium">
+                    {usd(metrics.recurring.breakdown.proMonthly)}/mo
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -248,24 +344,30 @@ export default function RevenuePage() {
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-purple-400" />
-                  Yearly Subscriptions
+                  Pro yearly
                 </CardTitle>
-                <CardDescription>$225/year (25% savings)</CardDescription>
+                <CardDescription>Billed once a year, amortised over twelve months</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-gray-800/50 rounded-lg p-4 text-center">
-                    <p className="text-3xl font-bold text-white">{metrics.byType.yearly.subscribers}</p>
-                    <p className="text-xs text-gray-400 mt-1">Subscribers</p>
+                    <p className="text-3xl font-bold text-white">
+                      {metrics.recurring.subscriptions.proYearly}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">Billing today</p>
                   </div>
                   <div className="bg-gray-800/50 rounded-lg p-4 text-center">
-                    <p className="text-3xl font-bold text-purple-400">${metrics.byType.yearly.revenue.toLocaleString()}</p>
-                    <p className="text-xs text-gray-400 mt-1">Total Revenue</p>
+                    <p className="text-3xl font-bold text-purple-400">
+                      {usd(metrics.byType.yearly.collected)}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">Collected, {windowLabel}</p>
                   </div>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gray-800/30 rounded-lg">
-                  <span className="text-gray-400">MRR Equivalent</span>
-                  <span className="text-white font-medium">${metrics.byType.yearly.mrrEquivalent.toFixed(2)}/mo</span>
+                  <span className="text-gray-400">Contributes to MRR</span>
+                  <span className="text-white font-medium">
+                    {usd(metrics.recurring.breakdown.proYearly)}/mo
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -273,82 +375,36 @@ export default function RevenuePage() {
 
           {/* Revenue Chart */}
           {metrics.timeSeries && metrics.timeSeries.length > 0 && (
-            <TimeSeriesChart
-              title="Revenue Trend"
-              subtitle="Daily revenue from actual payments"
-              data={metrics.timeSeries}
-              series={[
-                { key: "revenue", name: "Revenue", color: "#3fb883" },
-                { key: "refunds", name: "Refunds", color: "#ef4444" },
-              ]}
-              icon={DollarSign}
-              valueFormatter={(v) => `$${v.toLocaleString()}`}
-            />
+            <div>
+              <TimeSeriesChart
+                title="Revenue Trend"
+                subtitle={`Daily payments and refunds, ${windowLabel}`}
+                data={metrics.timeSeries}
+                series={[
+                  { key: "revenue", name: "Payments", color: "#3fb883" },
+                  { key: "refunds", name: "Refunds", color: "#ef4444" },
+                ]}
+                icon={DollarSign}
+                valueFormatter={(v) => usd(v)}
+              />
+              <div className="mt-2">
+                <MetricProvenance
+                  window={`Payments dated in the ${windowLabel}`}
+                  source={metrics.provenance?.collected}
+                />
+              </div>
+            </div>
           )}
 
-          {/* Discounts & Distribution */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <DistributionChart
-              title="Subscription Types"
-              data={typeDistribution}
-              type="pie"
-              icon={Users}
-            />
-
-            <Card className="bg-gray-900/50 border-gray-800">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Percent className="h-5 w-5 text-yellow-400" />
-                  Discounts Applied
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div className="bg-gray-800/50 rounded-lg p-4">
-                    <p className="text-2xl font-bold text-yellow-400">{metrics.discounts.paymentsWithDiscount}</p>
-                    <p className="text-xs text-gray-400 mt-1">Discounted Payments</p>
-                  </div>
-                  <div className="bg-gray-800/50 rounded-lg p-4">
-                    <p className="text-2xl font-bold text-yellow-400">${metrics.discounts.totalDiscountAmount}</p>
-                    <p className="text-xs text-gray-400 mt-1">Total Discounts</p>
-                  </div>
-                  <div className="bg-gray-800/50 rounded-lg p-4">
-                    <p className="text-2xl font-bold text-yellow-400">{metrics.discounts.avgDiscountPercent}%</p>
-                    <p className="text-xs text-gray-400 mt-1">Avg Discount</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Calculated vs Actual Comparison */}
-          <Card className="bg-blue-900/20 border-blue-500/30">
-            <CardHeader>
-              <CardTitle className="text-white">Calculated vs Actual Revenue</CardTitle>
-              <CardDescription>Comparing subscriber-based estimates to actual payments</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-400">Calculated MRR (from subscriber counts)</p>
-                  <p className="text-2xl font-bold text-gray-300">${metrics.calculated.mrr.toLocaleString()}</p>
-                  <p className="text-xs text-gray-500">Based on {totalSubscribers} Pro subscribers x $25/mo</p>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-400">Actual MRR (from payments)</p>
-                  <p className="text-2xl font-bold text-green-400">${metrics.actual.mrr_equivalent.toLocaleString()}</p>
-                  <p className="text-xs text-gray-500">Includes yearly plans prorated + discounts</p>
-                </div>
-              </div>
-              <div className="mt-4 p-3 bg-gray-800/50 rounded-lg">
-                <p className="text-xs text-gray-400">
-                  Difference of <span className="text-white font-medium">
-                    ${Math.abs(metrics.calculated.mrr - metrics.actual.mrr_equivalent).toFixed(2)}
-                  </span> due to yearly subscriptions, discounts, and payment timing.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Subscription mix. There is deliberately no discounts panel: it used to
+              infer a discount from any payment below list price, which counted
+              prorations and plan changes as discounts. Stripe holds the real figures. */}
+          <DistributionChart
+            title="Subscriptions billing today"
+            data={typeDistribution}
+            type="pie"
+            icon={Users}
+          />
 
           {/* Stripe Live Data */}
           {metrics.stripe && (
@@ -358,25 +414,41 @@ export default function RevenuePage() {
                   <CreditCard className="h-5 w-5" />
                   Live Stripe Balance
                 </CardTitle>
+                <CardDescription>
+                  {metrics.stripe.chargeCount.toLocaleString()} charges created in the {windowLabel}
+                  {metrics.stripe.truncated ? ", capped at the first 1,000" : ""}
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-4 gap-4 text-center">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                   <div>
-                    <p className="text-2xl font-bold text-green-400">${metrics.stripe.available.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-green-400">{usd(metrics.stripe.available)}</p>
                     <p className="text-xs text-gray-400">Available</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-yellow-400">${metrics.stripe.pending.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-yellow-400">{usd(metrics.stripe.pending)}</p>
                     <p className="text-xs text-gray-400">Pending</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-white">${metrics.stripe.totalCharges.toLocaleString()}</p>
-                    <p className="text-xs text-gray-400">Total Charges</p>
+                    <p className="text-2xl font-bold text-white">{usd(metrics.stripe.totalCharges)}</p>
+                    <p className="text-xs text-gray-400">Charges in window</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-red-400">${metrics.stripe.totalRefunds.toLocaleString()}</p>
-                    <p className="text-xs text-gray-400">Refunds</p>
+                    <p className="text-2xl font-bold text-red-400">
+                      {usd(metrics.stripe.refundedAgainstTheseCharges)}
+                    </p>
+                    <p className="text-xs text-gray-400">Refunded against them</p>
                   </div>
+                </div>
+                <p className="text-gray-400 text-xs mt-4">
+                  Refunds are attributed to the charge they reverse, not to the date the refund
+                  happened, so the last figure is not refunds issued in this window.
+                </p>
+                <div className="mt-2">
+                  <MetricProvenance
+                    window={`Charges created in the ${windowLabel}`}
+                    source={metrics.provenance?.stripe}
+                  />
                 </div>
               </CardContent>
             </Card>
