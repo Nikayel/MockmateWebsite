@@ -18,7 +18,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { verifyCronRequest } from "@/lib/cron-auth"
 import { logger } from "@/lib/logger"
 import { trackUsageEvent, calculateCost, type UsageEventType } from "@/lib/usage-tracking"
-import { recordGlobalSpend } from "@/lib/global-spend-guard"
+import {
+  recordGlobalSpend,
+  isGlobalCeilingExceeded,
+  getGlobalDailyCeiling,
+  getGlobalDailySpend,
+} from "@/lib/global-spend-guard"
 
 /** Event types the Edge path is allowed to report. */
 const REPORTABLE_EVENT_TYPES: readonly UsageEventType[] = [
@@ -168,4 +173,45 @@ export async function POST(request: NextRequest) {
   })
 
   return NextResponse.json({ success: true, totalTokens, cost })
+}
+
+/**
+ * Global daily spend ceiling probe, for the Edge runtime.
+ *
+ * isGlobalCeilingExceeded is consulted in exactly one place, inside checkQuota,
+ * so every route that does not call checkQuota bypasses the kill-switch
+ * entirely — including /api/feedback/stream, which cannot call it at all
+ * because the ceiling lives in Firestore and Edge cannot reach Firebase Admin.
+ *
+ * Same shape as the POST above, for the same reason: this is how an Edge
+ * function borrows a Node capability. Same CRON_SECRET bearer, because the
+ * answer gates spending and must not be reachable with a user's token.
+ *
+ * `spendToday` and `ceiling` are returned alongside the verdict so the caller
+ * can log how close the platform is, not just whether it tripped.
+ */
+export async function GET(request: NextRequest) {
+  const auth = verifyCronRequest(request)
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
+  }
+
+  const ceiling = getGlobalDailyCeiling()
+
+  // isGlobalCeilingExceeded fails CLOSED on a Firestore error, and that verdict
+  // must reach the Edge caller intact — this endpoint is the only thing standing
+  // between an unreadable ledger and unmetered Edge spend.
+  const exceeded = await isGlobalCeilingExceeded()
+
+  // Best-effort detail. Never allowed to turn a definite verdict into an error:
+  // if the ledger is unreadable, `exceeded` is already true and that is what
+  // matters.
+  let spendToday: number | null = null
+  try {
+    spendToday = await getGlobalDailySpend()
+  } catch {
+    spendToday = null
+  }
+
+  return NextResponse.json({ ceilingExceeded: exceeded, spendToday, ceiling })
 }

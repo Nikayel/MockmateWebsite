@@ -152,6 +152,79 @@ describe("/api/feedback/stream cost bounds", () => {
     })
   })
 
+  describe("global daily spend ceiling", () => {
+    const probing = (ceilingExceeded: boolean) => {
+      vi.stubEnv("CRON_SECRET", "probe-secret")
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://example.test")
+      const probe = vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ ceilingExceeded, spendToday: 260, ceiling: 250 }),
+      }))
+      vi.stubGlobal("fetch", probe)
+      return probe
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it("refuses with 503 when the platform ceiling has been reached", async () => {
+      probing(true)
+      const { POST } = await import("./route")
+
+      const response = await POST(makeRequest())
+
+      expect(response.status).toBe(503)
+      expect((await response.json()).code).toBe("GLOBAL_CAPACITY_LIMIT")
+      // The whole point: no AI call happens past the ceiling.
+      expect(mocks.generateFeedbackResponseEdge).not.toHaveBeenCalled()
+    })
+
+    it("proceeds normally when the ceiling has not been reached", async () => {
+      probing(false)
+      const { POST } = await import("./route")
+
+      const response = await POST(makeRequest())
+
+      expect(response.status).toBe(200)
+      await drain(response)
+      expect(mocks.generateFeedbackResponseEdge).toHaveBeenCalled()
+    })
+
+    it("caches the verdict so it does not probe on every request", async () => {
+      const probe = probing(false)
+      const { POST } = await import("./route")
+
+      await drain(await POST(makeRequest()))
+      await drain(await POST(makeRequest()))
+      await drain(await POST(makeRequest()))
+
+      expect(probe).toHaveBeenCalledTimes(1)
+    })
+
+    it("does not deny a finished interview because the probe was unreachable", async () => {
+      // The Firestore-error case is already covered fail-closed on the Node
+      // side (isGlobalCeilingExceeded returns true, so the probe answers true).
+      // What reaches here is "Edge could not reach our own origin", which says
+      // nothing about spend, and per-user limits still apply.
+      vi.stubEnv("CRON_SECRET", "probe-secret")
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://example.test")
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          throw new Error("origin unreachable")
+        })
+      )
+      const { POST } = await import("./route")
+
+      const response = await POST(makeRequest())
+
+      expect(response.status).toBe(200)
+      await drain(response)
+    })
+  })
+
   describe("input bounds", () => {
     it("caps the number of transcript messages reaching the AI calls", async () => {
       const { POST } = await import("./route")

@@ -221,10 +221,13 @@ async function checkFeedbackRateLimit(userId: string): Promise<EdgeRateLimitVerd
     try {
       allowed = await checkUpstashWindow(key, window, nowMs)
     } catch (error) {
-      logger.error("[Streaming Feedback] Distributed rate limit unavailable, using isolate counter", {
-        window: window.name,
-        error,
-      })
+      logger.error(
+        "[Streaming Feedback] Distributed rate limit unavailable, using isolate counter",
+        {
+          window: window.name,
+          error,
+        }
+      )
       allowed = undefined
     }
 
@@ -236,6 +239,94 @@ async function checkFeedbackRateLimit(userId: string): Promise<EdgeRateLimitVerd
   }
 
   return { allowed: true }
+}
+
+// ============================================================================
+// Global daily spend ceiling (Edge)
+// ============================================================================
+//
+// isGlobalCeilingExceeded is consulted in exactly ONE place on the platform:
+// inside checkQuota. Every route that does not call checkQuota therefore
+// bypasses the $250/day kill-switch, and this route is the largest of them. It
+// cannot call it directly either — the counter lives in Firestore and Edge
+// cannot load Firebase Admin — so it asks the Node side, exactly as it already
+// does for usage reporting.
+
+interface CeilingProbe {
+  exceeded: boolean
+  checkedAtMs: number
+}
+
+/**
+ * Per-isolate cache of the last probe. 60 seconds bounds the extra internal
+ * request to at most one per isolate per minute, against a route that is about
+ * to make up to five reasoning-model calls, while keeping the reaction time to
+ * a tripped ceiling well under the window in which real money accumulates.
+ */
+const CEILING_PROBE_TTL_MS = 60_000
+let cachedCeilingProbe: CeilingProbe | null = null
+
+/**
+ * Ask the Node side whether the platform-wide daily ceiling has been reached.
+ *
+ * Returns false (allow) when the probe itself cannot be completed, which is a
+ * DIFFERENT decision from the one lib/global-spend-guard.ts makes, and
+ * deliberately so. That function fails closed because an unreadable ledger means
+ * spend is genuinely invisible. Here the equivalent failure is already covered:
+ * a Firestore error makes isGlobalCeilingExceeded return true, the probe
+ * returns ceilingExceeded: true, and this route blocks. The only case that
+ * reaches the fallback is "Edge could not reach our own origin", which says
+ * nothing about spend — and the cost of guessing wrong is denying a user the
+ * feedback for an interview they have just spent 45 minutes on. A stale cached
+ * verdict is preferred over a guess, and per-user rate limits and budgets still
+ * apply either way.
+ */
+async function isGlobalSpendCeilingReached(): Promise<boolean> {
+  const nowMs = Date.now()
+  if (cachedCeilingProbe && nowMs - cachedCeilingProbe.checkedAtMs < CEILING_PROBE_TTL_MS) {
+    return cachedCeilingProbe.exceeded
+  }
+
+  const secret = process.env.CRON_SECRET
+  const configuredOrigin = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "")
+  const origin =
+    configuredOrigin || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+
+  if (!secret || !origin) {
+    logger.error("[Streaming Feedback] Cannot check the global spend ceiling: misconfigured", {
+      reason: !secret ? "CRON_SECRET unset" : "no NEXT_PUBLIC_SITE_URL or VERCEL_URL",
+    })
+    return cachedCeilingProbe?.exceeded ?? false
+  }
+
+  try {
+    const response = await fetch(`${origin}/api/internal/usage`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${secret}` },
+    })
+    if (!response.ok) {
+      throw new Error(`Ceiling probe responded ${response.status}`)
+    }
+    const data = (await response.json()) as {
+      ceilingExceeded?: unknown
+      spendToday?: unknown
+      ceiling?: unknown
+    }
+    const exceeded = data.ceilingExceeded === true
+    cachedCeilingProbe = { exceeded, checkedAtMs: nowMs }
+    if (exceeded) {
+      logger.error("[Streaming Feedback] Global daily spend ceiling reached, refusing feedback", {
+        spendToday: data.spendToday,
+        ceiling: data.ceiling,
+      })
+    }
+    return exceeded
+  } catch (error) {
+    logger.error("[Streaming Feedback] Global spend ceiling probe failed", { error })
+    // Prefer a stale verdict to a guess; see the note above on why this does
+    // not fail closed the way the Firestore-side guard does.
+    return cachedCeilingProbe?.exceeded ?? false
+  }
 }
 
 // ============================================================================
@@ -347,6 +438,24 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // Aggregate kill-switch, after the (cheap, local) rate limit and before the
+  // (expensive, remote) AI calls. 503 rather than 429: this is not the caller's
+  // fault and retrying with a different account will not help.
+  if (await isGlobalSpendCeilingReached()) {
+    return new Response(
+      JSON.stringify({
+        error:
+          "AI feedback is temporarily paused due to unusually high platform usage. " +
+          "Your session is saved — please try again later.",
+        code: "GLOBAL_CAPACITY_LIMIT",
+      }),
+      {
+        status: 503,
+        headers: { "Content-Type": "application/json", "Retry-After": "3600" },
+      }
+    )
+  }
+
   const encoder = new TextEncoder()
 
   // Create a TransformStream for streaming
@@ -430,9 +539,7 @@ export async function POST(request: NextRequest) {
         // Only reachable from a synthetic session, so it is worth seeing.
         logger.warn("[Streaming Feedback] Transcript exceeded the message cap", {
           userId: authenticatedUserId,
-          received: Array.isArray(rawConversationTranscript)
-            ? rawConversationTranscript.length
-            : 0,
+          received: Array.isArray(rawConversationTranscript) ? rawConversationTranscript.length : 0,
           cap: MAX_TRANSCRIPT_MESSAGES,
           scenarioId,
         })

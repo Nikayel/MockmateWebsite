@@ -3,6 +3,9 @@ import { NextRequest } from "next/server"
 
 const trackUsageEvent = vi.fn(() => Promise.resolve())
 const recordGlobalSpend = vi.fn(() => Promise.resolve())
+const isGlobalCeilingExceeded = vi.fn(() => Promise.resolve(false))
+const getGlobalDailySpend = vi.fn(() => Promise.resolve(12.5))
+const getGlobalDailyCeiling = vi.fn(() => 250)
 
 vi.mock("@/lib/usage-tracking", () => ({
   trackUsageEvent: (...args: unknown[]) => trackUsageEvent(...(args as [])),
@@ -13,9 +16,12 @@ vi.mock("@/lib/usage-tracking", () => ({
 
 vi.mock("@/lib/global-spend-guard", () => ({
   recordGlobalSpend: (...args: unknown[]) => recordGlobalSpend(...(args as [])),
+  isGlobalCeilingExceeded: () => isGlobalCeilingExceeded(),
+  getGlobalDailySpend: () => getGlobalDailySpend(),
+  getGlobalDailyCeiling: () => getGlobalDailyCeiling(),
 }))
 
-import { POST } from "./route"
+import { GET, POST } from "./route"
 
 const SECRET = "test-cron-secret"
 
@@ -189,6 +195,39 @@ describe("POST /api/internal/usage", () => {
     it("does not record spend for a rejected body", async () => {
       await POST(makeRequest({ ...validBody, provider: undefined }, `Bearer ${SECRET}`))
       expect(recordGlobalSpend).not.toHaveBeenCalled()
+    })
+  })
+
+  describe("ceiling probe (GET)", () => {
+    it("is the same auth boundary as the ingest", async () => {
+      // The answer gates spending, so it must not be reachable with a user token.
+      expect((await GET(makeRequest(null))).status).toBe(401)
+      expect((await GET(makeRequest(null, "Bearer wrong-secret-value"))).status).toBe(401)
+      expect(isGlobalCeilingExceeded).not.toHaveBeenCalled()
+    })
+
+    it("reports the ceiling verdict with the numbers behind it", async () => {
+      isGlobalCeilingExceeded.mockResolvedValueOnce(true)
+      const response = await GET(makeRequest(null, `Bearer ${SECRET}`))
+
+      expect(response.status).toBe(200)
+      expect(response.data).toMatchObject({
+        ceilingExceeded: true,
+        spendToday: 12.5,
+        ceiling: 250,
+      })
+    })
+
+    it("keeps a definite verdict when the detail read fails", async () => {
+      // isGlobalCeilingExceeded fails CLOSED, and that verdict must survive a
+      // secondary failure rather than being downgraded to an error response.
+      isGlobalCeilingExceeded.mockResolvedValueOnce(true)
+      getGlobalDailySpend.mockRejectedValueOnce(new Error("firestore down"))
+
+      const response = await GET(makeRequest(null, `Bearer ${SECRET}`))
+
+      expect(response.status).toBe(200)
+      expect(response.data).toMatchObject({ ceilingExceeded: true, spendToday: null })
     })
   })
 })
