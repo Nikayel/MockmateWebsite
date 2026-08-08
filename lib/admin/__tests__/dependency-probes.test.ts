@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {
+  deriveDependencyAlerts,
   runDependencyProbes,
   summarizeProbes,
   type DependencyProbe,
@@ -193,5 +194,51 @@ describe("summarizeProbes", () => {
     ])
     expect(summary.status).toBe("unhealthy")
     expect(summary).toMatchObject({ unhealthy: 1, degraded: 1, unknown: 1, total: 3 })
+  })
+})
+
+describe("deriveDependencyAlerts", () => {
+  const result = (overrides: Partial<ProbeResult>): ProbeResult => ({
+    id: "x",
+    label: "X",
+    critical: false,
+    status: "healthy",
+    detail: "",
+    latencyMs: 1,
+    ...overrides,
+  })
+
+  it("raises nothing for a working dependency", () => {
+    expect(deriveDependencyAlerts([result({ id: "stripe" })])).toEqual([])
+  })
+
+  it("raises one alert per non-healthy dependency, loudest first", () => {
+    const alerts = deriveDependencyAlerts([
+      result({ id: "sentry", label: "Sentry", status: "unknown", detail: "unverifiable" }),
+      result({ id: "stripe", label: "Stripe", status: "degraded", detail: "slow" }),
+      result({ id: "firestore", label: "Firestore", status: "unhealthy", detail: "refused" }),
+    ])
+
+    expect(alerts.map((alert) => alert.type)).toEqual(["error", "warning", "info"])
+    expect(alerts[0].id).toBe("dependency-firestore")
+  })
+
+  it("keeps ids stable across polls so an acknowledgement can outlive a refresh", () => {
+    const failing = result({ id: "brevo", label: "Brevo", status: "unhealthy", detail: "401" })
+    expect(deriveDependencyAlerts([failing])[0].id).toBe(
+      deriveDependencyAlerts([failing])[0].id
+    )
+  })
+
+  it("changes the signature when the failure changes, so an old ack cannot cover it", () => {
+    const first = deriveDependencyAlerts([
+      result({ id: "brevo", status: "unhealthy", detail: "credentials rejected" }),
+    ])[0]
+    const second = deriveDependencyAlerts([
+      result({ id: "brevo", status: "unhealthy", detail: "vendor 503" }),
+    ])[0]
+
+    expect(first.id).toBe(second.id)
+    expect(first.signature).not.toBe(second.signature)
   })
 })
