@@ -10,14 +10,48 @@
  * - range: '7d' | '30d' | '90d' | 'all' (default: '30d')
  * - algorithm: 'sm2' | 'fsrs' | 'all' (default: 'all')
  *
- * Requires admin authentication
+ * Requires EXPORT_DATA. Three things were wrong with this route:
+ *
+ *  - it accepted any admin role, skipping the EXPORT_DATA permission that
+ *    exists precisely to gate bulk data leaving the system,
+ *  - it wrote no audit entry, so a full dump of every user's practice history
+ *    left no trace at all, and
+ *  - it emitted the raw Firebase uid on every row. An export is the copy of
+ *    the data that ends up in a spreadsheet, an email or a shared drive, and a
+ *    raw uid there is a join key back to the live user record.
+ *
+ * Rows now carry a stable pseudonymous `user_key` instead: the same user always
+ * hashes to the same key, so longitudinal analysis across exports still works,
+ * but the file no longer carries account identifiers.
  */
 
+import { createHash } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
-import { verifyAdminAccess } from "@/lib/admin/middleware"
-import { getRecentEvents, getAggregateComparison } from "@/lib/spaced-repetition"
-import type { AlgorithmResearchEvent, AlgorithmComparisonAggregate } from "@/lib/types"
+import { requirePermission } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
+import { logAdminAction } from "@/lib/admin/audit"
+import { getAggregateComparison } from "@/lib/spaced-repetition"
+import type { AlgorithmResearchEvent } from "@/lib/types"
+
+/** See AUDIT_ACTIONS in lib/admin/audit.ts; this route's action is not there yet. */
+const EXPORT_RESEARCH_AUDIT_ACTION = "export_research_data"
+
+/**
+ * Domain separation string, so a research `user_key` cannot be matched against
+ * a hash of the same uid produced anywhere else in the system.
+ */
+const USER_KEY_NAMESPACE = "codesparring:research-export:v1"
+
+/**
+ * Stable pseudonym for a user id. Deterministic (the same uid always maps to
+ * the same key, so two exports can be joined) and not reversible by reading
+ * the file.
+ */
+function pseudonymize(userId: string | undefined | null): string {
+  if (!userId) return ""
+  return createHash("sha256").update(`${USER_KEY_NAMESPACE}:${userId}`).digest("hex").slice(0, 16)
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,8 +63,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Verify admin access
-    const authResult = await verifyAdminAccess(request)
+    // Bulk data leaving the system is exactly what EXPORT_DATA gates.
+    const authResult = await requirePermission(request, PERMISSIONS.EXPORT_DATA)
     if (!authResult.authorized) {
       return NextResponse.json(
         { success: false, error: authResult.error },
@@ -81,6 +115,22 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         )
     }
+
+    // Record the export BEFORE the bytes leave. The trail has to show what was
+    // taken, by whom, and how much of it.
+    await logAdminAction(
+      authResult.context!,
+      EXPORT_RESEARCH_AUDIT_ACTION,
+      {
+        type,
+        format,
+        range,
+        algorithm: algorithmFilter,
+        rowCount: Array.isArray(data) ? data.length : 1,
+        pseudonymized: type !== "comparison",
+      },
+      { request }
+    )
 
     if (format === "json") {
       return NextResponse.json(data, {
@@ -135,7 +185,7 @@ async function exportEvents(startDate: Date | null, algorithmFilter: string): Pr
   // Flatten for export
   return events.map((e) => ({
     id: e.id,
-    user_id: e.user_id,
+    user_key: pseudonymize(e.user_id),
     algorithm: e.algorithm,
     timestamp: e.timestamp,
     problem_id: e.problem_id,
@@ -181,7 +231,7 @@ async function exportUserSummaries(algorithmFilter: string): Promise<any[]> {
     }
 
     summaries.push({
-      user_id: data.user_id,
+      user_key: pseudonymize(data.user_id),
       algorithm: data.algorithm,
       algorithm_assigned_at: data.algorithm_assigned_at,
       algorithm_user_overridden: data.algorithm_user_overridden,
@@ -256,17 +306,23 @@ async function exportComparison(): Promise<any> {
     fsrs_average_lapse_rate: comparison.fsrs.average_lapse_rate,
     fsrs_interval_accuracy: comparison.fsrs.interval_accuracy,
 
-    // Comparison
+    // Descriptive differences between the two cohort averages.
+    //
+    // The export used to end with `overall_winner` and `confidence_level`, the
+    // latter computed as `60 + wins * 7`. A spreadsheet outlives the dashboard
+    // that produced it, so an invented confidence in a CSV column keeps being
+    // quoted long after the screen has been fixed. Both columns are gone, and
+    // the wins counts are renamed to say what they actually count.
     retention_rate_difference: comparison.comparison.retention_rate_difference,
     average_score_difference: comparison.comparison.average_score_difference,
     time_to_mastery_difference_days: comparison.comparison.time_to_mastery_difference_days,
     engagement_difference: comparison.comparison.engagement_difference,
     interval_efficiency_difference: comparison.comparison.interval_efficiency_difference,
     sufficient_sample_size: comparison.comparison.sufficient_sample_size,
-    overall_winner: comparison.comparison.overall_winner,
-    confidence_level: comparison.comparison.confidence_level,
-    fsrs_wins_count: comparison.comparison.fsrs_wins_count,
-    sm2_wins_count: comparison.comparison.sm2_wins_count,
+    fsrs_cohort_averages_led: comparison.comparison.fsrs_wins_count,
+    sm2_cohort_averages_led: comparison.comparison.sm2_wins_count,
+    analysis_note:
+      "Descriptive cohort averages only. Leading on an average is not a result. The tested verdict (user-level Welch t-tests, Holm corrected across three metrics, with a sample ratio mismatch check) is on /admin/research and in GET /api/admin/research/enhanced.",
   }
 }
 
