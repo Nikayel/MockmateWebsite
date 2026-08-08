@@ -9,13 +9,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { FieldPath } from "firebase-admin/firestore"
 import { adminDb, adminAuth } from "@/lib/firebase-admin"
 import {
-  verifyAdminAccess,
+  withPermission,
   requirePermission,
   successResponse,
   unauthorizedResponse,
   errorResponse,
 } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
+import { parseBoundedInt } from "@/lib/admin/query-params"
 import { logAdminAction } from "@/lib/admin/audit"
 import Stripe from "stripe"
 import { Pinecone } from "@pinecone-database/pinecone"
@@ -76,16 +77,31 @@ function getAuthProvider(authUser: import("firebase-admin/auth").UserRecord): st
   return provider || "unknown"
 }
 
-export async function GET(request: NextRequest) {
-  const authResult = await verifyAdminAccess(request)
-  if (!authResult.authorized) {
-    return unauthorizedResponse(authResult.error!, authResult.status || 401)
-  }
-
+export const GET = withPermission(PERMISSIONS.VIEW_USERS, async (request) => {
   try {
+    if (!adminDb) {
+      return errorResponse("Database not available", 503)
+    }
+
     const { searchParams } = new URL(request.url)
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10))
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)))
+    // The existing Math.min/Math.max pair did not survive garbage: parseInt("abc")
+    // is NaN, and every comparison against NaN is false, so ?limit=abc produced
+    // NaN and paginated to an empty slice with totalPages NaN.
+    const pageParam = parseBoundedInt(searchParams.get("page"), {
+      min: 1,
+      max: 10_000,
+      fallback: 1,
+    })
+    const limitParam = parseBoundedInt(searchParams.get("limit"), {
+      min: 1,
+      max: 100,
+      fallback: 50,
+    })
+    if (!pageParam.ok || !limitParam.ok) {
+      return errorResponse("page and limit must be integers", 400)
+    }
+    const page = pageParam.value
+    const limit = limitParam.value
     const search = (searchParams.get("search") || "").toLowerCase()
 
     // 1. Fetch all users from Firebase Auth (Google, GitHub, etc.)
@@ -163,11 +179,11 @@ export async function GET(request: NextRequest) {
         searchCapped: authUsers.length >= MAX_AUTH_USERS,
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error listing users", { error })
-    return errorResponse(error.message || "Failed to list users", 500)
+    return errorResponse("Failed to list users", 500)
   }
-}
+})
 
 /**
  * DELETE /api/admin/users
@@ -343,8 +359,10 @@ export async function DELETE(request: NextRequest) {
       userId,
       email: emailForCheck,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Deletion touches Stripe and Pinecone; their messages name customer ids,
+    // index hosts and API versions, so only the log gets the detail.
     logger.error("Error deleting user", { error, adminId })
-    return errorResponse(error.message || "Failed to delete user", 500)
+    return errorResponse("Failed to delete user", 500)
   }
 }
