@@ -56,18 +56,42 @@ interface VoidedReward {
   processedAt: string
 }
 
-interface PaymentStats {
-  totalRevenue: number
-  totalRefunds: number
-  netRevenue: number
+interface PaymentTotals {
+  revenue: number
+  refunds: number
+  net: number
   paymentCount: number
   refundCount: number
-  refundRate: number
+  refundShareOfEventsPercent: number
+}
+
+interface PaymentStats {
+  /** Every payment ever recorded, aggregated server side. */
+  allTime: PaymentTotals
+  /** How many documents fed the tables below. */
+  recentSampleSize: number
   recentPayments: PaymentRecord[]
   recentRefunds: PaymentRecord[]
   recentWebhooks: WebhookEvent[]
   voidedRewards: VoidedReward[]
+  provenance?: {
+    allTime: string
+    recent: string
+  }
 }
+
+/** One short line naming the scope and the source of the numbers above it. */
+function MetricProvenance({ scope, source }: { scope: string; source?: string }) {
+  return (
+    <p className="text-gray-500 text-xs">
+      {scope}
+      {source ? ` · ${source}` : ""}
+    </p>
+  )
+}
+
+const usd = (value: number) =>
+  value.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 })
 
 export default function PaymentsPage() {
   const { firebaseUser } = useAuth()
@@ -151,38 +175,50 @@ export default function PaymentsPage() {
         refreshing={refreshing}
       />
 
-      {/* Revenue Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard
-          title="Total Revenue"
-          value={`$${(data?.totalRevenue || 0).toFixed(2)}`}
-          subtitle={`${data?.paymentCount || 0} payments`}
-          icon={DollarSign}
-          valueColor="text-green-400"
-          iconColor="text-green-400"
+      {/* All-time money. Aggregated across the whole collection, not summed from the tables below. */}
+      <div>
+        <h2 className="text-xl font-bold text-white mb-1">All time</h2>
+        <MetricProvenance
+          scope="Every payment ever recorded"
+          source={data?.provenance?.allTime}
         />
-        <MetricCard
-          title="Total Refunds"
-          value={`$${(data?.totalRefunds || 0).toFixed(2)}`}
-          subtitle={`${data?.refundCount || 0} refunds`}
-          icon={TrendingDown}
-          valueColor="text-red-400"
-          iconColor="text-red-400"
-        />
-        <MetricCard
-          title="Net Revenue"
-          value={`$${(data?.netRevenue || 0).toFixed(2)}`}
-          subtitle="Revenue - Refunds"
-          icon={CreditCard}
-          valueColor="text-[#c4703f]"
-        />
-        <MetricCard
-          title="Refund Rate"
-          value={`${(data?.refundRate || 0).toFixed(1)}%`}
-          subtitle="Refunds / Payments"
-          icon={Activity}
-          valueColor={data?.refundRate && data.refundRate > 5 ? "text-red-400" : "text-green-400"}
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-3">
+          <MetricCard
+            title="Total Revenue"
+            value={usd(data?.allTime.revenue || 0)}
+            subtitle={`${(data?.allTime.paymentCount || 0).toLocaleString()} payments`}
+            icon={DollarSign}
+            valueColor="text-green-400"
+            iconColor="text-green-400"
+          />
+          <MetricCard
+            title="Total Refunds"
+            value={usd(data?.allTime.refunds || 0)}
+            subtitle={`${(data?.allTime.refundCount || 0).toLocaleString()} refunds`}
+            icon={TrendingDown}
+            valueColor="text-red-400"
+            iconColor="text-red-400"
+          />
+          <MetricCard
+            title="Net Revenue"
+            value={usd(data?.allTime.net || 0)}
+            subtitle="Revenue less refunds"
+            icon={CreditCard}
+            valueColor="text-[#c4703f]"
+          />
+          <MetricCard
+            title="Refund Share"
+            value={`${(data?.allTime.refundShareOfEventsPercent || 0).toFixed(1)}%`}
+            subtitle="Of all payment events"
+            icon={Activity}
+            valueColor={
+              data?.allTime.refundShareOfEventsPercent &&
+              data.allTime.refundShareOfEventsPercent > 5
+                ? "text-red-400"
+                : "text-green-400"
+            }
+          />
+        </div>
       </div>
 
       {/* Recent Payments */}
@@ -193,7 +229,8 @@ export default function PaymentsPage() {
             Recent Payments
           </CardTitle>
           <CardDescription className={typography.cardDescription}>
-            Successful payments from Stripe
+            Successful payments within the {data?.recentSampleSize ?? 0} most recent records. A
+            sample, not a total.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -247,7 +284,8 @@ export default function PaymentsPage() {
             Recent Refunds
           </CardTitle>
           <CardDescription className={typography.cardDescription}>
-            Refunds processed through Stripe
+            Refunds within the {data?.recentSampleSize ?? 0} most recent records. A sample, not a
+            total.
           </CardDescription>
         </CardHeader>
         <CardContent>

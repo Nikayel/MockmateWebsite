@@ -2,9 +2,20 @@
  * Admin Payments API
  *
  * Endpoints for monitoring payments, refunds, and webhook activity.
+ *
+ * Two scopes live here and the response keeps them apart. The totals are
+ * aggregated across the whole `payment_history` collection; the tables show the
+ * most recent records. They used to be the same thing: the route fetched 100
+ * documents for its tables, summed those, and labelled the result "Total
+ * Revenue", so the headline stopped growing once the hundred-and-first payment
+ * arrived.
+ *
+ * `payment_history.amount` is in CENTS. `referral_rewards.amount` is in DOLLARS
+ * (or in whole months for a credit). Only the first is converted below.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { AggregateField } from 'firebase-admin/firestore'
 import { adminDb } from '@/lib/firebase-admin'
 import {
   requirePermission,
@@ -12,6 +23,10 @@ import {
   unauthorizedResponse,
 } from '@/lib/admin/middleware'
 import { PERMISSIONS } from '@/lib/admin/rbac'
+import {
+  centsToDollars,
+  summarizePaymentAggregates,
+} from '@/lib/admin/revenue-metrics'
 
 interface PaymentRecord {
   id: string
@@ -44,18 +59,34 @@ interface VoidedReward {
   processedAt: string
 }
 
-interface PaymentStats {
-  totalRevenue: number
-  totalRefunds: number
-  netRevenue: number
+/** All-time money, aggregated across the whole collection. Dollars. */
+interface PaymentTotals {
+  revenue: number
+  refunds: number
+  net: number
   paymentCount: number
   refundCount: number
-  refundRate: number
+  /** Share of payment events that were refunds, 0-100. Cannot exceed 100. */
+  refundShareOfEventsPercent: number
+}
+
+interface PaymentStats {
+  /** Every payment ever recorded. Not the sample in the tables below. */
+  allTime: PaymentTotals
+  /** How many documents fed the recent-activity tables. */
+  recentSampleSize: number
   recentPayments: PaymentRecord[]
   recentRefunds: PaymentRecord[]
   recentWebhooks: WebhookEvent[]
   voidedRewards: VoidedReward[]
+  provenance: {
+    allTime: string
+    recent: string
+  }
 }
+
+/** How many recent documents the activity tables sample. */
+const RECENT_PAYMENT_SAMPLE = 100
 
 /**
  * GET /api/admin/payments
@@ -69,25 +100,63 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // All-time totals, computed by Firestore across every document rather than
+    // by summing the page fetched below. Two aggregation queries cost the same
+    // whether the collection holds a hundred payments or a million.
+    const [succeededAggregate, refundedAggregate] = await Promise.all([
+      adminDb
+        .collection('payment_history')
+        .where('status', '==', 'succeeded')
+        .aggregate({
+          total: AggregateField.sum('amount'),
+          count: AggregateField.count(),
+        })
+        .get(),
+      adminDb
+        .collection('payment_history')
+        .where('status', '==', 'refunded')
+        .aggregate({
+          total: AggregateField.sum('amount'),
+          count: AggregateField.count(),
+        })
+        .get(),
+    ])
+
+    const totals = summarizePaymentAggregates({
+      succeededTotalCents: succeededAggregate.data().total ?? 0,
+      succeededCount: succeededAggregate.data().count ?? 0,
+      refundedTotalCents: refundedAggregate.data().total ?? 0,
+      refundedCount: refundedAggregate.data().count ?? 0,
+    })
+
     const stats: PaymentStats = {
-      totalRevenue: 0,
-      totalRefunds: 0,
-      netRevenue: 0,
-      paymentCount: 0,
-      refundCount: 0,
-      refundRate: 0,
+      allTime: {
+        revenue: centsToDollars(totals.collectedCents),
+        refunds: centsToDollars(totals.refundedCents),
+        net: centsToDollars(totals.netCents),
+        paymentCount: totals.succeededCount,
+        refundCount: totals.refundedCount,
+        refundShareOfEventsPercent: Math.round(totals.refundShareOfEventsPercent * 10) / 10,
+      },
+      recentSampleSize: 0,
       recentPayments: [],
       recentRefunds: [],
       recentWebhooks: [],
       voidedRewards: [],
+      provenance: {
+        allTime:
+          'Firestore aggregation over the whole payment_history collection, written by the Stripe webhook. Amounts stored in cents.',
+        recent: `The ${RECENT_PAYMENT_SAMPLE} most recent payment_history documents. A sample, not a total.`,
+      },
     }
 
-    // Get payment history
+    // The most recent records, for the activity tables only.
     const paymentsSnapshot = await adminDb
       .collection('payment_history')
       .orderBy('created_at', 'desc')
-      .limit(100)
+      .limit(RECENT_PAYMENT_SAMPLE)
       .get()
+    stats.recentSampleSize = paymentsSnapshot.size
 
     // Collect user IDs to fetch emails
     const userIds = new Set<string>()
@@ -103,17 +172,17 @@ export async function GET(request: NextRequest) {
     })
     await Promise.all(userPromises)
 
-    // Process payments
+    // Fill the activity tables. Nothing here contributes to a total.
     for (const doc of paymentsSnapshot.docs) {
       const data = doc.data()
-      const amount = data.amount || 0
+      const amount = typeof data.amount === 'number' ? data.amount : 0
 
       const payment: PaymentRecord = {
         id: doc.id,
         userId: data.user_id,
         userEmail: userEmails.get(data.user_id),
         type: data.type,
-        amount: amount / 100, // Convert cents to dollars
+        amount: centsToDollars(amount),
         currency: data.currency || 'usd',
         status: data.status,
         description: data.description,
@@ -121,14 +190,10 @@ export async function GET(request: NextRequest) {
       }
 
       if (data.status === 'succeeded' && amount > 0) {
-        stats.totalRevenue += amount / 100
-        stats.paymentCount++
         if (stats.recentPayments.length < 20) {
           stats.recentPayments.push(payment)
         }
       } else if (data.status === 'refunded' || amount < 0) {
-        stats.totalRefunds += Math.abs(amount) / 100
-        stats.refundCount++
         if (stats.recentRefunds.length < 20) {
           stats.recentRefunds.push({
             ...payment,
@@ -137,11 +202,6 @@ export async function GET(request: NextRequest) {
         }
       }
     }
-
-    stats.netRevenue = stats.totalRevenue - stats.totalRefunds
-    stats.refundRate = stats.paymentCount > 0
-      ? (stats.refundCount / stats.paymentCount) * 100
-      : 0
 
     // Get recent webhook events
     const webhooksSnapshot = await adminDb
@@ -197,6 +257,7 @@ export async function GET(request: NextRequest) {
         referredUserId: data.referredUserId,
         referredEmail: voidedUserEmails.get(data.referredUserId) || 'Unknown',
         type: data.type,
+        // Dollars for cash, whole months for a credit. Not cents; do not divide.
         amount: data.amount,
         voidedReason: data.voidedReason || 'Unknown',
         processedAt: data.processedAt?.toDate?.()?.toISOString() || '',
