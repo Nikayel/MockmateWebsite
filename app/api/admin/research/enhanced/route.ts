@@ -8,7 +8,8 @@
  * - Prediction accuracy metrics
  * - Calibration data
  * - Trend analysis
- * - Research quality score
+ * - Readiness figures: users per arm, required sample, power, sample ratio
+ *   check, and how many declared metrics ran. No composite quality score.
  *
  * Requires admin authentication
  */
