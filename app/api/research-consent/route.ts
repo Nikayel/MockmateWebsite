@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { withAuth } from "@/lib/auth-helpers"
+import { logger } from "@/lib/logger"
 import {
   RESEARCH_CONSENT_VERSION,
   getResearchConsent,
@@ -40,7 +41,22 @@ export const PUT = withAuth(async ({ userId, request }) => {
   try {
     const consent = await setResearchConsent(userId, parsed.data.consented)
     return NextResponse.json({ consent })
-  } catch {
+  } catch (error) {
+    // This is a consent record, so the failure has consequences beyond a broken button. If the user
+    // was withdrawing, the platform keeps treating them as a participant. If they were opting in,
+    // their data is excluded from research they agreed to join. Either way the UI shows a generic
+    // "Failed to save your choice", the user retries or gives up, and the only two states that
+    // matter legally - what they chose, and what we recorded - are now out of sync with nothing
+    // written down anywhere.
+    //
+    // The response body stays generic on purpose. The log carries the detail.
+    logger.error("Research consent decision was not recorded", {
+      endpoint: "PUT /api/research-consent",
+      userId,
+      consented: parsed.data.consented,
+      version: RESEARCH_CONSENT_VERSION,
+      error,
+    })
     return NextResponse.json({ error: "Failed to save your choice" }, { status: 500 })
   }
 })
