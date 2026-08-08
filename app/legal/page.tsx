@@ -157,8 +157,8 @@ export default function LegalPage() {
                   <ul className="list-inside list-disc space-y-1 text-sm">
                     <li>
                       Microphone audio captured while you hold or toggle the record control. Your
-                      browser asks for microphone permission first, and nothing is captured until
-                      you grant it and start a recording.
+                      browser asks for microphone permission first, and nothing is captured until you
+                      grant it and start a recording.
                     </li>
                     <li>
                       Audio is streamed live to Deepgram over an encrypted connection for real-time
@@ -167,8 +167,8 @@ export default function LegalPage() {
                     </li>
                     <li>
                       The resulting text transcript becomes an ordinary message in your interview
-                      conversation. It is stored with that session, sent to our AI providers like
-                      any typed message, and follows the interview session retention period below.
+                      conversation. It is stored with that session, sent to our AI providers like any
+                      typed message, and follows the interview session retention period below.
                     </li>
                     <li>
                       Voice mode is entirely optional. If you never enable it, no audio ever leaves
