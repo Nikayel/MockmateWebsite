@@ -1,16 +1,29 @@
 /**
- * Rate Limiting Metrics Tracking
+ * Rate Limiting Metrics Reporting
  *
- * Tracks rate limit events for monitoring and abuse detection.
- * - Tracks blocked requests by endpoint
- * - Identifies repeat offenders
- * - Provides visibility into API abuse patterns
+ * Reads `rate_limit_aggregates`, `rate_limit_events` and `rate_limit_offenders`
+ * and turns them into the abuse view on the admin pages.
+ *
+ * NOTHING CURRENTLY WRITES THOSE COLLECTIONS. This module used to export
+ * `trackRateLimitEvent`, meant to be called from the limiter in lib/rate-limit,
+ * and the limiter never called it. The result was an abuse dashboard that
+ * reported a 0.00% block rate, zero offenders and no DDoS indicator no matter
+ * what was happening, which is indistinguishable from a platform under no
+ * attack at all.
+ *
+ * The writer is gone rather than left uncalled. Re-instrumenting means calling
+ * into these collections from the limiter itself, and it is worth pricing first:
+ * the original writer ran two Firestore transactions per request, which is a
+ * real cost on the hot path and probably wants sampling or a counter store.
  */
 
 import { adminDb } from './firebase-admin'
-import { FieldValue } from 'firebase-admin/firestore'
 import { logger } from './logger'
 
+/**
+ * Shape of a `rate_limit_events` document. Kept as the contract any future
+ * instrumentation has to write, not because anything writes it today.
+ */
 export interface RateLimitEvent {
   id?: string
   identifier: string // IP address or user ID
@@ -53,99 +66,11 @@ export interface RateLimitMetrics {
 }
 
 /**
- * Track a rate limit check (both allowed and blocked)
- */
-export async function trackRateLimitEvent(event: Omit<RateLimitEvent, 'id' | 'timestamp'>): Promise<void> {
-  try {
-    // Only store blocked events to save space
-    // For allowed requests, just increment counters
-    if (event.blocked) {
-      await adminDb.collection('rate_limit_events').add({
-        ...event,
-        timestamp: FieldValue.serverTimestamp(),
-      })
-    }
-
-    // Update aggregate counters
-    const now = new Date()
-    const hourKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}`
-
-    const aggregateRef = adminDb.collection('rate_limit_aggregates').doc(hourKey)
-
-    await adminDb.runTransaction(async (transaction) => {
-      const doc = await transaction.get(aggregateRef)
-
-      if (!doc.exists) {
-        transaction.set(aggregateRef, {
-          hour: hourKey,
-          total: 1,
-          blocked: event.blocked ? 1 : 0,
-          byEndpoint: {
-            [event.endpoint]: {
-              total: 1,
-              blocked: event.blocked ? 1 : 0,
-            },
-          },
-          uniqueIdentifiers: [event.identifier],
-          createdAt: FieldValue.serverTimestamp(),
-        })
-      } else {
-        const data = doc.data()!
-        const byEndpoint = data.byEndpoint || {}
-
-        if (!byEndpoint[event.endpoint]) {
-          byEndpoint[event.endpoint] = { total: 0, blocked: 0 }
-        }
-        byEndpoint[event.endpoint].total++
-        if (event.blocked) byEndpoint[event.endpoint].blocked++
-
-        const identifiers = new Set(data.uniqueIdentifiers || [])
-        identifiers.add(event.identifier)
-
-        transaction.update(aggregateRef, {
-          total: FieldValue.increment(1),
-          blocked: FieldValue.increment(event.blocked ? 1 : 0),
-          byEndpoint,
-          uniqueIdentifiers: Array.from(identifiers),
-        })
-      }
-    })
-
-    // Track repeat offenders
-    if (event.blocked) {
-      const offenderRef = adminDb.collection('rate_limit_offenders').doc(event.identifier.replace(/[\/\.]/g, '_'))
-
-      await adminDb.runTransaction(async (transaction) => {
-        const doc = await transaction.get(offenderRef)
-
-        if (!doc.exists) {
-          transaction.set(offenderRef, {
-            identifier: event.identifier,
-            blockedCount: 1,
-            firstBlocked: FieldValue.serverTimestamp(),
-            lastBlocked: FieldValue.serverTimestamp(),
-            endpoints: [event.endpoint],
-          })
-        } else {
-          const endpoints = new Set(doc.data()?.endpoints || [])
-          endpoints.add(event.endpoint)
-
-          transaction.update(offenderRef, {
-            blockedCount: FieldValue.increment(1),
-            lastBlocked: FieldValue.serverTimestamp(),
-            endpoints: Array.from(endpoints),
-          })
-        }
-      })
-    }
-  } catch (error) {
-    // Don't let metrics tracking break the app
-    logger.error('Failed to track rate limit event', { error, endpoint: event.endpoint })
-  }
-}
-
-/**
- * Get rate limit metrics for admin dashboard
+ * Get rate limit metrics for the admin dashboard.
+ *
+ * Reports zeros until something writes the underlying collections. See the file
+ * header: the writer that was supposed to fill them had no call sites and has
+ * been removed.
  */
 export async function getRateLimitMetrics(hours: number = 24): Promise<RateLimitMetrics> {
   const metrics: RateLimitMetrics = {
@@ -164,9 +89,6 @@ export async function getRateLimitMetrics(hours: number = 24): Promise<RateLimit
   }
 
   try {
-    const now = new Date()
-    const cutoffTime = new Date(now.getTime() - hours * 60 * 60 * 1000)
-
     // Get hourly aggregates
     const aggregatesSnapshot = await adminDb
       .collection('rate_limit_aggregates')
