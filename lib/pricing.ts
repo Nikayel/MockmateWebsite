@@ -207,25 +207,16 @@ export interface AIProviderRate {
    * thinking tokens too: they bill as output but produce no visible text.
    */
   outputPer1M: number
-  /**
-   * USD per 1M input tokens served from the vendor's prompt cache, when the
-   * vendor prices cache hits separately. Omitted means "no separate cache rate
-   * established" and cached input bills at the full input rate.
-   */
-  cachedInputPer1M?: number
 }
 
 /**
- * DeepSeek prices a prompt-cache hit at roughly 1/50th of the miss rate (see
- * lib/ai/model-ids.ts). That matters here because the interview system prompt is
- * stable across every turn of a session, so most input tokens after the first
- * turn are cache hits.
- *
- * UNVERIFIED: derived from the "~1/50th" ratio documented in the repo, not from
- * a vendor price sheet. Needs human confirmation.
+ * A `cachedInputPer1M` rate (DeepSeek prices a prompt-cache hit at roughly
+ * 1/50th of a miss) used to sit on the type above and on the two DeepSeek rows,
+ * and getProviderCostInfo() published it to the admin cost tables. Nothing ever
+ * applied it, so a table that names a cache rate stated a discount the platform
+ * does not receive. It is removed along with the calculateAICost option that was
+ * its only consumer; that function's docstring records how to restore both.
  */
-const DEEPSEEK_CACHE_HIT_DIVISOR = 50
-
 export const AI_PROVIDER_RATES = {
   // --- GPT-5.6 Luna, one key per reasoning effort ---
   // The RATE is identical across all four: effort changes how many output tokens
@@ -249,16 +240,8 @@ export const AI_PROVIDER_RATES = {
   gemini: { inputPer1M: 1.5, outputPer1M: 7.5 }, // Gemini 3.6 Flash
   "gemini-lite": { inputPer1M: 0.3, outputPer1M: 2.5 }, // Gemini 3.5 Flash-Lite
   // --- DeepSeek V4 ---
-  deepseek: {
-    inputPer1M: 0.435,
-    outputPer1M: 0.87,
-    cachedInputPer1M: 0.435 / DEEPSEEK_CACHE_HIT_DIVISOR,
-  }, // V4 Pro
-  "deepseek-chat": {
-    inputPer1M: 0.14,
-    outputPer1M: 0.28,
-    cachedInputPer1M: 0.14 / DEEPSEEK_CACHE_HIT_DIVISOR,
-  }, // V4 Flash
+  deepseek: { inputPer1M: 0.435, outputPer1M: 0.87 }, // V4 Pro
+  "deepseek-chat": { inputPer1M: 0.14, outputPer1M: 0.28 }, // V4 Flash
   // --- Configured but not routed to by FALLBACK_ORDER ---
   // Priced from the model actually pinned in lib/ai-providers.ts
   // (claude-haiku-4-5-20251001, documented there as $1 in / $5 out per 1M).
@@ -398,7 +381,6 @@ export function getProviderCostInfo(): Array<{
   costPer1kTokens: number
   inputPer1kTokens: number
   outputPer1kTokens: number
-  cachedInputPer1kTokens?: number
   displayName: string
 }> {
   return (Object.keys(AI_PROVIDER_RATES) as AIProvider[]).map((provider) => {
@@ -408,9 +390,6 @@ export function getProviderCostInfo(): Array<{
       costPer1kTokens: AI_PROVIDER_COSTS[provider],
       inputPer1kTokens: roundRate(rate.inputPer1M / 1000),
       outputPer1kTokens: roundRate(rate.outputPer1M / 1000),
-      ...(rate.cachedInputPer1M !== undefined
-        ? { cachedInputPer1kTokens: roundRate(rate.cachedInputPer1M / 1000) }
-        : {}),
       displayName: PROVIDER_DISPLAY_NAMES[provider] ?? provider,
     }
   })
