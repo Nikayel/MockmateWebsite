@@ -214,6 +214,13 @@ async function buildOverview() {
 
 /** One user's spend, budget standing and recent sessions. */
 async function buildUserDetail(userId: string) {
+  // Without this, a missing Admin SDK surfaces as "cannot read collection of
+  // undefined" and a 500 labelled "Failed to fetch usage data", which sends
+  // whoever is on call looking at the usage query rather than at the boot.
+  if (!adminDb) {
+    throw new Error("Firebase Admin SDK not initialized")
+  }
+
   const summary = await getUserUsageSummary(userId)
   if (!summary) return null
 
