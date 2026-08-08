@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { apiRateLimit } from "@/lib/rate-limit"
 import { grantDeepgramAccessToken } from "@/lib/voice/deepgram-auth"
+import { getFlagAsync } from "@/lib/feature-flags"
 import { logger } from "@/lib/logger"
 
 export async function GET(request: NextRequest) {
@@ -19,6 +20,19 @@ export async function GET(request: NextRequest) {
   const authResult = await verifyAuth(request)
   if (!authResult.authenticated || !authResult.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  // Kill switch, flippable from /admin/feature-flags without a deploy. Checked
+  // after auth so an anonymous caller still gets 401 rather than learning the
+  // platform's operational state. The awaited form is deliberate: a kill switch
+  // read from a possibly-cold cache is the one case where the extra round trip
+  // on a cold instance is worth paying for.
+  if (await getFlagAsync("DISABLE_VOICE_MODE", authResult.userId)) {
+    logger.info("[Voice Token] Refused: DISABLE_VOICE_MODE is on")
+    return NextResponse.json(
+      { error: "Voice transcription is currently disabled" },
+      { status: 503 }
+    )
   }
 
   const accountKey = process.env.DEEPGRAM_API_KEY
