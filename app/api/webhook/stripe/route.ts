@@ -159,6 +159,62 @@ async function recordWebhookFailure(
 }
 
 /**
+ * Resolve the CodeSparring user behind a Stripe customer id, for the entitlement-REVOKING handlers
+ * (refund, dispute, uncollectible).
+ *
+ * Those handlers used to query `profiles.where(stripe_customer_id == customerId)` and do nothing at
+ * all when it came back empty — a refunded or charged-back user silently kept Pro, with no error and
+ * no dead-letter row. The profile field is not a dependable link either: it is only written when a
+ * customer id happens to be known at checkout or webhook time, and the yearly one-time path logs a
+ * CRITICAL when it finishes without one.
+ *
+ * So when the profile query misses we ask Stripe for the customer and read `metadata.userId`, which
+ * both /api/create-checkout and this webhook stamp on every customer they create. A hit there also
+ * backfills `stripe_customer_id`, so the cheap query works for every later event about this customer.
+ *
+ * Returns null when the user genuinely cannot be identified; callers MUST treat that as an error.
+ */
+async function resolveProfileByStripeCustomer(
+  customerId: string
+): Promise<{ userId: string; profile: FirebaseFirestore.DocumentData | undefined } | null> {
+  const profilesQuery = await adminDb
+    .collection("profiles")
+    .where("stripe_customer_id", "==", customerId)
+    .limit(1)
+    .get()
+
+  if (!profilesQuery.empty) {
+    const profileDoc = profilesQuery.docs[0]
+    return { userId: profileDoc.id, profile: profileDoc.data() }
+  }
+
+  try {
+    const customer = await stripe.customers.retrieve(customerId)
+    const userId = customer.deleted ? undefined : customer.metadata?.userId
+    if (!userId) return null
+
+    const profileSnap = await adminDb.collection("profiles").doc(userId).get()
+    if (!profileSnap.exists) return null
+
+    paymentLogger.warn("Profile had no stripe_customer_id — recovered via customer metadata", {
+      userId,
+      customerId,
+    })
+    await profileSnap.ref.set(
+      { stripe_customer_id: customerId, updated_at: new Date().toISOString() },
+      { merge: true }
+    )
+    return { userId, profile: profileSnap.data() }
+  } catch (lookupError) {
+    paymentLogger.error("Failed to resolve user from Stripe customer metadata", {
+      customerId,
+      error: lookupError,
+    })
+    return null
+  }
+}
+
+/**
  * Release the idempotency marker so Stripe's automatic retry RE-RUNS a failed event, instead of the
  * pre-written marker making the retry skip and silently dropping the entitlement update. Safe to pair
  * with retries because the entitlement mutations are idempotent (fixed-value tier writes, keyed
@@ -1001,67 +1057,89 @@ export async function POST(request: NextRequest) {
 
     try {
       const customerId = charge.customer as string
-      if (customerId) {
-        const profilesQuery = await adminDb
-          .collection("profiles")
-          .where("stripe_customer_id", "==", customerId)
-          .limit(1)
-          .get()
+      const resolved = customerId ? await resolveProfileByStripeCustomer(customerId) : null
 
-        if (!profilesQuery.empty) {
-          const profileDoc = profilesQuery.docs[0]
-          const userId = profileDoc.id
+      if (!resolved) {
+        // Entitlement-revoking and unresolvable: never pass silently, or a refunded user keeps Pro.
+        await recordWebhookFailure(
+          event,
+          "charge.refunded:unresolved-user",
+          new Error(`Refunded charge ${charge.id} has no resolvable user (customer ${customerId})`)
+        )
+      } else {
+        const { userId, profile: refundProfile } = resolved
 
-          // Record refund in payment history
-          await recordPaymentHistory(userId, {
-            type: "subscription",
-            amount: -(charge.amount_refunded || 0),
-            currency: charge.currency || "usd",
-            status: "refunded",
-            stripe_payment_intent_id: charge.payment_intent as string,
-            description: charge.refunded ? "Full refund" : "Partial refund",
+        // Record refund in payment history
+        await recordPaymentHistory(userId, {
+          type: "subscription",
+          amount: -(charge.amount_refunded || 0),
+          currency: charge.currency || "usd",
+          status: "refunded",
+          stripe_payment_intent_id: charge.payment_intent as string,
+          description: charge.refunded ? "Full refund" : "Partial refund",
+        })
+
+        // REFERRAL CLAWBACK: Void pending referral rewards
+        // Two scenarios:
+        // 1. User was referred - void rewards their referrer would get (voidReferralRewards)
+        // 2. User referred others - void their pending conversion rewards (voidReferrerConversionRewards)
+        try {
+          const refundReason = `Refund processed: ${charge.refunded ? "full" : "partial"} refund`
+
+          // Void rewards where this user is the referred user (their referrer loses rewards)
+          await voidReferralRewards(userId, refundReason)
+
+          // Void conversion rewards where this user is the referrer
+          // This handles case where a Pro user who referred others refunds their subscription
+          await voidReferrerConversionRewards(userId, refundReason)
+
+          paymentLogger.info("Voided referral rewards due to refund", { userId })
+        } catch (clawbackError) {
+          paymentLogger.error("Failed to void referral rewards", { userId, error: clawbackError })
+          // Don't fail the webhook - clawback is non-critical
+        }
+
+        // If fully refunded, downgrade user
+        if (charge.refunded) {
+          await adminDb.collection("profiles").doc(userId).set(
+            {
+              subscription_tier: "free",
+              subscription_status: "refunded",
+              updated_at: new Date().toISOString(),
+            },
+            { merge: true }
+          )
+
+          await updateQuotaForSubscriptionTierAdmin(userId, "free", {
+            resetUsage: false,
+            profileData: {
+              created_at: refundProfile?.created_at,
+              subscription_type: refundProfile?.subscription_type,
+            },
           })
+          paymentLogger.info("User downgraded due to full refund", { userId })
 
-          // REFERRAL CLAWBACK: Void pending referral rewards
-          // Two scenarios:
-          // 1. User was referred - void rewards their referrer would get (voidReferralRewards)
-          // 2. User referred others - void their pending conversion rewards (voidReferrerConversionRewards)
-          try {
-            const refundReason = `Refund processed: ${charge.refunded ? "full" : "partial"} refund`
-
-            // Void rewards where this user is the referred user (their referrer loses rewards)
-            await voidReferralRewards(userId, refundReason)
-
-            // Void conversion rewards where this user is the referrer
-            // This handles case where a Pro user who referred others refunds their subscription
-            await voidReferrerConversionRewards(userId, refundReason)
-
-            paymentLogger.info("Voided referral rewards due to refund", { userId })
-          } catch (clawbackError) {
-            paymentLogger.error("Failed to void referral rewards", { userId, error: clawbackError })
-            // Don't fail the webhook - clawback is non-critical
-          }
-
-          // If fully refunded, downgrade user
-          if (charge.refunded) {
-            await adminDb.collection("profiles").doc(userId).set(
-              {
-                subscription_tier: "free",
-                subscription_status: "refunded",
-                updated_at: new Date().toISOString(),
-              },
-              { merge: true }
-            )
-
-            const refundProfile = profileDoc.data()
-            await updateQuotaForSubscriptionTierAdmin(userId, "free", {
-              resetUsage: false,
-              profileData: {
-                created_at: refundProfile?.created_at,
-                subscription_type: refundProfile?.subscription_type,
-              },
-            })
-            paymentLogger.info("User downgraded due to full refund", { userId })
+          // Downgrading the tier does NOT stop the money. A refunded MONTHLY subscriber still has a
+          // live Stripe subscription and gets charged again next cycle — refund, lose access, keep
+          // paying. Cancel it. Yearly is a one-time payment and has no subscription to cancel.
+          const subscriptionId = refundProfile?.stripe_subscription_id as string | undefined
+          if (subscriptionId) {
+            try {
+              await stripe.subscriptions.cancel(subscriptionId)
+              paymentLogger.warn("Canceled subscription after full refund", {
+                userId,
+                subscriptionId,
+              })
+            } catch (cancelError) {
+              // Already-canceled subscriptions throw here, which is fine and expected on a retry.
+              // Anything else must be visible: the customer would keep being billed.
+              paymentLogger.error("Failed to cancel subscription after full refund", {
+                userId,
+                subscriptionId,
+                error: cancelError,
+              })
+              await recordWebhookFailure(event, "charge.refunded:cancel", cancelError)
+            }
           }
         }
       }
@@ -1483,56 +1561,55 @@ export async function POST(request: NextRequest) {
           : dispute.charge
 
       const customerId = typeof charge === "object" ? (charge.customer as string) : null
-      if (customerId) {
-        const profilesQuery = await adminDb
-          .collection("profiles")
-          .where("stripe_customer_id", "==", customerId)
-          .limit(1)
-          .get()
+      const resolved = customerId ? await resolveProfileByStripeCustomer(customerId) : null
 
-        if (!profilesQuery.empty) {
-          const profileDoc = profilesQuery.docs[0]
-          const userId = profileDoc.id
+      if (!resolved) {
+        // A chargeback we cannot attribute means the disputing user keeps Pro. Make it visible.
+        await recordWebhookFailure(
+          event,
+          "charge.dispute.created:unresolved-user",
+          new Error(`Dispute ${dispute.id} has no resolvable user (customer ${customerId})`)
+        )
+      } else {
+        const { userId, profile } = resolved
 
-          // Downgrade to free tier on dispute
-          await adminDb.collection("profiles").doc(userId).set(
-            {
-              subscription_tier: "free",
-              subscription_status: "disputed",
-              dispute_id: dispute.id,
-              dispute_reason: dispute.reason,
-              dispute_created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            { merge: true }
-          )
+        // Downgrade to free tier on dispute
+        await adminDb.collection("profiles").doc(userId).set(
+          {
+            subscription_tier: "free",
+            subscription_status: "disputed",
+            dispute_id: dispute.id,
+            dispute_reason: dispute.reason,
+            dispute_created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          { merge: true }
+        )
 
-          const profile = profileDoc.data()
-          await updateQuotaForSubscriptionTierAdmin(userId, "free", {
-            resetUsage: false,
-            profileData: {
-              created_at: profile?.created_at,
-              subscription_type: profile?.subscription_type,
-            },
-          })
+        await updateQuotaForSubscriptionTierAdmin(userId, "free", {
+          resetUsage: false,
+          profileData: {
+            created_at: profile?.created_at,
+            subscription_type: profile?.subscription_type,
+          },
+        })
 
-          // Void referral rewards (same as refund)
-          try {
-            await voidReferralRewards(userId, `Dispute/chargeback: ${dispute.reason}`)
-            await voidReferrerConversionRewards(userId, `Dispute/chargeback: ${dispute.reason}`)
-          } catch (clawbackError) {
-            paymentLogger.error("Failed to void referral rewards on dispute", {
-              userId,
-              error: clawbackError,
-            })
-          }
-
-          paymentLogger.warn("User downgraded due to chargeback dispute", {
+        // Void referral rewards (same as refund)
+        try {
+          await voidReferralRewards(userId, `Dispute/chargeback: ${dispute.reason}`)
+          await voidReferrerConversionRewards(userId, `Dispute/chargeback: ${dispute.reason}`)
+        } catch (clawbackError) {
+          paymentLogger.error("Failed to void referral rewards on dispute", {
             userId,
-            disputeId: dispute.id,
-            reason: dispute.reason,
+            error: clawbackError,
           })
         }
+
+        paymentLogger.warn("User downgraded due to chargeback dispute", {
+          userId,
+          disputeId: dispute.id,
+          reason: dispute.reason,
+        })
       }
     } catch (error) {
       paymentLogger.error("Error handling charge dispute", { error })
@@ -1554,37 +1631,36 @@ export async function POST(request: NextRequest) {
 
     try {
       const customerId = invoice.customer as string
-      if (customerId) {
-        const profilesQuery = await adminDb
-          .collection("profiles")
-          .where("stripe_customer_id", "==", customerId)
-          .limit(1)
-          .get()
+      const resolved = customerId ? await resolveProfileByStripeCustomer(customerId) : null
 
-        if (!profilesQuery.empty) {
-          const profileDoc = profilesQuery.docs[0]
-          const userId = profileDoc.id
+      if (!resolved) {
+        // Unpaid and unattributable means the user keeps Pro for free. Make it visible.
+        await recordWebhookFailure(
+          event,
+          "invoice.marked_uncollectible:unresolved-user",
+          new Error(`Uncollectible invoice ${invoice.id} has no resolvable user (${customerId})`)
+        )
+      } else {
+        const { userId, profile } = resolved
 
-          await adminDb.collection("profiles").doc(userId).set(
-            {
-              subscription_tier: "free",
-              subscription_status: "uncollectible",
-              updated_at: new Date().toISOString(),
-            },
-            { merge: true }
-          )
+        await adminDb.collection("profiles").doc(userId).set(
+          {
+            subscription_tier: "free",
+            subscription_status: "uncollectible",
+            updated_at: new Date().toISOString(),
+          },
+          { merge: true }
+        )
 
-          const profile = profileDoc.data()
-          await updateQuotaForSubscriptionTierAdmin(userId, "free", {
-            resetUsage: false,
-            profileData: {
-              created_at: profile?.created_at,
-              subscription_type: profile?.subscription_type,
-            },
-          })
+        await updateQuotaForSubscriptionTierAdmin(userId, "free", {
+          resetUsage: false,
+          profileData: {
+            created_at: profile?.created_at,
+            subscription_type: profile?.subscription_type,
+          },
+        })
 
-          paymentLogger.warn("User downgraded due to uncollectible invoice", { userId })
-        }
+        paymentLogger.warn("User downgraded due to uncollectible invoice", { userId })
       }
     } catch (error) {
       paymentLogger.error("Error handling uncollectible invoice", { error })
