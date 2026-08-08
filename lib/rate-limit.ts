@@ -478,51 +478,93 @@ function getClientIdentifier(request: NextRequest): string {
 }
 
 /**
+ * Resolve the identity to charge a request against: the VERIFIED Firebase uid when the caller is
+ * signed in, otherwise the client IP.
+ *
+ * WHY: an IP is a terrible identity for a signed-in action. On a NAT'd campus or café network every
+ * visitor shares one, so one person's usage spends everyone else's budget. Keying on the uid gives
+ * each account its own bucket, which is what the limit was always meant to express.
+ *
+ * The token is verified, never merely parsed — an unverified `sub` claim would let anyone mint a
+ * fresh bucket per request. Verification failures fall back to the IP rather than throwing, so a
+ * malformed or expired token cannot slip past the limiter (the route's own auth check rejects it a
+ * moment later anyway). firebase-admin is imported lazily to keep this module usable from runtimes
+ * that never take this path, matching FirestoreRateLimitStore above.
+ */
+async function resolveRateLimitIdentifier(request: NextRequest): Promise<string> {
+  const authHeader =
+    request.headers.get("authorization") || request.headers.get("Authorization") || ""
+
+  if (authHeader.startsWith("Bearer ")) {
+    const idToken = authHeader.slice("Bearer ".length).trim()
+    if (idToken) {
+      try {
+        const { adminAuth } = await import("./firebase-admin")
+        const decoded = await adminAuth.verifyIdToken(idToken)
+        if (decoded?.uid) return `user:${decoded.uid}`
+      } catch {
+        // Fall through to the IP bucket.
+      }
+    }
+  }
+
+  return `ip:${getClientIdentifier(request)}`
+}
+
+/**
+ * Apply one rate-limit bucket to a request. Shared by every limiter in this file so the 429 shape,
+ * headers and fail-open behavior stay identical no matter how the identity was derived.
+ */
+async function enforceRateLimit(
+  config: RateLimitConfig,
+  identifier: string
+): Promise<NextResponse | null> {
+  const prefix = config.prefix || "rl"
+  const key = `${prefix}:${identifier}`
+  const store = getStore()
+
+  try {
+    const result = await store.increment(key, config)
+
+    if (!result.allowed) {
+      logger.warn("Rate limit exceeded", {
+        key,
+        identifier,
+        retryAfter: result.retryAfter,
+      })
+
+      return NextResponse.json(
+        {
+          error: "Too many requests. Please try again later.",
+          retryAfter: result.retryAfter,
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": (result.retryAfter || 60).toString(),
+            "X-RateLimit-Limit": config.maxRequests.toString(),
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": result.resetTime.toString(),
+          },
+        }
+      )
+    }
+
+    return null // Allow request
+  } catch (error) {
+    logger.error("Rate limiting error, allowing request", { key, error })
+    // Fail open - don't block users if rate limiting fails
+    return null
+  }
+}
+
+/**
  * Rate limit middleware
  * Returns null if allowed, or NextResponse with 429 if rate limited
  */
 export function rateLimit(config: RateLimitConfig) {
-  const prefix = config.prefix || "rl"
-
-  return async (request: NextRequest): Promise<NextResponse | null> => {
-    const identifier = getClientIdentifier(request)
-    const key = `${prefix}:${identifier}`
-    const store = getStore()
-
-    try {
-      const result = await store.increment(key, config)
-
-      if (!result.allowed) {
-        logger.warn("Rate limit exceeded", {
-          key,
-          identifier,
-          retryAfter: result.retryAfter,
-        })
-
-        return NextResponse.json(
-          {
-            error: "Too many requests. Please try again later.",
-            retryAfter: result.retryAfter,
-          },
-          {
-            status: 429,
-            headers: {
-              "Retry-After": (result.retryAfter || 60).toString(),
-              "X-RateLimit-Limit": config.maxRequests.toString(),
-              "X-RateLimit-Remaining": "0",
-              "X-RateLimit-Reset": result.resetTime.toString(),
-            },
-          }
-        )
-      }
-
-      return null // Allow request
-    } catch (error) {
-      logger.error("Rate limiting error, allowing request", { key, error })
-      // Fail open - don't block users if rate limiting fails
-      return null
-    }
-  }
+  return async (request: NextRequest): Promise<NextResponse | null> =>
+    enforceRateLimit(config, getClientIdentifier(request))
 }
 
 /**
@@ -561,14 +603,80 @@ export const feedbackRateLimit = rateLimit({
   prefix: "rl:feedback",
 })
 
-// Extremely strict for sensitive operations like account deletion
-// 2 requests per hour to prevent abuse
-export const sensitiveOperationRateLimit = rateLimit({
-  interval: 60 * 60 * 1000, // 1 hour
+const ONE_HOUR_MS = 60 * 60 * 1000
+
+/**
+ * Account deletion: irreversible, and nobody legitimately does it twice in an hour.
+ * Deliberately left at the original strict limit.
+ */
+const ACCOUNT_DELETION_BUCKET: RateLimitConfig = {
+  interval: ONE_HOUR_MS,
   uniqueTokenPerInterval: 100,
   maxRequests: 2,
-  prefix: "rl:sensitive",
-})
+  prefix: "rl:account-deletion",
+}
+
+/**
+ * Starting checkout. Ten per hour still stops card-testing abuse, but leaves room for the ordinary
+ * mess of paying: a declined card, a second attempt with a promo code, a back button, a reload.
+ */
+const CHECKOUT_BUCKET: RateLimitConfig = {
+  interval: ONE_HOUR_MS,
+  uniqueTokenPerInterval: 500,
+  maxRequests: 10,
+  prefix: "rl:checkout",
+}
+
+/** Opening the Stripe billing portal is read-mostly and cheap; same allowance as checkout. */
+const CUSTOMER_PORTAL_BUCKET: RateLimitConfig = {
+  interval: ONE_HOUR_MS,
+  uniqueTokenPerInterval: 500,
+  maxRequests: 10,
+  prefix: "rl:customer-portal",
+}
+
+/**
+ * Per-route buckets for `sensitiveOperationRateLimit`. Anything not listed gets the strict
+ * account-deletion bucket, so a new caller fails toward the safer limit.
+ */
+const SENSITIVE_OPERATION_BUCKETS: ReadonlyArray<{ pathname: string; bucket: RateLimitConfig }> = [
+  { pathname: "/api/create-checkout", bucket: CHECKOUT_BUCKET },
+  { pathname: "/api/customer-portal", bucket: CUSTOMER_PORTAL_BUCKET },
+]
+
+function getRequestPathname(request: NextRequest): string {
+  try {
+    return new URL(request.url).pathname
+  } catch {
+    return ""
+  }
+}
+
+/**
+ * Rate limit for sensitive operations: account deletion, checkout, and the billing portal.
+ *
+ * Two things were wrong with the single `rl:sensitive` bucket this replaces.
+ *
+ * 1. All three routes shared ONE counter, so opening the billing portal twice used up the same
+ *    budget as starting a checkout. Each route now has its own bucket.
+ * 2. It allowed 2 requests per hour PER IP. Behind a NAT'd campus or café network — exactly where
+ *    this product is being sold — the third person all day could not pay, and got a 429 with no
+ *    explanation. Buckets are now keyed on the verified uid when the caller is signed in, so one
+ *    student cannot spend the lecture hall's budget; IP remains the fallback for anonymous callers.
+ *
+ * Account deletion keeps the strict 2/hour. Checkout and the portal move to 10/hour, which still
+ * blocks card-testing while surviving a declined card and a retry.
+ */
+export async function sensitiveOperationRateLimit(
+  request: NextRequest
+): Promise<NextResponse | null> {
+  const pathname = getRequestPathname(request)
+  const bucket =
+    SENSITIVE_OPERATION_BUCKETS.find((entry) => pathname.startsWith(entry.pathname))?.bucket ??
+    ACCOUNT_DELETION_BUCKET
+
+  return enforceRateLimit(bucket, await resolveRateLimitIdentifier(request))
+}
 
 /**
  * Guest session creations per hour per IP. Default 3 — strict, because guest
