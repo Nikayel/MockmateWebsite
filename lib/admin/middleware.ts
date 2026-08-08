@@ -14,6 +14,7 @@ import {
   type AdminRole,
   type Permission,
 } from "./rbac"
+import { clampInt } from "./query-params"
 
 export interface AdminContext {
   userId: string
@@ -187,8 +188,11 @@ export function withPermission<T>(
 /**
  * Parse common query parameters for admin APIs
  */
+const ADMIN_TIME_RANGES = ["7d", "30d", "90d", "all"] as const
+export type AdminTimeRange = (typeof ADMIN_TIME_RANGES)[number]
+
 export function parseAdminQueryParams(request: NextRequest): {
-  timeRange: "7d" | "30d" | "90d" | "all"
+  timeRange: AdminTimeRange
   startDate: Date | null
   endDate: Date
   page: number
@@ -196,9 +200,17 @@ export function parseAdminQueryParams(request: NextRequest): {
 } {
   const { searchParams } = new URL(request.url)
 
-  const timeRange = (searchParams.get("timeRange") || "7d") as "7d" | "30d" | "90d" | "all"
-  const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10))
-  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)))
+  // Validated rather than cast. A blind `as` let any string through, and since the
+  // switch below falls through to `startDate = null`, an unrecognised value selected
+  // the unbounded all-time scan. `?timeRange=lol` was the most expensive query in the
+  // admin, and it also poisoned the response cache under its own key.
+  const requested = searchParams.get("timeRange")
+  const timeRange: AdminTimeRange = ADMIN_TIME_RANGES.includes(requested as AdminTimeRange)
+    ? (requested as AdminTimeRange)
+    : "7d"
+
+  const page = clampInt(searchParams.get("page"), { min: 1, max: 10_000, fallback: 1 })
+  const limit = clampInt(searchParams.get("limit"), { min: 1, max: 100, fallback: 50 })
 
   const now = new Date()
   let startDate: Date | null = null
@@ -226,29 +238,8 @@ export function parseAdminQueryParams(request: NextRequest): {
   }
 }
 
-/**
- * Get date range for a time period
- */
-export function getDateRange(timeRange: string): { startDate: Date | null; endDate: Date } {
-  const now = new Date()
-  let startDate: Date | null = null
-
-  switch (timeRange) {
-    case "7d":
-      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-      break
-    case "30d":
-      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-      break
-    case "90d":
-      startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-      break
-    case "1y":
-      startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
-      break
-    default:
-      startDate = null
-  }
-
-  return { startDate, endDate: now }
-}
+// getDateRange lived here as a third copy of the window arithmetic above, with a
+// "1y" case the other two did not have and zero callers anywhere in the repo. The
+// two remaining copies disagreeing was the kind of thing that produced a funnel
+// whose stages covered different windows, so the unused one is gone rather than
+// left as a tempting import.
