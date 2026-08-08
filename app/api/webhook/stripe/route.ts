@@ -59,6 +59,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 const paymentLogger = logger.child({ service: "stripe-webhook" })
 
 /**
+ * Hard cap on failed charge attempts before a subscription is marked past_due (which revokes Pro),
+ * used as a backstop when Stripe keeps scheduling retries. Stripe's default smart-retry schedule
+ * makes at most 4 attempts, so this only fires on a non-default/never-ending retry configuration.
+ */
+const MAX_DUNNING_ATTEMPTS = 4
+
+/**
  * Record payment to payment_history collection
  */
 async function recordPaymentHistory(
@@ -824,21 +831,47 @@ export async function POST(request: NextRequest) {
           const userId = profileDoc.id
           const profileRef = adminDb.collection("profiles").doc(userId)
 
-          // Update subscription status to indicate payment issue
-          await profileRef.set(
-            {
-              subscription_status: "past_due",
-              payment_failed_at: new Date().toISOString(),
-              payment_failure_reason:
-                invoice.last_finalization_error?.message || "Payment declined",
-              updated_at: new Date().toISOString(),
-            },
-            { merge: true }
-          )
+          // `past_due` is a HARD LOCKOUT downstream: lib/quota-enforcement.ts lists it in
+          // INACTIVE_SUBSCRIPTION_STATUSES, so writing it strips Pro access immediately. Setting it on
+          // the FIRST decline punished a paying customer for an expired card while Stripe was still
+          // happily retrying, and Stripe's dunning runs for days. So we only lock once Stripe itself
+          // reports the retry sequence is over.
+          //
+          // THRESHOLD: `next_payment_attempt == null` is Stripe's own "I will not try again" signal —
+          // it is set while smart retries remain and cleared when dunning is exhausted. The
+          // `attempt_count` cap is a backstop for a misconfigured retry schedule that never gives up,
+          // so an unpayable subscription cannot keep Pro access forever.
+          const attemptCount = invoice.attempt_count ?? 0
+          const retriesExhausted =
+            !invoice.next_payment_attempt || attemptCount >= MAX_DUNNING_ATTEMPTS
 
-          paymentLogger.warn("Subscription marked as past_due", { userId })
+          const failureUpdate: Record<string, unknown> = {
+            payment_failed_at: new Date().toISOString(),
+            payment_failure_reason: invoice.last_finalization_error?.message || "Payment declined",
+            payment_attempt_count: attemptCount,
+            updated_at: new Date().toISOString(),
+          }
+          if (retriesExhausted) {
+            failureUpdate.subscription_status = "past_due"
+          }
 
-          // Send payment failure email notification
+          await profileRef.set(failureUpdate, { merge: true })
+
+          if (retriesExhausted) {
+            paymentLogger.warn("Subscription marked as past_due — Stripe dunning exhausted", {
+              userId,
+              attemptCount,
+            })
+          } else {
+            paymentLogger.info("Payment failed but Stripe will retry — Pro access preserved", {
+              userId,
+              attemptCount,
+              nextPaymentAttempt: invoice.next_payment_attempt,
+            })
+          }
+
+          // Send payment failure email notification on EVERY failure. The customer needs to fix their
+          // card during the retry window; that is the whole point of not locking them out yet.
           const profile = profileDoc.data()
           if (profile?.email) {
             try {
@@ -1121,14 +1154,17 @@ export async function POST(request: NextRequest) {
 
             logger.payment("Subscription renewed", { userId })
           }
-          // Handle recovery from past_due
-          else if (profile?.subscription_status === "past_due") {
+          // Handle recovery from a failed payment. `payment_failed_at` is also checked because a
+          // decline inside Stripe's retry window now records the failure WITHOUT setting past_due
+          // (see invoice.payment_failed); without this the dunning flags would never be cleared.
+          else if (profile?.subscription_status === "past_due" || profile?.payment_failed_at) {
             await profileRef.set(
               {
                 subscription_status: "active",
                 subscription_tier: "pro",
                 payment_failed_at: null,
                 payment_failure_reason: null,
+                payment_attempt_count: null,
                 payment_recovered_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               },
