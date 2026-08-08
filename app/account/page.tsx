@@ -47,6 +47,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { SubscriptionStatusBanner } from "@/components/ui/subscription-status-banner"
 import { ResearchConsentCard } from "@/components/account/ResearchConsentCard"
+import { SendFeedbackCard } from "@/components/feedback/SendFeedbackCard"
 import { Profile, ProfileQuota, NotificationPreferences, PaymentHistory } from "@/lib/types"
 import {
   DEFAULT_NOTIFICATION_PREFERENCES as DEFAULT_SMART_NOTIFICATION_PREFERENCES,
@@ -1193,6 +1194,27 @@ export default function AccountPage() {
                 )}
               </div>
             )}
+
+            {/* Feedback & Support */}
+            <div className="border-border/50 bg-card/50 overflow-hidden rounded-xl border">
+              <button
+                onClick={() => toggleSection("feedback")}
+                className="hover:bg-muted/30 flex w-full items-center justify-between p-4 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Mail className="text-muted-foreground h-4 w-4" />
+                  <span className="text-foreground text-sm font-medium">Feedback & Support</span>
+                </div>
+                <ChevronDown
+                  className={`text-muted-foreground h-4 w-4 transition-transform ${expandedSections.has("feedback") ? "rotate-180" : ""}`}
+                />
+              </button>
+              {expandedSections.has("feedback") && (
+                <div className="px-4 pb-4">
+                  <SendFeedbackCard />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
