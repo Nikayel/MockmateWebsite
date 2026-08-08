@@ -1847,7 +1847,7 @@ function InterviewPageContent() {
   const onSendInterviewerMessage = () => handleSendMessage(true)
 
   return (
-    <main className="bg-background min-h-screen">
+    <main className="bg-background min-h-dvh">
       <h1 className="sr-only">Mock Interview Environment</h1>
       {!isInterviewMode && <Header />}
 
@@ -1875,8 +1875,15 @@ function InterviewPageContent() {
         <section
           className={`from-card to-background flex flex-col bg-gradient-to-b pt-1.5 pb-1.5 ${
             isResultView
-              ? "min-h-screen overflow-x-hidden overflow-y-auto"
-              : "h-screen overflow-hidden"
+              ? "min-h-dvh overflow-x-hidden overflow-y-auto"
+              : // `h-dvh`, not `h-screen`. On iOS Safari `100vh` is the height
+                // the viewport WOULD have if the browser chrome were retracted,
+                // so it is taller than what is actually on screen. Paired with
+                // `overflow-hidden`, the bottom of this fixed-height column sat
+                // underneath the URL bar with no way to scroll to it: the
+                // message input and the Run / Submit buttons were unreachable on
+                // a phone. `100dvh` tracks the visible viewport instead.
+                "h-dvh overflow-hidden"
           }`}
         >
           <div
