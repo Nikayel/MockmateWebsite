@@ -64,14 +64,11 @@ export function trackEvent(eventName: string, params?: Record<string, any>) {
 }
 
 /**
- * Track page view
+ * `trackPageView` used to live here with no call sites. GA4 fires its own
+ * page_view when analytics starts (see components/ConsentAnalytics), so the
+ * helper was not a gap waiting to be filled, it was a second way to send an
+ * event the platform already sends.
  */
-export function trackPageView(pageName: string, params?: Record<string, any>) {
-  trackEvent("page_view", {
-    page_name: pageName,
-    ...params,
-  })
-}
 
 /**
  * Track user signup
@@ -122,38 +119,16 @@ export function trackSessionComplete(params: {
 }
 
 /**
- * Track code execution
+ * Deleted from here: `trackCodeExecution`, `trackHintUsage` and
+ * `trackAIInteraction`.
+ *
+ * All three had zero call sites, and the first was actively misleading: the
+ * route that looks like its caller (app/api/session/metrics) imports a
+ * different `trackCodeExecution` from lib/session-metrics. Code execution, hint
+ * reveals and AI turns are all already recorded, server-side and per session, by
+ * lib/session-metrics and lib/analytics-server. A client-side duplicate that
+ * nobody called was not instrumentation, it was the appearance of it.
  */
-export function trackCodeExecution(params: {
-  sessionId: string
-  language: string
-  passed: boolean
-  executionTimeMs: number
-}) {
-  trackEvent("code_execution", params)
-}
-
-/**
- * Track hint usage
- */
-export function trackHintUsage(params: {
-  sessionId: string
-  hintIndex: number
-  timeToFirstHintSeconds?: number
-}) {
-  trackEvent("hint_used", params)
-}
-
-/**
- * Track AI interaction
- */
-export function trackAIInteraction(params: {
-  sessionId: string
-  interactionType: "partner" | "interviewer"
-  messageCount: number
-}) {
-  trackEvent("ai_interaction", params)
-}
 
 /**
  * Track subscription purchase
@@ -169,23 +144,15 @@ export function trackPurchase(params: {
 }
 
 /**
- * Track subscription cancellation
+ * Deleted from here: `trackCancellation` and `trackError`, both uncalled.
+ *
+ * Cancellation is a webhook event, not a browser event: Stripe tells us, and
+ * app/api/webhook/stripe is where that is recorded. Errors reach Sentry through
+ * lib/logger and app/api/client-error. `trackError` in particular was worse than
+ * absent, because the admin System Health page counted analytics_events rows
+ * with event_name "error" and this was the only thing that would ever have
+ * written one, so the error count was structurally always zero.
  */
-export function trackCancellation(params: { userId: string; tier: string; reason?: string }) {
-  trackEvent("subscription_cancel", params)
-}
-
-/**
- * Track error
- */
-export function trackError(params: {
-  errorType: string
-  errorMessage: string
-  page?: string
-  userId?: string
-}) {
-  trackEvent("error", params)
-}
 
 /**
  * Track user upgrade flow
