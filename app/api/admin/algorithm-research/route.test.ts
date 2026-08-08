@@ -11,14 +11,97 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import type { NextRequest } from "next/server"
 
-const h = vi.hoisted(() => ({
-  requirePermission: vi.fn(),
-  migrateAllUsersToFsrs: vi.fn(),
-  markAbTestEnded: vi.fn(() => Promise.resolve()),
-  logAdminAction: vi.fn(() => Promise.resolve()),
-}))
+/** Every `.set()` the route performs, so a test can assert where data landed. */
+type WriteRecord = { path: string; data: Record<string, unknown> }
 
-vi.mock("@/lib/firebase-admin", () => ({ adminDb: {} }))
+const h = vi.hoisted(() => {
+  const writes: WriteRecord[] = []
+
+  // Fixture: one SM-2 user with sessions, one FSRS user with mastery rows, and
+  // one user the experiment never randomized.
+  const profiles = [
+    {
+      id: "u-sm2",
+      data: { spaced_repetition_algorithm: "sm2", streak_days: 3, longest_streak_days: 5 },
+    },
+    { id: "u-fsrs", data: { spaced_repetition_algorithm: "fsrs" } },
+    { id: "u-none", data: { email: "never@randomized.test" } },
+  ]
+  const sessionsByUser: Record<string, Array<Record<string, unknown>>> = {
+    "u-sm2": [
+      { performanceScore: 80, durationMinutes: 20, completedAt: "2026-08-01T10:00:00.000Z" },
+      { performanceScore: 40, durationMinutes: 10, completedAt: "2026-08-02T10:00:00.000Z" },
+    ],
+    "u-fsrs": [],
+    "u-none": [
+      { performanceScore: 90, durationMinutes: 5, completedAt: "2026-08-03T10:00:00.000Z" },
+    ],
+  }
+  const masteryByUser: Record<string, Array<Record<string, unknown>>> = {
+    "u-sm2": [{ review_count: 4, interval_days: 6, mastery_level: "learning" }],
+    "u-fsrs": [{ review_count: 2, interval_days: 30, mastery_level: "mastered" }],
+    "u-none": [],
+  }
+
+  const snapshotOf = (docs: Array<{ id: string; data: Record<string, unknown> }>) => ({
+    docs: docs.map((doc) => ({ id: doc.id, data: () => doc.data, ref: { path: doc.id } })),
+    size: docs.length,
+    empty: docs.length === 0,
+  })
+
+  const queryStub = (docs: Array<{ id: string; data: Record<string, unknown> }>) => {
+    const query: Record<string, unknown> = {
+      get: () => Promise.resolve(snapshotOf(docs)),
+    }
+    query.orderBy = () => query
+    query.limit = () => query
+    query.where = () => query
+    return query
+  }
+
+  const listAsDocs = (rows: Array<Record<string, unknown>>) =>
+    rows.map((row, index) => ({ id: `${index}`, data: row }))
+
+  const docStub = (path: string, userId: string) => ({
+    get: () =>
+      Promise.resolve({
+        // user_stats is treated as absent so the rebuild branch is exercised.
+        exists: false,
+        data: () => null,
+      }),
+    set: (data: Record<string, unknown>) => {
+      writes.push({ path, data })
+      return Promise.resolve()
+    },
+    collection: (sub: string) =>
+      queryStub(
+        sub === "problems"
+          ? listAsDocs(masteryByUser[userId] ?? [])
+          : listAsDocs(sessionsByUser[userId] ?? [])
+      ),
+  })
+
+  const adminDb = {
+    collection: (name: string) => {
+      if (name === "profiles") return queryStub(profiles)
+      return {
+        ...queryStub([]),
+        doc: (id: string) => docStub(`${name}/${id}`, id),
+      }
+    },
+  }
+
+  return {
+    requirePermission: vi.fn(),
+    migrateAllUsersToFsrs: vi.fn(),
+    markAbTestEnded: vi.fn(() => Promise.resolve()),
+    logAdminAction: vi.fn(() => Promise.resolve()),
+    adminDb,
+    writes,
+  }
+})
+
+vi.mock("@/lib/firebase-admin", () => ({ adminDb: h.adminDb }))
 vi.mock("@/lib/admin/middleware", () => ({ requirePermission: h.requirePermission }))
 vi.mock("@/lib/admin/rbac", () => ({
   PERMISSIONS: { VIEW_ANALYTICS: "view_analytics", MANAGE_SETTINGS: "manage_settings" },
@@ -190,5 +273,92 @@ describe("POST /api/admin/algorithm-research end-ab-switch-fsrs", () => {
   it("leaves legacy actions untouched (unknown action still 400s)", async () => {
     const res = await POST(postRequest({ action: "bogus" }))
     expect(res.status).toBe(400)
+  })
+})
+
+describe("POST /api/admin/algorithm-research backfill-research", () => {
+  const backfill = (body: Record<string, unknown> = {}) =>
+    POST(postRequest({ action: "backfill-research", ...body }))
+
+  const writesTo = (collection: string) =>
+    h.writes.filter((write) => write.path.startsWith(`${collection}/`))
+
+  beforeEach(() => {
+    h.writes.length = 0
+  })
+
+  it("defaults to a dry run and writes nothing", async () => {
+    const res = asStub(await backfill())
+
+    expect(res.status).toBe(200)
+    expect(h.writes).toHaveLength(0)
+    expect(res.data.message).toContain("Dry run")
+    expect(res.data.data?.dryRun).toBe(true)
+    expect(res.data.data?.backfillDocsWritten).toBe(0)
+  })
+
+  it("refuses a live run without the typed confirmation", async () => {
+    const res = asStub(await backfill({ dryRun: false }))
+
+    expect(res.status).toBe(400)
+    expect(h.writes).toHaveLength(0)
+  })
+
+  it("refuses a live run with the wrong confirmation", async () => {
+    const res = asStub(await backfill({ dryRun: false, confirm: "yes" }))
+
+    expect(res.status).toBe(400)
+    expect(h.writes).toHaveLength(0)
+  })
+
+  it("never writes into the live A/B cohort collections", async () => {
+    await backfill({ dryRun: false, confirm: "BACKFILL" })
+
+    // The old implementation wrote to algorithm_research_metrics/{uid}/summary,
+    // which generateAggregateComparison() reads via collectionGroup("summary").
+    expect(writesTo("algorithm_research_metrics")).toHaveLength(0)
+    expect(h.writes.some((write) => write.path.includes("/summary"))).toBe(false)
+    expect(writesTo("algorithm_research_backfill").length).toBeGreaterThan(0)
+  })
+
+  it("skips users with no algorithm assignment instead of filing them under SM-2", async () => {
+    const res = asStub(await backfill({ dryRun: false, confirm: "BACKFILL" }))
+
+    expect(res.data.data?.usersSkippedUnassigned).toBe(1)
+    const derived = writesTo("algorithm_research_backfill")
+    expect(derived.map((write) => write.path)).not.toContain("algorithm_research_backfill/u-none")
+    expect(derived.every((write) => write.data.algorithm !== undefined)).toBe(true)
+  })
+
+  it("tags derived rows with their provenance and leaves unmeasurable fields null", async () => {
+    await backfill({ dryRun: false, confirm: "BACKFILL" })
+
+    const row = writesTo("algorithm_research_backfill").find(
+      (write) => write.path === "algorithm_research_backfill/u-sm2"
+    )!
+    expect(row.data.data_source).toBe("backfill_derived")
+    expect(row.data.estimated_fields).toContain("average_interval_accuracy")
+    expect(row.data.average_time_to_mastery_days).toBeNull()
+    // 80 and 40 -> mean 60, one of two sessions at or above the 56 threshold.
+    expect(row.data.lifetime_average_score).toBe(60)
+    expect(row.data.lifetime_retention_rate).toBe(50)
+  })
+
+  it("audits both dry runs and live runs", async () => {
+    await backfill()
+    await backfill({ dryRun: false, confirm: "BACKFILL" })
+
+    expect(h.logAdminAction).toHaveBeenCalledTimes(2)
+    const [, action, details] = h.logAdminAction.mock.calls[1] as unknown as [
+      unknown,
+      string,
+      Record<string, unknown>,
+    ]
+    expect(action).toBe("backfill_research_data")
+    expect(details).toMatchObject({
+      dryRun: false,
+      destination: "algorithm_research_backfill",
+      usersSkippedUnassigned: 1,
+    })
   })
 })

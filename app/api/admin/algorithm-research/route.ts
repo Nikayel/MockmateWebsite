@@ -59,6 +59,44 @@ const endAbSchema = z.object({
   cursor: z.string().min(1).optional(),
 })
 
+/**
+ * Where derived (reconstructed) research summaries go.
+ *
+ * A FLAT collection, deliberately. Anything written to a subcollection named
+ * `summary` is picked up by `collectionGroup("summary")`, which is how the A/B
+ * cohort statistics and the CSV export both gather their rows, so a
+ * "quarantine" path of the form `.../{uid}/summary/current` would quarantine
+ * nothing at all.
+ */
+const BACKFILL_COLLECTION = "algorithm_research_backfill"
+
+/** Typed by the operator to turn a preview into a write. */
+const BACKFILL_CONFIRM_TOKEN = "BACKFILL"
+
+/**
+ * `dryRun` defaults to TRUE. A destructive action whose safe mode is opt-in is
+ * only safe for the people who remember to opt in.
+ */
+const backfillSchema = z.object({
+  action: z.literal("backfill-research"),
+  dryRun: z.boolean().optional().default(true),
+  confirm: z.string().optional(),
+})
+
+interface BackfillResult {
+  dryRun: boolean
+  usersScanned: number
+  usersWithHistory: number
+  /** Users with no algorithm assignment. Skipped, never defaulted to SM-2. */
+  usersSkippedUnassigned: number
+  usersSkippedNoHistory: number
+  backfillDocsWritten: number
+  userStatsWritten: number
+  /** Dry run only: user_stats documents a live run would rebuild. */
+  userStatsWouldWrite: number
+  errors: string[]
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Verify Admin SDK is initialized
@@ -315,12 +353,51 @@ export async function POST(request: NextRequest) {
       }
 
       case "backfill-research": {
-        // Backfill research data from existing problem mastery and session summaries
-        // This populates algorithm_research_metrics for users who practiced before tracking was added
-        const result = await backfillResearchData()
+        const parsed = backfillSchema.safeParse(body)
+        if (!parsed.success) {
+          return NextResponse.json(
+            { success: false, error: "Invalid request", details: parsed.error.flatten() },
+            { status: 400 }
+          )
+        }
+        const { dryRun, confirm } = parsed.data
+
+        // A real run needs the typed confirmation. Defaulting dryRun to true
+        // means an old client, a replayed request or a mistaken curl produces a
+        // preview instead of a write.
+        if (!dryRun && confirm !== BACKFILL_CONFIRM_TOKEN) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `A live backfill requires confirm: "${BACKFILL_CONFIRM_TOKEN}". Run it with dryRun first and read the counts.`,
+            },
+            { status: 400 }
+          )
+        }
+
+        const result = await backfillResearchData({ dryRun })
+
+        await logAdminAction(
+          authResult.context!,
+          RESEARCH_AUDIT_ACTIONS.BACKFILL_RESEARCH,
+          {
+            dryRun,
+            usersScanned: result.usersScanned,
+            usersWithHistory: result.usersWithHistory,
+            usersSkippedUnassigned: result.usersSkippedUnassigned,
+            backfillDocsWritten: result.backfillDocsWritten,
+            userStatsWritten: result.userStatsWritten,
+            destination: BACKFILL_COLLECTION,
+            errorCount: result.errors.length,
+          },
+          { request }
+        )
+
         return NextResponse.json({
           success: true,
-          message: `Backfilled research data for ${result.usersProcessed} users (${result.researchSummariesCreated} research summaries, ${result.userStatsUpdated} user_stats)`,
+          message: dryRun
+            ? `Dry run: would write ${result.usersWithHistory} derived summaries to ${BACKFILL_COLLECTION} and rebuild ${result.userStatsWouldWrite} user_stats documents. Nothing was written. ${result.usersSkippedUnassigned} users have no algorithm assignment and were skipped.`
+            : `Backfill complete: ${result.backfillDocsWritten} derived summaries written to ${BACKFILL_COLLECTION} (quarantined, not part of the A/B cohorts) and ${result.userStatsWritten} user_stats rebuilt.`,
           data: result,
         })
       }
@@ -344,257 +421,107 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Backfill research data from existing problem mastery and session summaries
- * This creates algorithm_research_metrics/summary documents for users who practiced
- * before research tracking was added, and updates user_stats if missing
+ * Derive research summaries for users who practiced before event tracking
+ * existed.
+ *
+ * WHY THIS WRITES SOMEWHERE ELSE NOW
+ *
+ * This function used to write its output to
+ * `algorithm_research_metrics/{uid}/summary/current`, which is exactly the
+ * collection group `generateAggregateComparison()` reads to build the SM-2 vs
+ * FSRS cohort statistics. Its output is not measurement, it is reconstruction:
+ * interval accuracy inferred from a default `predicted_retention` of 50 when
+ * the session never recorded one, time to mastery estimated as days active
+ * divided by problems mastered when no mastery timestamps exist, a longest
+ * streak defaulted to 1. Those rows then sat in the cohorts indistinguishable
+ * from measured ones, and the founder's decision rested on the mixture.
+ *
+ * Worse, users with no `spaced_repetition_algorithm` were filed as "sm2",
+ * inventing an SM-2 cohort out of people the experiment never randomized.
+ *
+ * So: derived rows go to their own top-level collection, tagged with their
+ * provenance. Note the collection is FLAT, one document per user, precisely
+ * because a subcollection named `summary` would be swept up by the
+ * `collectionGroup("summary")` query no matter which parent it hung under.
+ * Unassigned users are skipped rather than defaulted, and every estimated
+ * field is either omitted or listed in `estimated_fields`.
  */
-async function backfillResearchData(): Promise<{
-  usersProcessed: number
-  researchSummariesCreated: number
-  userStatsUpdated: number
-  errors: string[]
-}> {
-  const result = {
-    usersProcessed: 0,
-    researchSummariesCreated: 0,
-    userStatsUpdated: 0,
+async function backfillResearchData(options: { dryRun: boolean }): Promise<BackfillResult> {
+  const result: BackfillResult = {
+    dryRun: options.dryRun,
+    usersScanned: 0,
+    usersWithHistory: 0,
+    usersSkippedUnassigned: 0,
+    usersSkippedNoHistory: 0,
+    backfillDocsWritten: 0,
+    userStatsWritten: 0,
+    userStatsWouldWrite: 0,
     errors: [] as string[],
   }
 
   try {
-    // Get all user profiles
     const profilesSnap = await adminDb.collection("profiles").get()
-    const userIds = profilesSnap.docs.map((doc) => doc.id)
 
-    for (const userId of userIds) {
+    for (const profileDoc of profilesSnap.docs) {
+      const userId = profileDoc.id
       try {
-        result.usersProcessed++
+        result.usersScanned++
+        const profileData = profileDoc.data()
 
-        // Get user's algorithm assignment
-        const profileData = profilesSnap.docs.find((d) => d.id === userId)?.data()
-        const algorithm = (profileData?.spaced_repetition_algorithm || "sm2") as "sm2" | "fsrs"
+        // Never invent an arm. A user with no assignment was not randomized,
+        // and guessing "sm2" both fabricates a cohort member and skews the
+        // sample ratio check that is supposed to catch exactly this.
+        const algorithm = profileData?.spaced_repetition_algorithm
+        if (algorithm !== "sm2" && algorithm !== "fsrs") {
+          result.usersSkippedUnassigned++
+          continue
+        }
 
-        // Check if research summary already exists
-        const existingSummary = await adminDb
-          .collection("algorithm_research_metrics")
-          .doc(userId)
-          .collection("summary")
-          .doc("current")
-          .get()
-
-        // Get problem mastery data (unified collection)
-        const masterySnap = await adminDb
-          .collection("problem_mastery")
-          .doc(userId)
-          .collection("problems")
-          .get()
-
-        // Get session summaries
-        const sessionsSnap = await adminDb
-          .collection("users")
-          .doc(userId)
-          .collection("session_summaries")
-          .orderBy("completedAt", "desc")
-          .limit(100)
-          .get()
+        const [masterySnap, sessionsSnap] = await Promise.all([
+          adminDb.collection("problem_mastery").doc(userId).collection("problems").get(),
+          adminDb
+            .collection("users")
+            .doc(userId)
+            .collection("session_summaries")
+            .orderBy("completedAt", "desc")
+            .limit(100)
+            .get(),
+        ])
 
         const sessions = sessionsSnap.docs.map((d) => d.data())
         const masteryDocs = masterySnap.docs.map((d) => d.data())
 
-        // Skip if no data to backfill
         if (sessions.length === 0 && masteryDocs.length === 0) {
+          result.usersSkippedNoHistory++
           continue
         }
 
-        // Create research summary if it doesn't exist
-        if (!existingSummary.exists && (sessions.length > 0 || masteryDocs.length > 0)) {
-          const totalReviews = masteryDocs.reduce((sum, m) => sum + (m.review_count || 1), 0)
-          const totalScore = sessions.reduce((sum, s) => sum + (s.performanceScore || 0), 0)
-          const avgScore = sessions.length > 0 ? Math.round(totalScore / sessions.length) : 0
-          const retainedCount = sessions.filter((s) => (s.performanceScore || 0) >= 56).length
-          const retentionRate =
-            sessions.length > 0 ? Math.round((retainedCount / sessions.length) * 100) : 0
-          const problemsMastered = masteryDocs.filter(
-            (m) => m.mastery_level === "mastered" || m.mastery_level === "reviewing"
-          ).length
+        result.usersWithHistory++
 
-          const totalMinutes = sessions.reduce((sum, s) => sum + (s.durationMinutes || 0), 0)
+        const summary = buildDerivedSummary(userId, algorithm, profileData, sessions, masteryDocs)
 
-          // Get first and last review dates
-          const sortedSessions = [...sessions].sort(
-            (a, b) =>
-              new Date(a.completedAt || 0).getTime() - new Date(b.completedAt || 0).getTime()
-          )
-          const firstReview = sortedSessions[0]?.completedAt || new Date().toISOString()
-          const lastReview =
-            sortedSessions[sortedSessions.length - 1]?.completedAt || new Date().toISOString()
-
-          // Calculate average time to mastery from actual mastery data
-          // Time from first review to mastery level
-          const masteredProblems = masteryDocs.filter(
-            (m) => m.mastery_level === "mastered" || m.mastery_level === "reviewing"
-          )
-          let avgTimeToMastery: number | null = null
-          if (masteredProblems.length > 0) {
-            const timeToMasteryDays = masteredProblems
-              .filter((m) => m.first_reviewed_at && m.mastered_at)
-              .map((m) => {
-                const first = new Date(m.first_reviewed_at).getTime()
-                const mastered = new Date(m.mastered_at).getTime()
-                return Math.max(1, Math.round((mastered - first) / (1000 * 60 * 60 * 24)))
-              })
-
-            if (timeToMasteryDays.length > 0) {
-              avgTimeToMastery = Math.round(
-                timeToMasteryDays.reduce((sum, d) => sum + d, 0) / timeToMasteryDays.length
-              )
-            }
-          }
-          // Fallback: estimate based on total days active vs problems mastered
-          if (avgTimeToMastery === null) {
-            const daysActive =
-              new Set(sessions.map((s) => s.completedAt?.split("T")[0]).filter(Boolean)).size || 1
-            avgTimeToMastery =
-              problemsMastered > 0 ? Math.round(daysActive / problemsMastered) : null
-          }
-
-          // Calculate interval accuracy from mastery data
-          // Compare predicted vs actual retention (score >= 56 means retained)
-          const accuratePredictions = sessions.filter((s) => {
-            const predicted = (s.predicted_retention || 50) >= 50 // Predicted to retain if >= 50%
-            const actual = (s.performanceScore || 0) >= 56 // Actually retained if score >= 56
-            return predicted === actual
-          }).length
-          const intervalAccuracy =
-            sessions.length > 0 ? Math.round((accuratePredictions / sessions.length) * 100) : null
-
-          const now = new Date().toISOString()
-          const daysActiveSet = new Set(
-            sessions.map((s) => s.completedAt?.split("T")[0]).filter(Boolean)
-          )
-          const daysActiveCount = daysActiveSet.size || 1
-
-          const researchSummary = {
-            user_id: userId,
-            algorithm,
-            algorithm_assigned_at: profileData?.created_at || now,
-            algorithm_user_overridden: false,
-            total_reviews: totalReviews,
-            total_problems_seen: masteryDocs.length || sessions.length,
-            total_time_spent_minutes: totalMinutes,
-            total_days_active: daysActiveCount,
-            lifetime_average_score: avgScore,
-            lifetime_retention_rate: retentionRate,
-            lifetime_lapse_rate: 100 - retentionRate,
-            problems_mastered: problemsMastered,
-            problems_learning: masteryDocs.length - problemsMastered,
-            problems_struggling: 0,
-            average_time_to_mastery_days: avgTimeToMastery,
-            longest_streak: profileData?.longest_streak_days || 1,
-            current_streak: profileData?.streak_days || 0,
-            average_daily_reviews: totalReviews / Math.max(1, daysActiveCount),
-            average_session_length_minutes:
-              sessions.length > 0 ? Math.round(totalMinutes / sessions.length) : 0,
-            weekly_averages: [],
-            average_interval_accuracy: intervalAccuracy,
-            interval_distribution: {
-              "1-3_days": 0,
-              "4-7_days": 0,
-              "8-14_days": 0,
-              "15-30_days": 0,
-              "31-60_days": 0,
-              "60+_days": 0,
-            },
-            first_review_at: firstReview,
-            last_review_at: lastReview,
-            created_at: now,
-            updated_at: now,
-          }
-
-          // Populate interval distribution from mastery data
-          for (const mastery of masteryDocs) {
-            const interval = mastery.interval_days || 1
-            if (interval <= 3) researchSummary.interval_distribution["1-3_days"]++
-            else if (interval <= 7) researchSummary.interval_distribution["4-7_days"]++
-            else if (interval <= 14) researchSummary.interval_distribution["8-14_days"]++
-            else if (interval <= 30) researchSummary.interval_distribution["15-30_days"]++
-            else if (interval <= 60) researchSummary.interval_distribution["31-60_days"]++
-            else researchSummary.interval_distribution["60+_days"]++
-          }
-
-          await adminDb
-            .collection("algorithm_research_metrics")
-            .doc(userId)
-            .collection("summary")
-            .doc("current")
-            .set(researchSummary)
-
-          result.researchSummariesCreated++
+        if (!options.dryRun) {
+          await adminDb.collection(BACKFILL_COLLECTION).doc(userId).set(summary)
+          result.backfillDocsWritten++
         }
 
-        // Check and update user_stats if missing or empty
+        // user_stats is a product aggregate rebuilt from real sessions rather
+        // than a research cohort, but it is still a live write, so it obeys the
+        // same dry run and confirmation.
         const userStatsDoc = await adminDb.collection("user_stats").doc(userId).get()
         const existingStats = userStatsDoc.data()
+        const needsStats =
+          sessions.length > 0 && (!userStatsDoc.exists || (existingStats?.totalSessions || 0) === 0)
 
-        if (!userStatsDoc.exists || (existingStats?.totalSessions || 0) === 0) {
-          if (sessions.length > 0) {
-            // Rebuild user_stats from session summaries
-            const patternStats: Record<string, any> = {}
-            const difficultyStats: Record<string, any> = {}
-            let totalMinutes = 0
-            let totalScore = 0
-
-            for (const session of sessions) {
-              totalMinutes += session.durationMinutes || 0
-              totalScore += session.performanceScore || 0
-
-              const pattern = session.pattern || "unknown"
-              if (!patternStats[pattern]) {
-                patternStats[pattern] = {
-                  sessions: 0,
-                  totalScore: 0,
-                  averageScore: 0,
-                  bestScore: 0,
-                }
-              }
-              patternStats[pattern].sessions++
-              patternStats[pattern].totalScore += session.performanceScore || 0
-              patternStats[pattern].bestScore = Math.max(
-                patternStats[pattern].bestScore,
-                session.performanceScore || 0
-              )
-
-              const difficulty = session.difficulty || "medium"
-              if (!difficultyStats[difficulty]) {
-                difficultyStats[difficulty] = { sessions: 0, totalScore: 0, averageScore: 0 }
-              }
-              difficultyStats[difficulty].sessions++
-              difficultyStats[difficulty].totalScore += session.performanceScore || 0
-            }
-
-            // Calculate averages
-            for (const p of Object.values(patternStats) as any[]) {
-              p.averageScore = p.sessions > 0 ? Math.round(p.totalScore / p.sessions) : 0
-            }
-            for (const d of Object.values(difficultyStats) as any[]) {
-              d.averageScore = d.sessions > 0 ? Math.round(d.totalScore / d.sessions) : 0
-            }
-
-            const userStats = {
-              userId,
-              totalSessions: sessions.length,
-              totalPracticeMinutes: totalMinutes,
-              totalScore,
-              averageScore: sessions.length > 0 ? Math.round(totalScore / sessions.length) : 0,
-              patternStats,
-              difficultyStats,
-              lastSessionAt: sessions[0]?.completedAt,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            }
-
-            await adminDb.collection("user_stats").doc(userId).set(userStats, { merge: true })
-            result.userStatsUpdated++
+        if (needsStats) {
+          if (options.dryRun) {
+            result.userStatsWouldWrite++
+          } else {
+            await adminDb
+              .collection("user_stats")
+              .doc(userId)
+              .set(buildUserStats(userId, sessions), { merge: true })
+            result.userStatsWritten++
           }
         }
       } catch (userError) {
@@ -603,14 +530,195 @@ async function backfillResearchData(): Promise<{
         )
       }
     }
-
-    // Regenerate aggregate comparison with new data
-    await generateAggregateComparison()
   } catch (error) {
     result.errors.push(`Global error: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 
   return result
+}
+
+/**
+ * Reconstruct one user's history into a derived summary.
+ *
+ * Every value that cannot be measured from the stored history is `null` and
+ * named in `estimated_fields`, rather than being filled with a plausible
+ * default. A null says "we never recorded this"; a default says "we measured
+ * this", and only one of those is true.
+ */
+function buildDerivedSummary(
+  userId: string,
+  algorithm: "sm2" | "fsrs",
+  profileData: FirebaseFirestore.DocumentData | undefined,
+  sessions: FirebaseFirestore.DocumentData[],
+  masteryDocs: FirebaseFirestore.DocumentData[]
+): Record<string, unknown> {
+  const now = new Date().toISOString()
+  const estimatedFields: string[] = []
+
+  const totalReviews = masteryDocs.reduce((sum, m) => sum + (m.review_count || 1), 0)
+  const scoredSessions = sessions.filter((s) => typeof s.performanceScore === "number")
+  const avgScore =
+    scoredSessions.length > 0
+      ? Math.round(
+          scoredSessions.reduce((sum, s) => sum + s.performanceScore, 0) / scoredSessions.length
+        )
+      : null
+  const retainedCount = scoredSessions.filter((s) => s.performanceScore >= 56).length
+  const retentionRate =
+    scoredSessions.length > 0 ? Math.round((retainedCount / scoredSessions.length) * 100) : null
+
+  const problemsMastered = masteryDocs.filter(
+    (m) => m.mastery_level === "mastered" || m.mastery_level === "reviewing"
+  ).length
+  const totalMinutes = sessions.reduce((sum, s) => sum + (s.durationMinutes || 0), 0)
+
+  const sortedSessions = [...sessions].sort(
+    (a, b) => new Date(a.completedAt || 0).getTime() - new Date(b.completedAt || 0).getTime()
+  )
+  const firstReview = sortedSessions[0]?.completedAt ?? null
+  const lastReview = sortedSessions[sortedSessions.length - 1]?.completedAt ?? null
+
+  // Time to mastery only from problems that actually carry both timestamps.
+  // The old fallback (days active divided by problems mastered) was a number
+  // with the shape of a measurement and none of the meaning.
+  const timeToMasteryDays = masteryDocs
+    .filter((m) => m.first_reviewed_at && m.mastered_at)
+    .map((m) =>
+      Math.max(
+        1,
+        Math.round(
+          (new Date(m.mastered_at).getTime() - new Date(m.first_reviewed_at).getTime()) / 86_400_000
+        )
+      )
+    )
+  const avgTimeToMastery =
+    timeToMasteryDays.length > 0
+      ? Math.round(timeToMasteryDays.reduce((sum, d) => sum + d, 0) / timeToMasteryDays.length)
+      : null
+  if (avgTimeToMastery === null) estimatedFields.push("average_time_to_mastery_days")
+
+  // Interval accuracy only over sessions that recorded a prediction. Defaulting
+  // the prediction to 50 made every unpredicted session count as a hit whenever
+  // the user happened to pass.
+  const predictedSessions = sessions.filter(
+    (s) => typeof s.predicted_retention === "number" && typeof s.performanceScore === "number"
+  )
+  const accuratePredictions = predictedSessions.filter(
+    (s) => s.predicted_retention >= 50 === s.performanceScore >= 56
+  ).length
+  const intervalAccuracy =
+    predictedSessions.length > 0
+      ? Math.round((accuratePredictions / predictedSessions.length) * 100)
+      : null
+  if (intervalAccuracy === null) estimatedFields.push("average_interval_accuracy")
+
+  const daysActiveCount =
+    new Set(sessions.map((s) => s.completedAt?.split("T")[0]).filter(Boolean)).size || 0
+
+  const intervalDistribution = {
+    "1-3_days": 0,
+    "4-7_days": 0,
+    "8-14_days": 0,
+    "15-30_days": 0,
+    "31-60_days": 0,
+    "60+_days": 0,
+  }
+  for (const mastery of masteryDocs) {
+    const interval = mastery.interval_days || 1
+    if (interval <= 3) intervalDistribution["1-3_days"]++
+    else if (interval <= 7) intervalDistribution["4-7_days"]++
+    else if (interval <= 14) intervalDistribution["8-14_days"]++
+    else if (interval <= 30) intervalDistribution["15-30_days"]++
+    else if (interval <= 60) intervalDistribution["31-60_days"]++
+    else intervalDistribution["60+_days"]++
+  }
+
+  return {
+    user_id: userId,
+    algorithm,
+    // Provenance, so no later reader can mistake this for a measured row.
+    data_source: "backfill_derived",
+    derived_at: now,
+    derived_from: { sessions: sessions.length, mastery_documents: masteryDocs.length },
+    estimated_fields: estimatedFields,
+    algorithm_assigned_at: profileData?.algorithm_assigned_at ?? null,
+    algorithm_user_overridden: profileData?.algorithm_user_overridden === true,
+    total_reviews: totalReviews,
+    total_problems_seen: masteryDocs.length || sessions.length,
+    total_time_spent_minutes: totalMinutes,
+    total_days_active: daysActiveCount,
+    lifetime_average_score: avgScore,
+    lifetime_retention_rate: retentionRate,
+    lifetime_lapse_rate: retentionRate === null ? null : 100 - retentionRate,
+    problems_mastered: problemsMastered,
+    problems_learning: Math.max(0, masteryDocs.length - problemsMastered),
+    average_time_to_mastery_days: avgTimeToMastery,
+    longest_streak: profileData?.longest_streak_days ?? null,
+    current_streak: profileData?.streak_days ?? null,
+    average_daily_reviews: daysActiveCount > 0 ? totalReviews / daysActiveCount : null,
+    average_session_length_minutes:
+      sessions.length > 0 ? Math.round(totalMinutes / sessions.length) : null,
+    average_interval_accuracy: intervalAccuracy,
+    interval_distribution: intervalDistribution,
+    first_review_at: firstReview,
+    last_review_at: lastReview,
+  }
+}
+
+/** Rebuild user_stats from the user's real session summaries. */
+function buildUserStats(
+  userId: string,
+  sessions: FirebaseFirestore.DocumentData[]
+): Record<string, unknown> {
+  const patternStats: Record<
+    string,
+    { sessions: number; totalScore: number; averageScore: number; bestScore: number }
+  > = {}
+  const difficultyStats: Record<
+    string,
+    { sessions: number; totalScore: number; averageScore: number }
+  > = {}
+  let totalMinutes = 0
+  let totalScore = 0
+
+  for (const session of sessions) {
+    totalMinutes += session.durationMinutes || 0
+    totalScore += session.performanceScore || 0
+
+    const pattern = session.pattern || "unknown"
+    patternStats[pattern] ??= { sessions: 0, totalScore: 0, averageScore: 0, bestScore: 0 }
+    patternStats[pattern].sessions++
+    patternStats[pattern].totalScore += session.performanceScore || 0
+    patternStats[pattern].bestScore = Math.max(
+      patternStats[pattern].bestScore,
+      session.performanceScore || 0
+    )
+
+    const difficulty = session.difficulty || "medium"
+    difficultyStats[difficulty] ??= { sessions: 0, totalScore: 0, averageScore: 0 }
+    difficultyStats[difficulty].sessions++
+    difficultyStats[difficulty].totalScore += session.performanceScore || 0
+  }
+
+  for (const stats of Object.values(patternStats)) {
+    stats.averageScore = stats.sessions > 0 ? Math.round(stats.totalScore / stats.sessions) : 0
+  }
+  for (const stats of Object.values(difficultyStats)) {
+    stats.averageScore = stats.sessions > 0 ? Math.round(stats.totalScore / stats.sessions) : 0
+  }
+
+  return {
+    userId,
+    totalSessions: sessions.length,
+    totalPracticeMinutes: totalMinutes,
+    totalScore,
+    averageScore: sessions.length > 0 ? Math.round(totalScore / sessions.length) : 0,
+    patternStats,
+    difficultyStats,
+    lastSessionAt: sessions[0]?.completedAt ?? null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }
 }
 
 /**
