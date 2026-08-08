@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
-import { verifyAdminAccess } from "@/lib/admin/middleware"
+import { withPermission } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
+import { parseBoundedInt } from "@/lib/admin/query-params"
 import {
   cohortPeriodKey,
   collectLearnActivityPeriods,
@@ -19,19 +21,12 @@ interface CohortData {
 
 /**
  * Cohort Analytics API
- * Returns user retention cohort data for the admin dashboard
+ * Returns user retention cohort data for the admin dashboard.
+ *
+ * Retention is analytics, so VIEW_ANALYTICS. Any admin role reached it before.
  */
-export async function GET(request: NextRequest) {
+export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (request) => {
   try {
-    // Verify admin access
-    const authResult = await verifyAdminAccess(request)
-    if (!authResult.authorized) {
-      return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status || 403 }
-      )
-    }
-
     if (!adminDb) {
       return NextResponse.json(
         { success: false, error: "Database not available" },
@@ -43,7 +38,20 @@ export async function GET(request: NextRequest) {
     // Normalize to the two supported bucketings (garbage input always bucketed monthly before).
     const cohortType: CohortPeriodType =
       searchParams.get("type") === "weekly" ? "weekly" : "monthly"
-    const numCohorts = parseInt(searchParams.get("cohorts") || "6", 10)
+    // Each cohort is another retention pass over every profile, and a
+    // non-numeric value made the loop bound NaN. 24 covers two years of months.
+    const cohortsParam = parseBoundedInt(searchParams.get("cohorts"), {
+      min: 1,
+      max: 24,
+      fallback: 6,
+    })
+    if (!cohortsParam.ok) {
+      return NextResponse.json(
+        { success: false, error: `Invalid cohorts: ${cohortsParam.error}` },
+        { status: 400 }
+      )
+    }
+    const numCohorts = cohortsParam.value
 
     // Get all users with their signup dates
     const profilesSnapshot = await adminDb.collection("profiles").get()
@@ -240,4 +248,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
