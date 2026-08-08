@@ -1,6 +1,7 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
+import { LandingPageBreadcrumb } from "@/components/seo/LandingPageBreadcrumb"
 import { TrackedCtaLink } from "@/components/seo/TrackedCtaLink"
 import { Terminal, CheckCircle2, ArrowRight } from "lucide-react"
 
@@ -31,11 +32,14 @@ export function LandingPageTemplate({
 }: LandingPageTemplateProps) {
   return (
     <main className="min-h-screen bg-black">
+      {/* One mount here covers all fourteen landing, comparison and guide pages that render through
+          this template, none of which previously published a breadcrumb. */}
+      <LandingPageBreadcrumb title={title} />
       <Header />
 
       {/* Hero Section */}
       <section className="relative overflow-hidden border-b border-white/5 pt-32 pb-16 md:pt-40 md:pb-24">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(196, 112, 63,0.1)_0%,rgba(0,0,0,0)_70%)]" />
+        <div className="bg-[radial-gradient(ellipse_at_top,rgba(196, 112, 63,0.1)_0%,rgba(0,0,0,0)_70%)] absolute inset-0" />
         <div className="relative z-10 container mx-auto max-w-4xl px-4 text-center">
           <span className="mb-6 inline-block rounded-full bg-[#c4703f]/10 px-4 py-1.5 text-sm font-semibold text-[#c4703f]">
             {subtitle}
@@ -47,11 +51,7 @@ export function LandingPageTemplate({
             {heroDescription}
           </p>
           <div className="flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-6">
-            <TrackedCtaLink
-              href="/interview"
-              location="seo_landing_hero"
-              keyword={primaryKeyword}
-            >
+            <TrackedCtaLink href="/interview" location="seo_landing_hero" keyword={primaryKeyword}>
               <Button
                 size="lg"
                 className="h-14 bg-[#c4703f] px-8 text-lg font-bold text-black hover:bg-[#c4703f]/90"
