@@ -1,34 +1,114 @@
 /**
- * Feedback Collection API
+ * Admin triage for the `feedback` collection.
  *
- * Manage user feedback, feature requests, and NPS surveys
+ * Reads and updates the reports users send through POST /api/product-feedback. There is
+ * deliberately no POST here: an unvalidated user-writable handler sitting among role-gated ones is
+ * what let a normal account seed this queue with its own status, priority, adminNotes and vote
+ * count.
+ *
+ * Two properties this file is responsible for:
+ *
+ * 1. Every value it emits is one the admin UI knows how to render. Firestore documents outlive the
+ *    code that wrote them, so a stored `type` of "nps" (a value this product no longer offers) is
+ *    normalized here rather than shipped to a client that will index a config record with it.
+ * 2. Reading the queue costs a page, not the collection. The stat cards used to be computed by
+ *    pulling every document on every request and counting in JavaScript, so the cost of loading the
+ *    dashboard grew with the amount of feedback the product had ever received.
  */
 
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { verifyToken, getAdminRole } from "@/lib/admin/rbac"
 import { Timestamp } from "firebase-admin/firestore"
+import type { Query } from "firebase-admin/firestore"
+import {
+  adminFeedbackUpdateSchema,
+  resolveFeedbackPriority,
+  resolveFeedbackStatus,
+  resolveFeedbackType,
+  type FeedbackPriority,
+  type FeedbackStatus,
+  type UserFeedbackType,
+} from "@/lib/feedback/user-feedback-schema"
 
 export const dynamic = "force-dynamic"
 
 export interface FeedbackItem {
   id: string
   userId: string
-  userEmail?: string
-  type: "feedback" | "feature_request" | "bug_report" | "nps"
+  userEmail: string | null
+  type: UserFeedbackType
   content: string
-  rating?: number
-  npsScore?: number
-  status: "new" | "reviewed" | "in_progress" | "resolved" | "declined"
-  priority: "low" | "medium" | "high" | "critical"
-  category?: string
+  /** The route the user was on when they wrote this. Context for a bug report. */
+  path: string | null
+  status: FeedbackStatus
+  priority: FeedbackPriority
   votes: number
-  createdAt: string
-  updatedAt: string
-  adminNotes?: string
+  createdAt: string | null
+  updatedAt: string | null
+  /** Set once an admin has actually written back, so the queue records outreach. */
+  repliedAt: string | null
+  adminNotes: string | null
 }
 
-// GET - List feedback
+export interface FeedbackStats {
+  total: number
+  new: number
+  inProgress: number
+  resolved: number
+  featureRequests: number
+  bugReports: number
+}
+
+const DEFAULT_PAGE_SIZE = 25
+const MAX_PAGE_SIZE = 100
+
+/** Firestore timestamps, ISO strings and missing values all reach the client the same way. */
+function toIsoString(value: unknown): string | null {
+  if (value instanceof Timestamp) return value.toDate().toISOString()
+  if (value instanceof Date) return value.toISOString()
+  if (typeof value === "string") return value
+  return null
+}
+
+function toNullableString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null
+}
+
+/**
+ * Page size from an untrusted query param.
+ *
+ * `parseInt("abc")` is NaN, and `Math.min(NaN, 100)` is NaN, which Firestore rejects at the
+ * `.limit()` call and turns into a 500 on a request that should simply have used the default.
+ */
+function parsePageSize(raw: string | null): number {
+  const parsed = Number.parseInt(raw ?? "", 10)
+  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_PAGE_SIZE
+  return Math.min(parsed, MAX_PAGE_SIZE)
+}
+
+/** Counting server-side keeps the stat cards O(1) in client work and avoids reading documents. */
+async function loadStats(): Promise<FeedbackStats> {
+  const collection = adminDb.collection("feedback")
+  const countOf = async (field?: "status" | "type", value?: string) => {
+    const query = field && value ? collection.where(field, "==", value) : collection
+    const snapshot = await query.count().get()
+    return snapshot.data().count
+  }
+
+  const [total, brandNew, inProgress, resolved, featureRequests, bugReports] = await Promise.all([
+    countOf(),
+    countOf("status", "new"),
+    countOf("status", "in_progress"),
+    countOf("status", "resolved"),
+    countOf("type", "feature_request"),
+    countOf("type", "bug_report"),
+  ])
+
+  return { total, new: brandNew, inProgress, resolved, featureRequests, bugReports }
+}
+
+// GET - List feedback (one page at a time)
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get("Authorization")
@@ -57,9 +137,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status")
     const type = searchParams.get("type")
-    const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 200)
+    const cursor = searchParams.get("cursor")
+    const pageSize = parsePageSize(searchParams.get("limit"))
 
-    let query = adminDb.collection("feedback").orderBy("createdAt", "desc")
+    let query: Query = adminDb.collection("feedback").orderBy("createdAt", "desc")
 
     if (status && status !== "all") {
       query = query.where("status", "==", status)
@@ -68,68 +149,54 @@ export async function GET(request: NextRequest) {
       query = query.where("type", "==", type)
     }
 
-    query = query.limit(limit)
+    // A cursor that no longer resolves (the document was deleted between pages) falls back to the
+    // first page rather than erroring, because the alternative is a dead "Load more" button.
+    if (cursor) {
+      const cursorDoc = await adminDb.collection("feedback").doc(cursor).get()
+      if (cursorDoc.exists) {
+        query = query.startAfter(cursorDoc)
+      }
+    }
 
-    const snapshot = await query.get()
-    const feedback: FeedbackItem[] = snapshot.docs.map((doc) => {
+    // One extra document tells us whether another page exists without a second query.
+    const snapshot = await query.limit(pageSize + 1).get()
+    const hasMore = snapshot.docs.length > pageSize
+    const docs = hasMore ? snapshot.docs.slice(0, pageSize) : snapshot.docs
+
+    const feedback: FeedbackItem[] = docs.map((doc) => {
       const data = doc.data()
       return {
         id: doc.id,
-        userId: data.userId,
-        userEmail: data.userEmail,
-        type: data.type || "feedback",
-        content: data.content,
-        rating: data.rating,
-        npsScore: data.npsScore,
-        status: data.status || "new",
-        priority: data.priority || "medium",
-        category: data.category,
-        votes: data.votes || 0,
-        createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
-        updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt,
-        adminNotes: data.adminNotes,
+        userId: typeof data.userId === "string" ? data.userId : "",
+        userEmail: toNullableString(data.userEmail),
+        type: resolveFeedbackType(data.type),
+        content: typeof data.content === "string" ? data.content : "",
+        path: toNullableString(data.path),
+        status: resolveFeedbackStatus(data.status),
+        priority: resolveFeedbackPriority(data.priority),
+        votes: typeof data.votes === "number" ? data.votes : 0,
+        createdAt: toIsoString(data.createdAt),
+        updatedAt: toIsoString(data.updatedAt),
+        repliedAt: toIsoString(data.repliedAt),
+        adminNotes: toNullableString(data.adminNotes),
       }
     })
 
-    // Calculate stats
-    const allFeedbackSnapshot = await adminDb.collection("feedback").get()
-    const allFeedback = allFeedbackSnapshot.docs.map((d) => d.data())
+    // Stats describe the whole queue, so they are only worth recomputing on a first page. Paging
+    // deeper does not change them and should not pay for six aggregation queries.
+    const stats = cursor ? null : await loadStats()
 
-    const npsScores = allFeedback.filter((f) => f.npsScore !== undefined).map((f) => f.npsScore)
-    const promoters = npsScores.filter((s) => s >= 9).length
-    const detractors = npsScores.filter((s) => s <= 6).length
-    const npsScore =
-      npsScores.length > 0 ? Math.round(((promoters - detractors) / npsScores.length) * 100) : 0
-
-    const stats = {
-      total: allFeedback.length,
-      new: allFeedback.filter((f) => f.status === "new").length,
-      inProgress: allFeedback.filter((f) => f.status === "in_progress").length,
-      resolved: allFeedback.filter((f) => f.status === "resolved").length,
-      featureRequests: allFeedback.filter((f) => f.type === "feature_request").length,
-      bugReports: allFeedback.filter((f) => f.type === "bug_report").length,
-      npsScore,
-      avgRating:
-        allFeedback.filter((f) => f.rating).length > 0
-          ? Math.round(
-              (allFeedback.filter((f) => f.rating).reduce((s, f) => s + f.rating, 0) /
-                allFeedback.filter((f) => f.rating).length) *
-                10
-            ) / 10
-          : 0,
-    }
-
-    return NextResponse.json({ success: true, feedback, stats })
+    return NextResponse.json({
+      success: true,
+      feedback,
+      stats,
+      nextCursor: hasMore ? docs[docs.length - 1].id : null,
+    })
   } catch (error) {
     console.error("[Feedback API] GET Error:", error)
     return NextResponse.json({ success: false, error: "Failed to fetch feedback" }, { status: 500 })
   }
 }
-
-// Users submit through POST /api/product-feedback, which is auth-gated, rate limited and
-// schema-validated. There is deliberately no POST here: an unvalidated user-writable handler
-// sitting among role-gated ones is what let a normal account seed this queue with its own
-// status, priority, adminNotes and vote count.
 
 // PUT - Update feedback status/notes (admin only)
 export async function PUT(request: NextRequest) {
@@ -159,20 +226,35 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Database not available" }, { status: 500 })
     }
 
-    const body = await request.json()
-    const { id, status, priority, adminNotes } = body
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ success: false, error: "Invalid JSON body" }, { status: 400 })
+    }
 
-    if (!id) {
+    // Validated against the same schema the tests pin. Before this, an admin client could write any
+    // string into `status`, and a status the UI has no config entry for is exactly the class of
+    // stored value that used to blank the page.
+    const parsed = adminFeedbackUpdateSchema.safeParse(body)
+    if (!parsed.success) {
       return NextResponse.json(
-        { success: false, error: "Feedback ID is required" },
+        { success: false, error: parsed.error.issues[0]?.message ?? "Invalid update" },
         { status: 400 }
       )
     }
 
-    const updateData: Record<string, any> = { updatedAt: Timestamp.now() }
+    const { id, status, priority, adminNotes, assignee, tags, markReplied } = parsed.data
+
+    const updateData: Record<string, unknown> = { updatedAt: Timestamp.now() }
     if (status) updateData.status = status
     if (priority) updateData.priority = priority
     if (adminNotes !== undefined) updateData.adminNotes = adminNotes
+    if (assignee !== undefined) updateData.assignee = assignee
+    if (tags !== undefined) updateData.tags = tags
+    if (markReplied !== undefined) {
+      updateData.repliedAt = markReplied ? Timestamp.now() : null
+    }
 
     await adminDb.collection("feedback").doc(id).update(updateData)
 
