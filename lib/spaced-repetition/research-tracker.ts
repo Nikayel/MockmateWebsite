@@ -828,12 +828,40 @@ function calculateAverageInterval(users: AlgorithmResearchSummary[]): number {
 // ============================================
 
 /**
- * Get the latest aggregate comparison
+ * Get the latest aggregate comparison.
+ *
+ * The stored document is PROJECTED onto the current shape rather than cast to
+ * it. Every document written before `confidence_level` and `overall_winner`
+ * were deleted still carries them, and this function is the single read path
+ * the admin route and the export both go through. A cast satisfies the compiler
+ * and changes nothing at runtime, so an unprojected read would keep serving the
+ * fabricated confidence out of Firestore long after the code that computed it
+ * was gone. Projecting here means the field dies at the boundary, without a
+ * migration and without every caller having to remember.
  */
 export async function getAggregateComparison(): Promise<AlgorithmComparisonAggregate | null> {
   const doc = await adminDb.collection("algorithm_research_aggregate").doc("comparison").get()
+  if (!doc.exists) return null
 
-  return doc.exists ? (doc.data() as AlgorithmComparisonAggregate) : null
+  const stored = doc.data() as AlgorithmComparisonAggregate
+  const comparison = stored.comparison ?? ({} as AlgorithmComparisonAggregate["comparison"])
+
+  return {
+    last_updated: stored.last_updated,
+    data_range: stored.data_range,
+    sm2: stored.sm2,
+    fsrs: stored.fsrs,
+    comparison: {
+      retention_rate_difference: comparison.retention_rate_difference,
+      average_score_difference: comparison.average_score_difference,
+      time_to_mastery_difference_days: comparison.time_to_mastery_difference_days,
+      engagement_difference: comparison.engagement_difference,
+      interval_efficiency_difference: comparison.interval_efficiency_difference,
+      sufficient_sample_size: comparison.sufficient_sample_size,
+      fsrs_wins_count: comparison.fsrs_wins_count,
+      sm2_wins_count: comparison.sm2_wins_count,
+    },
+  }
 }
 
 /**

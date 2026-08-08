@@ -35,6 +35,7 @@ import {
   EXPERIMENT_DESIGN,
   type ExperimentReadout,
 } from "./experiment-readout"
+import { getAggregateComparison } from "../spaced-repetition/research-tracker"
 
 // ============================================
 // Types
@@ -191,15 +192,14 @@ export async function analyzeResearchData(): Promise<EnhancedResearchAnalysis> {
   let sm2Events: AlgorithmResearchEvent[] = []
   let fsrsEvents: AlgorithmResearchEvent[] = []
 
-  // Fetch comparison data with error handling
+  // Fetch comparison data with error handling.
+  //
+  // Through getAggregateComparison rather than reading the document directly:
+  // that function projects the stored shape, which is what keeps a legacy
+  // `confidence_level` written by an older build from riding out to the client
+  // inside `comparison`.
   try {
-    const comparisonDoc = await adminDb
-      .collection("algorithm_research_aggregate")
-      .doc("comparison")
-      .get()
-    comparison = comparisonDoc.exists
-      ? (comparisonDoc.data() as AlgorithmComparisonAggregate)
-      : null
+    comparison = await getAggregateComparison()
   } catch (error) {
     console.error("Research analyzer: Failed to fetch comparison data:", error)
     // Continue with null comparison
