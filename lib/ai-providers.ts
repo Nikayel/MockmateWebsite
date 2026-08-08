@@ -71,8 +71,9 @@ export interface AIResponse {
   /**
    * Provider-REPORTED token usage (Gemini usageMetadata, OpenAI-compatible
    * usage, Anthropic usage). Absent when the provider returned no usage data —
-   * consumers must omit the fields rather than estimate. `tokensUsed` above
-   * remains the legacy 4-chars-per-token estimate feeding the cost pipeline.
+   * consumers must omit the fields rather than estimate. `tokensUsed` above is
+   * the same measured total when the provider reported one, and falls back to
+   * a 4-chars-per-token estimate only when it did not.
    */
   tokensIn?: number
   tokensOut?: number
@@ -82,6 +83,22 @@ export interface AIResponse {
 interface ProviderTokenUsage {
   inputTokens: number
   outputTokens: number
+}
+
+/**
+ * Accept provider-reported usage only when both halves are real numbers.
+ *
+ * A vendor that returns `null`, a string, or a negative count would otherwise
+ * poison the cost ledger and the spend ceiling with NaN, and NaN >= ceiling is
+ * false — a malformed usage payload would quietly disable the kill-switch. A
+ * partial or malformed report falls back to the estimate instead.
+ */
+function normalizeProviderUsage(usage?: ProviderTokenUsage): ProviderTokenUsage | undefined {
+  if (!usage) return undefined
+  const { inputTokens, outputTokens } = usage
+  const isValid = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0
+  if (!isValid(inputTokens) || !isValid(outputTokens)) return undefined
+  return { inputTokens, outputTokens }
 }
 
 /** Text plus (when the provider exposes it) measured token usage. */
@@ -905,14 +922,31 @@ export async function generateAIResponse(
 
         const latencyMs = Date.now() - startTime
 
-        // Estimate tokens (rough estimate: 4 chars per token)
-        const inputTokens = Math.ceil(
+        // Fallback estimate (4 chars per token) for providers that report no
+        // usage. Only ever used when `providerUsage` is absent.
+        const estimatedInputTokens = Math.ceil(
           (systemPrompt.length +
             userMessage.length +
             history.reduce((sum, h) => sum + h.content.length, 0)) /
             4
         )
-        const outputTokens = Math.ceil(text.length / 4)
+        const estimatedOutputTokens = Math.ceil(text.length / 4)
+
+        // Prefer the provider's MEASURED usage for everything downstream.
+        //
+        // The estimate divides the RETURNED TEXT by four, and reasoning tokens
+        // produce no returned text — they bill as output while leaving nothing
+        // to measure. Every rung of the primary chain is a reasoning model
+        // (Luna at explicit effort, Gemini 3.x with a thinking budget), so on a
+        // high-effort call the estimate could be a small fraction of what we
+        // were actually charged. Measured usage was already being fetched on
+        // this exact code path and attached to the response as tokensIn/Out,
+        // and simply not used for money: the ledger, the per-user budget cap,
+        // the $250/day kill-switch and the single-request anomaly detector all
+        // read the blind estimate instead.
+        const measuredUsage = normalizeProviderUsage(providerUsage)
+        const inputTokens = measuredUsage?.inputTokens ?? estimatedInputTokens
+        const outputTokens = measuredUsage?.outputTokens ?? estimatedOutputTokens
         const totalTokens = inputTokens + outputTokens
         const cost = calculateCost(inputTokens, outputTokens, provider)
 
@@ -956,6 +990,9 @@ export async function generateAIResponse(
             cached: false,
             sessionId,
             scenarioId,
+            // Lets a reconciliation separate measured rows from estimated ones
+            // without re-deriving which providers report usage.
+            isExactTokenCount: measuredUsage !== undefined,
           }).catch(() => {
             // Usage tracking failure is non-critical - silent fail
           })
@@ -983,9 +1020,10 @@ export async function generateAIResponse(
           latencyMs,
           tokensUsed: totalTokens,
           // Measured, provider-reported usage — omitted entirely when the
-          // provider gave none so downstream events never carry estimates.
-          ...(providerUsage
-            ? { tokensIn: providerUsage.inputTokens, tokensOut: providerUsage.outputTokens }
+          // provider gave none (or gave something malformed) so downstream
+          // events never carry estimates dressed as measurements.
+          ...(measuredUsage
+            ? { tokensIn: measuredUsage.inputTokens, tokensOut: measuredUsage.outputTokens }
             : {}),
         }
       } catch (error: any) {
