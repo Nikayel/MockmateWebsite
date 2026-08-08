@@ -5,9 +5,11 @@
  * Supports different announcement types: banner, modal, toast
  */
 
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
-import { verifyToken, getAdminRole } from "@/lib/admin/rbac"
+import { withPermission } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
+import { parseBoundedInt } from "@/lib/admin/query-params"
 import { Timestamp } from "firebase-admin/firestore"
 import type { FullAnnouncement } from "@/lib/types/announcements"
 
@@ -16,35 +18,50 @@ export const dynamic = "force-dynamic"
 // Re-export for backwards compatibility
 export type Announcement = FullAnnouncement
 
-// GET - List announcements
-export async function GET(request: NextRequest) {
+/**
+ * Fields a PUT may change. `views`, `dismissals`, `createdBy` and `createdAt`
+ * are outside it: the first two are engagement counters the product writes, and
+ * an editable counter is a fabricated metric.
+ */
+const MUTABLE_ANNOUNCEMENT_FIELDS = [
+  "title",
+  "message",
+  "type",
+  "priority",
+  "targetAudience",
+  "targetUserIds",
+  "startDate",
+  "endDate",
+  "dismissible",
+  "active",
+  "cta",
+] as const
+
+/**
+ * GET - List announcements. Publishing to every user is a settings-level act and
+ * the whole page is one surface, so reading it takes MANAGE_SETTINGS too. The
+ * old gate was `if (!role)`, which passes any role the lookup returns.
+ */
+export const GET = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request) => {
   try {
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    const role = await getAdminRole(auth.userId)
-    if (!role) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permissions" },
-        { status: 403 }
-      )
-    }
-
     if (!adminDb) {
-      return NextResponse.json({ success: false, error: "Database not available" }, { status: 500 })
+      return NextResponse.json({ success: false, error: "Database not available" }, { status: 503 })
     }
 
     const { searchParams } = new URL(request.url)
     const activeOnly = searchParams.get("active") === "true"
-    const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100)
+    const limitParam = parseBoundedInt(searchParams.get("limit"), {
+      min: 1,
+      max: 100,
+      fallback: 50,
+    })
+    if (!limitParam.ok) {
+      return NextResponse.json(
+        { success: false, error: `Invalid limit: ${limitParam.error}` },
+        { status: 400 }
+      )
+    }
+    const limit = limitParam.value
 
     let query = adminDb.collection("announcements").orderBy("createdAt", "desc")
 
@@ -100,32 +117,13 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
 
-// POST - Create announcement
-export async function POST(request: NextRequest) {
+// POST - Create announcement. [super_admin, admin] is exactly MANAGE_SETTINGS.
+export const POST = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request, context) => {
   try {
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    const role = await getAdminRole(auth.userId)
-    if (!role || !["super_admin", "admin"].includes(role)) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permissions" },
-        { status: 403 }
-      )
-    }
-
     if (!adminDb) {
-      return NextResponse.json({ success: false, error: "Database not available" }, { status: 500 })
+      return NextResponse.json({ success: false, error: "Database not available" }, { status: 503 })
     }
 
     const body = await request.json()
@@ -162,7 +160,7 @@ export async function POST(request: NextRequest) {
       endDate: endDate ? Timestamp.fromDate(new Date(endDate)) : null,
       dismissible,
       active,
-      createdBy: auth.userId,
+      createdBy: context.userId,
       createdAt: now,
       updatedAt: now,
       views: 0,
@@ -174,7 +172,7 @@ export async function POST(request: NextRequest) {
 
     // Log the action
     await adminDb.collection("admin_audit_log").add({
-      adminId: auth.userId,
+      adminId: context.userId,
       action: "create_announcement",
       details: { announcementId: docRef.id, title },
       timestamp: now,
@@ -191,32 +189,13 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
 
 // PUT - Update announcement
-export async function PUT(request: NextRequest) {
+export const PUT = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request, context) => {
   try {
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    const role = await getAdminRole(auth.userId)
-    if (!role || !["super_admin", "admin"].includes(role)) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permissions" },
-        { status: 403 }
-      )
-    }
-
     if (!adminDb) {
-      return NextResponse.json({ success: false, error: "Database not available" }, { status: 500 })
+      return NextResponse.json({ success: false, error: "Database not available" }, { status: 503 })
     }
 
     const body = await request.json()
@@ -236,9 +215,15 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Announcement not found" }, { status: 404 })
     }
 
-    const updateData: Record<string, any> = {
-      ...updates,
-      updatedAt: Timestamp.now(),
+    // Allowlist rather than `{ ...updates }`. Spreading the body into update()
+    // let a caller overwrite the `views` and `dismissals` engagement counters
+    // and forge `createdBy`, which is the only record of who published the
+    // message every user sees.
+    const updateData: Record<string, unknown> = { updatedAt: Timestamp.now() }
+    for (const field of MUTABLE_ANNOUNCEMENT_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(updates, field)) {
+        updateData[field] = updates[field]
+      }
     }
 
     // Convert dates if present
@@ -253,9 +238,10 @@ export async function PUT(request: NextRequest) {
 
     // Log the action
     await adminDb.collection("admin_audit_log").add({
-      adminId: auth.userId,
+      adminId: context.userId,
       action: "update_announcement",
-      details: { announcementId: id, updates: Object.keys(updates) },
+      // What was applied, not what was asked for.
+      details: { announcementId: id, updates: Object.keys(updateData) },
       timestamp: Timestamp.now(),
     })
 
@@ -267,32 +253,13 @@ export async function PUT(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
 
 // DELETE - Delete announcement
-export async function DELETE(request: NextRequest) {
+export const DELETE = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request, context) => {
   try {
-    const authHeader = request.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const auth = await verifyToken(token)
-    if (!auth.valid || !auth.userId) {
-      return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 })
-    }
-
-    const role = await getAdminRole(auth.userId)
-    if (!role || !["super_admin", "admin"].includes(role)) {
-      return NextResponse.json(
-        { success: false, error: "Insufficient permissions" },
-        { status: 403 }
-      )
-    }
-
     if (!adminDb) {
-      return NextResponse.json({ success: false, error: "Database not available" }, { status: 500 })
+      return NextResponse.json({ success: false, error: "Database not available" }, { status: 503 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -316,7 +283,7 @@ export async function DELETE(request: NextRequest) {
 
     // Log the action
     await adminDb.collection("admin_audit_log").add({
-      adminId: auth.userId,
+      adminId: context.userId,
       action: "delete_announcement",
       details: { announcementId: id },
       timestamp: Timestamp.now(),
@@ -330,4 +297,4 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
