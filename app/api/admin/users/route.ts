@@ -343,15 +343,29 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    // 6. Log the admin action for audit trail
-    await logAdminAction(adminId, "delete_user", {
-      targetUserId: userId,
-      targetEmail: emailForCheck,
-      targetTier: profileData?.subscription_tier,
-      deletedDocuments: deletedDocCount,
-      stripeSubscriptionCancelled: !!profileData?.stripe_subscription_id,
-      authDeleted,
-    })
+    // 6. Log the admin action for audit trail.
+    //
+    // The context and the request are passed, not the bare uid. Called with a uid
+    // string the helper records adminEmail, ip and userAgent as null, and this is
+    // the most sensitive action the platform has: an irreversible deletion of
+    // somebody's account and every document attached to it. "Some admin did this"
+    // is not an answer an audit log should be able to give here.
+    await logAdminAction(
+      authResult.context!,
+      "delete_user",
+      {
+        targetUserId: userId,
+        targetEmail: emailForCheck,
+        targetTier: profileData?.subscription_tier,
+        deletedDocuments: deletedDocCount,
+        stripeSubscriptionCancelled: !!profileData?.stripe_subscription_id,
+        authDeleted,
+      },
+      {
+        request,
+        target: { type: "profiles", id: userId, label: emailForCheck ?? null },
+      }
+    )
 
     return successResponse({
       message: "User and all associated data have been permanently deleted",
