@@ -49,8 +49,24 @@ export async function getGlobalDailySpend(now: Date = new Date()): Promise<numbe
 
 /**
  * True when today's aggregate spend has reached the configured ceiling.
- * Fails OPEN (returns false) on read error so a transient Firestore problem
- * does not hard-block all traffic — per-user quotas + rate limits still apply.
+ *
+ * Fails CLOSED (returns true) on read error. This is the platform's last line of
+ * defence against unbounded COGS, and a brake that releases itself the moment it
+ * cannot read its own gauge is not a brake. The failure mode it protects against
+ * is specifically correlated: the load that runs spend up is the same load that
+ * makes Firestore reads fail, so "fail open on error" is most likely to yield
+ * exactly when it matters most.
+ *
+ * The asymmetry decides it. Failing closed costs an outage of AI features that
+ * an operator can end in one step (set GLOBAL_DAILY_SPEND_CEILING_USD=0 to
+ * disable the gate) and that the user is told about in plain language. Failing
+ * open costs money that cannot be recovered at all, with no upper bound and no
+ * one watching.
+ *
+ * Note the other guards do NOT cover for this one. checkQuota's per-user budget
+ * read is the same Firestore that just failed, and its circuit breaker fails
+ * open by design (bounded per user, unbounded across users) — which is the very
+ * hole an aggregate ceiling exists to close.
  */
 export async function isGlobalCeilingExceeded(now: Date = new Date()): Promise<boolean> {
   const ceiling = getGlobalDailyCeiling()
@@ -68,8 +84,12 @@ export async function isGlobalCeilingExceeded(now: Date = new Date()): Promise<b
     }
     return false
   } catch (error) {
-    logger.warn("Global spend ceiling check failed (failing open)", { error })
-    return false
+    logger.error(
+      "CRITICAL: Global spend ceiling check failed - blocking AI (failing closed). " +
+        "Set GLOBAL_DAILY_SPEND_CEILING_USD=0 to disable the gate if this is a false positive.",
+      { error, ceiling, day: utcDayKey(now) }
+    )
+    return true
   }
 }
 

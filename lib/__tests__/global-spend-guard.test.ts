@@ -113,8 +113,21 @@ describe("global-spend-guard", () => {
       expect(await isGlobalCeilingExceeded()).toBe(false)
     })
 
-    it("fails open (false) when the read throws", async () => {
+    it("fails CLOSED (true) when the read throws", async () => {
+      // A spend ceiling that releases itself when it cannot read its own gauge
+      // is not a ceiling — and the load that runs spend up is the same load that
+      // makes Firestore reads fail, so failing open yields exactly when it
+      // matters most. Blocking is recoverable in one step; the money is not.
       process.env[CEILING_ENV] = "50"
+      mockGet.mockRejectedValueOnce(new Error("firestore down"))
+      const { isGlobalCeilingExceeded } = await import("../global-spend-guard")
+      expect(await isGlobalCeilingExceeded()).toBe(true)
+    })
+
+    it("stays disabled on a read error when the gate is turned off", async () => {
+      // The env kill-switch is the operator's escape hatch from a fail-closed
+      // block, so it must not itself depend on a working Firestore read.
+      process.env[CEILING_ENV] = "0"
       mockGet.mockRejectedValueOnce(new Error("firestore down"))
       const { isGlobalCeilingExceeded } = await import("../global-spend-guard")
       expect(await isGlobalCeilingExceeded()).toBe(false)
