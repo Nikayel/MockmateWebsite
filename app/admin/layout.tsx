@@ -31,7 +31,6 @@ import {
   CreditCard,
   Loader2,
   Scale,
-  Lightbulb,
   Menu,
   X,
   GraduationCap,
@@ -79,7 +78,6 @@ const NAV_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/admin/announcements": Megaphone,
   "/admin/feature-flags": Flag,
   "/admin/feedback": MessageSquare,
-  "/admin/insights": Lightbulb,
   "/admin/audit": ClipboardList,
   "/admin/settings": Settings,
 }
