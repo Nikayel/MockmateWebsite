@@ -875,6 +875,36 @@ export async function expireOldRewards(): Promise<number> {
 }
 
 /**
+ * Resolve display emails for a set of user ids.
+ *
+ * Reads `profiles`, not `users`. Nothing anywhere writes an `email` field onto
+ * a `users` document, so every admin referral view that looked there rendered
+ * "Unknown" for every row and an operator could not tell who a reward belonged
+ * to. `Profile.email` is a required field and `app/api/admin/payments` already
+ * resolves emails this way.
+ *
+ * Deduplicates before fetching: the same referrer appears on many rows.
+ */
+async function fetchUserEmails(userIds: Iterable<string>): Promise<Map<string, string>> {
+  const unique = Array.from(new Set(Array.from(userIds).filter(Boolean)))
+  const emails = new Map<string, string>()
+
+  await Promise.all(
+    unique.map(async (userId) => {
+      try {
+        const profileDoc = await adminDb.collection("profiles").doc(userId).get()
+        emails.set(userId, profileDoc.data()?.email || "Unknown")
+      } catch (error) {
+        logger.error("Failed to resolve user email for referral admin view", { error, userId })
+        emails.set(userId, "Unknown")
+      }
+    })
+  )
+
+  return emails
+}
+
+/**
  * Get pending rewards for admin to process
  */
 export async function getPendingRewards(): Promise<{
@@ -895,21 +925,21 @@ export async function getPendingRewards(): Promise<{
       .orderBy("createdAt", "desc")
       .get()
 
+    // Resolve every email in one deduplicated pass rather than two document
+    // reads per row, which re-read the same referrer once per reward.
+    const emails = await fetchUserEmails(
+      pendingSnapshot.docs.flatMap((doc) => [doc.data().referrerId, doc.data().referredUserId])
+    )
+
     for (const doc of pendingSnapshot.docs) {
       const data = doc.data()
-
-      // Get user emails
-      const [referrerDoc, referredDoc] = await Promise.all([
-        adminDb.collection("users").doc(data.referrerId).get(),
-        adminDb.collection("users").doc(data.referredUserId).get(),
-      ])
 
       const reward = {
         id: doc.id,
         ...data,
         createdAt: data.createdAt?.toDate() || new Date(),
-        referrerEmail: referrerDoc.data()?.email || "Unknown",
-        referredEmail: referredDoc.data()?.email || "Unknown",
+        referrerEmail: emails.get(data.referrerId) || "Unknown",
+        referredEmail: emails.get(data.referredUserId) || "Unknown",
       } as ReferralReward & { referrerEmail: string; referredEmail: string }
 
       if (data.type === "conversion_cash") {
@@ -1166,21 +1196,9 @@ export async function getAllReferralsDetailed(): Promise<DetailedReferral[]> {
       }
     }
 
-    // Collect unique user IDs
-    const userIds = new Set<string>()
-    for (const doc of referralsSnapshot.docs) {
-      const data = doc.data()
-      userIds.add(data.referrerId)
-      userIds.add(data.referredUserId)
-    }
-
-    // Fetch all users in parallel
-    const userEmails = new Map<string, string>()
-    const userPromises = Array.from(userIds).map(async (userId) => {
-      const userDoc = await adminDb.collection("users").doc(userId).get()
-      userEmails.set(userId, userDoc.data()?.email || "Unknown")
-    })
-    await Promise.all(userPromises)
+    const userEmails = await fetchUserEmails(
+      referralsSnapshot.docs.flatMap((doc) => [doc.data().referrerId, doc.data().referredUserId])
+    )
 
     // Build detailed referral list
     for (const doc of referralsSnapshot.docs) {
@@ -1317,11 +1335,11 @@ export async function getReferralStats(): Promise<ReferralStats> {
       .slice(0, 10)
 
     // Fetch user details for top referrers
+    const topReferrerEmails = await fetchUserEmails(topReferrerIds.map(([userId]) => userId))
     for (const [userId, counts] of topReferrerIds) {
-      const userDoc = await adminDb.collection("users").doc(userId).get()
       stats.topReferrers.push({
         userId,
-        email: userDoc.data()?.email || "Unknown",
+        email: topReferrerEmails.get(userId) || "Unknown",
         referralCount: counts.count,
         conversions: counts.conversions,
       })
