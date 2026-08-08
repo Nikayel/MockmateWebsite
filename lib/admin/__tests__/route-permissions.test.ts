@@ -58,6 +58,8 @@ const ROUTE_RULES: RouteRule[] = [
   { route: "learn-research", method: "GET?view=export", permission: PERMISSIONS.EXPORT_DATA, roles: ANALYTICS_READERS },
   { route: "learner-model", method: "GET", permission: PERMISSIONS.VIEW_ANALYTICS, roles: ANALYTICS_READERS },
   { route: "nps", method: "GET", permission: PERMISSIONS.VIEW_ANALYTICS, roles: ANALYTICS_READERS },
+  { route: "revenue", method: "GET", permission: PERMISSIONS.VIEW_REVENUE, roles: ANALYTICS_READERS },
+  { route: "funnel", method: "GET", permission: PERMISSIONS.VIEW_ANALYTICS, roles: ANALYTICS_READERS },
   { route: "providers", method: "GET", permission: PERMISSIONS.MANAGE_SETTINGS, roles: SETTINGS_MANAGERS },
   { route: "query-performance", method: "GET", permission: PERMISSIONS.VIEW_ANALYTICS, roles: ANALYTICS_READERS },
   { route: "query-performance", method: "POST", permission: PERMISSIONS.MANAGE_USERS, roles: PEOPLE_HANDLERS },
@@ -82,15 +84,27 @@ const ROUTE_RULES: RouteRule[] = [
  */
 const INTENTIONALLY_ANY_ADMIN = ["me"]
 
-/** Owned by other work in flight at the time of writing. */
-const NOT_MINE = [
-  "algorithm-research",
-  "funnel",
-  "payments",
-  "referrals",
-  "research",
-  "revenue",
+/**
+ * Routes still on a bare admin check, each with a reason.
+ *
+ * This list used to hold six entries whose only justification was that another
+ * agent owned the file. That is an ownership boundary, not a security argument,
+ * and it made the test certify the exact hole it exists to catch: `revenue` sat
+ * here while the assertions below stated that support cannot read revenue. Both
+ * are now gated, and anything added here has to earn it.
+ */
+const UNGATED_WITH_REASON: Array<{ route: string; reason: string }> = [
+  {
+    route: "algorithm-research",
+    reason:
+      "Mutations are individually gated inside the handler per action; the GET is analytics-shaped. Tracked as an open finding rather than exempt on principle.",
+  },
+  { route: "payments", reason: "Revenue-shaped read still on a bare admin check." },
+  { route: "referrals", reason: "Revenue-shaped read still on a bare admin check." },
+  { route: "research", reason: "Export path gated inline; the readouts are not." },
 ]
+
+const NOT_MINE = UNGATED_WITH_REASON.map((entry) => entry.route)
 
 /** The constant name, e.g. VIEW_ANALYTICS, as it appears in route source. */
 function permissionConstantName(permission: Permission): string {

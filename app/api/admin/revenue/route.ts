@@ -24,7 +24,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { adminDb } from '@/lib/firebase-admin'
-import { verifyAdminAccess, parseAdminQueryParams } from '@/lib/admin/middleware'
+import { withPermission, parseAdminQueryParams } from '@/lib/admin/middleware'
+import { PERMISSIONS } from '@/lib/admin/rbac'
 import { adminCache, getCacheKey, CACHE_TTL } from '@/lib/admin/cache'
 import { countBillingSubscriptions } from '@/lib/admin/subscription-state'
 import {
@@ -54,22 +55,19 @@ const PROVENANCE = {
 /** Hard ceiling on charges pulled from Stripe in one request, so the route cannot run away. */
 const MAX_STRIPE_CHARGES = 1000
 
-export async function GET(request: NextRequest) {
+/**
+ * VIEW_REVENUE, not a bare admin check. This route serves MRR, ARR and live Stripe
+ * balances; verifyAdminAccess returns true for ANY role, so the read-only analyst
+ * and the users-only support role were both reading the company's revenue.
+ */
+export const GET = withPermission(PERMISSIONS.VIEW_REVENUE, async (request) => {
   try {
-    // Verify Admin SDK is initialized
+    // Verify Admin SDK is initialized. Below the auth gate so an unauthenticated
+    // caller cannot learn anything about server configuration.
     if (!adminDb) {
       return NextResponse.json(
         { success: false, error: 'Firebase Admin SDK not initialized.' },
         { status: 500 }
-      )
-    }
-
-    // Verify admin access
-    const authResult = await verifyAdminAccess(request)
-    if (!authResult.authorized) {
-      return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status || 403 }
       )
     }
 
@@ -242,13 +240,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response)
   } catch (error) {
+    // Logged in full server-side; the client gets a stable message. The raw
+    // message here leaked Firestore index URLs and Stripe internals.
     console.error('Admin revenue API error:', error)
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
+      { success: false, error: 'Failed to load revenue data' },
       { status: 500 }
     )
   }
-}
+})

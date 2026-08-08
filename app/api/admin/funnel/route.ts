@@ -21,7 +21,8 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
-import { verifyAdminAccess, parseAdminQueryParams } from "@/lib/admin/middleware"
+import { withPermission, parseAdminQueryParams } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 import {
   buildFunnelStages,
   buildFunnelTrend,
@@ -52,16 +53,13 @@ const PROVENANCE = {
   signupsBySource: "First-touch profiles.acquisition_source, within the selected window.",
 } as const
 
-export async function GET(request: NextRequest) {
+/**
+ * VIEW_ANALYTICS, not a bare admin check. verifyAdminAccess returns true for ANY
+ * role, so the users-only support role was reading the conversion funnel, and the
+ * subscribed stage of it is a revenue figure.
+ */
+export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (request) => {
   try {
-    const authResult = await verifyAdminAccess(request)
-    if (!authResult.authorized) {
-      return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status || 403 }
-      )
-    }
-
     if (!adminDb) {
       return NextResponse.json(
         { success: false, error: "Database not available" },
@@ -211,4 +209,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
