@@ -12,6 +12,7 @@ import { Pinecone } from "@pinecone-database/pinecone"
 import { logger } from "@/lib/logger"
 import { sensitiveOperationRateLimit } from "@/lib/rate-limit"
 import { csrfProtection } from "@/lib/csrf"
+import { deleteAllUserData } from "./delete-user-data"
 
 export const dynamic = "force-dynamic"
 
@@ -78,58 +79,13 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    // 3. Delete all user data from Firestore collections
-    const batch = adminDb.batch()
-    const collectionsToDelete = [
-      { name: "profiles", field: null, docId: userId }, // Profile uses userId as doc ID
-      { name: "sessions", field: "userId" },
-      { name: "interview_sessions", field: "user_id" },
-      { name: "profile_quota", field: "user_id" },
-      { name: "payment_history", field: "user_id" },
-      { name: "email_notifications", field: "user_id" },
-      { name: "session_vectors", field: "userId" },
-      { name: "performance_profiles", field: "userId" },
-      { name: "promo_code_usage", field: "userId" },
-      { name: "analytics", field: "userId" },
-      { name: "user_learning_state", field: null, docId: userId }, // Doc ID is userId
-      { name: "problem_mastery", field: "userId" },
-      { name: "user_roadmaps", field: "userId" },
-      { name: "analytics_events", field: "userId" },
-      { name: "referral_relationships", field: "referrer_id" },
-      { name: "referral_relationships", field: "referred_id" },
-      { name: "referral_rewards", field: "user_id" },
-      { name: "subscription_history", field: "user_id" },
-      { name: "webhook_events", field: null }, // No user reference, skip
-    ]
-
-    let deletedDocCount = 0
-
-    for (const col of collectionsToDelete) {
-      try {
-        if (col.docId) {
-          // Delete specific document by ID
-          const docRef = adminDb.collection(col.name).doc(col.docId)
-          const doc = await docRef.get()
-          if (doc.exists) {
-            batch.delete(docRef)
-            deletedDocCount++
-          }
-        } else if (col.field) {
-          // Query and delete documents by field
-          const snapshot = await adminDb.collection(col.name).where(col.field, "==", userId).get()
-
-          snapshot.docs.forEach((doc) => {
-            batch.delete(doc.ref)
-            deletedDocCount++
-          })
-        }
-      } catch (colError) {
-        logger.error("Error deleting from collection", { collection: col.name, error: colError })
-      }
-    }
-
-    // Commit the batch delete
-    await batch.commit()
+    // 3. Delete all user data from Firestore.
+    //
+    // The collection map and the chunked execution both live in ./delete-user-data
+    // and ./user-data-map. Deletes are chunked so the 500-op batch cap cannot be
+    // hit, and per-collection failures are returned rather than swallowed: this
+    // route must never claim a complete erasure it did not perform.
+    const { deletedDocuments, failedCollections } = await deleteAllUserData(adminDb, userId)
 
     // 4. Delete user vectors from Pinecone (GDPR compliance)
     if (process.env.PINECONE_API_KEY) {
@@ -162,20 +118,60 @@ export async function DELETE(request: NextRequest) {
         }
       } catch (pineconeError) {
         logger.error("Failed to delete Pinecone vectors", { error: pineconeError, userId })
+        failedCollections.push("pinecone")
       }
     }
 
-    // 5. Delete the Firebase Auth user account
+    // 5. Delete the Firebase Auth user account.
+    //
+    // This one is not survivable. If the auth record remains, the person can
+    // still sign in to an account whose data we just removed, and a fresh
+    // profile gets built under the same uid on their next visit. Reporting
+    // success in that state is the single most misleading thing this route
+    // could do, so it fails loudly instead.
     try {
       await adminAuth.deleteUser(userId)
     } catch (authDeleteError) {
       logger.error("Failed to delete Firebase Auth user", { error: authDeleteError, userId })
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "We removed your stored data but could not close your sign-in account. Please contact privacy@codesparring.dev so we can finish the deletion.",
+          deletedDocuments,
+        },
+        { status: 500 }
+      )
     }
+
+    // Honest reporting: only claim a complete erasure when every collection
+    // actually completed. A partial deletion announced as total is worse than a
+    // visible failure, because no one ever retries it.
+    if (failedCollections.length > 0) {
+      logger.error("Account deletion completed with failures", {
+        userId,
+        failedCollections,
+        deletedDocuments,
+      })
+
+      return NextResponse.json({
+        success: true,
+        complete: false,
+        message:
+          "Your account is closed and most of your data is deleted, but some records could not be removed automatically. Our team has been alerted and will finish the deletion. Email privacy@codesparring.dev if you would like confirmation.",
+        deletedDocuments,
+        failedCollections,
+      })
+    }
+
+    logger.info("Account deletion complete", { userId, deletedDocuments })
 
     return NextResponse.json({
       success: true,
-      message: "Account and all associated data have been permanently deleted",
-      deletedDocuments: deletedDocCount,
+      complete: true,
+      message:
+        "Your account and the data we hold for it have been permanently deleted. Stripe keeps its own record of any payments, as tax law requires.",
+      deletedDocuments,
     })
   } catch (error) {
     logger.error("Delete account error", { error })
