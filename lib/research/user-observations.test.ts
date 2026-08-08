@@ -24,7 +24,12 @@ function event(overrides: EventOverrides): AlgorithmResearchEvent {
     quality_rating: 4,
     time_spent_minutes: 10,
     hints_used: 0,
-    pre_review: { interval_days: 3, days_since_last_review: 3, days_overdue: 0, predicted_retention: 80 },
+    pre_review: {
+      interval_days: 3,
+      days_since_last_review: 3,
+      days_overdue: 0,
+      predicted_retention: 80,
+    },
     post_review: { new_interval_days: 6, mastery_level: "learning", mastery_level_changed: false },
     actual_retention: true,
     retention_as_predicted: true,
@@ -141,10 +146,12 @@ describe("event level versus user level", () => {
     const fsrsMeans = [50, 60, 70, 80]
 
     sm2Means.forEach((score, index) => {
-      for (let i = 0; i < 2; i++) events.push(event({ user_id: `s${index}`, algorithm: "sm2", score }))
+      for (let i = 0; i < 2; i++)
+        events.push(event({ user_id: `s${index}`, algorithm: "sm2", score }))
     })
     fsrsMeans.forEach((score, index) => {
-      for (let i = 0; i < 30; i++) events.push(event({ user_id: `f${index}`, algorithm: "fsrs", score }))
+      for (let i = 0; i < 30; i++)
+        events.push(event({ user_id: `f${index}`, algorithm: "fsrs", score }))
     })
 
     const set = aggregateEventsByUser(events)
