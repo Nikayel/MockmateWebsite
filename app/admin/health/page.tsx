@@ -10,6 +10,7 @@ import {
   CheckCircle,
   AlertTriangle,
   XCircle,
+  HelpCircle,
   Database,
   Server,
   Shield,
@@ -18,45 +19,72 @@ import {
   AlertCircle,
   Bell,
   Check,
+  CreditCard,
+  Sparkles,
+  Mic,
+  Mail,
+  Bug,
 } from "lucide-react"
 import { logger } from "@/lib/logger"
 
-interface ServiceHealth {
-  status: "healthy" | "degraded" | "unhealthy"
-  latency: number
-  message?: string
+/**
+ * Every card on this page comes from a probe that can fail. The four cards this
+ * replaced (database, api, auth, storage) were initialised healthy, and only one
+ * of them was ever reassigned, so the page could not go red.
+ *
+ * "unverified" is the state that keeps it honest: a dependency we cannot check
+ * for free is shown in grey and counted separately, never folded into healthy.
+ */
+type ProbeStatus = "healthy" | "degraded" | "unhealthy" | "unknown"
+
+interface DependencyResult {
+  id: string
+  label: string
+  critical: boolean
+  status: ProbeStatus
+  detail: string
+  latencyMs: number | null
+}
+
+interface HealthAlert {
+  id: string
+  type: "error" | "warning" | "info"
+  title: string
+  message: string
+  signature: string
+  acknowledged: boolean
+  acknowledgedBy: string | null
+  acknowledgedAt: string | null
 }
 
 interface HealthData {
-  status: "healthy" | "degraded" | "unhealthy"
+  status: ProbeStatus
   lastChecked: string
-  services: {
-    database: ServiceHealth
-    api: ServiceHealth
-    auth: ServiceHealth
-    storage: ServiceHealth
+  dependencies: DependencyResult[]
+  summary: {
+    status: ProbeStatus
+    healthy: number
+    degraded: number
+    unhealthy: number
+    unknown: number
+    total: number
   }
   metrics: {
-    errorCount: number
-    warningCount: number
-    requestVolume: number
+    /** null when the count could not be taken. Never rendered as a zero. */
+    productEvents24h: number | null
   }
   memory: {
     used: number
     total: number
     percentage: number
   }
-  alerts: Array<{
-    id: string
-    type: "error" | "warning" | "info"
-    title: string
-    message: string
-    timestamp: string
-    acknowledged: boolean
-  }>
+  alerts: HealthAlert[]
 }
 
-const statusConfig = {
+const statusConfig: Record<
+  ProbeStatus,
+  { icon: typeof CheckCircle; color: string; bg: string; label: string }
+> = {
   healthy: { icon: CheckCircle, color: "text-green-400", bg: "bg-green-500/20", label: "Healthy" },
   degraded: {
     icon: AlertTriangle,
@@ -65,13 +93,20 @@ const statusConfig = {
     label: "Degraded",
   },
   unhealthy: { icon: XCircle, color: "text-red-400", bg: "bg-red-500/20", label: "Unhealthy" },
+  unknown: { icon: HelpCircle, color: "text-gray-400", bg: "bg-gray-500/20", label: "Unverified" },
 }
 
-const serviceIcons = {
-  database: Database,
-  api: Server,
-  auth: Shield,
-  storage: HardDrive,
+/** Falls back to a generic icon so a newly added probe still renders. */
+const dependencyIcons: Record<string, typeof Database> = {
+  firestore: Database,
+  "firebase-auth": Shield,
+  stripe: CreditCard,
+  openai: Sparkles,
+  deepseek: Sparkles,
+  gemini: Sparkles,
+  deepgram: Mic,
+  brevo: Mail,
+  sentry: Bug,
 }
 
 export default function SystemHealthPage() {
@@ -79,6 +114,7 @@ export default function SystemHealthPage() {
   const [health, setHealth] = useState<HealthData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [acknowledging, setAcknowledging] = useState<string | null>(null)
 
   const loadHealth = useCallback(
     async (showRefreshing = false) => {
@@ -112,19 +148,29 @@ export default function SystemHealthPage() {
     return () => clearInterval(interval)
   }, [loadHealth])
 
-  const acknowledgeAlert = async (alertId: string) => {
+  /**
+   * The signature travels with the acknowledgement so the server can reject a
+   * stale tab trying to silence a failure it never saw.
+   */
+  const setAcknowledged = async (alert: HealthAlert, acknowledged: boolean) => {
     if (!firebaseUser) return
+    setAcknowledging(alert.id)
 
     try {
       const token = await firebaseUser.getIdToken()
-      await fetch("/api/admin/health", {
+      const response = await fetch("/api/admin/health", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ alertId, acknowledged: true }),
+        body: JSON.stringify({ alertId: alert.id, signature: alert.signature, acknowledged }),
       })
-      loadHealth(true)
+      if (!response.ok) {
+        logger.error("Acknowledge request rejected", { status: response.status })
+      }
+      await loadHealth(true)
     } catch (error) {
       logger.error("Error acknowledging alert", { error })
+    } finally {
+      setAcknowledging(null)
     }
   }
 
@@ -158,7 +204,7 @@ export default function SystemHealthPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-3xl font-bold text-white">System Health</h1>
-          <p className="mt-1 text-gray-400">Monitor system status, performance, and alerts</p>
+          <p className="mt-1 text-gray-400">Live checks against every service the platform runs on</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">
@@ -196,9 +242,16 @@ export default function SystemHealthPage() {
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-3xl font-bold text-white">{health.metrics.errorCount}</p>
-              <p className="text-gray-400">Errors in window</p>
+            <div className="text-right text-sm">
+              <p className="text-3xl font-bold text-white">
+                {health.summary.healthy}/{health.summary.total}
+              </p>
+              <p className="text-gray-400">dependencies verified healthy</p>
+              {health.summary.unknown > 0 && (
+                <p className="mt-1 text-gray-500">
+                  {health.summary.unknown} could not be checked
+                </p>
+              )}
             </div>
           </div>
         </CardContent>
@@ -217,7 +270,7 @@ export default function SystemHealthPage() {
             {health.alerts.map((alert) => (
               <div
                 key={alert.id}
-                className={`rounded-lg border p-4 ${
+                className={`rounded-lg border p-4 ${alert.acknowledged ? "opacity-60" : ""} ${
                   alert.type === "error"
                     ? "border-red-500/30 bg-red-500/10"
                     : alert.type === "warning"
@@ -225,10 +278,10 @@ export default function SystemHealthPage() {
                       : "border-blue-500/30 bg-blue-500/10"
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <AlertCircle
-                      className={`h-5 w-5 ${
+                      className={`h-5 w-5 shrink-0 ${
                         alert.type === "error"
                           ? "text-red-400"
                           : alert.type === "warning"
@@ -239,17 +292,36 @@ export default function SystemHealthPage() {
                     <div>
                       <h4 className="font-medium text-white">{alert.title}</h4>
                       <p className="text-sm text-gray-400">{alert.message}</p>
+                      {alert.acknowledged && alert.acknowledgedAt && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          Acknowledged {new Date(alert.acknowledgedAt).toLocaleString()}
+                        </p>
+                      )}
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => acknowledgeAlert(alert.id)}
-                    className="text-gray-400 hover:text-white"
-                  >
-                    <Check className="mr-1 h-4 w-4" />
-                    Acknowledge
-                  </Button>
+                  {alert.acknowledged ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={acknowledging === alert.id}
+                      onClick={() => setAcknowledged(alert, false)}
+                      className="shrink-0 text-gray-500 hover:text-white"
+                    >
+                      <Check className="mr-1 h-4 w-4" />
+                      Acknowledged
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={acknowledging === alert.id}
+                      onClick={() => setAcknowledged(alert, true)}
+                      className="shrink-0 text-gray-400 hover:text-white"
+                    >
+                      <Check className="mr-1 h-4 w-4" />
+                      Acknowledge
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -257,42 +329,52 @@ export default function SystemHealthPage() {
         </Card>
       )}
 
-      {/* Services Status */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {(Object.entries(health.services) as [keyof typeof health.services, ServiceHealth][]).map(
-          ([name, service]) => {
-            const ServiceIcon = serviceIcons[name]
-            const ServiceStatusIcon = statusConfig[service.status].icon
+      {/* Dependencies */}
+      <div>
+        <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold text-white">
+          <Server className="h-5 w-5 text-[#c4703f]" />
+          Dependencies
+        </h2>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {health.dependencies.map((dependency) => {
+            const config = statusConfig[dependency.status]
+            const DependencyIcon = dependencyIcons[dependency.id] ?? Server
+            const DependencyStatusIcon = config.icon
             return (
-              <Card key={name} className="border-gray-800 bg-gray-900/50">
+              <Card key={dependency.id} className="border-gray-800 bg-gray-900/50">
                 <CardContent className="p-6">
                   <div className="mb-4 flex items-center justify-between">
-                    <div className={`p-3 ${statusConfig[service.status].bg} rounded-lg`}>
-                      <ServiceIcon className={`h-6 w-6 ${statusConfig[service.status].color}`} />
+                    <div className={`rounded-lg p-3 ${config.bg}`}>
+                      <DependencyIcon className={`h-6 w-6 ${config.color}`} />
                     </div>
-                    <Badge
-                      className={
-                        statusConfig[service.status].bg + " " + statusConfig[service.status].color
-                      }
-                    >
-                      <ServiceStatusIcon className="mr-1 h-3 w-3" />
-                      {statusConfig[service.status].label}
+                    <Badge className={`${config.bg} ${config.color}`}>
+                      <DependencyStatusIcon className="mr-1 h-3 w-3" />
+                      {config.label}
                     </Badge>
                   </div>
-                  <h3 className="font-medium text-white capitalize">{name}</h3>
-                  <p className="mt-1 text-sm text-gray-400">{service.latency}ms latency</p>
-                  {service.message && (
-                    <p className="mt-2 text-xs text-yellow-400">{service.message}</p>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-medium text-white">{dependency.label}</h3>
+                    {dependency.critical && (
+                      <Badge variant="outline" className="border-gray-700 text-xs text-gray-400">
+                        Critical
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="mt-1 text-sm text-gray-400">
+                    {dependency.latencyMs === null
+                      ? "Not measured"
+                      : `${dependency.latencyMs}ms latency`}
+                  </p>
+                  <p className="mt-2 text-xs text-gray-500">{dependency.detail}</p>
                 </CardContent>
               </Card>
             )
-          }
-        )}
+          })}
+        </div>
       </div>
 
-      {/* Metrics */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
+      {/* Counters */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <Card className="border-gray-800 bg-gray-900/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -300,24 +382,33 @@ export default function SystemHealthPage() {
                 <Activity className="h-6 w-6 text-[#c4703f]" />
               </div>
               <div>
-                <p className="text-3xl font-bold text-white">
-                  {health.metrics.requestVolume.toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-400">Requests (24h)</p>
+                {health.metrics.productEvents24h === null ? (
+                  <p className="text-lg font-medium text-gray-500">Not collected</p>
+                ) : (
+                  <p className="text-3xl font-bold text-white">
+                    {health.metrics.productEvents24h.toLocaleString()}
+                  </p>
+                )}
+                <p className="text-sm text-gray-400">Product events (24h)</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* Error volume is deliberately absent. It was a count of analytics_events rows with
+            event_name "error", which nothing has ever written, so it was a permanent zero
+            driving an alert that could never fire. Errors go to Sentry through lib/logger. */}
         <Card className="border-gray-800 bg-gray-900/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-red-500/20 p-3">
-                <AlertCircle className="h-6 w-6 text-red-400" />
+              <div className="rounded-lg bg-gray-500/20 p-3">
+                <AlertCircle className="h-6 w-6 text-gray-400" />
               </div>
               <div>
-                <p className="text-3xl font-bold text-white">{health.metrics.errorCount}</p>
-                <p className="text-sm text-gray-400">Errors (24h)</p>
+                <p className="text-lg font-medium text-gray-500">Not collected here</p>
+                <p className="text-sm text-gray-400">
+                  Error volume lives in Sentry. No Firestore sink records it.
+                </p>
               </div>
             </div>
           </CardContent>
