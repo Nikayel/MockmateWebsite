@@ -63,6 +63,12 @@ export default function UsersPage() {
    * result was ever rendered.
    */
   const [searchQuery, setSearchQuery] = useState("")
+  /**
+   * Why the last list load failed, or null. Previously a 500 or a 403 left the list
+   * empty and the table rendered "No users found", so a broken query and a genuinely
+   * empty platform were the same screen.
+   */
+  const [usersError, setUsersError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -113,15 +119,27 @@ export default function UsersPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          setUsers(data.users)
-          setTotalPages(data.pagination.totalPages)
-        }
+      if (!response.ok) {
+        setUsersError(
+          response.status === 403
+            ? "Your role does not have permission to list users."
+            : `The users service returned ${response.status}.`
+        )
+        return
       }
+
+      const data = await response.json()
+      if (!data.success) {
+        setUsersError("The users service returned a response this page could not read.")
+        return
+      }
+
+      setUsers(data.users)
+      setTotalPages(data.pagination.totalPages)
+      setUsersError(null)
     } catch (error) {
       logger.error("Error loading users list", { error, search: searchQuery })
+      setUsersError("Could not reach the users service. Check your connection and try again.")
     } finally {
       setUsersLoading(false)
     }
@@ -359,8 +377,23 @@ export default function UsersPage() {
             <div className="flex items-center justify-center py-12">
               <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
             </div>
+          ) : usersError ? (
+            <div className="py-12 text-center">
+              <p className="font-medium text-yellow-400">Could not load users</p>
+              <p className="mx-auto mt-1 max-w-md text-sm text-gray-400">{usersError}</p>
+              <Button
+                onClick={loadUsers}
+                variant="outline"
+                size="sm"
+                className="mt-4 border-gray-700 text-gray-300"
+              >
+                Try again
+              </Button>
+            </div>
           ) : users.length === 0 ? (
-            <div className="py-12 text-center text-gray-400">No users found</div>
+            <div className="py-12 text-center text-gray-400">
+              {searchQuery ? `No users match "${searchQuery}"` : "No users found"}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
