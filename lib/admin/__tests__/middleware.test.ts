@@ -28,7 +28,7 @@ vi.mock("../rbac", async (importOriginal) => {
 })
 
 const { verifyAdminAccess, requirePermission } = await import("../middleware")
-const { PERMISSIONS } = await import("../rbac")
+const { PERMISSIONS, AdminRoleUnavailableError } = await import("../rbac")
 
 function requestWithToken(token = "valid-token"): NextRequest {
   return {
@@ -68,6 +68,24 @@ describe("verifyAdminAccess", () => {
 
     expect(result.authorized).toBe(false)
     expect(result.status).toBe(403)
+  })
+
+  it("reports a failed role lookup as a fault, not as a refusal", async () => {
+    // A Firestore blip used to surface as 403 "not an admin", which told a real
+    // super_admin they had no access and gave the shell nothing to retry.
+    getAdminRole.mockRejectedValue(new AdminRoleUnavailableError("firestore down"))
+
+    const result = await verifyAdminAccess(requestWithToken())
+
+    expect(result.authorized).toBe(false)
+    expect(result.status).toBe(503)
+    expect(result.error).not.toContain("not an admin")
+  })
+
+  it("does not swallow an unexpected error as a fault", async () => {
+    getAdminRole.mockRejectedValue(new TypeError("programming error"))
+
+    await expect(verifyAdminAccess(requestWithToken())).rejects.toThrow(TypeError)
   })
 
   it("rejects a missing bearer token before touching the database", async () => {
