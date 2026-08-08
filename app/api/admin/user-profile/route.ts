@@ -5,13 +5,9 @@
  * Includes cognitive profile, skill insights, misconceptions, and learning data
  */
 
-import { NextRequest, NextResponse } from "next/server"
-import {
-  verifyAdminAccess,
-  successResponse,
-  unauthorizedResponse,
-  errorResponse,
-} from "@/lib/admin/middleware"
+import { NextResponse } from "next/server"
+import { withPermission, successResponse, errorResponse } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
 import { logAdminAction } from "@/lib/admin/audit"
 import {
   getEnhancedUserProfile,
@@ -25,15 +21,21 @@ import { reconcileStreak } from "@/lib/spaced-repetition/streak"
 import { clampPracticeMinutes } from "@/lib/session-duration"
 import type { Profile } from "@/lib/types"
 
-export async function GET(request: NextRequest) {
-  const authResult = await verifyAdminAccess(request)
-  if (!authResult.authorized) {
-    return unauthorizedResponse(authResult.error!, authResult.status || 401)
-  }
-
-  const adminId = authResult.context!.userId
+/**
+ * This returns one named user's email, full name, session history, cognitive
+ * profile and behavioural inferences. That is the textbook case for
+ * VIEW_USER_DETAILS, which admin, support and super_admin hold. The route only
+ * checked "is an admin", which let the read-only analyst role open any
+ * individual learner's full profile.
+ */
+export const GET = withPermission(PERMISSIONS.VIEW_USER_DETAILS, async (request, context) => {
+  const adminId = context.userId
 
   try {
+    if (!adminDb) {
+      return errorResponse("Database not available", 503)
+    }
+
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get("userId")
 
@@ -169,11 +171,13 @@ export async function GET(request: NextRequest) {
         recommendations: accurateBehavior.recommendations,
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Detail to the log, a stable message to the caller: error.message here
+    // carried Firestore index URLs and internal collection names.
     logger.error("Error fetching user profile for admin", { error, adminId })
-    return errorResponse(error.message || "Failed to fetch user profile", 500)
+    return errorResponse("Failed to fetch user profile", 500)
   }
-}
+})
 
 /**
  * Get misconceptions summary for a user
