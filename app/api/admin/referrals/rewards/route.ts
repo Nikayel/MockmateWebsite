@@ -16,9 +16,11 @@ import {
   checkRewardEligibility,
   normalizeRedemptionReference,
   MAX_REDEMPTION_REFERENCE_LENGTH,
+  RECORD_REDEMPTION_AUDIT_ACTION,
 } from "@/lib/referrals"
 import { requirePermission, errorResponse, unauthorizedResponse } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
+import { logAdminAction } from "@/lib/admin/audit"
 
 const MAX_NOTES_LENGTH = 1000
 
@@ -158,6 +160,32 @@ export async function POST(request: NextRequest) {
       const status = result.code === "not_found" ? 404 : result.code === "write_failed" ? 500 : 409
       return errorResponse(result.message, status)
     }
+
+    // This is the endpoint that discharges the company's obligations to its
+    // users, and it can be driven past the eligibility gate. It wrote no audit
+    // entry at all. Pass the whole admin context so the actor's email is
+    // recorded, and the request so the IP and user agent are real.
+    await logAdminAction(
+      authResult.context!,
+      RECORD_REDEMPTION_AUDIT_ACTION,
+      {
+        rewardType: result.after.type,
+        amount: result.after.amount,
+        referrerId: result.after.referrerId,
+        referredUserId: result.after.referredUserId,
+        redemptionReference: reference,
+        redemptionMethod: "manual_out_of_band",
+        // The override is the whole reason this needs an audit trail.
+        eligibilityOverridden: skipEligibilityCheck,
+        notes: notes?.trim() || null,
+      },
+      {
+        request,
+        target: { type: "referral_rewards", id: rewardId, label: reference },
+        before: { ...result.before },
+        after: { ...result.after },
+      }
+    )
 
     return NextResponse.json({
       success: true,
