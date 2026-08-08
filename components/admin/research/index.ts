@@ -12,3 +12,4 @@ export {
 
 export { UserAlgorithmBreakdown } from "./UserAlgorithmBreakdown"
 export { LearnerModelPanel } from "./LearnerModelPanel"
+export { ExperimentReadoutPanel } from "./ExperimentReadoutPanel"

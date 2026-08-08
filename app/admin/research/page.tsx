@@ -34,6 +34,7 @@ import {
   RecommendationsPanel,
   UserAlgorithmBreakdown,
   LearnerModelPanel,
+  ExperimentReadoutPanel,
 } from "@/components/admin/research"
 import { useLearnerModelStats } from "@/lib/hooks/useLearnerModelStats"
 import {
@@ -45,7 +46,6 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  Award,
   Activity,
   BarChart3,
   Loader2,
@@ -502,16 +502,21 @@ export default function ResearchDashboard() {
         </Card>
       </div>
 
-      {/* Winner Banner */}
-      {comp && (
-        <WinnerBanner
-          winner={comp.overall_winner as "sm2" | "fsrs" | null}
-          confidence={comp.confidence_level}
-          fsrsWins={comp.fsrs_wins_count}
-          sm2Wins={comp.sm2_wins_count}
-          sufficientSample={comp.sufficient_sample_size}
-        />
-      )}
+      {/* Verdict.
+          This used to be a WinnerBanner reading `comparison.confidence_level`,
+          a number computed as `60 + wins * 7` and labelled "confidence". The
+          panel below reports a user-level test, its interval, n per arm and the
+          SRM check, and says "not enough data yet" when that is the truth. */}
+      {enhancedLoading ? (
+        <Card className="border-gray-800 bg-gray-900/50">
+          <CardContent className="flex items-center gap-2 py-6 text-gray-400">
+            <Loader2 className="h-5 w-5 animate-spin text-[#c4703f]" />
+            Computing the experiment readout...
+          </CardContent>
+        </Card>
+      ) : enhancedData?.experiment ? (
+        <ExperimentReadoutPanel readout={enhancedData.experiment} />
+      ) : null}
 
       {/* Insights Summary */}
       {insights && (
@@ -724,13 +729,15 @@ export default function ResearchDashboard() {
                     Statistical Significance Tests
                   </h3>
                   <p className="text-sm text-gray-400">
-                    T-tests comparing SM-2 and FSRS performance. p &lt; 0.05 indicates statistical
-                    significance.
+                    Welch t-tests on one value per user, because the A/B randomizes users rather
+                    than reviews. These are the raw per-metric p-values. The verdict at the top of
+                    the page applies the Holm correction across all three before calling a winner.
                   </p>
                 </div>
                 {enhancedData.metadata && (
                   <Badge variant="outline" className="border-gray-700 text-gray-400">
-                    {enhancedData.metadata.totalEventsAnalyzed.toLocaleString()} events analyzed
+                    {enhancedData.metadata.totalUsersAnalyzed.toLocaleString()} users from{" "}
+                    {enhancedData.metadata.totalEventsAnalyzed.toLocaleString()} reviews
                   </Badge>
                 )}
               </div>
@@ -739,17 +746,17 @@ export default function ResearchDashboard() {
                 <SignificanceTestCard
                   title="Retention Rate"
                   test={enhancedData.significanceTests.retention}
-                  description="% of reviews where user recalled correctly"
+                  description="Per user: share of their reviews recalled correctly"
                 />
                 <SignificanceTestCard
                   title="Average Score"
                   test={enhancedData.significanceTests.score}
-                  description="Performance score on practice problems"
+                  description="Per user: mean score across their reviews"
                 />
                 <SignificanceTestCard
                   title="Interval Accuracy"
                   test={enhancedData.significanceTests.intervalAccuracy}
-                  description="How well scheduled intervals predict retention"
+                  description="Per user: share of reviews the schedule predicted correctly"
                 />
               </div>
 
@@ -1173,75 +1180,6 @@ function AlgorithmCard({
             <p className="text-xl font-bold text-yellow-400">{overridden}</p>
             <p className="text-xs text-gray-400">Overridden</p>
           </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-interface WinnerBannerProps {
-  winner: "sm2" | "fsrs" | null
-  confidence: number | null
-  fsrsWins: number
-  sm2Wins: number
-  sufficientSample: boolean
-}
-
-function WinnerBanner({
-  winner,
-  confidence,
-  fsrsWins,
-  sm2Wins,
-  sufficientSample,
-}: WinnerBannerProps) {
-  return (
-    <Card
-      className={`border-2 ${
-        winner === "fsrs"
-          ? "border-purple-500/50 bg-purple-500/10"
-          : winner === "sm2"
-            ? "border-blue-500/50 bg-blue-500/10"
-            : "border-gray-700 bg-gray-800/50"
-      }`}
-    >
-      <CardContent className="py-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {winner ? (
-              <Award className="h-10 w-10 text-yellow-400" />
-            ) : (
-              <Activity className="h-10 w-10 text-gray-400" />
-            )}
-            <div>
-              {winner ? (
-                <>
-                  <Badge
-                    className={`mb-1 px-4 py-1 text-lg ${
-                      winner === "fsrs" ? "bg-purple-500" : "bg-blue-500"
-                    }`}
-                  >
-                    {winner.toUpperCase()} WINNING
-                  </Badge>
-                  <p className="text-gray-300">
-                    With {confidence}% confidence based on current data
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-xl font-bold text-white">No Clear Winner Yet</p>
-                  <p className="text-gray-400">
-                    FSRS leads in {fsrsWins}/5 metrics, SM-2 leads in {sm2Wins}/5
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-          {!sufficientSample && (
-            <div className="flex items-center gap-2 rounded-lg bg-yellow-500/10 px-4 py-2 text-yellow-400">
-              <AlertTriangle className="h-5 w-5" />
-              <span className="text-sm">Need more users for statistical significance</span>
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>
