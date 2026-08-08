@@ -8,28 +8,33 @@ Ordered by what breaks if you skip it.
 
 ---
 
-## 1. Deploy the Firestore rules and indexes
+## 1. Deploy the Firestore rules
+
+Indexes are **DONE**. All 67 composite indexes were deployed to `danuxx-42bf3` on 2026-08-08,
+including the 13 on `interview_sessions` behind the `/admin/sessions` filters, the 4 on
+`feedback` behind the triage queue and the per-account daily submission cap, and the
+`user_misconceptions` index whose absence 500'd the RAG misconception path. Verify build state in
+the console; Firestore builds indexes asynchronously and a query against one still building
+fails the same way a missing one does.
+
+One index exists in the project that is not in `firestore.indexes.json`. It was left alone
+rather than deleted, since `--force` is the only way to remove it and an index nobody declared
+is more likely to be one somebody added from a console error link than one that is safe to drop.
+
+**Rules are still NOT deployed, and this is the most important line in this document.**
 
 ```bash
-firebase deploy --only firestore:rules,firestore:indexes
+firebase deploy --only firestore:rules
 ```
 
-**This is the most important line in this document.** `firestore.rules` is deployed by hand, so the
-security fix that closed the free-Pro hole is currently only in the repo. Until you run this, any
-signed-in user can still delete their profile and recreate it as `subscription_tier: "pro"` straight
-from the browser console.
+`firestore.rules` is deployed by hand, so the security fix that closed the free-Pro hole is
+still only in the repo. Until you run this, any signed-in user can delete their profile and
+recreate it as `subscription_tier: "pro"` straight from the browser console.
 
-The same deploy ships the missing `user_misconceptions` composite index, without which a signed-in
-user hits a 500 on the RAG misconception path.
-
-It also ships the indexes the admin sweep of 2026-08-07 added. Until they are live:
-
-- **`interview_sessions`, 13 indexes.** Every filter on `/admin/sessions` fails. The page names
-  undeployed indexes as a likely cause rather than showing an empty list, so the symptom is legible,
-  but the feature does not work.
-- **`feedback`, 4 indexes.** The triage queue on `/admin/feedback` and the per-account daily
-  submission cap both fail with `FAILED_PRECONDITION`. The cap is what stops one account flooding
-  the queue, so this one gates the feedback feature going live at all.
+The file compiles clean as of 2026-08-08 (it previously emitted five warnings, all from one
+unused helper, now removed). Run `pnpm test:integration` first: it exercises
+`firestore-rules.integration.test.ts` against a local emulator using this same file, and should
+stay at 23 passing.
 
 Verify afterwards: `pnpm test:integration` runs `firestore-rules.integration.test.ts` against a local
 emulator using the same rules file. It should stay at 23 passing.
