@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import type { DependencyProbe } from "../dependency-probes"
+import { adminCache } from "../cache"
 
 /**
  * The System Health route.
@@ -75,7 +76,17 @@ type HealthResponse = {
   status: number
 }
 
+/**
+ * Swap the registered probes.
+ *
+ * Also drops the route's probe cache. The route caches results so the page's 30s
+ * poll does not re-hit seven vendors on every refresh, which means a test that
+ * changes the world and then asks for health would otherwise be answered from the
+ * previous state. Clearing here rather than in a beforeEach covers the cases that
+ * swap probes midway through a test to prove a dependency recovering.
+ */
 function useProbes(...probes: Array<Partial<DependencyProbe> & Pick<DependencyProbe, "id" | "run">>) {
+  adminCache.delete("health:dependency-probes")
   probeSet.length = 0
   for (const probe of probes) {
     probeSet.push({ label: probe.id, critical: false, ...probe } as DependencyProbe)
