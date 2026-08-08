@@ -26,12 +26,10 @@ import {
 } from "@/lib/usage-tracking"
 import { getCacheStats } from "@/lib/ai-cache"
 import {
-  verifyAdminAccess,
   requirePermission,
   successResponse,
   errorResponse,
   unauthorizedResponse,
-  type AdminContext,
 } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
 import { logAdminAction } from "@/lib/admin/audit"
@@ -124,7 +122,8 @@ export async function GET(request: NextRequest) {
     }
   } catch (error) {
     console.error("[Admin Usage API] Error fetching usage data:", error)
-    return errorResponse(error instanceof Error ? error.message : "Failed to fetch usage data", 500)
+    // Detail to the log; this path touches Firestore and provider cost tables.
+    return errorResponse("Failed to fetch usage data", 500)
   }
 }
 
@@ -339,6 +338,6 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error("[Admin Usage API] Error performing action:", error)
-    return errorResponse(error instanceof Error ? error.message : "Failed to perform action", 500)
+    return errorResponse("Failed to perform action", 500)
   }
 }
