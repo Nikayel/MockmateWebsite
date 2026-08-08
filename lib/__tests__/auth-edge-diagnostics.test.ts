@@ -26,9 +26,7 @@ vi.stubEnv("NEXT_PUBLIC_FIREBASE_API_KEY", "test-api-key")
 const { verifyAuthEdge } = await import("../auth-edge")
 
 function requestWithToken(token = "a.valid-looking.token"): Request {
-  return {
-    headers: { get: (name: string) => (name === "Authorization" ? `Bearer ${token}` : null) },
-  } as Request
+  return { headers: { get: (name: string) => (name === "Authorization" ? `Bearer ${token}` : null) } } as Request
 }
 
 /** Stub `fetch` with a fixed response, or make it reject to simulate a transport failure. */

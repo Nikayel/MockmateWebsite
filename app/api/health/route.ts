@@ -43,11 +43,7 @@ const startTime = Date.now()
 /**
  * Check Firebase Admin SDK health
  */
-async function checkFirebase(): Promise<{
-  status: "pass" | "fail" | "warn"
-  latency: number
-  message?: string
-}> {
+async function checkFirebase(): Promise<{ status: "pass" | "fail" | "warn"; latency: number; message?: string }> {
   const start = Date.now()
   try {
     const { adminDb } = await import("@/lib/firebase-admin")
@@ -69,11 +65,7 @@ async function checkFirebase(): Promise<{
 /**
  * Check Stripe API health
  */
-async function checkStripe(): Promise<{
-  status: "pass" | "fail" | "warn"
-  latency: number
-  message?: string
-}> {
+async function checkStripe(): Promise<{ status: "pass" | "fail" | "warn"; latency: number; message?: string }> {
   const start = Date.now()
   try {
     if (!process.env.STRIPE_SECRET_KEY) {
