@@ -294,16 +294,6 @@ export async function signInWithGitHub(redirect?: string) {
       console.log("Current origin:", typeof window !== "undefined" ? window.location.origin : "N/A")
     }
 
-    // Check if popup might be blocked
-    if (typeof window !== "undefined") {
-      const testPopup = window.open("", "_blank", "width=1,height=1")
-      if (!testPopup || testPopup.closed || typeof testPopup.closed === "undefined") {
-        if (isDev) console.warn("Popup might be blocked, consider using redirect method")
-      } else {
-        testPopup.close()
-      }
-    }
-
     const result = await signInWithPopup(auth, provider)
     if (isDev) console.log("GitHub sign-in successful")
 
@@ -405,16 +395,6 @@ export async function signInWithGoogle(redirect?: string) {
       console.log("Attempting Google sign-in...")
       console.log("Auth domain:", auth.app.options.authDomain)
       console.log("Current origin:", typeof window !== "undefined" ? window.location.origin : "N/A")
-    }
-
-    // Check if popup might be blocked
-    if (typeof window !== "undefined") {
-      const testPopup = window.open("", "_blank", "width=1,height=1")
-      if (!testPopup || testPopup.closed || typeof testPopup.closed === "undefined") {
-        if (isDev) console.warn("Popup might be blocked, consider using redirect method")
-      } else {
-        testPopup.close()
-      }
     }
 
     const result = await signInWithPopup(auth, provider)
