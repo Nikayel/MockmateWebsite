@@ -130,13 +130,6 @@ export const ADMIN_NAV: readonly AdminNavEntry[] = [
     // The queue exposes who wrote each item, so its route requires VIEW_USER_DETAILS.
     permission: "view_user_details",
   },
-  {
-    name: "Insights",
-    href: "/admin/insights",
-    section: "Operations",
-    badge: "AI",
-    permission: "view_analytics",
-  },
   { name: "Audit Log", href: "/admin/audit", section: "Operations", permission: "manage_settings" },
   {
     name: "Settings",

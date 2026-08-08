@@ -129,7 +129,6 @@ describe("nav permissions match the routes they open", () => {
     "/admin/feedback": "feedback",
     "/admin/scoring": "scoring",
     "/admin/rag": "rag-health",
-    "/admin/insights": "insight-effectiveness",
     "/admin/learn-research": "learn-research",
     "/admin/bugfix-quality": "bugfix-quality",
   }
