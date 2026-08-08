@@ -351,9 +351,29 @@ function describeVerdict(
 
     case "no_difference_detected": {
       const test = primary.test!
+      const favours = favouredArm(test)
+      const gap =
+        favours === "neither"
+          ? `${primary.label} came out identical in both arms`
+          : `${primary.label} differs by ${formatUnit(test.meanDifference, primary.unit)} in favour of ${armName(favours)}`
+      const interval = `the 95% interval runs from ${formatUnit(test.differenceInterval.lower, primary.unit)} to ${formatUnit(test.differenceInterval.upper, primary.unit)}`
+      const counts = `n = ${test.nControl} SM-2 vs ${test.nTreatment} FSRS`
+      const adjusted = formatPValue(primary.adjustedPValue ?? 1)
+
+      // The interval printed here is UNCORRECTED while the verdict is Holm
+      // corrected across the family, so the two can legitimately disagree: a
+      // raw p of 0.02 across three metrics adjusts to 0.06 and lands here with
+      // an interval that excludes zero. The sentence therefore reads the
+      // interval it just printed instead of asserting that every
+      // non-significant interval must contain zero.
+      const spansZero = test.differenceInterval.lower <= 0 && test.differenceInterval.upper >= 0
+      const reading = spansZero
+        ? `and spans no difference (Holm adjusted p = ${adjusted}, ${counts})`
+        : `and does not contain zero on its own, but that interval is uncorrected: across the ${design.familyMetrics.length} metrics tested together the Holm adjusted p = ${adjusted} stays above alpha = ${design.alpha} (${counts})`
+
       return {
         headline: "No difference detected on the primary metric",
-        detail: `${primary.label} differs by ${formatUnit(test.meanDifference, primary.unit)} in favour of ${armName(favouredArm(test) === "sm2" ? "sm2" : "fsrs")}, but the 95% interval runs from ${formatUnit(test.differenceInterval.lower, primary.unit)} to ${formatUnit(test.differenceInterval.upper, primary.unit)} and spans no difference (Holm adjusted p = ${formatPValue(primary.adjustedPValue ?? 1)}, n = ${test.nControl} SM-2 vs ${test.nTreatment} FSRS). This is not evidence the algorithms are equal, only that the current sample cannot separate them.`,
+        detail: `${gap}, but ${interval} ${reading}. This is not evidence the algorithms are equal, only that the current sample cannot separate them.`,
       }
     }
 

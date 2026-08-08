@@ -151,6 +151,22 @@ describe("verdicts", () => {
     expect(readout.detail).toContain("not evidence the algorithms are equal")
   })
 
+  it("does not claim an interval spans zero when it excludes zero", () => {
+    // Raw p on retention sits under 0.05 while the Holm adjustment across three
+    // metrics pushes it back over, so the verdict is "no difference" and the
+    // uncorrected interval printed beside it excludes zero. The sentence has to
+    // follow the interval rather than the verdict.
+    const readout = readoutFor(arm("sm2", 40, 0.7), arm("fsrs", 40, 0.73))
+
+    expect(readout.verdict).toBe("no_difference_detected")
+    expect(readout.primary.test!.pValue).toBeLessThan(0.05)
+    expect(readout.primary.adjustedPValue!).toBeGreaterThanOrEqual(0.05)
+    expect(readout.primary.test!.differenceInterval.lower).toBeGreaterThan(0)
+    expect(readout.detail).not.toContain("spans no difference")
+    expect(readout.detail).toContain("does not contain zero")
+    expect(readout.detail).toContain("Holm adjusted p =")
+  })
+
   it("applies the Holm correction across the metric family", () => {
     const readout = readoutFor(arm("sm2", 60, 0.6), arm("fsrs", 60, 0.75))
     const tested = [readout.primary, ...readout.secondary].filter((metric) => metric.test)
