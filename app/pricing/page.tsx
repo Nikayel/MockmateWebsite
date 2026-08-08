@@ -1,5 +1,4 @@
 import { PricingPageClient } from "@/components/pricing/PricingPageClient"
-import { FAQPageJsonLd } from "@/components/seo/JsonLd"
 
 /**
  * Pricing Page - Server Component
@@ -46,8 +45,11 @@ const faqs = [
 export default function PricingPage() {
   return (
     <>
-      {/* JSON-LD for SEO - rendered server-side */}
-      <FAQPageJsonLd faqs={faqs} />
+      {/* No FAQPage JSON-LD here. Google stopped rendering FAQ rich results on
+          2026-05-07, and components/seo/JsonLd.tsx states the rule this follows:
+          an unrendered schema type is bytes on every page for no return. The faqs
+          array below is still the real page content, just no longer duplicated
+          into a graph nothing reads. */}
       <PricingPageClient faqs={faqs} />
     </>
   )

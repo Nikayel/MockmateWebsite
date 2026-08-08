@@ -190,28 +190,13 @@ export function SoftwareApplicationJsonLd() {
   )
 }
 
-// FAQ Schema - for pricing page FAQs
-export function FAQPageJsonLd({ faqs }: { faqs: Array<{ question: string; answer: string }> }) {
-  const schema = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: faqs.map((faq) => ({
-      "@type": "Question",
-      name: faq.question,
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: faq.answer,
-      },
-    })),
-  }
-
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
-    />
-  )
-}
+// FAQPageJsonLd was removed when its last caller (the pricing page) dropped it.
+// Google stopped rendering FAQ rich results on 2026-05-07, which is the date this
+// file's own header records, so the schema was bytes on every pricing view for no
+// return. HomepagePositioningFAQJsonLd below is deliberately KEPT: it exists to
+// give AI crawlers a differentiation answer, which is a separate purpose from a
+// Google rich result and one this site actively courts (see public/llms.txt and
+// the AI-crawler allowances in app/robots.ts).
 
 // WebPage Schema - generic page schema
 export function WebPageJsonLd({
