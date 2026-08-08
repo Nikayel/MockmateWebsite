@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from "next/server"
-import { verifyAdminAccess, parseAdminQueryParams } from "@/lib/admin/middleware"
+import { NextResponse } from "next/server"
+import { withPermission, parseAdminQueryParams } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
+import { parseBoundedInt } from "@/lib/admin/query-params"
 import { adminCache, getCacheKey, CACHE_TTL } from "@/lib/admin/cache"
 import {
   getConstitutionalAIStats,
@@ -23,18 +25,12 @@ import { logger } from "@/lib/logger"
  * - Score accuracy metrics
  * - Conflict analysis (when AI and initial scoring disagree)
  * - Time series data for charts
+ *
+ * Platform-wide scoring behaviour, so VIEW_ANALYTICS. It previously accepted any
+ * admin role, including support.
  */
-export async function GET(request: NextRequest) {
+export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (request) => {
   try {
-    // Verify admin access
-    const authResult = await verifyAdminAccess(request)
-    if (!authResult.authorized) {
-      return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status || 403 }
-      )
-    }
-
     // Parse query params
     const { timeRange } = parseAdminQueryParams(request)
     const searchParams = request.nextUrl.searchParams
@@ -46,7 +42,19 @@ export async function GET(request: NextRequest) {
       | null
     const includeTimeSeries = searchParams.get("includeTimeSeries") !== "false"
     const includeConflicts = searchParams.get("includeConflicts") !== "false"
-    const conflictLimit = parseInt(searchParams.get("conflictLimit") || "20", 10)
+    // conflictLimit reaches a Firestore .limit(); unbounded it is a full scan.
+    const conflictLimitParam = parseBoundedInt(searchParams.get("conflictLimit"), {
+      min: 1,
+      max: 200,
+      fallback: 20,
+    })
+    if (!conflictLimitParam.ok) {
+      return NextResponse.json(
+        { success: false, error: `Invalid conflictLimit: ${conflictLimitParam.error}` },
+        { status: 400 }
+      )
+    }
+    const conflictLimit = conflictLimitParam.value
 
     // Build request object
     const analyticsRequest: ScoringAnalyticsRequest = {
@@ -94,14 +102,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response)
   } catch (error) {
+    // Detail stays in the server log. Returning error.message here handed the
+    // caller Firestore index URLs and collection names.
     logger.error("[Admin Scoring API] Error fetching analytics", { error })
 
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to fetch scoring analytics",
-      },
+      { success: false, error: "Failed to fetch scoring analytics" },
       { status: 500 }
     )
   }
-}
+})
