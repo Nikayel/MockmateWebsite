@@ -31,7 +31,8 @@ import { adminDb } from "@/lib/firebase-admin"
 import { requirePermission } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
 import { logAdminAction } from "@/lib/admin/audit"
-import { getAggregateComparison } from "@/lib/spaced-repetition"
+import { analyzeResearchData } from "@/lib/research/analyzer"
+import type { ExperimentReadout } from "@/lib/research/experiment-readout"
 import type { AlgorithmResearchEvent } from "@/lib/types"
 
 /** See AUDIT_ACTIONS in lib/admin/audit.ts; this route's action is not there yet. */
@@ -261,11 +262,93 @@ async function exportUserSummaries(algorithmFilter: string): Promise<any[]> {
   return summaries
 }
 
+/**
+ * The tested half of the comparison export.
+ *
+ * A CSV outlives the dashboard that produced it, so it has to carry enough for
+ * the reader to judge the claim on their own: the effect with its interval, the
+ * n behind it, the correction applied, and the sample ratio check that decides
+ * whether any of it is valid. Where the sample cannot support a test the
+ * columns are EMPTY rather than zero, and `experiment_verdict` says why. A blank
+ * cell reads as "no answer"; a zero reads as "no effect", and those are
+ * different claims.
+ */
+function flattenExperimentReadout(readout: ExperimentReadout): Record<string, unknown> {
+  const { primary, sampleRatio, sample, design, window } = readout
+  const test = primary.test
+
+  return {
+    experiment_id: design.experimentId,
+    experiment_verdict: readout.verdict,
+    experiment_headline: readout.headline,
+    experiment_detail: readout.detail,
+
+    // Analysis window. The tested numbers cover this range, which is NOT the
+    // lifetime range the descriptive block above is built from.
+    analysis_window_start: window.start,
+    analysis_window_end: window.end,
+    analysis_events_analyzed: window.eventsAnalyzed,
+    analysis_window_truncated: window.truncated,
+
+    // Primary metric, declared in advance so the decision is not made by
+    // whichever of the three metrics happens to look best today.
+    primary_metric: primary.key,
+    primary_metric_label: primary.label,
+    primary_n_users_sm2: primary.nControl,
+    primary_n_users_fsrs: primary.nTreatment,
+    primary_mean_sm2: test ? test.meanControl : null,
+    primary_mean_fsrs: test ? test.meanTreatment : null,
+    primary_mean_difference_fsrs_minus_sm2: test ? test.meanDifference : null,
+    primary_difference_ci95_lower: test ? test.differenceInterval.lower : null,
+    primary_difference_ci95_upper: test ? test.differenceInterval.upper : null,
+    primary_t_statistic: test ? test.tStatistic : null,
+    primary_degrees_of_freedom: test ? test.degreesOfFreedom : null,
+    primary_p_value: test ? test.pValue : null,
+    primary_p_value_holm_adjusted: primary.adjustedPValue,
+    primary_significant_after_correction: test ? primary.significant : null,
+    primary_effect_size_cohens_d: test ? test.effectSize.d : null,
+    primary_effect_size_ci95_lower: test ? test.effectSize.interval.lower : null,
+    primary_effect_size_ci95_upper: test ? test.effectSize.interval.upper : null,
+    primary_effect_size_label: test ? test.effectSize.label : null,
+    primary_unavailable_reason: primary.unavailableReason,
+    multiple_comparison_correction: design.multipleComparisonCorrection,
+    metrics_in_family: design.familyMetrics.length,
+    alpha: design.alpha,
+
+    // Sample ratio mismatch. Checked first: a broken split makes every
+    // comparison above a comparison of two different populations.
+    srm_assigned_users_sm2: sampleRatio.nControl,
+    srm_assigned_users_fsrs: sampleRatio.nTreatment,
+    srm_expected_sm2_share: sampleRatio.expectedControlShare,
+    srm_observed_sm2_share: sampleRatio.observedControlShare,
+    srm_chi_square: sampleRatio.chiSquare,
+    srm_p_value: sampleRatio.pValue,
+    srm_alarm_threshold: sampleRatio.threshold,
+    srm_mismatch: sampleRatio.mismatch,
+
+    // How much sample the design wanted, and how small an effect this sample
+    // could have caught. Without these a null result cannot be told apart from
+    // no data.
+    users_needed_per_arm_for_target_effect: sample.usersNeededPerArm,
+    target_effect_size_cohens_d: design.targetEffectSize,
+    minimum_detectable_effect_cohens_d: sample.minimumDetectableEffect,
+    power: design.power,
+    users_with_mixed_assignment: sample.usersWithMixedAssignment,
+    stopping_rule: design.stoppingRule,
+  }
+}
+
 async function exportComparison(): Promise<any> {
-  const comparison = await getAggregateComparison()
+  // One analysis pass gives both halves of this export: the stored descriptive
+  // aggregate and the tested readout built from user-level observations.
+  const analysis = await analyzeResearchData()
+  const comparison = analysis.comparison
 
   if (!comparison) {
-    return { message: "No comparison data available" }
+    return {
+      message: "No comparison data available",
+      ...flattenExperimentReadout(analysis.experiment),
+    }
   }
 
   // Flatten for easier consumption
@@ -322,7 +405,9 @@ async function exportComparison(): Promise<any> {
     fsrs_cohort_averages_led: comparison.comparison.fsrs_wins_count,
     sm2_cohort_averages_led: comparison.comparison.sm2_wins_count,
     analysis_note:
-      "Descriptive cohort averages only. Leading on an average is not a result. The tested verdict (user-level Welch t-tests, Holm corrected across three metrics, with a sample ratio mismatch check) is on /admin/research and in GET /api/admin/research/enhanced.",
+      "Every column above this line is a descriptive cohort average. Leading on an average is not a result. The tested columns below are the ones to quote.",
+
+    ...flattenExperimentReadout(analysis.experiment),
   }
 }
 
@@ -332,10 +417,18 @@ function convertToCSV(data: any, type: string): string {
   }
 
   if (type === "comparison") {
-    // Single object - convert to key-value pairs
+    // Single object - convert to key-value pairs.
+    //
+    // An absent value writes an EMPTY cell, not the string "null". A metric
+    // that could not be tested has no number, and printing "null" beside a
+    // p-value column invites the reader to treat it as a zero.
     const lines = ["metric,value"]
     for (const [key, value] of Object.entries(data)) {
-      lines.push(`${key},"${value}"`)
+      if (value === null || value === undefined) {
+        lines.push(`${key},`)
+        continue
+      }
+      lines.push(`${key},"${String(value).replace(/"/g, '""')}"`)
     }
     return lines.join("\n")
   }
