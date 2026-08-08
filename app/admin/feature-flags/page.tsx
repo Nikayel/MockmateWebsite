@@ -49,6 +49,7 @@ import {
   Percent,
   AlertCircle,
   Loader2,
+  History,
 } from "lucide-react"
 import { logger } from "@/lib/logger"
 
@@ -81,6 +82,38 @@ interface FeatureFlag {
  * because the page reloaded the list and the row simply stayed as it was. An
  * operator flipping a kill switch had no way to tell "saved" from "refused".
  */
+/** One audit-log row for a flag, as returned by `GET ?history=<flagId>`. */
+interface FlagHistoryEntry {
+  id: string
+  action: string
+  adminId: string
+  adminEmail: string | null
+  before: { enabled?: boolean; rolloutPercentage?: number } | null
+  after: { enabled?: boolean; rolloutPercentage?: number } | null
+  ip: string | null
+  timestamp: string | null
+}
+
+const HISTORY_ACTION_LABELS: Record<string, string> = {
+  create_feature_flag: "Created",
+  update_feature_flag: "Changed",
+  delete_feature_flag: "Deleted",
+}
+
+/** Render the state change an entry recorded, e.g. "on to off". */
+function describeHistoryChange(entry: FlagHistoryEntry): string {
+  const before = entry.before?.enabled
+  const after = entry.after?.enabled
+  if (before === undefined && after !== undefined) return after ? "created on" : "created off"
+  if (before !== undefined && after === undefined) return before ? "deleted while on" : "deleted"
+  if (before !== after) return `${before ? "on" : "off"} to ${after ? "on" : "off"}`
+
+  const beforePct = entry.before?.rolloutPercentage
+  const afterPct = entry.after?.rolloutPercentage
+  if (beforePct !== afterPct) return `rollout ${beforePct}% to ${afterPct}%`
+  return "settings edited"
+}
+
 /**
  * How long a change takes to reach every running server. Mirrors
  * FLAG_CACHE_TTL_MS in lib/feature-flags.ts. An operator flipping a kill
@@ -177,6 +210,9 @@ export default function FeatureFlagsPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   /** The flag awaiting confirmation, if the requested toggle needs one. */
   const [flagToConfirm, setFlagToConfirm] = useState<FeatureFlag | null>(null)
+  /** The flag whose change history is open, and the entries read back for it. */
+  const [historyFlag, setHistoryFlag] = useState<FeatureFlag | null>(null)
+  const [historyEntries, setHistoryEntries] = useState<FlagHistoryEntry[] | null>(null)
 
   const loadFlags = useCallback(
     async (showRefreshing = false) => {
@@ -312,6 +348,27 @@ export default function FeatureFlagsPage() {
     const flag = flagToConfirm
     setFlagToConfirm(null)
     if (flag) await applyToggle(flag)
+  }
+
+  const openHistory = async (flag: FeatureFlag) => {
+    if (!firebaseUser) return
+    setHistoryFlag(flag)
+    setHistoryEntries(null)
+
+    try {
+      const token = await firebaseUser.getIdToken()
+      const response = await fetch(`/api/admin/feature-flags?history=${flag.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await readFlagResponse<{ history: FlagHistoryEntry[] }>(response)
+      setHistoryEntries(data.history)
+    } catch (error) {
+      logger.error("Error loading flag history", { error })
+      setHistoryEntries([])
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not load this flag's history."
+      )
+    }
   }
 
   const handleDelete = async (flag: FeatureFlag) => {
@@ -539,6 +596,15 @@ export default function FeatureFlagsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => openHistory(flag)}
+                          className="text-gray-400 hover:text-white"
+                          aria-label={`Change history for ${flag.name}`}
+                        >
+                          <History className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleOpenEdit(flag)}
                           className="text-gray-400 hover:text-white"
                           aria-label={`Edit ${flag.name}`}
@@ -564,6 +630,62 @@ export default function FeatureFlagsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Change history, read back out of the audit log */}
+      <Dialog
+        open={historyFlag !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setHistoryFlag(null)
+            setHistoryEntries(null)
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl border-gray-800 bg-gray-900 text-white">
+          <DialogHeader>
+            <DialogTitle>Change history: {historyFlag?.name}</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Who changed this flag, when, and what it changed from. Read from the admin audit
+              log, most recent first.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[55vh] space-y-2 overflow-y-auto py-2">
+            {historyEntries === null && (
+              <div className="flex items-center gap-2 py-8 text-gray-400">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading history
+              </div>
+            )}
+            {historyEntries?.length === 0 && (
+              <p className="py-8 text-center text-gray-500">
+                No recorded changes. Entries appear here from the first change made after audit
+                logging covered this page.
+              </p>
+            )}
+            {historyEntries?.map((entry) => (
+              <div
+                key={entry.id}
+                className="rounded-lg border border-gray-700/50 bg-gray-800/30 p-3 text-sm"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="bg-[#c4703f]/20 text-[#c4703f]">
+                    {HISTORY_ACTION_LABELS[entry.action] ?? entry.action}
+                  </Badge>
+                  <span className="text-white">{describeHistoryChange(entry)}</span>
+                  <span className="ml-auto text-xs text-gray-500">
+                    {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "unknown time"}
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-gray-500">
+                  {entry.adminEmail || entry.adminId}
+                  {entry.ip && <span> from {entry.ip}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirm a toggle that takes a working feature away from live users */}
       <AlertDialog
