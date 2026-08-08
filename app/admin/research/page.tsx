@@ -35,6 +35,7 @@ import {
   UserAlgorithmBreakdown,
   LearnerModelPanel,
   ExperimentReadoutPanel,
+  ResearchDataActions,
 } from "@/components/admin/research"
 import { useLearnerModelStats } from "@/lib/hooks/useLearnerModelStats"
 import {
@@ -109,9 +110,7 @@ export default function ResearchDashboard() {
     error,
     loadData,
     migrateUsers,
-    backfillData,
     migrating,
-    backfilling,
     runAbDryRun,
     confirmEndAbTest,
     clearAbDryRun,
@@ -119,6 +118,9 @@ export default function ResearchDashboard() {
     abDryRunResult,
     abFinalResult,
   } = useResearchData(firebaseUser)
+  // `backfillData` from the hook is intentionally not used: it posts the
+  // backfill with no dry run and no confirmation. ResearchDataActions owns
+  // that flow now.
 
   // Enhanced statistical analysis
   const {
@@ -285,19 +287,14 @@ export default function ResearchDashboard() {
               End A/B — Switch All to FSRS
             </Button>
           )}
-          <Button
-            onClick={backfillData}
-            variant="outline"
-            disabled={backfilling}
-            className="border-[#c4703f] text-[#c4703f] hover:bg-[#c4703f]/10"
-          >
-            {backfilling ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Repeat className="mr-2 h-4 w-4" />
-            )}
-            Backfill Data
-          </Button>
+          {/* Backfill used to be a single unguarded click that wrote derived
+              rows into the live cohorts. It is now dry run first, then a
+              confirmation, and it writes to a quarantine collection. */}
+          <ResearchDataActions
+            firebaseUser={firebaseUser}
+            aggregateLastUpdated={data?.lastUpdated}
+            onCompleted={() => loadData(true)}
+          />
         </>
       }
     >

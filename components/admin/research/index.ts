@@ -13,3 +13,4 @@ export {
 export { UserAlgorithmBreakdown } from "./UserAlgorithmBreakdown"
 export { LearnerModelPanel } from "./LearnerModelPanel"
 export { ExperimentReadoutPanel } from "./ExperimentReadoutPanel"
+export { ResearchDataActions } from "./ResearchDataActions"
