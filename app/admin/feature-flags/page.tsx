@@ -157,7 +157,15 @@ const defaultFlag: {
 export default function FeatureFlagsPage() {
   const { firebaseUser } = useAuth()
   const [flags, setFlags] = useState<FeatureFlag[]>([])
-  const [stats, setStats] = useState({ total: 0, enabled: 0, experiments: 0, killSwitches: 0 })
+  const [stats, setStats] = useState({
+    total: 0,
+    enabled: 0,
+    experiments: 0,
+    killSwitches: 0,
+    orphans: 0,
+  })
+  /** Keys some code path actually reads, served by the API from the FLAGS const. */
+  const [wiredKeys, setWiredKeys] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -184,9 +192,11 @@ export default function FeatureFlagsPage() {
         const data = await readFlagResponse<{
           flags: FeatureFlag[]
           stats: typeof stats
+          wiredKeys?: string[]
         }>(response)
         setFlags(data.flags)
         setStats(data.stats)
+        setWiredKeys(data.wiredKeys ?? [])
         setErrorMessage(null)
       } catch (error) {
         logger.error("Error loading feature flags", { error })
@@ -394,6 +404,9 @@ export default function FeatureFlagsPage() {
               <div>
                 <p className="text-3xl font-bold text-white">{stats.total}</p>
                 <p className="text-sm text-gray-400">Total Flags</p>
+                {stats.orphans > 0 && (
+                  <p className="text-xs text-gray-500">{stats.orphans} not read by code</p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -493,6 +506,14 @@ export default function FeatureFlagsPage() {
                               <Badge className="bg-yellow-500/20 text-yellow-400">
                                 <Percent className="mr-1 h-3 w-3" />
                                 {flag.rolloutPercentage}%
+                              </Badge>
+                            )}
+                            {!flag.wired && (
+                              <Badge
+                                className="bg-gray-600/30 text-gray-300"
+                                title="No code path reads this key, so toggling it changes nothing."
+                              >
+                                Not read by code
                               </Badge>
                             )}
                           </div>
@@ -610,7 +631,21 @@ export default function FeatureFlagsPage() {
                   placeholder="feature_name"
                   className="border-gray-700 bg-gray-800 font-mono text-white"
                   disabled={!!editingFlag}
+                  list="wired-flag-keys"
                 />
+                {/* The keys code reads. Picking one of these is the difference
+                    between a switch that works and a row that does nothing. */}
+                <datalist id="wired-flag-keys">
+                  {wiredKeys.map((wiredKey) => (
+                    <option key={wiredKey} value={wiredKey} />
+                  ))}
+                </datalist>
+                {!editingFlag && formData.key && !wiredKeys.includes(formData.key) && (
+                  <p className="text-xs text-yellow-400">
+                    No code reads this key yet. The flag will save, but toggling it will not
+                    change anything until a code path checks it.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Name</Label>
