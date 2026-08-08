@@ -32,8 +32,9 @@ describe("userFeedbackSubmissionSchema", () => {
 
   it("rejects a type the product does not offer", () => {
     // "nps" used to be part of the union even though NPS lives in its own collection.
-    expect(userFeedbackSubmissionSchema.safeParse({ type: "nps", content: validContent }).success)
-      .toBe(false)
+    expect(
+      userFeedbackSubmissionSchema.safeParse({ type: "nps", content: validContent }).success
+    ).toBe(false)
   })
 
   // The core of API-3: a signed-in user posting straight at the endpoint must not be able to
@@ -87,9 +88,9 @@ describe("userFeedbackSubmissionSchema", () => {
 
   it("rejects a non-string content, including one that would coerce", () => {
     expect(userFeedbackSubmissionSchema.safeParse({ content: 12345678901 }).success).toBe(false)
-    expect(userFeedbackSubmissionSchema.safeParse({ content: { text: validContent } }).success).toBe(
-      false
-    )
+    expect(
+      userFeedbackSubmissionSchema.safeParse({ content: { text: validContent } }).success
+    ).toBe(false)
   })
 })
 
@@ -114,7 +115,9 @@ describe("adminFeedbackUpdateSchema", () => {
 
   it("requires an id", () => {
     expect(adminFeedbackUpdateSchema.safeParse({ status: "resolved" }).success).toBe(false)
-    expect(adminFeedbackUpdateSchema.safeParse({ id: "  ", status: "resolved" }).success).toBe(false)
+    expect(adminFeedbackUpdateSchema.safeParse({ id: "  ", status: "resolved" }).success).toBe(
+      false
+    )
   })
 
   it("caps tag count and tag length", () => {
@@ -124,9 +127,9 @@ describe("adminFeedbackUpdateSchema", () => {
     expect(adminFeedbackUpdateSchema.safeParse({ id: "a", tags: ["x".repeat(80)] }).success).toBe(
       false
     )
-    expect(adminFeedbackUpdateSchema.safeParse({ id: "a", tags: ["editor", "voice"] }).success).toBe(
-      true
-    )
+    expect(
+      adminFeedbackUpdateSchema.safeParse({ id: "a", tags: ["editor", "voice"] }).success
+    ).toBe(true)
   })
 })
 

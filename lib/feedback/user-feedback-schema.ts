@@ -25,13 +25,7 @@ import { z } from "zod"
 export const USER_FEEDBACK_TYPES = ["feedback", "feature_request", "bug_report"] as const
 export type UserFeedbackType = (typeof USER_FEEDBACK_TYPES)[number]
 
-export const FEEDBACK_STATUSES = [
-  "new",
-  "reviewed",
-  "in_progress",
-  "resolved",
-  "declined",
-] as const
+export const FEEDBACK_STATUSES = ["new", "reviewed", "in_progress", "resolved", "declined"] as const
 export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number]
 
 export const FEEDBACK_PRIORITIES = ["low", "medium", "high", "critical"] as const
