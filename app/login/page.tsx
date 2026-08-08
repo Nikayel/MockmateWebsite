@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Github, Terminal } from "lucide-react"
 import {
+  consumeRedirectSignIn,
   getStoredRedirectPath,
   resolveSafeRedirect,
   signInWithGitHub,
@@ -69,6 +70,18 @@ function LoginPageContent() {
   useEffect(() => {
     // Only redirect if auth is initialized and user exists
     if (!initialized || !firebaseUser) return
+
+    // A redirect-based sign-in (the popup fallback) brings the visitor back here
+    // as a cold page load, so `authStatus` has reset to "idle" and the
+    // profile-creation effect below would never fire. Without this branch they
+    // would be pushed straight to the dashboard with an auth record and no
+    // profile: exactly the orphaned account that makes checkout 404 forever.
+    // Handing control to the "authenticating" state runs the same post-sign-in
+    // work a popup flow does.
+    if (consumeRedirectSignIn()) {
+      setAuthStatus("authenticating")
+      return
+    }
 
     // User is already logged in, redirect them. getStoredRedirectPath validates,
     // normalizes, and clears the stored destination in one step.

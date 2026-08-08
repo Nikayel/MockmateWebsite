@@ -274,96 +274,203 @@ function validateAuth(auth: Auth) {
   return config
 }
 
-export async function signInWithGitHub(redirect?: string) {
+// =============================================================================
+// OAuth sign-in
+// =============================================================================
+// Popup first, redirect as the fallback. `signInWithPopup` is the better
+// experience when it works: the page keeps its state, and a cancelled popup is
+// recoverable. It fails outright in three situations we cannot detect in
+// advance, and until now those users simply had no way in. The redirect helpers
+// below this block existed the whole time with zero call sites.
+
+/** Firebase provider ids we support, and the label our analytics uses. */
+type SupportedProvider = "github" | "google"
+
+/**
+ * Popup failures that a full-page redirect actually recovers from.
+ *
+ * `auth/popup-closed-by-user` and `auth/cancelled-popup-request` are absent on
+ * purpose: the first means the person deliberately closed the window and the
+ * second means they clicked a second provider. Yanking the page out from under
+ * someone who just cancelled would be hostile, not helpful.
+ */
+const REDIRECT_RECOVERABLE_POPUP_ERRORS: ReadonlySet<string> = new Set([
+  "auth/popup-blocked",
+  "auth/operation-not-supported-in-this-environment",
+  "auth/web-storage-unsupported",
+])
+
+/**
+ * Marks that a redirect sign-in is in flight.
+ *
+ * `signInWithRedirect` navigates away and the visitor comes back as a cold page
+ * load, so every piece of in-memory state that a popup sign-in relies on is
+ * gone, including the login page's `authStatus`. Without this flag the login
+ * page treats the returning visitor as "already signed in" and pushes them
+ * onward WITHOUT running profile creation, which is precisely how an orphaned
+ * auth user (no profile, checkout 404s forever) gets made.
+ */
+const REDIRECT_IN_FLIGHT_KEY = "auth_redirect_in_flight"
+
+function markRedirectSignInStarted(): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(REDIRECT_IN_FLIGHT_KEY, "1")
+  } catch {
+    // Private mode with storage disabled. The redirect still works; the caller
+    // just loses the "this was a redirect" hint.
+  }
+}
+
+/**
+ * Reads and clears the redirect marker. Returns true when this page load is the
+ * return leg of a redirect sign-in, so the caller knows to run the same
+ * post-sign-in work a popup flow would have done.
+ */
+export function consumeRedirectSignIn(): boolean {
+  if (typeof window === "undefined") return false
+  try {
+    const pending = localStorage.getItem(REDIRECT_IN_FLIGHT_KEY) === "1"
+    if (pending) localStorage.removeItem(REDIRECT_IN_FLIGHT_KEY)
+    return pending
+  } catch {
+    return false
+  }
+}
+
+/** Outcome of a sign-in attempt. */
+export type SignInResult =
+  | { status: "signed-in"; user: FirebaseUser; providerId: string | null }
+  /** The browser blocked the popup; the page is now navigating to the provider. */
+  | { status: "redirecting" }
+
+function buildProvider(provider: SupportedProvider) {
+  if (provider === "github") {
+    const githubProvider = new GithubAuthProvider()
+    githubProvider.addScope("read:user")
+    return githubProvider
+  }
+
+  const googleProvider = new GoogleAuthProvider()
+  googleProvider.addScope("profile")
+  googleProvider.addScope("email")
+  return googleProvider
+}
+
+/**
+ * Dev-only diagnostics for a failed sign-in. Kept verbatim from the two
+ * near-identical copies it replaces, because auth/internal-error is genuinely
+ * hard to debug without the configuration dump.
+ */
+function logSignInFailure(provider: SupportedProvider, auth: Auth, error: any): void {
+  if (!isDev) return
+
+  const label = provider === "github" ? "GitHub" : "Google"
+  console.error(`Error signing in with ${label}:`, error)
+  console.error("Error code:", error?.code)
+  console.error("Error message:", error?.message)
+  console.error("Error name:", error?.name)
+  console.error("Error stack:", error?.stack)
+
+  if (error?.customData) console.error("Error customData:", error.customData)
+  if (error?.cause) console.error("Error cause:", error.cause)
+
+  if (error?.code !== "auth/internal-error") return
+
+  const currentHost = typeof window !== "undefined" ? window.location.hostname : ""
+  const authDomain = auth.app.options.authDomain || ""
+
+  console.error("Debugging auth/internal-error:")
+  console.error("- Auth domain:", authDomain)
+  console.error("- Project ID:", auth.app.options.projectId)
+  console.error("- Has API key:", !!auth.app.options.apiKey)
+  console.error("- Current URL:", typeof window !== "undefined" ? window.location.href : "N/A")
+  console.error("- Current origin:", typeof window !== "undefined" ? window.location.origin : "N/A")
+  console.error("- User agent:", typeof window !== "undefined" ? navigator.userAgent : "N/A")
+
+  if (authDomain && !authDomain.includes(currentHost) && currentHost !== "localhost") {
+    console.error("WARNING: Auth domain doesn't match current hostname!")
+    console.error("  Auth domain:", authDomain)
+    console.error("  Current hostname:", currentHost)
+  }
+
+  console.error("Please verify:")
+  console.error(`  1. ${label} OAuth provider is enabled in Firebase Console`)
+  console.error("  2. Authorized domains include:", authDomain, "and", currentHost)
+  console.error("  3. OAuth redirect URIs are configured correctly")
+  console.error("  4. Check browser console for CSP violations")
+  console.error("  5. Try disabling browser extensions that might block popups")
+}
+
+/**
+ * Signs in with the given provider, falling back to a full-page redirect when
+ * the browser refuses the popup.
+ *
+ * Both providers share this because the fallback has to behave identically for
+ * each, and two hand-maintained copies of a security-relevant branch is how they
+ * drift apart.
+ */
+async function signInWithProvider(
+  provider: SupportedProvider,
+  redirect?: string
+): Promise<SignInResult> {
   const { getAuthLazy } = await import("./firebase-lazy")
   const auth = await getAuthLazy()
 
   // Validate auth is initialized
   validateAuth(auth)
 
-  // Store redirect in localStorage to retrieve after auth (with validation)
+  // Store redirect in localStorage to retrieve after auth (with validation).
+  // This is also what carries the destination across a redirect sign-in.
   storeRedirectPath(redirect)
 
-  const provider = new GithubAuthProvider()
-  provider.addScope("read:user")
+  const authProvider = buildProvider(provider)
 
   try {
     if (isDev) {
-      console.log("Attempting GitHub sign-in...")
+      console.log(`Attempting ${provider} sign-in...`)
       console.log("Auth domain:", auth.app.options.authDomain)
       console.log("Current origin:", typeof window !== "undefined" ? window.location.origin : "N/A")
     }
 
-    const result = await signInWithPopup(auth, provider)
-    if (isDev) console.log("GitHub sign-in successful")
+    const result = await signInWithPopup(auth, authProvider)
+    if (isDev) console.log(`${provider} sign-in successful`)
 
     // Track login/signup event
     const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime
     if (isNewUser) {
-      trackSignup("github", result.user.uid)
+      trackSignup(provider, result.user.uid)
     } else {
-      trackLogin("github", result.user.uid)
+      trackLogin(provider, result.user.uid)
     }
 
     return {
+      status: "signed-in",
       user: result.user,
       providerId: result.providerId,
     }
   } catch (error: any) {
-    if (isDev) {
-      console.error("Error signing in with GitHub:", error)
-      console.error("Error code:", error?.code)
-      console.error("Error message:", error?.message)
-      console.error("Error name:", error?.name)
-      console.error("Error stack:", error?.stack)
+    logSignInFailure(provider, auth, error)
 
-      // Try to extract more details from the error
-      if (error?.customData) {
-        console.error("Error customData:", error.customData)
-      }
-      if (error?.cause) {
-        console.error("Error cause:", error.cause)
-      }
+    // The popup was refused by the browser rather than by the user. A redirect
+    // is the same sign-in without a second window, so take it automatically
+    // instead of showing "Pop-up was blocked, please allow pop-ups" to someone
+    // whose browser will not let them.
+    if (REDIRECT_RECOVERABLE_POPUP_ERRORS.has(error?.code)) {
+      if (isDev) console.warn(`Popup refused (${error?.code}); falling back to redirect sign-in`)
 
-      // Log Firebase configuration for debugging
-      if (error?.code === "auth/internal-error") {
-        console.error("Debugging auth/internal-error:")
-        console.error("- Auth domain:", auth.app.options.authDomain)
-        console.error("- Project ID:", auth.app.options.projectId)
-        console.error("- Has API key:", !!auth.app.options.apiKey)
-        console.error(
-          "- Current URL:",
-          typeof window !== "undefined" ? window.location.href : "N/A"
-        )
-        console.error(
-          "- Current origin:",
-          typeof window !== "undefined" ? window.location.origin : "N/A"
-        )
-        console.error("- User agent:", typeof window !== "undefined" ? navigator.userAgent : "N/A")
-
-        // Check if authDomain matches current origin
-        const currentHost = typeof window !== "undefined" ? window.location.hostname : ""
-        const authDomain = auth.app.options.authDomain || ""
-        if (authDomain && !authDomain.includes(currentHost) && currentHost !== "localhost") {
-          console.error("WARNING: Auth domain doesn't match current hostname!")
-          console.error("  Auth domain:", authDomain)
-          console.error("  Current hostname:", currentHost)
-        }
-
-        console.error("Please verify:")
-        console.error("  1. GitHub OAuth provider is enabled in Firebase Console")
-        console.error(
-          "  2. Authorized domains include:",
-          auth.app.options.authDomain,
-          "and",
-          currentHost
-        )
-        console.error("  3. OAuth redirect URIs are configured correctly")
-        console.error("  4. Check browser console for CSP violations")
-        console.error("  5. Try disabling browser extensions that might block popups")
-
-        // Suggest using redirect as fallback
-        console.error("Alternative: Try using redirect-based auth instead of popup")
+      try {
+        markRedirectSignInStarted()
+        await signInWithRedirect(auth, authProvider)
+        // signInWithRedirect navigates the page. Nothing after this runs in
+        // practice, but the caller needs a resolved value for the case where the
+        // navigation is itself delayed.
+        return { status: "redirecting" }
+      } catch (redirectError: any) {
+        consumeRedirectSignIn() // never left the marker set on a failed redirect
+        logSignInFailure(provider, auth, redirectError)
+        // Fall through and report the ORIGINAL popup failure, which is the one
+        // that describes what the user experienced.
       }
     }
 
@@ -376,107 +483,12 @@ export async function signInWithGitHub(redirect?: string) {
   }
 }
 
-export async function signInWithGoogle(redirect?: string) {
-  const { getAuthLazy } = await import("./firebase-lazy")
-  const auth = await getAuthLazy()
+export async function signInWithGitHub(redirect?: string): Promise<SignInResult> {
+  return signInWithProvider("github", redirect)
+}
 
-  // Validate auth is initialized
-  validateAuth(auth)
-
-  // Store redirect in localStorage to retrieve after auth (with validation)
-  storeRedirectPath(redirect)
-
-  const provider = new GoogleAuthProvider()
-  provider.addScope("profile")
-  provider.addScope("email")
-
-  try {
-    if (isDev) {
-      console.log("Attempting Google sign-in...")
-      console.log("Auth domain:", auth.app.options.authDomain)
-      console.log("Current origin:", typeof window !== "undefined" ? window.location.origin : "N/A")
-    }
-
-    const result = await signInWithPopup(auth, provider)
-    if (isDev) console.log("Google sign-in successful")
-
-    // Track login/signup event
-    const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime
-    if (isNewUser) {
-      trackSignup("google", result.user.uid)
-    } else {
-      trackLogin("google", result.user.uid)
-    }
-
-    return {
-      user: result.user,
-      providerId: result.providerId,
-    }
-  } catch (error: any) {
-    if (isDev) {
-      console.error("Error signing in with Google:", error)
-      console.error("Error code:", error?.code)
-      console.error("Error message:", error?.message)
-      console.error("Error name:", error?.name)
-      console.error("Error stack:", error?.stack)
-
-      // Try to extract more details from the error
-      if (error?.customData) {
-        console.error("Error customData:", error.customData)
-      }
-      if (error?.cause) {
-        console.error("Error cause:", error.cause)
-      }
-
-      // Log Firebase configuration for debugging
-      if (error?.code === "auth/internal-error") {
-        console.error("Debugging auth/internal-error:")
-        console.error("- Auth domain:", auth.app.options.authDomain)
-        console.error("- Project ID:", auth.app.options.projectId)
-        console.error("- Has API key:", !!auth.app.options.apiKey)
-        console.error(
-          "- Current URL:",
-          typeof window !== "undefined" ? window.location.href : "N/A"
-        )
-        console.error(
-          "- Current origin:",
-          typeof window !== "undefined" ? window.location.origin : "N/A"
-        )
-        console.error("- User agent:", typeof window !== "undefined" ? navigator.userAgent : "N/A")
-
-        // Check if authDomain matches current origin
-        const currentHost = typeof window !== "undefined" ? window.location.hostname : ""
-        const authDomain = auth.app.options.authDomain || ""
-        if (authDomain && !authDomain.includes(currentHost) && currentHost !== "localhost") {
-          console.error("WARNING: Auth domain doesn't match current hostname!")
-          console.error("  Auth domain:", authDomain)
-          console.error("  Current hostname:", currentHost)
-        }
-
-        console.error("Please verify:")
-        console.error("  1. Google OAuth provider is enabled in Firebase Console")
-        console.error(
-          "  2. Authorized domains include:",
-          auth.app.options.authDomain,
-          "and",
-          currentHost
-        )
-        console.error("  3. OAuth redirect URIs are configured correctly")
-        console.error("  4. Check browser console for CSP violations")
-        console.error("  5. Try disabling browser extensions that might block popups")
-
-        // Suggest using redirect as fallback
-        console.error("Alternative: Try using redirect-based auth instead of popup")
-      }
-    }
-
-    // Provide user-friendly error message
-    const friendlyMessage = getAuthErrorMessage(error)
-    const authError = new Error(friendlyMessage) as any
-    authError.code = error?.code
-    authError.originalError = error
-    throw authError
-  }
+export async function signInWithGoogle(redirect?: string): Promise<SignInResult> {
+  return signInWithProvider("google", redirect)
 }
 
 export async function signOut() {
@@ -509,7 +521,19 @@ export function generateVSCodeDeepLink(token: string) {
 
 // Helper to convert Firebase user to our User type
 // Redirect-based sign-in functions (fallback for when popup fails)
-export async function signInWithGitHubRedirect(redirect?: string) {
+/**
+ * Starts a redirect sign-in directly, skipping the popup attempt.
+ *
+ * `signInWithGitHub` / `signInWithGoogle` already fall back to this path on
+ * their own when the browser blocks the popup, so most callers do not need it.
+ * It stays exported for a deliberate "use redirect instead" affordance, e.g. an
+ * in-browser webview or an embedded context where the popup is known to fail.
+ *
+ * Sets the same in-flight marker the automatic fallback uses, so the returning
+ * page load is recognised as a completed sign-in rather than as an already
+ * signed-in visitor.
+ */
+async function startRedirectSignIn(provider: SupportedProvider, redirect?: string): Promise<void> {
   const { getAuthLazy } = await import("./firebase-lazy")
   const auth = await getAuthLazy()
   validateAuth(auth)
@@ -517,27 +541,22 @@ export async function signInWithGitHubRedirect(redirect?: string) {
   // Store redirect in localStorage to retrieve after auth (with validation)
   storeRedirectPath(redirect)
 
-  const provider = new GithubAuthProvider()
-  provider.addScope("read:user")
-
-  await signInWithRedirect(auth, provider)
+  markRedirectSignInStarted()
+  try {
+    await signInWithRedirect(auth, buildProvider(provider))
+  } catch (error) {
+    consumeRedirectSignIn() // do not leave the marker set on a navigation that never happened
+    throw error
+  }
   // Note: This will redirect the page, so we won't return here
 }
 
-export async function signInWithGoogleRedirect(redirect?: string) {
-  const { getAuthLazy } = await import("./firebase-lazy")
-  const auth = await getAuthLazy()
-  validateAuth(auth)
+export async function signInWithGitHubRedirect(redirect?: string): Promise<void> {
+  return startRedirectSignIn("github", redirect)
+}
 
-  // Store redirect in localStorage to retrieve after auth (with validation)
-  storeRedirectPath(redirect)
-
-  const provider = new GoogleAuthProvider()
-  provider.addScope("profile")
-  provider.addScope("email")
-
-  await signInWithRedirect(auth, provider)
-  // Note: This will redirect the page, so we won't return here
+export async function signInWithGoogleRedirect(redirect?: string): Promise<void> {
+  return startRedirectSignIn("google", redirect)
 }
 
 // Handle redirect result (call this on the auth callback page)
