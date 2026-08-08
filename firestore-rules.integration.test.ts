@@ -337,3 +337,228 @@ describe("interview_sessions: score sanity", () => {
     await assertFails(setDoc(doc(db, "interview_sessions", "s3"), newSession(USER)))
   })
 })
+
+// =============================================================================
+// The rest of the money and entitlement surface.
+//
+// The tests above cover profiles, which is where the entitlement TIER lives.
+// Everything below is the surface around it: the records that say what was paid,
+// what was granted, what quota remains, and what the platform has spent. Each of
+// these is written only by the Admin SDK in production, which bypasses rules
+// entirely, so a client write reaching any of them is by definition forgery.
+//
+// Uncovered rules are indistinguishable from absent ones on the day someone
+// probes them, and this file is the only thing that runs the real artifact.
+// =============================================================================
+
+/** Write a document the way the Admin SDK does, bypassing rules. */
+async function seed(path: [string, string], data: Record<string, unknown>) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), path[0], path[1]), data)
+  })
+}
+
+describe("subscriptions: a user cannot grant themselves one", () => {
+  it("lets a user read their own subscription", async () => {
+    await seed(["subscriptions", USER], { tier: "pro", status: "active" })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertSucceeds(getDoc(doc(db, "subscriptions", USER)))
+  })
+
+  it("REJECTS reading someone else's subscription", async () => {
+    await seed(["subscriptions", OTHER], { tier: "pro", status: "active" })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(getDoc(doc(db, "subscriptions", OTHER)))
+  })
+
+  it("REJECTS creating a subscription for yourself", async () => {
+    // The whole point: writing this document is how you would buy Pro for free.
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(setDoc(doc(db, "subscriptions", USER), { tier: "pro", status: "active" }))
+  })
+
+  it("REJECTS updating an existing subscription", async () => {
+    await seed(["subscriptions", USER], { tier: "free", status: "active" })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(updateDoc(doc(db, "subscriptions", USER), { tier: "pro" }))
+  })
+
+  it("REJECTS deleting a subscription", async () => {
+    await seed(["subscriptions", USER], { tier: "pro", status: "cancelled" })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(deleteDoc(doc(db, "subscriptions", USER)))
+  })
+})
+
+describe("payment_history: a user cannot forge a payment", () => {
+  it("lets a user read their own payment", async () => {
+    await seed(["payment_history", "pay_1"], { user_id: USER, amount: 2500 })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertSucceeds(getDoc(doc(db, "payment_history", "pay_1")))
+  })
+
+  it("REJECTS reading someone else's payment", async () => {
+    await seed(["payment_history", "pay_2"], { user_id: OTHER, amount: 2500 })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(getDoc(doc(db, "payment_history", "pay_2")))
+  })
+
+  it("REJECTS writing a payment record, even one that names you honestly", async () => {
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(setDoc(doc(db, "payment_history", "pay_3"), { user_id: USER, amount: 2500 }))
+  })
+})
+
+describe("profile_quota: server-authoritative", () => {
+  it("lets a user read their own quota", async () => {
+    await seed(["profile_quota", USER], { user_id: USER, sessionsUsed: 3 })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertSucceeds(getDoc(doc(db, "profile_quota", USER)))
+  })
+
+  it("REJECTS reading someone else's quota", async () => {
+    await seed(["profile_quota", OTHER], { user_id: OTHER, sessionsUsed: 3 })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(getDoc(doc(db, "profile_quota", OTHER)))
+  })
+
+  it("REJECTS resetting your own usage counter", async () => {
+    await seed(["profile_quota", USER], { user_id: USER, sessionsUsed: 99 })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(updateDoc(doc(db, "profile_quota", USER), { sessionsUsed: 0 }))
+  })
+
+  it("REJECTS creating a fresh zero-usage quota document", async () => {
+    // The old client used to do exactly this, which is why creates are off.
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(setDoc(doc(db, "profile_quota", USER), { user_id: USER, sessionsUsed: 0 }))
+  })
+})
+
+describe("promo_code_usage: single use is enforced by immutability", () => {
+  it("lets a user record their own use of a code", async () => {
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertSucceeds(
+      setDoc(doc(db, "promo_code_usage", `${USER}_LAUNCH50`), {
+        user_id: USER,
+        code: "LAUNCH50",
+        usedAt: "2026-01-01T00:00:00.000Z",
+      })
+    )
+  })
+
+  it("REJECTS a record whose document id does not carry the caller's uid", async () => {
+    // The id format is what makes a second use collide with the first.
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(
+      setDoc(doc(db, "promo_code_usage", "anything_LAUNCH50"), {
+        user_id: USER,
+        code: "LAUNCH50",
+        usedAt: "2026-01-01T00:00:00.000Z",
+      })
+    )
+  })
+
+  it("REJECTS claiming a use on behalf of another user", async () => {
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(
+      setDoc(doc(db, "promo_code_usage", `${USER}_LAUNCH50`), {
+        user_id: OTHER,
+        code: "LAUNCH50",
+        usedAt: "2026-01-01T00:00:00.000Z",
+      })
+    )
+  })
+
+  it("REJECTS deleting a usage record, which would allow reusing the code", async () => {
+    // This is the whole single-use mechanism: the record cannot be removed, so a
+    // 100%-off code cannot be redeemed twice by the same account.
+    await seed(["promo_code_usage", `${USER}_LAUNCH50`], {
+      user_id: USER,
+      code: "LAUNCH50",
+      usedAt: "2026-01-01T00:00:00.000Z",
+    })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(deleteDoc(doc(db, "promo_code_usage", `${USER}_LAUNCH50`)))
+  })
+
+  it("REJECTS rewriting a usage record to point at a different code", async () => {
+    await seed(["promo_code_usage", `${USER}_LAUNCH50`], {
+      user_id: USER,
+      code: "LAUNCH50",
+      usedAt: "2026-01-01T00:00:00.000Z",
+    })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(updateDoc(doc(db, "promo_code_usage", `${USER}_LAUNCH50`), { code: "OTHER" }))
+  })
+
+  it("REJECTS a record missing the fields the server relies on", async () => {
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(setDoc(doc(db, "promo_code_usage", `${USER}_LAUNCH50`), { user_id: USER }))
+  })
+})
+
+describe("spend ledgers: invisible to every client", () => {
+  it("REJECTS reading the global daily spend counter", async () => {
+    await seed(["global_usage", "2026-08-08"], { totalCost: 42 })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(getDoc(doc(db, "global_usage", "2026-08-08")))
+  })
+
+  it("REJECTS zeroing the global spend counter, which would disarm the kill switch", async () => {
+    // isGlobalCeilingExceeded reads this document. A client that could write it
+    // could switch off the platform-wide daily spend ceiling.
+    await seed(["global_usage", "2026-08-08"], { totalCost: 249 })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(updateDoc(doc(db, "global_usage", "2026-08-08"), { totalCost: 0 }))
+  })
+
+  it("REJECTS reading or writing per-call usage events", async () => {
+    await seed(["usage_events", "evt_1"], { userId: USER, costUsd: 0.01 })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(getDoc(doc(db, "usage_events", "evt_1")))
+    await assertFails(setDoc(doc(db, "usage_events", "evt_2"), { userId: USER, costUsd: 0 }))
+  })
+})
+
+describe("server-only collections stay server-only", () => {
+  it("REJECTS client access to the admin tree", async () => {
+    await seed(["admin", "roles"], { anything: true })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(getDoc(doc(db, "admin", "roles")))
+    await assertFails(setDoc(doc(db, "admin", "self"), { role: "super_admin" }))
+  })
+
+  it("REJECTS client access to the system tree", async () => {
+    await seed(["system", "config"], { anything: true })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(getDoc(doc(db, "system", "config")))
+  })
+
+  it("REJECTS client access to the experiment config", async () => {
+    // Writing this is how a participant would move themselves between arms.
+    await seed(["research_config", "algorithm"], { ab_ended: false })
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(getDoc(doc(db, "research_config", "algorithm")))
+    await assertFails(updateDoc(doc(db, "research_config", "algorithm"), { ab_ended: true }))
+  })
+})
+
+describe("the catch-all denies anything not explicitly allowed", () => {
+  it("REJECTS a collection no rule mentions", async () => {
+    // A new collection added by future code is closed until someone opens it,
+    // rather than open until someone notices.
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(setDoc(doc(db, "some_future_collection", "doc_1"), { a: 1 }))
+    await assertFails(getDoc(doc(db, "some_future_collection", "doc_1")))
+  })
+
+  it("REJECTS an unauthenticated caller everywhere it matters", async () => {
+    await seed(["subscriptions", USER], { tier: "pro" })
+    await seed(["payment_history", "pay_9"], { user_id: USER, amount: 2500 })
+    const db = testEnv.unauthenticatedContext().firestore()
+    await assertFails(getDoc(doc(db, "subscriptions", USER)))
+    await assertFails(getDoc(doc(db, "payment_history", "pay_9")))
+    await assertFails(setDoc(doc(db, "profiles", USER), newProfile(USER)))
+  })
+})
