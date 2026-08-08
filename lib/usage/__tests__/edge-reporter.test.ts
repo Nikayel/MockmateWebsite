@@ -38,10 +38,7 @@ describe("reportEdgeUsage failure visibility", () => {
   })
 
   it("returns true and stays quiet on a successful report", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({ ok: true, status: 200 }))
-    )
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200 })))
     const { reportEdgeUsage } = await import("../edge-reporter")
 
     expect(await reportEdgeUsage(REPORT)).toBe(true)

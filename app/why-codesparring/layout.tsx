@@ -23,18 +23,20 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "How It Works - Science-Backed Interview Prep | CodeSparring",
-    description:
-      "Stop guessing how much to practice. Our algorithm calculates exactly when and how often to review each problem.",
+    description: "Stop guessing how much to practice. Our algorithm calculates exactly when and how often to review each problem.",
     url: "/why-codesparring",
     type: "website",
   },
   twitter: {
     title: "How It Works - Science-Backed Interview Prep | CodeSparring",
-    description:
-      "Stop guessing how much to practice. Our algorithm calculates exactly when and how often to review each problem.",
+    description: "Stop guessing how much to practice. Our algorithm calculates exactly when and how often to review each problem.",
   },
 }
 
-export default function WhySkilonLayout({ children }: { children: React.ReactNode }) {
+export default function WhySkilonLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return <LenisProvider>{children}</LenisProvider>
 }
