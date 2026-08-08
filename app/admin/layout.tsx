@@ -49,6 +49,7 @@ import type { AdminRole } from "@/lib/admin/rbac"
 import {
   ADMIN_NAV,
   activeNavHref,
+  fallbackNavHref,
   visibleNavEntries,
   visibleNavSections,
 } from "@/lib/admin/navigation"
@@ -134,6 +135,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     setMobileNavOpen(false)
   }, [pathname])
+
+  // Send an admin who landed on a destination their role cannot open somewhere they
+  // can. The overview requires VIEW_ANALYTICS, which support does not hold, and it is
+  // both the default landing page and the sidebar logo's target, so without this that
+  // role's first click into the admin is a 403 it cannot navigate away from.
+  useEffect(() => {
+    if (gate.status !== "authorized") return
+
+    const reachable = visibleNavEntries(ADMIN_NAV, gate.identity.permissions)
+    if (activeNavHref(reachable, pathname) !== null) return
+
+    const fallback = fallbackNavHref(reachable)
+    // No fallback means the role can open nothing at all, which is a genuine access
+    // refusal and must not become a redirect loop.
+    if (fallback && fallback !== pathname) router.replace(fallback)
+  }, [gate, pathname, router])
 
   // Escape closes the drawer, which is the expected exit from any overlay.
   useEffect(() => {

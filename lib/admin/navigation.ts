@@ -25,8 +25,17 @@ export interface AdminNavEntry {
   section: AdminNavSection
   badge?: string
   /**
-   * Permission required to see this destination. Omitted means every admin role may
-   * see it, which is reserved for the overview.
+   * Permission required to see this destination.
+   *
+   * INVARIANT: this must match the permission the page's own API route enforces.
+   * A looser value here is worse than no filtering, because the link renders, the
+   * admin clicks it, and the page 403s. The first version of this file granted the
+   * Audit Log on `view_errors` while `app/api/admin/audit/route.ts` requires
+   * MANAGE_SETTINGS, which offered analyst and support a link straight into a
+   * refusal.
+   *
+   * Omitting it means every admin role may see the entry, and it is only correct
+   * for a destination whose API is not permission-gated at all.
    */
   permission?: Permission
 }
@@ -39,7 +48,10 @@ export interface AdminNavEntry {
  * tree, so they were reachable only by typing the URL.
  */
 export const ADMIN_NAV: readonly AdminNavEntry[] = [
-  { name: "Overview", href: "/admin", section: "Core" },
+  // The overview renders /api/admin/analytics, which requires VIEW_ANALYTICS, so
+  // support cannot open it. That role reaches the admin through Users instead; the
+  // shell redirects anyone who lands on a destination their role cannot see.
+  { name: "Overview", href: "/admin", section: "Core", permission: "view_analytics" },
   { name: "Users", href: "/admin/users", section: "Core", permission: "view_users" },
   { name: "Sessions", href: "/admin/sessions", section: "Core", permission: "view_analytics" },
 
@@ -76,7 +88,9 @@ export const ADMIN_NAV: readonly AdminNavEntry[] = [
   },
   { name: "RAG", href: "/admin/rag", section: "Technical", permission: "view_analytics" },
   { name: "System Health", href: "/admin/health", section: "Technical", permission: "view_errors" },
-  { name: "Errors", href: "/admin/errors", section: "Technical", permission: "view_errors" },
+  // The errors page reads /api/admin/analytics, not an errors-specific route, so its
+  // gate is VIEW_ANALYTICS despite the name.
+  { name: "Errors", href: "/admin/errors", section: "Technical", permission: "view_analytics" },
 
   {
     name: "Research",
@@ -113,7 +127,8 @@ export const ADMIN_NAV: readonly AdminNavEntry[] = [
     name: "Feedback",
     href: "/admin/feedback",
     section: "Operations",
-    permission: "view_analytics",
+    // The queue exposes who wrote each item, so its route requires VIEW_USER_DETAILS.
+    permission: "view_user_details",
   },
   {
     name: "Insights",
@@ -122,7 +137,7 @@ export const ADMIN_NAV: readonly AdminNavEntry[] = [
     badge: "AI",
     permission: "view_analytics",
   },
-  { name: "Audit Log", href: "/admin/audit", section: "Operations", permission: "view_errors" },
+  { name: "Audit Log", href: "/admin/audit", section: "Operations", permission: "manage_settings" },
   {
     name: "Settings",
     href: "/admin/settings",
@@ -140,6 +155,20 @@ export function visibleNavEntries(
   permissions: readonly Permission[]
 ): AdminNavEntry[] {
   return entries.filter((entry) => !entry.permission || permissions.includes(entry.permission))
+}
+
+/**
+ * Where to send an admin who landed on a destination their role cannot see.
+ *
+ * Necessary because the overview requires VIEW_ANALYTICS, which `support` does not
+ * hold, and the overview is both the default landing page and the target of the
+ * sidebar logo. Without this, that role's first click into the admin is a 403.
+ *
+ * Returns null when the role can see nothing at all, which the caller must treat as
+ * a genuine access refusal rather than redirecting in a loop.
+ */
+export function fallbackNavHref(visible: readonly AdminNavEntry[]): string | null {
+  return visible[0]?.href ?? null
 }
 
 /**

@@ -1,12 +1,15 @@
 import { describe, it, expect } from "vitest"
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import {
   ADMIN_NAV,
   ADMIN_NAV_SECTIONS,
   visibleNavEntries,
   visibleNavSections,
   activeNavHref,
+  fallbackNavHref,
 } from "../navigation"
-import { ROLE_PERMISSIONS } from "../rbac"
+import { ROLE_PERMISSIONS, PERMISSIONS } from "../rbac"
 
 /**
  * The sidebar used to render all 21 destinations for all four roles, so a `support`
@@ -38,15 +41,23 @@ describe("visibleNavEntries", () => {
     expect(hrefs).toContain("/admin/revenue")
   })
 
-  it("always shows the overview, which declares no permission", () => {
-    for (const role of Object.keys(ROLE_PERMISSIONS) as (keyof typeof ROLE_PERMISSIONS)[]) {
-      const hrefs = visibleNavEntries(ADMIN_NAV, ROLE_PERMISSIONS[role]).map((e) => e.href)
-      expect(hrefs).toContain("/admin")
-    }
+  it("hides the overview from support, whose analytics route would 403", () => {
+    // The overview renders /api/admin/analytics (VIEW_ANALYTICS). support does not
+    // hold it, so offering the link would send that role straight into a refusal.
+    const hrefs = visibleNavEntries(ADMIN_NAV, ROLE_PERMISSIONS.support).map((e) => e.href)
+    expect(hrefs).not.toContain("/admin")
+    expect(hrefs).toContain("/admin/users")
   })
 
-  it("shows nothing but the overview to a role with no permissions", () => {
-    expect(visibleNavEntries(ADMIN_NAV, []).map((e) => e.href)).toEqual(["/admin"])
+  it("shows nothing to a role with no permissions", () => {
+    expect(visibleNavEntries(ADMIN_NAV, [])).toEqual([])
+  })
+
+  it("gives every role at least one reachable destination", () => {
+    for (const role of Object.keys(ROLE_PERMISSIONS) as (keyof typeof ROLE_PERMISSIONS)[]) {
+      const visible = visibleNavEntries(ADMIN_NAV, ROLE_PERMISSIONS[role])
+      expect(fallbackNavHref(visible), `${role} has nowhere to land`).not.toBeNull()
+    }
   })
 
   it("includes the two pages that had no nav entry at all", () => {
@@ -96,6 +107,49 @@ describe("activeNavHref", () => {
     // "/admin/research" must not light up on "/admin/research-notes".
     expect(activeNavHref(ADMIN_NAV, "/admin/research-notes")).toBeNull()
   })
+})
+
+/**
+ * The invariant that actually bit: a nav entry whose permission is looser than the
+ * permission its API enforces renders a link straight into a 403. This reads the
+ * route files rather than a copy of their rules, so changing a route's gate without
+ * changing the nav fails here.
+ */
+describe("nav permissions match the routes they open", () => {
+  // Several pages are not served by a same-named route: the errors page reads the
+  // analytics route, and the overview does too. Mapping is therefore explicit.
+  const NAV_HREF_TO_ROUTE: Record<string, string> = {
+    "/admin": "analytics",
+    "/admin/users": "users",
+    "/admin/errors": "analytics",
+    "/admin/health": "health",
+    "/admin/audit": "audit",
+    "/admin/announcements": "announcements",
+    "/admin/feature-flags": "feature-flags",
+    "/admin/feedback": "feedback",
+    "/admin/scoring": "scoring",
+    "/admin/rag": "rag-health",
+    "/admin/insights": "insight-effectiveness",
+    "/admin/learn-research": "learn-research",
+    "/admin/bugfix-quality": "bugfix-quality",
+  }
+
+  for (const [href, routeDir] of Object.entries(NAV_HREF_TO_ROUTE)) {
+    it(`${href} declares the permission ${routeDir} enforces`, () => {
+      const source = readFileSync(
+        resolve(__dirname, "../../../app/api/admin", routeDir, "route.ts"),
+        "utf8"
+      )
+      const enforced = source.match(/withPermission\(\s*PERMISSIONS\.([A-Z_]+)/)
+      if (!enforced) return // route is not permission-gated; nav may declare anything
+
+      const entry = ADMIN_NAV.find((e) => e.href === href)
+      expect(entry, `no nav entry for ${href}`).toBeDefined()
+      expect(entry!.permission, `${href} would 403 for a role the nav invites in`).toBe(
+        PERMISSIONS[enforced[1] as keyof typeof PERMISSIONS]
+      )
+    })
+  }
 })
 
 describe("ADMIN_NAV", () => {
