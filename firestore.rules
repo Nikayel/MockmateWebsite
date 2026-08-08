@@ -505,8 +505,24 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // A user may read their OWN session summaries, and only those.
+    //
+    // app/sessions/[id]/page.tsx falls back to users/{uid}/session_summaries/{id}
+    // for the score breakdown when the session document lacks one, using the
+    // client SDK. The catch-all below denied it, so that fallback threw on every
+    // session and the throw was swallowed: the breakdown simply never appeared.
+    //
+    // Firestore grants access when ANY matching rule allows, so this narrower
+    // match opens exactly this subcollection while the catch-all continues to
+    // contribute nothing. Writes stay server-only: only lib/session-metrics.ts
+    // through the Admin SDK produces these documents.
+    match /users/{userId}/session_summaries/{summaryId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
     // Per-user usage summaries live at users/{uid}/usage_summaries/{period};
-    // the whole users/* tree is server-only (budget state is read via API).
+    // the rest of the users/* tree is server-only (budget state is read via API).
     match /users/{userId}/{document=**} {
       allow read, write: if false;
     }
