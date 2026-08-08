@@ -1,4 +1,5 @@
 export { AdminLayout, AdminSection, TimeRangeSelector } from "./AdminLayout"
+export { AdminAccessDenied, AdminGateError, AdminSignInRequired } from "./AdminAccessState"
 export { StatCard, MetricCard, ComparisonCard } from "./StatCard"
 export { DataTable, renderBadge } from "./DataTable"
 export { ExportButton, ExportMenu } from "./ExportButton"

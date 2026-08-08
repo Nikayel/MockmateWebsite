@@ -33,9 +33,14 @@ import {
   Scale,
   Lightbulb,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { logger } from "@/lib/logger"
-import { Skeleton } from "@/components/admin/shared"
+import {
+  AdminAccessDenied,
+  AdminGateError,
+  AdminSignInRequired,
+  Skeleton,
+} from "@/components/admin/shared"
+import { parseAdminIdentity, type AdminIdentity } from "@/lib/admin/identity"
 
 interface NavItem {
   name: string
@@ -92,21 +97,39 @@ const navigation: NavItem[] = [
 // Group navigation items by section
 const sections = ["Core", "Revenue", "Technical", "Operations"]
 
+/**
+ * What the gate knows about the current visitor. "forbidden" is the only state that
+ * means "you are not an admin"; a failed check is its own state so a backend hiccup
+ * cannot lock a real admin out of the dashboard.
+ */
+type AdminGateState =
+  | { status: "checking" }
+  | { status: "signed-out" }
+  | { status: "forbidden" }
+  | { status: "error"; message: string }
+  | { status: "authorized"; identity: AdminIdentity }
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const { firebaseUser, loading: authLoading } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
+  const [gate, setGate] = useState<AdminGateState>({ status: "checking" })
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
-    const checkAdminAccess = async () => {
-      if (authLoading) return
+    if (authLoading) return
 
-      if (!firebaseUser) {
-        router.push("/login?redirect=admin")
-        return
-      }
+    if (!firebaseUser) {
+      setGate({ status: "signed-out" })
+      router.push("/login?redirect=admin")
+      return
+    }
+
+    let cancelled = false
+
+    const checkAdminAccess = async () => {
+      setGate({ status: "checking" })
 
       try {
         // Identity only. /api/admin/me reads one admin_roles document and returns,
@@ -115,27 +138,61 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const response = await fetch("/api/admin/me", {
           headers: { Authorization: `Bearer ${token}` },
         })
+        if (cancelled) return
 
-        if (response.status === 403) {
-          setIsAdmin(false)
+        if (response.status === 401) {
+          setGate({ status: "signed-out" })
           return
         }
 
-        if (response.ok) {
-          setIsAdmin(true)
-        } else {
-          setIsAdmin(false)
+        if (response.status === 403) {
+          setGate({ status: "forbidden" })
+          return
         }
+
+        if (!response.ok) {
+          logger.error("Admin identity check failed", {
+            status: response.status,
+            userId: firebaseUser.uid,
+          })
+          setGate({
+            status: "error",
+            message: `The admin service returned ${response.status}. This is a problem with the check, not with your account.`,
+          })
+          return
+        }
+
+        const identity = parseAdminIdentity(await response.json())
+        if (cancelled) return
+
+        if (!identity) {
+          setGate({
+            status: "error",
+            message: "The admin service returned a response this page could not read.",
+          })
+          return
+        }
+
+        setGate({ status: "authorized", identity })
       } catch (error) {
         logger.error("Admin check failed", { error, userId: firebaseUser?.uid })
-        setIsAdmin(false)
+        if (!cancelled) {
+          setGate({
+            status: "error",
+            message: "Could not reach the admin service. Check your connection and try again.",
+          })
+        }
       }
     }
 
     checkAdminAccess()
-  }, [authLoading, firebaseUser, router])
 
-  if (authLoading || isAdmin === null) {
+    return () => {
+      cancelled = true
+    }
+  }, [authLoading, firebaseUser, router, retryCount])
+
+  if (authLoading || gate.status === "checking") {
     return (
       <div className="flex min-h-screen bg-[#1a1917]">
         {/* Sidebar skeleton */}
@@ -167,24 +224,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     )
   }
 
-  if (!isAdmin) {
+  if (gate.status === "signed-out") {
+    return <AdminSignInRequired onSignIn={() => router.push("/login?redirect=admin")} />
+  }
+
+  if (gate.status === "forbidden") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#1a1917]">
-        <div className="max-w-md rounded-lg border border-red-500/30 bg-gray-900/50 p-8 text-center">
-          <Shield className="mx-auto mb-4 h-12 w-12 text-red-400" />
-          <h1 className="mb-2 text-xl font-bold text-white">Access Denied</h1>
-          <p className="mb-6 text-gray-400">
-            You don't have permission to access the admin dashboard.
-          </p>
-          <Button
-            onClick={() => router.push("/")}
-            className="bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
-          >
-            Return to Home
-          </Button>
-        </div>
-      </div>
+      <AdminAccessDenied
+        email={firebaseUser?.email ?? undefined}
+        onGoHome={() => router.push("/")}
+      />
     )
+  }
+
+  if (gate.status === "error") {
+    return <AdminGateError message={gate.message} onRetry={() => setRetryCount((n) => n + 1)} />
   }
 
   const handleSignOut = async () => {
