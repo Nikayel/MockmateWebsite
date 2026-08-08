@@ -157,6 +157,42 @@ export function summarizePaymentWindow(
   }
 }
 
+/**
+ * Totals read back from Firestore aggregation queries rather than from
+ * documents. Aggregating server-side is what lets a total be a real total: the
+ * payments page used to sum the hundred documents it had fetched for its
+ * recent-activity tables and label the result "Total Revenue".
+ */
+export interface PaymentAggregateInput {
+  /** Sum of `amount` over succeeded payments, cents, as Firestore returned it. */
+  succeededTotalCents: number
+  succeededCount: number
+  /** Sum of `amount` over refunds, cents. Stored negative, so this is usually negative. */
+  refundedTotalCents: number
+  refundedCount: number
+}
+
+/**
+ * Turn aggregation results into the same summary shape the document-level
+ * reducer produces, so both paths report identical fields and one set of rules
+ * about signs and bounded ratios.
+ */
+export function summarizePaymentAggregates(
+  input: PaymentAggregateInput
+): PaymentWindowSummary {
+  const collectedCents = Math.max(0, input.succeededTotalCents)
+  const refundedCents = Math.abs(input.refundedTotalCents)
+  const events = input.succeededCount + input.refundedCount
+  return {
+    collectedCents,
+    refundedCents,
+    netCents: collectedCents - refundedCents,
+    succeededCount: input.succeededCount,
+    refundedCount: input.refundedCount,
+    refundShareOfEventsPercent: events > 0 ? (input.refundedCount / events) * 100 : 0,
+  }
+}
+
 /** Loose read model over a Stripe charge. Stripe amounts are always cents. */
 export interface StripeChargeInput {
   amount?: unknown

@@ -5,6 +5,7 @@ import {
   computeArrCents,
   computeMrrCents,
   getListPricesCents,
+  summarizePaymentAggregates,
   summarizePaymentWindow,
   summarizeStripeCharges,
   type ListPricesCents,
@@ -166,6 +167,70 @@ describe("summarizePaymentWindow", () => {
 
   it("returns zeroes rather than NaN for an empty window", () => {
     expect(summarizePaymentWindow([])).toEqual({
+      collectedCents: 0,
+      refundedCents: 0,
+      netCents: 0,
+      succeededCount: 0,
+      refundedCount: 0,
+      refundShareOfEventsPercent: 0,
+    })
+  })
+})
+
+describe("summarizePaymentAggregates", () => {
+  it("agrees with the document-level reducer on the same data", () => {
+    const documents = [
+      { amount: 2500, status: "succeeded" },
+      { amount: 22500, status: "succeeded" },
+      { amount: -2500, status: "refunded" },
+    ]
+    const fromDocuments = summarizePaymentWindow(documents)
+    const fromAggregates = summarizePaymentAggregates({
+      succeededTotalCents: 25000,
+      succeededCount: 2,
+      refundedTotalCents: -2500, // Firestore sums the stored negative amounts
+      refundedCount: 1,
+    })
+    expect(fromAggregates).toEqual(fromDocuments)
+  })
+
+  it("reports refunds as a magnitude whichever sign the store holds", () => {
+    const negative = summarizePaymentAggregates({
+      succeededTotalCents: 0,
+      succeededCount: 0,
+      refundedTotalCents: -5000,
+      refundedCount: 2,
+    })
+    const positive = summarizePaymentAggregates({
+      succeededTotalCents: 0,
+      succeededCount: 0,
+      refundedTotalCents: 5000,
+      refundedCount: 2,
+    })
+    expect(negative.refundedCents).toBe(5000)
+    expect(positive.refundedCents).toBe(5000)
+    expect(negative.netCents).toBe(-5000)
+  })
+
+  it("keeps the refund share bounded when a window holds only refunds", () => {
+    const summary = summarizePaymentAggregates({
+      succeededTotalCents: 0,
+      succeededCount: 0,
+      refundedTotalCents: -5000,
+      refundedCount: 3,
+    })
+    expect(summary.refundShareOfEventsPercent).toBe(100)
+  })
+
+  it("returns zeroes for an empty collection", () => {
+    expect(
+      summarizePaymentAggregates({
+        succeededTotalCents: 0,
+        succeededCount: 0,
+        refundedTotalCents: 0,
+        refundedCount: 0,
+      })
+    ).toEqual({
       collectedCents: 0,
       refundedCents: 0,
       netCents: 0,
