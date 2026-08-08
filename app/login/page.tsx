@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Github, Terminal } from "lucide-react"
+import { AlertTriangle, Github, Terminal } from "lucide-react"
 import {
   consumeRedirectSignIn,
   getStoredRedirectPath,
@@ -35,11 +35,35 @@ function getLoginErrorMessage(error: unknown): string {
   return "Something went wrong. Please try again."
 }
 
+/**
+ * Explains a failed profile write in terms of what it costs the user.
+ *
+ * Vague copy is what let this failure hide. "Profile setup encountered an issue,
+ * you can still use the app" reads as cosmetic; the actual consequence is that
+ * /api/create-checkout answers 404 "User profile not found" on every attempt,
+ * permanently, and no amount of retrying the purchase helps.
+ */
+function getProfileSetupErrorMessage(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code
+
+  if (code === "permission-denied") {
+    return "We couldn't save your profile to our database. This is usually temporary. Please try again."
+  }
+  if (code === "unavailable" || code === "deadline-exceeded") {
+    return "We couldn't reach our database to finish setting up your account. Please check your connection and try again."
+  }
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  return "Something went wrong while setting up your account. Please try again."
+}
+
 function LoginPageContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [authStatus, setAuthStatus] = useState<
-    "idle" | "authenticating" | "creating-profile" | "complete"
+    "idle" | "authenticating" | "creating-profile" | "complete" | "profile-error"
   >("idle")
+  const [profileErrorMessage, setProfileErrorMessage] = useState<string | null>(null)
   const [authProvider, setAuthProvider] = useState<"github" | "google" | null>(null)
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -230,22 +254,22 @@ function LoginPageContent() {
 
           // User is authenticated, redirect them
           router.push(getStoredRedirectPath() ?? safeRedirect)
-        } catch (profileError: any) {
-          // Only show error toast for critical errors, not for permission issues
-          // Permission issues might be temporary and the user can still use the app
-          if (profileError.code === "permission-denied") {
-            // Don't show error toast for permission issues - they might resolve on retry
-          } else {
-            // Show error for other issues, but don't block the user
-            toast.error("Profile setup encountered an issue", {
-              description: "You can still use the app, but some features may be limited",
-            })
-          }
-
-          // Mark as complete and redirect anyway - don't block user from using the app
-          setAuthStatus("complete")
-
-          router.push(getStoredRedirectPath() ?? safeRedirect)
+        } catch (profileError: unknown) {
+          // Do NOT redirect past this.
+          //
+          // The old code swallowed permission-denied entirely ("might resolve on
+          // retry"), showed a soft toast for everything else, and pushed the user
+          // onward regardless. Nothing ever retried. The user arrived at a
+          // working-looking dashboard as an auth record with no profiles/{uid}
+          // document, so /api/create-checkout answered 404 "User profile not
+          // found" on every upgrade attempt, forever, with no path out and no
+          // signal that anything was wrong. Onboarding never fired either.
+          //
+          // Failing visibly here costs one interrupted sign-in. Failing silently
+          // costs the customer.
+          console.error("[Login] Profile setup failed", profileError)
+          setProfileErrorMessage(getProfileSetupErrorMessage(profileError))
+          setAuthStatus("profile-error")
         }
       }
 
@@ -298,8 +322,76 @@ function LoginPageContent() {
     }
   }
 
+  const handleRetryProfileSetup = () => {
+    setProfileErrorMessage(null)
+    // The profile-creation effect keys off this status, so flipping it back runs
+    // the whole post-sign-in sequence again against the same firebaseUser.
+    setAuthStatus("authenticating")
+  }
+
   return (
     <main className="bg-background relative min-h-screen">
+      {/* Account setup failed. Blocking on purpose: see the catch block above. */}
+      {authStatus === "profile-error" && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-background/98 fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="profile-error-title"
+          aria-describedby="profile-error-description"
+        >
+          <div className="w-full max-w-md px-6 text-center">
+            <div className="mb-6 flex justify-center">
+              <div className="bg-destructive/10 text-destructive flex h-16 w-16 items-center justify-center rounded-full">
+                <AlertTriangle className="h-7 w-7" aria-hidden="true" />
+              </div>
+            </div>
+
+            <h2
+              id="profile-error-title"
+              className="text-foreground mb-2 text-2xl font-semibold tracking-tight"
+            >
+              We couldn&apos;t finish setting up your account
+            </h2>
+
+            <p id="profile-error-description" className="text-muted-foreground mb-4 text-sm">
+              {profileErrorMessage}
+            </p>
+
+            <p className="text-muted-foreground/80 mb-8 text-sm">
+              You are signed in, but until this completes your account has no profile, so upgrading
+              to Pro and your practice history will not work. Please retry before continuing.
+            </p>
+
+            <div className="space-y-3">
+              <Button onClick={handleRetryProfileSetup} className="h-11 w-full rounded-xl">
+                Try again
+              </Button>
+              <Button
+                onClick={() => {
+                  setAuthStatus("complete")
+                  router.push(getStoredRedirectPath() ?? safeRedirect)
+                }}
+                variant="outline"
+                className="h-11 w-full rounded-xl"
+              >
+                Continue anyway
+              </Button>
+            </div>
+
+            <p className="text-muted-foreground/60 mt-6 text-xs">
+              Still stuck? Email{" "}
+              <a href="mailto:support@codesparring.dev" className="hover:text-foreground underline">
+                support@codesparring.dev
+              </a>{" "}
+              and we will set your account up by hand.
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Clean Loading Overlay */}
       {(authStatus === "authenticating" ||
         authStatus === "creating-profile" ||
