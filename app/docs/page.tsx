@@ -20,7 +20,12 @@ import { motion } from "framer-motion"
 import Link from "next/link"
 
 const quickStart = [
-  { step: "01", title: "Sign Up", desc: "Create your account - no downloads needed", icon: Download },
+  {
+    step: "01",
+    title: "Sign Up",
+    desc: "Create your account - no downloads needed",
+    icon: Download,
+  },
   { step: "02", title: "Configure", desc: "Set your preferences and skill level", icon: Settings },
   { step: "03", title: "Practice", desc: "Start your first mock interview", icon: Play },
   { step: "04", title: "Improve", desc: "Review feedback and track progress", icon: BarChart3 },
@@ -53,29 +58,29 @@ const shortcuts = [
 
 export default function DocsPage() {
   return (
-    <main className="min-h-screen bg-background">
+    <main className="bg-background min-h-screen">
       <Header />
 
       {/* Hero Section */}
-      <section className="relative min-h-[50vh] flex items-center overflow-hidden">
+      <section className="relative flex min-h-[50vh] items-center overflow-hidden">
         <GridBackground />
-        <div className="container mx-auto px-4 relative z-10 py-32">
+        <div className="relative z-10 container mx-auto px-4 py-32">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             className="max-w-3xl"
           >
-            <Badge className="bg-[#c4703f]/10 text-[#c4703f] border-[#c4703f]/20 mb-6">
+            <Badge className="bg-accent/10 text-accent-strong border-accent/20 mb-6">
               Documentation
             </Badge>
-            <h1 className="text-5xl md:text-7xl font-heading font-bold text-foreground mb-6 leading-tight">
+            <h1 className="font-heading text-foreground mb-6 text-5xl leading-tight font-bold md:text-7xl">
               Get
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#c4703f] to-[#3fb883]">
+              <span className="from-accent to-neural block bg-gradient-to-r bg-clip-text text-transparent">
                 Started
               </span>
             </h1>
-            <p className="text-xl text-muted-foreground max-w-xl leading-relaxed">
+            <p className="text-muted-foreground max-w-xl text-xl leading-relaxed">
               Everything you need to master coding interviews with CodeSparring.
             </p>
           </motion.div>
@@ -83,18 +88,18 @@ export default function DocsPage() {
       </section>
 
       {/* Quick Start - Horizontal flow */}
-      <section className="py-24 bg-background">
+      <section className="bg-background py-24">
         <div className="container mx-auto px-4">
           <motion.p
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            className="text-muted-foreground text-sm uppercase tracking-widest mb-12"
+            className="text-muted-foreground mb-12 text-sm tracking-widest uppercase"
           >
             Quick Start
           </motion.p>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
             {quickStart.map((item, index) => (
               <motion.div
                 key={item.step}
@@ -104,14 +109,14 @@ export default function DocsPage() {
                 transition={{ delay: index * 0.1 }}
                 className="relative"
               >
-                <div className="text-6xl font-bold text-foreground mb-4">{item.step}</div>
-                <div className="flex items-center gap-3 mb-2">
-                  <item.icon className="h-5 w-5 text-[#c4703f]" />
-                  <h3 className="text-lg font-semibold text-foreground">{item.title}</h3>
+                <div className="text-foreground mb-4 text-6xl font-bold">{item.step}</div>
+                <div className="mb-2 flex items-center gap-3">
+                  <item.icon className="text-accent-strong h-5 w-5" />
+                  <h3 className="text-foreground text-lg font-semibold">{item.title}</h3>
                 </div>
                 <p className="text-muted-foreground text-sm">{item.desc}</p>
                 {index < quickStart.length - 1 && (
-                  <ArrowRight className="hidden md:block absolute top-8 -right-3 h-4 w-4 text-foreground" />
+                  <ArrowRight className="text-foreground absolute top-8 -right-3 hidden h-4 w-4 md:block" />
                 )}
               </motion.div>
             ))}
@@ -120,19 +125,19 @@ export default function DocsPage() {
       </section>
 
       {/* Features - Clean list */}
-      <section className="py-24 bg-background border-t border-border">
+      <section className="bg-background border-border border-t py-24">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
+          <div className="mx-auto max-w-4xl">
             <motion.p
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-muted-foreground text-sm uppercase tracking-widest mb-12"
+              className="text-muted-foreground mb-12 text-sm tracking-widest uppercase"
             >
               Core Features
             </motion.p>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+            <div className="grid grid-cols-1 gap-12 md:grid-cols-3">
               {features.map((feature, index) => (
                 <motion.div
                   key={feature.title}
@@ -141,12 +146,12 @@ export default function DocsPage() {
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.1 }}
                 >
-                  <feature.icon className="h-8 w-8 text-[#c4703f] mb-4" />
-                  <h3 className="text-xl font-semibold text-foreground mb-4">{feature.title}</h3>
+                  <feature.icon className="text-accent-strong mb-4 h-8 w-8" />
+                  <h3 className="text-foreground mb-4 text-xl font-semibold">{feature.title}</h3>
                   <ul className="space-y-2">
                     {feature.items.map((item) => (
                       <li key={item} className="text-muted-foreground flex items-center gap-2">
-                        <span className="w-1 h-1 rounded-full bg-[#3fb883]" />
+                        <span className="bg-neural h-1 w-1 rounded-full" />
                         {item}
                       </li>
                     ))}
@@ -159,17 +164,17 @@ export default function DocsPage() {
       </section>
 
       {/* Keyboard Shortcuts */}
-      <section className="py-24 bg-background border-t border-border">
+      <section className="bg-background border-border border-t py-24">
         <div className="container mx-auto px-4">
-          <div className="max-w-2xl mx-auto">
+          <div className="mx-auto max-w-2xl">
             <motion.div
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="flex items-center gap-3 mb-12"
+              className="mb-12 flex items-center gap-3"
             >
-              <Keyboard className="h-5 w-5 text-muted-foreground" />
-              <p className="text-muted-foreground text-sm uppercase tracking-widest">
+              <Keyboard className="text-muted-foreground h-5 w-5" />
+              <p className="text-muted-foreground text-sm tracking-widest uppercase">
                 Keyboard Shortcuts
               </p>
             </motion.div>
@@ -182,10 +187,10 @@ export default function DocsPage() {
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.05 }}
-                  className="flex items-center justify-between py-3 border-b border-border"
+                  className="border-border flex items-center justify-between border-b py-3"
                 >
                   <span className="text-muted-foreground">{shortcut.action}</span>
-                  <kbd className="px-3 py-1 rounded bg-card text-muted-foreground font-mono text-sm">
+                  <kbd className="bg-card text-muted-foreground rounded px-3 py-1 font-mono text-sm">
                     {shortcut.key}
                   </kbd>
                 </motion.div>
@@ -196,28 +201,35 @@ export default function DocsPage() {
       </section>
 
       {/* CTA */}
-      <section className="py-24 bg-background border-t border-border">
+      <section className="bg-background border-border border-t py-24">
         <div className="container mx-auto px-4 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <h2 className="text-3xl font-heading font-bold text-foreground mb-4">
+            <h2 className="font-heading text-foreground mb-4 text-3xl font-bold">
               Ready to practice?
             </h2>
-            <p className="text-muted-foreground mb-8 max-w-md mx-auto">
+            <p className="text-muted-foreground mx-auto mb-8 max-w-md">
               Start your first mock interview and get AI-powered feedback instantly.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col justify-center gap-4 sm:flex-row">
               <Link href="/interview">
-                <Button size="lg" className="bg-card text-foreground hover:bg-muted rounded-full px-8">
+                <Button
+                  size="lg"
+                  className="bg-card text-foreground hover:bg-muted rounded-full px-8"
+                >
                   Start Practicing
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
               <Link href="/samples">
-                <Button size="lg" variant="outline" className="border-border text-foreground hover:bg-card rounded-full px-8 bg-transparent">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="border-border text-foreground hover:bg-card rounded-full bg-transparent px-8"
+                >
                   View Samples
                   <ExternalLink className="ml-2 h-4 w-4" />
                 </Button>

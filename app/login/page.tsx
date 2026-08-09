@@ -625,7 +625,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <main className="bg-background flex min-h-screen items-center justify-center">
-          <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
+          <div className="border-accent h-12 w-12 animate-spin rounded-full border-b-2"></div>
         </main>
       }
     >

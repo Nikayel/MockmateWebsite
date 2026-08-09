@@ -54,7 +54,7 @@ export const ChatColumn = memo(function ChatColumn({
 
   return (
     <Card
-      className={`glass-effect order-3 h-full flex-col gap-0 overflow-hidden border-border bg-card/50 py-0 ${
+      className={`glass-effect border-border bg-card/50 order-3 h-full flex-col gap-0 overflow-hidden py-0 ${
         focusMode
           ? "hidden"
           : collapsed
@@ -68,7 +68,7 @@ export const ChatColumn = memo(function ChatColumn({
       }`}
     >
       <CardHeader className="flex-shrink-0 px-4 pt-3 pb-2">
-        <CardTitle className="flex w-full min-w-0 items-center justify-between gap-2 text-sm text-foreground">
+        <CardTitle className="text-foreground flex w-full min-w-0 items-center justify-between gap-2 text-sm">
           <div className="flex min-w-0 items-center gap-2.5">
             <div className="relative flex-shrink-0">
               <div className="bg-accent/15 text-accent ring-accent/30 flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ring-1">
@@ -115,7 +115,7 @@ export const ChatColumn = memo(function ChatColumn({
       <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
         <div className="mb-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-2">
           {interviewerMessages.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">
+            <div className="text-muted-foreground py-8 text-center">
               <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
               <p className="text-xs">Interview will begin when you start...</p>
             </div>
@@ -141,21 +141,21 @@ export const ChatColumn = memo(function ChatColumn({
               ))}
               {isBusy && (
                 <div className="flex justify-start">
-                  <div className="max-w-[90%] rounded-lg border border-border/50 bg-muted/50 p-2 text-muted-foreground">
+                  <div className="border-border/50 bg-muted/50 text-muted-foreground max-w-[90%] rounded-lg border p-2">
                     <div className="flex items-center space-x-2">
-                      <Brain className="h-3 w-3 animate-pulse text-[#c4703f]" />
+                      <Brain className="text-accent-strong h-3 w-3 animate-pulse" />
                       <span className="text-xs">CodeSparring AI is thinking</span>
                       <span className="flex space-x-0.5">
                         <span
-                          className="h-1 w-1 animate-bounce rounded-full bg-[#c4703f]"
+                          className="bg-accent h-1 w-1 animate-bounce rounded-full"
                           style={{ animationDelay: "0ms" }}
                         />
                         <span
-                          className="h-1 w-1 animate-bounce rounded-full bg-[#c4703f]"
+                          className="bg-accent h-1 w-1 animate-bounce rounded-full"
                           style={{ animationDelay: "150ms" }}
                         />
                         <span
-                          className="h-1 w-1 animate-bounce rounded-full bg-[#c4703f]"
+                          className="bg-accent h-1 w-1 animate-bounce rounded-full"
                           style={{ animationDelay: "300ms" }}
                         />
                       </span>
@@ -168,7 +168,7 @@ export const ChatColumn = memo(function ChatColumn({
           )}
         </div>
         {(isInterviewStarted || showPostInterviewDiscussion) && (
-          <div className="flex flex-shrink-0 flex-col gap-2 border-t border-border pt-3">
+          <div className="border-border flex flex-shrink-0 flex-col gap-2 border-t pt-3">
             <VoiceModeToggle
               isRecording={isRecordingInterviewer}
               onToggleRecording={onToggleRecording}

@@ -50,7 +50,7 @@ export function BugfixTourStep({
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <p className="mb-1 text-xs font-medium text-cyan-200">
+          <p className="text-accent-strong mb-1 text-xs font-medium">
             Step {stepIndex + 1} of {TOUR_STEPS.length}
           </p>
           <h2 id="bugfix-tour-step-title" className="text-foreground text-base font-semibold">

@@ -117,7 +117,7 @@ export function GuidedQuiz({
             >
               <span className="mt-0.5 shrink-0">
                 {showCorrect ? (
-                  <Check className="h-3.5 w-3.5 text-emerald-300" aria-hidden="true" />
+                  <Check className="text-neural h-3.5 w-3.5" aria-hidden="true" />
                 ) : showWrong ? (
                   <XCircle className="h-3.5 w-3.5 text-red-300" aria-hidden="true" />
                 ) : (
@@ -132,7 +132,10 @@ export function GuidedQuiz({
       {answered && (
         <div className="mt-2 space-y-1">
           <p
-            className={cn("text-xs font-medium", isCorrect ? "text-emerald-300" : "text-amber-300")}
+            className={cn(
+              "text-xs font-medium",
+              isCorrect ? "text-neural" : "text-amber-700 dark:text-amber-300"
+            )}
           >
             {isCorrect ? "Correct." : "Not quite."} {block.options[selectedIndex].rationale}
           </p>

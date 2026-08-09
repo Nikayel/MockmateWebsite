@@ -320,7 +320,7 @@ export default function SessionsPage() {
                               )
                             }
                             size="sm"
-                            className="h-8 bg-purple-600 text-xs text-white hover:bg-purple-500"
+                            className="bg-accent text-accent-foreground hover:bg-accent/90 h-8 text-xs"
                           >
                             <Play className="mr-1.5 h-3 w-3" />
                             Continue Wrap-up

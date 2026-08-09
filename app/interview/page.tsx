@@ -2113,7 +2113,7 @@ function InterviewPageLoading() {
   return (
     <main className="from-card via-background to-card flex min-h-screen flex-1 items-center justify-center bg-gradient-to-b">
       <div className="text-center">
-        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
+        <div className="border-accent mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2"></div>
         <p className="text-muted-foreground">Loading interview...</p>
       </div>
     </main>

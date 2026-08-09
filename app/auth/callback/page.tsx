@@ -5,17 +5,17 @@ import dynamic from "next/dynamic"
 // Dynamically import the actual component to avoid SSR issues
 // ssr: false ensures this component never runs on the server
 const AuthCallbackClient = dynamic(
-  () => import("./auth-callback-client").then(mod => ({ default: mod.AuthCallbackClient })),
-  { 
+  () => import("./auth-callback-client").then((mod) => ({ default: mod.AuthCallbackClient })),
+  {
     ssr: false,
     loading: () => (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="bg-background flex min-h-screen items-center justify-center">
         <div className="text-foreground text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#c4703f] mx-auto mb-4"></div>
+          <div className="border-accent mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2"></div>
           <p>Completing sign in...</p>
         </div>
       </div>
-    )
+    ),
   }
 )
 

@@ -790,7 +790,7 @@ export default function DashboardPage() {
 
                     {shouldRecommendBugfixRamp && (
                       <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3">
-                        <p className="text-xs font-medium text-emerald-300">
+                        <p className="text-neural text-xs font-medium">
                           Beginner Debugger track recommended
                         </p>
                         <p className="text-muted-foreground mt-1 text-xs">
@@ -833,7 +833,7 @@ export default function DashboardPage() {
                 <Link href="/upgrade">
                   <Button
                     size="sm"
-                    className="w-full bg-amber-500 text-white hover:bg-amber-600 sm:w-auto"
+                    className="bg-accent text-accent-foreground hover:bg-accent/90 w-full sm:w-auto"
                   >
                     <Crown className="mr-1.5 h-3.5 w-3.5" />
                     Upgrade

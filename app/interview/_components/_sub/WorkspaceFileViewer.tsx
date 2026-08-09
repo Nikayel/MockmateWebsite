@@ -29,7 +29,7 @@ export function WorkspaceFileViewer({
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-foreground font-semibold">Codebase Files</h3>
         {selectedScenario.type === "bugfix" && (
-          <Badge className="border-cyan-400/30 bg-cyan-400/10 text-xs text-cyan-200">
+          <Badge className="border-accent/30 bg-accent/10 text-accent-strong text-xs">
             inspect in editor
           </Badge>
         )}

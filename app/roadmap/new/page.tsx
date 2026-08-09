@@ -254,7 +254,7 @@ export default function NewRoadmapPage() {
                 {isRateLimited && (
                   <button
                     onClick={() => setError(null)}
-                    className="mt-3 inline-flex items-center gap-2 rounded-md bg-yellow-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-yellow-700"
+                    className="bg-accent text-accent-foreground hover:bg-accent/90 mt-3 inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors"
                   >
                     <RefreshCw className="h-3.5 w-3.5" />
                     Dismiss & Try Again
@@ -359,7 +359,7 @@ export default function NewRoadmapPage() {
                     <div className="flex flex-col justify-center gap-3 sm:flex-row">
                       <Link
                         href="/upgrade"
-                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 px-6 py-3 font-semibold text-white shadow-lg transition-all hover:from-yellow-400 hover:to-orange-400"
+                        className="bg-accent text-accent-foreground hover:bg-accent/90 inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 font-semibold shadow-lg transition-all"
                       >
                         Upgrade to Pro
                         <ArrowRight className="h-4 w-4" />
@@ -408,7 +408,7 @@ function StepIndicator({
       <div
         className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors ${
           completed
-            ? "bg-green-500 text-white"
+            ? "bg-neural text-white"
             : active
               ? "bg-primary text-primary-foreground"
               : "bg-muted text-muted-foreground"

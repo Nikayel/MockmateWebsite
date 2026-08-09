@@ -59,8 +59,8 @@ export default function LimitReachedPage() {
 
   if (loading || authLoading || !initialized) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
+      <main className="bg-background flex min-h-screen items-center justify-center">
+        <div className="border-accent h-12 w-12 animate-spin rounded-full border-b-2"></div>
       </main>
     )
   }
@@ -70,7 +70,7 @@ export default function LimitReachedPage() {
   // false "0 sessions left" wall.
   if (checkFailed || !usageLimit) {
     return (
-      <main className="min-h-screen bg-background">
+      <main className="bg-background min-h-screen">
         <Header />
 
         <div className="pt-24 pb-16">
@@ -80,15 +80,15 @@ export default function LimitReachedPage() {
                 <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-yellow-500/20">
                   <AlertCircle className="h-10 w-10 text-yellow-400" />
                 </div>
-                <h1 className="font-heading mb-4 text-3xl font-bold text-foreground">
+                <h1 className="font-heading text-foreground mb-4 text-3xl font-bold">
                   Couldn't check your usage
                 </h1>
-                <p className="mb-8 text-lg text-muted-foreground">
+                <p className="text-muted-foreground mb-8 text-lg">
                   We couldn't load your session usage right now. Please try again in a moment.
                 </p>
                 <Button
                   onClick={runUsageCheck}
-                  className="bg-[#c4703f] px-8 py-6 text-lg text-foreground hover:bg-[#b3632f]"
+                  className="bg-accent text-accent-foreground hover:bg-accent/90 px-8 py-6 text-lg"
                 >
                   Retry
                 </Button>
@@ -103,7 +103,7 @@ export default function LimitReachedPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="bg-background min-h-screen">
       <Header />
 
       <div className="pt-24 pb-16">
@@ -114,24 +114,24 @@ export default function LimitReachedPage() {
                 <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-yellow-500/20">
                   <AlertCircle className="h-10 w-10 text-yellow-400" />
                 </div>
-                <h1 className="font-heading mb-4 text-4xl font-bold text-foreground">
+                <h1 className="font-heading text-foreground mb-4 text-4xl font-bold">
                   Monthly Limit Reached
                 </h1>
-                <p className="mb-2 text-xl text-muted-foreground">
+                <p className="text-muted-foreground mb-2 text-xl">
                   You've used all {usageLimit?.limit ?? PRICING_CONFIG.free.sessionsPerMonth} free
                   sessions this month
                 </p>
-                <div className="mt-4 flex items-center justify-center space-x-2 text-muted-foreground">
+                <div className="text-muted-foreground mt-4 flex items-center justify-center space-x-2">
                   <Clock className="h-4 w-4" />
                   <span className="text-sm">Your limit resets at the start of next month</span>
                 </div>
               </div>
 
-              <div className="mb-8 rounded-lg border border-border bg-muted/50 p-6">
+              <div className="border-border bg-muted/50 mb-8 rounded-lg border p-6">
                 <div className="mb-6 flex items-center justify-between">
                   <div>
-                    <p className="mb-1 text-sm text-muted-foreground">Sessions Used</p>
-                    <p className="text-3xl font-bold text-foreground">
+                    <p className="text-muted-foreground mb-1 text-sm">Sessions Used</p>
+                    <p className="text-foreground text-3xl font-bold">
                       {usageLimit?.used ?? 0} /{" "}
                       {usageLimit?.limit ?? PRICING_CONFIG.free.sessionsPerMonth}
                     </p>
@@ -145,9 +145,9 @@ export default function LimitReachedPage() {
               <div className="mb-8 rounded-lg border border-yellow-500/20 bg-gradient-to-br from-yellow-500/10 to-orange-500/10 p-8">
                 <div className="mb-4 flex items-center justify-center space-x-2">
                   <Crown className="h-6 w-6 text-yellow-400" />
-                  <h2 className="text-2xl font-bold text-foreground">Upgrade to Pro</h2>
+                  <h2 className="text-foreground text-2xl font-bold">Upgrade to Pro</h2>
                 </div>
-                <p className="mb-6 text-muted-foreground">
+                <p className="text-muted-foreground mb-6">
                   Get {PRICING_CONFIG.pro.sessionsDisplay} and unlock advanced features to land your
                   dream job.
                 </p>
@@ -157,15 +157,15 @@ export default function LimitReachedPage() {
                     <div key={valueProp.title} className="flex items-start space-x-3">
                       <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-green-400" />
                       <div>
-                        <p className="font-semibold text-foreground">{valueProp.title}</p>
-                        <p className="text-sm text-muted-foreground">{valueProp.description}</p>
+                        <p className="text-foreground font-semibold">{valueProp.title}</p>
+                        <p className="text-muted-foreground text-sm">{valueProp.description}</p>
                       </div>
                     </div>
                   ))}
                 </div>
 
                 <Link href="/upgrade">
-                  <Button className="w-full bg-yellow-500 px-8 py-6 text-lg text-foreground hover:bg-yellow-600 md:w-auto">
+                  <Button className="text-foreground w-full bg-yellow-500 px-8 py-6 text-lg hover:bg-yellow-600 md:w-auto">
                     <Crown className="mr-2 h-5 w-5" />
                     Upgrade to Pro - from {PRICING_CONFIG.pro.website.yearly.priceDisplay}/mo
                     <ArrowRight className="ml-2 h-5 w-5" />
@@ -177,7 +177,7 @@ export default function LimitReachedPage() {
                 <Link href="/dashboard">
                   <Button
                     variant="outline"
-                    className="border-border bg-transparent text-muted-foreground hover:bg-muted"
+                    className="border-border text-muted-foreground hover:bg-muted bg-transparent"
                   >
                     Go to Dashboard
                   </Button>
@@ -185,7 +185,7 @@ export default function LimitReachedPage() {
                 <Link href="/profile">
                   <Button
                     variant="outline"
-                    className="border-border bg-transparent text-muted-foreground hover:bg-muted"
+                    className="border-border text-muted-foreground hover:bg-muted bg-transparent"
                   >
                     View Profile
                   </Button>

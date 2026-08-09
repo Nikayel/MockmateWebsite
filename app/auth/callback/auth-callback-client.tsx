@@ -175,7 +175,7 @@ export function AuthCallbackClient() {
     return (
       <div className="bg-background flex min-h-screen items-center justify-center">
         <div className="text-foreground text-center">
-          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
+          <div className="border-accent mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2"></div>
           <p>Completing sign in...</p>
         </div>
       </div>
@@ -211,14 +211,14 @@ export function AuthCallbackClient() {
             {redirectUrl ? (
               <Button
                 onClick={() => (window.location.href = redirectUrl)}
-                className="w-full bg-[#c4703f] hover:bg-[#c4703f]/80"
+                className="bg-accent text-accent-foreground hover:bg-accent/90 w-full"
               >
                 Continue to {redirectUrl.replace("/", "")}
               </Button>
             ) : (
               <Button
                 onClick={handleOpenVSCode}
-                className="w-full bg-[#c4703f] hover:bg-[#c4703f]/80"
+                className="bg-accent text-accent-foreground hover:bg-accent/90 w-full"
               >
                 <ExternalLink className="mr-2 h-4 w-4" />
                 Go to Dashboard
@@ -238,7 +238,7 @@ export function AuthCallbackClient() {
             <p>Don't have the extension installed?</p>
             <Button
               variant="link"
-              className="p-0 text-[#c4703f]"
+              className="text-accent-strong p-0"
               onClick={() => (window.location.href = "/install")}
             >
               <Download className="mr-1 h-3 w-3" />

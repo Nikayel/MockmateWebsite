@@ -415,7 +415,7 @@ export function BugfixOnboardingTour({
               animate={reduceMotion ? undefined : { scale: 1, y: 0 }}
             >
               <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-cyan-400/15 text-cyan-200">
+                <div className="bg-accent/10 text-accent-strong flex h-10 w-10 items-center justify-center rounded-md">
                   <Bug className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <div>

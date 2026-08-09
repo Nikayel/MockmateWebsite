@@ -216,7 +216,7 @@ export const ProblemColumn = memo(function ProblemColumn({
                           <span className="bg-accent h-4 w-1 rounded-full"></span>
                           Description
                           {realInterviewMode && scenarioDetails?.fuzzyStatement && (
-                            <Badge className="border-cyan-400/30 bg-cyan-400/10 text-xs text-cyan-200">
+                            <Badge className="border-accent/30 bg-accent/10 text-accent-strong text-xs">
                               Real Interview Mode
                             </Badge>
                           )}

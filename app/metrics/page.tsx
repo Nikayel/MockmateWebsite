@@ -199,8 +199,8 @@ function ScoreRing({ score, size = 120, label }: { score: number; size?: number;
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold text-foreground">{score}%</span>
-        <span className="text-[10px] tracking-wider text-muted-foreground uppercase">{label}</span>
+        <span className="text-foreground text-2xl font-bold">{score}%</span>
+        <span className="text-muted-foreground text-[10px] tracking-wider uppercase">{label}</span>
       </div>
     </div>
   )
@@ -260,11 +260,11 @@ export default function MetricsPage() {
 
   if (authLoading || !initialized || loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background">
+      <main className="bg-background flex min-h-screen items-center justify-center">
         <div className="flex items-center gap-3">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-muted" />
-          <div className="h-2 w-2 animate-pulse rounded-full bg-muted delay-75" />
-          <div className="h-2 w-2 animate-pulse rounded-full bg-muted delay-150" />
+          <div className="bg-muted h-2 w-2 animate-pulse rounded-full" />
+          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-75" />
+          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-150" />
         </div>
       </main>
     )
@@ -272,7 +272,7 @@ export default function MetricsPage() {
 
   if (error) {
     return (
-      <main className="min-h-screen bg-background">
+      <main className="bg-background min-h-screen">
         <Header />
         <div className="pt-24 pb-16">
           <div className="container mx-auto max-w-5xl px-4">
@@ -304,7 +304,7 @@ export default function MetricsPage() {
   const hardData = metrics?.difficulty.find((d) => d.difficulty === "hard")
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="bg-background min-h-screen">
       <Header />
 
       <div className="pt-24 pb-16">
@@ -312,15 +312,15 @@ export default function MetricsPage() {
           {!hasData ? (
             /* Empty State - Minimal */
             <div className="mx-auto max-w-lg py-24 text-center">
-              <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-card">
-                <Activity className="h-8 w-8 text-muted-foreground" />
+              <div className="border-border bg-card mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border">
+                <Activity className="text-muted-foreground h-8 w-8" />
               </div>
-              <h1 className="mb-3 text-2xl font-semibold text-foreground">No sessions yet</h1>
-              <p className="mb-8 leading-relaxed text-muted-foreground">
+              <h1 className="text-foreground mb-3 text-2xl font-semibold">No sessions yet</h1>
+              <p className="text-muted-foreground mb-8 leading-relaxed">
                 Complete your first practice session to see your performance analytics.
               </p>
               <Link href="/interview">
-                <Button className="bg-card font-medium text-foreground hover:bg-muted">
+                <Button className="bg-card text-foreground hover:bg-muted font-medium">
                   Start practicing
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -330,23 +330,23 @@ export default function MetricsPage() {
             <>
               {/* Header - Compact */}
               <div className="mb-12">
-                <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="text-muted-foreground mb-2 flex items-center gap-2 text-sm">
                   <Activity className="h-4 w-4" />
                   <span>Performance Analytics</span>
                 </div>
-                <h1 className="text-3xl font-semibold text-foreground">Your Progress</h1>
+                <h1 className="text-foreground text-3xl font-semibold">Your Progress</h1>
               </div>
 
               {/* Main Stats - Bento Grid */}
               <div className="mb-8 grid grid-cols-12 gap-4">
                 {/* Big Number - Sessions */}
-                <div className="col-span-12 rounded-2xl border border-border/50 bg-card/50 p-6 md:col-span-4">
+                <div className="border-border/50 bg-card/50 col-span-12 rounded-2xl border p-6 md:col-span-4">
                   <div className="mb-4 flex items-start justify-between">
-                    <span className="text-sm text-muted-foreground">Total Sessions</span>
-                    <span className="font-mono text-xs text-muted-foreground">30d</span>
+                    <span className="text-muted-foreground text-sm">Total Sessions</span>
+                    <span className="text-muted-foreground font-mono text-xs">30d</span>
                   </div>
                   <div className="flex items-end gap-4">
-                    <span className="text-5xl font-light tracking-tight text-foreground">
+                    <span className="text-foreground text-5xl font-light tracking-tight">
                       {metrics.overview.totalSessions}
                     </span>
                     <div className="pb-2">
@@ -359,7 +359,7 @@ export default function MetricsPage() {
                 </div>
 
                 {/* Score Ring with Toggle */}
-                <div className="col-span-6 flex flex-col items-center justify-center rounded-2xl border border-border/50 bg-card/50 p-6 md:col-span-4">
+                <div className="border-border/50 bg-card/50 col-span-6 flex flex-col items-center justify-center rounded-2xl border p-6 md:col-span-4">
                   <ScoreRing
                     score={
                       showOverallScore
@@ -371,10 +371,10 @@ export default function MetricsPage() {
                   <div className="mt-3 flex items-center gap-2">
                     <button
                       onClick={() => setShowOverallScore(!showOverallScore)}
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-muted-foreground"
+                      className="text-muted-foreground hover:text-muted-foreground flex items-center gap-1.5 text-xs transition-colors"
                     >
                       {showOverallScore ? (
-                        <ToggleRight className="h-4 w-4 text-[#c4703f]" />
+                        <ToggleRight className="text-accent-strong h-4 w-4" />
                       ) : (
                         <ToggleLeft className="h-4 w-4" />
                       )}
@@ -382,9 +382,9 @@ export default function MetricsPage() {
                     </button>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <HelpCircle className="h-3 w-3 cursor-help text-muted-foreground" />
+                        <HelpCircle className="text-muted-foreground h-3 w-3 cursor-help" />
                       </TooltipTrigger>
-                      <TooltipContent className="max-w-xs bg-muted text-foreground">
+                      <TooltipContent className="bg-muted text-foreground max-w-xs">
                         <p className="mb-1 font-medium">
                           {showOverallScore ? "Interview Score" : "Technical Score"}
                         </p>
@@ -401,10 +401,10 @@ export default function MetricsPage() {
                 {/* Trend + Practice Time Stack */}
                 <div className="col-span-6 flex flex-col gap-4 md:col-span-4">
                   {/* Trend */}
-                  <div className="flex-1 rounded-2xl border border-border/50 bg-card/50 p-5">
-                    <span className="text-sm text-muted-foreground">Weekly Trend</span>
+                  <div className="border-border/50 bg-card/50 flex-1 rounded-2xl border p-5">
+                    <span className="text-muted-foreground text-sm">Weekly Trend</span>
                     <div className="mt-2 flex items-center gap-2">
-                      <span className="text-2xl font-light text-foreground">
+                      <span className="text-foreground text-2xl font-light">
                         {metrics.trends.weeklyAverage}%
                       </span>
                       {metrics.trends.trend === "improving" && (
@@ -418,7 +418,7 @@ export default function MetricsPage() {
                         </span>
                       )}
                       {metrics.trends.trend === "stable" && (
-                        <span className="flex items-center text-sm text-muted-foreground">
+                        <span className="text-muted-foreground flex items-center text-sm">
                           <Minus className="h-4 w-4" />
                         </span>
                       )}
@@ -426,28 +426,28 @@ export default function MetricsPage() {
                   </div>
 
                   {/* Practice Time */}
-                  <div className="flex-1 rounded-2xl border border-border/50 bg-card/50 p-5">
-                    <span className="text-sm text-muted-foreground">Practice Time</span>
+                  <div className="border-border/50 bg-card/50 flex-1 rounded-2xl border p-5">
+                    <span className="text-muted-foreground text-sm">Practice Time</span>
                     <div className="mt-2 flex items-baseline gap-1">
-                      <span className="text-2xl font-light text-foreground">
+                      <span className="text-foreground text-2xl font-light">
                         {metrics.overview.totalPracticeHours}
                       </span>
-                      <span className="text-sm text-muted-foreground">hours</span>
+                      <span className="text-muted-foreground text-sm">hours</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Activity Heatmap */}
-                <div className="col-span-12 rounded-2xl border border-border/50 bg-card/50 p-6">
+                <div className="border-border/50 bg-card/50 col-span-12 rounded-2xl border p-6">
                   <div className="mb-4 flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Activity</span>
-                    <span className="text-xs text-muted-foreground">Last 12 weeks</span>
+                    <span className="text-muted-foreground text-sm">Activity</span>
+                    <span className="text-muted-foreground text-xs">Last 12 weeks</span>
                   </div>
                   <ActivityHeatmap sessions={metrics.recentSessions} />
-                  <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="text-muted-foreground mt-4 flex items-center gap-2 text-xs">
                     <span>Less</span>
                     <div className="flex gap-0.5">
-                      <div className="h-2.5 w-2.5 rounded-sm bg-muted/50" />
+                      <div className="bg-muted/50 h-2.5 w-2.5 rounded-sm" />
                       <div className="h-2.5 w-2.5 rounded-sm bg-emerald-900/60" />
                       <div className="h-2.5 w-2.5 rounded-sm bg-emerald-700/70" />
                       <div className="h-2.5 w-2.5 rounded-sm bg-emerald-500/80" />
@@ -477,14 +477,16 @@ export default function MetricsPage() {
               {/* Two Column Layout */}
               <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
                 {/* Pattern Mastery */}
-                <div className="rounded-2xl border border-border/50 bg-card/50">
-                  <div className="flex items-center gap-2 border-b border-border/50 p-5">
-                    <Layers className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-muted-foreground">Pattern Mastery</span>
+                <div className="border-border/50 bg-card/50 rounded-2xl border">
+                  <div className="border-border/50 flex items-center gap-2 border-b p-5">
+                    <Layers className="text-muted-foreground h-4 w-4" />
+                    <span className="text-muted-foreground text-sm font-medium">
+                      Pattern Mastery
+                    </span>
                   </div>
                   <div className="p-4">
                     {metrics.patterns.length === 0 ? (
-                      <p className="p-4 text-sm text-muted-foreground">
+                      <p className="text-muted-foreground p-4 text-sm">
                         Complete sessions to track patterns
                       </p>
                     ) : (
@@ -494,10 +496,12 @@ export default function MetricsPage() {
                           return (
                             <div
                               key={pattern.pattern}
-                              className="group flex items-center justify-between rounded-lg p-3 transition-colors hover:bg-muted/30"
+                              className="group hover:bg-muted/30 flex items-center justify-between rounded-lg p-3 transition-colors"
                             >
                               <div className="flex items-center gap-3">
-                                <span className="text-sm text-foreground">{pattern.displayName}</span>
+                                <span className="text-foreground text-sm">
+                                  {pattern.displayName}
+                                </span>
                                 <span
                                   className={`rounded px-2 py-0.5 text-xs ${config.bg} ${config.color}`}
                                 >
@@ -505,10 +509,10 @@ export default function MetricsPage() {
                                 </span>
                               </div>
                               <div className="flex items-center gap-4">
-                                <span className="text-xs text-muted-foreground">
+                                <span className="text-muted-foreground text-xs">
                                   {pattern.sessions} sessions
                                 </span>
-                                <span className="w-12 text-right font-mono text-sm text-muted-foreground">
+                                <span className="text-muted-foreground w-12 text-right font-mono text-sm">
                                   {showOverallScore
                                     ? pattern.averageScore
                                     : pattern.averageTechnicalScore || pattern.averageScore}
@@ -524,10 +528,10 @@ export default function MetricsPage() {
                 </div>
 
                 {/* Difficulty Breakdown */}
-                <div className="rounded-2xl border border-border/50 bg-card/50">
-                  <div className="flex items-center gap-2 border-b border-border/50 p-5">
-                    <Crosshair className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-muted-foreground">By Difficulty</span>
+                <div className="border-border/50 bg-card/50 rounded-2xl border">
+                  <div className="border-border/50 flex items-center gap-2 border-b p-5">
+                    <Crosshair className="text-muted-foreground h-4 w-4" />
+                    <span className="text-muted-foreground text-sm font-medium">By Difficulty</span>
                   </div>
                   <div className="p-5">
                     <div className="grid grid-cols-3 gap-4">
@@ -552,10 +556,12 @@ export default function MetricsPage() {
                                   : data.averageTechnicalScore || data.averageScore}
                                 %
                               </div>
-                              <div className="text-xs text-muted-foreground">{data.sessions} sessions</div>
+                              <div className="text-muted-foreground text-xs">
+                                {data.sessions} sessions
+                              </div>
                             </>
                           ) : (
-                            <div className="text-sm text-muted-foreground">—</div>
+                            <div className="text-muted-foreground text-sm">—</div>
                           )}
                         </div>
                       ))}
@@ -565,26 +571,28 @@ export default function MetricsPage() {
               </div>
 
               {/* Recent Sessions - List Style */}
-              <div className="mb-8 rounded-2xl border border-border/50 bg-card/50">
-                <div className="flex items-center justify-between border-b border-border/50 p-5">
+              <div className="border-border/50 bg-card/50 mb-8 rounded-2xl border">
+                <div className="border-border/50 flex items-center justify-between border-b p-5">
                   <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-muted-foreground">Recent Sessions</span>
+                    <Clock className="text-muted-foreground h-4 w-4" />
+                    <span className="text-muted-foreground text-sm font-medium">
+                      Recent Sessions
+                    </span>
                   </div>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-muted-foreground text-xs">
                     {metrics.recentSessions.length} total
                   </span>
                 </div>
                 <div>
                   {metrics.recentSessions.length === 0 ? (
-                    <p className="p-6 text-sm text-muted-foreground">No sessions yet</p>
+                    <p className="text-muted-foreground p-6 text-sm">No sessions yet</p>
                   ) : (
-                    <div className="divide-y divide-border">
+                    <div className="divide-border divide-y">
                       {metrics.recentSessions.slice(0, 5).map((session) => (
                         <Link
                           key={session.id}
                           href={`/sessions/${session.id}`}
-                          className="group flex items-center justify-between p-4 transition-colors hover:bg-muted/30"
+                          className="group hover:bg-muted/30 flex items-center justify-between p-4 transition-colors"
                         >
                           <div className="flex items-center gap-4">
                             <div
@@ -594,7 +602,7 @@ export default function MetricsPage() {
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="text-sm text-foreground capitalize">
+                                <span className="text-foreground text-sm capitalize">
                                   {(session.pattern || "unknown").replace(/-/g, " ")}
                                 </span>
                                 <span
@@ -603,7 +611,7 @@ export default function MetricsPage() {
                                   {session.difficulty}
                                 </span>
                               </div>
-                              <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                              <div className="text-muted-foreground mt-0.5 flex items-center gap-3 text-xs">
                                 <span>{session.durationMinutes} min</span>
                                 <span>
                                   {new Date(session.completedAt).toLocaleDateString("en-US", {
@@ -614,7 +622,7 @@ export default function MetricsPage() {
                               </div>
                             </div>
                           </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-muted-foreground" />
+                          <ChevronRight className="text-muted-foreground group-hover:text-muted-foreground h-4 w-4 transition-colors" />
                         </Link>
                       ))}
                     </div>
@@ -623,10 +631,10 @@ export default function MetricsPage() {
               </div>
 
               {/* CTA - Minimal */}
-              <div className="flex items-center justify-between rounded-2xl border border-border/50 bg-card/30 p-6">
+              <div className="border-border/50 bg-card/30 flex items-center justify-between rounded-2xl border p-6">
                 <div>
-                  <h3 className="mb-1 font-medium text-foreground">Ready for more practice?</h3>
-                  <p className="text-sm text-muted-foreground">
+                  <h3 className="text-foreground mb-1 font-medium">Ready for more practice?</h3>
+                  <p className="text-muted-foreground text-sm">
                     Keep building your skills with targeted sessions.
                   </p>
                 </div>

@@ -331,8 +331,8 @@ function UpgradePageContent() {
           {/* Already Pro Message */}
           {isProUser && (
             <div className="space-y-4 py-8 text-center">
-              <div className="inline-flex items-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-emerald-200">
-                <CheckCircle className="mr-2 h-5 w-5 text-emerald-400" />
+              <div className="border-neural/40 bg-neural/10 text-neural inline-flex items-center rounded-lg border px-4 py-3">
+                <CheckCircle className="text-neural mr-2 h-5 w-5" />
                 You're already enjoying CodeSparring Pro!
               </div>
               <div>
@@ -363,7 +363,7 @@ export default function UpgradePage() {
       <Suspense
         fallback={
           <main className="bg-background flex min-h-screen items-center justify-center">
-            <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
+            <div className="border-accent h-12 w-12 animate-spin rounded-full border-b-2"></div>
           </main>
         }
       >

@@ -1245,7 +1245,7 @@ export default function AccountPage() {
             <AlertDialogAction
               onClick={handleDeleteAccount}
               disabled={isDeleting}
-              className="h-9 bg-red-600 text-sm text-white hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 text-sm"
             >
               {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>

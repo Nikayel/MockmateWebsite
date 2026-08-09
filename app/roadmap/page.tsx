@@ -871,7 +871,7 @@ export default function RoadmapPage() {
                     </div>
                   ) : todayTotal > 0 && todayCompleted === todayTotal ? (
                     <div className="flex items-center justify-center gap-3 py-2">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500">
+                      <div className="bg-neural flex h-10 w-10 items-center justify-center rounded-full">
                         <Trophy className="h-5 w-5 text-white" />
                       </div>
                       <div className="text-center sm:text-left">
@@ -1251,7 +1251,7 @@ export default function RoadmapPage() {
               <button
                 onClick={handleArchiveRoadmap}
                 disabled={isArchiving}
-                className="flex-1 rounded-lg bg-red-500 px-4 py-2 text-sm text-white transition-colors hover:bg-red-600 disabled:opacity-50 sm:flex-none"
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 flex-1 rounded-lg px-4 py-2 text-sm transition-colors disabled:opacity-50 sm:flex-none"
               >
                 {isArchiving ? "Ending..." : "End Roadmap"}
               </button>
