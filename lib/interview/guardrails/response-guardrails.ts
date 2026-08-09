@@ -70,6 +70,19 @@ export function concedesPlatformFault(response: string): boolean {
 const SHELL_COMMAND_INSTRUCTION_PATTERN =
   /\b(?:try\s+(?:running|executing)|re-?run|run|execute)\s+`?(?:(?:python3?|node|pytest|pip3?|npm|pnpm|bash|sh)\b|[\w./-]+\.(?:py|js|ts|sh)\b)/i
 
+/**
+ * The matched instruction snippet when a response tells the candidate to run a
+ * shell command, else null. Exported for the chat route's log-only observer:
+ * the guardrail below regenerates interviewer replies, but the partner lane
+ * never passes through guardrails, and a regenerated reply leaves no
+ * production-visible trace (per-attempt gate logs are info-level, which is
+ * dev-only). The observer counts raw model attempts on both lanes.
+ */
+export function matchShellCommandInstruction(response: string): string | null {
+  const match = response.match(SHELL_COMMAND_INSTRUCTION_PATTERN)
+  return match ? match[0].trim() : null
+}
+
 export interface ResponseGuardrail {
   name: string
   severity: "critical" | "warning"
@@ -179,9 +192,9 @@ export const RESPONSE_GUARDRAILS: ResponseGuardrail[] = [
     name: "no-shell-command-instructions",
     severity: "critical",
     check: (ctx) => {
-      const match = ctx.response.match(SHELL_COMMAND_INSTRUCTION_PATTERN)
-      if (match) {
-        return { violated: true, evidence: `Instructed a shell command: "${match[0].trim()}"` }
+      const instruction = matchShellCommandInstruction(ctx.response)
+      if (instruction) {
+        return { violated: true, evidence: `Instructed a shell command: "${instruction}"` }
       }
       return null
     },

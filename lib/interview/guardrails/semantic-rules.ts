@@ -80,6 +80,19 @@ export const SEMANTIC_RULES: SemanticRule[] = [
       "GOOD: 'Okay. What's the space complexity?'",
     ],
   },
+  {
+    id: "no-shell-command-instructions",
+    description:
+      "AI tells the candidate to run a shell/terminal command or to run code outside the platform. The platform has NO terminal: the only way to run code is the Run Tests button, and the console is read-only. Catches paraphrases the regex gate misses.",
+    examples: [
+      "BAD: 'Run python3 src/main.py fixtures/input.txt and check the output'",
+      "BAD: 'Open a terminal and execute the script'",
+      "BAD: 'From the command line, invoke the test runner'",
+      "BAD: 'Try running it locally to reproduce the failure'",
+      "GOOD: 'Run the tests and check what orbit_goods prints'",
+      "GOOD: 'Click Run Tests to reproduce the failure'",
+    ],
+  },
 ]
 
 /**

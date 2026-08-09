@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
-import { RESPONSE_GUARDRAILS } from "../response-guardrails"
+import { RESPONSE_GUARDRAILS, matchShellCommandInstruction } from "../response-guardrails"
+import { SEMANTIC_RULES, buildSemanticValidationPrompt } from "../semantic-rules"
 import type { ValidationContext } from "@/lib/interview/response-validation"
 import { createEmptyTracker } from "@/lib/interview/interview-phases"
 
@@ -69,5 +70,40 @@ describe("no-shell-command-instructions", () => {
         expect(guardrail?.check(contextFor(response))).toBeNull()
       })
     }
+  })
+})
+
+describe("matchShellCommandInstruction (route observer)", () => {
+  it("returns the matched snippet for the log entry", () => {
+    expect(
+      matchShellCommandInstruction("First, run python3 src/main.py fixtures/input.txt please.")
+    ).toBe("run python3")
+  })
+
+  it("returns null for button-based phrasing", () => {
+    expect(matchShellCommandInstruction("Click Run Tests to reproduce the failure.")).toBeNull()
+  })
+})
+
+describe("no-shell-command-instructions semantic rule", () => {
+  // The regex catches canonical forms; the LLM judge exists for paraphrases
+  // ("open a terminal", "run it locally"). Sampled on early interviewer turns
+  // only, so the route observer is the primary counter - this rule is the
+  // paraphrase net within that sample.
+  it("is registered and rendered into the judge prompt", () => {
+    const rule = SEMANTIC_RULES.find((r) => r.id === "no-shell-command-instructions")
+
+    expect(rule).toBeDefined()
+    expect(rule?.description).toContain("NO terminal")
+    expect(buildSemanticValidationPrompt("any response")).toContain("no-shell-command-instructions")
+  })
+
+  it("teaches the judge the paraphrase forms the regex misses", () => {
+    const rule = SEMANTIC_RULES.find((r) => r.id === "no-shell-command-instructions")
+    const examples = rule?.examples.join("\n") ?? ""
+
+    expect(examples).toContain("Open a terminal")
+    expect(examples).toContain("running it locally")
+    expect(examples).toContain("GOOD: 'Click Run Tests")
   })
 })
