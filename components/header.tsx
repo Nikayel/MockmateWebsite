@@ -20,6 +20,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut } from "@/lib/auth"
 import { useAuth } from "@/lib/auth-context"
+import { InterviewTrackDialog } from "@/components/interview/InterviewTrackPicker"
 import { isLearnPath } from "@/components/learn/learn-tracks"
 import { LearnTrackDialog } from "@/components/learn/LearnTrackPicker"
 import { LEARN_HUB_PATH } from "@/lib/tutorials/lesson-routes"
@@ -41,68 +42,95 @@ type MarketingNavItem = {
   isActive: (pathname: string) => boolean
 }
 
-type AppNavItem = {
-  label: string
-  href: string
-  icon: LucideIcon
-  isActive: (pathname: string) => boolean
-}
+// Which picker window a "picker" nav entry opens.
+type AppNavPickerId = "interview" | "learn"
 
-// Single source of truth for the logged-in product nav. Desktop renders these as
-// a label-only segmented control (icons read as template-y noise at six items),
-// while mobile keeps the icons to aid vertical scanning — both map from this one
-// list so the two menus, and their active states, can never drift apart.
+// Two kinds of nav entry, told apart by `kind` so the render has one branch instead
+// of a hand-written exception per hub. Interview and Learn are multi-track hubs
+// rather than single destinations, so their entries open a picker window; every
+// other entry is a plain link.
+type AppNavItem =
+  | {
+      kind: "link"
+      label: string
+      href: string
+      icon: LucideIcon
+      isActive: (pathname: string) => boolean
+    }
+  | {
+      kind: "picker"
+      label: string
+      picker: AppNavPickerId
+      icon: LucideIcon
+      isActive: (pathname: string) => boolean
+    }
+
+// Single source of truth for the logged-in product nav, links and pickers in one
+// ordered list. Desktop renders these as a label-only segmented control (icons read
+// as template-y noise at seven items), while mobile keeps the icons to aid vertical
+// scanning — both map from this one list so the two menus, and their active states,
+// can never drift apart.
 const APP_NAV: AppNavItem[] = [
   {
+    kind: "link",
     label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
     isActive: (pathname) => pathname.startsWith("/dashboard"),
   },
   {
+    // Each interview track is a different round with a different bar, so the entry
+    // offers the choice instead of picking one for the user the way the old default
+    // tab did. The tracks live in the interview registry, which is JSX-free and
+    // registry-free precisely so the header can import it on every page.
+    kind: "picker",
     label: "Interview",
-    href: "/interview",
+    picker: "interview",
     icon: Terminal,
     // Guard against /interview-prep, which is a separate marketing route.
     isActive: (pathname) =>
       pathname.startsWith("/interview") && !pathname.startsWith("/interview-prep"),
   },
   {
+    kind: "link",
     label: "Labs",
     href: "/labs",
     icon: FlaskConical,
     isActive: (pathname) => pathname.startsWith("/labs"),
   },
   {
+    kind: "link",
     label: "Sessions",
     href: "/sessions",
     icon: Clock,
     isActive: (pathname) => pathname.startsWith("/sessions"),
   },
   {
+    kind: "link",
     label: "Roadmap",
     href: "/roadmap",
     icon: Map,
     isActive: (pathname) => pathname.startsWith("/roadmap"),
   },
   {
+    kind: "link",
     label: "Knowledge",
     href: "/knowledge",
     icon: Brain,
     isActive: (pathname) => pathname.startsWith("/knowledge"),
   },
+  {
+    // Python + SQL + System Design, each with its own logo in the picker window. The
+    // tracks live in the Learn registry so the header, the window, and /learn can
+    // never drift apart. All tracks live under /learn/*, so one prefix covers the
+    // active state.
+    kind: "picker",
+    label: "Learn",
+    picker: "learn",
+    icon: GraduationCap,
+    isActive: isLearnPath,
+  },
 ]
-
-// "Learn" is a multi-track hub (Python + SQL + System Design) rather than a single
-// destination, so the nav entry opens a picker window showing each track's logo
-// instead of navigating. The tracks themselves live in the Learn registry so the
-// header, the window, and /learn can never drift apart. All tracks live under
-// /learn/*, so one prefix covers the active state.
-const LEARN_NAV = {
-  label: "Learn",
-  icon: GraduationCap,
-  isActive: isLearnPath,
-}
 
 // Single source of truth for the marketing (logged-out) nav. Desktop and mobile
 // both render from this list so the two menus can never drift apart, and every
@@ -139,11 +167,19 @@ const MARKETING_NAV: MarketingNavItem[] = [
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  // One picker window drives both the desktop nav button and the mobile menu row.
+  // One picker window per hub drives both the desktop nav button and the mobile menu row.
+  const [isInterviewPickerOpen, setIsInterviewPickerOpen] = useState(false)
   const [isLearnPickerOpen, setIsLearnPickerOpen] = useState(false)
   const { user, initialized } = useAuth()
   const pathname = usePathname()
   const userDisplayName = user?.user_metadata?.full_name || user?.email || "Account"
+
+  // Lets a picker nav entry reach its own window by id, so both menus stay a plain
+  // map over APP_NAV instead of growing a branch per hub.
+  const navPickers: Record<AppNavPickerId, { open: boolean; setOpen: (open: boolean) => void }> = {
+    interview: { open: isInterviewPickerOpen, setOpen: setIsInterviewPickerOpen },
+    learn: { open: isLearnPickerOpen, setOpen: setIsLearnPickerOpen },
+  }
 
   useEffect(() => {
     const handleScroll = () => {
@@ -220,36 +256,39 @@ export function Header() {
                   <div className="flex items-center gap-0.5">
                     {APP_NAV.map((item) => {
                       const active = item.isActive(pathname)
+                      const activeClass = active
+                        ? "bg-foreground/10 text-foreground"
+                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+
+                      if (item.kind === "picker") {
+                        const picker = navPickers[item.picker]
+                        return (
+                          <button
+                            key={item.label}
+                            type="button"
+                            onClick={() => picker.setOpen(true)}
+                            aria-haspopup="dialog"
+                            aria-expanded={picker.open}
+                            aria-current={active ? "page" : undefined}
+                            className={`inline-flex cursor-pointer items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${activeClass}`}
+                          >
+                            {item.label}
+                            <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                          </button>
+                        )
+                      }
+
                       return (
                         <Link
-                          key={item.href}
+                          key={item.label}
                           href={item.href}
                           aria-current={active ? "page" : undefined}
-                          className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
-                            active
-                              ? "bg-foreground/10 text-foreground"
-                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                          }`}
+                          className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${activeClass}`}
                         >
                           {item.label}
                         </Link>
                       )
                     })}
-                    <button
-                      type="button"
-                      onClick={() => setIsLearnPickerOpen(true)}
-                      aria-haspopup="dialog"
-                      aria-expanded={isLearnPickerOpen}
-                      aria-current={LEARN_NAV.isActive(pathname) ? "page" : undefined}
-                      className={`inline-flex cursor-pointer items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
-                        LEARN_NAV.isActive(pathname)
-                          ? "bg-foreground/10 text-foreground"
-                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                      }`}
-                    >
-                      {LEARN_NAV.label}
-                      <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-                    </button>
                   </div>
                   <div className="border-border flex items-center space-x-3 border-l pl-4">
                     <ThemeToggle />
@@ -342,14 +381,40 @@ export function Header() {
                     {APP_NAV.map((item) => {
                       const Icon = item.icon
                       const active = item.isActive(pathname)
+                      const activeClass = active
+                        ? "text-accent"
+                        : "hover:text-accent text-foreground/90"
+
+                      if (item.kind === "picker") {
+                        const picker = navPickers[item.picker]
+                        return (
+                          <button
+                            key={item.label}
+                            type="button"
+                            aria-haspopup="dialog"
+                            aria-expanded={picker.open}
+                            aria-current={active ? "page" : undefined}
+                            className={`flex cursor-pointer items-center space-x-2 transition-colors duration-300 ${activeClass}`}
+                            onClick={() => {
+                              // Close the sheet first: the picker is a modal dialog, and
+                              // leaving the menu open behind it traps focus in two layers.
+                              setIsMobileMenuOpen(false)
+                              picker.setOpen(true)
+                            }}
+                          >
+                            <Icon className="h-4 w-4" />
+                            <span>{item.label}</span>
+                            <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                          </button>
+                        )
+                      }
+
                       return (
                         <Link
-                          key={item.href}
+                          key={item.label}
                           href={item.href}
                           aria-current={active ? "page" : undefined}
-                          className={`flex items-center space-x-2 transition-colors duration-300 ${
-                            active ? "text-accent" : "hover:text-accent text-foreground/90"
-                          }`}
+                          className={`flex items-center space-x-2 transition-colors duration-300 ${activeClass}`}
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
                           <Icon className="h-4 w-4" />
@@ -357,25 +422,6 @@ export function Header() {
                         </Link>
                       )
                     })}
-                    <button
-                      type="button"
-                      aria-haspopup="dialog"
-                      aria-expanded={isLearnPickerOpen}
-                      aria-current={LEARN_NAV.isActive(pathname) ? "page" : undefined}
-                      className={`flex cursor-pointer items-center space-x-2 transition-colors duration-300 ${
-                        LEARN_NAV.isActive(pathname)
-                          ? "text-accent"
-                          : "hover:text-accent text-foreground/90"
-                      }`}
-                      onClick={() => {
-                        setIsMobileMenuOpen(false)
-                        setIsLearnPickerOpen(true)
-                      }}
-                    >
-                      <LEARN_NAV.icon className="h-4 w-4" />
-                      <span>{LEARN_NAV.label}</span>
-                      <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-                    </button>
                     <Link
                       href="/account"
                       className="hover:text-accent text-foreground/90 flex items-center space-x-2 transition-colors duration-300"
@@ -441,6 +487,7 @@ export function Header() {
         </div>
       </div>
 
+      <InterviewTrackDialog open={isInterviewPickerOpen} onOpenChange={setIsInterviewPickerOpen} />
       <LearnTrackDialog open={isLearnPickerOpen} onOpenChange={setIsLearnPickerOpen} />
     </header>
   )
