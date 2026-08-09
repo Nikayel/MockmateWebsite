@@ -35,7 +35,6 @@ interface TourStep {
   title: string
   description: string
   details?: string[]
-  surface: string
   visual?: "forgetting-curve" | "roadmap" | "interview" | "review"
 }
 
@@ -46,7 +45,6 @@ const tourSteps: TourStep[] = [
     title: "This is not another problem list",
     description:
       "CodeSparring is an interview practice loop: attempt, explain, test, get scored, then review before the skill decays.",
-    surface: "bg-cyan-950/45",
   },
   {
     id: "problem",
@@ -59,7 +57,6 @@ const tourSteps: TourStep[] = [
       "You may pass tests but struggle to explain tradeoffs",
       "You may repeat easy reps while weak patterns fade",
     ],
-    surface: "bg-amber-950/35",
     visual: "forgetting-curve",
   },
   {
@@ -73,7 +70,6 @@ const tourSteps: TourStep[] = [
       "Mastered patterns move farther apart",
       "Short, honest reps beat vague grinding",
     ],
-    surface: "bg-emerald-950/35",
   },
   {
     id: "roadmap",
@@ -86,7 +82,6 @@ const tourSteps: TourStep[] = [
       "Daily work stays small enough to finish",
       "Progress exposes what still needs evidence",
     ],
-    surface: "bg-blue-950/35",
     visual: "roadmap",
   },
   {
@@ -100,7 +95,6 @@ const tourSteps: TourStep[] = [
       "Get follow-ups when the explanation is thin",
       "Ask for nudges without spoiling the round",
     ],
-    surface: "bg-cyan-950/35",
     visual: "interview",
   },
   {
@@ -114,7 +108,6 @@ const tourSteps: TourStep[] = [
       "Weak patterns stay visible",
       "Readiness becomes a trend, not a mood",
     ],
-    surface: "bg-amber-950/30",
     visual: "review",
   },
   {
@@ -128,21 +121,20 @@ const tourSteps: TourStep[] = [
       "Bugfix for evidence and root-cause thinking",
       "Feature rounds for practical engineering judgment",
     ],
-    surface: "bg-cyan-950/45",
   },
 ]
 
 // Forgetting Curve Visualization
 function ForgettingCurveVisual() {
   return (
-    <div className="relative h-40 w-full overflow-hidden rounded-lg bg-gray-800/50 p-4">
+    <div className="bg-muted/50 relative h-40 w-full overflow-hidden rounded-lg p-4">
       <div className="absolute inset-0 p-4">
         {/* Y-axis label */}
-        <div className="absolute top-1/2 left-2 -translate-y-1/2 -rotate-90 text-xs text-gray-500">
+        <div className="text-muted-foreground absolute top-1/2 left-2 -translate-y-1/2 -rotate-90 text-xs">
           Memory
         </div>
         {/* X-axis label */}
-        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-xs text-gray-500">
+        <div className="text-muted-foreground absolute bottom-1 left-1/2 -translate-x-1/2 text-xs">
           Time (days)
         </div>
 
@@ -152,7 +144,7 @@ function ForgettingCurveVisual() {
           <motion.path
             d="M 10 10 Q 50 20, 80 60 T 190 90"
             fill="none"
-            className="text-red-400"
+            className="text-destructive"
             stroke="currentColor"
             strokeWidth="2"
             strokeDasharray="4 2"
@@ -164,7 +156,7 @@ function ForgettingCurveVisual() {
           <motion.path
             d="M 10 10 Q 30 15, 40 25 L 50 15 Q 70 20, 80 30 L 90 20 Q 120 25, 140 30 L 150 22 Q 170 25, 190 28"
             fill="none"
-            className="text-cyan-300"
+            className="text-accent"
             stroke="currentColor"
             strokeWidth="2.5"
             initial={{ pathLength: 0 }}
@@ -178,7 +170,7 @@ function ForgettingCurveVisual() {
               cx={x}
               cy={i === 0 ? 15 : i === 1 ? 20 : 22}
               r="4"
-              className="text-cyan-300"
+              className="text-accent"
               fill="currentColor"
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -191,12 +183,12 @@ function ForgettingCurveVisual() {
       {/* Legend */}
       <div className="absolute right-2 bottom-2 flex gap-3 text-xs">
         <div className="flex items-center gap-1">
-          <div className="h-0.5 w-3 bg-red-500" style={{ borderStyle: "dashed" }} />
-          <span className="text-gray-400">No review</span>
+          <div className="bg-destructive h-0.5 w-3" style={{ borderStyle: "dashed" }} />
+          <span className="text-muted-foreground">No review</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="h-0.5 w-3 bg-cyan-300" />
-          <span className="text-gray-400">With review</span>
+          <div className="bg-accent h-0.5 w-3" />
+          <span className="text-muted-foreground">With review</span>
         </div>
       </div>
     </div>
@@ -209,9 +201,9 @@ function RoadmapVisual() {
   const topics = ["Two Pointers", "Sliding Window", "Binary Search", "Review Day", "Hash Maps"]
 
   return (
-    <div className="rounded-lg bg-gray-800/50 p-4">
-      <div className="mb-3 flex items-center gap-2 text-sm text-gray-400">
-        <Target className="h-4 w-4 text-cyan-300" />
+    <div className="bg-muted/50 rounded-lg p-4">
+      <div className="text-muted-foreground mb-3 flex items-center gap-2 text-sm">
+        <Target className="text-accent-strong h-4 w-4" />
         <span>Google Interview - 14 days away</span>
       </div>
       <div className="space-y-2">
@@ -223,19 +215,19 @@ function RoadmapVisual() {
             transition={{ delay: i * 0.1 }}
             className="flex items-center gap-3"
           >
-            <span className="w-8 text-xs text-gray-500">{day}</span>
+            <span className="text-muted-foreground w-8 text-xs">{day}</span>
             <div
               className={`flex-1 rounded px-3 py-1.5 text-sm ${
                 i === 3
-                  ? "border border-amber-500/30 bg-amber-500/20 text-amber-400"
-                  : "bg-gray-700/50 text-gray-300"
+                  ? "border-accent/40 bg-accent/10 text-accent-strong border"
+                  : "bg-muted text-foreground"
               }`}
             >
               {topics[i]}
             </div>
             {i < 2 && (
-              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20">
-                <span className="text-xs text-emerald-400">✓</span>
+              <div className="bg-neural/15 flex h-5 w-5 items-center justify-center rounded-full">
+                <span className="text-neural text-xs">✓</span>
               </div>
             )}
           </motion.div>
@@ -254,7 +246,7 @@ function InterviewVisual() {
   ]
 
   return (
-    <div className="space-y-3 rounded-lg bg-gray-800/50 p-4">
+    <div className="bg-muted/50 space-y-3 rounded-lg p-4">
       {messages.map((msg, i) => (
         <motion.div
           key={i}
@@ -264,13 +256,13 @@ function InterviewVisual() {
           className={`flex gap-2 ${msg.role === "user" ? "justify-end" : ""}`}
         >
           {msg.role === "ai" && (
-            <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-cyan-300/15">
-              <MessageSquare className="h-3 w-3 text-cyan-200" />
+            <div className="bg-accent/10 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full">
+              <MessageSquare className="text-accent-strong h-3 w-3" />
             </div>
           )}
           <div
             className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-              msg.role === "ai" ? "bg-gray-700 text-gray-200" : "bg-cyan-300/15 text-cyan-100"
+              msg.role === "ai" ? "bg-muted text-foreground" : "bg-accent/10 text-foreground"
             }`}
           >
             {msg.text}
@@ -281,9 +273,9 @@ function InterviewVisual() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.5 }}
-        className="flex items-center gap-2 text-xs text-gray-500"
+        className="text-muted-foreground flex items-center gap-2 text-xs"
       >
-        <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+        <div className="bg-neural h-2 w-2 animate-pulse rounded-full" />
         Voice enabled - talk through your solution
       </motion.div>
     </div>
@@ -293,10 +285,10 @@ function InterviewVisual() {
 // Review Visual
 function ReviewVisual() {
   return (
-    <div className="rounded-lg bg-gray-800/50 p-4">
+    <div className="bg-muted/50 rounded-lg p-4">
       <div className="mb-3 flex items-center gap-2">
-        <Clock className="h-4 w-4 text-amber-500" />
-        <span className="text-sm text-gray-300">Upcoming Reviews</span>
+        <Clock className="text-accent-strong h-4 w-4" />
+        <span className="text-foreground text-sm">Upcoming Reviews</span>
       </div>
       <div className="space-y-2">
         {[
@@ -309,28 +301,28 @@ function ReviewVisual() {
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.15 }}
-            className="flex items-center justify-between rounded bg-gray-700/30 p-2"
+            className="bg-muted flex items-center justify-between rounded p-2"
           >
             <div>
-              <div className="text-sm text-gray-200">{item.topic}</div>
-              <div className="text-xs text-gray-500">{item.time}</div>
+              <div className="text-foreground text-sm">{item.topic}</div>
+              <div className="text-muted-foreground text-xs">{item.time}</div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-700">
+              <div className="bg-border h-1.5 w-16 overflow-hidden rounded-full">
                 <motion.div
                   className={`h-full rounded-full ${
                     item.retention > 80
-                      ? "bg-emerald-500"
+                      ? "bg-neural"
                       : item.retention > 60
                         ? "bg-amber-500"
-                        : "bg-red-500"
+                        : "bg-destructive"
                   }`}
                   initial={{ width: 0 }}
                   animate={{ width: `${item.retention}%` }}
                   transition={{ delay: 0.5 + i * 0.15, duration: 0.5 }}
                 />
               </div>
-              <span className="w-8 text-xs text-gray-400">{item.retention}%</span>
+              <span className="text-muted-foreground w-8 text-xs">{item.retention}%</span>
             </div>
           </motion.div>
         ))}
@@ -426,7 +418,7 @@ export function InteractiveTour({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md"
+        className="bg-background/90 fixed inset-0 z-[100] flex items-center justify-center backdrop-blur-md"
         ref={containerRef}
         onKeyDown={handleFocusTrapKeyDown}
         role="dialog"
@@ -438,7 +430,7 @@ export function InteractiveTour({
         <button
           onClick={handleSkip}
           aria-label="Skip interactive tour"
-          className="absolute top-6 right-6 flex items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-400 transition-colors hover:bg-white/5 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:outline-none"
+          className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-accent/50 absolute top-6 right-6 flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           Skip tour
           <X className="h-4 w-4" aria-hidden="true" />
@@ -456,10 +448,10 @@ export function InteractiveTour({
                 aria-current={idx === currentStep ? "step" : undefined}
                 className={`h-1.5 rounded-full transition-all duration-300 ${
                   idx === currentStep
-                    ? "w-8 bg-cyan-300"
+                    ? "bg-accent w-8"
                     : idx < currentStep
-                      ? "w-3 bg-cyan-300/50 hover:bg-cyan-300/70"
-                      : "w-3 bg-gray-700 hover:bg-gray-600"
+                      ? "bg-accent/50 hover:bg-accent/70 w-3"
+                      : "bg-muted-foreground/30 hover:bg-muted-foreground/50 w-3"
                 }`}
               />
             ))}
@@ -472,23 +464,26 @@ export function InteractiveTour({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
-            className="overflow-hidden rounded-2xl border border-gray-800 bg-gray-900 shadow-2xl"
+            className="border-border bg-card overflow-hidden rounded-2xl border shadow-2xl"
           >
             {/* Icon header */}
-            <div className={`border-b border-white/10 p-6 ${step.surface}`}>
+            <div className="border-border bg-accent/10 border-b p-6">
               <div className="relative flex flex-col items-center text-center">
-                <div className="mb-3 rounded-xl bg-white/10 p-3 ring-1 ring-white/10">
-                  <Icon className="h-8 w-8 text-cyan-100" aria-hidden="true" />
+                <div className="border-accent/25 bg-accent/10 mb-3 rounded-xl border p-3">
+                  <Icon className="text-accent-strong h-8 w-8" aria-hidden="true" />
                 </div>
                 <h2
                   id="interactive-tour-title"
-                  className="font-heading mb-1 text-xl font-bold text-white"
+                  className="font-heading text-foreground mb-1 text-xl font-bold"
                 >
                   {step.id === "welcome" && userName
                     ? `Hey ${userName}, welcome to CodeSparring!`
                     : step.title}
                 </h2>
-                <p id="interactive-tour-description" className="max-w-md text-sm text-white/90">
+                <p
+                  id="interactive-tour-description"
+                  className="text-muted-foreground max-w-md text-sm"
+                >
                   {step.description}
                 </p>
               </div>
@@ -511,12 +506,12 @@ export function InteractiveTour({
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.1 }}
-                      className="flex items-start gap-3 rounded-lg bg-gray-800/50 p-3"
+                      className="bg-muted/50 flex items-start gap-3 rounded-lg p-3"
                     >
-                      <div className="mt-0.5 rounded-full bg-cyan-300/15 p-1">
-                        <Zap className="h-3 w-3 text-cyan-200" />
+                      <div className="bg-accent/10 mt-0.5 rounded-full p-1">
+                        <Zap className="text-accent-strong h-3 w-3" />
                       </div>
-                      <span className="text-sm text-gray-300">{detail}</span>
+                      <span className="text-muted-foreground text-sm">{detail}</span>
                     </motion.div>
                   ))}
                 </div>
@@ -531,9 +526,9 @@ export function InteractiveTour({
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.5 + idx * 0.1 }}
-                      className="flex items-center gap-2 text-sm text-gray-400"
+                      className="text-muted-foreground flex items-center gap-2 text-sm"
                     >
-                      <div className="h-1 w-1 rounded-full bg-cyan-300" />
+                      <div className="bg-accent h-1 w-1 rounded-full" />
                       {detail}
                     </motion.div>
                   ))}
@@ -542,26 +537,26 @@ export function InteractiveTour({
             </div>
 
             {/* Navigation */}
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t border-gray-800 px-5 py-4">
+            <div className="border-border grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-t px-5 py-4">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handlePrev}
                 disabled={isFirstStep}
-                className={`justify-self-start text-gray-400 hover:text-white ${isFirstStep ? "invisible" : ""}`}
+                className={`text-muted-foreground justify-self-start ${isFirstStep ? "invisible" : ""}`}
               >
                 <ArrowLeft className="mr-1 h-4 w-4" />
                 Back
               </Button>
 
-              <span className="text-xs text-gray-500">
+              <span className="text-muted-foreground text-xs">
                 {currentStep + 1} / {tourSteps.length}
               </span>
 
               <Button
                 size="sm"
                 onClick={handleNext}
-                className="justify-self-end bg-cyan-300 font-medium text-gray-950 hover:bg-cyan-200"
+                className="bg-accent text-accent-foreground hover:bg-accent/90 focus-visible:ring-accent/50 justify-self-end font-medium"
               >
                 {isLastStep ? "Start Practicing" : "Next"}
                 <ArrowRight className="ml-1 h-4 w-4" />
@@ -570,9 +565,16 @@ export function InteractiveTour({
           </motion.div>
 
           {/* Keyboard hint */}
-          <p className="mt-4 text-center text-xs text-gray-600">
-            Press <kbd className="rounded bg-gray-800 px-1.5 py-0.5 text-gray-400">→</kbd> or{" "}
-            <kbd className="rounded bg-gray-800 px-1.5 py-0.5 text-gray-400">Enter</kbd> to continue
+          <p className="text-muted-foreground mt-4 text-center text-xs">
+            Press{" "}
+            <kbd className="border-border bg-muted text-muted-foreground rounded border px-1.5 py-0.5">
+              →
+            </kbd>{" "}
+            or{" "}
+            <kbd className="border-border bg-muted text-muted-foreground rounded border px-1.5 py-0.5">
+              Enter
+            </kbd>{" "}
+            to continue
           </p>
         </div>
       </motion.div>
