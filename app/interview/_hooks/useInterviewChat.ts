@@ -10,6 +10,11 @@ import {
   isKnownRefusalCode,
 } from "@/lib/interview/refusal-copy"
 import { trackUserMessage, trackAIMessage } from "@/lib/scoring/track-chat"
+import {
+  buildCodeChangeNote,
+  snapshotChatCode,
+  type ChatCodeSnapshot,
+} from "@/lib/interview/code-change-note"
 import { getGuidedChatState } from "@/lib/stores/guided-lab-store"
 import type { Scenario } from "@/lib/scenarios"
 import type { BugfixEvidenceEvent } from "@/lib/bugfix"
@@ -236,6 +241,16 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
   const router = useRouter()
   /** Whether a send is already in flight, per conversation lane. See handleSendMessage. */
   const sendInFlightRef = useRef({ interviewer: false, partner: false })
+  /**
+   * Code as of each lane's last successful send, keyed to the scenario so a
+   * scenario switch cannot diff against the previous scenario's files. Used to
+   * tell the model when the candidate edited code between messages - it gets the
+   * full current code every turn but has no other way to know what changed.
+   */
+  const lastSentCodeRef = useRef<{
+    scenarioId: string | undefined
+    lanes: { interviewer: ChatCodeSnapshot | null; partner: ChatCodeSnapshot | null }
+  }>({ scenarioId: undefined, lanes: { interviewer: null, partner: null } })
   const {
     chatInput,
     interviewerInput,
@@ -400,6 +415,23 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             : "\n\n[POST-INTERVIEW DISCUSSION: Continue discussing their solution. If they indicate they're done or have no questions, wrap up gracefully.]"
         }
 
+        // Flag code edits made since this lane's previous message. `messages` is
+        // the pre-append transcript, so an empty array means a fresh chat (or a
+        // session reset): record the snapshot but say nothing.
+        if (lastSentCodeRef.current.scenarioId !== selectedScenario?.id) {
+          lastSentCodeRef.current = {
+            scenarioId: selectedScenario?.id,
+            lanes: { interviewer: null, partner: null },
+          }
+        }
+        const codeSnapshot = snapshotChatCode(code, chatWorkspaceContext)
+        if (messages.length > 0) {
+          additionalContext += buildCodeChangeNote(
+            lastSentCodeRef.current.lanes[lane],
+            codeSnapshot
+          )
+        }
+
         if (!firebaseUser) {
           setMessages((prev) => [...prev, { type: "ai", message: "Please sign in to continue." }])
           return
@@ -458,6 +490,10 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           reportSendFailure(response.status, data, newUserMessage)
           return
         }
+
+        // The model has now seen this code state; diff future sends against it.
+        // Not updated on failure: the retry should still carry the change note.
+        lastSentCodeRef.current.lanes[lane] = codeSnapshot
 
         // Check if conversation has ended (AI already said goodbye)
         if (data.conversationEnded) {
