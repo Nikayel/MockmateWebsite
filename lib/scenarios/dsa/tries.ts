@@ -125,28 +125,31 @@ Implement the Trie class:
     },
     testCases: [
       {
-        input: { operations: ["insert", "search"], args: [["apple"], ["apple"]] },
-        expected: [null, true],
+        input: { operations: ["Trie", "insert", "search"], args: [[], ["apple"], ["apple"]] },
+        expected: [null, null, true],
         description: "Basic insert and search",
       },
       {
-        input: { operations: ["insert", "search"], args: [["apple"], ["app"]] },
-        expected: [null, false],
+        input: { operations: ["Trie", "insert", "search"], args: [[], ["apple"], ["app"]] },
+        expected: [null, null, false],
         description: "Search for prefix that is not a complete word",
       },
       {
-        input: { operations: ["insert", "startsWith"], args: [["apple"], ["app"]] },
-        expected: [null, true],
+        input: { operations: ["Trie", "insert", "startsWith"], args: [[], ["apple"], ["app"]] },
+        expected: [null, null, true],
         description: "startsWith for valid prefix",
       },
       {
-        input: { operations: ["insert", "insert", "search"], args: [["apple"], ["app"], ["app"]] },
-        expected: [null, null, true],
+        input: {
+          operations: ["Trie", "insert", "insert", "search"],
+          args: [[], ["apple"], ["app"], ["app"]],
+        },
+        expected: [null, null, null, true],
         description: "Insert prefix as word, then search",
       },
       {
-        input: { operations: ["search"], args: [["a"]] },
-        expected: [false],
+        input: { operations: ["Trie", "search"], args: [[], ["a"]] },
+        expected: [null, false],
         description: "Search in empty trie",
       },
     ],
@@ -336,35 +339,59 @@ Implement the AutocompleteSystem class:
       time: "O(p + q + mlogm) per input where p=prefix length, q=query results, m=matching sentences",
       space: "O(n * l) where n=sentences, l=avg length",
     },
+    // Class-invocation shape: operations[0] is the constructor and takes (sentences, times);
+    // each later entry is one input(c) call. These cases used to pass sentences/times/inputs as
+    // three separate keys, which the wrapper does not recognise as class-based, so it looked
+    // for a free function that this class-only starter does not have and a correct
+    // AutocompleteSystem scored 0/3.
     testCases: [
       {
         input: {
-          sentences: ["i love you", "island", "i love leetcode"],
-          times: [5, 3, 2],
-          inputs: ["i"],
+          operations: ["AutocompleteSystem", "input"],
+          values: [
+            [
+              ["i love you", "island", "i love leetcode"],
+              [5, 3, 2],
+            ],
+            ["i"],
+          ],
         },
-        expected: [["i love you", "island", "i love leetcode"]],
+        expected: [null, ["i love you", "island", "i love leetcode"]],
         description: 'Basic autocomplete with "i"',
       },
       {
         input: {
-          sentences: ["i love you", "island", "i love leetcode"],
-          times: [5, 3, 2],
-          inputs: ["i", " "],
+          operations: ["AutocompleteSystem", "input", "input"],
+          values: [
+            [
+              ["i love you", "island", "i love leetcode"],
+              [5, 3, 2],
+            ],
+            ["i"],
+            [" "],
+          ],
         },
         expected: [
+          null,
           ["i love you", "island", "i love leetcode"],
           ["i love you", "i love leetcode"],
         ],
         description: "Autocomplete narrowing with space",
       },
       {
-        input: { sentences: ["abc", "abcd", "abce"], times: [3, 3, 3], inputs: ["a", "b", "c"] },
-        expected: [
-          ["abc", "abcd", "abce"],
-          ["abc", "abcd", "abce"],
-          ["abc", "abcd", "abce"],
-        ],
+        input: {
+          operations: ["AutocompleteSystem", "input", "input", "input"],
+          values: [
+            [
+              ["abc", "abcd", "abce"],
+              [3, 3, 3],
+            ],
+            ["a"],
+            ["b"],
+            ["c"],
+          ],
+        },
+        expected: [null, ["abc", "abcd", "abce"], ["abc", "abcd", "abce"], ["abc", "abcd", "abce"]],
         description: "Same frequency - ASCII order",
       },
     ],
@@ -602,23 +629,32 @@ Implement the WordDictionary class:
     },
     testCases: [
       {
-        input: { operations: ["addWord", "search"], args: [["bad"], ["bad"]] },
-        expected: [null, true],
+        input: {
+          operations: ["WordDictionary", "addWord", "search"],
+          args: [[], ["bad"], ["bad"]],
+        },
+        expected: [null, null, true],
         description: "Exact match",
       },
       {
-        input: { operations: ["addWord", "search"], args: [["bad"], [".ad"]] },
-        expected: [null, true],
+        input: {
+          operations: ["WordDictionary", "addWord", "search"],
+          args: [[], ["bad"], [".ad"]],
+        },
+        expected: [null, null, true],
         description: "Wildcard prefix",
       },
       {
-        input: { operations: ["addWord", "search"], args: [["bad"], ["b.."]] },
-        expected: [null, true],
+        input: {
+          operations: ["WordDictionary", "addWord", "search"],
+          args: [[], ["bad"], ["b.."]],
+        },
+        expected: [null, null, true],
         description: "Multiple wildcards",
       },
       {
-        input: { operations: ["search"], args: [["any"]] },
-        expected: [false],
+        input: { operations: ["WordDictionary", "search"], args: [[], ["any"]] },
+        expected: [null, false],
         description: "Empty dictionary",
       },
     ],

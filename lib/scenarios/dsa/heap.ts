@@ -284,31 +284,42 @@ The median is the middle value in an ordered integer list. If the size of the li
       time: "O(log n) add, O(1) find",
       space: "O(n)",
     },
+    // Class-invocation shape, matching dsa-lru-cache: the constructor is operations[0] and
+    // every entry in `values` is an ARGUMENT ARRAY. These cases previously listed bare scalars
+    // (`values: [1, 2, null]`), which `new MedianFinder(...args)` spreads, throwing before any
+    // candidate code ran; and they omitted the constructor, so the wrapper's `i === 0` branch
+    // consumed the first addNum as the constructor call. A correct solution could not pass.
     testCases: [
       {
-        input: { operations: ["addNum", "addNum", "findMedian"], values: [1, 2, null] },
-        expected: [null, null, 1.5],
+        input: {
+          operations: ["MedianFinder", "addNum", "addNum", "findMedian"],
+          values: [[], [1], [2], []],
+        },
+        expected: [null, null, null, 1.5],
         description: "Two elements - even count",
       },
       {
         input: {
-          operations: ["addNum", "addNum", "addNum", "findMedian"],
-          values: [1, 2, 3, null],
+          operations: ["MedianFinder", "addNum", "addNum", "addNum", "findMedian"],
+          values: [[], [1], [2], [3], []],
         },
-        expected: [null, null, null, 2.0],
+        expected: [null, null, null, null, 2.0],
         description: "Three elements - odd count",
       },
       {
-        input: { operations: ["addNum", "findMedian"], values: [5, null] },
-        expected: [null, 5.0],
+        input: {
+          operations: ["MedianFinder", "addNum", "findMedian"],
+          values: [[], [5], []],
+        },
+        expected: [null, null, 5.0],
         description: "Single element",
       },
       {
         input: {
-          operations: ["addNum", "addNum", "addNum", "addNum", "findMedian"],
-          values: [2, 3, 4, 5, null],
+          operations: ["MedianFinder", "addNum", "addNum", "addNum", "addNum", "findMedian"],
+          values: [[], [2], [3], [4], [5], []],
         },
-        expected: [null, null, null, null, 3.5],
+        expected: [null, null, null, null, null, 3.5],
         description: "Four elements - average of middle two",
       },
     ],
@@ -468,9 +479,19 @@ The median is the middle value in an ordered integer list. If the size of the li
     testCases: [
       { input: { s: "aab" }, expected: "aba", description: "Valid rearrangement" },
       { input: { s: "aaab" }, expected: "", description: "Impossible - one char dominates" },
-      { input: { s: "aabb" }, expected: "abab", description: "Two chars equal frequency", orderMatters: false },
+      {
+        input: { s: "aabb" },
+        expected: "abab",
+        description: "Two chars equal frequency",
+        orderMatters: false,
+      },
       { input: { s: "a" }, expected: "a", description: "Single character" },
-      { input: { s: "ab" }, expected: "ab", description: "Two different chars", orderMatters: false },
+      {
+        input: { s: "ab" },
+        expected: "ab",
+        description: "Two different chars",
+        orderMatters: false,
+      },
     ],
   },
   {

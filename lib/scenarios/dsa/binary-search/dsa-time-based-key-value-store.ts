@@ -45,14 +45,10 @@ Implement the TimeMap class:
   testCases: [
     {
       input: {
-        operations: ["set", "get", "get"],
-        args: [
-          ["foo", "bar", 1],
-          ["foo", 1],
-          ["foo", 3],
-        ],
+        operations: ["TimeMap", "set", "get", "get"],
+        args: [[], ["foo", "bar", 1], ["foo", 1], ["foo", 3]],
       },
-      expected: [null, "bar", "bar"],
+      expected: [null, null, "bar", "bar"],
       description: "Basic operations",
     },
   ],

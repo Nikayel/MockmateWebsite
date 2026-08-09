@@ -57,6 +57,64 @@ function getFunctionCandidates(cleanCode: string): string[] {
   return Array.from(new Set(candidates)).filter((name) => !helperClassNames.has(name))
 }
 
+/**
+ * Key names a scenario may use for the method-call list and the per-call argument list.
+ *
+ * Class detection used to require the literal pair `operations` + `values`. Scenarios that
+ * named them anything else fell through to the free-function path, found no free function in
+ * a class-only starter, and returned nothing: a CORRECT solution scored 0/N and the candidate
+ * was told their code was wrong. dsa-online-stock-span, dsa-max-frequency-stack,
+ * dsa-time-based-key-value-store, dsa-implement-trie and dsa-add-search-word were all
+ * unsolvable for this reason, with nothing broken on the platform.
+ *
+ * Aliases rather than rewritten scenario data because these names are the interview-facing
+ * vocabulary each problem already uses, and rewriting them risks changing expected outputs.
+ */
+const CLASS_OPERATION_KEYS = ["operations", "ops"] as const
+const CLASS_ARGUMENT_KEYS = ["values", "args"] as const
+
+/**
+ * Keys whose value is a tree the CONSTRUCTOR consumes, for problems shaped as "build the
+ * structure from this input, then call these methods on it" (dsa-bst-iterator). Mirrors the
+ * `_treeKeywords` set used on the free-function path.
+ */
+const CLASS_CONSTRUCTOR_TREE_KEYS = ["root", "tree"] as const
+
+interface ClassInvocationKeys {
+  operationsKey: string
+  /** Null when operations take no arguments and the constructor is fed from a named key. */
+  argumentsKey: string | null
+  /** Set when the constructor's argument is a tree under its own key rather than values[0]. */
+  constructorTreeKey: string | null
+}
+
+/**
+ * Which input keys carry the method-call list and its arguments, or null when this test case
+ * is not a class-invocation shape at all.
+ */
+export function resolveClassInvocationKeys(
+  input: Record<string, unknown>
+): ClassInvocationKeys | null {
+  const operationsKey = CLASS_OPERATION_KEYS.find(
+    (key) => key in input && Array.isArray(input[key])
+  )
+  if (!operationsKey) return null
+
+  const argumentsKey =
+    CLASS_ARGUMENT_KEYS.find((key) => key in input && Array.isArray(input[key])) ?? null
+  if (argumentsKey) {
+    return { operationsKey, argumentsKey, constructorTreeKey: null }
+  }
+
+  // No argument list. This is only a class invocation if something else supplies the
+  // constructor's input, which for these problems is a tree under its own key.
+  const constructorTreeKey =
+    CLASS_CONSTRUCTOR_TREE_KEYS.find((key) => key in input && Array.isArray(input[key])) ?? null
+  if (!constructorTreeKey) return null
+
+  return { operationsKey, argumentsKey: null, constructorTreeKey }
+}
+
 export function buildJsWrapper(
   code: string,
   testCase: any,
@@ -69,16 +127,16 @@ export function buildJsWrapper(
   const inputKeysJson = JSON.stringify(inputKeys)
 
   // Check if class-based problem
-  const isClassBased =
-    inputKeys.includes("operations") &&
-    inputKeys.includes("values") &&
-    Array.isArray(testCase.input.operations)
+  const classKeys = resolveClassInvocationKeys(testCase.input)
+  const isClassBased = classKeys !== null
+  const operations = classKeys ? (testCase.input[classKeys.operationsKey] as unknown[]) : null
 
   let className: string | null = null
-  if (isClassBased && testCase.input.operations && testCase.input.operations.length > 0) {
-    const operationClassName = testCase.input.operations[0]
-    const specificClassMatch = cleanCode.match(new RegExp(`class\\s+${operationClassName}\\b`))
-    if (specificClassMatch) {
+  if (isClassBased && operations && operations.length > 0) {
+    const operationClassName = typeof operations[0] === "string" ? operations[0] : null
+    const specificClassMatch =
+      operationClassName && cleanCode.match(new RegExp(`class\\s+${operationClassName}\\b`))
+    if (operationClassName && specificClassMatch) {
       className = operationClassName
     }
   }
@@ -105,6 +163,14 @@ export function buildJsWrapper(
       className = classMatch ? classMatch[1] : null
     }
   }
+
+  // Classes the candidate declared, so the round-trip probe below can look for a
+  // serialize/deserialize pair on each. Helper node types are excluded: constructing them is
+  // pointless and TreeNode/ListNode are already declared by this wrapper.
+  const roundTripClassNames = [...cleanCode.matchAll(/class\s+(\w+)/g)]
+    .map((match) => match[1])
+    .filter((name) => !["Node", "ListNode", "TreeNode", "TrieNode", "GraphNode"].includes(name))
+    .filter((name) => isValidIdentifier(name))
 
   const candidates = getFunctionCandidates(cleanCode)
   // Check candidates in reverse order (typically main entry point is defined at/near bottom, helpers at top)
@@ -206,10 +272,24 @@ const _inputKeys = ${inputKeysJson};
 ${
   isClassBased && className
     ? `
-  const _operations = _input[_inputKeys.indexOf('operations')];
-  const _values = _input[_inputKeys.indexOf('values')];
+  const _operations = _input[_inputKeys.indexOf('${classKeys?.operationsKey}')];
   const _results = [];
   let _instance = null;
+${
+  classKeys?.constructorTreeKey
+    ? `
+  // The constructor consumes a named tree and every operation is a bare method call, so the
+  // instance is built up front and no entry in _operations is the constructor.
+  const _constructorTree = _input[_inputKeys.indexOf('${classKeys.constructorTreeKey}')];
+  _instance = new ${className}(_constructorTree && _constructorTree.length > 0 ? _buildTree(_constructorTree) : null);
+
+  for (let i = 0; i < _operations.length; i++) {
+    const result = _instance[_operations[i]]();
+    _results.push(result === undefined ? null : result);
+  }
+`
+    : `
+  const _values = _input[_inputKeys.indexOf('${classKeys?.argumentsKey}')];
 
   for (let i = 0; i < _operations.length; i++) {
     const op = _operations[i];
@@ -222,6 +302,8 @@ ${
       _results.push(result === undefined ? null : result);
     }
   }
+`
+}
   return _results;
 `
     : `
@@ -311,11 +393,43 @@ ${
     return arg;
   });
 
+  // Round-trip problems: the candidate writes a matched pair and the test asserts that
+  // decoding an encoding returns the original. Scanning for the pair on ANY class in scope
+  // covers the Codec pattern (class Codec with serialize + deserialize) that
+  // dsa-serialize-deserialize-tree and dsa-serialize-deserialize-bst ship. Previously only
+  // free encode/decode functions and a Solution instance were recognised, so a correct Codec
+  // fell through to the free-function lookup, found nothing, and scored 0.
+  function _roundTripFromInstance(_obj) {
+    if (!_obj) return null;
+    const _pairs = [['serialize', 'deserialize'], ['encode', 'decode']];
+    for (const _pair of _pairs) {
+      if (typeof _obj[_pair[0]] === 'function' && typeof _obj[_pair[1]] === 'function') {
+        return { write: _obj[_pair[0]].bind(_obj), read: _obj[_pair[1]].bind(_obj) };
+      }
+    }
+    return null;
+  }
+
+  let _roundTrip = null;
+  // Free-function pairs. A typeof check on an undeclared name is safe and does not throw.
+  if (typeof serialize === 'function' && typeof deserialize === 'function') {
+    _roundTrip = { write: serialize, read: deserialize };
+  } else if (typeof encode === 'function' && typeof decode === 'function') {
+    _roundTrip = { write: encode, read: decode };
+  } else {
+    _roundTrip = _roundTripFromInstance(_instance);
+${roundTripClassNames
+  .map(
+    (name) => `    if (!_roundTrip && typeof ${name} === 'function') {
+      try { _roundTrip = _roundTripFromInstance(new ${name}()); } catch (e) { /* needs ctor args */ }
+    }`
+  )
+  .join("\n")}
+  }
+
   let _result;
-  if (typeof encode === 'function' && typeof decode === 'function') {
-    _result = decode(encode(..._processedInput));
-  } else if (typeof Solution === 'function' && _instance && typeof _instance.encode === 'function' && typeof _instance.decode === 'function') {
-    _result = _instance.decode(_instance.encode(..._processedInput));
+  if (_roundTrip) {
+    _result = _roundTrip.read(_roundTrip.write(..._processedInput));
   } else {
     _result = _func(..._processedInput);
   }
