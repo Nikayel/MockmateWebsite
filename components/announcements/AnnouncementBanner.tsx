@@ -1,15 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {
-  X,
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle,
-  Info,
-  ExternalLink,
-  ChevronRight,
-} from "lucide-react"
+import { X, AlertCircle, AlertTriangle, CheckCircle, Info, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { Announcement } from "@/lib/types/announcements"
@@ -19,62 +11,30 @@ interface AnnouncementBannerProps {
   onDismiss: () => void
 }
 
+// Priority shows up as the accent strip and the icon chip only; the copy stays
+// on theme foreground/muted tokens so contrast holds in both themes. The old
+// design painted white text over the accent gradient, which fails AA on the
+// light-mode clay accent.
 const priorityConfig = {
   info: {
-    gradient: "from-accent/90 via-accent/80 to-accent/70",
-    bgSubtle: "bg-accent/10",
-    border: "border-accent/30",
     icon: Info,
-    iconBg: "bg-white/20",
-    iconColor: "text-white",
-    textPrimary: "text-white",
-    textSecondary: "text-white/80",
-    buttonBg: "bg-white/20 hover:bg-white/30",
-    buttonText: "text-white",
-    dismissHover: "hover:bg-white/20",
-    glowColor: "shadow-accent/20",
+    strip: "bg-accent",
+    chip: "bg-accent/10 text-accent",
   },
   warning: {
-    gradient: "from-amber-500/90 via-amber-500/80 to-orange-500/70",
-    bgSubtle: "bg-amber-500/10",
-    border: "border-amber-500/30",
     icon: AlertTriangle,
-    iconBg: "bg-white/20",
-    iconColor: "text-white",
-    textPrimary: "text-white",
-    textSecondary: "text-white/80",
-    buttonBg: "bg-white/20 hover:bg-white/30",
-    buttonText: "text-white",
-    dismissHover: "hover:bg-white/20",
-    glowColor: "shadow-amber-500/20",
+    strip: "bg-amber-500",
+    chip: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   },
   critical: {
-    gradient: "from-destructive/90 via-destructive/80 to-red-600/70",
-    bgSubtle: "bg-destructive/10",
-    border: "border-destructive/30",
     icon: AlertCircle,
-    iconBg: "bg-white/20",
-    iconColor: "text-white",
-    textPrimary: "text-white",
-    textSecondary: "text-white/80",
-    buttonBg: "bg-white/20 hover:bg-white/30",
-    buttonText: "text-white",
-    dismissHover: "hover:bg-white/20",
-    glowColor: "shadow-destructive/20",
+    strip: "bg-destructive",
+    chip: "bg-destructive/10 text-destructive",
   },
   success: {
-    gradient: "from-neural/90 via-neural/80 to-emerald-500/70",
-    bgSubtle: "bg-neural/10",
-    border: "border-neural/30",
     icon: CheckCircle,
-    iconBg: "bg-white/20",
-    iconColor: "text-white",
-    textPrimary: "text-white",
-    textSecondary: "text-white/80",
-    buttonBg: "bg-white/20 hover:bg-white/30",
-    buttonText: "text-white",
-    dismissHover: "hover:bg-white/20",
-    glowColor: "shadow-neural/20",
+    strip: "bg-neural",
+    chip: "bg-neural/10 text-neural",
   },
 }
 
@@ -113,64 +73,44 @@ export function AnnouncementBanner({ announcement, onDismiss }: AnnouncementBann
       aria-live={announcement.priority === "critical" ? "assertive" : "polite"}
       aria-atomic="true"
     >
-      <div
-        className={cn(
-          "relative overflow-hidden bg-gradient-to-r",
-          config.gradient,
-          "shadow-lg",
-          config.glowColor
-        )}
-      >
-        {/* Subtle animated background pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="animate-shimmer absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.1)_50%,transparent_75%)] bg-[length:250%_250%]" />
-        </div>
+      <div className="bg-card/95 border-border relative border-b shadow-sm backdrop-blur">
+        {/* Priority accent strip */}
+        <div className={cn("absolute inset-x-0 top-0 h-0.5", config.strip)} aria-hidden="true" />
 
-        <div className="relative container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
+        <div className="container mx-auto px-4 py-2.5">
+          <div className="flex items-center justify-between gap-3">
             {/* Icon and Content */}
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              {/* Icon with subtle background */}
               <div
                 className={cn(
-                  "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full",
-                  config.iconBg,
-                  "transition-transform duration-200 hover:scale-105"
+                  "flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full",
+                  config.chip
                 )}
               >
-                <Icon className={cn("h-4 w-4", config.iconColor)} aria-hidden="true" />
+                <Icon className="h-4 w-4" aria-hidden="true" />
               </div>
 
-              {/* Text content */}
-              <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-                <span className={cn("text-sm font-semibold tracking-tight", config.textPrimary)}>
-                  {announcement.title}
-                </span>
-                <span
-                  className={cn("hidden sm:inline-block", config.textSecondary)}
-                  aria-hidden="true"
-                >
-                  -
-                </span>
-                <span className={cn("truncate text-sm", config.textSecondary)}>
-                  {announcement.message}
-                </span>
-              </div>
+              {/* Text content: the message may wrap to two lines rather than
+                  being cut off; the provider measures the real height. */}
+              <p className="min-w-0 flex-1 text-sm leading-snug">
+                <span className="text-foreground font-semibold">{announcement.title}</span>
+                {announcement.message && (
+                  <>
+                    <span className="text-muted-foreground" aria-hidden="true">
+                      {" · "}
+                    </span>
+                    <span className="text-muted-foreground">{announcement.message}</span>
+                  </>
+                )}
+              </p>
             </div>
 
             {/* Actions */}
-            <div className="flex flex-shrink-0 items-center gap-2">
+            <div className="flex flex-shrink-0 items-center gap-1.5">
               {announcement.cta && (
                 <Button
                   size="sm"
-                  variant="ghost"
-                  className={cn(
-                    "h-8 rounded-full px-3 text-xs font-medium",
-                    config.buttonBg,
-                    config.buttonText,
-                    "transition-all duration-200",
-                    "focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-0"
-                  )}
+                  className="h-7 rounded-full px-3 text-xs"
                   onClick={handleCtaClick}
                 >
                   <span className="hidden sm:inline">{announcement.cta.text}</span>
@@ -183,22 +123,18 @@ export function AnnouncementBanner({ announcement, onDismiss }: AnnouncementBann
                 <button
                   onClick={handleDismiss}
                   className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full",
-                    "transition-all duration-200",
-                    config.dismissHover,
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                    "text-muted-foreground hover:text-foreground hover:bg-muted flex h-7 w-7 items-center justify-center rounded-full",
+                    "transition-colors duration-200",
+                    "focus-visible:ring-ring focus:outline-none focus-visible:ring-2"
                   )}
                   aria-label="Dismiss announcement"
                 >
-                  <X className={cn("h-4 w-4", config.iconColor)} aria-hidden="true" />
+                  <X className="h-4 w-4" aria-hidden="true" />
                 </button>
               )}
             </div>
           </div>
         </div>
-
-        {/* Bottom highlight line */}
-        <div className="absolute right-0 bottom-0 left-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
       </div>
     </div>
   )

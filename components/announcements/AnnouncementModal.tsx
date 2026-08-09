@@ -31,7 +31,7 @@ const priorityConfig = {
     titleColor: "text-foreground",
     buttonPrimary: "bg-accent hover:bg-accent/90 text-accent-foreground",
     buttonSecondary: "border-accent/30 text-accent hover:bg-accent/10",
-    accentColor: "accent",
+    accentLine: "via-accent",
   },
   warning: {
     gradient: "from-amber-500/20 via-amber-500/10 to-transparent",
@@ -43,7 +43,7 @@ const priorityConfig = {
     titleColor: "text-foreground",
     buttonPrimary: "bg-amber-500 hover:bg-amber-500/90 text-white",
     buttonSecondary: "border-amber-500/30 text-amber-400 hover:bg-amber-500/10",
-    accentColor: "amber-500",
+    accentLine: "via-amber-500",
   },
   critical: {
     gradient: "from-destructive/20 via-destructive/10 to-transparent",
@@ -55,7 +55,7 @@ const priorityConfig = {
     titleColor: "text-foreground",
     buttonPrimary: "bg-destructive hover:bg-destructive/90 text-foreground",
     buttonSecondary: "border-destructive/30 text-destructive hover:bg-destructive/10",
-    accentColor: "destructive",
+    accentLine: "via-destructive",
   },
   success: {
     gradient: "from-neural/20 via-neural/10 to-transparent",
@@ -67,7 +67,7 @@ const priorityConfig = {
     titleColor: "text-foreground",
     buttonPrimary: "bg-neural hover:bg-neural/90 text-foreground",
     buttonSecondary: "border-neural/30 text-neural hover:bg-neural/10",
-    accentColor: "neural",
+    accentLine: "via-neural",
   },
 }
 
@@ -308,11 +308,14 @@ export function AnnouncementModal({ announcement, onClose, onDismiss }: Announce
           </div>
         </div>
 
-        {/* Bottom accent line */}
+        {/* Bottom accent line. Full literal classes: Tailwind cannot generate a
+            class assembled from `via-${...}` at runtime, so the old interpolated
+            form never produced any CSS and the line was invisible. */}
         <div
           className={cn(
             "absolute right-0 bottom-0 left-0 h-1",
-            `bg-gradient-to-r from-transparent via-${config.accentColor} to-transparent`,
+            "bg-gradient-to-r from-transparent to-transparent",
+            config.accentLine,
             "opacity-50"
           )}
           aria-hidden="true"
