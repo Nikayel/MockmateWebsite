@@ -1,4 +1,11 @@
 // Web Worker for JavaScript Execution Sandbox
+
+// The `assert` implementation the scenario suites run against. It lives in its own file so
+// it can be unit tested, which is how it earned that file: the version that used to sit
+// inline here was missing `deepEqual` entirely, and every scenario that called it reported
+// a Type Error against the candidate's own code.
+importScripts("/workers/assert-shim.js")
+
 self.onmessage = async function (e) {
   const { code, files, entrypoint } = e.data
 
@@ -63,63 +70,7 @@ self.onmessage = async function (e) {
       const modules = {}
       const cache = {}
 
-      const deepEquals = (a, b) => {
-        if (a === b) return true
-        if (typeof a !== typeof b) return false
-        if (a === null || b === null) return a === b
-        if (typeof a === "object") {
-          const keysA = Object.keys(a).sort()
-          const keysB = Object.keys(b).sort()
-          if (keysA.length !== keysB.length) return false
-          if (keysA.join(",") !== keysB.join(",")) return false
-          return keysA.every((key) => deepEquals(a[key], b[key]))
-        }
-        return false
-      }
-
-      const assertMock = {
-        ok: (val, msg) => {
-          if (!val) throw new Error(msg || `Expected truthy, got ${val}`)
-        },
-        equal: (a, b, msg) => {
-          if (a != b) throw new Error(msg || `Expected ${a} == ${b}`)
-        },
-        notEqual: (a, b, msg) => {
-          if (a == b) throw new Error(msg || `Expected ${a} != ${b}`)
-        },
-        strictEqual: (a, b, msg) => {
-          if (a !== b) throw new Error(msg || `Expected ${a} === ${b}`)
-        },
-        notStrictEqual: (a, b, msg) => {
-          if (a === b) throw new Error(msg || `Expected ${a} !== ${b}`)
-        },
-        deepStrictEqual: (a, b, msg) => {
-          if (!deepEquals(a, b)) {
-            throw new Error(
-              msg || `Expected deep equality, got ${JSON.stringify(a)} vs ${JSON.stringify(b)}`
-            )
-          }
-        },
-        throws: (fn, reg) => {
-          try {
-            fn()
-          } catch (e) {
-            if (reg && reg instanceof RegExp && !reg.test(e.message)) {
-              throw new Error(`Expected error matching ${reg}, got: ${e.message}`)
-            }
-            return
-          }
-          throw new Error("Expected function to throw an error")
-        },
-        rejects: async (fn) => {
-          try {
-            await fn()
-          } catch {
-            return
-          }
-          throw new Error("Expected promise to reject")
-        },
-      }
+      const assertMock = self.createAssertShim()
 
       // Populate module code map
       for (const file of files) {
