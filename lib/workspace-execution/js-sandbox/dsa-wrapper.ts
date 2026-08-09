@@ -384,6 +384,18 @@ ${
   const _treeKeywords = new Set(['root', 'tree', 'node', 'p', 'q', 't1', 't2', 'left', 'right', 'subroot']);
   const _listKeywords = new Set(['head', 'list', 'l1', 'l2']);
 
+  // Provide the isBadVersion API that dsa-first-bad-version's problem statement and starter
+  // both promise. It existed nowhere in the repo, so the documented binary search scored 1/5
+  // while a bare "return bad" scored 5/5: the answer was arriving as an undocumented second
+  // positional argument, and the scenario graded INVERTED, rewarding a non-answer with full
+  // marks and writing that into mastery. Same shape as the tree building above: an input key
+  // the harness turns into something the candidate's code can use.
+  const _badIndex = _inputKeys.indexOf('bad');
+  if (_badIndex !== -1) {
+    const _firstBad = _input[_badIndex];
+    globalThis.isBadVersion = function (version) { return version >= _firstBad; };
+  }
+
   const _processedInput = _input.map((arg, i) => {
     const key = (_inputKeys[i] || '').toLowerCase();
     if (Array.isArray(arg)) {
@@ -427,11 +439,16 @@ ${roundTripClassNames
   .join("\n")}
   }
 
+  // Arguments the candidate's function actually receives. An input consumed as a harness
+  // affordance is dropped: passing bad positionally is what let a bare "return bad" score 5/5 on
+  // dsa-first-bad-version while the real binary search scored 1/5.
+  const _callArgs = _processedInput.filter((_, i) => _inputKeys[i] !== 'bad' || _badIndex === -1);
+
   let _result;
   if (_roundTrip) {
-    _result = _roundTrip.read(_roundTrip.write(..._processedInput));
+    _result = _roundTrip.read(_roundTrip.write(..._callArgs));
   } else {
-    _result = _func(..._processedInput);
+    _result = _func(..._callArgs);
   }
 
   const _hadTreeInput = _processedInput.some((arg, i) => {

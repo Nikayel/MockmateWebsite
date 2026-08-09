@@ -74,12 +74,20 @@ Example visualization:
     time: "O(n)",
     space: "O(log n)",
   },
+  // `expected` here is ONE correct answer, shown to the candidate when a test fails. Grading
+  // uses the balanced-bst-from-sorted property (lib/validators), because several different
+  // balanced BSTs are correct depending on which midpoint the candidate picks. These used to
+  // read `expected: "valid BST"`, a literal string no real solution could ever return.
   testCases: [
     {
       input: { nums: [-10, -3, 0, 5, 9] },
-      expected: "valid BST",
+      expected: [0, -10, 5, null, -3, null, 9],
       description: "Build balanced BST",
     },
-    { input: { nums: [1, 3] }, expected: "valid BST", description: "Two elements" },
+    {
+      input: { nums: [1, 3] },
+      expected: [1, null, 3],
+      description: "Two elements",
+    },
   ],
 }

@@ -21,41 +21,41 @@ export interface ReferenceSolution {
   inputSpec?: {
     params: Array<{
       name: string
-      type: 'int' | 'float' | 'string' | 'boolean' | 'array' | 'matrix' | 'object'
+      type: "int" | "float" | "string" | "boolean" | "array" | "matrix" | "object"
       minLength?: number
       maxLength?: number
       min?: number
       max?: number
-      elementType?: 'int' | 'float' | 'string' | 'boolean'
+      elementType?: "int" | "float" | "string" | "boolean"
       elementMin?: number
       elementMax?: number
     }>
     constraints?: Array<{
-      type: 'sum-exists' | 'sorted' | 'unique' | 'custom'
+      type: "sum-exists" | "sorted" | "unique" | "custom"
       params?: string[]
     }>
   }
-  outputComparison?: 'exact' | 'set' | 'any-valid' | 'property-based'
+  outputComparison?: "exact" | "set" | "any-valid" | "property-based"
 }
 
 export type ValidationMode =
-  | 'exact'           // Must match exactly (default for simple cases)
-  | 'property'        // Must satisfy defined properties
-  | 'reference'       // Compare against reference solution output
-  | 'any-valid'       // Any output satisfying constraints is valid
+  | "exact" // Must match exactly (default for simple cases)
+  | "property" // Must satisfy defined properties
+  | "reference" // Compare against reference solution output
+  | "any-valid" // Any output satisfying constraints is valid
 
 export type OutputNormalization =
-  | 'none'            // No normalization
-  | 'sort-array'      // Sort arrays before comparison
-  | 'sort-nested'     // Sort arrays and nested arrays
-  | 'set'             // Treat as set (order doesn't matter, no duplicates)
-  | 'multiset'        // Order doesn't matter, duplicates allowed
-  | 'normalize-whitespace'  // Trim and normalize whitespace
+  | "none" // No normalization
+  | "sort-array" // Sort arrays before comparison
+  | "sort-nested" // Sort arrays and nested arrays
+  | "set" // Treat as set (order doesn't matter, no duplicates)
+  | "multiset" // Order doesn't matter, duplicates allowed
+  | "normalize-whitespace" // Trim and normalize whitespace
 
 export interface ValidatorContext {
   input: Record<string, any>
   output: any
-  expected?: any  // Optional - not needed for property-based
+  expected?: any // Optional - not needed for property-based
   language: string
   scenarioId: string
 }
@@ -129,9 +129,9 @@ export const PropertyBuilders = {
   /**
    * Two-sum style: output indices point to values that sum to target
    */
-  twoSumValid: (numsKey = 'nums', targetKey = 'target'): Property => ({
-    name: 'valid-two-sum',
-    description: 'Output indices point to values that sum to target',
+  twoSumValid: (numsKey = "nums", targetKey = "target"): Property => ({
+    name: "valid-two-sum",
+    description: "Output indices point to values that sum to target",
     check: (ctx) => {
       const { input, output } = ctx
       const nums = input[numsKey]
@@ -142,21 +142,24 @@ export const PropertyBuilders = {
 
       // Indices must be valid, different, and values must sum to target
       return (
-        Number.isInteger(i) && Number.isInteger(j) &&
-        i >= 0 && i < nums.length &&
-        j >= 0 && j < nums.length &&
+        Number.isInteger(i) &&
+        Number.isInteger(j) &&
+        i >= 0 &&
+        i < nums.length &&
+        j >= 0 &&
+        j < nums.length &&
         i !== j &&
         nums[i] + nums[j] === target
       )
-    }
+    },
   }),
 
   /**
    * Array contains exactly the expected elements (order doesn't matter)
    */
   arrayAsSet: (expectedKey: string): Property => ({
-    name: 'array-as-set',
-    description: 'Output contains exactly the expected elements (any order)',
+    name: "array-as-set",
+    description: "Output contains exactly the expected elements (any order)",
     check: (ctx) => {
       const { output, expected } = ctx
       if (!Array.isArray(output) || !Array.isArray(expected)) return false
@@ -165,26 +168,26 @@ export const PropertyBuilders = {
       const sortedOutput = [...output].sort()
       const sortedExpected = [...expected].sort()
       return JSON.stringify(sortedOutput) === JSON.stringify(sortedExpected)
-    }
+    },
   }),
 
   /**
    * Linked list cycle detection: output is boolean or node reference
    */
   hasCycle: (): Property => ({
-    name: 'cycle-detection',
-    description: 'Correctly identifies if cycle exists',
+    name: "cycle-detection",
+    description: "Correctly identifies if cycle exists",
     check: (ctx) => {
       const { output, expected } = ctx
       // Accept boolean or truthy/falsy
       return Boolean(output) === Boolean(expected)
-    }
+    },
   }),
 
   /**
    * Valid BST traversal
    */
-  validBSTTraversal: (order: 'inorder' | 'preorder' | 'postorder'): Property => ({
+  validBSTTraversal: (order: "inorder" | "preorder" | "postorder"): Property => ({
     name: `valid-${order}-traversal`,
     description: `Output is valid ${order} BST traversal`,
     check: (ctx) => {
@@ -192,29 +195,109 @@ export const PropertyBuilders = {
       if (!Array.isArray(output)) return false
       // For traversals, exact match is usually required
       return JSON.stringify(output) === JSON.stringify(expected)
-    }
+    },
+  }),
+
+  /**
+   * The output is a height-balanced BST holding exactly the input array's values.
+   *
+   * Written for dsa-convert-sorted-array-bst, whose test cases used `expected: "valid BST"`
+   * as a literal string. A correct solution returns a tree, which the wrapper serialises to
+   * an array, so it never matched and scored 0/2, while `return "valid BST"` scored 2/2. The
+   * scenario graded INVERTED and wrote that into mastery.
+   *
+   * A property rather than a fixed answer because several different balanced BSTs are
+   * correct for the same input, depending on which midpoint the candidate picks.
+   */
+  balancedBstFromSorted: (numsKey = "nums"): Property => ({
+    name: "balanced-bst-from-sorted",
+    description: "Output is a height-balanced BST containing exactly the input values",
+    check: (ctx) => {
+      const { input, output } = ctx
+      const source: number[] = input[numsKey] ?? []
+      if (!Array.isArray(output)) return false
+
+      // Rebuild the tree from the level-order array so its structure can be inspected.
+      const values: number[] = []
+      interface Rebuilt {
+        val: number
+        left: Rebuilt | null
+        right: Rebuilt | null
+      }
+      const build = (): Rebuilt | null => {
+        if (output.length === 0 || output[0] === null) return null
+        const root: Rebuilt = { val: output[0], left: null, right: null }
+        const queue: Rebuilt[] = [root]
+        let i = 1
+        while (queue.length > 0 && i < output.length) {
+          const node = queue.shift() as Rebuilt
+          if (i < output.length) {
+            const value = output[i++]
+            if (value !== null && value !== undefined) {
+              node.left = { val: value, left: null, right: null }
+              queue.push(node.left)
+            }
+          }
+          if (i < output.length) {
+            const value = output[i++]
+            if (value !== null && value !== undefined) {
+              node.right = { val: value, left: null, right: null }
+              queue.push(node.right)
+            }
+          }
+        }
+        return root
+      }
+
+      const root = build()
+      if (source.length === 0) return root === null
+
+      // In-order traversal must reproduce the sorted input exactly: same values, sorted.
+      const inorder = (node: Rebuilt | null): void => {
+        if (!node) return
+        inorder(node.left)
+        values.push(node.val)
+        inorder(node.right)
+      }
+      inorder(root)
+      if (JSON.stringify(values) !== JSON.stringify([...source].sort((a, b) => a - b))) {
+        return false
+      }
+
+      // Height-balanced: no node's subtree heights differ by more than one.
+      let balanced = true
+      const height = (node: Rebuilt | null): number => {
+        if (!node) return 0
+        const left = height(node.left)
+        const right = height(node.right)
+        if (Math.abs(left - right) > 1) balanced = false
+        return Math.max(left, right) + 1
+      }
+      height(root)
+      return balanced
+    },
   }),
 
   /**
    * Valid palindrome check
    */
   isPalindrome: (): Property => ({
-    name: 'palindrome-check',
-    description: 'Correctly identifies palindrome',
+    name: "palindrome-check",
+    description: "Correctly identifies palindrome",
     check: (ctx) => {
       const { input, output } = ctx
-      const str = (input.s || input.str || '').toLowerCase().replace(/[^a-z0-9]/g, '')
-      const isPalin = str === str.split('').reverse().join('')
+      const str = (input.s || input.str || "").toLowerCase().replace(/[^a-z0-9]/g, "")
+      const isPalin = str === str.split("").reverse().join("")
       return output === isPalin
-    }
+    },
   }),
 
   /**
    * Valid anagram grouping (order of groups and within groups doesn't matter)
    */
   validAnagramGroups: (): Property => ({
-    name: 'valid-anagram-groups',
-    description: 'Groups are valid anagram sets',
+    name: "valid-anagram-groups",
+    description: "Groups are valid anagram sets",
     check: (ctx) => {
       const { input, output } = ctx
       if (!Array.isArray(output)) return false
@@ -228,7 +311,7 @@ export const PropertyBuilders = {
       // Check each group contains only anagrams
       for (const group of output) {
         if (!Array.isArray(group)) return false
-        const sorted = group.map((s: string) => s.split('').sort().join(''))
+        const sorted = group.map((s: string) => s.split("").sort().join(""))
         if (new Set(sorted).size !== 1) return false
       }
 
@@ -241,41 +324,41 @@ export const PropertyBuilders = {
       }
 
       return true
-    }
+    },
   }),
 
   /**
    * Output length matches expected
    */
   lengthMatches: (expectedLength: number): Property => ({
-    name: 'length-matches',
+    name: "length-matches",
     description: `Output length is ${expectedLength}`,
     check: (ctx) => {
       const { output } = ctx
       if (Array.isArray(output)) return output.length === expectedLength
-      if (typeof output === 'string') return output.length === expectedLength
+      if (typeof output === "string") return output.length === expectedLength
       return false
-    }
+    },
   }),
 
   /**
    * Output is within numeric range
    */
   inRange: (min: number, max: number): Property => ({
-    name: 'in-range',
+    name: "in-range",
     description: `Output is between ${min} and ${max}`,
     check: (ctx) => {
       const { output } = ctx
-      return typeof output === 'number' && output >= min && output <= max
-    }
+      return typeof output === "number" && output >= min && output <= max
+    },
   }),
 
   /**
    * Subarray sum equals target
    */
-  subarraySumEquals: (targetKey = 'target'): Property => ({
-    name: 'subarray-sum',
-    description: 'Subarray elements sum to target',
+  subarraySumEquals: (targetKey = "target"): Property => ({
+    name: "subarray-sum",
+    description: "Subarray elements sum to target",
     check: (ctx) => {
       const { input, output } = ctx
       const nums = input.nums || input.arr
@@ -289,7 +372,7 @@ export const PropertyBuilders = {
         sum += nums[i]
       }
       return sum === target
-    }
+    },
   }),
 }
 
@@ -300,7 +383,7 @@ export const Normalizers = {
   sortArray: (val: any): any => {
     if (!Array.isArray(val)) return val
     return [...val].sort((a, b) => {
-      if (typeof a === 'number' && typeof b === 'number') return a - b
+      if (typeof a === "number" && typeof b === "number") return a - b
       return String(a).localeCompare(String(b))
     })
   },
@@ -312,12 +395,12 @@ export const Normalizers = {
 
   toSet: (val: any): Set<any> => {
     if (!Array.isArray(val)) return new Set([val])
-    return new Set(val.map(v => JSON.stringify(v)))
+    return new Set(val.map((v) => JSON.stringify(v)))
   },
 
   normalizeWhitespace: (val: any): any => {
-    if (typeof val === 'string') {
-      return val.trim().replace(/\s+/g, ' ')
+    if (typeof val === "string") {
+      return val.trim().replace(/\s+/g, " ")
     }
     return val
   },
@@ -327,7 +410,7 @@ export const Normalizers = {
     if (raw === null || raw === undefined) return raw
 
     // Already parsed
-    if (typeof raw !== 'string') return raw
+    if (typeof raw !== "string") return raw
 
     const trimmed = raw.trim()
 
@@ -337,28 +420,28 @@ export const Normalizers = {
     } catch {}
 
     // Try Python tuple -> array: (1, 2) -> [1, 2]
-    if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
+    if (trimmed.startsWith("(") && trimmed.endsWith(")")) {
       try {
-        return JSON.parse('[' + trimmed.slice(1, -1) + ']')
+        return JSON.parse("[" + trimmed.slice(1, -1) + "]")
       } catch {}
     }
 
     // Try Python set -> array: {1, 2} -> [1, 2]
-    if (trimmed.startsWith('{') && trimmed.endsWith('}') && !trimmed.includes(':')) {
+    if (trimmed.startsWith("{") && trimmed.endsWith("}") && !trimmed.includes(":")) {
       try {
-        return JSON.parse('[' + trimmed.slice(1, -1) + ']')
+        return JSON.parse("[" + trimmed.slice(1, -1) + "]")
       } catch {}
     }
 
     // Boolean strings
-    if (trimmed.toLowerCase() === 'true') return true
-    if (trimmed.toLowerCase() === 'false') return false
+    if (trimmed.toLowerCase() === "true") return true
+    if (trimmed.toLowerCase() === "false") return false
 
     // Number strings
     const num = Number(trimmed)
-    if (!isNaN(num) && trimmed !== '') return num
+    if (!isNaN(num) && trimmed !== "") return num
 
     // Return as-is
     return raw
-  }
+  },
 }

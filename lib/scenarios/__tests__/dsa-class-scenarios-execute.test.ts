@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { scenarios } from "@/lib/scenarios"
 import { buildJsWrapper } from "@/lib/workspace-execution/js-sandbox/dsa-wrapper"
+import { validateResultEnhanced } from "@/lib/validators/runner"
 
 /**
  * Runs a real, correct solution through the real wrapper for each class-shaped DSA scenario.
@@ -164,6 +165,77 @@ describe("class-shaped DSA scenarios accept a correct solution", () => {
       search() { return false }
     }`
     )
+  })
+
+  describe("scenarios that used to grade inverted", () => {
+    // These two awarded full marks for a non-answer and zero for a correct one, so they wrote
+    // actively wrong mastery signal rather than merely failing loudly. Both halves matter:
+    // the real solution must pass AND the cheat must fail.
+    it("dsa-first-bad-version rewards the binary search, not the smuggled answer", () => {
+      expectSolves(
+        "dsa-first-bad-version",
+        `function firstBadVersion(n) {
+          let low = 1, high = n
+          while (low < high) {
+            const mid = Math.floor((low + high) / 2)
+            if (isBadVersion(mid)) high = mid; else low = mid + 1
+          }
+          return low
+        }`
+      )
+      // `bad` used to arrive as an undocumented second positional argument.
+      expectRejects("dsa-first-bad-version", `function firstBadVersion(n, bad) { return bad }`)
+    })
+
+    it("dsa-convert-sorted-array-bst rewards a real tree, not the literal string", () => {
+      const results = runScenario(
+        "dsa-convert-sorted-array-bst",
+        `function sortedArrayToBST(nums) {
+          const build = (lo, hi) => {
+            if (lo > hi) return null
+            const mid = (lo + hi) >> 1
+            const node = new TreeNode(nums[mid])
+            node.left = build(lo, mid - 1)
+            node.right = build(mid + 1, hi)
+            return node
+          }
+          return build(0, nums.length - 1)
+        }`
+      )
+
+      for (const result of results) {
+        const verdict = validateResultEnhanced(
+          result.actual,
+          {
+            input: (scenarios.find((s) => s.id === "dsa-convert-sorted-array-bst")!.testCases ??
+              [])[results.indexOf(result)].input,
+            expected: result.expected,
+            description: result.description ?? "",
+          },
+          "dsa-convert-sorted-array-bst",
+          "javascript"
+        )
+        expect(verdict.passed, `correct BST rejected: ${result.description}`).toBe(true)
+      }
+
+      // The old expectation was the literal string "valid BST", so returning it scored 2/2.
+      const cheat = runScenario(
+        "dsa-convert-sorted-array-bst",
+        `function sortedArrayToBST() { return "valid BST" }`
+      )
+      const cheatVerdict = validateResultEnhanced(
+        cheat[0].actual,
+        {
+          input: (scenarios.find((s) => s.id === "dsa-convert-sorted-array-bst")!.testCases ??
+            [])[0].input,
+          expected: cheat[0].expected,
+          description: "cheat",
+        },
+        "dsa-convert-sorted-array-bst",
+        "javascript"
+      )
+      expect(cheatVerdict.passed, 'returning the literal "valid BST" still scores').toBe(false)
+    })
   })
 
   it("dsa-time-based-key-value-store", () => {

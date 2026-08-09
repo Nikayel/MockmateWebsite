@@ -327,6 +327,15 @@ function detectPropertyValidators(
   const validators: Array<ReturnType<(typeof PropertyBuilders)[keyof typeof PropertyBuilders]>> = []
   const { input, expected } = testCase
 
+  // Building a height-balanced BST has many correct answers, so it is checked as a property.
+  // Its test cases previously used the literal string "valid BST" as the expected value: a
+  // correct tree serialises to an array and could never match, so it scored 0, while
+  // `return "valid BST"` scored full marks and wrote that into the candidate's mastery.
+  if (scenarioId === "dsa-convert-sorted-array-bst") {
+    validators.push(PropertyBuilders.balancedBstFromSorted("nums"))
+    return validators
+  }
+
   // Two-sum pattern detection.
   //
   // An allowlist, because the previous conditions were a substring check on the id OR "has
