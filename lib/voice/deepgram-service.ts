@@ -145,7 +145,7 @@ export class DeepgramVoiceService {
   private maxDurationTimeout: ReturnType<typeof setTimeout> | null = null
   private lastSentTranscript: string = ""
   private maxDurationMs: number = 180000 // 3 minutes default
-  private authToken: string = ""
+  private getAuthToken: (() => Promise<string | null>) | null = null
   private accessToken: string = ""
   private transcriptMuted: boolean = false
 
@@ -174,10 +174,15 @@ export class DeepgramVoiceService {
   }
 
   /**
-   * Set the auth token for fetching the API key from the server
+   * Supply the way to get a Firebase ID token, used to authenticate the token-grant call.
+   *
+   * A provider rather than a token string, because Firebase ID tokens expire after an hour and
+   * `getIdToken()` refreshes one that is close to expiry. A string captured when the hook mounted
+   * would be stale in any interview that ran longer than that, and the failure would be silent:
+   * the grant 401s, Deepgram never connects, and the caller falls back to Web Speech.
    */
-  setAuthToken(token: string): void {
-    this.authToken = token
+  setAuthTokenProvider(provider: (() => Promise<string | null>) | null): void {
+    this.getAuthToken = provider
   }
 
   /**
@@ -188,12 +193,13 @@ export class DeepgramVoiceService {
    * by the second recording. Granting per connection cannot go stale at all.
    */
   private async fetchAccessToken(): Promise<void> {
-    if (!this.authToken) {
+    const authToken = this.getAuthToken ? await this.getAuthToken() : null
+    if (!authToken) {
       throw new Error("Auth token required to fetch a Deepgram access token")
     }
 
     const response = await fetch("/api/voice/token", {
-      headers: { Authorization: `Bearer ${this.authToken}` },
+      headers: { Authorization: `Bearer ${authToken}` },
     })
 
     if (!response.ok) {
@@ -217,7 +223,7 @@ export class DeepgramVoiceService {
    * Check if Deepgram is configured (has API key or can fetch one)
    */
   isConfigured(): boolean {
-    return !!this.config.apiKey || !!this.authToken
+    return !!this.config.apiKey || !!this.getAuthToken
   }
 
   /**

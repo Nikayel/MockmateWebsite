@@ -225,10 +225,22 @@ function InterviewPageContent() {
 
   // Voice recording - using Deepgram with Web Speech API fallback
   // Auto-send enabled: sends automatically after 500ms pause
+  //
+  // `getAuthToken` is not optional in practice. The Deepgram service authenticates its token grant
+  // with it, so without one it reports itself unconfigured and `fallbackToWebSpeech` silently
+  // downgrades every interview to the browser recognizer. That is what used to happen here, which
+  // meant Nova-3, the interview keyterms, and the Big-O transcript repair were all inert in the
+  // product while their tests passed.
+  const getVoiceAuthToken = useCallback(async () => {
+    if (!firebaseUser) return null
+    return firebaseUser.getIdToken()
+  }, [firebaseUser])
+
   const interviewerVoice = useVoiceInput({
     fallbackToWebSpeech: true,
     autoSendEnabled: true,
     autoSendDelayMs: 500,
+    getAuthToken: getVoiceAuthToken,
     onTranscript: (transcript, _isFinal) => {
       setInterviewerInput(transcript)
     },
@@ -244,6 +256,7 @@ function InterviewPageContent() {
     fallbackToWebSpeech: true,
     autoSendEnabled: true,
     autoSendDelayMs: 500,
+    getAuthToken: getVoiceAuthToken,
     onTranscript: (transcript, _isFinal) => {
       setChatInput(transcript)
     },

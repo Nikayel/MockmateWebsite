@@ -68,7 +68,14 @@ export interface UseDeepgramOptions extends DeepgramConfig {
   autoSendDelayMs?: number // Delay before auto-send for cancel window (default: 500ms)
   // Usage tracking
   sessionId?: string
-  authToken?: string // Firebase auth token for tracking API
+  /**
+   * How to get a Firebase ID token. Required for Deepgram: without it the token grant cannot be
+   * authenticated, the service reports itself unconfigured, and `fallbackToWebSpeech` quietly
+   * downgrades the caller to the browser recognizer.
+   *
+   * A getter rather than a string so the token is always fresh; see `setAuthTokenProvider`.
+   */
+  getAuthToken?: () => Promise<string | null>
 }
 
 export interface UseDeepgramReturn {
@@ -111,9 +118,13 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
   const onUtteranceEndRef = useRef(options.onUtteranceEnd)
   const onTranscriptRef = useRef(options.onTranscript)
   const onMaxDurationRef = useRef(options.onMaxDuration)
+  // Held in a ref like the callbacks above: callers pass an inline arrow, so depending on its
+  // identity would tear down and rebuild the service (and its socket) on every render.
+  const getAuthTokenRef = useRef(options.getAuthToken)
   onUtteranceEndRef.current = options.onUtteranceEnd
   onTranscriptRef.current = options.onTranscript
   onMaxDurationRef.current = options.onMaxDuration
+  getAuthTokenRef.current = options.getAuthToken
 
   // Initialize service on mount
   useEffect(() => {
@@ -131,10 +142,11 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
       keyterms: options.keyterms,
     })
 
-    // Pass auth token so the service can fetch the API key from the server
-    if (options.authToken) {
-      service.setAuthToken(options.authToken)
-    }
+    // Pass the token provider so the service can grant itself a Deepgram access token. Read
+    // through the ref at call time, so the service sees the current getter without being rebuilt.
+    service.setAuthTokenProvider(
+      options.getAuthToken ? () => getAuthTokenRef.current?.() ?? Promise.resolve(null) : null
+    )
 
     serviceRef.current = service
 
@@ -256,33 +268,43 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
     setIsRecording(false)
 
     // Track voice usage if we have a valid recording session
-    if (recordingStartTimeRef.current && options.authToken) {
+    if (recordingStartTimeRef.current && getAuthTokenRef.current) {
       const durationSeconds = (Date.now() - recordingStartTimeRef.current) / 1000
 
       // Only track if recording was at least 1 second
       if (durationSeconds >= 1) {
-        fetch("/api/usage/voice", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${options.authToken}`,
-          },
-          body: JSON.stringify({
-            sessionId: options.sessionId,
-            durationSeconds,
-            model: options.model || DEFAULT_DEEPGRAM_MODEL,
-            transcriptLength: finalTranscript.length,
-          }),
-        }).catch((err) => {
-          // Non-critical - log but don't throw
-          logger.warn("[Voice Usage] Failed to track usage", { error: err })
-        })
+        const sessionId = options.sessionId
+        const model = options.model || DEFAULT_DEEPGRAM_MODEL
+        // Resolve the token at report time rather than capturing one: a long interview can outlive
+        // the token that was current when recording started.
+        void (async () => {
+          try {
+            const authToken = await getAuthTokenRef.current?.()
+            if (!authToken) return
+            await fetch("/api/usage/voice", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${authToken}`,
+              },
+              body: JSON.stringify({
+                sessionId,
+                durationSeconds,
+                model,
+                transcriptLength: finalTranscript.length,
+              }),
+            })
+          } catch (err) {
+            // Non-critical - log but don't throw
+            logger.warn("[Voice Usage] Failed to track usage", { error: err })
+          }
+        })()
       }
     }
 
     recordingStartTimeRef.current = null
     return finalTranscript
-  }, [options.authToken, options.sessionId, options.model])
+  }, [options.sessionId, options.model])
 
   const resetTranscript = useCallback(() => {
     serviceRef.current?.resetTranscript()
