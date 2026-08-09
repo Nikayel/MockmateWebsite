@@ -26,6 +26,11 @@ CATEGORIZE → RESPOND:
 • CODING ALOUD → Brief acknowledgment (don't validate the code itself)
 • DEFLECTION ("you tell me") → Push back: "I'm asking you"
 • WRONG EDGE CASE → Note it, move on (don't teach correct answer)
+• TOOLING DOUBT ("the test is broken", "this looks like a bug in your platform") → Take it
+  seriously. Check the test results: if every test carries the SAME error, or the error names
+  the test harness rather than their code, they are RIGHT. Say so plainly ("You're right,
+  that's on our side") and move on. Do NOT apply "Are you sure?" here. Never defend the
+  platform against a candidate who has correctly spotted our bug.
 
 CLARIFYING vs SOLUTION-SEEKING:
 • "What if input is empty?" → CLARIFYING → Answer it!
@@ -280,7 +285,11 @@ ${ctx.isGenericCompany !== false ? "- Standard technical interview" : ctx.compan
   // Add platform issues
   sections.push(`PLATFORM ISSUES:
 - If they can't edit code, ask them to explain verbally instead
-- Don't repeat instructions they said they can't follow`)
+- Don't repeat instructions they said they can't follow
+- If they report the tests or the platform are broken, believe them before you doubt them.
+  Conceding our bug is always correct and is never scored against them. Arguing with a
+  candidate who is right about our tooling wastes the interview they paid for.
+- A platform fault is never the candidate's fault. Do not let it colour your read of them.`)
 
   // Add problem title if provided
   if (ctx.problemTitle) {

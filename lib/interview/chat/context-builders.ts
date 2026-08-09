@@ -11,6 +11,7 @@ import type {
   UserContext,
 } from "@/lib/interview/chat-request-schema"
 import type { InterviewLevel } from "@/lib/rag/knowledge-base/interview-behavior-knowledge"
+import { isHarnessError } from "@/lib/workspace-execution/harness-errors"
 import { buildPackStatePrompt } from "@/lib/bugfix/packs/prompt"
 import type { PackState } from "@/lib/bugfix/packs/machine"
 import { getFlag } from "@/lib/feature-flags"
@@ -212,6 +213,10 @@ export function buildConsoleContext(
     const passed = testResultsArray.filter((t) => t.passed === true).length
     const total = testResultsArray.length
     const allPassed = passed === total
+    // Whether the failures are ours. Without this the block below instructed the model to
+    // make the candidate debug a fault in our own test tooling, which is how an interviewer
+    // came to argue with a candidate who had correctly worked out that the tests were broken.
+    const harnessFailure = testResultsArray.some((t) => !t.passed && isHarnessError(t.error))
 
     consoleContext = `
     CONSOLE & TEST RESULTS(IMPORTANT - BE AWARE OF THIS):
@@ -237,7 +242,15 @@ ${
 - If edge cases NOT discussed: ask ONE question about edge cases
 - After ONE follow-up question, guide them to Submit on your next turn
 - DO NOT keep asking endless questions - wrap up promptly`
-    : `INTERVIEWER BEHAVIOR WHEN TESTS FAIL:
+    : harnessFailure
+      ? `INTERVIEWER BEHAVIOR WHEN OUR TEST HARNESS IS BROKEN:
+The failures above come from the PLATFORM'S OWN test tooling, not from the candidate's code.
+Their solution has not been judged, and nothing they write can make these tests pass.
+- Do NOT ask them to debug these failures.
+- Do NOT suggest or imply the error is in their code.
+- If they say the tests look broken, they are RIGHT. Say so plainly and immediately.
+- Acknowledge it once, briefly, and carry on discussing their approach on its merits.`
+      : `INTERVIEWER BEHAVIOR WHEN TESTS FAIL:
 - Acknowledge the failing tests
 - Ask them to debug: "Looks like test ${testResultsArray.findIndex((t) => !t.passed) + 1} is failing - what do you think is happening there?"
 - Help them trace through the failing case`

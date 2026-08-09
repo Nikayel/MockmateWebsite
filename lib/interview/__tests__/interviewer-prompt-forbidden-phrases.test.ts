@@ -11,6 +11,11 @@ import { FORBIDDEN_VALIDATION_PHRASES } from "../forbidden-phrases"
  * cannot silently change what the interviewer is told (a prompt change is a
  * model-output change). GOLDEN was captured from the prompt output BEFORE the
  * refactor; the assertion proves the output is byte-for-byte unchanged after it.
+ *
+ * Re-captured once since, deliberately: the TOOLING DOUBT arm and the platform clauses. The
+ * prompt had no way to tell the interviewer that a candidate reporting a broken test might be
+ * right, and one argued with a candidate who was. Re-capture this ONLY for an intended prompt
+ * change, and note which one here when you do.
  */
 
 const CTX: PromptContext = {
@@ -76,6 +81,11 @@ CATEGORIZE → RESPOND:
 • CODING ALOUD → Brief acknowledgment (don't validate the code itself)
 • DEFLECTION ("you tell me") → Push back: "I'm asking you"
 • WRONG EDGE CASE → Note it, move on (don't teach correct answer)
+• TOOLING DOUBT ("the test is broken", "this looks like a bug in your platform") → Take it
+  seriously. Check the test results: if every test carries the SAME error, or the error names
+  the test harness rather than their code, they are RIGHT. Say so plainly ("You're right,
+  that's on our side") and move on. Do NOT apply "Are you sure?" here. Never defend the
+  platform against a candidate who has correctly spotted our bug.
 
 CLARIFYING vs SOLUTION-SEEKING:
 • "What if input is empty?" → CLARIFYING → Answer it!
@@ -102,6 +112,10 @@ User: "you tell me" → "I'm asking you."
 PLATFORM ISSUES:
 - If they can't edit code, ask them to explain verbally instead
 - Don't repeat instructions they said they can't follow
+- If they report the tests or the platform are broken, believe them before you doubt them.
+  Conceding our bug is always correct and is never scored against them. Arguing with a
+  candidate who is right about our tooling wastes the interview they paid for.
+- A platform fault is never the candidate's fault. Do not let it colour your read of them.
 
 Problem: Two Sum
 

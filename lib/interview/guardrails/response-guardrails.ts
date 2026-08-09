@@ -29,6 +29,34 @@ const VALIDATION_PHRASE_PATTERNS: RegExp[] = [
   /\bSpot on\b/i,
 ]
 
+/**
+ * Marks a response as conceding a fault on OUR side rather than validating the candidate's
+ * answer.
+ *
+ * Without this, agreement was un-sayable. A candidate correctly worked out that a scenario's
+ * tests were broken (our sandbox was missing assert.deepEqual, so every test threw), and the
+ * natural replies — "Good catch, you're right" or "That's right, that's on our side" — trip
+ * the validation-phrase gate, which is severity critical and forces regeneration with
+ * "YOUR PREVIOUS RESPONSE VIOLATED INTERVIEW RULES". The model's only compliant move was to
+ * push back, so it asked the candidate what made them say that.
+ *
+ * Kept narrow: every pattern names the platform or explicitly disclaims the candidate's code,
+ * so it cannot be reached by praising an answer.
+ */
+const PLATFORM_CONCESSION_PATTERNS: RegExp[] = [
+  /\b(?:our|the)\s+(?:test\s+)?(?:harness|tooling|test\s+runner)\b/i,
+  /\bon our (?:side|end)\b/i,
+  /\bnot (?:a bug in )?your code\b/i,
+  /\b(?:our|a platform|the platform)\s+(?:bug|fault|issue|problem)\b/i,
+  /\bthe tests (?:are|were|look) broken\b/i,
+  /\bthat's on us\b/i,
+]
+
+/** True when the response is owning a platform fault, not confirming an answer. */
+export function concedesPlatformFault(response: string): boolean {
+  return PLATFORM_CONCESSION_PATTERNS.some((pattern) => pattern.test(response))
+}
+
 export interface ResponseGuardrail {
   name: string
   severity: "critical" | "warning"
@@ -183,6 +211,11 @@ export const RESPONSE_GUARDRAILS: ResponseGuardrail[] = [
     name: "no-validation-phrases",
     severity: "critical",
     check: (ctx) => {
+      // Conceding our own bug is not validating their answer. The neutrality rule exists so
+      // candidates cannot read their score off the interviewer's tone; it was never meant to
+      // stop us admitting the tests are broken.
+      if (concedesPlatformFault(ctx.response)) return null
+
       for (const pattern of VALIDATION_PHRASE_PATTERNS) {
         const match = ctx.response.match(pattern)
         if (match) {
