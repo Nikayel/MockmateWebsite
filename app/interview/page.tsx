@@ -8,7 +8,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { useVoiceInput } from "@/lib/voice"
 import { getDbLazy } from "@/lib/firebase-lazy"
-import { collection, getDocs, query, where } from "firebase/firestore"
+import { collection, getDocs, query, where, orderBy, limit } from "firebase/firestore"
 import { useAuth } from "@/lib/auth-context"
 import type { Profile } from "@/lib/types"
 import { getUserProfile } from "@/lib/firestore-helpers"
@@ -653,9 +653,14 @@ function InterviewPageContent() {
       try {
         // Lazy load Firestore
         const db = await getDbLazy()
+        // This only builds the "completed" badge set for the scenario browser,
+        // so the newest 300 sessions are plenty; the old unbounded query read
+        // the user's entire history on every /interview load.
         const sessionsQuery = query(
           collection(db, "interview_sessions"),
-          where("user_id", "==", firebaseUser.uid)
+          where("user_id", "==", firebaseUser.uid),
+          orderBy("started_at", "desc"),
+          limit(300)
         )
         const sessionsSnap = await getDocs(sessionsQuery)
 

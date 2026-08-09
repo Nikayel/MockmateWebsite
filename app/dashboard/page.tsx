@@ -15,7 +15,7 @@ import { useAuth } from "@/lib/auth-context"
 import { getUserProfile, checkUsageLimit } from "@/lib/firestore-helpers"
 import { Profile, InterviewSession } from "@/lib/types"
 import { getDbLazy } from "@/lib/firebase-lazy"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore"
 import {
   Crown,
   BarChart3,
@@ -130,9 +130,14 @@ export default function DashboardPage() {
           (async () => {
             try {
               const db = await getDbLazy()
+              // The dashboard only shows the 5 most recent sessions and the 5
+              // most recent scored ones; 25 newest covers both without reading
+              // the user's entire history (which grows forever).
               const sessionsQuery = query(
                 collection(db, "interview_sessions"),
-                where("user_id", "==", firebaseUser.uid)
+                where("user_id", "==", firebaseUser.uid),
+                orderBy("started_at", "desc"),
+                limit(25)
               )
               return await getDocs(sessionsQuery)
             } catch {

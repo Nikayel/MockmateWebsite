@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { useAuth } from "@/lib/auth-context"
 import { getDbLazy } from "@/lib/firebase-lazy"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore"
 import {
   Clock,
   Calendar,
@@ -55,9 +55,13 @@ export default function SessionsPage() {
 
         try {
           const db = await getDbLazy()
+          // Newest 100, ordered by Firestore. The old unbounded query read the
+          // user's entire history on every visit and sorted it in JS.
           const sessionsQuery = query(
             collection(db, "interview_sessions"),
-            where("user_id", "==", firebaseUser.uid)
+            where("user_id", "==", firebaseUser.uid),
+            orderBy("started_at", "desc"),
+            limit(100)
           )
           const sessionsSnap = await getDocs(sessionsQuery)
 
@@ -69,12 +73,6 @@ export default function SessionsPage() {
                   ...doc.data(),
                 }) as InterviewSession
             )
-
-            sessionsData.sort((a, b) => {
-              const dateA = new Date(a.started_at).getTime()
-              const dateB = new Date(b.started_at).getTime()
-              return dateB - dateA
-            })
 
             setSessions(sessionsData)
           }

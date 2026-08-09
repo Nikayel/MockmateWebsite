@@ -64,10 +64,16 @@ async function getStatsFromInterviewSessions(userId: string): Promise<{
   lastSessionAt?: string
 } | null> {
   try {
+    // Bounded to the newest 500 completed sessions (user_id + completed_at is
+    // an existing composite index). This is a fallback aggregate for when
+    // user_stats is missing; reading a power user's unbounded full history to
+    // rebuild it on every dashboard load does not scale.
     const snapshot = await adminDb
       .collection("interview_sessions")
       .where("user_id", "==", userId)
       .where("completed_at", "!=", null)
+      .orderBy("completed_at", "desc")
+      .limit(500)
       .get()
 
     if (snapshot.empty) return null
