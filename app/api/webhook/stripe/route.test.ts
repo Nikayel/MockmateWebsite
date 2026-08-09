@@ -176,11 +176,11 @@ function webhookRequest() {
   } as never
 }
 
-function stripeEvent(type: string, object: DocData, id = "evt_1") {
+function stripeEvent(type: string, object: DocData, id = "evt_1", createdAgoSeconds = 0) {
   return {
     id,
     type,
-    created: Math.floor(Date.now() / 1000),
+    created: Math.floor(Date.now() / 1000) - createdAgoSeconds,
     request: { idempotency_key: null },
     data: { object },
   }
@@ -188,6 +188,48 @@ function stripeEvent(type: string, object: DocData, id = "evt_1") {
 
 afterEach(() => {
   vi.unstubAllEnvs()
+})
+
+/**
+ * Stripe retries a failing webhook with exponential backoff for up to three days, and every retry
+ * carries the ORIGINAL `event.created`. A route that rejects old `created` values therefore accepts
+ * the first delivery and refuses every recovery attempt, turning one transient Firestore blip into
+ * a customer who paid and never received Pro.
+ *
+ * The old tests could not have caught this: `stripeEvent` hardcoded `created` to now, so no test
+ * ever presented a retry. These pin the retry window that actually matters.
+ */
+describe("stripe webhook retries", () => {
+  const RETRY_AGES_SECONDS = [
+    ["10 minutes", 10 * 60],
+    ["1 hour", 60 * 60],
+    ["1 day", 24 * 60 * 60],
+    ["3 days, Stripe's last attempt", 3 * 24 * 60 * 60],
+  ] as const
+
+  it.each(RETRY_AGES_SECONDS)("processes a retry delivered %s after the event", async (_l, age) => {
+    const { POST } = await importRoute()
+    stripeMock.webhooks.constructEvent.mockReturnValue(
+      stripeEvent("customer.subscription.created", { id: "sub_1", customer: "cus_1" }, "evt_1", age)
+    )
+
+    const res = (await POST(webhookRequest())) as unknown as { data: DocData }
+
+    expect(res.data).toEqual({ received: true })
+    expect(store.get("webhook_events/evt_1")?.status).toBe("completed")
+  })
+
+  it("leaves replay protection to constructEvent, which sees a per-delivery timestamp", async () => {
+    const { POST } = await importRoute()
+    stripeMock.webhooks.constructEvent.mockImplementation(() => {
+      throw new Error("Timestamp outside the tolerance zone")
+    })
+
+    const res = (await POST(webhookRequest())) as unknown as { status: number }
+
+    expect(res.status).toBe(400)
+    expect(store.get("webhook_events/evt_1")).toBeUndefined()
+  })
 })
 
 describe("stripe webhook idempotency", () => {

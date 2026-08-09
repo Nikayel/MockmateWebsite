@@ -292,9 +292,14 @@ export const UI = {
 // =============================================================================
 
 export const WEBHOOK = {
-  /** Maximum age of a webhook event in seconds before rejecting (replay protection) */
-  MAX_EVENT_AGE_SECONDS: 300,
-  /** TTL for processed event deduplication records in days */
+  /**
+   * TTL for processed event deduplication records in days.
+   *
+   * This is the only webhook guard that belongs here. A MAX_EVENT_AGE_SECONDS used to sit
+   * alongside it, rejecting events whose `created` was over five minutes old; that broke every
+   * Stripe retry, since retries carry the original timestamp. Replay protection is enforced by
+   * `stripe.webhooks.constructEvent`, which checks the per-delivery signature timestamp instead.
+   */
   IDEMPOTENCY_TTL_DAYS: 30,
 } as const
 

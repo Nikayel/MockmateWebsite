@@ -343,20 +343,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
   }
 
-  // SECURITY: Replay attack protection - reject events older than configured threshold
-  // Stripe events have a 'created' timestamp (Unix seconds)
-  const eventAge = Date.now() / 1000 - event.created
-
-  if (eventAge > WEBHOOK.MAX_EVENT_AGE_SECONDS) {
-    paymentLogger.warn("Webhook event too old, possible replay attack", {
-      eventId: event.id,
-      eventType: event.type,
-      eventCreated: event.created,
-      eventAgeSeconds: Math.round(eventAge),
-      maxAgeSeconds: WEBHOOK.MAX_EVENT_AGE_SECONDS,
-    })
-    return NextResponse.json({ error: "Event too old" }, { status: 400 })
-  }
+  // Replay protection lives in `constructEvent` above, not here.
+  //
+  // There used to be a second check that rejected any event whose `event.created` was more than
+  // five minutes old. It read like defence in depth and was the opposite. `event.created` is when
+  // the event HAPPENED, not when it was delivered, and Stripe retries a failing webhook with
+  // exponential backoff for up to three days carrying that same original timestamp. So the first
+  // delivery got five minutes to succeed and every retry afterwards was refused with a 400,
+  // forever. One Firestore blip or one cold start during a deploy was enough to turn a recoverable
+  // failure into a customer who paid and never received Pro.
+  //
+  // It bought nothing, either. `stripe.webhooks.constructEvent` already enforces a five minute
+  // tolerance on the `t=` value inside the Stripe-Signature header, and that value IS re-signed on
+  // every retry, so a captured-and-replayed request still fails there. The timestamp that is fresh
+  // per delivery is the one worth checking, and Stripe checks it.
+  //
+  // Idempotency below is what makes a duplicate delivery harmless.
 
   // Check for idempotency - prevent processing the same event twice
   // Use event.id + idempotency_key if available for more robust deduplication
