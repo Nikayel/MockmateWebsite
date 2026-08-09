@@ -368,10 +368,14 @@ export function SystemDesignLessonPlayer({
                               </div>
                             </div>
                           )}
+                          {/* The drill bank on the course page, not `/interview`. This promised a
+                              system design mock and pointed at a browse surface that has never had
+                              one: the design scenarios were filed under a Debugging tab there, and
+                              now that `/interview` is DSA or Debugging it has none at all. */}
                           {nextStep.kind === "finished" && (
                             <Button asChild variant="outline" className="gap-2">
-                              <Link href="/interview">
-                                <ArrowLeft className="h-4 w-4" />
+                              <Link href={`${trackPath("system-design")}#drills`}>
+                                <ArrowRight className="h-4 w-4" />
                                 You finished the path. Practice a system design mock
                               </Link>
                             </Button>
