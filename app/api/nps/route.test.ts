@@ -27,7 +27,7 @@ vi.mock("@/lib/nps", () => ({
 vi.mock("@/lib/firebase-admin", () => ({
   adminDb: {
     collection: (name: string) =>
-      name === "users"
+      name === "profiles"
         ? {
             doc: () => ({
               get: () => Promise.resolve({ data: () => ({ subscription_tier: "pro" }) }),
@@ -37,8 +37,7 @@ vi.mock("@/lib/firebase-admin", () => ({
             where: () => ({
               where: () => ({
                 count: () => ({
-                  get: () =>
-                    Promise.resolve({ data: () => ({ count: mocks.sessionCount.value }) }),
+                  get: () => Promise.resolve({ data: () => ({ count: mocks.sessionCount.value }) }),
                 }),
               }),
             }),
