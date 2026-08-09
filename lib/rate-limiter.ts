@@ -21,22 +21,33 @@ import { AI_BUDGET_CAPS } from "./pricing"
 // Rate limit configuration by tier. budgetPerCycle comes from the canonical
 // AI_BUDGET_CAPS table in lib/pricing.ts rather than repeating the dollar values,
 // which previously appeared in four files under four different names.
+//
+// tokensPerMinute is sized so a normal interview never reaches it. It used to be 5,000 on
+// the free tier, and a single measured mid-interview turn is about 4,600: the system prompt
+// is ~10.5k characters before the RAG block, and every turn re-sends the whole transcript,
+// the candidate's code and the workspace files. So the first message was allowed, the second
+// was refused, and the interviewer went dead mid-conversation for a minute.
+//
+// These are burst guards, not the cost control. Spend is bounded by budgetPerCycle above and
+// by the global daily ceiling; call rate is bounded by requestsPerMinute. Each tier is now
+// requestsPerMinute x ~6,000 tokens, which makes the request cap the binding constraint and
+// leaves this to catch only genuinely abnormal payloads.
 export const RATE_LIMITS = {
   free: {
     requestsPerMinute: 10,
-    tokensPerMinute: 5000,
+    tokensPerMinute: 60000,
     maxConcurrentRequests: 2,
     budgetPerCycle: AI_BUDGET_CAPS.free,
   },
   pro: {
     requestsPerMinute: 30,
-    tokensPerMinute: 20000,
+    tokensPerMinute: 180000,
     maxConcurrentRequests: 5,
     budgetPerCycle: AI_BUDGET_CAPS.pro,
   },
   enterprise: {
     requestsPerMinute: 100,
-    tokensPerMinute: 100000,
+    tokensPerMinute: 600000,
     maxConcurrentRequests: 20,
     budgetPerCycle: AI_BUDGET_CAPS.enterprise,
   },

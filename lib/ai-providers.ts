@@ -837,8 +837,20 @@ export async function generateAIResponse(
     }
   }
 
-  // 3. Record request start for rate limiting
-  if (userId) {
+  // 3. Record request start for rate limiting.
+  //
+  // Skipped when the caller already metered this request. `enforceMeteredAiRequest` opens
+  // the window entry and the concurrency slot itself and ends them in the route, so
+  // recording again here counted one request twice: its estimate landed in the sliding
+  // window on top of the route's, and it held two concurrency slots at once. A free user
+  // gets two, so a single chat request sat at the limit for its whole duration and running
+  // tests while the interviewer was replying was refused by construction.
+  //
+  // `updateTokenCount` below stays unconditional either way. It overwrites the most recent
+  // window entry with the measured total, which is the route's entry when we skip here, so
+  // the window ends up holding real usage rather than an estimate.
+  const shouldTrackConcurrency = Boolean(userId) && !skipRateLimit
+  if (userId && shouldTrackConcurrency) {
     recordRequestStart(userId, 500) // Estimate 500 tokens
   }
 
@@ -873,7 +885,7 @@ export async function generateAIResponse(
   providerOrder = enabledProviders
 
   if (providerOrder.length === 0) {
-    if (userId) recordRequestEnd(userId)
+    if (userId && shouldTrackConcurrency) recordRequestEnd(userId)
     const missingKeys = disabledProviders
       .map((p) => `${ENV_KEY_FOR_PROVIDER[p]} (for ${p})`)
       .join(", ")
@@ -963,7 +975,7 @@ export async function generateAIResponse(
         // 4. Track usage
         if (userId) {
           updateTokenCount(userId, totalTokens)
-          recordRequestEnd(userId)
+          if (userId && shouldTrackConcurrency) recordRequestEnd(userId)
 
           // Fire-and-forget usage tracking - errors are non-critical
           trackUsageEvent({
@@ -1076,7 +1088,7 @@ export async function generateAIResponse(
   }
 
   // All providers failed
-  if (userId) recordRequestEnd(userId)
+  if (userId && shouldTrackConcurrency) recordRequestEnd(userId)
 
   // Build helpful error message
   const isQuotaError =
