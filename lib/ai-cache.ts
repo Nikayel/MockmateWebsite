@@ -1,38 +1,29 @@
 /**
- * AI Response Cache
+ * AI Response Cache (in-memory only)
  *
- * Caches AI responses to reduce API costs and improve latency.
- * Uses a combination of in-memory cache (fast) and Firestore (persistent).
+ * Dedupes identical AI requests on a warm serverless instance: double-clicked
+ * feedback generation, repeated hint requests against unchanged code, retried
+ * calls. Exact-match on a hash of the full request.
  *
- * Cache strategy:
- * - Semantic similarity: Hash the core request elements
- * - TTL: 24 hours for chat, 7 days for feedback
- * - Max entries: 1000 in-memory, unlimited in Firestore
+ * This module used to mirror every entry into a Firestore `ai_cache` collection
+ * as a "persistent" tier. Measured over its whole life (2,517 entries), only 41
+ * entries were ever hit — 81 hits total — because an exact hash over prompt +
+ * full history almost never recurs across instances, while 90% of the stored
+ * entries were for a chat type the code had already stopped caching. The
+ * Firestore tier bought pennies of savings for a collection, a cleanup job,
+ * and a read on many misses, so it was removed. The durable cost lever for AI
+ * spend is provider-side prompt caching (Gemini implicit caching; see the
+ * cachedContentTokenCount logging in ai-providers.ts), not response caching.
  */
 
 import crypto from "crypto"
-import { adminDb } from "./firebase-admin"
-import { FieldValue, Timestamp } from "firebase-admin/firestore"
 
 // Cache configuration
 const CACHE_CONFIG = {
-  // In-memory cache limits
   maxMemoryEntries: 1000,
-  memoryTTLMs: 30 * 60 * 1000, // 30 minutes in memory
-
-  // Firestore cache TTLs (in seconds)
-  ttlByType: {
-    chat: 24 * 60 * 60, // 24 hours
-    feedback: 7 * 24 * 60 * 60, // 7 days
-    hint: 7 * 24 * 60 * 60, // 7 days
-    system: 30 * 24 * 60 * 60, // 30 days for system prompts
-  } as Record<string, number>,
-
-  // Default TTL
-  defaultTTLSeconds: 24 * 60 * 60,
+  memoryTTLMs: 30 * 60 * 1000, // 30 minutes
 }
 
-// In-memory cache (LRU-style)
 interface MemoryCacheEntry {
   response: string
   createdAt: number
@@ -40,16 +31,6 @@ interface MemoryCacheEntry {
 }
 
 const memoryCache = new Map<string, MemoryCacheEntry>()
-
-// Negative cache: track keys that don't exist to avoid repeated Firestore reads
-// This saves Firestore costs by not querying for keys we recently checked
-interface NegativeCacheEntry {
-  checkedAt: number
-}
-
-const negativeCache = new Map<string, NegativeCacheEntry>()
-const NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes - don't re-check Firestore for misses
-const MAX_NEGATIVE_CACHE_SIZE = 5000 // Limit memory usage
 
 /**
  * Generate a cache key from request parameters
@@ -89,148 +70,43 @@ function hashString(str: string): string {
 }
 
 /**
- * Get cached response (memory first, then Firestore)
- * Uses negative caching to avoid repeated Firestore reads for missing keys
+ * Get cached response. Async signature kept so call sites are agnostic to the
+ * storage tier.
  */
 export async function getCachedResponse(cacheKey: string): Promise<{
   hit: boolean
   response?: string
-  source?: "memory" | "firestore"
+  source?: "memory"
 }> {
-  // Check memory cache first
   const memoryEntry = memoryCache.get(cacheKey)
-  if (memoryEntry) {
-    const age = Date.now() - memoryEntry.createdAt
-    if (age < CACHE_CONFIG.memoryTTLMs) {
-      memoryEntry.hitCount++
-      return { hit: true, response: memoryEntry.response, source: "memory" }
-    } else {
-      // Expired, remove from memory
-      memoryCache.delete(cacheKey)
-    }
+  if (!memoryEntry) return { hit: false }
+
+  const age = Date.now() - memoryEntry.createdAt
+  if (age >= CACHE_CONFIG.memoryTTLMs) {
+    memoryCache.delete(cacheKey)
+    return { hit: false }
   }
 
-  // Check negative cache - if we recently checked and it wasn't there, skip Firestore
-  const negativeEntry = negativeCache.get(cacheKey)
-  if (negativeEntry) {
-    const age = Date.now() - negativeEntry.checkedAt
-    if (age < NEGATIVE_CACHE_TTL_MS) {
-      // Recently checked and it wasn't there - skip Firestore read (saves cost!)
-      return { hit: false }
-    } else {
-      // Expired negative cache entry
-      negativeCache.delete(cacheKey)
-    }
-  }
-
-  // Check Firestore cache
-  try {
-    const cacheDoc = await adminDb.collection("ai_cache").doc(cacheKey).get()
-
-    if (cacheDoc.exists) {
-      const data = cacheDoc.data()!
-      const expiresAt = data.expiresAt?.toDate()
-
-      if (expiresAt && expiresAt > new Date()) {
-        // Valid cache entry - also store in memory for faster subsequent access
-        const response = data.response as string
-        memoryCache.set(cacheKey, {
-          response,
-          createdAt: Date.now(),
-          hitCount: 1,
-        })
-        pruneMemoryCache()
-
-        // Remove from negative cache if it was there
-        negativeCache.delete(cacheKey)
-
-        // Update hit count in Firestore (fire and forget)
-        adminDb
-          .collection("ai_cache")
-          .doc(cacheKey)
-          .update({
-            hitCount: FieldValue.increment(1),
-            lastAccessedAt: FieldValue.serverTimestamp(),
-          })
-          .catch(() => {})
-
-        return { hit: true, response, source: "firestore" }
-      } else {
-        // Expired, delete from Firestore (fire and forget)
-        adminDb
-          .collection("ai_cache")
-          .doc(cacheKey)
-          .delete()
-          .catch(() => {})
-      }
-    }
-
-    // Cache miss - add to negative cache to avoid re-checking Firestore
-    addToNegativeCache(cacheKey)
-  } catch (error) {
-    console.error("[AI Cache] Firestore read error:", error)
-  }
-
-  return { hit: false }
+  memoryEntry.hitCount++
+  return { hit: true, response: memoryEntry.response, source: "memory" }
 }
 
 /**
- * Add a key to the negative cache (tracks cache misses)
- */
-function addToNegativeCache(cacheKey: string): void {
-  // Prune if over limit
-  if (negativeCache.size >= MAX_NEGATIVE_CACHE_SIZE) {
-    // Remove oldest 500 entries
-    const entries = Array.from(negativeCache.entries()).sort(
-      (a, b) => a[1].checkedAt - b[1].checkedAt
-    )
-
-    for (let i = 0; i < 500 && i < entries.length; i++) {
-      negativeCache.delete(entries[i][0])
-    }
-  }
-
-  negativeCache.set(cacheKey, { checkedAt: Date.now() })
-}
-
-/**
- * Store response in cache
+ * Store response in cache. The `type` parameter shaped per-type Firestore TTLs
+ * in the old two-tier design; the memory tier uses one TTL, but the parameter
+ * stays so call sites keep declaring what they cache.
  */
 export async function setCachedResponse(
   cacheKey: string,
   response: string,
-  type: string = "chat"
+  _type: string = "chat"
 ): Promise<void> {
-  const ttlSeconds = CACHE_CONFIG.ttlByType[type] || CACHE_CONFIG.defaultTTLSeconds
-  const expiresAt = new Date(Date.now() + ttlSeconds * 1000)
-
-  // Remove from negative cache since we're storing a value now
-  negativeCache.delete(cacheKey)
-
-  // Store in memory
   memoryCache.set(cacheKey, {
     response,
     createdAt: Date.now(),
     hitCount: 0,
   })
   pruneMemoryCache()
-
-  // Store in Firestore (fire and forget)
-  try {
-    await adminDb
-      .collection("ai_cache")
-      .doc(cacheKey)
-      .set({
-        response,
-        type,
-        createdAt: FieldValue.serverTimestamp(),
-        expiresAt: Timestamp.fromDate(expiresAt),
-        hitCount: 0,
-        lastAccessedAt: FieldValue.serverTimestamp(),
-      })
-  } catch (error) {
-    console.error("[AI Cache] Firestore write error:", error)
-  }
 }
 
 /**
@@ -256,8 +132,6 @@ function pruneMemoryCache(): void {
 export function getCacheStats(): {
   memoryCacheSize: number
   memoryHits: number
-  negativeCacheSize: number
-  negativeCacheSavings: string
 } {
   let totalHits = 0
   for (const entry of memoryCache.values()) {
@@ -267,35 +141,16 @@ export function getCacheStats(): {
   return {
     memoryCacheSize: memoryCache.size,
     memoryHits: totalHits,
-    negativeCacheSize: negativeCache.size,
-    // Each entry in negative cache = 1 avoided Firestore read
-    negativeCacheSavings: `~${negativeCache.size} Firestore reads avoided`,
   }
 }
 
 /**
- * Clear all caches (for testing or maintenance)
+ * Clear the cache (admin action / tests). Returns the number of entries
+ * dropped. Only clears THIS instance's memory — other warm instances keep
+ * theirs until their entries expire (30 min max).
  */
-export async function clearCache(options?: { memoryOnly?: boolean }): Promise<void> {
+export async function clearCache(): Promise<number> {
+  const cleared = memoryCache.size
   memoryCache.clear()
-  negativeCache.clear()
-
-  if (!options?.memoryOnly) {
-    // Delete expired Firestore entries (batch delete)
-    try {
-      const expiredDocs = await adminDb
-        .collection("ai_cache")
-        .where("expiresAt", "<", Timestamp.now())
-        .limit(500)
-        .get()
-
-      const batch = adminDb.batch()
-      expiredDocs.docs.forEach((doc) => batch.delete(doc.ref))
-      await batch.commit()
-
-      console.log(`[AI Cache] Cleaned ${expiredDocs.size} expired entries`)
-    } catch (error) {
-      console.error("[AI Cache] Failed to clean expired entries:", error)
-    }
-  }
+  return cleared
 }

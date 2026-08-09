@@ -27,5 +27,4 @@ Current jobs (see each route header for details):
 | `subscription-expiry`            | daily                                |
 | `expire-referral-rewards`        | daily                                |
 | `guest-session-cleanup`          | daily                                |
-| `ai-cache-cleanup`               | daily (needs a cron-job.org entry)   |
 | `email-notifications`            | see route header                     |
