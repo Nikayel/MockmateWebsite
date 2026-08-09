@@ -5,6 +5,7 @@ import {
   type ProactiveSkipResponse,
 } from "./response-flow"
 import type { TestResultItem } from "@/lib/interview/chat-request-schema"
+import { isHarnessError } from "@/lib/workspace-execution/harness-errors"
 
 type ChatPromptEarlyResponse = ProactiveSkipResponse | EndedConversationResponse
 
@@ -157,8 +158,16 @@ Pick ONE natural response (or create your own). Keep it under 20 words. Sound li
   }
 
   if (isWrapUp && role === "interviewer") {
-    const passedTests = testResults?.filter((t) => t.passed).length || 0
-    const totalTests = testResults?.length || 0
+    // Tests that broke inside our own harness never judged the candidate, so they are excluded
+    // from the tally rather than counted as failures. Without this the debrief recomputed the
+    // pass rate from raw results and told the candidate "STATUS: DID NOT PASS" and "in a real
+    // interview, this wouldn't be a pass" for a fault that was entirely ours. The harness
+    // branch added to buildConsoleContext only reaches the SYSTEM prompt; this text is in the
+    // user message and contradicted it.
+    const scoreableTests = (testResults ?? []).filter((t) => !isHarnessError(t.error))
+    const harnessBrokeTests = (testResults?.length ?? 0) - scoreableTests.length
+    const passedTests = scoreableTests.filter((t) => t.passed).length
+    const totalTests = scoreableTests.length
     const passRate = totalTests > 0 ? (passedTests / totalTests) * 100 : 0
     const allTestsPassed = passedTests === totalTests && totalTests > 0
 
@@ -169,7 +178,17 @@ FINAL STATE:
 ${currentCodeContext}
 
 TEST RESULTS: ${passedTests}/${totalTests} tests passed (${Math.round(passRate)}%)
-${allTestsPassed ? "STATUS: PASSED" : "STATUS: DID NOT PASS"}
+${
+  totalTests === 0
+    ? "STATUS: NOT ASSESSED - our test harness failed, so their code was never judged.\nDo NOT say they did not pass, and do NOT attribute this to them. Acknowledge the fault is ours."
+    : allTestsPassed
+      ? "STATUS: PASSED"
+      : "STATUS: DID NOT PASS"
+}${
+        harnessBrokeTests > 0 && totalTests > 0
+          ? `\nNOTE: ${harnessBrokeTests} further test(s) failed inside OUR harness and are excluded above. They are not the candidate's fault; do not mention them as failures.`
+          : ""
+      }
 
 ${partnerMessagesCount ? `AI Partner Usage: ${partnerMessagesCount} interactions` : "No AI Partner usage"}
 Time spent: ${elapsedMinutes || "unknown"} minutes

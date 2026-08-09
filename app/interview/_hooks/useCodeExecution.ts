@@ -15,7 +15,7 @@ import type {
   TestSummary,
   WorkspaceContextFile,
 } from "../_types"
-import { HARNESS_ERROR_NOTICE } from "@/lib/workspace-execution/harness-errors"
+import { HARNESS_ERROR_NOTICE, isHarnessError } from "@/lib/workspace-execution/harness-errors"
 import {
   announceRunFailure,
   applyExecutionApiError,
@@ -206,9 +206,16 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
         // Check for syntax/compilation errors vs service unavailability
         const errorResults = data.results.filter((r: TestResult) => r.error)
         const allFailed = data.summary.passRate === 0
+        // A harness fault is worth reporting even when it only broke SOME tests. The branch
+        // below used to sit entirely behind `allFailed`, so a scenario mixing assert.equal
+        // (which worked) with assert.deepEqual (which did not) produced a partial pass rate,
+        // skipped classification altogether, and was scored against the candidate.
+        const harnessError = errorResults.find((r: TestResult) => isHarnessError(r.error))?.error
 
-        if (allFailed && errorResults.length > 0) {
-          const firstError = errorResults[0].error
+        if (harnessError || (allFailed && errorResults.length > 0)) {
+          // Prefer the harness fault over errorResults[0]: a run mixing one genuine failure
+          // with several of ours was being blamed entirely on the candidate.
+          const firstError = harnessError ?? errorResults[0].error
           const cause = classifyFailedRun(firstError)
 
           if (cause === "service-down") {
@@ -357,9 +364,16 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
         // Check for syntax/compilation errors vs service unavailability
         const errorResults = data.results.filter((r: TestResult) => r.error)
         const allFailed = data.summary.passRate === 0
+        // A harness fault is worth reporting even when it only broke SOME tests. The branch
+        // below used to sit entirely behind `allFailed`, so a scenario mixing assert.equal
+        // (which worked) with assert.deepEqual (which did not) produced a partial pass rate,
+        // skipped classification altogether, and was scored against the candidate.
+        const harnessError = errorResults.find((r: TestResult) => isHarnessError(r.error))?.error
 
-        if (allFailed && errorResults.length > 0) {
-          const firstError = errorResults[0].error
+        if (harnessError || (allFailed && errorResults.length > 0)) {
+          // Prefer the harness fault over errorResults[0]: a run mixing one genuine failure
+          // with several of ours was being blamed entirely on the candidate.
+          const firstError = harnessError ?? errorResults[0].error
           const cause = classifyFailedRun(firstError)
 
           if (cause === "service-down") {

@@ -1,4 +1,5 @@
 import { useRef } from "react"
+import { isHarnessError } from "@/lib/workspace-execution/harness-errors"
 import type { Dispatch, SetStateAction } from "react"
 import { toast } from "sonner"
 import type { User } from "@/lib/types"
@@ -191,8 +192,29 @@ export function useInterviewFeedback(
         skillsDemonstrated: opts.selectedScenario?.tags || [],
       }
 
-      const feedbackText = `Completed ${opts.selectedScenario?.title} with ${opts.testSummary.passed}/${opts.testSummary.total} tests passing`
-      let calculatedPerformanceScore = opts.testSummary.passRate
+      // Tests that failed inside our own harness never judged this candidate, so they are
+      // dropped before anything is scored. Posting the raw summary meant a harness fault was
+      // recorded as a failed attempt: with three of five rows failing on "assert.deepEqual is
+      // not a function", a candidate who had fixed the real bug went to the mastery
+      // calculation as 2/5, which is 52 mastery instead of 88. That number is the
+      // spaced-repetition input, so our bug rescheduled their review as a failure.
+      const scoreableTests = opts.testResults.filter((test) => !isHarnessError(test.error))
+      const harnessBrokeCount = opts.testResults.length - scoreableTests.length
+      const scoreablePassed = scoreableTests.filter((test) => test.passed).length
+      const scoreableTotal = scoreableTests.length
+      const testSummary =
+        harnessBrokeCount > 0
+          ? {
+              ...opts.testSummary,
+              passed: scoreablePassed,
+              total: scoreableTotal,
+              failed: scoreableTotal - scoreablePassed,
+              passRate: scoreableTotal > 0 ? (scoreablePassed / scoreableTotal) * 100 : 0,
+            }
+          : opts.testSummary
+
+      const feedbackText = `Completed ${opts.selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
+      let calculatedPerformanceScore = testSummary.passRate
       const localTechnicalScore: number | undefined = undefined
       let scoreBreakdownData: {
         understanding?: number
@@ -268,8 +290,8 @@ export function useInterviewFeedback(
             userId: opts.user.id,
             code: opts.code,
             language: opts.selectedLanguage,
-            testsPassed: opts.testSummary.passed,
-            testsTotal: opts.testSummary.total,
+            testsPassed: testSummary.passed,
+            testsTotal: testSummary.total,
             scenarioType: opts.selectedScenario?.type,
             scenarioTitle: opts.selectedScenario?.title,
             scenarioId: opts.selectedScenario?.id,
@@ -299,7 +321,7 @@ export function useInterviewFeedback(
 
           // Set initial values while streaming
           aiFeedbackSucceeded = true
-          calculatedPerformanceScore = opts.testSummary.passRate // Will be updated by stream
+          calculatedPerformanceScore = testSummary.passRate // Will be updated by stream
           scoreBreakdownData = {
             understanding: 50,
             problemSolving: 50,
@@ -345,8 +367,8 @@ export function useInterviewFeedback(
               sessionId: opts.currentSessionId,
               finalCode: opts.code,
               language: opts.selectedLanguage,
-              testsPassed: opts.testSummary.passed,
-              testsTotal: opts.testSummary.total,
+              testsPassed: testSummary.passed,
+              testsTotal: testSummary.total,
               efficiencyScore: efficiencyData?.efficiencyScore || 50,
             })
             .catch((err) => console.error("Session metrics tracking failed:", err))
@@ -386,7 +408,7 @@ export function useInterviewFeedback(
                 solutionCode:
                   opts.code || (isSystemDesign ? "// Design discussion completed via chat" : ""),
                 language: opts.selectedLanguage,
-                passed: isSystemDesign ? true : opts.testSummary.passed === opts.testSummary.total,
+                passed: isSystemDesign ? true : testSummary.passed === testSummary.total,
                 score: calculatedPerformanceScore,
                 problemType: opts.selectedScenario.type,
               }),
