@@ -40,47 +40,52 @@ const sampleSessions = [
 
 export default function SamplesPage() {
   return (
-    <main className="min-h-screen bg-background">
+    <main className="bg-background min-h-screen">
       <Header />
 
       {/* Hero Section */}
-      <section className="pt-24 pb-12 bg-gradient-to-br from-background via-secondary to-background">
+      <section className="from-background via-secondary to-background bg-gradient-to-br pt-24 pb-12">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <Badge className="bg-[#c4703f]/20 text-[#c4703f] border-[#c4703f]/30 mb-6">Sample Feedback Reports</Badge>
-            <h1 className="text-4xl md:text-6xl font-heading font-bold text-white mb-6">
+          <div className="mx-auto max-w-4xl text-center">
+            <Badge className="bg-accent/20 text-accent-strong border-accent/30 mb-6">
+              Sample Feedback Reports
+            </Badge>
+            <h1 className="font-heading text-foreground mb-6 text-4xl font-bold md:text-6xl">
               Real Interview
               <span className="text-gradient"> Feedback Examples</span>
             </h1>
-            <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
-              Explore detailed feedback reports from actual CodeSparring interview sessions. See how our AI analyzes
-              performance, identifies improvement areas, and provides actionable insights.
+            <p className="text-muted-foreground mx-auto mb-8 max-w-3xl text-xl">
+              Explore detailed feedback reports from actual CodeSparring interview sessions. See how
+              our AI analyzes performance, identifies improvement areas, and provides actionable
+              insights.
             </p>
           </div>
         </div>
       </section>
 
       {/* Sample Sessions Grid */}
-      <section className="py-16 bg-gradient-to-b from-gray-900 to-black">
+      <section className="from-card to-background bg-gradient-to-b py-16">
         <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
-            <h2 className="text-3xl font-heading font-bold text-white mb-12 text-center">Browse Sample Sessions</h2>
+          <div className="mx-auto max-w-6xl">
+            <h2 className="font-heading text-foreground mb-12 text-center text-3xl font-bold">
+              Browse Sample Sessions
+            </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+            <div className="mb-12 grid grid-cols-1 gap-8 md:grid-cols-3">
               {sampleSessions.map((session) => (
                 <Card
                   key={session.id}
-                  className="bg-gray-900/50 border-gray-700 glass-effect hover:border-[#c4703f]/50 transition-all duration-300"
+                  className="bg-card/50 border-border glass-effect hover:border-accent/50 transition-all duration-300"
                 >
                   <CardHeader>
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="mb-2 flex items-center justify-between">
                       <Badge
                         className={`${
                           session.difficulty === "Easy"
-                            ? "bg-green-500/20 text-green-400 border-green-500/30"
+                            ? "text-neural border-green-500/30 bg-green-500/20"
                             : session.difficulty === "Medium"
-                              ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
-                              : "bg-red-500/20 text-red-400 border-red-500/30"
+                              ? "border-yellow-500/30 bg-yellow-500/20 text-amber-700 dark:text-yellow-400"
+                              : "border-red-500/30 bg-red-500/20 text-red-600 dark:text-red-400"
                         }`}
                       >
                         {session.difficulty}
@@ -88,27 +93,27 @@ export default function SamplesPage() {
                       <div
                         className={`text-2xl font-bold ${
                           session.status === "excellent"
-                            ? "text-green-400"
+                            ? "text-neural"
                             : session.status === "good"
-                              ? "text-yellow-400"
-                              : "text-red-400"
+                              ? "text-amber-700 dark:text-yellow-400"
+                              : "text-red-600 dark:text-red-400"
                         }`}
                       >
                         {session.grade}
                       </div>
                     </div>
-                    <CardTitle className="text-white text-lg">{session.title}</CardTitle>
+                    <CardTitle className="text-foreground text-lg">{session.title}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <p className="text-gray-300 text-sm">{session.description}</p>
+                    <p className="text-muted-foreground text-sm">{session.description}</p>
 
-                    <div className="flex items-center space-x-2 text-gray-400">
+                    <div className="text-muted-foreground flex items-center space-x-2">
                       <Clock className="h-4 w-4" />
                       <span className="text-sm">{session.timeSpent}</span>
                     </div>
 
                     <Link href={`/samples/${session.id}`}>
-                      <Button className="w-full bg-[#c4703f] hover:bg-[#c4703f]/80 text-white">
+                      <Button className="bg-accent hover:bg-accent/90 text-accent-foreground w-full">
                         View Full Report
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
@@ -122,15 +127,21 @@ export default function SamplesPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-black">
+      <section className="bg-background py-16">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-heading font-bold text-white mb-6">Ready to Get Your Own Detailed Feedback?</h2>
-          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Start practicing with CodeSparring and receive comprehensive performance analytics for your coding interviews.
+          <h2 className="font-heading text-foreground mb-6 text-3xl font-bold">
+            Ready to Get Your Own Detailed Feedback?
+          </h2>
+          <p className="text-muted-foreground mx-auto mb-8 max-w-2xl text-xl">
+            Start practicing with CodeSparring and receive comprehensive performance analytics for
+            your coding interviews.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col justify-center gap-4 sm:flex-row">
             <Link href="/interview">
-              <Button size="lg" className="bg-[#c4703f] hover:bg-[#c4703f]/80 text-white px-8 py-4 text-lg">
+              <Button
+                size="lg"
+                className="bg-accent hover:bg-accent/90 text-accent-foreground px-8 py-4 text-lg"
+              >
                 Start Practicing Free
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
@@ -139,7 +150,7 @@ export default function SamplesPage() {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-white text-white hover:bg-white hover:text-black px-8 py-4 text-lg bg-transparent"
+                className="border-border text-foreground hover:bg-muted bg-transparent px-8 py-4 text-lg"
               >
                 View Pricing
               </Button>

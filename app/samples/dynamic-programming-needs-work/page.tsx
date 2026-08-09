@@ -25,30 +25,41 @@ import Link from "next/link"
 
 export default function DynamicProgrammingNeedsWorkPage() {
   return (
-    <main className="min-h-screen bg-black">
+    <main className="bg-background min-h-screen">
       <Header />
 
       {/* Header Section */}
-      <section className="pt-24 pb-8 bg-gradient-to-br from-black via-gray-900 to-black">
+      <section className="from-background via-card to-background bg-gradient-to-br pt-24 pb-8">
         <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
-            <Link href="/samples" className="inline-flex items-center text-[#c4703f] hover:text-[#c4703f]/80 mb-6">
+          <div className="mx-auto max-w-6xl">
+            <Link
+              href="/samples"
+              className="text-accent-strong hover:text-accent-strong/80 mb-6 inline-flex items-center"
+            >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Samples
             </Link>
 
-            <div className="flex items-center justify-between mb-6">
+            <div className="mb-6 flex items-center justify-between">
               <div>
-                <div className="flex items-center space-x-4 mb-2">
-                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Hard</Badge>
-                  <Badge className="bg-[#c4703f]/20 text-[#c4703f] border-[#c4703f]/30">Completed</Badge>
+                <div className="mb-2 flex items-center space-x-4">
+                  <Badge className="border-red-500/30 bg-red-500/20 text-red-600 dark:text-red-400">
+                    Hard
+                  </Badge>
+                  <Badge className="bg-accent/20 text-accent-strong border-accent/30">
+                    Completed
+                  </Badge>
                 </div>
-                <h1 className="text-4xl font-heading font-bold text-white">Longest Increasing Subsequence</h1>
-                <p className="text-gray-300 mt-2">Dynamic programming optimization problem</p>
+                <h1 className="font-heading text-foreground text-4xl font-bold">
+                  Longest Increasing Subsequence
+                </h1>
+                <p className="text-muted-foreground mt-2">
+                  Dynamic programming optimization problem
+                </p>
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold text-red-400 mb-1">C</div>
-                <div className="text-gray-400">Overall Grade</div>
+                <div className="mb-1 text-4xl font-bold text-red-600 dark:text-red-400">C</div>
+                <div className="text-muted-foreground">Overall Grade</div>
               </div>
             </div>
           </div>
@@ -56,62 +67,62 @@ export default function DynamicProgrammingNeedsWorkPage() {
       </section>
 
       {/* Feedback Summary */}
-      <section className="py-8 bg-gradient-to-b from-gray-900 to-black">
+      <section className="from-card to-background bg-gradient-to-b py-8">
         <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
-            <Card className="bg-gray-900/50 border-gray-700 glass-effect mb-8">
+          <div className="mx-auto max-w-6xl">
+            <Card className="bg-card/50 border-border glass-effect mb-8">
               <CardHeader>
-                <CardTitle className="text-white text-2xl">Performance Overview</CardTitle>
+                <CardTitle className="text-foreground text-2xl">Performance Overview</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
+                  <div className="bg-background/50 flex items-center justify-between rounded-lg p-4">
                     <div>
-                      <div className="text-gray-400 text-sm">Time Taken</div>
-                      <div className="text-white text-xl font-semibold">45 minutes</div>
+                      <div className="text-muted-foreground text-sm">Time Taken</div>
+                      <div className="text-foreground text-xl font-semibold">45 minutes</div>
                     </div>
-                    <Clock className="h-8 w-8 text-red-400" />
+                    <Clock className="h-8 w-8 text-red-600 dark:text-red-400" />
                   </div>
 
-                  <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
+                  <div className="bg-background/50 flex items-center justify-between rounded-lg p-4">
                     <div>
-                      <div className="text-gray-400 text-sm">Complexity Accuracy</div>
-                      <div className="text-white text-xl font-semibold">Poor</div>
+                      <div className="text-muted-foreground text-sm">Complexity Accuracy</div>
+                      <div className="text-foreground text-xl font-semibold">Poor</div>
                     </div>
-                    <XCircle className="h-8 w-8 text-red-400" />
+                    <XCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
                   </div>
 
-                  <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
+                  <div className="bg-background/50 flex items-center justify-between rounded-lg p-4">
                     <div>
-                      <div className="text-gray-400 text-sm">Edge Cases Discussed</div>
-                      <div className="text-white text-xl font-semibold">No</div>
+                      <div className="text-muted-foreground text-sm">Edge Cases Discussed</div>
+                      <div className="text-foreground text-xl font-semibold">No</div>
                     </div>
-                    <XCircle className="h-8 w-8 text-red-400" />
+                    <XCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
                   </div>
 
-                  <div className="flex items-center justify-between p-4 bg-black/30 rounded-lg">
+                  <div className="bg-background/50 flex items-center justify-between rounded-lg p-4">
                     <div>
-                      <div className="text-gray-400 text-sm">Alternative Solutions</div>
-                      <div className="text-white text-xl font-semibold">No</div>
+                      <div className="text-muted-foreground text-sm">Alternative Solutions</div>
+                      <div className="text-foreground text-xl font-semibold">No</div>
                     </div>
-                    <XCircle className="h-8 w-8 text-red-400" />
+                    <XCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
               {/* Code Solution */}
-              <Card className="bg-gray-900/50 border-gray-700 glass-effect">
+              <Card className="bg-card/50 border-border glass-effect">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <Code className="h-5 w-5 text-[#c4703f]" />
+                  <CardTitle className="text-foreground flex items-center space-x-2">
+                    <Code className="text-accent-strong h-5 w-5" />
                     <span>Your Solution</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="bg-black rounded-lg p-4">
-                    <pre className="text-sm text-white font-mono leading-relaxed">
+                  <div className="bg-background rounded-lg p-4">
+                    <pre className="text-foreground font-mono text-sm leading-relaxed">
                       <code>{`function lengthOfLIS(nums) {
     let maxLength = 1;
     
@@ -135,36 +146,44 @@ export default function DynamicProgrammingNeedsWorkPage() {
                   </div>
                   <div className="mt-4 space-y-2">
                     <div className="flex items-center space-x-2">
-                      <XCircle className="h-4 w-4 text-red-400" />
-                      <span className="text-red-400 text-sm">Incorrect algorithm - greedy approach</span>
+                      <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      <span className="text-sm text-red-600 dark:text-red-400">
+                        Incorrect algorithm - greedy approach
+                      </span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <XCircle className="h-4 w-4 text-red-400" />
-                      <span className="text-red-400 text-sm">O(n²) time complexity, not optimal</span>
+                      <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      <span className="text-sm text-red-600 dark:text-red-400">
+                        O(n²) time complexity, not optimal
+                      </span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <AlertTriangle className="h-4 w-4 text-yellow-400" />
-                      <span className="text-yellow-400 text-sm">Misses optimal substructure</span>
+                      <AlertTriangle className="h-4 w-4 text-amber-700 dark:text-yellow-400" />
+                      <span className="text-sm text-amber-700 dark:text-yellow-400">
+                        Misses optimal substructure
+                      </span>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               {/* AI Feedback */}
-              <Card className="bg-gray-900/50 border-gray-700 glass-effect">
+              <Card className="bg-card/50 border-border glass-effect">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center space-x-2">
-                    <MessageSquare className="h-5 w-5 text-[#c4703f]" />
+                  <CardTitle className="text-foreground flex items-center space-x-2">
+                    <MessageSquare className="text-accent-strong h-5 w-5" />
                     <span>AI Feedback</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <AlertTriangle className="h-4 w-4 text-red-400" />
-                      <span className="text-red-400 font-semibold">Critical Issues</span>
+                  <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4">
+                    <div className="mb-2 flex items-center space-x-2">
+                      <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      <span className="font-semibold text-red-600 dark:text-red-400">
+                        Critical Issues
+                      </span>
                     </div>
-                    <ul className="text-gray-300 text-sm space-y-1">
+                    <ul className="text-muted-foreground space-y-1 text-sm">
                       <li>• Used greedy approach instead of dynamic programming</li>
                       <li>• Algorithm produces incorrect results for many inputs</li>
                       <li>• Missed the optimal substructure property</li>
@@ -172,23 +191,28 @@ export default function DynamicProgrammingNeedsWorkPage() {
                     </ul>
                   </div>
 
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Target className="h-4 w-4 text-yellow-400" />
-                      <span className="text-yellow-400 font-semibold">What You Missed</span>
+                  <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-4">
+                    <div className="mb-2 flex items-center space-x-2">
+                      <Target className="h-4 w-4 text-amber-700 dark:text-yellow-400" />
+                      <span className="font-semibold text-amber-700 dark:text-yellow-400">
+                        What You Missed
+                      </span>
                     </div>
-                    <p className="text-gray-300 text-sm">
-                      This is a classic DP problem. The key insight is that for each position, you need to consider all
-                      previous elements that are smaller and build upon their LIS lengths.
+                    <p className="text-muted-foreground text-sm">
+                      This is a classic DP problem. The key insight is that for each position, you
+                      need to consider all previous elements that are smaller and build upon their
+                      LIS lengths.
                     </p>
                   </div>
 
-                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <BookOpen className="h-4 w-4 text-blue-400" />
-                      <span className="text-blue-400 font-semibold">Study Recommendations</span>
+                  <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-4">
+                    <div className="mb-2 flex items-center space-x-2">
+                      <BookOpen className="h-4 w-4 text-blue-700 dark:text-blue-400" />
+                      <span className="font-semibold text-blue-700 dark:text-blue-400">
+                        Study Recommendations
+                      </span>
                     </div>
-                    <ul className="text-gray-300 text-sm space-y-1">
+                    <ul className="text-muted-foreground space-y-1 text-sm">
                       <li>• Review dynamic programming fundamentals</li>
                       <li>• Practice identifying optimal substructure</li>
                       <li>• Study the O(n log n) binary search solution</li>
@@ -200,16 +224,16 @@ export default function DynamicProgrammingNeedsWorkPage() {
             </div>
 
             {/* Correct Solution */}
-            <Card className="mt-8 bg-gray-900/50 border-gray-700 glass-effect">
+            <Card className="bg-card/50 border-border glass-effect mt-8">
               <CardHeader>
-                <CardTitle className="text-white flex items-center space-x-2">
-                  <Lightbulb className="h-5 w-5 text-[#c4703f]" />
+                <CardTitle className="text-foreground flex items-center space-x-2">
+                  <Lightbulb className="text-accent-strong h-5 w-5" />
                   <span>Correct DP Solution</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="bg-black rounded-lg p-4">
-                  <pre className="text-sm text-white font-mono leading-relaxed">
+                <div className="bg-background rounded-lg p-4">
+                  <pre className="text-foreground font-mono text-sm leading-relaxed">
                     <code>{`function lengthOfLIS(nums) {
     if (nums.length === 0) return 0;
     
@@ -227,69 +251,69 @@ export default function DynamicProgrammingNeedsWorkPage() {
 }`}</code>
                   </pre>
                 </div>
-                <div className="mt-4 text-gray-300 text-sm">
+                <div className="text-muted-foreground mt-4 text-sm">
                   <p>
-                    <strong>Key insight:</strong> dp[i] represents the length of the longest increasing subsequence
-                    ending at index i. For each position, we check all previous positions and extend their LIS if the
-                    current element is larger.
+                    <strong>Key insight:</strong> dp[i] represents the length of the longest
+                    increasing subsequence ending at index i. For each position, we check all
+                    previous positions and extend their LIS if the current element is larger.
                   </p>
                 </div>
               </CardContent>
             </Card>
 
             {/* Performance Metrics */}
-            <Card className="mt-8 bg-gray-900/50 border-gray-700 glass-effect">
+            <Card className="bg-card/50 border-border glass-effect mt-8">
               <CardHeader>
-                <CardTitle className="text-white flex items-center space-x-2">
-                  <BarChart3 className="h-5 w-5 text-[#c4703f]" />
+                <CardTitle className="text-foreground flex items-center space-x-2">
+                  <BarChart3 className="text-accent-strong h-5 w-5" />
                   <span>Detailed Performance Metrics</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-gray-300">Problem Understanding</span>
-                      <span className="text-red-400 font-semibold">45%</span>
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-muted-foreground">Problem Understanding</span>
+                      <span className="font-semibold text-red-600 dark:text-red-400">45%</span>
                     </div>
-                    <Progress value={45} className="h-2 bg-gray-800" />
+                    <Progress value={45} className="bg-muted h-2" />
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-gray-300">Code Quality</span>
-                      <span className="text-red-400 font-semibold">35%</span>
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-muted-foreground">Code Quality</span>
+                      <span className="font-semibold text-red-600 dark:text-red-400">35%</span>
                     </div>
-                    <Progress value={35} className="h-2 bg-gray-800" />
+                    <Progress value={35} className="bg-muted h-2" />
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-gray-300">Communication</span>
-                      <span className="text-red-400 font-semibold">55%</span>
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-muted-foreground">Communication</span>
+                      <span className="font-semibold text-red-600 dark:text-red-400">55%</span>
                     </div>
-                    <Progress value={55} className="h-2 bg-gray-800" />
+                    <Progress value={55} className="bg-muted h-2" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Actions */}
-            <Card className="mt-8 bg-gray-900/50 border-gray-700 glass-effect">
+            <Card className="bg-card/50 border-border glass-effect mt-8">
               <CardHeader>
-                <CardTitle className="text-white">Actions</CardTitle>
+                <CardTitle className="text-foreground">Actions</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <Button className="bg-gray-700 hover:bg-gray-600 text-white flex-1">
+                <div className="flex flex-col gap-4 sm:flex-row">
+                  <Button className="bg-secondary hover:bg-secondary/80 text-secondary-foreground flex-1">
                     <Download className="mr-2 h-4 w-4" />
                     Export Report (JSON)
                   </Button>
-                  <Button className="bg-[#c4703f] hover:bg-[#c4703f]/80 text-white flex-1">
+                  <Button className="bg-accent hover:bg-accent/90 text-accent-foreground flex-1">
                     <RotateCcw className="mr-2 h-4 w-4" />
                     Retry Session
                   </Button>
-                  <Button className="bg-[#c4703f] hover:bg-[#c4703f]/80 text-white flex-1">
+                  <Button className="bg-accent hover:bg-accent/90 text-accent-foreground flex-1">
                     <Plus className="mr-2 h-4 w-4" />
                     New Problem
                   </Button>
