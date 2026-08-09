@@ -7,6 +7,8 @@ import { ArrowRight, Lock, Clock, Crown } from "lucide-react"
 import Link from "next/link"
 import type { CompanyQuestionData } from "@/lib/data/company-questions/types"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
+import { isPaidTier } from "@/lib/pricing"
+import type { SubscriptionTier } from "@/lib/config"
 
 /**
  * The gated body of a company guide.
@@ -61,8 +63,8 @@ export function CompanyPrepContent({ company }: CompanyPrepContentProps) {
           },
         })
         if (response.ok) {
-          const data = await response.json()
-          setIsPro(data.tier === "pro" || data.tier === "enterprise")
+          const data = (await response.json()) as { tier?: SubscriptionTier }
+          setIsPro(isPaidTier(data.tier ?? "free"))
         } else {
           // API error - default to false but don't assume
           setIsPro(false)

@@ -18,6 +18,8 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/lib/auth-context"
+import { isPaidTier } from "@/lib/pricing"
+import type { SubscriptionTier } from "@/lib/config"
 import { memoryBandFor } from "@/lib/spaced-repetition/memory-bands"
 import type {
   CardBelief,
@@ -152,8 +154,8 @@ export default function KnowledgePage() {
         setIsPro(false)
         return
       }
-      const profile = await res.json()
-      setIsPro(profile.subscription_tier === "pro" || profile.subscription_tier === "enterprise")
+      const profile = (await res.json()) as { subscription_tier?: SubscriptionTier }
+      setIsPro(isPaidTier(profile.subscription_tier ?? "free"))
     } catch {
       setEntitlementFailed(true)
       setIsPro(false)

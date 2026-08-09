@@ -7,6 +7,8 @@ import { Archive, BookOpen, CheckCircle2, Plus, RefreshCw, Target, XCircle } fro
 import { Header } from "@/components/header"
 import { useAuth } from "@/lib/auth-context"
 import { roadmapProgressPercent } from "@/lib/roadmap/progress"
+import { isPaidTier } from "@/lib/pricing"
+import type { SubscriptionTier } from "@/lib/config"
 import { cn } from "@/lib/utils"
 
 export interface RoadmapSummary {
@@ -393,8 +395,8 @@ export function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
           },
         })
         if (response.ok) {
-          const data = await response.json()
-          setIsPro(data.tier === "pro" || data.tier === "enterprise")
+          const data = (await response.json()) as { tier?: SubscriptionTier }
+          setIsPro(isPaidTier(data.tier ?? "free"))
         }
       } catch (error) {
         console.error("Error checking subscription:", error)

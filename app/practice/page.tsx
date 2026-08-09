@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import { useAuth } from "@/lib/auth-context"
+import { isPaidTier } from "@/lib/pricing"
+import type { SubscriptionTier } from "@/lib/config"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { type DueItem } from "@/components/practice"
@@ -316,8 +318,8 @@ export default function PracticePage() {
         return
       }
 
-      const profile = await res.json()
-      setIsPro(profile.subscription_tier === "pro" || profile.subscription_tier === "enterprise")
+      const profile = (await res.json()) as { subscription_tier?: SubscriptionTier }
+      setIsPro(isPaidTier(profile.subscription_tier ?? "free"))
     } catch {
       setEntitlementFailed(true)
       setIsPro(false)

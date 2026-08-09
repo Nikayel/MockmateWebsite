@@ -5,6 +5,8 @@ import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Crown, ExternalLink } from "lucide-react"
 import Link from "next/link"
+import { isPaidTier } from "@/lib/pricing"
+import type { SubscriptionTier } from "@/lib/config"
 
 interface CompanyHeroCTAProps {
   companyId: string
@@ -41,8 +43,8 @@ export function CompanyHeroCTA({ companyId, careersUrl }: CompanyHeroCTAProps) {
           },
         })
         if (response.ok) {
-          const data = await response.json()
-          setIsPro(data.tier === "pro" || data.tier === "enterprise")
+          const data = (await response.json()) as { tier?: SubscriptionTier }
+          setIsPro(isPaidTier(data.tier ?? "free"))
         } else {
           setIsPro(false)
         }
