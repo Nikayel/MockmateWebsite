@@ -55,9 +55,9 @@ export function RoleSelector({
       className="p-8"
     >
       <div className="mb-6">
-        <p className="mb-1 text-sm font-medium text-cyan-300">Step 1 of 4</p>
-        <h2 className="text-xl font-bold text-foreground">Calibrate the interview room</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-accent-strong mb-1 text-sm font-medium">Step 1 of 4</p>
+        <h2 className="text-foreground text-xl font-bold">Calibrate the interview room</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
           This sets the difficulty and follow-up pressure.
         </p>
       </div>
@@ -77,20 +77,18 @@ export function RoleSelector({
               role="radio"
               aria-checked={isSelected}
               aria-label={`${role.label}: ${role.description}`}
-              className={`rounded-lg border p-4 text-left transition-all focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:outline-none ${
+              className={`focus-visible:ring-accent/50 rounded-lg border p-4 text-left transition-all focus-visible:ring-2 focus-visible:outline-none ${
                 isSelected
-                  ? "border-cyan-300 bg-cyan-300/10"
-                  : "border-border bg-muted/50 hover:border-border"
+                  ? "border-accent/50 bg-accent/5"
+                  : "border-border bg-card hover:border-accent/40 hover:bg-accent/5"
               }`}
             >
               <Icon
-                className={`mb-2 h-5 w-5 ${isSelected ? "text-cyan-300" : "text-muted-foreground"}`}
+                className={`mb-2 h-5 w-5 ${isSelected ? "text-accent-strong" : "text-muted-foreground"}`}
                 aria-hidden="true"
               />
-              <div className={`font-medium ${isSelected ? "text-foreground" : "text-foreground"}`}>
-                {role.label}
-              </div>
-              <div className="text-xs text-muted-foreground">{role.description}</div>
+              <div className="text-foreground font-medium">{role.label}</div>
+              <div className="text-muted-foreground text-xs">{role.description}</div>
             </button>
           )
         })}
@@ -100,11 +98,11 @@ export function RoleSelector({
         <Button variant="ghost" onClick={onBack} className="text-muted-foreground">
           <ArrowLeft className="mr-1 h-4 w-4" /> Back
         </Button>
-        <span className="text-sm text-muted-foreground">Experience</span>
+        <span className="text-muted-foreground text-sm">Experience</span>
         <Button
           onClick={onNext}
           disabled={!canProceed}
-          className="justify-self-end bg-cyan-300 text-foreground hover:bg-cyan-200 disabled:opacity-50"
+          className="bg-accent text-accent-foreground hover:bg-accent/90 focus-visible:ring-accent/50 justify-self-end disabled:opacity-50"
         >
           Continue <ArrowRight className="ml-1 h-4 w-4" />
         </Button>

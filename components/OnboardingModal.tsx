@@ -114,7 +114,7 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background/90 p-4 backdrop-blur-sm"
+        className="bg-background/90 fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 backdrop-blur-sm"
         role="presentation"
       >
         <motion.div
@@ -123,7 +123,7 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="my-auto w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-card"
+          className="border-border bg-card my-auto w-full max-w-xl overflow-hidden rounded-2xl border"
           role="dialog"
           aria-modal="true"
           aria-labelledby="onboarding-title"
@@ -132,7 +132,7 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
           {/* Progress bar - Accessibility: aria-valuenow for screen readers.
               The intro screen omits aria-valuenow so valuenow never exceeds valuemax. */}
           <div
-            className="h-1 bg-muted"
+            className="bg-muted h-1"
             role="progressbar"
             aria-valuenow={isIntroStep ? undefined : step}
             aria-valuemin={1}
@@ -140,7 +140,7 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
             aria-label={stepAnnouncement}
           >
             <motion.div
-              className="h-full bg-cyan-300"
+              className="bg-accent h-full"
               initial={{ width: 0 }}
               animate={{ width: `${((step + 1) / totalSteps) * 100}%` }}
               transition={{ duration: 0.3 }}
