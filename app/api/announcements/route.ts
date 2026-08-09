@@ -94,8 +94,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const announcements: UserAnnouncement[] = []
-    const viewedIds: string[] = []
+    const announcements: Array<UserAnnouncement & { createdAtMs: number }> = []
 
     for (const doc of snapshot.docs) {
       const data = doc.data()
@@ -131,27 +130,13 @@ export async function GET(request: NextRequest) {
       }
 
       if (nowDate < startDate) {
-        console.log(
-          "[User Announcements API] Skipping",
-          announcementId,
-          "- not started yet. Start:",
-          startDate,
-          "Now:",
-          nowDate
-        )
-        continue // Not started yet
+        logger.debug("[Announcements] Skipping - not started yet", { announcementId })
+        continue
       }
 
       if (endDate && nowDate > endDate) {
-        console.log(
-          "[User Announcements API] Skipping",
-          announcementId,
-          "- expired. End:",
-          endDate,
-          "Now:",
-          nowDate
-        )
-        continue // Expired
+        logger.debug("[Announcements] Skipping - expired", { announcementId })
+        continue
       }
 
       // Check target audience
@@ -161,24 +146,13 @@ export async function GET(request: NextRequest) {
           // Check if user is in the specific list
           const targetUserIds = data.targetUserIds || []
           if (!userId || !targetUserIds.includes(userId)) {
-            console.log(
-              "[User Announcements API] Skipping",
-              announcementId,
-              "- user not in specific list"
-            )
+            logger.debug("[Announcements] Skipping - user not in specific list", { announcementId })
             continue
           }
         } else {
           // Check subscription tier
           if (targetAudience !== userTier) {
-            console.log(
-              "[User Announcements API] Skipping",
-              announcementId,
-              "- tier mismatch. Required:",
-              targetAudience,
-              "User:",
-              userTier
-            )
+            logger.debug("[Announcements] Skipping - tier mismatch", { announcementId })
             continue
           }
         }
@@ -193,22 +167,23 @@ export async function GET(request: NextRequest) {
         priority: data.priority || "info",
         dismissible: data.dismissible ?? true,
         cta: data.cta || undefined,
+        createdAtMs: data.createdAt?.toMillis?.() ?? 0,
       })
-
-      viewedIds.push(announcementId)
     }
 
-    // Sort announcements by priority (critical first) then by newest
+    // Sort by priority (critical first), then newest. The unordered
+    // collection get() has no inherent order, so the tie-break is explicit.
     announcements.sort((a, b) => {
       const priorityDiff = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0)
       if (priorityDiff !== 0) return priorityDiff
-      // Both have same priority, already sorted by createdAt from Firestore
-      return 0
+      return b.createdAtMs - a.createdAtMs
     })
 
     // Limit to 10 announcements after filtering and sorting
-    const limitedAnnouncements = announcements.slice(0, 10)
-    const limitedViewedIds = viewedIds.slice(0, 10)
+    const limitedAnnouncements = announcements
+      .slice(0, 10)
+      .map(({ createdAtMs: _createdAtMs, ...announcement }) => announcement)
+    const limitedViewedIds = limitedAnnouncements.map((a) => a.id)
 
     // Increment view counts (fire and forget)
     if (limitedViewedIds.length > 0) {
@@ -296,26 +271,20 @@ export async function POST(request: NextRequest) {
       dismissals: FieldValue.increment(1),
     })
 
-    // Store dismissal for logged-in users
+    // Store dismissal for logged-in users. arrayUnion + merge is atomic, so two
+    // concurrent dismissals (double click, two tabs) cannot lose each other the
+    // way the old read-modify-write could.
     if (userId) {
-      const userDismissedRef = adminDb.collection("user_dismissed_announcements").doc(userId)
-      const userDismissedDoc = await userDismissedRef.get()
-
-      if (userDismissedDoc.exists) {
-        const currentIds = userDismissedDoc.data()?.announcementIds || []
-        if (!currentIds.includes(announcementId)) {
-          await userDismissedRef.update({
-            announcementIds: [...currentIds, announcementId],
+      await adminDb
+        .collection("user_dismissed_announcements")
+        .doc(userId)
+        .set(
+          {
+            announcementIds: FieldValue.arrayUnion(announcementId),
             updatedAt: Timestamp.now(),
-          })
-        }
-      } else {
-        await userDismissedRef.set({
-          announcementIds: [announcementId],
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        })
-      }
+          },
+          { merge: true }
+        )
     }
 
     return NextResponse.json({

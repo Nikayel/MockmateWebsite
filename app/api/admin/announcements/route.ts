@@ -36,8 +36,7 @@ function toAuditSnapshot(
 
   const snapshot: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(data)) {
-    snapshot[key] =
-      value instanceof Timestamp ? value.toDate().toISOString() : (value as unknown)
+    snapshot[key] = value instanceof Timestamp ? value.toDate().toISOString() : (value as unknown)
   }
   return snapshot
 }
@@ -255,12 +254,15 @@ export const PUT = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request, c
       }
     }
 
-    // Convert dates if present
+    // Convert dates if present; an empty string means "clear the end date" and
+    // must become null, or the user route would compare against Invalid Date.
     if (updates.startDate) {
       updateData.startDate = Timestamp.fromDate(new Date(updates.startDate))
     }
     if (updates.endDate) {
       updateData.endDate = Timestamp.fromDate(new Date(updates.endDate))
+    } else if (Object.prototype.hasOwnProperty.call(updates, "endDate")) {
+      updateData.endDate = null
     }
 
     const before = doc.data()
