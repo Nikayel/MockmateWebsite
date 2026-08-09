@@ -7,6 +7,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { NpsSurvey } from "@/components/nps/NpsSurvey"
 import { Button } from "@/components/ui/button"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
@@ -307,19 +308,6 @@ export default function DashboardPage() {
     if (score >= 80) return "text-emerald-400"
     if (score >= 60) return "text-amber-400"
     return "text-red-400"
-  }
-
-  const getDifficultyStyle = (difficulty: string) => {
-    switch (difficulty) {
-      case "easy":
-        return "text-emerald-400"
-      case "medium":
-        return "text-amber-400"
-      case "hard":
-        return "text-red-400"
-      default:
-        return "text-muted-foreground"
-    }
   }
 
   // Guided teaching labs are excluded from interview-readiness — they carry a
@@ -677,7 +665,7 @@ export default function DashboardPage() {
                                 {session.topic}
                               </span>
                               <span
-                                className={`text-[10px] tracking-wider uppercase ${getDifficultyStyle(session.difficulty)}`}
+                                className={`text-[10px] tracking-wider uppercase ${difficultyColorClass(session.difficulty, "textOnLight")}`}
                               >
                                 {session.difficulty}
                               </span>

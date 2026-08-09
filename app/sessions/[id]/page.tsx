@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { useAuth } from "@/lib/auth-context"
 import PracticeFeedback from "@/components/PracticeFeedback"
 import { getDbLazy } from "@/lib/firebase-lazy"
@@ -159,19 +160,6 @@ export default function SessionDetailPage() {
     )
   }
 
-  const getDifficultyStyle = (difficulty: string) => {
-    switch (difficulty) {
-      case "easy":
-        return "text-emerald-400 bg-emerald-500/10"
-      case "medium":
-        return "text-amber-400 bg-amber-500/10"
-      case "hard":
-        return "text-red-400 bg-red-500/10"
-      default:
-        return "text-muted-foreground bg-muted/10"
-    }
-  }
-
   return (
     <main className="bg-background min-h-screen">
       <Header />
@@ -196,7 +184,7 @@ export default function SessionDetailPage() {
                 <div className="mb-2 flex items-center gap-2">
                   <h1 className="text-foreground text-xl font-semibold">{session.topic}</h1>
                   <span
-                    className={`rounded px-2 py-0.5 text-[10px] tracking-wider uppercase ${getDifficultyStyle(session.difficulty)}`}
+                    className={`rounded px-2 py-0.5 text-[10px] tracking-wider uppercase ${difficultyColorClass(session.difficulty, "badgeOnLight")}`}
                   >
                     {session.difficulty}
                   </span>

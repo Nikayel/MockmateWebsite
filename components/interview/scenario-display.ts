@@ -1,5 +1,5 @@
 import { Cpu, Bug, Wrench, Layers } from "lucide-react"
-import type { ScenarioType, DifficultyLevel } from "@/lib/scenarios"
+import type { ScenarioType } from "@/lib/scenarios"
 
 /**
  * The single scenario-type table. Every scenario-type surface derives from this: the filter
@@ -18,36 +18,24 @@ export interface ExerciseTypeConfig {
 export const EXERCISE_TYPES: readonly ExerciseTypeConfig[] = [
   { id: "bugfix", label: "Bug Fix", description: "Repair failing codebases", icon: Bug },
   { id: "add-functionality", label: "Add Feature", description: "Extend codebases", icon: Wrench },
-  { id: "system-design", label: "System Design", description: "Architecture & scalability", icon: Layers },
-  { id: "dsa", label: "DSA Drill", cardLabel: "DSA", description: "Algorithms & data structures", icon: Cpu },
+  {
+    id: "system-design",
+    label: "System Design",
+    description: "Architecture & scalability",
+    icon: Layers,
+  },
+  {
+    id: "dsa",
+    label: "DSA Drill",
+    cardLabel: "DSA",
+    description: "Algorithms & data structures",
+    icon: Cpu,
+  },
 ]
 
-export const getDifficultyStyle = (difficulty: DifficultyLevel) => {
-  switch (difficulty) {
-    case "easy":
-      return "border-transparent bg-emerald-500/10 text-emerald-300"
-    case "medium":
-      return "border-transparent bg-amber-500/10 text-amber-200"
-    case "hard":
-      return "border-transparent bg-rose-500/10 text-rose-300"
-    default:
-      return "border-transparent bg-white/5 text-zinc-300"
-  }
-}
-
-// Solid dot color for the compact list row (LeetCode-style difficulty marker).
-export const getDifficultyDot = (difficulty: DifficultyLevel) => {
-  switch (difficulty) {
-    case "easy":
-      return "bg-emerald-400"
-    case "medium":
-      return "bg-amber-400"
-    case "hard":
-      return "bg-rose-400"
-    default:
-      return "bg-zinc-500"
-  }
-}
+// Difficulty colors live in `lib/ui/difficulty-colors.ts` (difficultyColorClass) — the
+// single source of truth. The local getDifficultyStyle/getDifficultyDot copies this file
+// used to carry drifted off it (rose vs red, dark-only -300 text) and are gone.
 
 export const getTypeConfig = (type: ScenarioType) => {
   const config = EXERCISE_TYPES.find((t) => t.id === type)
