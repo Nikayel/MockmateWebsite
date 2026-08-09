@@ -4,6 +4,7 @@ import React from "react"
 import { CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Sparra, type SparraState } from "@/components/brand/Sparra"
 import { cn } from "@/lib/utils"
 
 /**
@@ -59,6 +60,34 @@ export function TestResultsPanel({ results, isRunning = false, className }: Test
   const passed = results.filter((r) => r.passed).length
   const failed = results.length - passed
   const passRate = results.length > 0 ? Math.round((passed / results.length) * 100) : 0
+
+  // Sparra reacts once when a run completes (suite green → pass pop, any
+  // failure → fail shake), then settles to the static mark — reactions are
+  // one-shot and nothing loops while results are on screen (brand rule).
+  const [reaction, setReaction] = React.useState<SparraState | undefined>(undefined)
+  const wasRunning = React.useRef(false)
+  React.useEffect(() => {
+    if (isRunning) {
+      wasRunning.current = true
+      setReaction(undefined)
+      return
+    }
+    if (wasRunning.current && results.length > 0) {
+      wasRunning.current = false
+      setReaction(failed === 0 ? "pass" : "fail")
+    }
+  }, [isRunning, results.length, failed])
+
+  const handleSparraAnimationEnd = React.useCallback(
+    (event: React.AnimationEvent<HTMLSpanElement>) => {
+      if (event.animationName === "sparra-pop" || event.animationName === "sparra-shake") {
+        setReaction(undefined)
+      }
+    },
+    []
+  )
+
+  const sparraState: SparraState | undefined = isRunning ? "thinking" : reaction
 
   // Detect if there's a code error (syntax/runtime) - all tests fail with same error
   const errorResults = results.filter((r) => r.error)
@@ -136,6 +165,7 @@ export function TestResultsPanel({ results, isRunning = false, className }: Test
       {/* Summary */}
       <div className="bg-muted/50 flex items-center justify-between rounded px-2 py-1.5">
         <div className="flex items-center gap-2">
+          <Sparra state={sparraState} size={22} onAnimationEnd={handleSparraAnimationEnd} />
           <span className="text-muted-foreground text-xs">Tests:</span>
           <Badge className="border-green-500/30 bg-green-500/20 text-xs text-green-400">
             {passed} passed
@@ -236,8 +266,7 @@ export function TestResultsPanel({ results, isRunning = false, className }: Test
 
       {isRunning && (
         <div className="text-muted-foreground flex items-center justify-center py-2 text-xs">
-          <div className="border-border/30 mr-2 h-3 w-3 animate-spin rounded-full border border-t-gray-400" />
-          Running tests...
+          Running tests…
         </div>
       )}
     </div>
