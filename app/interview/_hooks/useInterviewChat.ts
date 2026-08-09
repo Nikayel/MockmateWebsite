@@ -1,4 +1,4 @@
-import { useCallback } from "react"
+import { useCallback, useRef } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -234,6 +234,8 @@ export function buildChatErrorToast(
  */
 export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewChatReturn {
   const router = useRouter()
+  /** Whether a send is already in flight, per conversation lane. See handleSendMessage. */
+  const sendInFlightRef = useRef({ interviewer: false, partner: false })
   const {
     chatInput,
     interviewerInput,
@@ -281,6 +283,19 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
     const userMessage = input.trim()
 
     if (userMessage) {
+      // One send at a time per lane. The UI disables the composer while a reply is pending,
+      // but the voice path does not go through the UI: onUtteranceEnd calls handleAutoSend,
+      // which calls straight in here past every `disabled` attribute. Two concurrent
+      // /api/chat calls followed, and a free user only gets two concurrency slots, so the
+      // second was refused outright. Whichever finished first also cleared the loading flag
+      // and unlocked the composer while the other was still running.
+      //
+      // A ref rather than the isLoadingInterviewer state: this has to be a real check-and-set,
+      // and a React state read inside an async handler is neither current nor atomic.
+      const lane = isInterviewer ? "interviewer" : "partner"
+      if (sendInFlightRef.current[lane]) return
+      sendInFlightRef.current[lane] = true
+
       const newUserMessage: ChatMessage = { type: "user", message: userMessage }
       setMessages((prev) => [...prev, newUserMessage])
       setLoading(true)
@@ -552,6 +567,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
         reportSendFailure(0, null, newUserMessage)
       } finally {
         setLoading(false)
+        sendInFlightRef.current[lane] = false
       }
     }
   }

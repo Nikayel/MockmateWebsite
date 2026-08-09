@@ -19,7 +19,7 @@ import {
 
 describe("shouldTriggerSilenceNudge", () => {
   describe("a candidate who has not spoken yet", () => {
-    const quiet = { hasEverMessaged: false, secondsSinceActivity: 600 }
+    const quiet = { hasEverMessaged: false, secondsSinceActivity: 600, isComposing: false }
 
     it("is left alone two minutes in, when they are still reading", () => {
       expect(shouldTriggerSilenceNudge({ ...quiet, timeSilentSec: 120 })).toBe(false)
@@ -37,7 +37,7 @@ describe("shouldTriggerSilenceNudge", () => {
   })
 
   describe("a candidate who spoke and then went quiet", () => {
-    const stopped = { hasEverMessaged: true, secondsSinceActivity: 600 }
+    const stopped = { hasEverMessaged: true, secondsSinceActivity: 600, isComposing: false }
 
     it("is checked on after the shorter threshold", () => {
       expect(shouldTriggerSilenceNudge({ ...stopped, timeSilentSec: SILENCE_THRESHOLD_SEC })).toBe(
@@ -61,6 +61,7 @@ describe("shouldTriggerSilenceNudge", () => {
           hasEverMessaged: false,
           timeSilentSec: 3600,
           secondsSinceActivity: 5,
+          isComposing: false,
         })
       ).toBe(false)
     })
@@ -71,6 +72,7 @@ describe("shouldTriggerSilenceNudge", () => {
           hasEverMessaged: true,
           timeSilentSec: 3600,
           secondsSinceActivity: RECENT_ACTIVITY_SEC - 1,
+          isComposing: false,
         })
       ).toBe(false)
     })
@@ -81,8 +83,36 @@ describe("shouldTriggerSilenceNudge", () => {
           hasEverMessaged: true,
           timeSilentSec: 3600,
           secondsSinceActivity: RECENT_ACTIVITY_SEC,
+          isComposing: false,
         })
       ).toBe(true)
     })
+  })
+})
+
+describe("a candidate who is mid-sentence", () => {
+  // The nudge sets isLoadingInterviewer, which ChatColumn reads as isBusy to disable the
+  // textarea and swallow Enter. Firing while someone is typing took their focus and stopped
+  // their Enter key working, on a message that was about to end the silence anyway.
+  it("is not interrupted, however long the chat has been quiet", () => {
+    expect(
+      shouldTriggerSilenceNudge({
+        hasEverMessaged: false,
+        timeSilentSec: 3600,
+        secondsSinceActivity: 3600,
+        isComposing: true,
+      })
+    ).toBe(false)
+  })
+
+  it("is nudged once the composer is empty again", () => {
+    expect(
+      shouldTriggerSilenceNudge({
+        hasEverMessaged: false,
+        timeSilentSec: 3600,
+        secondsSinceActivity: 3600,
+        isComposing: false,
+      })
+    ).toBe(true)
   })
 })

@@ -20,6 +20,8 @@ export interface UseInterviewProactiveAIOptions {
 
   // ---- live inputs read by the silence effect / WithContext body ----
   interviewerMessages: ChatMessage[]
+  /** Unsent text in the interviewer composer. A nudge must not interrupt a half-typed reply. */
+  interviewerInput: string
   elapsedTime: number
   code: string
   chatWorkspaceContext: unknown
@@ -69,6 +71,7 @@ export function useInterviewProactiveAI(
     showPostInterviewDiscussion,
     isLoadingInterviewer,
     interviewerMessages,
+    interviewerInput,
     elapsedTime,
     code,
     chatWorkspaceContext,
@@ -353,12 +356,14 @@ Interviews are conversations, not just coding exercises.`
   // pattern as useInterviewAutosave.
   const proactiveLatestRef = useRef({
     interviewerMessages,
+    interviewerInput,
     elapsedTime,
     isLoadingInterviewer,
     triggerProactiveInterviewerWithContext,
   })
   proactiveLatestRef.current = {
     interviewerMessages,
+    interviewerInput,
     elapsedTime,
     isLoadingInterviewer,
     triggerProactiveInterviewerWithContext,
@@ -395,6 +400,7 @@ Interviews are conversations, not just coding exercises.`
     const checkAndTrigger = () => {
       const {
         interviewerMessages: latestMessages,
+        interviewerInput: latestInput,
         elapsedTime: latestElapsed,
         isLoadingInterviewer: latestLoading,
         triggerProactiveInterviewerWithContext: latestTrigger,
@@ -416,6 +422,7 @@ Interviews are conversations, not just coding exercises.`
         hasEverMessaged,
         timeSilentSec,
         secondsSinceActivity: (Date.now() - lastActivityRef.current) / 1000,
+        isComposing: latestInput.trim().length > 0,
       })
       if (!shouldSpeak) return
 

@@ -1068,6 +1068,7 @@ function InterviewPageContent() {
     showPostInterviewDiscussion,
     isLoadingInterviewer,
     interviewerMessages,
+    interviewerInput,
     elapsedTime,
     code,
     chatWorkspaceContext,
