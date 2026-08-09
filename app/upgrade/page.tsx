@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { Check, CheckCircle } from "lucide-react"
-import { getProPricing } from "@/lib/config"
+import { getProPricing, PRICING_CONFIG } from "@/lib/config"
 import { trackUpgradeFlow, trackPurchase } from "@/lib/analytics"
 import { Profile } from "@/lib/types"
 import { toast } from "sonner"
@@ -297,7 +297,10 @@ function UpgradePageContent() {
                 <ul className="text-muted-foreground space-y-1.5 text-sm">
                   <li className="flex items-center gap-2">
                     <Check className="text-accent h-3.5 w-3.5" />
-                    35 sessions/month
+                    {/* The number is the enforced quota, not copy: it must move with
+                        PRICING_CONFIG or the checkout page promises a limit the
+                        server no longer grants. */}
+                    {`${PRICING_CONFIG.pro.sessionsPerMonth} sessions/month`}
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="text-accent h-3.5 w-3.5" />

@@ -5,7 +5,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Check, ChevronDown } from "lucide-react"
-import { getProPricing } from "@/lib/config"
+import { getProPricing, PRICING_CONFIG } from "@/lib/config"
 import { trackEvent } from "@/lib/analytics"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
@@ -97,7 +97,11 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
                   20+ problems, unlimited practice
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-gray-500" />8 full interview sessions/month
+                  <Check className="h-3.5 w-3.5 text-gray-500" />
+                  {/* The number is the enforced quota, not copy: it must move with
+                      PRICING_CONFIG or this page advertises a limit the server no
+                      longer grants. */}
+                  {`${PRICING_CONFIG.free.sessionsPerMonth} full interview sessions/month`}
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-3.5 w-3.5 text-gray-500" />
@@ -138,7 +142,7 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
               <ul className="space-y-1.5 text-sm text-gray-300">
                 <li className="flex items-center gap-2">
                   <Check className="text-accent h-3.5 w-3.5" />
-                  35 sessions/month
+                  {`${PRICING_CONFIG.pro.sessionsPerMonth} sessions/month`}
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="text-accent h-3.5 w-3.5" />
