@@ -1,6 +1,14 @@
 "use client"
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react"
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react"
 import { useAuth } from "@/lib/auth-context"
 import { toast } from "sonner"
 import { AnnouncementBanner } from "./AnnouncementBanner"
@@ -33,27 +41,37 @@ interface AnnouncementProviderProps {
   children: React.ReactNode
 }
 
+/**
+ * Read dismissed IDs synchronously so the very first fetch/render already knows
+ * them. Loading these in an effect was the "dismissed banner flashes for a
+ * second" bug: the initial fetch closed over an empty list, rendered the
+ * dismissed banner, and only a refetch made it disappear.
+ */
+function readStoredDismissedIds(): string[] {
+  if (typeof window === "undefined") return []
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    const parsed = stored ? JSON.parse(stored) : []
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : []
+  } catch {
+    return []
+  }
+}
+
 export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
-  const { firebaseUser } = useAuth()
+  const { firebaseUser, initialized } = useAuth()
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
-  const [dismissedIds, setDismissedIds] = useState<string[]>([])
+  const [dismissedIds, setDismissedIds] = useState<string[]>(readStoredDismissedIds)
   const [shownToastIds, setShownToastIds] = useState<Set<string>>(new Set())
   const [shownModalIds, setShownModalIds] = useState<Set<string>>(new Set())
   const [currentModal, setCurrentModal] = useState<Announcement | null>(null)
   const [bannerHeight, setBannerHeight] = useState(0)
   const bannerContainerRef = useRef<HTMLDivElement>(null)
 
-  // Load dismissed IDs from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        setDismissedIds(JSON.parse(stored))
-      }
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, [])
+  // Read through a ref inside the fetch so dismissing does not trigger a
+  // refetch: local state already removed the announcement.
+  const dismissedIdsRef = useRef(dismissedIds)
+  dismissedIdsRef.current = dismissedIds
 
   // Fetch announcements
   const fetchAnnouncements = useCallback(async () => {
@@ -66,8 +84,8 @@ export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
       }
 
       // Send dismissed IDs for non-logged-in users
-      if (!firebaseUser && dismissedIds.length > 0) {
-        headers["X-Dismissed-Announcements"] = JSON.stringify(dismissedIds)
+      if (!firebaseUser && dismissedIdsRef.current.length > 0) {
+        headers["X-Dismissed-Announcements"] = JSON.stringify(dismissedIdsRef.current)
       }
 
       const response = await fetch("/api/announcements", { headers })
@@ -75,29 +93,38 @@ export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.announcements) {
-          // Filter out locally dismissed announcements
-          const filtered = data.announcements.filter(
-            (a: Announcement) => !dismissedIds.includes(a.id)
-          )
-          setAnnouncements(filtered)
+          setAnnouncements(data.announcements)
         }
       }
     } catch (error) {
       console.error("[Announcements] Error fetching:", error)
     }
-  }, [firebaseUser, dismissedIds])
+  }, [firebaseUser])
 
-  // Initial fetch and periodic refresh
+  // Initial fetch and periodic refresh. Waits for auth to initialize so the
+  // first fetch already carries the user's credentials: an anonymous pre-fetch
+  // does not know about server-side dismissals and briefly showed banners the
+  // user had dismissed on another device.
   useEffect(() => {
+    if (!initialized) return
+
     fetchAnnouncements()
 
     const interval = setInterval(fetchAnnouncements, FETCH_INTERVAL)
     return () => clearInterval(interval)
-  }, [fetchAnnouncements])
+  }, [fetchAnnouncements, initialized])
+
+  // Everything downstream works from the visible list: filtering at render
+  // time (rather than at fetch time) means a dismissal can never flash back in,
+  // whichever of the fetch and the dismissal finishes last.
+  const visibleAnnouncements = useMemo(
+    () => announcements.filter((a) => !dismissedIds.includes(a.id)),
+    [announcements, dismissedIds]
+  )
 
   // Show toast announcements when they arrive
   useEffect(() => {
-    announcements
+    visibleAnnouncements
       .filter((a) => a.type === "toast" && !shownToastIds.has(a.id))
       .forEach((announcement) => {
         setShownToastIds((prev) => new Set([...prev, announcement.id]))
@@ -142,13 +169,13 @@ export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
             })
         }
       })
-  }, [announcements, shownToastIds])
+  }, [visibleAnnouncements, shownToastIds])
 
   // Show modal announcements one at a time
   useEffect(() => {
     if (currentModal) return // Don't show another if one is open
 
-    const modalAnnouncement = announcements.find(
+    const modalAnnouncement = visibleAnnouncements.find(
       (a) => a.type === "modal" && !shownModalIds.has(a.id)
     )
 
@@ -156,32 +183,40 @@ export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
       setShownModalIds((prev) => new Set([...prev, modalAnnouncement.id]))
       setCurrentModal(modalAnnouncement)
     }
-  }, [announcements, currentModal, shownModalIds])
+  }, [visibleAnnouncements, currentModal, shownModalIds])
 
-  // Update banner height CSS variable
+  // Measure the real banner height instead of assuming 52px per banner: a
+  // message that wraps (narrow viewports, long copy) made the fixed banner
+  // overlap the header and page content by however much the estimate was off.
   useEffect(() => {
-    const bannerAnnouncements = announcements.filter((a) => a.type === "banner")
+    const container = bannerContainerRef.current
 
-    if (bannerAnnouncements.length > 0) {
-      // Each banner is approximately 52px (py-3 = 12px top + 12px bottom + ~28px content)
-      const height = bannerAnnouncements.length * 52
+    const apply = (height: number) => {
       setBannerHeight(height)
       document.documentElement.style.setProperty("--announcement-banner-height", `${height}px`)
-    } else {
-      setBannerHeight(0)
-      document.documentElement.style.setProperty("--announcement-banner-height", "0px")
     }
 
+    if (!container) {
+      apply(0)
+      return
+    }
+
+    apply(container.offsetHeight)
+    const observer = new ResizeObserver(() => apply(container.offsetHeight))
+    observer.observe(container)
+
     return () => {
+      observer.disconnect()
       document.documentElement.style.setProperty("--announcement-banner-height", "0px")
     }
-  }, [announcements])
+    // Re-run when the set of banners changes so the ref is (un)mounted fresh.
+  }, [visibleAnnouncements])
 
   // Dismiss announcement
   const dismissAnnouncement = useCallback(
     async (id: string) => {
-      // Update local state immediately
-      setAnnouncements((prev) => prev.filter((a) => a.id !== id))
+      // Update local state immediately; visibleAnnouncements filters on
+      // dismissedIds, so this hides every surface at once.
       setDismissedIds((prev) => {
         const updated = [...prev, id]
         try {
@@ -225,13 +260,13 @@ export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
 
   // Get banner announcements (shown at top of page)
   const getBannerAnnouncements = useCallback(() => {
-    return announcements.filter((a) => a.type === "banner")
-  }, [announcements])
+    return visibleAnnouncements.filter((a) => a.type === "banner")
+  }, [visibleAnnouncements])
 
   // Get modal announcements
   const getModalAnnouncements = useCallback(() => {
-    return announcements.filter((a) => a.type === "modal")
-  }, [announcements])
+    return visibleAnnouncements.filter((a) => a.type === "modal")
+  }, [visibleAnnouncements])
 
   const handleModalClose = useCallback(() => {
     if (currentModal) {
@@ -244,7 +279,7 @@ export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
   }, [currentModal, dismissAnnouncement])
 
   const value: AnnouncementContextValue = {
-    announcements,
+    announcements: visibleAnnouncements,
     dismissAnnouncement,
     refreshAnnouncements: fetchAnnouncements,
     getBannerAnnouncements,
