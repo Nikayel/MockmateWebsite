@@ -36,7 +36,8 @@ export type CourseId = "python" | "data-engineering" | "system-design"
  * `PythonLevelId` stays pinned to 1-4 so Python-only maps (e.g. `LEVEL_PREVIEWS`) are not forced to
  * grow, while the shared `TutorialLevelId` (used by `TutorialLessonProgress.levelId` and the SQL /
  * System-Design level ids) spans the full 0..11 range. Widening it is a type-only change — the
- * serialized shape is unaffected and the progress Zod schema widens in lockstep.
+ * serialized shape is unaffected. Widen `tutorialLevelIdSchema` in ./level-id-schema to match:
+ * it is the runtime half of this union and the only thing the request boundaries validate against.
  */
 export type TutorialLevelId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11
 export type PythonLevelId = 1 | 2 | 3 | 4 | 5

@@ -21,6 +21,7 @@
  */
 import { z } from "zod"
 import { adminDb } from "@/lib/firebase-admin"
+import { tutorialLevelIdSchema } from "./level-id-schema"
 import { getResearchConsent, isResearchUsable } from "./research-consent"
 import { toKnowledgeComponents } from "./knowledge-components"
 import type { CourseId, LearnItemResponse } from "./types"
@@ -55,20 +56,7 @@ export const learnItemResponseInputSchema = z.object({
   /** `demo_run` only: whether the learner edited the example before running it. */
   edited: z.boolean().optional(),
   lessonId: z.string().min(1).max(200),
-  levelId: z.union([
-    z.literal(0),
-    z.literal(1),
-    z.literal(2),
-    z.literal(3),
-    z.literal(4),
-    z.literal(5),
-    z.literal(6),
-    z.literal(7),
-    z.literal(8),
-    z.literal(9),
-    z.literal(10),
-    z.literal(11),
-  ]),
+  levelId: tutorialLevelIdSchema,
   itemId: z.string().min(1).max(200),
   section: lessonSectionSchema,
   skills: z.array(z.string().min(1).max(80)).max(12).optional(),

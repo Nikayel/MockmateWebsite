@@ -10,6 +10,7 @@
  */
 import { z } from "zod"
 import { adminDb } from "@/lib/firebase-admin"
+import { tutorialLevelIdSchema } from "./level-id-schema"
 import type { CourseId, TutorialLessonProgress } from "./types"
 
 const COLLECTION = "user_tutorial_progress"
@@ -39,23 +40,10 @@ const sectionStatusSchema = z.enum(["not_started", "in_progress", "completed"])
  */
 export const tutorialProgressInputSchema = z.object({
   lessonId: z.string().min(1),
-  // Python ships L1-4, SQL L1-6, and System Design L0-11 (L0 is the interview-method level). The
-  // literal union spans the full shared 0..11 `TutorialLevelId` range so every course's section
-  // progress persists AND `z.infer` narrows to `TutorialLevelId` (not a bare `number`).
-  levelId: z.union([
-    z.literal(0),
-    z.literal(1),
-    z.literal(2),
-    z.literal(3),
-    z.literal(4),
-    z.literal(5),
-    z.literal(6),
-    z.literal(7),
-    z.literal(8),
-    z.literal(9),
-    z.literal(10),
-    z.literal(11),
-  ]),
+  // Python ships L1-4, SQL L1-6, and System Design L0-11 (L0 is the interview-method level).
+  // The accepted range is owned by ./level-id-schema so this endpoint and the item-response
+  // endpoint cannot disagree about which levels exist.
+  levelId: tutorialLevelIdSchema,
   sections: z.object({
     teach: sectionStatusSchema,
     apply: sectionStatusSchema,
