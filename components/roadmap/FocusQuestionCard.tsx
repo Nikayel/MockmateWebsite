@@ -173,7 +173,7 @@ export function QuestionCard({
       {isEvaluating && (
         <div className="mt-3 flex items-center gap-2 border-t border-blue-200 pt-3 text-xs text-blue-600 dark:border-blue-800/30 dark:text-blue-400">
           <Loader2 className="h-3 w-3 animate-spin" />
-          <span>We are evaluating your submission...</span>
+          <span>Scoring your submission…</span>
         </div>
       )}
     </motion.div>

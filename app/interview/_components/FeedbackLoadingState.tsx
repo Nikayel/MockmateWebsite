@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { CheckCircle2 } from "lucide-react"
+import { Sparra } from "@/components/brand/Sparra"
 
 export interface FeedbackLoadingStateProps {
   onGoToDashboard: () => void
@@ -32,6 +33,11 @@ const PHASE_TO_STEP: Record<string, number> = {
   persisting: 3,
   complete: 4,
 }
+
+// The determinate ring is tuned to the observed p95 of scoring (matches the
+// fallback step timers below). It holds at 95% rather than closing — the
+// result view replaces it when the answer actually lands (brand rule).
+const SCORING_P95_MS = 15000
 
 export function FeedbackLoadingState({
   interviewStats,
@@ -78,12 +84,22 @@ export function FeedbackLoadingState({
   return (
     <div className="flex min-h-[500px] flex-col items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm">
+        {/* Sparra scoring — determinate ring bounds the wait */}
+        <div className="mb-8 flex justify-center" role="status">
+          <Sparra
+            state="scoring"
+            size={88}
+            scoreDurationMs={SCORING_P95_MS}
+            label="Scoring your submission"
+          />
+        </div>
+
         {/* Header - Apple-style clean typography */}
         <div className="mb-12 text-center">
-          <h2 className="mb-3 text-2xl font-semibold tracking-tight text-foreground">
-            Generating Feedback
+          <h2 className="text-foreground mb-3 text-2xl font-semibold tracking-tight">
+            Scoring your submission
           </h2>
-          <p className="text-sm font-medium text-muted-foreground">
+          <p className="text-muted-foreground text-sm font-medium">
             {elapsedTime < 60
               ? `${elapsedTime}s`
               : `${Math.floor(elapsedTime / 60)}m ${elapsedTime % 60}s`}
@@ -107,17 +123,14 @@ export function FeedbackLoadingState({
                   {isComplete ? (
                     <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                   ) : isCurrent ? (
-                    <div className="relative flex h-5 w-5 items-center justify-center">
-                      <div className="absolute h-5 w-5 animate-ping rounded-full bg-foreground/20" />
-                      <div className="h-2.5 w-2.5 rounded-full bg-card" />
-                    </div>
+                    <div className="h-2.5 w-2.5 rounded-full bg-[#8ab4f0]" />
                   ) : (
-                    <div className="h-2 w-2 rounded-full bg-muted" />
+                    <div className="bg-muted h-2 w-2 rounded-full" />
                   )}
                 </div>
                 <span
                   className={`text-sm font-medium transition-colors duration-300 ${
-                    isComplete ? "text-muted-foreground" : isCurrent ? "text-foreground" : "text-muted-foreground"
+                    isCurrent ? "text-foreground" : "text-muted-foreground"
                   }`}
                 >
                   {step}
@@ -132,32 +145,34 @@ export function FeedbackLoadingState({
           <div className="flex justify-center gap-4">
             {interviewStats.testsPassed !== undefined &&
               interviewStats.totalTests !== undefined && (
-                <div className="flex flex-col items-center rounded-2xl bg-muted/50 px-5 py-3">
-                  <span className="text-lg font-semibold text-foreground">
+                <div className="bg-muted/50 flex flex-col items-center rounded-2xl px-5 py-3">
+                  <span className="text-foreground text-lg font-semibold">
                     {interviewStats.testsPassed}/{interviewStats.totalTests}
                   </span>
-                  <span className="text-xs font-medium text-muted-foreground">tests</span>
+                  <span className="text-muted-foreground text-xs font-medium">tests</span>
                 </div>
               )}
             {interviewStats.timeSpentMinutes !== undefined && (
-              <div className="flex flex-col items-center rounded-2xl bg-muted/50 px-5 py-3">
-                <span className="text-lg font-semibold text-foreground">
+              <div className="bg-muted/50 flex flex-col items-center rounded-2xl px-5 py-3">
+                <span className="text-foreground text-lg font-semibold">
                   {interviewStats.timeSpentMinutes}m
                 </span>
-                <span className="text-xs font-medium text-muted-foreground">duration</span>
+                <span className="text-muted-foreground text-xs font-medium">duration</span>
               </div>
             )}
             {interviewStats.codeLines !== undefined && (
-              <div className="flex flex-col items-center rounded-2xl bg-muted/50 px-5 py-3">
-                <span className="text-lg font-semibold text-foreground">{interviewStats.codeLines}</span>
-                <span className="text-xs font-medium text-muted-foreground">lines</span>
+              <div className="bg-muted/50 flex flex-col items-center rounded-2xl px-5 py-3">
+                <span className="text-foreground text-lg font-semibold">
+                  {interviewStats.codeLines}
+                </span>
+                <span className="text-muted-foreground text-xs font-medium">lines</span>
               </div>
             )}
           </div>
         )}
 
         {/* Subtle footer - Apple style */}
-        <p className="mt-10 text-center text-xs font-medium text-muted-foreground">
+        <p className="text-muted-foreground mt-10 text-center text-xs font-medium">
           Your results will be saved automatically
         </p>
       </div>

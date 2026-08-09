@@ -264,7 +264,7 @@ export default function SessionsPage() {
                           )}
                           {isFeedbackPending && !isInProgress && (
                             <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-400">
-                              Generating Feedback...
+                              Scoring…
                             </span>
                           )}
                           {isFeedbackFailed && !isInProgress && (
