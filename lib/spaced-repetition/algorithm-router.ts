@@ -143,10 +143,15 @@ function reconstructFSRSCardFromFields(data: {
  * Get user's assigned algorithm, or assign one if not set
  * Uses 50/50 random assignment for A/B testing
  */
-export async function getUserAlgorithm(userId: string): Promise<SpacedRepetitionAlgorithm> {
+export async function getUserAlgorithm(
+  userId: string,
+  // A caller that already holds the profile snapshot can pass it in; every
+  // hot path used to pay a second read of the same doc for this lookup.
+  knownProfileDoc?: FirebaseFirestore.DocumentSnapshot
+): Promise<SpacedRepetitionAlgorithm> {
   const config = await getAlgorithmConfig()
   const profileRef = adminDb.collection("profiles").doc(userId)
-  const profileDoc = await profileRef.get()
+  const profileDoc = knownProfileDoc ?? (await profileRef.get())
 
   if (!profileDoc.exists) {
     // User doesn't exist yet, return default (will be assigned on profile creation).

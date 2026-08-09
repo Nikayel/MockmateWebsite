@@ -64,15 +64,10 @@ function getScenarioIdByTitle(title: string): string | undefined {
  * default. Used so the due-queue windows are bucketed by the user's local
  * calendar day instead of the server's UTC day.
  */
-async function resolveUserTimezone(userId: string): Promise<string> {
-  try {
-    const profileDoc = await adminDb.collection("profiles").doc(userId).get()
-    if (profileDoc.exists) {
-      const profile = profileDoc.data() as Profile
-      return profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
-    }
-  } catch {
-    // Use default timezone if profile fetch fails
+function timezoneFromProfileDoc(profileDoc: FirebaseFirestore.DocumentSnapshot): string {
+  if (profileDoc.exists) {
+    const profile = profileDoc.data() as Profile
+    return profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
   }
   return DEFAULT_TIMEZONE
 }
@@ -194,16 +189,27 @@ export async function getDueProblems(
   const now = new Date()
   const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000)
 
+  // One profile read serves both the timezone and the algorithm lookup; this
+  // call used to read the same profiles/{userId} doc twice, on a route the
+  // practice page hits several times per visit.
+  let profileDoc: FirebaseFirestore.DocumentSnapshot | undefined
+  try {
+    profileDoc = await adminDb.collection("profiles").doc(userId).get()
+  } catch {
+    // Fall back to defaults below if the profile fetch fails
+  }
+
   // Bucket by the USER'S local calendar day, not the server's UTC day, so an
   // item due tomorrow in the user's timezone (but still "today" in UTC) is not
   // mislabeled as due today. getEndOfDayInTimezone returns the UTC instant of
   // 23:59:59.999 local time on the target local calendar day.
-  const userTimezone = timezone || (await resolveUserTimezone(userId))
+  const userTimezone =
+    timezone || (profileDoc ? timezoneFromProfileDoc(profileDoc) : DEFAULT_TIMEZONE)
   const todayEnd = getEndOfDayInTimezone(now, userTimezone, 0)
   const upcomingEnd = getEndOfDayInTimezone(now, userTimezone, upcomingDays)
 
   // Get user's algorithm for transparency
-  const userAlgorithm = await getUserAlgorithm(userId)
+  const userAlgorithm = await getUserAlgorithm(userId, profileDoc)
 
   // Query problem mastery collection
   const masteryRef = adminDb.collection("problem_mastery").doc(userId).collection("problems")
