@@ -161,18 +161,29 @@ export interface ChatErrorToast {
   description: string
   /** True when the toast should carry a link to the upgrade page. */
   showUpgradeAction: boolean
+  /** True when sending the same message again could plausibly work. */
+  canRetry: boolean
 }
 
 /**
- * Turns a failed /api/chat response into the toast a user should see, or null
- * when the failure needs no toast (the message already lands in the transcript).
+ * Turns a failed /api/chat response into the toast the candidate should see.
+ *
+ * Always returns one. It used to return null for unlabelled failures, on the reasoning that
+ * "the message already lands in the transcript" — but what landed there was the raw error
+ * body wearing the interviewer's face. A candidate on the free tier watched the interviewer
+ * say "Token limit exceeded. 5,000 tokens/minute for free tier." mid-question. Those bubbles
+ * are also counted as interviewer dialogue by the feedback scorer and replayed to the model
+ * as prior conversation, so it read its own error text as something it had said.
+ *
+ * The transcript no longer carries system failures at all, which makes this the only channel
+ * that reaches the candidate. Returning null here would leave them staring at nothing.
  *
  * Pure and exported so the mapping can be tested without a rendered chat.
  */
 export function buildChatErrorToast(
   status: number,
   data: { code?: unknown; message?: unknown; error?: unknown } | null | undefined
-): ChatErrorToast | null {
+): ChatErrorToast {
   const code = typeof data?.code === "string" ? data.code : undefined
   const message = typeof data?.message === "string" ? data.message : undefined
   const error = typeof data?.error === "string" ? data.error : undefined
@@ -183,6 +194,8 @@ export function buildChatErrorToast(
       title: REFUSAL_TITLES[code] ?? "We couldn't continue",
       description: message ?? error ?? "Please try again in a moment.",
       showUpgradeAction: UPGRADE_RESOLVES.has(code),
+      // A refusal is a decision, not a hiccup. Retrying it just repeats the refusal.
+      canRetry: false,
     }
   }
 
@@ -193,10 +206,21 @@ export function buildChatErrorToast(
       title: "Too many requests",
       description: message ?? error ?? "Give it a few seconds and try again.",
       showUpgradeAction: false,
+      canRetry: true,
     }
   }
 
-  return null
+  // Everything else is a transport or server failure. The candidate's message is back in
+  // the composer, so say so rather than leaving them wondering whether it was sent.
+  return {
+    title: "The interviewer couldn't respond",
+    description:
+      message ??
+      error ??
+      "Something went wrong on our side. Your message is back in the box, so you can send it again.",
+    showUpgradeAction: false,
+    canRetry: status >= 500 || status === 0,
+  }
 }
 
 /**
@@ -273,6 +297,43 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
       // Deferred clear wins over any in-flight onTranscript from queued WebSocket messages
       const clearInput = setInput
       setTimeout(() => clearInput(""), 0)
+
+      /**
+       * Undo the optimistic send and hand the message back to the candidate.
+       *
+       * Our failures do not belong in the transcript. The raw error body used to be appended
+       * as a `type: "ai"` bubble, so the interviewer appeared to say "Token limit exceeded.
+       * 5,000 tokens/minute for free tier." mid-question; the feedback scorer counts those
+       * bubbles as interviewer dialogue, and they are replayed to the model as prior turns.
+       *
+       * The candidate's own message goes too, by identity rather than by position so a
+       * proactive nudge landing in between cannot make this remove the wrong one. A message
+       * that never reached the interviewer did not happen, and leaving it there would show
+       * it twice as soon as they resend.
+       */
+      const reportSendFailure = (
+        status: number,
+        data: { code?: unknown; message?: unknown; error?: unknown } | null | undefined,
+        failed: ChatMessage
+      ) => {
+        setMessages((prev) => prev.filter((message) => message !== failed))
+        setInput(failed.message)
+
+        const errorToast = buildChatErrorToast(status, data)
+        toast.error(errorToast.title, {
+          description: errorToast.description,
+          // Longer than the usual 6s: these carry a decision, not just news.
+          duration: errorToast.showUpgradeAction ? 12000 : 6000,
+          action: errorToast.showUpgradeAction
+            ? { label: "See Pro plans", onClick: () => router.push(UPGRADE_PATH) }
+            : errorToast.canRetry
+              ? {
+                  label: "Retry",
+                  onClick: () => handleSendMessage(isInterviewer, failed.message),
+                }
+              : undefined,
+        })
+      }
 
       // Track user message for conversation context (phase tracking)
       if (isInterviewer) {
@@ -373,23 +434,13 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
         const data = await response.json()
         if (!response.ok) {
           console.warn("[API] Request failed:", response.status, response.url, data)
-          const errorMsg = data?.message || data?.error || "Something went wrong. Please try again."
-          setMessages((prev) => [...prev, { type: "ai", message: errorMsg }])
-
-          const errorToast = buildChatErrorToast(response.status, data)
-          if (errorToast) {
-            toast.error(errorToast.title, {
-              description: errorToast.description,
-              // Longer than the usual 6s: these carry a decision, not just news.
-              duration: errorToast.showUpgradeAction ? 12000 : 6000,
-              action: errorToast.showUpgradeAction
-                ? {
-                    label: "See Pro plans",
-                    onClick: () => router.push(UPGRADE_PATH),
-                  }
-                : undefined,
-            })
-          }
+          // Deliberately NOT appended to the transcript. The raw error body used to be
+          // pushed in as a `type: "ai"` message, which made the interviewer appear to say
+          // "Token limit exceeded. 5,000 tokens/minute for free tier." mid-question. Those
+          // bubbles were also scored as interviewer dialogue and replayed to the model as
+          // prior turns. The toast is the channel for our failures; the transcript is for
+          // the interview.
+          reportSendFailure(response.status, data, newUserMessage)
           return
         }
 
@@ -491,25 +542,14 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             })
           }
         } else {
-          setMessages((prev) => [
-            ...prev,
-            { type: "ai", message: "Sorry, I encountered an error. Please try again." },
-          ])
+          // A 200 with no reply is still our failure, not something the interviewer said.
+          reportSendFailure(response.status, data, newUserMessage)
         }
       } catch (error) {
         console.error("Chat error:", error)
-        setMessages((prev) => [
-          ...prev,
-          { type: "ai", message: "Sorry, I couldn't process that. Please try again." },
-        ])
-        toast.error("Failed to send message", {
-          description: "Network error. Please check your connection and try again.",
-          duration: 6000,
-          action: {
-            label: "Retry",
-            onClick: () => handleSendMessage(isInterviewer, userMessage),
-          },
-        })
+        // Status 0 means the request never got an answer at all. buildChatErrorToast treats
+        // that as retryable, which is right: a dropped connection usually is.
+        reportSendFailure(0, null, newUserMessage)
       } finally {
         setLoading(false)
       }

@@ -96,10 +96,48 @@ describe("buildChatErrorToast", () => {
     expect(result?.showUpgradeAction).toBe(false)
   })
 
-  it("stays silent for ordinary server errors, which land in the transcript", () => {
-    expect(buildChatErrorToast(500, { error: "Internal error" })).toBeNull()
-    expect(buildChatErrorToast(400, null)).toBeNull()
-    expect(buildChatErrorToast(502, undefined)).toBeNull()
+  describe("ordinary server errors", () => {
+    // These used to return null, on the reasoning that the failure already reached the
+    // candidate through the transcript. What reached them was the raw error body rendered
+    // as an interviewer message. The transcript no longer carries our failures at all, so
+    // returning null here would leave the candidate with no signal whatsoever.
+    it("still reaches the candidate", () => {
+      expect(buildChatErrorToast(500, { error: "Internal error" })).not.toBeNull()
+      expect(buildChatErrorToast(400, null)).not.toBeNull()
+      expect(buildChatErrorToast(502, undefined)).not.toBeNull()
+    })
+
+    it("does not put words in the interviewer's mouth", () => {
+      const result = buildChatErrorToast(500, { error: "Internal error" })
+
+      expect(result.title).toBe("The interviewer couldn't respond")
+      expect(result.showUpgradeAction).toBe(false)
+    })
+
+    it("offers a retry for a server fault but not for a bad request", () => {
+      expect(buildChatErrorToast(500, { error: "Internal error" }).canRetry).toBe(true)
+      expect(buildChatErrorToast(400, null).canRetry).toBe(false)
+    })
+  })
+
+  describe("retryability", () => {
+    it("offers a retry on throttling, which resolves on its own", () => {
+      expect(buildChatErrorToast(429, { error: "Too many requests" }).canRetry).toBe(true)
+    })
+
+    it("does not offer a retry on a refusal, which would just repeat itself", () => {
+      const result = buildChatErrorToast(403, {
+        code: "SESSION_LIMIT_EXCEEDED",
+        message: "Upgrade to keep going.",
+      })
+
+      expect(result.canRetry).toBe(false)
+    })
+
+    it("treats a request that never got an answer as retryable", () => {
+      // Status 0 is the thrown-fetch path: a dropped connection usually is worth retrying.
+      expect(buildChatErrorToast(0, null).canRetry).toBe(true)
+    })
   })
 
   it("falls back to a neutral title for a code it has never seen", () => {
