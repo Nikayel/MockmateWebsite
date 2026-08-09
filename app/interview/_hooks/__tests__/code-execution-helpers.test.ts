@@ -86,6 +86,7 @@ describe("applyExecutionApiError", () => {
     setInterviewerMessages: vi.fn(),
     setIsRunningTests: vi.fn(),
     playSound: vi.fn(),
+    announcedFailureRef: { current: null as string | null },
   })
 
   beforeEach(() => {
@@ -115,23 +116,66 @@ describe("applyExecutionApiError", () => {
 
     expect(ctx.setInterviewerMessages).not.toHaveBeenCalled()
     expect(toast.error).toHaveBeenCalledTimes(1)
-    expect(ctx.playSound).toHaveBeenCalledWith("fail")
+    // No failure sound: the runner never ran, so the candidate did not fail.
+    expect(ctx.playSound).not.toHaveBeenCalled()
     expect(ctx.setIsRunningTests).toHaveBeenCalledWith(false)
   })
 
-  it("dedupes the interviewer nudge against the last two messages", () => {
-    vi.mocked(isExecutionServiceError).mockReturnValue(false)
-    const ctx = makeCtx()
+  describe("when the harness is what broke", () => {
+    // A missing method on our own assert shim used to reach the candidate as "check that
+    // your function name matches what the problem expects".
+    const harnessFailure = {
+      ok: false,
+      status: 500,
+      data: { error: "assert.deepEqual is not a function" },
+    }
 
-    applyExecutionApiError({ ok: false, status: 500, data: { error: "boom" } }, ctx)
-    const updater = ctx.setInterviewerMessages.mock.calls[0][0] as (prev: any[]) => any[]
+    it("says the failure is ours and never blames their function", () => {
+      vi.mocked(isExecutionServiceError).mockReturnValue(false)
+      const ctx = makeCtx()
 
-    const prevWithRecentError = [
-      { type: "ai", message: "There was a problem running your code: x" },
-    ]
-    expect(updater(prevWithRecentError)).toBe(prevWithRecentError) // unchanged (deduped)
+      applyExecutionApiError(harnessFailure, ctx)
 
-    const fresh = [{ type: "ai", message: "hello" }]
-    expect(updater(fresh)).toHaveLength(2) // appends a new nudge
+      const updater = ctx.setInterviewerMessages.mock.calls[0][0] as (prev: any[]) => any[]
+      const [spoken] = updater([])
+      expect(spoken.message).toMatch(/our own tooling/i)
+      expect(spoken.message).not.toMatch(/your function name/i)
+    })
+
+    it("plays no failure sound, because the candidate did not fail", () => {
+      vi.mocked(isExecutionServiceError).mockReturnValue(false)
+      const ctx = makeCtx()
+
+      applyExecutionApiError(harnessFailure, ctx)
+
+      expect(ctx.playSound).not.toHaveBeenCalled()
+      expect(toast.error).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe("repeating itself", () => {
+    it("stays quiet about a failure it has already reported", () => {
+      // The old guard scanned the last two messages, so two intervening messages reopened
+      // it. The proactive silence poll supplied exactly that, and a candidate who never
+      // typed heard the same line twice.
+      vi.mocked(isExecutionServiceError).mockReturnValue(false)
+      const ctx = makeCtx()
+      const failure = { ok: false, status: 500, data: { error: "boom" } }
+
+      applyExecutionApiError(failure, ctx)
+      applyExecutionApiError(failure, ctx)
+
+      expect(ctx.setInterviewerMessages).toHaveBeenCalledTimes(1)
+    })
+
+    it("speaks up when the candidate hits a different failure", () => {
+      vi.mocked(isExecutionServiceError).mockReturnValue(false)
+      const ctx = makeCtx()
+
+      applyExecutionApiError({ ok: false, status: 500, data: { error: "boom" } }, ctx)
+      applyExecutionApiError({ ok: false, status: 500, data: { error: "different" } }, ctx)
+
+      expect(ctx.setInterviewerMessages).toHaveBeenCalledTimes(2)
+    })
   })
 })

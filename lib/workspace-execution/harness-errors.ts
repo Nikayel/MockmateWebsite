@@ -28,7 +28,18 @@ const HARNESS_ERROR_PATTERNS: RegExp[] = [
   /module not found:\s*(?:node:)?assert\b/i,
   // The worker's results channel never delivered a parseable payload.
   /__workspace_test_results__/i,
+  /test runner did not report any test results/i,
+  // The scenario asked for a runner that does not exist.
+  /workspace runner not found/i,
 ]
+
+/**
+ * Deliberately NOT a rule here: "every failing test reported the same error". It reads like
+ * a strong harness signal and is not one. A candidate whose function throws on any input
+ * produces an identical error for every case, which is the single most common way to fail a
+ * debugging scenario. Treating that as our fault would tell people their broken code was
+ * fine.
+ */
 
 /**
  * True when the failure is the platform's, not the candidate's.

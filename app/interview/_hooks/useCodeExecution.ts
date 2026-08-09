@@ -1,7 +1,7 @@
+import { useRef } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import { toast } from "sonner"
 import { analyzeCodeEfficiency } from "@/lib/interview"
-import { isExecutionServiceError } from "@/lib/piston"
 import { saveSessionState } from "@/lib/firestore-helpers"
 import type { Scenario } from "@/lib/scenarios"
 import type { PackRunView } from "@/lib/workspace-execution"
@@ -15,7 +15,13 @@ import type {
   TestSummary,
   WorkspaceContextFile,
 } from "../_types"
-import { applyExecutionApiError, executeScenario } from "./code-execution-helpers"
+import { HARNESS_ERROR_NOTICE } from "@/lib/workspace-execution/harness-errors"
+import {
+  announceRunFailure,
+  applyExecutionApiError,
+  classifyFailedRun,
+  executeScenario,
+} from "./code-execution-helpers"
 import { useGuidedLabStore } from "@/lib/stores/guided-lab-store"
 
 /**
@@ -135,6 +141,11 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
     markQuestionEvaluating,
   } = opts
 
+  // The last failure the interviewer spoke about, so it does not repeat itself about a
+  // failure the candidate has not changed. Cleared whenever a run gets anything to pass, so
+  // an error they fix and later reintroduce is worth mentioning again.
+  const announcedFailureRef = useRef<string | null>(null)
+
   const runCode = async () => {
     if (!selectedScenario) return
 
@@ -164,6 +175,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
           setInterviewerMessages,
           setIsRunningTests,
           playSound,
+          announcedFailureRef,
         })
         return
       }
@@ -197,9 +209,9 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
 
         if (allFailed && errorResults.length > 0) {
           const firstError = errorResults[0].error
-          const isServiceDown = isExecutionServiceError(firstError)
+          const cause = classifyFailedRun(firstError)
 
-          if (isServiceDown) {
+          if (cause === "service-down") {
             toast.error("Code execution unavailable", {
               description:
                 "Our code runner is temporarily unavailable. Please try again in a few minutes.",
@@ -210,31 +222,45 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
             return
           }
 
-          const isSyntaxError =
-            firstError &&
-            (firstError.includes("SyntaxError") ||
-              firstError.includes("Compilation error") ||
-              firstError.includes("Unexpected token") ||
-              firstError.includes("unexpected token") ||
-              firstError.includes("Parse error") ||
-              firstError.includes("IndentationError") ||
-              firstError.includes("invalid syntax"))
+          if (cause === "harness") {
+            // Our scaffolding broke, so there is nothing for them to fix and no failure
+            // sound to play. Saying "an error in your code" here is what sent a candidate
+            // hunting through correct code while the interviewer argued that they were
+            // wrong about the tests being broken.
+            toast.error("This one is on us", {
+              description: HARNESS_ERROR_NOTICE,
+              duration: 12000,
+            })
+            setIsRunningTests(false)
+            announceRunFailure(
+              setInterviewerMessages,
+              announcedFailureRef,
+              firstError,
+              "Those failures are coming from our test harness, not from your code. Nothing " +
+                "you write will make them pass, so please do not spend the interview on it. " +
+                "Try another problem and let us know this happened."
+            )
+            return
+          }
 
           playSound("fail")
           setIsRunningTests(false)
 
-          const errorMsgText = `I see there's ${isSyntaxError ? "a syntax error" : "an error"} in your code. Check the console below the editor - it shows exactly what went wrong. Let me know if you'd like help understanding the error.`
-          setInterviewerMessages((prev) => {
-            const recentMessages = prev.slice(-2)
-            const hasRecentErrorMsg = recentMessages.some(
-              (msg) => msg.type === "ai" && msg.message.includes("error in your code")
-            )
-            if (hasRecentErrorMsg) return prev
-            return [...prev, { type: "ai", message: errorMsgText }]
-          })
+          announceRunFailure(
+            setInterviewerMessages,
+            announcedFailureRef,
+            firstError,
+            `I see there's ${cause === "syntax" ? "a syntax error" : "an error"} in your code. ` +
+              `Check the console below the editor - it shows exactly what went wrong. Let me ` +
+              `know if you'd like help understanding the error.`
+          )
 
           return
         }
+
+        // Something passed, so the run they were last told about is behind them. Clearing
+        // this lets the interviewer speak up again if that same error comes back later.
+        announcedFailureRef.current = null
 
         // Play sound based on results
         if (data.summary.passRate === 100) {
@@ -294,6 +320,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
           setInterviewerMessages,
           setIsRunningTests,
           playSound,
+          announcedFailureRef,
         })
         return
       }
@@ -333,9 +360,9 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
 
         if (allFailed && errorResults.length > 0) {
           const firstError = errorResults[0].error
-          const isServiceDown = isExecutionServiceError(firstError)
+          const cause = classifyFailedRun(firstError)
 
-          if (isServiceDown) {
+          if (cause === "service-down") {
             playSound("fail")
             setIsRunningTests(false)
             toast.error("Code execution unavailable", {
@@ -346,22 +373,24 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
             return
           }
 
-          const isSyntaxError =
-            firstError &&
-            (firstError.includes("SyntaxError") ||
-              firstError.includes("Compilation error") ||
-              firstError.includes("Unexpected token") ||
-              firstError.includes("unexpected token") ||
-              firstError.includes("Parse error") ||
-              firstError.includes("IndentationError") ||
-              firstError.includes("invalid syntax"))
+          if (cause === "harness") {
+            // "Fix errors before submitting" is an instruction the candidate cannot carry
+            // out when the errors are ours, and it blocks the submit they are entitled to.
+            setIsRunningTests(false)
+            toast.error("This one is on us", {
+              description: HARNESS_ERROR_NOTICE,
+              duration: 12000,
+            })
+            return
+          }
 
           playSound("fail")
           setIsRunningTests(false)
           toast.error("Fix errors before submitting", {
-            description: isSyntaxError
-              ? "There's a syntax error in your code."
-              : "Your code has errors that need to be fixed.",
+            description:
+              cause === "syntax"
+                ? "There's a syntax error in your code."
+                : "Your code has errors that need to be fixed.",
           })
           return
         }
