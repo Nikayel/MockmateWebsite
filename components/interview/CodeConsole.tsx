@@ -14,6 +14,7 @@ import {
   JAVASCRIPT_WRAPPER_LINE_OFFSET,
   type PackRunView,
 } from "@/lib/workspace-execution"
+import { HARNESS_ERROR_NOTICE, isHarnessError } from "@/lib/workspace-execution/harness-errors"
 
 /**
  * CodeConsole - IDE-like console panel for code execution output
@@ -130,11 +131,19 @@ function parseErrorLineNumber(
   return adjustedLineNum
 }
 
-// Detect error type from message
-function getErrorType(
+// Detect error type from message. Exported for CodeConsole.test.ts: what this returns
+// decides whether a candidate is told a failure is theirs, so it is worth pinning down.
+export function getErrorType(
   error: string
-): "syntax" | "runtime" | "type" | "logic" | "timeout" | "security" | "unknown" {
+): "syntax" | "runtime" | "type" | "logic" | "timeout" | "security" | "harness" | "unknown" {
   const lowerError = error.toLowerCase()
+
+  // Harness faults first. "assert.deepEqual is not a function" matches the type bucket
+  // below on "is not a function", which told candidates to check their own signatures for
+  // a method the sandbox had simply failed to define.
+  if (isHarnessError(error)) {
+    return "harness"
+  }
 
   // Security / Execution Environment Errors
   if (
@@ -192,6 +201,14 @@ function getErrorType(
     return "timeout"
   }
 
+  // Assertion failures, checked before the runtime bucket. An assertion message quotes the
+  // values it compared, so "Expected deep equality, got undefined vs [0,2]" was matching on
+  // "undefined" below and being reported as a runtime fault rather than a wrong answer.
+  // Anchored to the start so it only catches messages the assert shim actually produces.
+  if (lowerError.trimStart().startsWith("expected") || lowerError.includes("assertionerror")) {
+    return "logic"
+  }
+
   // Runtime/Value errors
   if (
     lowerError.includes("referenceerror") ||
@@ -225,8 +242,8 @@ function getErrorType(
   return "unknown"
 }
 
-// Format error message for display with helpful hints
-function formatErrorMessage(
+// Format error message for display with helpful hints. Exported alongside getErrorType.
+export function formatErrorMessage(
   error: string,
   language: "python" | "javascript" | "typescript" = "python",
   userCodeLineCount?: number
@@ -241,6 +258,7 @@ function formatErrorMessage(
     timeout: "⏱️ Timeout/Recursion Error",
     logic: "🟡 Logic Error",
     security: "🔒 Execution Environment Error",
+    harness: "🛠️ Our Bug, Not Yours",
     unknown: "❌ Error",
   }
 
@@ -252,11 +270,14 @@ function formatErrorMessage(
     logic: "Your solution runs but produces incorrect output. Review your algorithm.",
     security:
       "An execution environment or security policy issue occurred. Please contact support or try reloading the page.",
+    harness: HARNESS_ERROR_NOTICE,
     unknown: "Review your code for potential issues.",
   }
 
   let title = titles[errorType]
-  if (lineNum) {
+  // A harness fault has no line in the candidate's code to point at, and appending one
+  // would send them looking for a bug they did not write.
+  if (lineNum && errorType !== "harness") {
     title += ` on line ${lineNum}`
   }
 
