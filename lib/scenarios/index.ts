@@ -187,15 +187,24 @@ async function loadBugFixScenarios(): Promise<BugFixScenario[]> {
 }
 
 /**
- * Lazy load SystemDesign scenarios
+ * Lazy load SystemDesign scenarios.
+ *
+ * Both banks, because the eager registry (lib/scenarios.ts) spreads both and this loader is what
+ * `getScenarioById` resolves against. Loading only the core bank left `system-design-newsfeed`
+ * listed everywhere and openable nowhere: every `/interview?scenario=...` deep link for it, from a
+ * review card or the Learn drill bank, died on "Scenario not found". Mirrors how bugfix already
+ * shares one composition with the eager registry.
  */
 async function loadSystemDesignScenarios(): Promise<SystemDesignScenario[]> {
   if (loadedModules.has("system-design")) {
     return loadedModules.get("system-design") as SystemDesignScenario[]
   }
 
-  const systemDesignModule = await import("./system-design")
-  const scenarios = systemDesignModule.systemDesignScenarios
+  const [core, realWorld] = await Promise.all([
+    import("./system-design"),
+    import("./real-world/system-design"),
+  ])
+  const scenarios = [...core.systemDesignScenarios, ...realWorld.realWorldSystemDesignScenarios]
   loadedModules.set("system-design", scenarios)
   return scenarios
 }
