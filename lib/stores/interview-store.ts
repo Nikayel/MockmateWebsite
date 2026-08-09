@@ -227,7 +227,11 @@ const initialState: InterviewState = {
   showScenarioBrowser: true,
 
   // Filters
-  filterType: ["bugfix"],
+  // No preset type. `/interview` renders one track at a time and narrows the catalog to that
+  // track's own scenario types, so a type filter here is redundant at best. At worst it is the
+  // bug it used to be: with `["bugfix"]` preset, arriving at the DSA track intersected to nothing
+  // and showed "No problems match your filters" over 200-plus problems the user never filtered.
+  filterType: [],
   filterDifficulty: [],
   filterCompanies: [],
   searchQuery: "",
