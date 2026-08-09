@@ -57,6 +57,19 @@ export function concedesPlatformFault(response: string): boolean {
   return PLATFORM_CONCESSION_PATTERNS.some((pattern) => pattern.test(response))
 }
 
+/**
+ * Instructional shell-command forms: "run python3 src/main.py", "execute node
+ * index.js", "try running pytest", "re-run src/main.py". The candidate has no
+ * terminal - the Run Tests button is the only way code runs - but bugfix pack
+ * task files quote literal run commands and the model repeated them as things
+ * to type. The verb must sit immediately before an interpreter or script path,
+ * so descriptions stay legal: "Run Tests runs python3 for you" does not match
+ * ("runs"/"running" are not in the verb alternation), and neither does "run the
+ * tests".
+ */
+const SHELL_COMMAND_INSTRUCTION_PATTERN =
+  /\b(?:try\s+(?:running|executing)|re-?run|run|execute)\s+`?(?:(?:python3?|node|pytest|pip3?|npm|pnpm|bash|sh)\b|[\w./-]+\.(?:py|js|ts|sh)\b)/i
+
 export interface ResponseGuardrail {
   name: string
   severity: "critical" | "warning"
@@ -161,6 +174,18 @@ export const RESPONSE_GUARDRAILS: ResponseGuardrail[] = [
       return null
     },
     hint: "The 'See Full Interview Score' button only appears AFTER submit. Guide them to Submit first.",
+  },
+  {
+    name: "no-shell-command-instructions",
+    severity: "critical",
+    check: (ctx) => {
+      const match = ctx.response.match(SHELL_COMMAND_INSTRUCTION_PATTERN)
+      if (match) {
+        return { violated: true, evidence: `Instructed a shell command: "${match[0].trim()}"` }
+      }
+      return null
+    },
+    hint: "There is no terminal. The candidate runs code only via the 'Run Tests' button. Say 'run the tests' or 'click Run Tests', never a shell command.",
   },
   {
     name: "one-question-at-a-time",
