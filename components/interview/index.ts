@@ -16,7 +16,6 @@
 export { ScenarioBrowser } from "./ScenarioBrowser"
 export { PatternBrowser } from "./PatternBrowser"
 export { DSARoadmap } from "./DSARoadmap"
-export { InterviewerChat, AIChatPartner } from "./InterviewerChat"
 
 // ScenarioBrowser sub-components
 export { ScenarioCard } from "./ScenarioCard"
