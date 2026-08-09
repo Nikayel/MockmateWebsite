@@ -67,20 +67,6 @@ export async function trackAIChatServer(params: {
     ...(tokensOut !== undefined ? { tokensOut } : {}),
   })
 }
-
-/**
- * Track API error
- */
-export async function trackAPIErrorServer(params: {
-  endpoint: string
-  errorType: string
-  errorMessage: string
-  userId?: string
-  statusCode?: number
-}) {
-  await trackEventServer("api_error", params)
-}
-
 /**
  * Track feedback generation
  */

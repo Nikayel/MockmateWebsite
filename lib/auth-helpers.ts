@@ -58,22 +58,9 @@ export async function verifyAuth(request: NextRequest): Promise<AuthResult> {
 }
 
 /**
- * Get user ID from request (throws if not authenticated)
- */
-export async function requireAuth(request: NextRequest): Promise<string> {
-  const result = await verifyAuth(request)
-
-  if (!result.authenticated || !result.userId) {
-    throw new Error(result.error || 'Unauthorized')
-  }
-
-  return result.userId
-}
-
-/**
  * Standard unauthorized response
  */
-export function unauthorizedResponse(message = 'Unauthorized'): NextResponse {
+function unauthorizedResponse(message = 'Unauthorized'): NextResponse {
   return NextResponse.json({ error: message }, { status: 401 })
 }
 
@@ -136,13 +123,3 @@ export interface OptionalAuthContext {
 type OptionalAuthHandler = (
   context: OptionalAuthContext
 ) => Promise<NextResponse>
-
-export function withOptionalAuth(handler: OptionalAuthHandler) {
-  return async (request: NextRequest): Promise<NextResponse> => {
-    const authResult = await verifyAuth(request)
-    return handler({
-      userId: authResult.authenticated ? authResult.userId : null,
-      request
-    })
-  }
-}

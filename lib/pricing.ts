@@ -44,28 +44,6 @@ export function getAnnualPrice(tier: SubscriptionTier): number {
       return 0
   }
 }
-
-/**
- * Get display price string
- */
-export function getPriceDisplay(
-  tier: SubscriptionTier,
-  period: "monthly" | "yearly" = "monthly"
-): string {
-  switch (tier) {
-    case "free":
-      return PRICING_CONFIG.free.priceDisplay
-    case "pro":
-      return period === "monthly"
-        ? PRICING_CONFIG.pro.website.monthly.priceDisplay
-        : PRICING_CONFIG.pro.website.yearly.priceDisplay
-    case "enterprise":
-      return PRICING_CONFIG.enterprise.priceDisplay
-    default:
-      return "$0"
-  }
-}
-
 /**
  * Effective monthly session limit for a tier. Enterprise is effectively
  * unlimited (999 sentinel). This is the single source of truth so the server
@@ -113,30 +91,9 @@ export const AI_BUDGET_CAPS = {
 /**
  * Get AI budget cap for a tier
  */
-export function getAIBudgetCap(tier: SubscriptionTier): number {
+function getAIBudgetCap(tier: SubscriptionTier): number {
   return AI_BUDGET_CAPS[tier] ?? AI_BUDGET_CAPS.free
 }
-
-/**
- * Calculate MRR (Monthly Recurring Revenue) from user counts
- */
-export function calculateMRR(tierCounts: {
-  free: number
-  pro: number
-  enterprise: number
-}): number {
-  const proRevenue = tierCounts.pro * getMonthlyPrice("pro")
-  const enterpriseRevenue = tierCounts.enterprise * getMonthlyPrice("enterprise")
-  return proRevenue + enterpriseRevenue
-}
-
-/**
- * Calculate ARR (Annual Recurring Revenue) from MRR
- */
-export function calculateARR(mrr: number): number {
-  return mrr * 12
-}
-
 /**
  * Get all pricing tiers with full details for admin display
  */

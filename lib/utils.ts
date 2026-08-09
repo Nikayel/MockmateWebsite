@@ -56,23 +56,6 @@ export function getStoredDateComponents(date: Date): {
     }
   }
 }
-
-/**
- * @deprecated Use getStoredDateComponents instead for roadmap dates.
- * This function assumes UTC midnight storage which may not be true for legacy data.
- */
-export function getUTCDateComponents(date: Date): {
-  year: number
-  month: number
-  day: number
-} {
-  return {
-    year: date.getUTCFullYear(),
-    month: date.getUTCMonth(),
-    day: date.getUTCDate(),
-  }
-}
-
 /**
  * Extracts date components from the current local date.
  */

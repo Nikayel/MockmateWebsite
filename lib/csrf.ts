@@ -45,7 +45,7 @@ function generateCSRFToken(): string {
 /**
  * Set CSRF token cookie in response
  */
-export function setCSRFTokenCookie(response: NextResponse): NextResponse {
+function setCSRFTokenCookie(response: NextResponse): NextResponse {
   const token = generateCSRFToken()
 
   response.cookies.set(CSRF_COOKIE_NAME, token, {
@@ -102,19 +102,4 @@ export function csrfProtection(request: NextRequest): NextResponse | null {
   }
 
   return null
-}
-
-/**
- * Get CSRF token for client-side usage
- */
-export function getCSRFToken(request: NextRequest): string | null {
-  return request.cookies.get(CSRF_COOKIE_NAME)?.value || null
-}
-
-/**
- * Create a response with CSRF token cookie
- */
-export function createResponseWithCSRFToken(data: any, status = 200): NextResponse {
-  const response = NextResponse.json(data, { status })
-  return setCSRFTokenCookie(response)
 }

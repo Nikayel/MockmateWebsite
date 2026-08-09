@@ -501,18 +501,6 @@ export async function signOut() {
     throw error
   }
 }
-
-export async function getCurrentUser(): Promise<FirebaseUser | null> {
-  const { getAuthLazy } = await import("./firebase-lazy")
-  const auth = await getAuthLazy()
-  return new Promise((resolve) => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      unsubscribe()
-      resolve(user)
-    })
-  })
-}
-
 export function generateVSCodeDeepLink(token: string) {
   const encodedToken = encodeURIComponent(token)
   // VS Code extension coming soon - will use codesparring extension ID

@@ -299,37 +299,3 @@ export async function clearCache(options?: { memoryOnly?: boolean }): Promise<vo
     }
   }
 }
-
-/**
- * Wrapper for AI calls with caching
- */
-export async function withCache<T>(
-  cacheKey: string,
-  type: string,
-  fetchFn: () => Promise<T>,
-  options?: {
-    skipCache?: boolean
-    forceRefresh?: boolean
-  }
-): Promise<{ result: T; cached: boolean }> {
-  if (options?.skipCache) {
-    const result = await fetchFn()
-    return { result, cached: false }
-  }
-
-  if (!options?.forceRefresh) {
-    const cached = await getCachedResponse(cacheKey)
-    if (cached.hit && cached.response) {
-      return { result: cached.response as T, cached: true }
-    }
-  }
-
-  const result = await fetchFn()
-
-  // Cache the result if it's a string (most AI responses)
-  if (typeof result === "string") {
-    await setCachedResponse(cacheKey, result, type)
-  }
-
-  return { result, cached: false }
-}
