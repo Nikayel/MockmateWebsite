@@ -1,10 +1,5 @@
 // CodeMirror 6 Editor - Replacing Monaco for better performance and smaller bundle size
-export {
-  CodeMirrorEditor,
-  CodeMirrorErrorBoundary,
-  EDITOR_OPTIONS,
-  cleanupOrphanedModels,
-} from "./CodeMirrorEditor"
+export { CodeMirrorEditor, CodeMirrorErrorBoundary } from "./CodeMirrorEditor"
 export type { CodeMirrorEditorProps, CodeMirrorEditorRef } from "./CodeMirrorEditor"
 
 /**

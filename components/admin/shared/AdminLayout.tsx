@@ -119,35 +119,3 @@ export function AdminSection({
     </div>
   )
 }
-
-interface TimeRangeSelectorProps {
-  value: string
-  onChange: (value: string) => void
-  ranges?: string[]
-}
-
-export function TimeRangeSelector({
-  value,
-  onChange,
-  ranges = ["7d", "30d", "90d", "all"],
-}: TimeRangeSelectorProps) {
-  return (
-    <div className="flex gap-1 bg-gray-900 rounded-lg p-1">
-      {ranges.map((range) => (
-        <Button
-          key={range}
-          size="sm"
-          variant={value === range ? "default" : "ghost"}
-          onClick={() => onChange(range)}
-          className={
-            value === range
-              ? "bg-[#c4703f] text-black hover:bg-[#c4703f]/80"
-              : "text-gray-400 hover:text-white hover:bg-gray-800"
-          }
-        >
-          {range === "all" ? "All" : range.toUpperCase()}
-        </Button>
-      ))}
-    </div>
-  )
-}

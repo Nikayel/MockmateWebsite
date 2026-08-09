@@ -17,7 +17,7 @@ export function Skeleton({
 }
 
 // Skeleton for MetricCard
-export function MetricCardSkeleton() {
+function MetricCardSkeleton() {
   return (
     <Card className="bg-gray-900/50 border-gray-800">
       <CardContent className="p-6">
@@ -63,87 +63,6 @@ export function ChartSkeleton({ height = 300 }: { height?: number }) {
         <Skeleton className={`w-full rounded-lg`} style={{ height }} />
       </CardContent>
     </Card>
-  )
-}
-
-// Skeleton for table rows
-export function TableRowSkeleton({ columns = 5 }: { columns?: number }) {
-  return (
-    <tr className="border-b border-gray-800/50">
-      {Array.from({ length: columns }).map((_, i) => (
-        <td key={i} className="py-3 px-4">
-          <Skeleton className="h-4 w-full max-w-[120px]" />
-        </td>
-      ))}
-    </tr>
-  )
-}
-
-// Skeleton for a full table
-export function TableSkeleton({
-  rows = 5,
-  columns = 5,
-}: {
-  rows?: number
-  columns?: number
-}) {
-  return (
-    <Card className="bg-gray-900/50 border-gray-800">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-6 w-32" />
-          <Skeleton className="h-9 w-40" />
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-800">
-                {Array.from({ length: columns }).map((_, i) => (
-                  <th key={i} className="py-3 px-4 text-left">
-                    <Skeleton className="h-3 w-16" />
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: rows }).map((_, i) => (
-                <TableRowSkeleton key={i} columns={columns} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// Skeleton for page loading state
-export function PageSkeleton() {
-  return (
-    <div className="space-y-8">
-      {/* Header skeleton */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Skeleton className="h-9 w-48 mb-2" />
-          <Skeleton className="h-4 w-64" />
-        </div>
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-9 w-36 rounded-lg" />
-          <Skeleton className="h-9 w-24" />
-        </div>
-      </div>
-
-      {/* Metrics grid skeleton */}
-      <MetricsGridSkeleton count={4} />
-
-      {/* Chart skeleton */}
-      <ChartSkeleton height={280} />
-
-      {/* Table skeleton */}
-      <TableSkeleton rows={5} columns={5} />
-    </div>
   )
 }
 

@@ -434,9 +434,3 @@ export class CodeMirrorErrorBoundary extends React.Component<
     return this.props.children
   }
 }
-
-// Backwards compatibility exports
-export const EDITOR_OPTIONS = {}
-export function cleanupOrphanedModels() {
-  // No-op for backwards compatibility
-}

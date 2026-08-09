@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils"
  * Difficulty badges deliberately keep amber: they are a traffic light, where an ordered
  * green/amber/red scale is the point and yellow earns its place.
  */
-export const LESSON_NOTICE_CLASS =
+const LESSON_NOTICE_CLASS =
   "rounded-lg border border-orange-500/40 bg-orange-500/10 text-orange-800 dark:text-orange-300"
 
 /** Matching text colour for controls rendered inside a notice (e.g. a Retry button). */

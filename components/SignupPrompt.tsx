@@ -79,8 +79,7 @@ export function SignupPrompt({ score, sessionId, scenarioTitle, onDismiss }: Sig
       // "redirecting", and that flow comes back through the login page, which
       // already creates the profile.
       if (result.status === "signed-in") {
-        const isNewUser =
-          result.user.metadata.creationTime === result.user.metadata.lastSignInTime
+        const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime
         await createOrUpdateProfile(
           result.user.uid,
           result.user.email || "",
@@ -103,7 +102,7 @@ export function SignupPrompt({ score, sessionId, scenarioTitle, onDismiss }: Sig
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
+      className="bg-background/70 fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
       onClick={(e: React.MouseEvent<HTMLDivElement>) => {
         if (e.target === e.currentTarget) handleClose()
       }}
@@ -113,32 +112,34 @@ export function SignupPrompt({ score, sessionId, scenarioTitle, onDismiss }: Sig
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.1 }}
       >
-        <Card className="relative w-full max-w-sm border-border bg-card">
+        <Card className="border-border bg-card relative w-full max-w-sm">
           {/* Close button */}
           <button
             onClick={handleClose}
-            className="absolute top-3 right-3 z-10 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-muted-foreground"
+            className="text-muted-foreground hover:bg-muted hover:text-muted-foreground absolute top-3 right-3 z-10 rounded-full p-1.5 transition-colors"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
           </button>
 
           {/* Score header */}
-          <div className="border-b border-border px-6 pt-6 pb-4 text-center">
-            <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+          <div className="border-border border-b px-6 pt-6 pb-4 text-center">
+            <div className="bg-muted mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full">
               <span className={`text-2xl font-bold ${getScoreColor()}`}>{score}%</span>
             </div>
-            <p className="truncate text-sm text-muted-foreground">{scenarioTitle}</p>
+            <p className="text-muted-foreground truncate text-sm">{scenarioTitle}</p>
           </div>
 
           <CardContent className="space-y-4 p-5">
             {/* Value prop - compact */}
-            <div className="rounded-lg border border-border/50 bg-muted/50 p-3">
+            <div className="border-border/50 bg-muted/50 rounded-lg border p-3">
               <div className="flex items-start gap-2.5">
                 <Brain className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" />
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Don't forget this pattern</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-sm font-medium">
+                    Don't forget this pattern
+                  </p>
+                  <p className="text-muted-foreground mt-0.5 text-xs">
                     Create an account to get review reminders before you forget.
                   </p>
                 </div>
@@ -150,10 +151,10 @@ export function SignupPrompt({ score, sessionId, scenarioTitle, onDismiss }: Sig
               <Button
                 onClick={() => handleAuth("github")}
                 disabled={isLoading}
-                className="h-10 w-full bg-card text-sm font-medium text-foreground hover:bg-muted"
+                className="bg-card text-foreground hover:bg-muted h-10 w-full text-sm font-medium"
               >
                 {isLoading && authProvider === "github" ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-black" />
+                  <div className="border-border h-4 w-4 animate-spin rounded-full border-2 border-t-black" />
                 ) : (
                   <>
                     <Github className="mr-2 h-4 w-4" />
@@ -166,10 +167,10 @@ export function SignupPrompt({ score, sessionId, scenarioTitle, onDismiss }: Sig
                 onClick={() => handleAuth("google")}
                 disabled={isLoading}
                 variant="outline"
-                className="h-10 w-full border-border bg-transparent text-sm font-medium text-muted-foreground hover:bg-muted"
+                className="border-border text-muted-foreground hover:bg-muted h-10 w-full bg-transparent text-sm font-medium"
               >
                 {isLoading && authProvider === "google" ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-zinc-300" />
+                  <div className="border-border h-4 w-4 animate-spin rounded-full border-2 border-t-zinc-300" />
                 ) : (
                   <>
                     <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
@@ -197,7 +198,7 @@ export function SignupPrompt({ score, sessionId, scenarioTitle, onDismiss }: Sig
             </div>
 
             {/* Trust signals */}
-            <div className="flex justify-center gap-4 pt-1 text-xs text-muted-foreground">
+            <div className="text-muted-foreground flex justify-center gap-4 pt-1 text-xs">
               <span className="flex items-center gap-1">
                 <CheckCircle className="h-3 w-3" />
                 Free
@@ -211,47 +212,5 @@ export function SignupPrompt({ score, sessionId, scenarioTitle, onDismiss }: Sig
         </Card>
       </motion.div>
     </motion.div>
-  )
-}
-
-/**
- * Compact inline signup prompt for embedding in feedback views
- */
-export function SignupPromptInline({
-  score,
-  sessionId,
-  onSignup,
-}: {
-  score: number
-  sessionId: string
-  onSignup?: () => void
-}) {
-  const router = useRouter()
-
-  return (
-    <div className="from-accent/10 border-accent/20 rounded-xl border bg-gradient-to-r to-purple-600/10 p-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="bg-accent/20 flex h-12 w-12 items-center justify-center rounded-full">
-            <Trophy className="text-accent h-6 w-6" />
-          </div>
-          <div>
-            <p className="text-foreground font-medium">You scored {score}%</p>
-            <p className="text-muted-foreground text-sm">Sign up to save progress & unlock more</p>
-          </div>
-        </div>
-        <Button
-          onClick={() => {
-            // Store redirect info
-            localStorage.setItem("auth_redirect", `sessions/${sessionId}`)
-            router.push("/login")
-          }}
-          className="bg-accent hover:bg-accent/90 text-accent-foreground"
-        >
-          Sign Up Free
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
-      </div>
-    </div>
   )
 }

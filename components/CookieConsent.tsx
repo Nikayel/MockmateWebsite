@@ -8,7 +8,7 @@ import Link from "next/link"
 const CONSENT_COOKIE_NAME = "codesparring_cookie_consent"
 const CONSENT_VERSION = "1.0" // Increment when policy changes
 
-export type ConsentPreferences = {
+type ConsentPreferences = {
   necessary: boolean // Always true
   analytics: boolean
   functional: boolean
@@ -24,7 +24,7 @@ const defaultPreferences: ConsentPreferences = {
   timestamp: new Date().toISOString(),
 }
 
-export function getConsentPreferences(): ConsentPreferences | null {
+function getConsentPreferences(): ConsentPreferences | null {
   if (typeof window === "undefined") return null
 
   try {
@@ -47,11 +47,6 @@ export function getConsentPreferences(): ConsentPreferences | null {
 export function hasAnalyticsConsent(): boolean {
   const preferences = getConsentPreferences()
   return preferences?.analytics ?? false
-}
-
-export function hasFunctionalConsent(): boolean {
-  const preferences = getConsentPreferences()
-  return preferences?.functional ?? false
 }
 
 export function CookieConsent() {

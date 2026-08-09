@@ -191,42 +191,6 @@ export function GradingCriteriaRadial({ className }: { className?: string }) {
     </div>
   )
 }
-
-// Compact inline version for interview page
-export function GradingCriteriaCompact({ className }: { className?: string }) {
-  return (
-    <div className={cn("flex items-center gap-1", className)}>
-      {criteria.map((criterion, idx) => (
-        <div
-          key={criterion.id}
-          className="group relative"
-          title={`${criterion.label}: ${criterion.hint}`}
-        >
-          {/* Small bar segment */}
-          <div
-            className="h-1 rounded-full transition-all group-hover:h-1.5"
-            style={{
-              width: `${criterion.weight * 0.8}px`,
-              backgroundColor: criterion.color,
-              opacity: 0.7,
-            }}
-          />
-
-          {/* Tooltip on hover */}
-          <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 opacity-0 transition-opacity group-hover:opacity-100">
-            <div className="bg-card border-border rounded border px-2 py-1 whitespace-nowrap">
-              <span className="text-[10px] font-medium" style={{ color: criterion.color }}>
-                {criterion.label}
-              </span>
-              <span className="text-muted-foreground ml-1 text-[10px]">{criterion.weight}%</span>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 // Minimal tooltip trigger for interview coding panel
 export function GradingCriteriaTooltip({ className }: { className?: string }) {
   const [isOpen, setIsOpen] = useState(false)

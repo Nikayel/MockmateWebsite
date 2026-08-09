@@ -381,38 +381,4 @@ export function VoiceModeToggle({
   )
 }
 
-// Legacy export for backwards compatibility
-export interface LegacyVoiceModeToggleProps {
-  isLiveMode: boolean
-  onModeChange: (isLive: boolean) => void
-  isRecording: boolean
-  onToggleRecording: () => void
-  onSendMessage?: () => void
-  transcript?: string
-  disabled?: boolean
-  showSendButton?: boolean
-  compact?: boolean
-  className?: string
-}
-
-export function LegacyVoiceModeToggle({
-  isRecording,
-  onToggleRecording,
-  transcript = "",
-  disabled = false,
-  compact = false,
-  className,
-}: LegacyVoiceModeToggleProps) {
-  return (
-    <VoiceModeToggle
-      isRecording={isRecording}
-      onToggleRecording={onToggleRecording}
-      transcript={transcript}
-      disabled={disabled}
-      compact={compact}
-      className={className}
-    />
-  )
-}
-
 export default VoiceModeToggle
