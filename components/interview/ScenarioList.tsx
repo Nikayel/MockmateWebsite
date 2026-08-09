@@ -76,7 +76,7 @@ export function ScenarioList({
   if (scenarios.length === 0) {
     return (
       <div className="py-16 text-center">
-        <div className="border-border/[0.06] bg-card/[0.03] mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border">
+        <div className="border-border bg-muted/50 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border">
           <Search className="text-muted-foreground h-6 w-6" aria-hidden="true" />
         </div>
         <p className="text-muted-foreground mb-2">No problems match your filters</p>
@@ -102,7 +102,7 @@ export function ScenarioList({
         <div
           role="group"
           aria-label="List density"
-          className="border-border/[0.06] bg-card/60 inline-flex rounded-lg border p-0.5"
+          className="border-border bg-card inline-flex rounded-lg border p-0.5"
         >
           {(
             [
@@ -124,7 +124,7 @@ export function ScenarioList({
                 className={cn(
                   "focus-visible:ring-accent/50 flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
                   isActive
-                    ? "bg-card text-foreground"
+                    ? "bg-muted text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -173,7 +173,7 @@ export function ScenarioList({
           <button
             type="button"
             onClick={() => setVisibleCount((count) => count + LOAD_MORE_STEP)}
-            className="border-border/[0.08] bg-card/[0.03] text-foreground hover:bg-card/[0.06] focus-visible:ring-accent/50 rounded-full border px-5 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            className="border-border bg-card text-foreground hover:border-accent/40 hover:bg-accent/5 focus-visible:ring-accent/50 cursor-pointer rounded-full border px-5 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
           >
             Show more
             <span className="text-muted-foreground ml-1.5">

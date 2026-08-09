@@ -30,7 +30,7 @@ export function InterviewTrackHeader({ track, total, completed }: InterviewTrack
     <header className="mb-8">
       <Link
         href="/interview"
-        className="border-border bg-card/[0.04] text-muted-foreground hover:text-foreground hover:border-accent/40 focus-visible:ring-accent/50 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
+        className="border-border bg-card text-muted-foreground hover:text-foreground hover:border-accent/40 hover:bg-accent/5 focus-visible:ring-accent/50 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
       >
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
         Change track

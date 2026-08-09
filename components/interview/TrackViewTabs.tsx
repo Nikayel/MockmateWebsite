@@ -37,10 +37,7 @@ export function TrackViewTabs<Id extends string>({
     <div
       role="group"
       aria-label={label}
-      className={cn(
-        "border-border/[0.06] bg-card/[0.02] inline-flex rounded-full border p-1",
-        className
-      )}
+      className={cn("border-border bg-card inline-flex rounded-full border p-1", className)}
     >
       {tabs.map(({ id, label: tabLabel, Icon }) => {
         const isActive = id === value
@@ -52,9 +49,7 @@ export function TrackViewTabs<Id extends string>({
             aria-pressed={isActive}
             className={cn(
               "focus-visible:ring-accent/50 flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none",
-              isActive
-                ? "bg-foreground/10 text-foreground"
-                : "text-muted-foreground hover:text-foreground"
+              isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
             <Icon className="h-3.5 w-3.5" aria-hidden="true" />

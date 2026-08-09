@@ -3,6 +3,7 @@
 import { memo, useState, useRef, useEffect } from "react"
 import { Check, X, ChevronDown, Building2 } from "lucide-react"
 import { scenarios, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { EXERCISE_TYPES } from "./scenario-display"
 import { ScenarioSearchBar } from "./ScenarioSearchBar"
 
@@ -35,9 +36,9 @@ interface ScenarioFiltersProps {
 }
 
 const DIFFICULTIES = [
-  { id: "easy", label: "Easy", color: "border-emerald-300/25 text-emerald-200" },
-  { id: "medium", label: "Medium", color: "border-amber-300/25 text-amber-100" },
-  { id: "hard", label: "Hard", color: "border-red-300/25 text-red-100" },
+  { id: "easy", label: "Easy" },
+  { id: "medium", label: "Medium" },
+  { id: "hard", label: "Hard" },
 ] as const
 
 // Dynamically get all unique companies from scenarios
@@ -160,9 +161,9 @@ export const ScenarioFilters = memo(function ScenarioFilters({
   }
 
   return (
-    <div className="mb-6 space-y-4 rounded-2xl border border-border/[0.05] bg-card/[0.02] p-4 shadow-2xl backdrop-blur-2xl">
+    <div className="border-border bg-card mb-6 space-y-4 rounded-2xl border p-4 shadow-xs">
       {/* Search & Actions Row */}
-      <div className="flex flex-col gap-4 border-b border-border/[0.04] pb-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="border-border flex flex-col gap-4 border-b pb-4 lg:flex-row lg:items-center lg:justify-between">
         {/* Left side: Search input + Stats */}
         <div className="max-w-xl flex-1">
           <ScenarioSearchBar
@@ -178,7 +179,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
         <div className="flex flex-wrap items-center gap-4">
           {/* Difficulty Selection */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+            <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
               Difficulty
             </span>
             <div className="flex gap-1.5">
@@ -188,10 +189,10 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                   <button
                     key={diff.id}
                     onClick={() => onToggleDifficulty(diff.id as DifficultyLevel)}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-all duration-200 ${
+                    className={`focus-visible:ring-accent/50 cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-all duration-200 focus-visible:ring-2 focus-visible:outline-none ${
                       isActive
-                        ? `${diff.id === "easy" ? "border-transparent bg-emerald-500/20 text-emerald-300" : diff.id === "medium" ? "border-transparent bg-amber-500/20 text-amber-200" : "border-transparent bg-red-500/20 text-red-300"} font-semibold`
-                        : "border-transparent bg-card/[0.025] text-muted-foreground hover:bg-card/[0.06] hover:text-foreground"
+                        ? `border-transparent font-semibold ${difficultyColorClass(diff.id, "badgeOnLight")}`
+                        : "border-border bg-muted/50 text-muted-foreground hover:text-foreground"
                     } `}
                     aria-pressed={isActive}
                   >
@@ -207,10 +208,10 @@ export const ScenarioFilters = memo(function ScenarioFilters({
             <button
               ref={companyTriggerRef}
               onClick={() => setShowCompanyDropdown(!showCompanyDropdown)}
-              className={`focus-visible:ring-accent flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-all duration-200 focus-visible:ring-2 focus-visible:outline-none ${
+              className={`focus-visible:ring-accent/50 flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-all duration-200 focus-visible:ring-2 focus-visible:outline-none ${
                 filterCompanies.length > 0
-                  ? "border-transparent bg-foreground/10 text-foreground"
-                  : "border-transparent bg-card/[0.03] text-muted-foreground hover:bg-card/[0.06] hover:text-foreground"
+                  ? "border-accent/50 bg-accent/10 text-accent-strong"
+                  : "border-border bg-muted/50 text-muted-foreground hover:text-foreground"
               } `}
               aria-haspopup="menu"
               aria-expanded={showCompanyDropdown}
@@ -241,21 +242,21 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                   tabIndex={-1}
                   aria-label="Filter by company"
                   onKeyDown={handleCompanyMenuKeyDown}
-                  className="absolute top-full right-0 z-20 mt-2 flex w-[min(15rem,calc(100vw-2rem))] flex-col rounded-2xl border border-border/[0.06] bg-background/90 shadow-2xl backdrop-blur-xl"
+                  className="border-border bg-popover text-popover-foreground absolute top-full right-0 z-20 mt-2 flex w-[min(15rem,calc(100vw-2rem))] flex-col rounded-2xl border shadow-lg"
                 >
-                  <div className="border-b border-border/[0.06] p-2">
+                  <div className="border-border border-b p-2">
                     <input
                       ref={companySearchRef}
                       value={companyQuery}
                       onChange={(e) => setCompanyQuery(e.target.value)}
                       placeholder="Search companies"
                       aria-label="Search companies"
-                      className="w-full rounded-lg border border-border/[0.06] bg-card/[0.03] px-2.5 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-border focus:outline-none"
+                      className="border-input bg-background text-foreground placeholder:text-muted-foreground focus:border-accent/50 w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none"
                     />
                   </div>
                   <div className="max-h-64 overflow-y-auto py-1">
                     {visibleCompanies.length === 0 && (
-                      <p className="px-3 py-2 text-sm text-muted-foreground">No matches</p>
+                      <p className="text-muted-foreground px-3 py-2 text-sm">No matches</p>
                     )}
                     {visibleCompanies.map((company) => {
                       const isActive = filterCompanies.includes(company as Company)
@@ -265,17 +266,17 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                           role="menuitemcheckbox"
                           aria-checked={isActive}
                           onClick={() => onToggleCompany(company as Company)}
-                          className="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-card/[0.06] focus-visible:bg-card/[0.08] focus-visible:outline-none"
+                          className="hover:bg-muted focus-visible:bg-muted flex w-full cursor-pointer items-center justify-between px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none"
                         >
                           <span className={isActive ? "text-foreground" : "text-muted-foreground"}>
                             {company}
                           </span>
                           <span className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-muted-foreground text-xs">
                               {COMPANY_COUNTS[company] ?? 0}
                             </span>
                             {isActive && (
-                              <Check className="h-3.5 w-3.5 text-foreground" aria-hidden="true" />
+                              <Check className="text-foreground h-3.5 w-3.5" aria-hidden="true" />
                             )}
                           </span>
                         </button>
@@ -284,11 +285,11 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                   </div>
                   {filterCompanies.length > 0 && (
                     <>
-                      <div className="my-1 border-t border-border" role="separator" />
+                      <div className="border-border my-1 border-t" role="separator" />
                       <button
                         role="menuitem"
                         onClick={onClearCompanies}
-                        className="w-full px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-card/[0.06] hover:text-foreground focus-visible:bg-card/[0.08] focus-visible:outline-none"
+                        className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:bg-muted w-full cursor-pointer px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none"
                       >
                         Clear selection
                       </button>
@@ -312,19 +313,17 @@ export const ScenarioFilters = memo(function ScenarioFilters({
               <button
                 key={type.id}
                 onClick={() => onToggleType(type.id as ScenarioType)}
-                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
+                className={`focus-visible:ring-accent/50 flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all duration-200 focus-visible:ring-2 focus-visible:outline-none ${
                   isActive
-                    ? "border-transparent bg-card text-foreground shadow-sm"
-                    : "border-transparent bg-card/[0.03] text-muted-foreground hover:bg-card/[0.06] hover:text-foreground"
+                    ? "border-accent/50 bg-accent/10 text-accent-strong"
+                    : "border-border bg-muted/50 text-muted-foreground hover:text-foreground"
                 } `}
                 aria-pressed={isActive}
                 title={type.description}
               >
                 <Icon className="h-3.5 w-3.5" />
                 {type.label}
-                <span className={`text-xs ${isActive ? "text-muted-foreground" : "text-muted-foreground"}`}>
-                  {count}
-                </span>
+                <span className="text-xs opacity-70">{count}</span>
                 {isActive && <Check className="h-3 w-3" />}
               </button>
             )
@@ -334,8 +333,8 @@ export const ScenarioFilters = memo(function ScenarioFilters({
 
       {/* Active Filters Summary */}
       {hasActiveFilters && (
-        <div className="flex flex-wrap items-center gap-2 border-t border-border/[0.06] pt-3">
-          <span className="text-xs text-muted-foreground">Active:</span>
+        <div className="border-border flex flex-wrap items-center gap-2 border-t pt-3">
+          <span className="text-muted-foreground text-xs">Active:</span>
           {filterType.map((t) => {
             const type = EXERCISE_TYPES.find((et) => et.id === t)
             if (!type) return null
@@ -343,14 +342,14 @@ export const ScenarioFilters = memo(function ScenarioFilters({
             return (
               <span
                 key={t}
-                className="inline-flex items-center gap-1.5 rounded-full border-transparent bg-card/[0.05] px-2.5 py-1 text-xs text-muted-foreground"
+                className="bg-muted text-muted-foreground inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs"
               >
                 <Icon className="h-3 w-3" />
                 {type.label}
                 <button
                   onClick={() => onRemoveType(t)}
                   aria-label={`Remove ${type.label} filter`}
-                  className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+                  className="focus-visible:ring-ring rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:outline-none"
                 >
                   <X className="h-3 w-3" aria-hidden="true" />
                 </button>
@@ -360,19 +359,13 @@ export const ScenarioFilters = memo(function ScenarioFilters({
           {filterDifficulty.map((d) => (
             <span
               key={d}
-              className={`inline-flex items-center gap-1.5 rounded-full border-transparent px-2.5 py-1 text-xs ${
-                d === "easy"
-                  ? "bg-emerald-500/10 text-emerald-300"
-                  : d === "medium"
-                    ? "bg-amber-500/10 text-amber-200"
-                    : "bg-red-500/10 text-red-300"
-              }`}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs capitalize ${difficultyColorClass(d, "badgeOnLight")}`}
             >
               {d}
               <button
                 onClick={() => onRemoveDifficulty(d)}
                 aria-label={`Remove ${d} difficulty filter`}
-                className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+                className="focus-visible:ring-ring rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:outline-none"
               >
                 <X className="h-3 w-3" aria-hidden="true" />
               </button>
@@ -381,25 +374,25 @@ export const ScenarioFilters = memo(function ScenarioFilters({
           {filterCompanies.map((c) => (
             <span
               key={c}
-              className="inline-flex items-center gap-1.5 rounded-full border-transparent bg-card/[0.05] px-2.5 py-1 text-xs text-muted-foreground"
+              className="bg-muted text-muted-foreground inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs"
             >
               {c}
               <button
                 onClick={() => onRemoveCompany(c)}
                 aria-label={`Remove ${c} filter`}
-                className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+                className="focus-visible:ring-ring rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:outline-none"
               >
                 <X className="h-3 w-3" aria-hidden="true" />
               </button>
             </span>
           ))}
           {searchQuery && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border-transparent bg-card/[0.05] px-2.5 py-1 text-xs text-muted-foreground">
+            <span className="bg-muted text-muted-foreground inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs">
               "{searchQuery}"
               <button
                 onClick={() => onSearchChange("")}
                 aria-label="Clear search filter"
-                className="rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+                className="focus-visible:ring-ring rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:outline-none"
               >
                 <X className="h-3 w-3" aria-hidden="true" />
               </button>
