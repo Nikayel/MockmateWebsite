@@ -4,6 +4,7 @@ import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import { extractTopicsFromMessage } from "@/lib/interview"
 import type { Scenario } from "@/lib/scenarios"
 import type { ChatMessage } from "../_types"
+import { shouldTriggerSilenceNudge } from "./proactive-silence"
 
 /** Minimal structural shape of the cached profile read into the proactive payload. */
 interface ProactiveUserProfile {
@@ -93,6 +94,26 @@ export function useInterviewProactiveAI(
   const lastInterviewerMessageRef = useRef<number>(Date.now())
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const hasTriggeredSilenceRef = useRef<boolean>(false)
+  /** The cooldown handle, so teardown can cancel it instead of leaving it to fire. */
+  const cooldownTimerRef = useRef<NodeJS.Timeout | null>(null)
+  /** Cancels an in-flight nudge when the interview ends underneath it. */
+  const abortRef = useRef<AbortController | null>(null)
+
+  // The gates as of the latest render. The trigger below reads them again after its await:
+  // a nudge that was legitimate when it was sent can land after the candidate has submitted,
+  // and it would be appended to a finished interview and persisted into the transcript that
+  // feeds scoring.
+  const liveGatesRef = useRef({ showFeedback, showPostInterviewDiscussion })
+  liveGatesRef.current = { showFeedback, showPostInterviewDiscussion }
+
+  // When the candidate last did something other than talk. Silence detection measured chat
+  // only, so a candidate reading the brief or heads-down editing and running tests was told
+  // at the two-minute mark that they had not communicated at all and that silence hurts
+  // their collaboration score. Working quietly is not the same as being stuck.
+  const lastActivityRef = useRef<number>(Date.now())
+  useEffect(() => {
+    lastActivityRef.current = Date.now()
+  }, [code, testResults])
 
   // Analyze code for context-aware proactive feedback
   // IMPORTANT: This analysis is NEUTRAL - do not praise patterns until correctness is verified
@@ -242,12 +263,17 @@ Interviews are conversations, not just coding exercises.`
           contextPrompt = analyzeCodeForProactiveFeedback(code)
       }
 
+      abortRef.current?.abort()
+      const abortController = new AbortController()
+      abortRef.current = abortController
+
       const token = await getCurrentUserToken()
       const headers: Record<string, string> = { "Content-Type": "application/json" }
       if (token) headers.Authorization = `Bearer ${token}`
       const response = await fetch("/api/chat", {
         method: "POST",
         headers,
+        signal: abortController.signal,
         body: JSON.stringify({
           message: contextPrompt,
           context: interviewerMessages,
@@ -284,7 +310,19 @@ Interviews are conversations, not just coding exercises.`
       const data = await response.json()
       if (!response.ok) {
         console.warn("[API] Request failed:", response.status, response.url, data)
+        // Un-latch so the next poll can try again. The caller sets the latch before calling,
+        // then starts a three-minute cooldown, so a nudge lost to a transient 429 used to
+        // take the next three minutes of silence detection down with it. Deliberately no
+        // toast: the candidate never asked for this message and does not need to know it
+        // failed.
+        hasTriggeredSilenceRef.current = false
+        return
       }
+
+      // The interview may have ended while this was in flight. Appending here would put a
+      // question into a finished transcript, and that transcript is persisted and scored.
+      const { showFeedback: ended, showPostInterviewDiscussion: wrappingUp } = liveGatesRef.current
+      if (ended || wrappingUp) return
 
       if (data.reply) {
         setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
@@ -297,7 +335,11 @@ Interviews are conversations, not just coding exercises.`
         }
       }
     } catch (error) {
+      // An abort is the interview ending underneath us, which is not a failure and must not
+      // re-arm the latch.
+      if ((error as Error)?.name === "AbortError") return
       console.error("Proactive interviewer error:", error)
+      hasTriggeredSilenceRef.current = false
     } finally {
       setIsLoadingInterviewer(false)
     }
@@ -348,7 +390,6 @@ Interviews are conversations, not just coding exercises.`
       }
     }
 
-    const SILENCE_THRESHOLD_SEC = 120
     const COOLDOWN_MS = 3 * 60 * 1000
 
     const checkAndTrigger = () => {
@@ -371,14 +412,21 @@ Interviews are conversations, not just coding exercises.`
         timeSilentSec = latestElapsed
       }
 
-      if (timeSilentSec >= SILENCE_THRESHOLD_SEC) {
-        hasTriggeredSilenceRef.current = true
-        const contextType = hasEverMessaged ? "silence_stopped" : "silence_no_communication"
-        latestTrigger(contextType, Math.floor(timeSilentSec))
-        setTimeout(() => {
-          hasTriggeredSilenceRef.current = false
-        }, COOLDOWN_MS)
-      }
+      const shouldSpeak = shouldTriggerSilenceNudge({
+        hasEverMessaged,
+        timeSilentSec,
+        secondsSinceActivity: (Date.now() - lastActivityRef.current) / 1000,
+      })
+      if (!shouldSpeak) return
+
+      hasTriggeredSilenceRef.current = true
+      const contextType = hasEverMessaged ? "silence_stopped" : "silence_no_communication"
+      latestTrigger(contextType, Math.floor(timeSilentSec))
+      if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current)
+      cooldownTimerRef.current = setTimeout(() => {
+        hasTriggeredSilenceRef.current = false
+        cooldownTimerRef.current = null
+      }, COOLDOWN_MS)
     }
 
     checkAndTrigger()
@@ -392,10 +440,14 @@ Interviews are conversations, not just coding exercises.`
     }
   }, [isInterviewStarted, showFeedback, showPostInterviewDiscussion])
 
-  // Cleanup the silence timer on unmount
+  // Cleanup on unmount. The cooldown and the in-flight request need this as much as the
+  // interval does: a bare setTimeout kept the latch alive past teardown, and a fetch with
+  // nobody listening still resolves into setInterviewerMessages.
   useEffect(() => {
     return () => {
       if (silenceTimerRef.current) clearInterval(silenceTimerRef.current)
+      if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current)
+      abortRef.current?.abort()
     }
   }, [])
 
@@ -404,8 +456,15 @@ Interviews are conversations, not just coding exercises.`
       clearInterval(silenceTimerRef.current)
       silenceTimerRef.current = null
     }
+    if (cooldownTimerRef.current) {
+      clearTimeout(cooldownTimerRef.current)
+      cooldownTimerRef.current = null
+    }
+    abortRef.current?.abort()
+    abortRef.current = null
     hasTriggeredSilenceRef.current = false
     lastInterviewerMessageRef.current = Date.now()
+    lastActivityRef.current = Date.now()
   }
 
   return { resetProactiveState }
