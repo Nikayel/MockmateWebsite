@@ -14,76 +14,13 @@
  * (or in whole months for a credit). Only the first is converted below.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { AggregateField } from 'firebase-admin/firestore'
-import { adminDb } from '@/lib/firebase-admin'
-import {
-  requirePermission,
-  errorResponse,
-  unauthorizedResponse,
-} from '@/lib/admin/middleware'
-import { PERMISSIONS } from '@/lib/admin/rbac'
-import {
-  centsToDollars,
-  summarizePaymentAggregates,
-} from '@/lib/admin/revenue-metrics'
-
-interface PaymentRecord {
-  id: string
-  userId: string
-  userEmail?: string
-  type: 'subscription' | 'one_time'
-  amount: number
-  currency: string
-  status: 'succeeded' | 'failed' | 'refunded'
-  description?: string
-  createdAt: string
-}
-
-interface WebhookEvent {
-  id: string
-  eventType: string
-  processedAt: string
-  eventId: string
-}
-
-interface VoidedReward {
-  id: string
-  referrerId: string
-  referrerEmail: string
-  referredUserId: string
-  referredEmail: string
-  type: 'signup_cash' | 'conversion_credit'
-  amount: number
-  voidedReason: string
-  processedAt: string
-}
-
-/** All-time money, aggregated across the whole collection. Dollars. */
-interface PaymentTotals {
-  revenue: number
-  refunds: number
-  net: number
-  paymentCount: number
-  refundCount: number
-  /** Share of payment events that were refunds, 0-100. Cannot exceed 100. */
-  refundShareOfEventsPercent: number
-}
-
-interface PaymentStats {
-  /** Every payment ever recorded. Not the sample in the tables below. */
-  allTime: PaymentTotals
-  /** How many documents fed the recent-activity tables. */
-  recentSampleSize: number
-  recentPayments: PaymentRecord[]
-  recentRefunds: PaymentRecord[]
-  recentWebhooks: WebhookEvent[]
-  voidedRewards: VoidedReward[]
-  provenance: {
-    allTime: string
-    recent: string
-  }
-}
+import { NextRequest, NextResponse } from "next/server"
+import { AggregateField } from "firebase-admin/firestore"
+import { adminDb } from "@/lib/firebase-admin"
+import { requirePermission, errorResponse, unauthorizedResponse } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
+import { centsToDollars, summarizePaymentAggregates } from "@/lib/admin/revenue-metrics"
+import type { PaymentRecord, PaymentStats } from "@/lib/admin/payment-types"
 
 /** How many recent documents the activity tables sample. */
 const RECENT_PAYMENT_SAMPLE = 100
@@ -105,18 +42,18 @@ export async function GET(request: NextRequest) {
     // whether the collection holds a hundred payments or a million.
     const [succeededAggregate, refundedAggregate] = await Promise.all([
       adminDb
-        .collection('payment_history')
-        .where('status', '==', 'succeeded')
+        .collection("payment_history")
+        .where("status", "==", "succeeded")
         .aggregate({
-          total: AggregateField.sum('amount'),
+          total: AggregateField.sum("amount"),
           count: AggregateField.count(),
         })
         .get(),
       adminDb
-        .collection('payment_history')
-        .where('status', '==', 'refunded')
+        .collection("payment_history")
+        .where("status", "==", "refunded")
         .aggregate({
-          total: AggregateField.sum('amount'),
+          total: AggregateField.sum("amount"),
           count: AggregateField.count(),
         })
         .get(),
@@ -145,15 +82,15 @@ export async function GET(request: NextRequest) {
       voidedRewards: [],
       provenance: {
         allTime:
-          'Firestore aggregation over the whole payment_history collection, written by the Stripe webhook. Amounts stored in cents.',
+          "Firestore aggregation over the whole payment_history collection, written by the Stripe webhook. Amounts stored in cents.",
         recent: `The ${RECENT_PAYMENT_SAMPLE} most recent payment_history documents. A sample, not a total.`,
       },
     }
 
     // The most recent records, for the activity tables only.
     const paymentsSnapshot = await adminDb
-      .collection('payment_history')
-      .orderBy('created_at', 'desc')
+      .collection("payment_history")
+      .orderBy("created_at", "desc")
       .limit(RECENT_PAYMENT_SAMPLE)
       .get()
     stats.recentSampleSize = paymentsSnapshot.size
@@ -167,15 +104,15 @@ export async function GET(request: NextRequest) {
     // Fetch user emails
     const userEmails = new Map<string, string>()
     const userPromises = Array.from(userIds).map(async (userId) => {
-      const userDoc = await adminDb.collection('profiles').doc(userId).get()
-      userEmails.set(userId, userDoc.data()?.email || 'Unknown')
+      const userDoc = await adminDb.collection("profiles").doc(userId).get()
+      userEmails.set(userId, userDoc.data()?.email || "Unknown")
     })
     await Promise.all(userPromises)
 
     // Fill the activity tables. Nothing here contributes to a total.
     for (const doc of paymentsSnapshot.docs) {
       const data = doc.data()
-      const amount = typeof data.amount === 'number' ? data.amount : 0
+      const amount = typeof data.amount === "number" ? data.amount : 0
 
       const payment: PaymentRecord = {
         id: doc.id,
@@ -183,17 +120,17 @@ export async function GET(request: NextRequest) {
         userEmail: userEmails.get(data.user_id),
         type: data.type,
         amount: centsToDollars(amount),
-        currency: data.currency || 'usd',
+        currency: data.currency || "usd",
         status: data.status,
         description: data.description,
         createdAt: data.created_at,
       }
 
-      if (data.status === 'succeeded' && amount > 0) {
+      if (data.status === "succeeded" && amount > 0) {
         if (stats.recentPayments.length < 20) {
           stats.recentPayments.push(payment)
         }
-      } else if (data.status === 'refunded' || amount < 0) {
+      } else if (data.status === "refunded" || amount < 0) {
         if (stats.recentRefunds.length < 20) {
           stats.recentRefunds.push({
             ...payment,
@@ -205,12 +142,12 @@ export async function GET(request: NextRequest) {
 
     // Get recent webhook events
     const webhooksSnapshot = await adminDb
-      .collection('webhook_events')
-      .orderBy('processed_at', 'desc')
+      .collection("webhook_events")
+      .orderBy("processed_at", "desc")
       .limit(50)
       .get()
 
-    stats.recentWebhooks = webhooksSnapshot.docs.map(doc => {
+    stats.recentWebhooks = webhooksSnapshot.docs.map((doc) => {
       const data = doc.data()
       return {
         id: doc.id,
@@ -222,9 +159,9 @@ export async function GET(request: NextRequest) {
 
     // Get voided rewards (clawbacks)
     const voidedSnapshot = await adminDb
-      .collection('referral_rewards')
-      .where('status', '==', 'voided')
-      .orderBy('processedAt', 'desc')
+      .collection("referral_rewards")
+      .where("status", "==", "voided")
+      .orderBy("processedAt", "desc")
       .limit(20)
       .get()
 
@@ -240,27 +177,27 @@ export async function GET(request: NextRequest) {
     const voidedUserEmails = new Map<string, string>()
     const voidedUserPromises = Array.from(voidedUserIds).map(async (userId) => {
       if (!userEmails.has(userId)) {
-        const userDoc = await adminDb.collection('profiles').doc(userId).get()
-        voidedUserEmails.set(userId, userDoc.data()?.email || 'Unknown')
+        const userDoc = await adminDb.collection("profiles").doc(userId).get()
+        voidedUserEmails.set(userId, userDoc.data()?.email || "Unknown")
       } else {
         voidedUserEmails.set(userId, userEmails.get(userId)!)
       }
     })
     await Promise.all(voidedUserPromises)
 
-    stats.voidedRewards = voidedSnapshot.docs.map(doc => {
+    stats.voidedRewards = voidedSnapshot.docs.map((doc) => {
       const data = doc.data()
       return {
         id: doc.id,
         referrerId: data.referrerId,
-        referrerEmail: voidedUserEmails.get(data.referrerId) || 'Unknown',
+        referrerEmail: voidedUserEmails.get(data.referrerId) || "Unknown",
         referredUserId: data.referredUserId,
-        referredEmail: voidedUserEmails.get(data.referredUserId) || 'Unknown',
+        referredEmail: voidedUserEmails.get(data.referredUserId) || "Unknown",
         type: data.type,
         // Dollars for cash, whole months for a credit. Not cents; do not divide.
         amount: data.amount,
-        voidedReason: data.voidedReason || 'Unknown',
-        processedAt: data.processedAt?.toDate?.()?.toISOString() || '',
+        voidedReason: data.voidedReason || "Unknown",
+        processedAt: data.processedAt?.toDate?.()?.toISOString() || "",
       }
     })
 
@@ -269,9 +206,9 @@ export async function GET(request: NextRequest) {
       data: stats,
     })
   } catch (error) {
-    console.error('[Admin Payments API] Error:', error)
+    console.error("[Admin Payments API] Error:", error)
     return errorResponse(
-      error instanceof Error ? error.message : 'Failed to fetch payment data',
+      error instanceof Error ? error.message : "Failed to fetch payment data",
       500
     )
   }

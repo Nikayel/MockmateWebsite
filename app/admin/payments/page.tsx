@@ -24,66 +24,12 @@ import {
   tableStyles,
   badgeVariants,
 } from "@/lib/admin/design-system"
-
-interface PaymentRecord {
-  id: string
-  userId: string
-  userEmail?: string
-  type: 'subscription' | 'one_time'
-  amount: number
-  currency: string
-  status: 'succeeded' | 'failed' | 'refunded'
-  description?: string
-  createdAt: string
-}
-
-interface WebhookEvent {
-  id: string
-  eventType: string
-  processedAt: string
-  eventId: string
-}
-
-interface VoidedReward {
-  id: string
-  referrerId: string
-  referrerEmail: string
-  referredUserId: string
-  referredEmail: string
-  type: 'signup_cash' | 'conversion_credit'
-  amount: number
-  voidedReason: string
-  processedAt: string
-}
-
-interface PaymentTotals {
-  revenue: number
-  refunds: number
-  net: number
-  paymentCount: number
-  refundCount: number
-  refundShareOfEventsPercent: number
-}
-
-interface PaymentStats {
-  /** Every payment ever recorded, aggregated server side. */
-  allTime: PaymentTotals
-  /** How many documents fed the tables below. */
-  recentSampleSize: number
-  recentPayments: PaymentRecord[]
-  recentRefunds: PaymentRecord[]
-  recentWebhooks: WebhookEvent[]
-  voidedRewards: VoidedReward[]
-  provenance?: {
-    allTime: string
-    recent: string
-  }
-}
+import type { PaymentStats } from "@/lib/admin/payment-types"
 
 /** One short line naming the scope and the source of the numbers above it. */
 function MetricProvenance({ scope, source }: { scope: string; source?: string }) {
   return (
-    <p className="text-gray-500 text-xs">
+    <p className="text-xs text-gray-500">
       {scope}
       {source ? ` · ${source}` : ""}
     </p>
@@ -133,10 +79,10 @@ export default function PaymentsPage() {
   }, [loadData])
 
   const getWebhookBadgeVariant = (eventType: string) => {
-    if (eventType.includes('succeeded') || eventType.includes('paid')) {
+    if (eventType.includes("succeeded") || eventType.includes("paid")) {
       return badgeVariants.success
     }
-    if (eventType.includes('failed') || eventType.includes('refund')) {
+    if (eventType.includes("failed") || eventType.includes("refund")) {
       return badgeVariants.error
     }
     return badgeVariants.info
@@ -144,7 +90,7 @@ export default function PaymentsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <Loader2 className="h-10 w-10 animate-spin text-[#c4703f]" />
       </div>
     )
@@ -152,12 +98,12 @@ export default function PaymentsPage() {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
         <AlertCircle className="h-10 w-10 text-red-400" />
-        <p className="text-red-400 text-sm">{error}</p>
+        <p className="text-sm text-red-400">{error}</p>
         <button
           onClick={() => loadData()}
-          className="text-sm text-gray-400 hover:text-white underline"
+          className="text-sm text-gray-400 underline hover:text-white"
         >
           Try again
         </button>
@@ -177,12 +123,9 @@ export default function PaymentsPage() {
 
       {/* All-time money. Aggregated across the whole collection, not summed from the tables below. */}
       <div>
-        <h2 className="text-xl font-bold text-white mb-1">All time</h2>
-        <MetricProvenance
-          scope="Every payment ever recorded"
-          source={data?.provenance?.allTime}
-        />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-3">
+        <h2 className="mb-1 text-xl font-bold text-white">All time</h2>
+        <MetricProvenance scope="Every payment ever recorded" source={data?.provenance?.allTime} />
+        <div className="mt-3 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <MetricCard
             title="Total Revenue"
             value={usd(data?.allTime.revenue || 0)}
@@ -238,11 +181,31 @@ export default function PaymentsPage() {
             <table className={tableStyles.table}>
               <thead>
                 <tr className={tableStyles.headerRow}>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>User</th>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Type</th>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Amount</th>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Description</th>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Date</th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                  >
+                    User
+                  </th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                  >
+                    Type
+                  </th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}
+                  >
+                    Amount
+                  </th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                  >
+                    Description
+                  </th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                  >
+                    Date
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -256,11 +219,15 @@ export default function PaymentsPage() {
                         {payment.type}
                       </Badge>
                     </td>
-                    <td className={`${spacing.tableCellPadding} text-right text-green-400 font-medium tabular-nums`}>
+                    <td
+                      className={`${spacing.tableCellPadding} text-right font-medium text-green-400 tabular-nums`}
+                    >
                       ${payment.amount.toFixed(2)}
                     </td>
-                    <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted} truncate max-w-[200px]`}>
-                      {payment.description || '-'}
+                    <td
+                      className={`${spacing.tableCellPadding} ${typography.tableCellMuted} max-w-[200px] truncate`}
+                    >
+                      {payment.description || "-"}
                     </td>
                     <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                       {new Date(payment.createdAt).toLocaleDateString()}
@@ -293,10 +260,26 @@ export default function PaymentsPage() {
             <table className={tableStyles.table}>
               <thead>
                 <tr className={tableStyles.headerRow}>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>User</th>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Amount</th>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Description</th>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Date</th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                  >
+                    User
+                  </th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}
+                  >
+                    Amount
+                  </th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                  >
+                    Description
+                  </th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                  >
+                    Date
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -305,11 +288,13 @@ export default function PaymentsPage() {
                     <td className={`${spacing.tableCellPadding} ${typography.tableCell}`}>
                       {refund.userEmail || refund.userId}
                     </td>
-                    <td className={`${spacing.tableCellPadding} text-right text-red-400 font-medium tabular-nums`}>
+                    <td
+                      className={`${spacing.tableCellPadding} text-right font-medium text-red-400 tabular-nums`}
+                    >
                       -${refund.amount.toFixed(2)}
                     </td>
                     <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
-                      {refund.description || '-'}
+                      {refund.description || "-"}
                     </td>
                     <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
                       {new Date(refund.createdAt).toLocaleDateString()}
@@ -341,12 +326,36 @@ export default function PaymentsPage() {
             <table className={tableStyles.table}>
               <thead>
                 <tr className={tableStyles.headerRow}>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Referrer</th>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Referred User</th>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Type</th>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}>Amount</th>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Reason</th>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Date</th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                  >
+                    Referrer
+                  </th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                  >
+                    Referred User
+                  </th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                  >
+                    Type
+                  </th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-right`}
+                  >
+                    Amount
+                  </th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                  >
+                    Reason
+                  </th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                  >
+                    Date
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -359,21 +368,28 @@ export default function PaymentsPage() {
                       {reward.referredEmail}
                     </td>
                     <td className={spacing.tableCellPadding}>
-                      <Badge className={reward.type === 'signup_cash'
-                        ? badgeVariants.success
-                        : badgeVariants.purple
-                      }>
-                        {reward.type === 'signup_cash' ? '$10 Cash' : 'Free Month'}
+                      <Badge
+                        className={
+                          reward.type === "signup_cash"
+                            ? badgeVariants.success
+                            : badgeVariants.purple
+                        }
+                      >
+                        {reward.type === "signup_cash" ? "$10 Cash" : "Free Month"}
                       </Badge>
                     </td>
-                    <td className={`${spacing.tableCellPadding} text-right text-orange-400 font-medium tabular-nums`}>
-                      {reward.type === 'signup_cash' ? `$${reward.amount}` : `${reward.amount} mo`}
+                    <td
+                      className={`${spacing.tableCellPadding} text-right font-medium text-orange-400 tabular-nums`}
+                    >
+                      {reward.type === "signup_cash" ? `$${reward.amount}` : `${reward.amount} mo`}
                     </td>
-                    <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted} truncate max-w-[200px]`}>
+                    <td
+                      className={`${spacing.tableCellPadding} ${typography.tableCellMuted} max-w-[200px] truncate`}
+                    >
                       {reward.voidedReason}
                     </td>
                     <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
-                      {reward.processedAt ? new Date(reward.processedAt).toLocaleDateString() : '-'}
+                      {reward.processedAt ? new Date(reward.processedAt).toLocaleDateString() : "-"}
                     </td>
                   </tr>
                 ))}
@@ -402,9 +418,21 @@ export default function PaymentsPage() {
             <table className={tableStyles.table}>
               <thead>
                 <tr className={tableStyles.headerRow}>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Event Type</th>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Event ID</th>
-                  <th className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}>Processed At</th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                  >
+                    Event Type
+                  </th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                  >
+                    Event ID
+                  </th>
+                  <th
+                    className={`${spacing.tableHeaderPadding} ${typography.tableHeader} text-left`}
+                  >
+                    Processed At
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -415,7 +443,9 @@ export default function PaymentsPage() {
                         {webhook.eventType}
                       </Badge>
                     </td>
-                    <td className={`${spacing.tableCellPadding} font-mono text-xs ${typography.tableCellMuted}`}>
+                    <td
+                      className={`${spacing.tableCellPadding} font-mono text-xs ${typography.tableCellMuted}`}
+                    >
                       {webhook.eventId}
                     </td>
                     <td className={`${spacing.tableCellPadding} ${typography.tableCellMuted}`}>
