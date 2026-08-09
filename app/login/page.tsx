@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { Sparra } from "@/components/brand/Sparra"
 import { AlertTriangle, Github, Terminal } from "lucide-react"
 import {
   consumeRedirectSignIn,
@@ -462,7 +463,7 @@ function LoginPageContent() {
 
           {/* brand */}
           <div className="relative z-10 flex items-center gap-2">
-            <span className="bg-accent h-2 w-2 rounded-full" />
+            <Sparra size={22} />
             <span className="text-foreground text-sm font-semibold tracking-tight">
               CodeSparring
             </span>
@@ -519,7 +520,7 @@ function LoginPageContent() {
           >
             {/* brand (mobile only — left pane hidden on small screens) */}
             <motion.div variants={staggerItem} className="mb-8 flex items-center gap-2 lg:hidden">
-              <span className="bg-accent h-2 w-2 rounded-full" />
+              <Sparra size={22} />
               <span className="text-foreground text-sm font-semibold tracking-tight">
                 CodeSparring
               </span>

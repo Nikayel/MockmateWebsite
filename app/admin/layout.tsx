@@ -242,7 +242,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <aside className="fixed top-0 left-0 z-40 h-screen w-64 border-r border-gray-800 bg-gray-900/95">
           <div className="flex h-14 items-center justify-between border-b border-gray-800 px-3">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#c4703f] to-[#3fb883]">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#ffb347] via-[#ff8a3d] to-[#e0552a]">
                 <Shield className="h-4 w-4 text-black" />
               </div>
               <div>
@@ -328,7 +328,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Menu className="h-5 w-5" />
         </button>
         <Link href="/admin" className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#c4703f] to-[#3fb883]">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#ffb347] via-[#ff8a3d] to-[#e0552a]">
             <Shield className="h-3.5 w-3.5 text-black" />
           </div>
           <span className="font-heading text-sm font-semibold text-white">Admin</span>
@@ -359,7 +359,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex h-14 flex-shrink-0 items-center justify-between border-b border-gray-800/80 px-3">
           {!railMode && (
             <Link href="/admin" className="group flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#c4703f] to-[#3fb883] shadow-lg shadow-[#c4703f]/20 transition-shadow group-hover:shadow-[#c4703f]/30">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#ffb347] via-[#ff8a3d] to-[#e0552a] shadow-lg shadow-[#e0552a]/20 transition-shadow group-hover:shadow-[#e0552a]/30">
                 <Shield className="h-4 w-4 text-black" />
               </div>
               <div>
@@ -370,7 +370,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           )}
           {railMode && (
             <Link href="/admin" className="mx-auto" aria-label="Admin overview">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#c4703f] to-[#3fb883] shadow-lg shadow-[#c4703f]/20">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#ffb347] via-[#ff8a3d] to-[#e0552a] shadow-lg shadow-[#e0552a]/20">
                 <Shield className="h-4 w-4 text-black" />
               </div>
             </Link>
@@ -480,7 +480,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex-shrink-0 border-t border-gray-800/80 bg-gray-900/50 p-3">
           {!railMode && firebaseUser && (
             <div className="mb-3 flex items-center gap-2.5 rounded-lg border border-gray-700/50 bg-gradient-to-r from-gray-800/50 to-gray-800/30 p-2.5">
-              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#c4703f] to-[#3fb883] shadow-lg shadow-[#c4703f]/20">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#ffb347] via-[#ff8a3d] to-[#e0552a] shadow-lg shadow-[#e0552a]/20">
                 <span className="text-sm font-bold text-black">
                   {firebaseUser.email?.[0].toUpperCase()}
                 </span>
@@ -491,9 +491,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <div className="h-1.5 w-1.5 rounded-full bg-green-400" />
                   {/* The real role, not a hardcoded "Super Admin". An analyst who saw
                       that label had no way to know why half the dashboard 403s. */}
-                  <p className="text-[10px] text-gray-400">
-                    {ROLE_LABELS[gate.identity.role]}
-                  </p>
+                  <p className="text-[10px] text-gray-400">{ROLE_LABELS[gate.identity.role]}</p>
                 </div>
               </div>
             </div>

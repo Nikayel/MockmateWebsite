@@ -76,11 +76,10 @@ export function Footer() {
         <div className="flex flex-col gap-10 lg:flex-row lg:gap-12">
           {/* Brand */}
           <div className="space-y-4 lg:w-64 lg:shrink-0">
-            <div className="flex items-center space-x-2">
-              <Logo size={24} className="text-accent" />
-              <span className="font-heading text-xl font-bold tracking-tight">
-                <span className="text-foreground">Code</span>
-                <span className="text-accent">Sparring</span>
+            <div className="flex items-center gap-2">
+              <Logo size={24} />
+              <span className="font-ui text-foreground text-xl font-semibold tracking-tight">
+                CodeSparring
               </span>
             </div>
             <p className="text-muted-foreground text-sm">

@@ -1,60 +1,22 @@
-import { ImageResponse } from 'next/og'
-import { NextRequest } from 'next/server'
+import { ImageResponse } from "next/og"
+import { sparraMarkDataUri } from "@/lib/brand/sparra-mark"
 
-export const runtime = 'edge'
+export const runtime = "edge"
 
-// Serve a large PNG icon for SEO/structured data at /api/logo.png
-export async function GET(request: NextRequest) {
+// Serve a large PNG icon for SEO/structured data at /api/logo.png.
+// JSON-LD (components/seo/JsonLd.tsx) points Google at this URL — keep it working.
+export async function GET() {
   return new ImageResponse(
-    (
-      <div
-        style={{
-          background: '#0a0a0a',
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: 64,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <span
-            style={{
-              fontSize: 180,
-              fontWeight: 900,
-              color: '#c4703f',
-            }}
-          >
-            {'<'}
-          </span>
-          <span
-            style={{
-              fontSize: 120,
-              fontWeight: 900,
-              color: '#c4703f',
-            }}
-          >
-            ⚡
-          </span>
-          <span
-            style={{
-              fontSize: 180,
-              fontWeight: 900,
-              color: '#3fb883',
-            }}
-          >
-            {'>'}
-          </span>
-        </div>
-      </div>
-    ),
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={sparraMarkDataUri(512)} width={512} height={512} alt="" />
+    </div>,
     {
       width: 512,
       height: 512,

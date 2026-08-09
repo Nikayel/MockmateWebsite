@@ -25,6 +25,7 @@ import { isLearnPath } from "@/components/learn/learn-tracks"
 import { LearnTrackDialog } from "@/components/learn/LearnTrackPicker"
 import { LEARN_HUB_PATH } from "@/lib/tutorials/lesson-routes"
 import { NotificationBell } from "@/components/notification-bell"
+import { Sparra } from "@/components/brand/Sparra"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { Button } from "@/components/ui/button"
 import {
@@ -225,7 +226,7 @@ export function Header() {
           <div className="flex h-14 items-center justify-between gap-4 font-[var(--font-geist)]">
             <Link
               href={user ? "/dashboard" : "/"}
-              className="group flex items-center"
+              className="group flex items-center gap-2"
               onClick={() => {
                 // For logged-out users already on the home route, scroll back to
                 // the hero (Next.js won't re-navigate to the same path, and a
@@ -238,6 +239,7 @@ export function Header() {
                 }
               }}
             >
+              <Sparra size={26} />
               <span className="text-foreground text-lg font-semibold tracking-[-0.02em] transition-colors">
                 CodeSparring
               </span>

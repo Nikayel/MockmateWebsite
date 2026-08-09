@@ -1,39 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
-  <!-- CodeSparring Logo: Two angle brackets facing each other like sparring partners -->
-  <!-- with a lightning bolt/spark in the middle representing energy and practice -->
-
-  <!-- Left bracket < -->
-  <path
-    d="M16 12L6 24L16 36"
-    stroke="#00d9ff"
-    stroke-width="4"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  />
-
-  <!-- Right bracket > -->
-  <path
-    d="M32 12L42 24L32 36"
-    stroke="#00ff88"
-    stroke-width="4"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  />
-
-  <!-- Lightning bolt in center - the "spark" -->
-  <path
-    d="M26 14L22 23H26L22 34"
-    stroke="url(#spark-gradient)"
-    stroke-width="3"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    fill="none"
-  />
-
-  <defs>
-    <linearGradient id="spark-gradient" x1="22" y1="14" x2="26" y2="34" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#00d9ff"/>
-      <stop offset="1" stop-color="#00ff88"/>
-    </linearGradient>
-  </defs>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="300" height="64">
+  <defs><linearGradient id="lh1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb347"></stop><stop offset=".55" stop-color="#ff8a3d"></stop><stop offset="1" stop-color="#e0552a"></stop></linearGradient></defs>
+  <rect width="64" height="64" rx="17" fill="url(#lh1)"></rect>
+  <g transform="translate(10.88 10.88) scale(0.66)" stroke="#2a1206" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M20 24 14 32 20 40" stroke-width="6"></path>
+    <path d="M44 24 50 32 44 40" stroke-width="6"></path>
+    <path d="M27 44Q32 49 37 44" stroke-width="5"></path>
+  </g>
+  <text x="80" y="41" font-family="Geist, &#39;Geist Variable&#39;, system-ui, -apple-system, sans-serif" font-size="27" font-weight="600" letter-spacing="-0.95" fill="#f2efe8">CodeSparring</text>
 </svg>
