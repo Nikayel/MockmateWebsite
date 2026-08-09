@@ -310,6 +310,14 @@ export function convertLegacyTestCase(
 }
 
 /**
+ * Scenarios where "expected is a pair of 0-based indices into `nums` that sum to `target`"
+ * is genuinely true. Membership is deliberate: a scenario has to be checked against this
+ * property before being added, because the validator REJECTS anything that does not satisfy
+ * it, including a correct answer to a different question.
+ */
+const TWO_SUM_INDEX_PAIR_SCENARIOS = new Set(["dsa-two-sum"])
+
+/**
  * Auto-detect appropriate property validators based on scenario ID and input shape
  */
 function detectPropertyValidators(
@@ -319,11 +327,19 @@ function detectPropertyValidators(
   const validators: Array<ReturnType<(typeof PropertyBuilders)[keyof typeof PropertyBuilders]>> = []
   const { input, expected } = testCase
 
-  // Two-sum pattern detection
-  if (
-    scenarioId.includes("two-sum") ||
-    (input.nums && input.target !== undefined && Array.isArray(expected) && expected.length === 2)
-  ) {
+  // Two-sum pattern detection.
+  //
+  // An allowlist, because the previous conditions were a substring check on the id OR "has
+  // nums + target and a 2-element expected", and both over-matched:
+  //   dsa-two-sum-bst          contains "two-sum" but is a BST search; scored 0/2
+  //   dsa-two-sum-ii-sorted    contains "two-sum" but keys its array `numbers` and answers
+  //                            1-indexed, so the validator threw; scored 0/3
+  //   dsa-find-first-last-position  has nums + target and returns [first, last] INDEX BOUNDS,
+  //                            so the validator asserted nums[3] + nums[4] === target, i.e.
+  //                            8 + 8 === 8; scored 0/2
+  // All three rejected their own documented answer keys. The property only holds where the
+  // expected value really is a pair of 0-based indices into `nums` summing to `target`.
+  if (TWO_SUM_INDEX_PAIR_SCENARIOS.has(scenarioId)) {
     validators.push(PropertyBuilders.twoSumValid("nums", "target"))
     return validators
   }
@@ -339,8 +355,17 @@ function detectPropertyValidators(
     return validators
   }
 
-  // Palindrome check
-  if (scenarioId.includes("palindrome") && typeof expected === "boolean") {
+  // Palindrome check.
+  //
+  // Requires the STRING the validator actually reads. It looks at `input.s || input.str` and
+  // falls back to "", which reverses to itself, so it declared every input a palindrome.
+  // dsa-palindrome-linked-list passes a `head` list and correctly answers false for a
+  // non-palindrome, and was marked wrong for it.
+  if (
+    scenarioId.includes("palindrome") &&
+    typeof expected === "boolean" &&
+    (typeof input.s === "string" || typeof input.str === "string")
+  ) {
     validators.push(PropertyBuilders.isPalindrome())
     return validators
   }
