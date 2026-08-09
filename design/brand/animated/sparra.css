@@ -1,0 +1,169 @@
+/* CodeSparring — Sparra motion
+   Apply .sparra to the icon wrapper. Reactions fire once, then return to idle. */
+
+@keyframes sparra-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@keyframes sparra-blink-open {
+  0%,
+  92%,
+  100% {
+    opacity: 1;
+  }
+  94%,
+  98% {
+    opacity: 0;
+  }
+}
+@keyframes sparra-blink-shut {
+  0%,
+  92%,
+  100% {
+    opacity: 0;
+  }
+  94%,
+  98% {
+    opacity: 1;
+  }
+}
+@keyframes sparra-tilt {
+  0%,
+  100% {
+    transform: rotate(-4deg);
+  }
+  50% {
+    transform: rotate(4deg);
+  }
+}
+@keyframes sparra-think-dot {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+@keyframes sparra-pop {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.13);
+  }
+  60% {
+    transform: scale(0.97);
+  }
+}
+@keyframes sparra-shake {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0);
+  }
+  20% {
+    transform: translateX(-4px) rotate(-4deg);
+  }
+  40% {
+    transform: translateX(4px) rotate(4deg);
+  }
+  60% {
+    transform: translateX(-3px) rotate(-3deg);
+  }
+  80% {
+    transform: translateX(2px) rotate(2deg);
+  }
+}
+@keyframes sparra-scan {
+  0%,
+  100% {
+    transform: translateX(-3px);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+}
+@keyframes sparra-score-ring {
+  from {
+    stroke-dashoffset: var(--sparra-ring-len, 207);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes sparra-flicker {
+  0%,
+  100% {
+    transform: scaleY(1) translateY(0);
+    opacity: 1;
+  }
+  50% {
+    transform: scaleY(1.14) translateY(-2px);
+    opacity: 0.86;
+  }
+}
+
+.sparra {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+}
+
+/* looping states */
+.sparra[data-state="idle"] {
+  animation: sparra-bob 3.4s ease-in-out infinite;
+}
+.sparra[data-state="idle"] .sparra-eyes-open {
+  animation: sparra-blink-open 4.6s linear infinite;
+}
+.sparra[data-state="idle"] .sparra-eyes-shut {
+  animation: sparra-blink-shut 4.6s linear infinite;
+}
+.sparra[data-state="thinking"] {
+  transform-origin: 50% 70%;
+  animation: sparra-tilt 2.6s ease-in-out infinite;
+}
+.sparra[data-state="thinking"] .sparra-dot {
+  animation: sparra-think-dot 1.2s ease-in-out infinite;
+}
+.sparra[data-state="thinking"] .sparra-dot:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.sparra[data-state="thinking"] .sparra-dot:nth-child(3) {
+  animation-delay: 0.36s;
+}
+.sparra[data-state="scoring"] .sparra-eyes {
+  animation: sparra-scan 2.2s ease-in-out infinite;
+}
+/* determinate 10s ring — set --sparra-score-duration to your real p95 */
+.sparra[data-state="scoring"] .sparra-ring {
+  animation: sparra-score-ring var(--sparra-score-duration, 10s) linear forwards;
+}
+.sparra[data-state="streak"] .sparra-flame {
+  transform-origin: 50% 23%;
+  animation: sparra-flicker 1.9s ease-in-out infinite;
+}
+
+/* one-shot reactions — remove the attribute on animationend */
+.sparra[data-state="pass"] {
+  animation: sparra-pop 0.7s ease-out 1;
+}
+.sparra[data-state="fail"] {
+  animation: sparra-shake 0.6s ease-in-out 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sparra,
+  .sparra * {
+    animation: none !important;
+  }
+}

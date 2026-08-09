@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs><linearGradient id="sgi" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb347"></stop><stop offset=".55" stop-color="#ff8a3d"></stop><stop offset="1" stop-color="#e0552a"></stop></linearGradient></defs>
+  
+  <g class="b">
+    <rect width="64" height="64" rx="17" fill="url(#sgi)"></rect>
+    <g transform="translate(10.88 10.88) scale(0.66)" stroke="#2a1206" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <g class="o">
+        <path d="M20 24 14 32 20 40" stroke-width="6"></path>
+        <path d="M44 24 50 32 44 40" stroke-width="6"></path>
+      </g>
+      <g class="s">
+        <path d="M14 32 21 32" stroke-width="6"></path>
+        <path d="M43 32 50 32" stroke-width="6"></path>
+      </g>
+      <path d="M27 44Q32 49 37 44" stroke-width="5"></path>
+    </g>
+  </g>
+</svg>

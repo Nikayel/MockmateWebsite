@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 128" width="220" height="128">
+  <defs><linearGradient id="ls2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb347"></stop><stop offset=".55" stop-color="#ff8a3d"></stop><stop offset="1" stop-color="#e0552a"></stop></linearGradient></defs>
+  <g transform="translate(78 0)"><rect width="64" height="64" rx="17" fill="url(#ls2)"></rect><g transform="translate(10.88 10.88) scale(0.66)" stroke="#2a1206" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M20 24 14 32 20 40" stroke-width="6"></path>
+    <path d="M44 24 50 32 44 40" stroke-width="6"></path>
+    <path d="M27 44Q32 49 37 44" stroke-width="5"></path>
+  </g></g>
+  <text x="110" y="112" text-anchor="middle" font-family="Geist, system-ui, sans-serif" font-size="27" font-weight="600" letter-spacing="-0.95" fill="#1a1917">CodeSparring</text>
+</svg>

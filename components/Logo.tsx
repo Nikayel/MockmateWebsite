@@ -1,75 +1,37 @@
 import { cn } from "@/lib/utils"
+import { Sparra } from "@/components/brand/Sparra"
 
 interface LogoProps {
   className?: string
   size?: number
 }
 
+/**
+ * The CodeSparring mark — Sparra's static default face on the ember chip.
+ * For animated states use components/brand/Sparra directly.
+ */
 export function Logo({ className = "", size = 32 }: LogoProps) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 32 32"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-    >
-      {/* CodeSparring Logo: Two brackets facing off with lightning spark */}
-
-      {/* Left bracket < - cyan */}
-      <path
-        d="M11 8L4 16L11 24"
-        stroke="#c4703f"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-
-      {/* Right bracket > - green */}
-      <path
-        d="M21 8L28 16L21 24"
-        stroke="#3fb883"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-
-      {/* Lightning spark in center */}
-      <path
-        d="M17.5 10L15 15.5H17.5L15 22"
-        stroke="url(#logo-gradient)"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-
-      <defs>
-        <linearGradient
-          id="logo-gradient"
-          x1="15"
-          y1="10"
-          x2="17.5"
-          y2="22"
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop stopColor="#c4703f" />
-          <stop offset="1" stopColor="#3fb883" />
-        </linearGradient>
-      </defs>
-    </svg>
-  )
+  return <Sparra size={size} className={className} />
 }
 
-export function LogoWithText({ className = "", size = 32 }: LogoProps) {
+/**
+ * Horizontal lockup: mark + wordmark in Geist SemiBold, per
+ * design/brand/README.md (gap = 25% of icon width, single-ink wordmark).
+ */
+export function LogoWithText({ className = "", size = 28 }: LogoProps) {
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <Logo size={size} />
-      <span className="text-xl font-heading font-bold tracking-tight">
-        <span className="text-white">Code</span>
-        <span className="text-accent">Sparring</span>
+    <span
+      className={cn("inline-flex items-center", className)}
+      style={{ gap: Math.round(size * 0.25) }}
+    >
+      <Sparra size={size} />
+      <span
+        className="font-ui text-foreground font-semibold tracking-[-0.035em]"
+        style={{ fontSize: Math.max(Math.round(size * 0.6), 14) }}
+      >
+        CodeSparring
       </span>
-    </div>
+    </span>
   )
 }
 
