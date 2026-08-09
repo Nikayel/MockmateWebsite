@@ -1,4 +1,4 @@
-import { Cpu, Bug, Wrench, Zap, Shield, Layers } from "lucide-react"
+import { Cpu, Bug, Wrench, Layers } from "lucide-react"
 import type { ScenarioType, DifficultyLevel } from "@/lib/scenarios"
 
 /**
@@ -18,8 +18,6 @@ export interface ExerciseTypeConfig {
 export const EXERCISE_TYPES: readonly ExerciseTypeConfig[] = [
   { id: "bugfix", label: "Bug Fix", description: "Repair failing codebases", icon: Bug },
   { id: "add-functionality", label: "Add Feature", description: "Extend codebases", icon: Wrench },
-  { id: "optimization", label: "Optimize", description: "Improve performance", icon: Zap },
-  { id: "security", label: "Security", description: "Fix vulnerabilities", icon: Shield },
   { id: "system-design", label: "System Design", description: "Architecture & scalability", icon: Layers },
   { id: "dsa", label: "DSA Drill", cardLabel: "DSA", description: "Algorithms & data structures", icon: Cpu },
 ]

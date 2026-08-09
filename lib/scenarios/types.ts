@@ -7,13 +7,7 @@ import { DSAPattern } from "../types/dsa-patterns"
 import type { ValidatorConfig, ReferenceSolution } from "../validators/types"
 import type { GuidedLabConfig } from "../bugfix/guided-lab/types"
 
-export type ScenarioType =
-  | "dsa"
-  | "bugfix"
-  | "optimization"
-  | "security"
-  | "system-design"
-  | "add-functionality"
+export type ScenarioType = "dsa" | "bugfix" | "system-design" | "add-functionality"
 export type DifficultyLevel = "easy" | "medium" | "hard"
 /**
  * Interview role / track a question is representative of, used for role-aware

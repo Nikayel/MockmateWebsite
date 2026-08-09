@@ -13,9 +13,7 @@ const SCENARIO_TYPE_PRIORITY: Record<ScenarioType, number> = {
   bugfix: 0,
   "add-functionality": 1,
   "system-design": 2,
-  optimization: 3,
-  security: 4,
-  dsa: 5,
+  dsa: 3,
 }
 
 export function useScenarioFilters() {
