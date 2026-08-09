@@ -462,9 +462,14 @@ export default function RoadmapPage() {
     setShowDayUnlockModal(false)
   }
 
-  // Handle starting a mock interview
+  // Handle starting a mock interview.
+  //
+  // No track param on purpose. `?mode=mock` was read by nothing and only ever worked because the
+  // browser opened on a default tab; this fires from the roadmap-complete card, and a roadmap
+  // blends DSA and bugfix work, so the honest destination is the picker rather than a guess at
+  // which of the two the user just finished.
   const handleStartMockInterview = () => {
-    router.push("/interview?mode=mock")
+    router.push("/interview")
   }
 
   // Handle adding more questions (would need to implement roadmap extension)
