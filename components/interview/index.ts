@@ -3,6 +3,13 @@
  *
  * Organized components for the interview page.
  * Split for maintainability and reusability.
+ *
+ * Deliberately does NOT re-export `interview-tracks` or `InterviewTrackPicker`.
+ *
+ * This barrel pulls in `ScenarioBrowser`, which imports the whole scenario registry. The picker and
+ * the track registry are imported by `components/header.tsx`, which renders on every page, so
+ * reaching them through here would put the entire catalog in the bundle of every route on the site.
+ * Import those two from their own paths, the way the header does.
  */
 
 // Core interview components
