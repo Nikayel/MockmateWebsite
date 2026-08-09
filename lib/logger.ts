@@ -375,8 +375,10 @@ async function sendToSentry(
 
 interface ExternalDeliveryOptions {
   /**
-   * Report to Sentry regardless of level. Revenue events log at `info`, which
-   * the severity gate below would otherwise drop.
+   * Report to Sentry regardless of level or warn sampling. Revenue events log
+   * at `info`, which the severity gate below would otherwise drop; rare
+   * must-see warns (e.g. guardrail-drift observers) would otherwise be sampled
+   * down to silence - a rare event at a 10% sample rate reads as zero.
    */
   alwaysReport?: boolean
 }
@@ -519,12 +521,12 @@ export const logger = {
     }
   },
 
-  warn(message: string, context?: LogContext) {
+  warn(message: string, context?: LogContext, options?: ExternalDeliveryOptions) {
     if (shouldLog("warn")) {
       console.warn(formatMessage("warn", message, context))
     }
     // Send warnings to external service in production
-    deliverExternally("warn", message, context)
+    deliverExternally("warn", message, context, options)
   },
 
   error(message: string, context?: ErrorContext) {

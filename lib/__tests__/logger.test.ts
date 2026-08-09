@@ -279,6 +279,15 @@ describe("Sentry quota protection", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it("delivers alwaysReport warns even when warns are sampled out", async () => {
+    const { logger } = await loadLogger({ warnSampleRate: "0" })
+
+    logger.warn("[Env Drift] rare must-see event", { role: "partner" }, { alwaysReport: true })
+
+    await flushDeliveries()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it("samples only a fraction of warns at the default rate", async () => {
     const { logger } = await loadLogger()
     // The rate is read per call, not at module scope, so unsetting it here
