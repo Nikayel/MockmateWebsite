@@ -736,7 +736,7 @@ export default function DashboardPage() {
                     <p className="text-muted-foreground text-sm">
                       Practice production incidents and build a separate debugging signal.
                     </p>
-                    <Link href="/interview?practice=true&type=bugfix">
+                    <Link href="/interview?track=debugging">
                       <Button
                         size="sm"
                         variant="outline"
@@ -799,7 +799,7 @@ export default function DashboardPage() {
                       </div>
                     )}
 
-                    <Link href="/interview?practice=true&type=bugfix">
+                    <Link href="/interview?track=debugging">
                       <Button
                         size="sm"
                         variant="outline"
