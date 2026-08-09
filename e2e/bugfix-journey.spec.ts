@@ -12,6 +12,15 @@ import { test, expect } from "@playwright/test"
  *     exists. Feedback lands on `/sessions/<id>`
  *     (app/interview/_hooks/useSessionRestore.ts:87).
  *
+ * A third was still wrong after that correction: `?scenario=<id>` on its own
+ * selects nothing. `useSessionReopen` takes over on exactly two shapes, either
+ * `session` + `scenario` (line 123) or `scenario` + `practice|roadmap` (line
+ * 374), and `useSessionRestore` is not a fallback because it early-returns
+ * unless a scenario is already selected (line 64). A bare `?scenario=` lands on
+ * the browse surface, so the first assertion below could never have passed.
+ * `practice=true` is the established shape for "open this scenario", used by
+ * /knowledge and the practice components.
+ *
  * It still requires an authenticated session and a live AI backend, so wiring
  * it into CI needs a seeded test user and a mocked provider first. Until then
  * there is NO automated proof that a user can complete a scored round, which
@@ -20,7 +29,7 @@ import { test, expect } from "@playwright/test"
 test.describe("Evidence-driven Bugfix Journey", () => {
   test("completes the bugfix flow for the onboarding scenario", async ({ page }) => {
     // 1. Select Incident
-    await page.goto("/interview?scenario=bugfix-onboarding")
+    await page.goto("/interview?scenario=bugfix-onboarding&practice=true")
 
     // Check that we're on the interview page and problem panel loaded
     await expect(page.locator("text=Onboarding: Cart Discount Bug")).toBeVisible()
