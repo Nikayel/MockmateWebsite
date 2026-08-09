@@ -56,6 +56,12 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
   const optsRef = useRef(opts)
   optsRef.current = opts
 
+  // Fingerprint of the last payload written remotely, keyed by session id.
+  // Without it every 30s tick rewrote the full session document (chat, console
+  // logs, workspace, test results) whether or not anything changed — 120 large
+  // Firestore writes per hour-long interview spent idle or thinking.
+  const lastRemoteSaveRef = useRef<{ sessionId: string; fingerprint: string } | null>(null)
+
   // Auto-save session data every 30 seconds (localStorage + Firestore/API)
   useEffect(() => {
     // Allow auto-save for both authenticated users and guests
@@ -67,6 +73,27 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
       const selectedScenario = opts.selectedScenario
       if (!selectedScenario) return
       try {
+        // Everything the remote save persists except the clock. elapsedTime
+        // advances every second, so including it would defeat the dirty check;
+        // it is only worth a remote write when real content changed with it.
+        const remoteFingerprint = JSON.stringify({
+          scenarioId: selectedScenario.id,
+          code: opts.code,
+          chatMessages: opts.chatMessages,
+          interviewerMessages: opts.interviewerMessages,
+          selectedLanguage: opts.selectedLanguage,
+          testResults: opts.testResults,
+          testSummary: opts.testSummary,
+          workspaceContext: opts.workspaceContext,
+          activeWorkspacePath: opts.activeWorkspacePath,
+          consoleLogs: opts.consoleLogs,
+          bugfixEvidenceEvents: opts.bugfixEvidenceEvents,
+          isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
+        })
+        const remoteDirty =
+          !opts.currentSessionId ||
+          lastRemoteSaveRef.current?.sessionId !== opts.currentSessionId ||
+          lastRemoteSaveRef.current?.fingerprint !== remoteFingerprint
         const sessionData = {
           scenarioId: selectedScenario.id,
           code: opts.code,
@@ -89,8 +116,11 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
           const storageKey = `interview_autosave_${opts.firebaseUser.uid}_${selectedScenario.id}`
           localStorage.setItem(storageKey, JSON.stringify(sessionData))
 
-          // Also save to Firestore if we have a session ID (for cross-device recovery)
-          if (opts.currentSessionId) {
+          // Also save to Firestore if we have a session ID (for cross-device
+          // recovery) - but only when something other than the clock changed.
+          // localStorage above still saves every tick, so elapsedTime recovery
+          // on the same device stays fresh.
+          if (opts.currentSessionId && remoteDirty) {
             await saveSessionState(opts.currentSessionId, {
               code: opts.code,
               selectedLanguage: opts.selectedLanguage,
@@ -114,7 +144,7 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
           localStorage.setItem(storageKey, JSON.stringify(sessionData))
 
           // Also save state to Firestore via API (for session recovery)
-          if (opts.currentSessionId) {
+          if (opts.currentSessionId && remoteDirty) {
             await fetch("/api/guest-session", {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
@@ -139,6 +169,13 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
                 },
               }),
             })
+          }
+        }
+
+        if (opts.currentSessionId && remoteDirty) {
+          lastRemoteSaveRef.current = {
+            sessionId: opts.currentSessionId,
+            fingerprint: remoteFingerprint,
           }
         }
       } catch (error) {
