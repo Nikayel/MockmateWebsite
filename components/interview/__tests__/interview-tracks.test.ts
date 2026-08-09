@@ -66,8 +66,10 @@ describe("interview track registry", () => {
     const present = new Set(scenarios.map((scenario) => scenario.type))
     for (const track of INTERVIEW_TRACKS) {
       for (const type of track.types) {
-        expect(present.has(type), `track "${track.id}" advertises "${type}", which has 0 scenarios`)
-          .toBe(true)
+        expect(
+          present.has(type),
+          `track "${track.id}" advertises "${type}", which has 0 scenarios`
+        ).toBe(true)
       }
     }
   })
