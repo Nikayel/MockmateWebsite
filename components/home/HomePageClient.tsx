@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 
 interface HomePageClientProps {
   header: React.ReactNode
@@ -37,11 +38,7 @@ export function HomePageClient({ header, footer, marketingContent }: HomePageCli
 
   // If user is authenticated, show loading while redirecting
   if (user) {
-    return (
-      <main className="bg-background flex min-h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#c4703f]"></div>
-      </main>
-    )
+    return <SparraLoader fullPage />
   }
 
   // Not authenticated - show the SSR'd marketing content

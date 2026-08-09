@@ -24,6 +24,7 @@ import { CompanyLogo } from "@/components/labs/CompanyLogo"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { Header } from "@/components/header"
 import { trackCaseLabStarted } from "@/lib/labs/case-lab-analytics"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 
 export default function CaseLabPlayPage() {
   const params = useParams<{ labId: string }>()
@@ -173,9 +174,7 @@ export default function CaseLabPlayPage() {
           {signedOutBanner}
 
           {isLoading ? (
-            <div className="flex min-h-[40vh] items-center justify-center">
-              <p className="text-muted-foreground text-sm">Loading your progress…</p>
-            </div>
+            <SparraLoader className="min-h-[40vh]" label="Loading your progress…" />
           ) : loadError ? (
             <div
               className="border-border bg-muted/30 flex min-h-[40vh] flex-col items-center justify-center gap-4 rounded-xl border p-6 text-center"

@@ -63,6 +63,7 @@ import {
   TabButton,
   type RoadmapSummary,
 } from "./_components/RoadmapPageParts"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 
 /**
  * Roadmap Page - Cognitive Load Optimized
@@ -616,10 +617,7 @@ export default function RoadmapPage() {
       <div className="bg-background min-h-screen">
         <Header />
         <div className="flex min-h-[calc(100vh-80px)] items-center justify-center pt-24">
-          <div className="text-center">
-            <div className="border-primary mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-t-transparent" />
-            <p className="text-muted-foreground">Loading your roadmap...</p>
-          </div>
+          <SparraLoader label="Loading your roadmap…" />
         </div>
       </div>
     )

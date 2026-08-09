@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 
 /**
  * In-page auth guard for the Python tutorial (defense-in-depth behind the Edge proxy gate in
@@ -23,9 +24,10 @@ export function LearnAuthGuard({ children }: { children: ReactNode }) {
 
   if (!initialized || !user) {
     return (
-      <div className="text-muted-foreground flex min-h-[40vh] items-center justify-center text-sm">
-        {initialized ? "Redirecting to sign in…" : "Loading…"}
-      </div>
+      <SparraLoader
+        className="min-h-[40vh]"
+        label={initialized ? "Redirecting to sign in…" : undefined}
+      />
     )
   }
 

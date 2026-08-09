@@ -70,6 +70,7 @@ import { useFeedbackStreaming } from "./_hooks/useFeedbackStreaming"
 import { useInterviewFeedback } from "./_hooks/useInterviewFeedback"
 import { useSystemDesignFeedback } from "./_hooks/useSystemDesignFeedback"
 import { useSystemDesignSubmit } from "./_hooks/useSystemDesignSubmit"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -1815,11 +1816,7 @@ function InterviewPageContent() {
   ])
 
   if (isLoading) {
-    return (
-      <main className="bg-background flex min-h-screen items-center justify-center">
-        <div className="text-foreground text-xl">Loading...</div>
-      </main>
-    )
+    return <SparraLoader fullPage label="Loading interview…" />
   }
 
   // Allow both authenticated users and guest mode
@@ -2116,14 +2113,7 @@ function InterviewPageContent() {
 
 // Loading fallback for Suspense boundary
 function InterviewPageLoading() {
-  return (
-    <main className="from-card via-background to-card flex min-h-screen flex-1 items-center justify-center bg-gradient-to-b">
-      <div className="text-center">
-        <div className="border-accent mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2"></div>
-        <p className="text-muted-foreground">Loading interview...</p>
-      </div>
-    </main>
-  )
+  return <SparraLoader fullPage label="Loading interview…" />
 }
 
 // Wrapper component with Suspense boundary for useSearchParams

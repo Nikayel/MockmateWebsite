@@ -21,6 +21,7 @@ import { motion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
 import Link from "next/link"
 import { getGuestId, confirmGuestSessionMigration, getGuestSessionData } from "@/lib/guest-session"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 
 function getLoginErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) return "Please try again."
@@ -623,13 +624,7 @@ function LoginPageContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense
-      fallback={
-        <main className="bg-background flex min-h-screen items-center justify-center">
-          <div className="border-accent h-12 w-12 animate-spin rounded-full border-b-2"></div>
-        </main>
-      }
-    >
+    <Suspense fallback={<SparraLoader fullPage />}>
       <LoginPageContent />
     </Suspense>
   )

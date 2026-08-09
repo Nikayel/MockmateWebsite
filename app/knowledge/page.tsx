@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowRight, Brain, Loader2, Lock } from "lucide-react"
+import { ArrowRight, Brain, Lock } from "lucide-react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -32,6 +32,7 @@ import { KnowledgeSummary } from "./_components/KnowledgeSummary"
 import { BlackBoxNotice } from "./_components/BlackBoxNotice"
 import { EvidenceList, type EvidenceRowView } from "./_components/EvidenceList"
 import { ChallengeDialog, type CorrectionSummary } from "./_components/ChallengeDialog"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 
 interface ModelResponse {
   enabled: boolean
@@ -275,11 +276,7 @@ export default function KnowledgePage() {
   )
 
   if (!initialized || authLoading || (user && isPro === null)) {
-    return (
-      <div className="bg-background flex min-h-screen items-center justify-center">
-        <Loader2 className="text-foreground h-6 w-6 animate-spin" />
-      </div>
-    )
+    return <SparraLoader fullPage />
   }
 
   if (!user) return null // redirecting

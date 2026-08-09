@@ -23,6 +23,7 @@ import { InterviewSession } from "@/lib/types"
 import Link from "next/link"
 import { getScenarioById } from "@/lib/scenarios/index"
 import { clampPracticeMinutes, isTruncatedDuration } from "@/lib/session-duration"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 
 export default function SessionsPage() {
   const router = useRouter()
@@ -128,15 +129,7 @@ export default function SessionsPage() {
   }, [sessions])
 
   if (loading || authLoading || !initialized) {
-    return (
-      <main className="bg-background flex min-h-screen items-center justify-center">
-        <div className="flex items-center gap-3">
-          <div className="bg-muted h-2 w-2 animate-pulse rounded-full" />
-          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-75" />
-          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-150" />
-        </div>
-      </main>
-    )
+    return <SparraLoader fullPage />
   }
 
   const getScoreColor = (score: number) => {

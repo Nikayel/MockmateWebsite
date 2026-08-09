@@ -10,6 +10,7 @@ import { roadmapProgressPercent } from "@/lib/roadmap/progress"
 import { isPaidTier } from "@/lib/pricing"
 import type { SubscriptionTier } from "@/lib/config"
 import { cn } from "@/lib/utils"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 
 export interface RoadmapSummary {
   id: string
@@ -414,10 +415,7 @@ export function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
       <div className="bg-background min-h-screen">
         <Header />
         <div className="flex min-h-[calc(100vh-80px)] items-center justify-center pt-24">
-          <div className="text-center">
-            <div className="border-primary mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-t-transparent" />
-            <p className="text-muted-foreground">Loading...</p>
-          </div>
+          <SparraLoader label="Loading your roadmap…" />
         </div>
       </div>
     )

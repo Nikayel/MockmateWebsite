@@ -15,9 +15,10 @@ import {
 } from "@/components/practice/CorrectionTraceBanner"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-import { Loader2, Lock, ArrowRight, HelpCircle, List, CalendarDays } from "lucide-react"
+import { Lock, ArrowRight, HelpCircle, List, CalendarDays } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 
 // Dynamic imports for heavy components - reduces initial bundle size
 const StreakBanner = dynamic(
@@ -345,11 +346,7 @@ export default function PracticePage() {
   }, [initialized, user, authLoading, router])
 
   if (!initialized || authLoading || isPro === null) {
-    return (
-      <div className="bg-background flex min-h-screen items-center justify-center">
-        <Loader2 className="text-foreground h-6 w-6 animate-spin" />
-      </div>
-    )
+    return <SparraLoader fullPage />
   }
 
   // Entitlement could not be determined. Access still fails closed, but the user is

@@ -22,6 +22,7 @@ import { ErrorBoundary } from "@/components/error-boundary"
 import Link from "next/link"
 import { isPaidTier } from "@/lib/pricing"
 import type { SubscriptionTier } from "@/lib/config"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 
 function UpgradePageContent() {
   const searchParams = useSearchParams()
@@ -360,13 +361,7 @@ function UpgradePageContent() {
 export default function UpgradePage() {
   return (
     <ErrorBoundary>
-      <Suspense
-        fallback={
-          <main className="bg-background flex min-h-screen items-center justify-center">
-            <div className="border-accent h-12 w-12 animate-spin rounded-full border-b-2"></div>
-          </main>
-        }
-      >
+      <Suspense fallback={<SparraLoader fullPage />}>
         <UpgradePageContent />
       </Suspense>
     </ErrorBoundary>

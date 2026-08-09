@@ -66,6 +66,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 
 export default function AccountPage() {
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
@@ -596,15 +597,7 @@ export default function AccountPage() {
   }
 
   if (authLoading || dataLoading) {
-    return (
-      <main className="bg-background flex min-h-screen items-center justify-center">
-        <div className="flex items-center gap-3">
-          <div className="bg-muted h-2 w-2 animate-pulse rounded-full" />
-          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-75" />
-          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-150" />
-        </div>
-      </main>
-    )
+    return <SparraLoader fullPage />
   }
 
   // isPaidTier so enterprise (a paid tier) is not treated as Free (DUP-2)

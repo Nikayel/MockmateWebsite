@@ -35,6 +35,7 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { isPaidTier } from "@/lib/pricing"
 import type { SubscriptionTier } from "@/lib/config"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 
 const OnboardingModal = dynamic(
   () => import("@/components/OnboardingModal").then((mod) => mod.OnboardingModal),
@@ -279,15 +280,7 @@ export default function DashboardPage() {
   }, [router, firebaseUser, authLoading, initialized, authCheckComplete, reloadKey])
 
   if (authLoading || !initialized || !authCheckComplete || dataLoading) {
-    return (
-      <main className="bg-background flex min-h-screen items-center justify-center">
-        <div className="flex items-center gap-3">
-          <div className="bg-muted h-2 w-2 animate-pulse rounded-full" />
-          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-75" />
-          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-150" />
-        </div>
-      </main>
-    )
+    return <SparraLoader fullPage />
   }
 
   if (!user) {

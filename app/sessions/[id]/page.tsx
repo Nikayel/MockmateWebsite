@@ -15,6 +15,7 @@ import { Sparra } from "@/components/brand/Sparra"
 import { InterviewSession } from "@/lib/types"
 import Link from "next/link"
 import { clampPracticeMinutes, isTruncatedDuration } from "@/lib/session-duration"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 
 export default function SessionDetailPage() {
   const router = useRouter()
@@ -141,15 +142,7 @@ export default function SessionDetailPage() {
   }, [session?.feedback_status, loadSession])
 
   if (loading || authLoading || !initialized) {
-    return (
-      <main className="bg-background flex min-h-screen items-center justify-center">
-        <div className="flex items-center gap-3">
-          <div className="bg-muted h-2 w-2 animate-pulse rounded-full" />
-          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-75" />
-          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-150" />
-        </div>
-      </main>
-    )
+    return <SparraLoader fullPage />
   }
 
   if (!session) {

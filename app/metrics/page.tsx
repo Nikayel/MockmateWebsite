@@ -23,6 +23,7 @@ import {
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 
 interface MetricsData {
   overview: {
@@ -259,15 +260,7 @@ export default function MetricsPage() {
   }, [firebaseUser, authLoading, initialized, router])
 
   if (authLoading || !initialized || loading) {
-    return (
-      <main className="bg-background flex min-h-screen items-center justify-center">
-        <div className="flex items-center gap-3">
-          <div className="bg-muted h-2 w-2 animate-pulse rounded-full" />
-          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-75" />
-          <div className="bg-muted h-2 w-2 animate-pulse rounded-full delay-150" />
-        </div>
-      </main>
-    )
+    return <SparraLoader fullPage />
   }
 
   if (error) {
