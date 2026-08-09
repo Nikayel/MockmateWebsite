@@ -86,7 +86,7 @@ const DEEPGRAM_LISTEN_URL = "wss://api.deepgram.com/v1/listen"
  * Exported (rather than living on the service as a private method) so the query
  * string can be asserted in tests without standing up a WebSocket.
  */
-export function buildListenUrl(config: DeepgramConfig, accessToken?: string): string {
+export function buildListenUrl(config: DeepgramConfig): string {
   const model = config.model || DEFAULT_DEEPGRAM_MODEL
   const params = new URLSearchParams({
     model,
@@ -108,14 +108,6 @@ export function buildListenUrl(config: DeepgramConfig, accessToken?: string): st
     for (const term of config.keyterms) {
       params.append("keyterm", term)
     }
-  }
-
-  // A browser cannot set an Authorization header on a WebSocket, and a granted
-  // JWT is far too long to pass through Sec-WebSocket-Protocol (it also needs
-  // the Bearer scheme, which that header cannot express), so the token rides on
-  // the query string. It only has to be valid for the upgrade request.
-  if (accessToken) {
-    params.set("access_token", accessToken)
   }
 
   return `${DEEPGRAM_LISTEN_URL}?${params.toString()}`
@@ -314,15 +306,17 @@ export class DeepgramVoiceService {
         }
       })
 
-      // Create WebSocket connection to Deepgram. A short raw API key can use the
-      // documented subprotocol form; a granted JWT cannot (wrong auth scheme and
-      // far too long for that header), so it goes on the query string instead.
+      // Create WebSocket connection to Deepgram. Both credential kinds ride the
+      // Sec-WebSocket-Protocol header: a raw API key as ["token", key], a granted
+      // JWT as ["bearer", jwt]. Deepgram rejects the JWT as a query parameter
+      // (access_token= and token= both fail the upgrade), so the header is the
+      // only browser-usable form for granted tokens.
       logger.info("[Deepgram] Connecting", {
         credential: this.config.apiKey ? "configured-api-key" : "granted-token",
       })
       const ws = this.config.apiKey
         ? new WebSocket(buildListenUrl(this.config), ["token", this.config.apiKey])
-        : new WebSocket(buildListenUrl(this.config, this.accessToken))
+        : new WebSocket(buildListenUrl(this.config), ["bearer", this.accessToken])
 
       ws.onopen = () => {
         logger.info("[Deepgram] WebSocket connected")
