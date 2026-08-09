@@ -415,6 +415,22 @@ async function callGemini(
     // Gemini reports measured usage on the response; thread it up so events
     // can carry real token counts (omitted when the SDK returns none).
     const usageMetadata = response.usageMetadata
+
+    // Implicit prompt-cache visibility. Gemini 2.5+ caches the shared request
+    // prefix (systemInstruction + early history) automatically and bills those
+    // tokens at a steep discount; cachedContentTokenCount says how many landed.
+    // Logged so production logs can answer "is prompt caching working?" -
+    // the cost ledger still records the full promptTokenCount, a conservative
+    // overestimate.
+    const cachedTokens = (usageMetadata as { cachedContentTokenCount?: number } | undefined)
+      ?.cachedContentTokenCount
+    if (typeof cachedTokens === "number" && cachedTokens > 0) {
+      logger.info("[Gemini] Prompt cache hit", {
+        model: config.model,
+        cachedTokens,
+        promptTokens: usageMetadata?.promptTokenCount,
+      })
+    }
     const usage: ProviderTokenUsage | undefined =
       typeof usageMetadata?.promptTokenCount === "number" &&
       typeof usageMetadata?.candidatesTokenCount === "number"

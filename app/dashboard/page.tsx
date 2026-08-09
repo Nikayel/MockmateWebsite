@@ -125,7 +125,7 @@ export default function DashboardPage() {
       }
 
       try {
-        const [userProfile, usageData, sessionsSnap, dueData] = await Promise.all([
+        const [fetchedProfile, usageData, sessionsSnap, dueData] = await Promise.all([
           getUserProfile(firebaseUser.uid),
           checkUsageLimit(firebaseUser.uid),
           (async () => {
@@ -160,6 +160,27 @@ export default function DashboardPage() {
             }
           })(),
         ])
+
+        // Self-heal: a signed-in user with no profile doc means the one-shot
+        // profile write on the login/signup path failed and nothing retried
+        // (found in prod: a Feb-2026 Auth user with satellite docs but no
+        // profile). The dashboard is the post-login landing page, so recreate
+        // it here; createOrUpdateProfile is create-only-ish (it never
+        // overwrites an existing profile's subscription fields).
+        let userProfile = fetchedProfile
+        if (!userProfile) {
+          try {
+            const { createOrUpdateProfile } = await import("@/lib/firestore-helpers")
+            userProfile = await createOrUpdateProfile(
+              firebaseUser.uid,
+              firebaseUser.email || "",
+              firebaseUser.displayName,
+              firebaseUser.photoURL
+            )
+          } catch (healError) {
+            console.error("Profile self-heal failed:", healError)
+          }
+        }
 
         setProfile(userProfile)
         setUsage(usageData)
