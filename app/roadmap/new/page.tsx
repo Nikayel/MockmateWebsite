@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { ChevronLeft, AlertCircle, RefreshCw, Crown, ArrowRight } from "lucide-react"
 import { Sparra } from "@/components/brand/Sparra"
+import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
 import Link from "next/link"
 
 import { Header } from "@/components/header"
@@ -381,6 +382,7 @@ export default function NewRoadmapPage() {
                     </div>
                     <h2 className="text-foreground mb-2 text-2xl font-bold">
                       Creating Your Personalized Roadmap
+                      <AnimatedEllipsis />
                     </h2>
                     <p className="text-muted-foreground mx-auto max-w-md">
                       We're analyzing {companyData?.name || "company"} interview patterns and

@@ -464,7 +464,7 @@ function LoginPageContent() {
 
           {/* brand */}
           <div className="relative z-10 flex items-center gap-2">
-            <Sparra size={22} />
+            <Sparra size={22} className="sparra-blink" />
             <span className="text-foreground text-sm font-semibold tracking-tight">
               CodeSparring
             </span>
@@ -521,7 +521,7 @@ function LoginPageContent() {
           >
             {/* brand (mobile only — left pane hidden on small screens) */}
             <motion.div variants={staggerItem} className="mb-8 flex items-center gap-2 lg:hidden">
-              <Sparra size={22} />
+              <Sparra size={22} className="sparra-blink" />
               <span className="text-foreground text-sm font-semibold tracking-tight">
                 CodeSparring
               </span>

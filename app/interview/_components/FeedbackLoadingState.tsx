@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { CheckCircle2 } from "lucide-react"
 import { Sparra } from "@/components/brand/Sparra"
+import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
 
 export interface FeedbackLoadingStateProps {
   onGoToDashboard: () => void
@@ -98,6 +99,7 @@ export function FeedbackLoadingState({
         <div className="mb-12 text-center">
           <h2 className="text-foreground mb-3 text-2xl font-semibold tracking-tight">
             Scoring your submission
+            <AnimatedEllipsis />
           </h2>
           <p className="text-muted-foreground text-sm font-medium">
             {elapsedTime < 60

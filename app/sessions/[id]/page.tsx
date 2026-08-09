@@ -12,6 +12,7 @@ import { getDbLazy } from "@/lib/firebase-lazy"
 import { doc, getDoc } from "firebase/firestore"
 import { ArrowLeft, Clock, Calendar, Terminal } from "lucide-react"
 import { Sparra } from "@/components/brand/Sparra"
+import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
 import { InterviewSession } from "@/lib/types"
 import Link from "next/link"
 import { clampPracticeMinutes, isTruncatedDuration } from "@/lib/session-duration"
@@ -293,7 +294,10 @@ export default function SessionDetailPage() {
                   label="Scoring your submission"
                 />
               </div>
-              <h3 className="text-foreground mb-2 text-lg font-medium">Scoring your submission</h3>
+              <h3 className="text-foreground mb-2 text-lg font-medium">
+                Scoring your submission
+                <AnimatedEllipsis />
+              </h3>
               <p className="text-muted-foreground mb-4 text-sm">
                 Your solution is being reviewed by our AI. This usually takes 30-60 seconds.
               </p>

@@ -7,11 +7,12 @@ interface LogoProps {
 }
 
 /**
- * The CodeSparring mark — Sparra's static default face on the ember chip.
- * For animated states use components/brand/Sparra directly.
+ * The CodeSparring mark — Sparra's default face on the ember chip, kept
+ * alive with an occasional blink (and a gentle bob when its wrapping
+ * `.group` link is hovered). For full states use components/brand/Sparra.
  */
 export function Logo({ className = "", size = 32 }: LogoProps) {
-  return <Sparra size={size} className={className} />
+  return <Sparra size={size} className={cn("sparra-blink", className)} />
 }
 
 /**
@@ -24,7 +25,7 @@ export function LogoWithText({ className = "", size = 28 }: LogoProps) {
       className={cn("inline-flex items-center", className)}
       style={{ gap: Math.round(size * 0.25) }}
     >
-      <Sparra size={size} />
+      <Sparra size={size} className="sparra-blink" />
       <span
         className="font-ui text-foreground font-semibold tracking-[-0.035em]"
         style={{ fontSize: Math.max(Math.round(size * 0.6), 14) }}

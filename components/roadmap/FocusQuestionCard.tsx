@@ -13,6 +13,7 @@ import {
 import { DailyPlan } from "@/lib/data/company-questions/types"
 import { cn } from "@/lib/utils"
 import { DifficultyBadge } from "./FocusSharedComponents"
+import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
 
 interface QuestionCardProps {
   question: DailyPlan["questions"][0]
@@ -173,7 +174,10 @@ export function QuestionCard({
       {isEvaluating && (
         <div className="mt-3 flex items-center gap-2 border-t border-blue-200 pt-3 text-xs text-blue-600 dark:border-blue-800/30 dark:text-blue-400">
           <Loader2 className="h-3 w-3 animate-spin" />
-          <span>Scoring your submission…</span>
+          <span>
+            Scoring your submission
+            <AnimatedEllipsis />
+          </span>
         </div>
       )}
     </motion.div>

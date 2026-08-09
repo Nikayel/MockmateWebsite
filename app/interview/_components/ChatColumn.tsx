@@ -3,6 +3,7 @@
 import { memo, type RefObject } from "react"
 import { MessageSquare, PanelRightClose, Send } from "lucide-react"
 import { Sparra } from "@/components/brand/Sparra"
+import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -145,7 +146,10 @@ export const ChatColumn = memo(function ChatColumn({
                   <div className="border-border/50 bg-muted/50 text-muted-foreground max-w-[90%] rounded-lg border p-2">
                     <div className="flex items-center gap-2">
                       <Sparra state="thinking" size={20} />
-                      <span className="text-xs">CodeSparring AI is thinking…</span>
+                      <span className="text-xs">
+                        CodeSparring AI is thinking
+                        <AnimatedEllipsis />
+                      </span>
                     </div>
                   </div>
                 </div>

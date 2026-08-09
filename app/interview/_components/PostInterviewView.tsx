@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import { FormattedText } from "@/components/ui/FormattedText"
 import { Sparra } from "@/components/brand/Sparra"
+import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
 import nextDynamic from "next/dynamic"
 
 const VoiceModeToggle = nextDynamic(
@@ -419,7 +420,8 @@ export function PostInterviewView({
                         <div className="flex items-center gap-2">
                           <Sparra state="thinking" size={20} />
                           <span className="text-muted-foreground text-xs">
-                            CodeSparring AI is thinking…
+                            CodeSparring AI is thinking
+                            <AnimatedEllipsis />
                           </span>
                         </div>
                       </div>

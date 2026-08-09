@@ -5,6 +5,7 @@ import { CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp } from "lucid
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Sparra, type SparraState } from "@/components/brand/Sparra"
+import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
 import { cn } from "@/lib/utils"
 
 /**
@@ -266,7 +267,10 @@ export function TestResultsPanel({ results, isRunning = false, className }: Test
 
       {isRunning && (
         <div className="text-muted-foreground flex items-center justify-center py-2 text-xs">
-          Running tests…
+          <span className="sparra-label">
+            Running tests
+            <AnimatedEllipsis />
+          </span>
         </div>
       )}
     </div>

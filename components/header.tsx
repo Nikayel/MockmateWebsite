@@ -239,7 +239,7 @@ export function Header() {
                 }
               }}
             >
-              <Sparra size={26} />
+              <Sparra size={26} className="sparra-blink" />
               <span className="text-foreground text-lg font-semibold tracking-[-0.02em] transition-colors">
                 CodeSparring
               </span>

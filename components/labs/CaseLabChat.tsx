@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Send } from "lucide-react"
 import { Sparra } from "@/components/brand/Sparra"
+import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -133,7 +134,10 @@ export function CaseLabChat({ className }: { className?: string }) {
         {sending && (
           <div className="flex items-center gap-2 self-start rounded-lg border border-[var(--wb-border)] bg-[var(--wb-main)] px-3 py-2">
             <Sparra state="thinking" size={18} />
-            <span className="text-xs text-[var(--wb-muted)]">Thinking…</span>
+            <span className="text-xs text-[var(--wb-muted)]">
+              Thinking
+              <AnimatedEllipsis />
+            </span>
           </div>
         )}
       </div>
