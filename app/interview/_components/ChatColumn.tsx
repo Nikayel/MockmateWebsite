@@ -1,7 +1,8 @@
 "use client"
 
 import { memo, type RefObject } from "react"
-import { Brain, MessageSquare, PanelRightClose, Send } from "lucide-react"
+import { MessageSquare, PanelRightClose, Send } from "lucide-react"
+import { Sparra } from "@/components/brand/Sparra"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -142,23 +143,9 @@ export const ChatColumn = memo(function ChatColumn({
               {isBusy && (
                 <div className="flex justify-start">
                   <div className="border-border/50 bg-muted/50 text-muted-foreground max-w-[90%] rounded-lg border p-2">
-                    <div className="flex items-center space-x-2">
-                      <Brain className="text-accent-strong h-3 w-3 animate-pulse" />
-                      <span className="text-xs">CodeSparring AI is thinking</span>
-                      <span className="flex space-x-0.5">
-                        <span
-                          className="bg-accent h-1 w-1 animate-bounce rounded-full"
-                          style={{ animationDelay: "0ms" }}
-                        />
-                        <span
-                          className="bg-accent h-1 w-1 animate-bounce rounded-full"
-                          style={{ animationDelay: "150ms" }}
-                        />
-                        <span
-                          className="bg-accent h-1 w-1 animate-bounce rounded-full"
-                          style={{ animationDelay: "300ms" }}
-                        />
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <Sparra state="thinking" size={20} />
+                      <span className="text-xs">CodeSparring AI is thinking…</span>
                     </div>
                   </div>
                 </div>

@@ -12,6 +12,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { Loader2 } from "lucide-react"
+import { Sparra } from "@/components/brand/Sparra"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -215,7 +216,8 @@ export function ReviewStation() {
           ) : null}
         </div>
       ) : (
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground flex items-center gap-2 text-xs">
+          {generating && <Sparra state="thinking" size={18} />}
           {generating
             ? "Generating interviewer feedback…"
             : "Finish the lab to generate interviewer feedback."}

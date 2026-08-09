@@ -10,7 +10,8 @@
  */
 
 import { useEffect, useRef, useState } from "react"
-import { Loader2, Send } from "lucide-react"
+import { Send } from "lucide-react"
+import { Sparra } from "@/components/brand/Sparra"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -130,8 +131,9 @@ export function CaseLabChat({ className }: { className?: string }) {
           ))
         )}
         {sending && (
-          <div className="self-start rounded-lg border border-[var(--wb-border)] bg-[var(--wb-main)] px-3 py-2">
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--wb-muted)]" aria-hidden />
+          <div className="flex items-center gap-2 self-start rounded-lg border border-[var(--wb-border)] bg-[var(--wb-main)] px-3 py-2">
+            <Sparra state="thinking" size={18} />
+            <span className="text-xs text-[var(--wb-muted)]">Thinking…</span>
           </div>
         )}
       </div>

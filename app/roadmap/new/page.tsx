@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { ChevronLeft, Loader2, AlertCircle, RefreshCw, Crown, ArrowRight } from "lucide-react"
+import { ChevronLeft, AlertCircle, RefreshCw, Crown, ArrowRight } from "lucide-react"
+import { Sparra } from "@/components/brand/Sparra"
 import Link from "next/link"
 
 import { Header } from "@/components/header"
@@ -375,7 +376,9 @@ export default function NewRoadmapPage() {
                 ) : (
                   // Show loading state
                   <>
-                    <Loader2 className="text-primary mx-auto mb-6 h-12 w-12 animate-spin" />
+                    <div className="mb-6 flex justify-center" role="status">
+                      <Sparra state="thinking" size={64} label="Creating your roadmap" />
+                    </div>
                     <h2 className="text-foreground mb-2 text-2xl font-bold">
                       Creating Your Personalized Roadmap
                     </h2>

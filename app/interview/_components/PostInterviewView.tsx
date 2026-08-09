@@ -18,6 +18,7 @@ import {
   MessageSquare,
 } from "lucide-react"
 import { FormattedText } from "@/components/ui/FormattedText"
+import { Sparra } from "@/components/brand/Sparra"
 import nextDynamic from "next/dynamic"
 
 const VoiceModeToggle = nextDynamic(
@@ -208,16 +209,16 @@ export function PostInterviewView({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           {/* Left side: Title and status */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 lg:gap-4">
-            <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+            <h2 className="text-foreground text-lg font-semibold tracking-tight sm:text-xl">
               {debriefPhase === "technical" ? "Technical Debrief" : "Wrap Up"}
             </h2>
-            <div className="flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1 sm:px-3 sm:py-1.5">
+            <div className="bg-muted/60 flex items-center gap-1.5 rounded-full px-2.5 py-1 sm:px-3 sm:py-1.5">
               {testSummary.passRate === 100 ? (
                 <CheckCircle className="h-3.5 w-3.5 text-emerald-500 sm:h-4 sm:w-4" />
               ) : (
                 <XCircle className="h-3.5 w-3.5 text-amber-500 sm:h-4 sm:w-4" />
               )}
-              <span className="text-xs font-medium text-muted-foreground sm:text-sm">
+              <span className="text-muted-foreground text-xs font-medium sm:text-sm">
                 {testSummary.passed}/{testSummary.total} tests
               </span>
             </div>
@@ -241,7 +242,7 @@ export function PostInterviewView({
               loading={isGeneratingFeedback}
               disabled={isGeneratingFeedback}
               size="sm"
-              className="h-10 min-h-[44px] flex-1 rounded-full bg-card px-4 text-xs font-semibold text-foreground shadow-sm transition-all duration-200 hover:bg-muted hover:shadow-md active:scale-[0.98] sm:h-11 sm:flex-none sm:px-5 sm:text-sm lg:px-6"
+              className="bg-card text-foreground hover:bg-muted h-10 min-h-[44px] flex-1 rounded-full px-4 text-xs font-semibold shadow-sm transition-all duration-200 hover:shadow-md active:scale-[0.98] sm:h-11 sm:flex-none sm:px-5 sm:text-sm lg:px-6"
             >
               <span className="hidden sm:inline">See Full Interview Score</span>
               <span className="sm:hidden">View Score</span>
@@ -252,14 +253,14 @@ export function PostInterviewView({
                 onClick={onClose}
                 variant="ghost"
                 size="sm"
-                className="h-10 min-h-[44px] w-10 min-w-[44px] rounded-full p-0 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:h-10 sm:w-10"
+                className="text-muted-foreground hover:bg-muted hover:text-foreground h-10 min-h-[44px] w-10 min-w-[44px] rounded-full p-0 transition-colors sm:h-10 sm:w-10"
               >
                 <X className="h-5 w-5" />
               </Button>
             )}
           </div>
         </div>
-        <p className="mt-2 text-xs font-medium text-muted-foreground sm:text-sm">
+        <p className="text-muted-foreground mt-2 text-xs font-medium sm:text-sm">
           {debriefPhase === "technical"
             ? "Discuss your solution, complexity trade-offs, and alternatives."
             : "Any final questions before viewing your feedback?"}
@@ -275,18 +276,18 @@ export function PostInterviewView({
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 lg:gap-5">
         {/* Left Column: Code & Test Results */}
         <div className="flex min-h-0 flex-col">
-          <Card className="flex min-h-0 flex-1 flex-col border-border bg-card/80">
+          <Card className="border-border bg-card/80 flex min-h-0 flex-1 flex-col">
             <CardHeader
-              className="min-h-[44px] flex-shrink-0 cursor-pointer border-b border-border px-3 py-2 transition-colors hover:bg-muted/50 sm:px-4 sm:py-2.5 lg:px-6"
+              className="border-border hover:bg-muted/50 min-h-[44px] flex-shrink-0 cursor-pointer border-b px-3 py-2 transition-colors sm:px-4 sm:py-2.5 lg:px-6"
               onClick={() => setShowCodeInDiscussion(!showCodeInDiscussion)}
             >
-              <CardTitle className="flex items-center justify-between text-xs text-foreground sm:text-sm">
+              <CardTitle className="text-foreground flex items-center justify-between text-xs sm:text-sm">
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                  <Code className="h-3.5 w-3.5 text-muted-foreground sm:h-4 sm:w-4" />
+                  <Code className="text-muted-foreground h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span>Your Solution</span>
                   <Badge
                     variant="outline"
-                    className="border-border text-[10px] text-muted-foreground sm:text-xs"
+                    className="border-border text-muted-foreground text-[10px] sm:text-xs"
                   >
                     {selectedLanguage}
                   </Badge>
@@ -294,13 +295,13 @@ export function PostInterviewView({
                   {efficiencyMetrics && efficiencyMetrics.estimatedTimeComplexity !== "Unknown" && (
                     <span className="hidden items-center gap-1.5 sm:flex">
                       <span className="text-muted-foreground">·</span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-muted-foreground text-xs">
                         {efficiencyMetrics.estimatedTimeComplexity} time
                       </span>
                       {efficiencyMetrics.estimatedSpaceComplexity !== "Unknown" && (
                         <>
                           <span className="text-muted-foreground">·</span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-muted-foreground text-xs">
                             {efficiencyMetrics.estimatedSpaceComplexity} space
                           </span>
                         </>
@@ -309,9 +310,9 @@ export function PostInterviewView({
                   )}
                 </div>
                 {showCodeInDiscussion ? (
-                  <ChevronUp className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                  <ChevronUp className="text-muted-foreground h-4 w-4 flex-shrink-0" />
                 ) : (
-                  <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                  <ChevronDown className="text-muted-foreground h-4 w-4 flex-shrink-0" />
                 )}
               </CardTitle>
             </CardHeader>
@@ -323,7 +324,7 @@ export function PostInterviewView({
                 </div>
                 {/* Test Results - Responsive height based on screen size */}
                 {testResults.length > 0 && (
-                  <div className="max-h-24 flex-shrink-0 overflow-y-auto border-t border-border p-2 sm:max-h-28 sm:p-3 lg:max-h-32">
+                  <div className="border-border max-h-24 flex-shrink-0 overflow-y-auto border-t p-2 sm:max-h-28 sm:p-3 lg:max-h-32">
                     <div className="space-y-1">
                       {testResults.map((result, index) => (
                         <div
@@ -352,16 +353,16 @@ export function PostInterviewView({
 
         {/* Right Column: Discussion Panel */}
         <div className="flex min-h-0 flex-col">
-          <Card className="flex min-h-0 flex-1 flex-col overflow-hidden border-border bg-card/80">
-            <CardHeader className="min-h-[44px] flex-shrink-0 border-b border-border px-3 py-2 sm:px-4 sm:py-2.5 lg:px-6">
-              <CardTitle className="flex items-center justify-between text-xs text-foreground sm:text-sm">
+          <Card className="border-border bg-card/80 flex min-h-0 flex-1 flex-col overflow-hidden">
+            <CardHeader className="border-border min-h-[44px] flex-shrink-0 border-b px-3 py-2 sm:px-4 sm:py-2.5 lg:px-6">
+              <CardTitle className="text-foreground flex items-center justify-between text-xs sm:text-sm">
                 <div className="flex items-center gap-1.5 sm:gap-2">
-                  <MessageSquare className="h-3.5 w-3.5 text-muted-foreground sm:h-4 sm:w-4" />
+                  <MessageSquare className="text-muted-foreground h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span>Discussion</span>
                 </div>
                 <Badge
                   variant="outline"
-                  className="border-border text-[10px] text-muted-foreground sm:text-xs"
+                  className="border-border text-muted-foreground text-[10px] sm:text-xs"
                 >
                   {interviewerMessages.filter((m) => m.type === "user").length} messages
                 </Badge>
@@ -414,22 +415,11 @@ export function PostInterviewView({
                   {/* Typing Indicator */}
                   {(isLoadingInterviewer || isGeneratingDiscussion) && (
                     <div className="flex justify-start">
-                      <div className="rounded-lg bg-muted px-3 py-2">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-muted-foreground">Typing</span>
-                          <span className="flex gap-0.5">
-                            <span
-                              className="h-1 w-1 animate-pulse rounded-full bg-muted"
-                              style={{ animationDelay: "0ms" }}
-                            />
-                            <span
-                              className="h-1 w-1 animate-pulse rounded-full bg-muted"
-                              style={{ animationDelay: "150ms" }}
-                            />
-                            <span
-                              className="h-1 w-1 animate-pulse rounded-full bg-muted"
-                              style={{ animationDelay: "300ms" }}
-                            />
+                      <div className="bg-muted rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <Sparra state="thinking" size={20} />
+                          <span className="text-muted-foreground text-xs">
+                            CodeSparring AI is thinking…
                           </span>
                         </div>
                       </div>
@@ -441,7 +431,7 @@ export function PostInterviewView({
                 {(hasNewMessages || !isAtBottom) && interviewerMessages.length > 0 && (
                   <button
                     onClick={() => scrollToBottom("smooth")}
-                    className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-muted px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="border-border bg-muted text-muted-foreground hover:bg-muted hover:text-foreground absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors"
                     aria-label="Scroll to latest messages"
                   >
                     <ChevronDown className="h-3 w-3" />
@@ -451,7 +441,7 @@ export function PostInterviewView({
               </div>
 
               {/* Chat Input - Touch targets meet Apple HIG 44x44 minimum */}
-              <div className="flex-shrink-0 border-t border-border p-2 sm:p-3">
+              <div className="border-border flex-shrink-0 border-t p-2 sm:p-3">
                 <VoiceModeToggle
                   isRecording={isRecordingInterviewer}
                   onToggleRecording={() => toggleVoiceRecording(true)}
@@ -465,7 +455,7 @@ export function PostInterviewView({
                       value={interviewerInput}
                       onChange={(e) => setInterviewerInput(e.target.value)}
                       placeholder="Ask about your solution..."
-                      className="h-11 flex-1 border-border bg-muted text-sm text-foreground placeholder-muted-foreground"
+                      className="border-border bg-muted text-foreground placeholder-muted-foreground h-11 flex-1 text-sm"
                       onKeyDown={(e) =>
                         e.key === "Enter" && !isLoadingInterviewer && handleSendMessage(true)
                       }
@@ -476,7 +466,7 @@ export function PostInterviewView({
                     <Button
                       onClick={() => handleSendMessage(true)}
                       size="sm"
-                      className="h-11 min-h-[44px] min-w-[44px] bg-card px-3 text-foreground hover:bg-muted"
+                      className="bg-card text-foreground hover:bg-muted h-11 min-h-[44px] min-w-[44px] px-3"
                       disabled={
                         !interviewerInput.trim() || isLoadingInterviewer || isGeneratingDiscussion
                       }
