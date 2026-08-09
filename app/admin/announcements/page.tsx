@@ -44,6 +44,7 @@ import {
   Power,
   PowerOff,
 } from "lucide-react"
+import { toast } from "sonner"
 import { logger } from "@/lib/logger"
 import { cn } from "@/lib/utils"
 
@@ -98,11 +99,13 @@ const priorityConfig = {
   },
 }
 
+// "page" is deliberately absent: the type exists in the schema but nothing on
+// the client renders it, so offering it here published announcements nobody
+// could ever see.
 const typeConfig = {
   banner: { label: "Banner", description: "Top banner across all pages" },
   modal: { label: "Modal", description: "Popup dialog on first visit" },
   toast: { label: "Toast", description: "Temporary notification" },
-  page: { label: "Page", description: "Dedicated announcement page" },
 }
 
 const audienceConfig = {
@@ -113,7 +116,29 @@ const audienceConfig = {
   specific: { label: "Specific", icon: Users },
 }
 
-const defaultAnnouncement: {
+/**
+ * Format a date for a `datetime-local` input, which expects LOCAL wall-clock
+ * time with no zone. The old `toISOString().slice(0, 16)` put UTC digits in a
+ * local field, so a "starts now" announcement was actually scheduled hours into
+ * the future (7h for a US Pacific admin) and silently never showed.
+ */
+function toDatetimeLocalValue(date: Date): string {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
+}
+
+/**
+ * Convert a `datetime-local` value back to an unambiguous ISO instant before it
+ * leaves the browser. Sending the raw zoneless string let the server (UTC on
+ * Vercel) reinterpret it, shifting every date on each edit round-trip.
+ */
+function datetimeLocalToISO(value: string): string | null {
+  if (!value) return null
+  const parsed = new Date(value)
+  return isNaN(parsed.getTime()) ? null : parsed.toISOString()
+}
+
+interface AnnouncementFormData {
   title: string
   message: string
   type: "banner" | "modal" | "toast" | "page"
@@ -125,18 +150,24 @@ const defaultAnnouncement: {
   dismissible: boolean
   active: boolean
   cta: { text: string; url: string }
-} = {
-  title: "",
-  message: "",
-  type: "banner",
-  priority: "info",
-  targetAudience: "all",
-  targetUserIds: "",
-  startDate: new Date().toISOString().slice(0, 16),
-  endDate: "",
-  dismissible: true,
-  active: true,
-  cta: { text: "", url: "" },
+}
+
+// A function rather than a module constant so "starts now" means now at the
+// moment the dialog opens, not whenever the page bundle was first evaluated.
+function makeDefaultFormData(): AnnouncementFormData {
+  return {
+    title: "",
+    message: "",
+    type: "banner",
+    priority: "info",
+    targetAudience: "all",
+    targetUserIds: "",
+    startDate: toDatetimeLocalValue(new Date()),
+    endDate: "",
+    dismissible: true,
+    active: true,
+    cta: { text: "", url: "" },
+  }
 }
 
 export default function AnnouncementsPage() {
@@ -150,7 +181,7 @@ export default function AnnouncementsPage() {
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingAnnouncement, setEditingAnnouncement] = useState<Partial<Announcement> | null>(null)
-  const [formData, setFormData] = useState(defaultAnnouncement)
+  const [formData, setFormData] = useState<AnnouncementFormData>(makeDefaultFormData)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const loadAnnouncements = useCallback(
@@ -188,7 +219,7 @@ export default function AnnouncementsPage() {
 
   const handleOpenCreate = () => {
     setEditingAnnouncement(null)
-    setFormData(defaultAnnouncement)
+    setFormData(makeDefaultFormData())
     setDialogOpen(true)
   }
 
@@ -201,8 +232,11 @@ export default function AnnouncementsPage() {
       priority: announcement.priority || "info",
       targetAudience: announcement.targetAudience || "all",
       targetUserIds: (announcement as any).targetUserIds?.join(", ") || "",
-      startDate: announcement.startDate?.slice(0, 16) || "",
-      endDate: announcement.endDate?.slice(0, 16) || "",
+      // Stored dates are ISO instants; render them as the admin's local time.
+      startDate: announcement.startDate
+        ? toDatetimeLocalValue(new Date(announcement.startDate))
+        : "",
+      endDate: announcement.endDate ? toDatetimeLocalValue(new Date(announcement.endDate)) : "",
       dismissible: announcement.dismissible ?? true,
       active: announcement.active ?? true,
       cta: announcement.cta || { text: "", url: "" },
@@ -213,6 +247,25 @@ export default function AnnouncementsPage() {
   const handleSave = async () => {
     if (!firebaseUser) return
 
+    const ctaText = formData.cta.text.trim()
+    const ctaUrl = formData.cta.url.trim()
+    if ((ctaText && !ctaUrl) || (!ctaText && ctaUrl)) {
+      toast.error("A call to action needs both button text and a URL.")
+      return
+    }
+
+    const startISO = datetimeLocalToISO(formData.startDate)
+    const endISO = datetimeLocalToISO(formData.endDate)
+    if (endISO && startISO && endISO <= startISO) {
+      toast.error("The end date must be after the start date.")
+      return
+    }
+
+    if (formData.targetAudience === "specific" && !formData.targetUserIds.trim()) {
+      toast.error("A specific-audience announcement needs at least one user ID.")
+      return
+    }
+
     setSaving(true)
     try {
       const token = await firebaseUser.getIdToken()
@@ -221,6 +274,11 @@ export default function AnnouncementsPage() {
       const body: any = editingAnnouncement
         ? { id: editingAnnouncement.id, ...formData }
         : { ...formData }
+
+      // Send unambiguous ISO instants: the raw datetime-local string would be
+      // reinterpreted in the server's timezone.
+      body.startDate = startISO ?? undefined
+      body.endDate = endISO
 
       if (formData.targetAudience === "specific" && formData.targetUserIds) {
         body.targetUserIds = formData.targetUserIds
@@ -231,9 +289,7 @@ export default function AnnouncementsPage() {
         delete body.targetUserIds
       }
 
-      if (!body.cta?.text && !body.cta?.url) {
-        body.cta = undefined as any
-      }
+      body.cta = ctaText && ctaUrl ? { text: ctaText, url: ctaUrl } : null
 
       const response = await fetch("/api/admin/announcements", {
         method,
@@ -246,10 +302,15 @@ export default function AnnouncementsPage() {
 
       if (response.ok) {
         setDialogOpen(false)
+        toast.success(editingAnnouncement ? "Announcement updated" : "Announcement created")
         loadAnnouncements(true)
+      } else {
+        const data = await response.json().catch(() => null)
+        toast.error(data?.error || "Failed to save the announcement.")
       }
     } catch (error) {
       logger.error("Error saving announcement", { error })
+      toast.error("Failed to save the announcement.")
     } finally {
       setSaving(false)
     }
@@ -267,10 +328,15 @@ export default function AnnouncementsPage() {
 
       if (response.ok) {
         setDeleteConfirmId(null)
+        toast.success("Announcement deleted")
         loadAnnouncements(true)
+      } else {
+        const data = await response.json().catch(() => null)
+        toast.error(data?.error || "Failed to delete the announcement.")
       }
     } catch (error) {
       logger.error("Error deleting announcement", { error })
+      toast.error("Failed to delete the announcement.")
     }
   }
 
@@ -279,7 +345,7 @@ export default function AnnouncementsPage() {
 
     try {
       const token = await firebaseUser.getIdToken()
-      await fetch("/api/admin/announcements", {
+      const response = await fetch("/api/admin/announcements", {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -291,9 +357,16 @@ export default function AnnouncementsPage() {
         }),
       })
 
+      if (response.ok) {
+        toast.success(announcement.active ? "Announcement deactivated" : "Announcement activated")
+      } else {
+        const data = await response.json().catch(() => null)
+        toast.error(data?.error || "Failed to update the announcement.")
+      }
       loadAnnouncements(true)
     } catch (error) {
       logger.error("Error toggling announcement", { error })
+      toast.error("Failed to update the announcement.")
     }
   }
 
@@ -439,7 +512,10 @@ export default function AnnouncementsPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent
+          className={cn("p-0 transition-opacity", refreshing && "pointer-events-none opacity-50")}
+          aria-busy={refreshing}
+        >
           {announcements.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="bg-muted/50 flex h-14 w-14 items-center justify-center rounded-2xl">
@@ -563,8 +639,8 @@ export default function AnnouncementsPage() {
                       </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    {/* Actions - always visible on touch, revealed on hover with a pointer */}
+                    <div className="flex items-center gap-1 transition-opacity sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
                       <Button
                         variant="ghost"
                         size="icon"
