@@ -7,7 +7,7 @@ import {
   validateResponseRelevance,
   type TaskComplexity,
 } from "@/lib/ai-providers"
-import { trackAIChatServer } from "@/lib/analytics-server"
+import { trackAIChatServer, trackEnvDriftServer } from "@/lib/analytics-server"
 import { logger } from "@/lib/logger"
 import { buildInterviewerLevelContext } from "@/lib/rag/knowledge-base/interview-behavior-knowledge"
 // NEW: Phase-aware interview system with deterministic phase detection
@@ -720,6 +720,14 @@ GROUNDING RULES (prevent hallucination):
         { sessionId, role, snippet: shellInstruction },
         { alwaysReport: true }
       )
+      // Durable counter: Vercel keeps runtime logs for about an hour and Sentry
+      // is not configured, so the countable record is an analytics_events doc
+      // (visible in the Firebase console filtered by event_name).
+      void trackEnvDriftServer({
+        sessionId,
+        role: role === "interviewer" ? "interviewer" : "partner",
+        snippet: shellInstruction,
+      })
     }
 
     // HARD GATES: Deterministic validation with retry loop

@@ -44,6 +44,30 @@ export async function trackCodeExecutionServer(params: {
 }
 
 /**
+ * Track an AI chat reply that instructed a shell command. There is no terminal
+ * anywhere in the product - the Run Tests button is the only way code runs - so
+ * every one of these is the model drifting from the environment prompt block.
+ * Fired by the chat route's log-only observer on the RAW response, both lanes;
+ * the interviewer guardrail usually regenerates the reply afterwards, so
+ * role=interviewer means "attempted and almost certainly caught" while
+ * role=partner means "the candidate saw it". Durable counterpart of the
+ * "[Env Drift]" logger.warn (Vercel log retention is too short to count with,
+ * and Sentry is not configured).
+ */
+export async function trackEnvDriftServer(params: {
+  sessionId?: string
+  role: "interviewer" | "partner"
+  snippet: string
+}) {
+  const { sessionId, ...rest } = params
+  await trackEventServer("env_drift_shell_command", {
+    ...rest,
+    // Firestore rejects undefined values - attach only when present.
+    ...(sessionId ? { sessionId } : {}),
+  })
+}
+
+/**
  * Track AI chat interaction
  */
 export async function trackAIChatServer(params: {
