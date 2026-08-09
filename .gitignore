@@ -85,3 +85,9 @@ ui-debug.log
 scratch.ts
 patch_runners.py
 eslint-results.json
+
+# Security audit working notes. This repository is PUBLIC, and these documents name
+# UNFIXED vulnerabilities with exact file:line, which is a roadmap for anyone who reads
+# them before the fixes land. They are meant to be read by whoever is doing the work, on
+# the machine doing the work, and nowhere else. Keep them local.
+/NAIVETY-AUDIT-FIXES.md
