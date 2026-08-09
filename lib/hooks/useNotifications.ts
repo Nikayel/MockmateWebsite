@@ -9,11 +9,11 @@
  * - Notification actions
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { useAuth } from '@/lib/auth-context'
-import type { InAppNotification, NotificationPreferences } from '@/lib/types/notifications'
-import type { NotificationType } from '@/lib/rag/knowledge-base/notification-knowledge'
-import { logger } from '@/lib/logger'
+import { useState, useEffect, useCallback, useRef } from "react"
+import { useAuth } from "@/lib/auth-context"
+import type { InAppNotification, NotificationPreferences } from "@/lib/types/notifications"
+import type { NotificationType } from "@/lib/rag/knowledge-base/notification-knowledge"
+import { logger } from "@/lib/logger"
 
 export interface UseNotificationsOptions {
   /** Polling interval in ms (0 to disable) */
@@ -51,9 +51,7 @@ export interface UseNotificationsReturn {
   updateQuietHours: (start: number, end: number, enabled: boolean) => Promise<void>
 }
 
-export function useNotifications(
-  options: UseNotificationsOptions = {}
-): UseNotificationsReturn {
+export function useNotifications(options: UseNotificationsOptions = {}): UseNotificationsReturn {
   const { pollInterval = 60000, fetchOnMount = true } = options
   const { firebaseUser, initialized } = useAuth()
 
@@ -71,11 +69,11 @@ export function useNotifications(
     try {
       const token = await firebaseUser.getIdToken()
       return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       }
     } catch (error) {
-      logger.error('[useNotifications] Failed to get auth token', { error })
+      logger.error("[useNotifications] Failed to get auth token", { error })
       return null
     }
   }, [firebaseUser])
@@ -97,7 +95,7 @@ export function useNotifications(
         return
       }
 
-      const response = await fetch('/api/notifications', {
+      const response = await fetch("/api/notifications", {
         headers,
       })
 
@@ -106,7 +104,7 @@ export function useNotifications(
           // User not authenticated - not an error state
           return
         }
-        throw new Error('Failed to fetch notifications')
+        throw new Error("Failed to fetch notifications")
       }
 
       const data = await response.json()
@@ -114,8 +112,8 @@ export function useNotifications(
       setNotifications(data.notifications || [])
       setUnreadCount(data.unreadCount || 0)
     } catch (err: any) {
-      logger.error('[useNotifications] Error fetching notifications', { error: err })
-      setError(err.message || 'Failed to fetch notifications')
+      logger.error("[useNotifications] Error fetching notifications", { error: err })
+      setError(err.message || "Failed to fetch notifications")
     } finally {
       setLoading(false)
     }
@@ -129,49 +127,50 @@ export function useNotifications(
       const headers = await getAuthHeaders()
       if (!headers) return
 
-      const response = await fetch('/api/notifications/preferences', {
+      const response = await fetch("/api/notifications/preferences", {
         headers,
       })
 
       if (!response.ok) {
         if (response.status === 401) return
-        throw new Error('Failed to fetch preferences')
+        throw new Error("Failed to fetch preferences")
       }
 
       const data = await response.json()
       setPreferences(data.preferences)
     } catch (err: any) {
-      logger.error('Error fetching notification preferences', { error: err })
+      logger.error("Error fetching notification preferences", { error: err })
     }
   }, [firebaseUser, getAuthHeaders])
 
   // Mark single notification as read
-  const markRead = useCallback(async (notificationId: string) => {
-    try {
-      const headers = await getAuthHeaders()
-      if (!headers) return
+  const markRead = useCallback(
+    async (notificationId: string) => {
+      try {
+        const headers = await getAuthHeaders()
+        if (!headers) return
 
-      const response = await fetch('/api/notifications', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ action: 'read', notificationId }),
-      })
+        const response = await fetch("/api/notifications", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ action: "read", notificationId }),
+        })
 
-      if (!response.ok) {
-        throw new Error('Failed to mark notification as read')
-      }
+        if (!response.ok) {
+          throw new Error("Failed to mark notification as read")
+        }
 
-      // Optimistic update
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === notificationId ? { ...n, read: true } : n
+        // Optimistic update
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
         )
-      )
-      setUnreadCount((prev) => Math.max(0, prev - 1))
-    } catch (err: any) {
-      setError(err.message)
-    }
-  }, [getAuthHeaders])
+        setUnreadCount((prev) => Math.max(0, prev - 1))
+      } catch (err: any) {
+        setError(err.message)
+      }
+    },
+    [getAuthHeaders]
+  )
 
   // Mark all notifications as read
   const markAllRead = useCallback(async () => {
@@ -179,14 +178,14 @@ export function useNotifications(
       const headers = await getAuthHeaders()
       if (!headers) return
 
-      const response = await fetch('/api/notifications', {
-        method: 'POST',
+      const response = await fetch("/api/notifications", {
+        method: "POST",
         headers,
-        body: JSON.stringify({ action: 'readAll' }),
+        body: JSON.stringify({ action: "readAll" }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to mark all as read')
+        throw new Error("Failed to mark all as read")
       }
 
       // Optimistic update
@@ -204,14 +203,14 @@ export function useNotifications(
         const headers = await getAuthHeaders()
         if (!headers) return
 
-        const response = await fetch('/api/notifications/preferences', {
-          method: 'PUT',
+        const response = await fetch("/api/notifications/preferences", {
+          method: "PUT",
           headers,
           body: JSON.stringify({ preferences: updates }),
         })
 
         if (!response.ok) {
-          throw new Error('Failed to update preferences')
+          throw new Error("Failed to update preferences")
         }
 
         const data = await response.json()
@@ -233,14 +232,14 @@ export function useNotifications(
         const headers = await getAuthHeaders()
         if (!headers) return
 
-        const response = await fetch('/api/notifications/preferences', {
-          method: 'PUT',
+        const response = await fetch("/api/notifications/preferences", {
+          method: "PUT",
           headers,
           body: JSON.stringify({ toggleType: type, enabled }),
         })
 
         if (!response.ok) {
-          throw new Error('Failed to toggle notification type')
+          throw new Error("Failed to toggle notification type")
         }
 
         // Optimistic update
@@ -266,27 +265,30 @@ export function useNotifications(
   )
 
   // Toggle global notifications
-  const toggleGlobal = useCallback(async (enabled: boolean) => {
-    try {
-      const headers = await getAuthHeaders()
-      if (!headers) return
+  const toggleGlobal = useCallback(
+    async (enabled: boolean) => {
+      try {
+        const headers = await getAuthHeaders()
+        if (!headers) return
 
-      const response = await fetch('/api/notifications/preferences', {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify({ enabled }),
-      })
+        const response = await fetch("/api/notifications/preferences", {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({ enabled }),
+        })
 
-      if (!response.ok) {
-        throw new Error('Failed to toggle notifications')
+        if (!response.ok) {
+          throw new Error("Failed to toggle notifications")
+        }
+
+        // Optimistic update
+        setPreferences((prev) => (prev ? { ...prev, enabled } : null))
+      } catch (err: any) {
+        setError(err.message)
       }
-
-      // Optimistic update
-      setPreferences((prev) => (prev ? { ...prev, enabled } : null))
-    } catch (err: any) {
-      setError(err.message)
-    }
-  }, [getAuthHeaders])
+    },
+    [getAuthHeaders]
+  )
 
   // Update quiet hours
   const updateQuietHours = useCallback(
@@ -295,20 +297,18 @@ export function useNotifications(
         const headers = await getAuthHeaders()
         if (!headers) return
 
-        const response = await fetch('/api/notifications/preferences', {
-          method: 'PUT',
+        const response = await fetch("/api/notifications/preferences", {
+          method: "PUT",
           headers,
           body: JSON.stringify({ quietHours: { start, end, enabled } }),
         })
 
         if (!response.ok) {
-          throw new Error('Failed to update quiet hours')
+          throw new Error("Failed to update quiet hours")
         }
 
         // Optimistic update
-        setPreferences((prev) =>
-          prev ? { ...prev, quietHours: { start, end, enabled } } : null
-        )
+        setPreferences((prev) => (prev ? { ...prev, quietHours: { start, end, enabled } } : null))
       } catch (err: any) {
         setError(err.message)
       }
@@ -336,9 +336,14 @@ export function useNotifications(
       pollRef.current = null
     }
 
-    // Only start polling if interval is positive and user is authenticated
+    // Only start polling if interval is positive and user is authenticated.
+    // Hidden tabs skip the fetch: the bell is in the header on every page, so
+    // without this every backgrounded tab kept billing a Firestore-backed
+    // request per minute indefinitely.
     if (pollInterval > 0 && firebaseUser) {
-      pollRef.current = setInterval(refresh, pollInterval)
+      pollRef.current = setInterval(() => {
+        if (!document.hidden) refresh()
+      }, pollInterval)
     }
 
     return () => {

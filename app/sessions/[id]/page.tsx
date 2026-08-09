@@ -98,23 +98,45 @@ export default function SessionDetailPage() {
     init()
   }, [authLoading, initialized, authCheckComplete, loadSession])
 
-  // Poll for feedback completion when session is in "pending" state
+  // Poll for feedback completion when session is in "pending" state.
+  // Backoff + a hard cap: the old fixed 5s interval had no stop condition
+  // other than the status changing, so a session stuck in "pending" polled 2
+  // Firestore reads every 5 seconds for as long as the tab stayed open.
   useEffect(() => {
     // Only poll if session is evaluating
     if (!session || session.feedback_status !== "pending") return
 
-    const pollInterval = setInterval(async () => {
-      const updatedSession = await loadSession()
-      if (updatedSession) {
-        setSession(updatedSession)
-        // Stop polling once feedback is complete or failed
-        if (updatedSession.feedback_status !== "pending") {
-          clearInterval(pollInterval)
+    let cancelled = false
+    let attempts = 0
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const MAX_ATTEMPTS = 40 // ~5 minutes with backoff, then give up quietly
+
+    const poll = async () => {
+      if (cancelled || attempts >= MAX_ATTEMPTS) return
+      attempts += 1
+
+      // Skip the read (but keep the schedule) while the tab is hidden.
+      if (!document.hidden) {
+        const updatedSession = await loadSession()
+        if (cancelled) return
+        if (updatedSession) {
+          setSession(updatedSession)
+          // Stop polling once feedback is complete or failed
+          if (updatedSession.feedback_status !== "pending") return
         }
       }
-    }, 5000) // Poll every 5 seconds
 
-    return () => clearInterval(pollInterval)
+      // 5s for the first 12 attempts (the common case resolves here), 15s after
+      const delay = attempts < 12 ? 5000 : 15000
+      timer = setTimeout(poll, delay)
+    }
+
+    timer = setTimeout(poll, 5000)
+
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+    }
   }, [session?.feedback_status, loadSession])
 
   if (loading || authLoading || !initialized) {
