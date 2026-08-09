@@ -60,12 +60,22 @@ export async function GET(request: NextRequest) {
       info: 1,
     }
 
-    // Fetch all announcements and filter in code to avoid composite index requirement
+    // Only active announcements leave Firestore; date-window, audience and
+    // dismissal filtering stay in code (cheap over <=50 docs, and they need
+    // per-user data anyway). The old unfiltered full-collection get() was
+    // polled by every client every 5 minutes, so its cost scaled with every
+    // announcement ever written times every user online.
     let snapshot
     try {
-      snapshot = await adminDb.collection("announcements").get()
+      snapshot = await adminDb
+        .collection("announcements")
+        .where("active", "==", true)
+        .limit(50)
+        .get()
 
-      logger.debug("[Announcements] Total announcements in DB", { count: snapshot.docs.length })
+      logger.debug("[Announcements] Active announcements fetched", {
+        count: snapshot.docs.length,
+      })
     } catch (queryError: unknown) {
       logger.error("[Announcements] Query error", { error: queryError as Error })
       return NextResponse.json({ success: true, announcements: [] })
@@ -185,21 +195,35 @@ export async function GET(request: NextRequest) {
       .map(({ createdAtMs: _createdAtMs, ...announcement }) => announcement)
     const limitedViewedIds = limitedAnnouncements.map((a) => a.id)
 
-    // Increment view counts (fire and forget)
-    if (limitedViewedIds.length > 0) {
-      Promise.all(
-        limitedViewedIds.map((id) =>
-          adminDb
-            .collection("announcements")
-            .doc(id)
-            .update({
-              views: FieldValue.increment(1),
-            })
-            .catch(() => {
-              // Ignore errors - view tracking is not critical
-            })
-        )
-      ).catch(() => {})
+    // Increment view counts (fire and forget). Two guards against write
+    // amplification: the client reports which ids it has already been counted
+    // for (X-Seen-Announcements, sessionStorage-backed), so the 5-minute poll
+    // does not re-count the same viewer forever; and the remaining increments
+    // go in one WriteBatch instead of one RPC per document.
+    let alreadyCountedIds: string[] = []
+    const seenHeader = request.headers.get("X-Seen-Announcements")
+    if (seenHeader) {
+      try {
+        const parsed = JSON.parse(seenHeader)
+        if (Array.isArray(parsed)) {
+          alreadyCountedIds = parsed.filter((id): id is string => typeof id === "string")
+        }
+      } catch {
+        // Ignore invalid JSON
+      }
+    }
+
+    const uncountedIds = limitedViewedIds.filter((id) => !alreadyCountedIds.includes(id))
+    if (uncountedIds.length > 0) {
+      const batch = adminDb.batch()
+      for (const id of uncountedIds) {
+        batch.update(adminDb.collection("announcements").doc(id), {
+          views: FieldValue.increment(1),
+        })
+      }
+      batch.commit().catch(() => {
+        // Ignore errors - view tracking is not critical
+      })
     }
 
     return NextResponse.json({

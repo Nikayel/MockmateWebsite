@@ -27,6 +27,7 @@ interface AnnouncementContextValue {
 const AnnouncementContext = createContext<AnnouncementContextValue | null>(null)
 
 const STORAGE_KEY = "dismissed_announcements"
+const SEEN_STORAGE_KEY = "seen_announcements"
 const FETCH_INTERVAL = 5 * 60 * 1000 // 5 minutes
 
 export function useAnnouncements() {
@@ -88,12 +89,35 @@ export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
         headers["X-Dismissed-Announcements"] = JSON.stringify(dismissedIdsRef.current)
       }
 
+      // Tell the server which announcements this browser has already been
+      // counted as viewing, so the 5-minute poll doesn't inflate view counts
+      // (and burn a write per announcement) on every tick.
+      let seenIds: string[] = []
+      try {
+        const storedSeen = sessionStorage.getItem(SEEN_STORAGE_KEY)
+        const parsed = storedSeen ? JSON.parse(storedSeen) : []
+        if (Array.isArray(parsed)) seenIds = parsed.filter((id) => typeof id === "string")
+      } catch {
+        // Ignore storage errors
+      }
+      if (seenIds.length > 0) {
+        headers["X-Seen-Announcements"] = JSON.stringify(seenIds)
+      }
+
       const response = await fetch("/api/announcements", { headers })
 
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.announcements) {
           setAnnouncements(data.announcements)
+
+          try {
+            const returnedIds = (data.announcements as Announcement[]).map((a) => a.id)
+            const merged = Array.from(new Set([...seenIds, ...returnedIds]))
+            sessionStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify(merged))
+          } catch {
+            // Ignore storage errors
+          }
         }
       }
     } catch (error) {
