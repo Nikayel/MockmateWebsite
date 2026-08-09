@@ -58,6 +58,7 @@ import {
   buildConsoleContext,
   buildCurrentCodeContext,
   buildEdgeCaseContext,
+  buildEnvironmentContext,
   buildPatternPromptContext,
   buildProblemContext,
   buildProviderHistory,
@@ -294,6 +295,11 @@ export async function POST(request: NextRequest) {
 
     const consoleContext = buildConsoleContext(testResultsArray, consoleLogsArray)
 
+    // How the candidate runs code (Run Tests / Submit buttons; no terminal exists).
+    // Goes to BOTH roles: the debugging partner was the one telling candidates to
+    // type "python3 src/main.py fixtures/input.txt" into a shell that isn't there.
+    const environmentContext = buildEnvironmentContext(scenarioType)
+
     // Build system design specific context with phase-based guidance
     const { isSystemDesign, elapsedMinutes, systemDesignContext } = buildSystemDesignPromptContext(
       scenarioType,
@@ -486,6 +492,7 @@ export async function POST(request: NextRequest) {
             testingPhaseOverride,
             fuzzyModeContext,
             toolResultsContext,
+            environmentContext,
             isGenericCompany,
             companyName: companyStyle.company,
           })
@@ -497,6 +504,8 @@ export async function POST(request: NextRequest) {
       partner: `You are an AI coding assistant(similar to ChatGPT, GitHub Copilot, or Claude) that candidates can use during technical interviews, similar to Meta's pilot program allowing AI tools.
 
 ${userContextString}${problemContext}
+
+${environmentContext}
 
 Your role:
     - You're an AI tool available to help during the interview (like Meta's pilot program)

@@ -3,6 +3,7 @@ import { MAX_FILE_SIZE } from "@/lib/interview/context-window"
 import {
   buildConsoleContext,
   buildCurrentCodeContext,
+  buildEnvironmentContext,
   buildProviderHistory,
   buildScenarioId,
   buildSystemDesignPromptContext,
@@ -124,5 +125,35 @@ describe("chat context builders", () => {
   it("derives stable dsa scenario ids from titles", () => {
     expect(buildScenarioId("Two Sum!")).toBe("dsa-two-sum")
     expect(buildScenarioId(undefined)).toBeUndefined()
+  })
+})
+
+describe("buildEnvironmentContext", () => {
+  it("tells the model the only way to run code is the Run Tests button", () => {
+    const result = buildEnvironmentContext("bugfix")
+
+    expect(result).toContain("NO terminal")
+    expect(result).toContain('"Run Tests"')
+    expect(result).toContain("NEVER tell them to run a shell command")
+  })
+
+  it("uses the bugfix submit label and covers pack run commands", () => {
+    const result = buildEnvironmentContext("bugfix")
+
+    expect(result).toContain('"Submit Fix"')
+    expect(result).toContain("python3 src/main.py fixtures/input.txt")
+    expect(result).toContain("Refer to the button, never to the command")
+  })
+
+  it("uses the plain submit label for non-bugfix coding scenarios", () => {
+    const result = buildEnvironmentContext(undefined)
+
+    expect(result).toContain('"Submit"')
+    expect(result).not.toContain("Submit Fix")
+    expect(result).not.toContain("Task files may quote a run command")
+  })
+
+  it("emits nothing for system design, which has no code execution", () => {
+    expect(buildEnvironmentContext("system-design")).toBe("")
   })
 })

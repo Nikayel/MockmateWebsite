@@ -171,6 +171,7 @@ export interface PromptContext {
   testingPhaseOverride?: string
   fuzzyModeContext?: string
   toolResultsContext?: string
+  environmentContext?: string // What the candidate can click to run code (no terminal exists)
   isGenericCompany?: boolean
   companyName?: string
 }
@@ -281,6 +282,12 @@ ${ctx.isGenericCompany !== false ? "- Standard technical interview" : ctx.compan
   }
 
   sections.push(FEW_SHOT_EXAMPLES)
+
+  // Add candidate environment (what they can actually click; there is no terminal).
+  // Sits next to PLATFORM ISSUES because both describe the platform, not the candidate.
+  if (ctx.environmentContext) {
+    sections.push(ctx.environmentContext)
+  }
 
   // Add platform issues
   sections.push(`PLATFORM ISSUES:

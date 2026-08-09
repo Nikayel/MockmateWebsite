@@ -450,6 +450,33 @@ GUIDED LAB STATE:
   return { isBugFix, bugFixContext }
 }
 
+/**
+ * What the candidate can physically do to run code. Without this the model invents a
+ * terminal: bugfix pack task files quote literal run commands ("python3 src/main.py
+ * fixtures/input.txt"), and both the interviewer and the debugging partner told
+ * candidates to go run them. The UI has no shell anywhere - the "Run Tests" button is
+ * the only execution affordance (it runs the scenario's command/tests in the browser
+ * sandbox) and the console is output-only. System design has no code execution, so it
+ * gets no block.
+ */
+export function buildEnvironmentContext(scenarioType: string | undefined): string {
+  if (scenarioType === "system-design") {
+    return ""
+  }
+
+  const submitLabel = scenarioType === "bugfix" ? "Submit Fix" : "Submit"
+  const runCmdLine =
+    scenarioType === "bugfix"
+      ? `\n- Task files may quote a run command (e.g. "python3 src/main.py fixtures/input.txt"). The candidate cannot type it anywhere: clicking "Run Tests" is what executes it. Refer to the button, never to the command.`
+      : ""
+
+  return `CANDIDATE ENVIRONMENT (how code actually runs here):
+- The candidate writes code in the in-browser editor. There is NO terminal and NO shell: they cannot type commands like python3, node, pip, or pytest.
+- The ONLY way they run code is clicking the "Run Tests" button. Output appears in a read-only console.
+- They finish by clicking "${submitLabel}".
+- NEVER tell them to run a shell command or script manually. Say "run the tests" or "click Run Tests" instead.${runCmdLine}`
+}
+
 export function buildComplexityContext(
   solutionComplexity: SolutionComplexityContext | undefined
 ): string {
