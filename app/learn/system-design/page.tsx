@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRight, Network } from "lucide-react"
+import { ArrowRight, Network, Timer } from "lucide-react"
 import { listSystemDesignLevels } from "@/lib/tutorials/system-design/registry"
 import { learnTrackMetadata } from "@/lib/seo/learn-metadata"
 import { learnCourseSchemaInput } from "@/lib/seo/learn-course-schema"
@@ -14,6 +14,7 @@ import {
 import { BreadcrumbJsonLd, CourseJsonLd, LessonListJsonLd } from "@/components/seo/JsonLd"
 import { firstPublishedLesson } from "@/lib/tutorials/level-path"
 import { LearnPathTopBar } from "@/components/tutorials/LearnPathTopBar"
+import { SystemDesignDrills } from "@/components/tutorials/SystemDesignDrills"
 
 export const metadata: Metadata = learnTrackMetadata({
   courseId: "system-design",
@@ -122,6 +123,20 @@ export default function LearnSystemDesignPage() {
               </Link>
             </div>
           )}
+
+          {/* Drills live at the foot of the page because they are the applied end of the course, not
+              a shortcut past it. This pill is the one concession to that placement: the same
+              secondary-link treatment `/learn/python` uses for the executor, so a returning learner
+              who came back to drill is not made to scroll the whole level list to find them. */}
+          <div className="mt-4 flex justify-center">
+            <Link
+              href="#drills"
+              className="border-border text-muted-foreground hover:border-accent/30 hover:text-foreground focus-visible:ring-accent/50 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <Timer className="h-3.5 w-3.5" aria-hidden="true" />
+              Already know this? Jump to the interview drills
+            </Link>
+          </div>
         </header>
 
         {/* 60-second demo tour: one tap into each interactive kind (see
@@ -184,6 +199,12 @@ export default function LearnSystemDesignPage() {
             )
           })}
         </ol>
+
+        {/* Below the levels on purpose. The levels are the course; a drill is the round you take
+            once you can hold the concepts, so it reads as the end of the page rather than a rival
+            entry point. The section derives its own list from the scenario registry, so nothing
+            here needs to know how many drills exist. */}
+        <SystemDesignDrills />
       </div>
     </>
   )
