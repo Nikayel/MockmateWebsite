@@ -31,7 +31,7 @@ const COURSE_DESCRIPTIONS: Record<CourseId, string> = {
   "data-engineering":
     "Free interactive data engineering course in the browser: real queries against seeded tables, graded instantly, from SELECT basics through window functions to the cloud platform, file format, and pipeline patterns data engineering interviews test.",
   "system-design":
-    "Free system design course: read each concept, then write your own design answer and compare it against a model answer, from the interview method to distributed systems and case studies.",
+    "Free system design course: read each concept, write your own design answer and compare it against a model answer, then take a full timed drill against an AI interviewer, from the interview method to distributed systems and case studies.",
 }
 
 /** Build the shared `Course` input for one Learn track, from the live corpus. */

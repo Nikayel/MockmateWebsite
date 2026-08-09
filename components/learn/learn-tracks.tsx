@@ -110,8 +110,8 @@ export const LEARN_TRACKS: LearnTrack[] = [
     label: "System Design",
     href: "/learn/system-design",
     blurb:
-      "Read the concept, then write your own design answer and compare it against a model answer.",
-    loop: ["Read", "Design"],
+      "Read the concept, write your own design answer, then take a full timed round against an AI interviewer.",
+    loop: ["Read", "Design", "Drill"],
     Mark: SystemDesignMark,
   },
 ]

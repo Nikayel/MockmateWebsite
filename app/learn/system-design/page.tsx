@@ -18,8 +18,10 @@ import { SystemDesignDrills } from "@/components/tutorials/SystemDesignDrills"
 
 export const metadata: Metadata = learnTrackMetadata({
   courseId: "system-design",
+  // Kept under the 155-character budget `truncateForDescription` enforces, so the drills survive
+  // instead of being the part Google cuts off.
   description:
-    "Learn system design the way real interviews test it: pick a level, then Read and Design every concept by writing a free-response answer and self-comparing against a model answer.",
+    "Learn system design the way interviews test it: read a concept, write your own design answer, then drill a full timed round with an AI interviewer.",
 })
 
 const LOOP_PHASES = ["Read", "Design"]

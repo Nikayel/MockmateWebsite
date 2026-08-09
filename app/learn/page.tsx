@@ -88,7 +88,7 @@ const COURSE_PITCH: Record<CourseId, { headline: string; body: string }> = {
   },
   "system-design": {
     headline: "Write the answer, then compare it",
-    body: "System design is not multiple choice, so these lessons are free response. You read the concept, write your own design answer, and only then reveal a model answer to compare against. The comparison is where the learning is, and it is the closest thing to a design round you can do alone.",
+    body: "System design is not multiple choice, so these lessons are free response. You read the concept, write your own design answer, and only then reveal a model answer to compare against. The comparison is where the learning is. When the concepts hold, the course ends in drills: open-ended briefs, each one a full timed round with an AI interviewer who questions your design while you build it.",
   },
 }
 
@@ -222,7 +222,8 @@ export default function LearnHubPage() {
           <p className="text-muted-foreground mt-4 max-w-2xl text-sm text-pretty">
             System Design works the same way with one substitution: instead of running code you
             write your own design answer, save it, and then reveal a model answer to compare
-            against.
+            against. It also adds a fourth step at the end of the course, a drill, which is the
+            whole interview rather than one concept from it.
           </p>
         </section>
 
