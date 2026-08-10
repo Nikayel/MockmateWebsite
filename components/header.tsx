@@ -361,18 +361,33 @@ export function Header() {
               )}
             </nav>
 
-            {/* Mobile Menu Button */}
+            {/* Mobile Menu Button. Its only content is an icon, so without a label
+                a screen reader announced the sole navigation control on small
+                screens as an unnamed "button", and nothing conveyed whether the
+                menu was open or what it controlled. */}
             <button
+              type="button"
               className="text-foreground cursor-pointer md:hidden"
+              aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-navigation"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
-              {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              {isMobileMenuOpen ? (
+                <X aria-hidden className="h-6 w-6" />
+              ) : (
+                <Menu aria-hidden className="h-6 w-6" />
+              )}
             </button>
           </div>
 
           {/* Mobile Navigation */}
           {isMobileMenuOpen && (
-            <nav className="border-border mt-4 border-t pb-4 md:hidden">
+            <nav
+              id="mobile-navigation"
+              aria-label="Main"
+              className="border-border mt-4 border-t pb-4 md:hidden"
+            >
               <div className="flex flex-col space-y-4 pt-4">
                 {!initialized ? (
                   <div className="flex justify-center py-4">
