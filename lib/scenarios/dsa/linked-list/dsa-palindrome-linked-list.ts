@@ -48,6 +48,13 @@ Example visualization:
     { input: { values: [1, 2] }, expected: false, description: "Not palindrome" },
     { input: { values: [1, 2, 1] }, expected: true, description: "Odd palindrome" },
     { input: { values: [1] }, expected: true, description: "Single node" },
+    // In every case above the first and last values decide the answer on their own, so
+    // comparing only those two passed. Here the ends match while the middle does not.
+    {
+      input: { values: [1, 2, 3, 1] },
+      expected: false,
+      description: "Ends match but the middle does not",
+    },
   ],
 
   // Proactive AI Interviewer Fields
