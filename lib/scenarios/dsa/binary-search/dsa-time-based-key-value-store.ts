@@ -51,6 +51,18 @@ Implement the TimeMap class:
       expected: [null, null, "bar", "bar"],
       description: "Basic operations",
     },
+    // The single case above stored one value per key and never queried a missing one, so
+    // keeping only the latest value (ignoring timestamps) and returning null instead of ""
+    // both passed. Here get at time 3 must skip the later value stored at time 4, and the
+    // last get asks for a key that was never set.
+    {
+      input: {
+        operations: ["TimeMap", "set", "set", "get", "get", "get"],
+        args: [[], ["foo", "bar", 1], ["foo", "bar2", 4], ["foo", 3], ["foo", 5], ["baz", 1]],
+      },
+      expected: [null, null, null, "bar", "bar2", ""],
+      description: "Query before a later write, and a key that was never set",
+    },
   ],
 
   // Proactive AI Interviewer Fields
