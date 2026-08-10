@@ -45,5 +45,30 @@ Implement the FreqStack class:
       expected: [null, null, null, null, 5],
       description: "Pop most frequent",
     },
+    // One push-push-push-pop was not enough to pin anything down: a plain LIFO stack, a
+    // version that breaks frequency ties by taking the OLDEST value, and one that just
+    // tracks overall counts all produced the same single answer. This sequence pops four
+    // times, and the second pop is decided purely by the tie-break rule (5 and 7 are both
+    // at frequency 2, and 7 was pushed more recently).
+    {
+      input: {
+        ops: [
+          "FreqStack",
+          "push",
+          "push",
+          "push",
+          "push",
+          "push",
+          "push",
+          "pop",
+          "pop",
+          "pop",
+          "pop",
+        ],
+        args: [[], [5], [7], [5], [7], [4], [5], [], [], [], []],
+      },
+      expected: [null, null, null, null, null, null, null, 5, 7, 5, 4],
+      description: "Ties break toward the most recently pushed value",
+    },
   ],
 }
