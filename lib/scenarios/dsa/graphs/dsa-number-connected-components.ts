@@ -60,5 +60,20 @@ Return the number of connected components in the graph.`,
       description: "One component",
     },
     { input: { n: 5, edges: [] }, expected: 5, description: "No edges" },
+    // Every case above is a forest, where the count is exactly n - len(edges), so both
+    // `return n - len(edges)` and a union-find that decremented on every edge without
+    // checking whether the two nodes were already joined passed. This one has a cycle.
+    {
+      input: {
+        n: 4,
+        edges: [
+          [0, 1],
+          [1, 2],
+          [0, 2],
+        ],
+      },
+      expected: 2,
+      description: "Redundant edge closes a cycle: three edges still leave two components",
+    },
   ],
 }
