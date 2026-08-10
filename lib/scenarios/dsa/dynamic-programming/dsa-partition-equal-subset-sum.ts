@@ -50,5 +50,19 @@ export const partitionEqualSubsetSumScenario: DSAScenario = {
     { input: { nums: [1, 2, 3, 4] }, expected: true, description: "[1,4] and [2,3]" },
     { input: { nums: [2, 2, 1, 1] }, expected: true, description: "[2,1] and [2,1]" },
     { input: { nums: [1, 1, 1, 1, 1] }, expected: false, description: "Odd count of 1s" },
+    // Both false cases above have an ODD total, so `sum(nums) % 2 == 0` passed. An even
+    // total is necessary but not sufficient: nothing here adds up to 6.
+    {
+      input: { nums: [2, 2, 3, 5] },
+      expected: false,
+      description: "Even total that still cannot be split",
+    },
+    // And every true case could be built by repeatedly taking the largest value that still
+    // fits. Here that rule stalls at 9 (5 then 4), while 5 + 3 + 2 reaches 10.
+    {
+      input: { nums: [5, 4, 4, 3, 2, 2] },
+      expected: true,
+      description: "Largest-first packing stalls, but a different subset reaches the half",
+    },
   ],
 }
