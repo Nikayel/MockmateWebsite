@@ -1,0 +1,87 @@
+/**
+ * These claims are advertising, rendered above a Subscribe button and emitted
+ * into structured data that Google indexes. They were previously hand-typed in
+ * five files, so a price change in lib/config.ts could leave the site claiming
+ * a discount it no longer offers with nothing failing.
+ *
+ * The point of this file is not to re-test arithmetic. It is to pin the claims
+ * to the config they describe, so that changing a price and NOT updating the
+ * marketing surfaces fails here instead of on the live pricing page.
+ */
+
+import { describe, it, expect } from "vitest"
+
+import { PRICING_CONFIG } from "../config"
+import {
+  COMPETITOR_PRICING,
+  MOCKS_FOR_IMPACT,
+  getHumanMockCostBasis,
+  getHumanMockCostMultiple,
+  getHumanMockTotalCost,
+  getLeetCodeComparisonClaim,
+  getLeetCodeSavingsPercent,
+} from "../pricing-comparison"
+
+describe("competitor comparison claims", () => {
+  it("derives the LeetCode discount from the live Pro price, not a literal", () => {
+    const ours = PRICING_CONFIG.pro.website.monthly.price
+    const theirs = COMPETITOR_PRICING.leetcodePremium.monthlyPrice
+
+    expect(getLeetCodeSavingsPercent()).toBe(Math.round(((theirs - ours) / theirs) * 100))
+  })
+
+  it("still reads 29% at the prices currently shipped ($25 vs $35)", () => {
+    // Guards the specific string the metadata, FAQ, and JSON-LD have all been
+    // quoting. If this fails, a price moved and that copy is now a false claim.
+    expect(getLeetCodeSavingsPercent()).toBe(29)
+    expect(getLeetCodeComparisonClaim()).toBe("29% cheaper than LeetCode Premium")
+  })
+
+  it("keeps the human-mock total consistent with its own stated cost basis", () => {
+    const { min, max } = getHumanMockTotalCost()
+
+    expect(min).toBe(COMPETITOR_PRICING.humanMock.perSessionMin * MOCKS_FOR_IMPACT)
+    expect(max).toBe(COMPETITOR_PRICING.humanMock.perSessionMax * MOCKS_FOR_IMPACT)
+    // The displayed range and the sentence explaining it must describe the same
+    // multiplication. These were two unrelated string literals before.
+    expect(getHumanMockCostBasis()).toContain(`x ${MOCKS_FOR_IMPACT} sessions`)
+    expect(getHumanMockCostBasis()).toContain(`$${COMPETITOR_PRICING.humanMock.perSessionMin}`)
+  })
+
+  it("derives the 45x human-mock multiple rather than asserting it", () => {
+    const ours = PRICING_CONFIG.pro.website.monthly.price
+
+    expect(getHumanMockCostMultiple()).toBe(Math.round(getHumanMockTotalCost().max / ours))
+    expect(getHumanMockCostMultiple()).toBe(45)
+  })
+})
+
+describe("PRICING_CONFIG internal consistency", () => {
+  /**
+   * The yearly block carries `savings` and `savingsPercent` as literals next to
+   * the prices they describe. Nothing recomputed them, so the pricing page's
+   * "Save 25%" badge and the FAQ's "saving you $75" could both go stale from a
+   * one-line price edit.
+   */
+  it("yearly savings and savingsPercent match the monthly and yearly prices", () => {
+    const { monthly, yearly } = PRICING_CONFIG.pro.website
+    const fullYear = monthly.price * 12
+
+    expect(yearly.savings).toBe(fullYear - yearly.totalPrice)
+    expect(yearly.savingsPercent).toBe(Math.round((yearly.savings / fullYear) * 100))
+  })
+
+  it("the yearly per-month display is the annual total divided by twelve", () => {
+    const { yearly } = PRICING_CONFIG.pro.website
+
+    expect(yearly.priceDisplay).toBe(`$${Math.round(yearly.totalPrice / 12)}`)
+  })
+
+  it("the yearly billing note states the actual annual charge", () => {
+    const { yearly } = PRICING_CONFIG.pro.website
+
+    // The pricing card renders this string verbatim as its one disclosure that
+    // an annual plan is a single charge, so it has to contain the real total.
+    expect(yearly.billingNote).toContain(String(yearly.totalPrice))
+  })
+})
