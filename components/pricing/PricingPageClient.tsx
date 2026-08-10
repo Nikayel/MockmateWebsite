@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import React, { useRef, useState } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -60,9 +60,24 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("yearly")
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const prefersReducedMotion = useReducedMotion()
+  const radioRefs = useRef<(HTMLButtonElement | null)[]>([])
   const proPricing = getProPricing("website")
 
   const currentProPrice = billingPeriod === "yearly" ? proPricing.yearly : proPricing.monthly
+
+  /** Arrow keys move between radios and select as they go, per the WAI-ARIA
+   *  radiogroup pattern. Without this the group is reachable but unusable by
+   *  keyboard, since only the selected option is in the tab order. */
+  const onBillingKeyDown = (e: React.KeyboardEvent, idx: number) => {
+    const forward = e.key === "ArrowRight" || e.key === "ArrowDown"
+    const backward = e.key === "ArrowLeft" || e.key === "ArrowUp"
+    if (!forward && !backward) return
+
+    e.preventDefault()
+    const next = (idx + (forward ? 1 : -1) + BILLING_PERIODS.length) % BILLING_PERIODS.length
+    setBillingPeriod(BILLING_PERIODS[next].value)
+    radioRefs.current[next]?.focus()
+  }
 
   return (
     <main className="bg-background min-h-screen">
@@ -82,39 +97,52 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
               needs to hear that these are two options of one setting and which one
               is active. The "Save 25%" badge is always in the DOM and only fades,
               so switching periods does not reflow the row. */}
-          <div className="mb-5 flex justify-center">
+          <div className="mb-5 flex items-center justify-center gap-2">
             <div
               role="radiogroup"
               aria-label="Billing period"
               className="border-border inline-flex items-center gap-1 rounded-full border p-1 text-sm"
             >
-              {BILLING_PERIODS.map((period) => (
-                <button
-                  key={period.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={billingPeriod === period.value}
-                  onClick={() => setBillingPeriod(period.value)}
-                  className={cn(
-                    "rounded-full px-3 py-1 transition-colors",
-                    billingPeriod === period.value
-                      ? "bg-muted text-foreground font-medium"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {period.label}
-                </button>
-              ))}
-              <span
-                aria-hidden={billingPeriod !== "yearly"}
-                className={cn(
-                  "text-neural ml-1 pr-2 text-xs font-medium transition-opacity",
-                  billingPeriod === "yearly" ? "opacity-100" : "opacity-0"
-                )}
-              >
-                {`Save ${proPricing.yearly.savingsPercent}%`}
-              </span>
+              {BILLING_PERIODS.map((period, idx) => {
+                const isSelected = billingPeriod === period.value
+                return (
+                  <button
+                    key={period.value}
+                    ref={(el) => {
+                      radioRefs.current[idx] = el
+                    }}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    // A radiogroup is one stop in the tab order and the arrows move
+                    // between options, so only the selected radio stays tabbable.
+                    tabIndex={isSelected ? 0 : -1}
+                    onKeyDown={(e) => onBillingKeyDown(e, idx)}
+                    onClick={() => setBillingPeriod(period.value)}
+                    className={cn(
+                      "rounded-full px-3 py-1 transition-colors",
+                      isSelected
+                        ? "bg-muted text-foreground font-medium"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {period.label}
+                  </button>
+                )
+              })}
             </div>
+            {/* Outside the radiogroup: it is a caption, not a third option, and a
+                screen reader walking the group should not meet it between radios.
+                Always rendered so switching periods never reflows the row. */}
+            <span
+              aria-hidden={billingPeriod !== "yearly"}
+              className={cn(
+                "text-neural-strong text-xs font-medium transition-opacity",
+                billingPeriod === "yearly" ? "opacity-100" : "opacity-0"
+              )}
+            >
+              {`Save ${proPricing.yearly.savingsPercent}%`}
+            </span>
           </div>
 
           {/* Pricing Cards - Ultra Compact */}
