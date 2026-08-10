@@ -32,7 +32,13 @@ function UpgradePageContent() {
   const [profileLoading, setProfileLoading] = useState(true)
   const [loading, setLoading] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
-  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("yearly")
+  // Honour the period the visitor already chose on /pricing. Without this the
+  // page reset to yearly, so selecting Monthly there, seeing $25/mo, and
+  // clicking Subscribe landed here on a card quoting $19/mo. Anything other
+  // than an explicit "monthly" keeps the yearly default.
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">(
+    searchParams?.get("billing") === "monthly" ? "monthly" : "yearly"
+  )
   const proPricing = getProPricing("website")
   const currentPrice = billingPeriod === "yearly" ? proPricing.yearly : proPricing.monthly
 
