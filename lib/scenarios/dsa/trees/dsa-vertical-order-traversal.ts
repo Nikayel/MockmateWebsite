@@ -47,5 +47,14 @@ The vertical order traversal of a binary tree is a list of top-to-bottom orderin
       expected: [[4], [2], [1, 5, 6], [3], [7]],
       description: "Same position nodes sorted by value",
     },
+    // In both cases above the column's values already arrive in the right order, so dropping
+    // the value tie-break (BFS order) and dropping the row ordering (sorting the whole
+    // column) each still passed. Here column 0 holds 5 at the top and 1, 2 two rows below:
+    // BFS reaches 2 first, and a full sort would put 1 and 2 ahead of the root.
+    {
+      input: { root: [5, 3, 4, null, 2, 1, null] },
+      expected: [[3], [5, 1, 2], [4]],
+      description: "Column 0 needs row order first, then value order within a row",
+    },
   ],
 }
