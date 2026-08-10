@@ -71,5 +71,8 @@ In a Unix-style file system, a period '.' refers to the current directory, a dou
     { input: { path: "/home/" }, expected: "/home", description: "Remove trailing slash" },
     { input: { path: "/../" }, expected: "/", description: "Stay at root" },
     { input: { path: "/home//foo/" }, expected: "/home/foo", description: "Multiple slashes" },
+    // No path contained a single dot, so a solution that dropped empty segments and handled
+    // ".." but never skipped "." passed. A current-directory segment must vanish too.
+    { input: { path: "/a/./b" }, expected: "/a/b", description: "Current-directory segment" },
   ],
 }
