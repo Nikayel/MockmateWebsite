@@ -12,15 +12,17 @@ export const binaryTreeRightSideViewScenario: DSAScenario = {
   estimatedTime: 20,
   problemStatement: `Given the root of a binary tree, imagine yourself standing on the right side of it, return the values of the nodes you can see ordered from top to bottom.
 
-Example visualization:
+Example:
 
-      1       ← visible (rightmost at level 0)
-     / \\
-    2   3     ← 3 visible (rightmost at level 1)
-     \\   \\
-      5   4   ← 4 visible (rightmost at level 2)
+\`\`\`
+    1
+   / \\
+  2   3
+   \\   \\
+    5   4
+\`\`\`
 
-  Standing on right side → see: [1, 3, 4]`,
+Standing on the right side you see [1, 3, 4].`,
   examples: [
     {
       input: "root = [1,2,3,null,5,null,4]",
