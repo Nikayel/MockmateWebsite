@@ -24,19 +24,21 @@ export const numberOfIslandsScenario: DSAScenario = {
 
 An island is surrounded by water and is formed by connecting adjacent lands horizontally or vertically. You may assume all four edges of the grid are all surrounded by water.
 
-Example visualization:
+Example:
 
-  ┌───┬───┬───┬───┬───┐
-  │ 1 │ 1 │ 0 │ 0 │ 0 │   Island 1: top-left
-  ├───┼───┼───┼───┼───┤          (connected 1s)
-  │ 1 │ 1 │ 0 │ 0 │ 0 │
-  ├───┼───┼───┼───┼───┤
-  │ 0 │ 0 │ 1 │ 0 │ 0 │   Island 2: center
-  ├───┼───┼───┼───┼───┤
-  │ 0 │ 0 │ 0 │ 1 │ 1 │   Island 3: bottom-right
-  └───┴───┴───┴───┴───┘
+\`\`\`
+┌───┬───┬───┬───┬───┐
+│ 1 │ 1 │ 0 │ 0 │ 0 │
+├───┼───┼───┼───┼───┤
+│ 1 │ 1 │ 0 │ 0 │ 0 │
+├───┼───┼───┼───┼───┤
+│ 0 │ 0 │ 1 │ 0 │ 0 │
+├───┼───┼───┼───┼───┤
+│ 0 │ 0 │ 0 │ 1 │ 1 │
+└───┴───┴───┴───┴───┘
+\`\`\`
 
-  Answer: 3 islands`,
+This grid holds 3 islands: the block in the top-left, the single cell in the centre, and the pair in the bottom-right.`,
   examples: [
     {
       input:
