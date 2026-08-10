@@ -83,6 +83,14 @@ Example visualization:
       expected: [],
       description: "Empty tree",
     },
+    // Both trees above are perfect, where reversing each level's VALUES in place happens to
+    // produce the same array as mirroring the structure. On an asymmetric tree the two come
+    // apart: that approach leaves node 4 hanging off the left branch.
+    {
+      input: { root: [1, 2, 3, 4] },
+      expected: [1, 3, 2, null, null, null, 4],
+      description: "Asymmetric tree: swapping children is not reversing level values",
+    },
   ],
 
   // Proactive AI Interviewer Fields
