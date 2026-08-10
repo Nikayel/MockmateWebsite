@@ -12,22 +12,19 @@ export const dsaKthSmallestBstScenario: DSAScenario = {
   estimatedTime: 20,
   problemStatement: `Given the root of a binary search tree, and an integer k, return the kth smallest value (1-indexed) of all the values of the nodes in the tree.
 
-Example visualization:
+Example:
 
-          5
-         / \\
-        3   6
+\`\`\`
+        5
        / \\
-      2   4
-     /
-    1
+      3   6
+     / \\
+    2   4
+   /
+  1
+\`\`\`
 
-    Inorder traversal (sorted): [1, 2, 3, 4, 5, 6]
-                                 ↑  ↑  ↑
-                                k=1 k=2 k=3
-
-    k=1 → return 1
-    k=3 → return 3`,
+For this tree, k = 1 returns 1 and k = 3 returns 3.`,
   examples: [
     {
       input: "root = [3,1,4,null,2], k = 1",
