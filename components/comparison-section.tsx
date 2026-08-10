@@ -323,7 +323,13 @@ export function ComparisonSection() {
             <CostCard
               label="CodeSparring"
               sublabel="AI mock interviews on demand"
-              note="Cancel anytime"
+              // Says WHICH plan this price is, because on /pricing the plan card
+              // two scrolls up defaults to Annually and shows $19/mo. Without
+              // this, one product appeared at two prices on one page with
+              // nothing explaining the difference. This section also renders on
+              // the homepage, where there is no billing toggle at all, so it
+              // states the plan rather than reading the toggle.
+              note={`${proMonthly.billingNote}. Cancel anytime.`}
               points={[
                 { included: true, text: "AI adapts to your skill level" },
                 { included: true, text: "Practice at 2am before your 9am interview" },
