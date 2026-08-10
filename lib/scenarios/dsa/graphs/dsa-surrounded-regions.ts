@@ -15,20 +15,22 @@ export const surroundedRegionsScenario: DSAScenario = {
 
 A region is captured by flipping all 'O's into 'X's in that surrounded region.
 
-Example visualization:
+Example:
 
-  Input:                    Output:
-  ┌───┬───┬───┬───┐         ┌───┬───┬───┬───┐
-  │ X │ X │ X │ X │         │ X │ X │ X │ X │
-  ├───┼───┼───┼───┤         ├───┼───┼───┼───┤
-  │ X │ O │ O │ X │   →     │ X │ X │ X │ X │  (captured!)
-  ├───┼───┼───┼───┤         ├───┼───┼───┼───┤
-  │ X │ X │ O │ X │         │ X │ X │ X │ X │  (captured!)
-  ├───┼───┼───┼───┤         ├───┼───┼───┼───┤
-  │ X │ O │ X │ X │         │ X │ O │ X │ X │  (on border - safe)
-  └───┴───┴───┴───┘         └───┴───┴───┴───┘
+\`\`\`
+Input                     Output
+┌───┬───┬───┬───┐         ┌───┬───┬───┬───┐
+│ X │ X │ X │ X │         │ X │ X │ X │ X │
+├───┼───┼───┼───┤         ├───┼───┼───┼───┤
+│ X │ O │ O │ X │         │ X │ X │ X │ X │
+├───┼───┼───┼───┤         ├───┼───┼───┼───┤
+│ X │ X │ O │ X │         │ X │ X │ X │ X │
+├───┼───┼───┼───┤         ├───┼───┼───┼───┤
+│ X │ O │ X │ X │         │ X │ O │ X │ X │
+└───┴───┴───┴───┘         └───┴───┴───┴───┘
+\`\`\`
 
-  Strategy: Mark border-connected O's as safe, flip the rest`,
+The O on the bottom edge survives, because a region touching the border is not surrounded.`,
   examples: [
     {
       input: 'board = [["X","X","X","X"],["X","O","O","X"],["X","X","O","X"],["X","O","X","X"]]',
