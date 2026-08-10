@@ -38,9 +38,12 @@ const faqs = [
     answer: `LeetCode gives you problems. We give you a system. Our spaced repetition algorithm schedules reviews at the optimal time for long-term retention, plus you get AI-powered mock interviews that feel like the real thing. And we're ${getLeetCodeSavingsPercent()}% cheaper.`,
   },
   {
-    question: "What counts as a 'scenario'?",
+    // The plan cards, the metadata and the quota all meter in "sessions". This
+    // answer asked about "scenarios", so the page used two nouns for the one
+    // unit it charges for, in the FAQ entry that exists to define it.
+    question: "What counts as a session?",
     answer:
-      "A scenario is one AI interview session. Starting a session uses 1 of your monthly sessions and grants 10 free opens, so you can come back to its problems again without spending another session.",
+      "A session is one AI interview. Starting a session uses 1 of your monthly sessions and grants 10 free opens, so you can come back to its problems again without spending another session.",
   },
 ]
 
