@@ -163,16 +163,16 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
                 <span className="text-muted-foreground text-sm">forever</span>
               </div>
 
-              <Link
-                href="/interview"
-                onClick={() =>
-                  trackEvent("cta_click", { location: "pricing_free", destination: "/interview" })
-                }
-              >
-                <Button variant="outline" className="mb-4 w-full">
+              <Button asChild variant="outline" className="mb-4 w-full">
+                <Link
+                  href="/interview"
+                  onClick={() =>
+                    trackEvent("cta_click", { location: "pricing_free", destination: "/interview" })
+                  }
+                >
                   Start practicing free
-                </Button>
-              </Link>
+                </Link>
+              </Button>
 
               <p className="text-muted-foreground mb-2 text-xs">
                 Try before you commit. Includes free Python, SQL, and System Design courses.
@@ -203,20 +203,30 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
                   buyer needs before clicking Subscribe, and it was missing. */}
               <p className="text-muted-foreground mb-3 text-xs">{currentProPrice.billingNote}</p>
 
-              <Link
-                href="/upgrade"
-                onClick={() =>
-                  trackEvent("cta_click", {
-                    location: "pricing_pro_subscribe",
-                    destination: "/upgrade",
-                    billing_period: billingPeriod,
-                  })
-                }
+              {/* The chosen period rides the URL. It used to be reported to
+                  analytics and then dropped: /upgrade keeps its own billingPeriod
+                  state defaulting to yearly, so a visitor who picked Monthly here,
+                  saw $25/mo, and clicked Subscribe landed on a page quoting $19.
+                  bg-accent-strong rather than bg-accent because white on --accent
+                  is 3.97:1 in light mode; --accent-strong takes it to 5.53:1 and
+                  is identical to --accent in dark mode. */}
+              <Button
+                asChild
+                className="bg-accent-strong text-accent-foreground hover:bg-accent-strong/90 mb-4 w-full font-semibold"
               >
-                <Button className="bg-accent text-accent-foreground hover:bg-accent/90 mb-4 w-full font-semibold">
+                <Link
+                  href={`/upgrade?billing=${billingPeriod}`}
+                  onClick={() =>
+                    trackEvent("cta_click", {
+                      location: "pricing_pro_subscribe",
+                      destination: "/upgrade",
+                      billing_period: billingPeriod,
+                    })
+                  }
+                >
                   Subscribe
-                </Button>
-              </Link>
+                </Link>
+              </Button>
 
               <p className="text-muted-foreground mb-2 text-xs">Everything in Free, plus...</p>
               <ul className="text-foreground space-y-1.5 text-sm">
