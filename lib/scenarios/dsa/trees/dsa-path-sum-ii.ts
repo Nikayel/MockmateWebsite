@@ -45,5 +45,13 @@ export const pathSumIiScenario: DSAScenario = {
       description: "Multiple paths",
     },
     { input: { root: [1, 2, 3], targetSum: 5 }, expected: [], description: "No valid paths" },
+    // Neither case had a partial sum that hits the target at an INTERNAL node, so a
+    // solution that recorded a path at any matching node instead of requiring a leaf
+    // passed. Here the root alone equals the target and would be collected as [[1]].
+    {
+      input: { root: [1, 2, 3], targetSum: 1 },
+      expected: [],
+      description: "Root alone matches, but a recorded path must end at a leaf",
+    },
   ],
 }
