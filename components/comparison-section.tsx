@@ -149,9 +149,16 @@ export function ComparisonSection() {
   const fontBody = "var(--font-open-sans), system-ui, -apple-system, sans-serif"
 
   return (
-    // Dark tile (#232220) — fixed dark surface, not theme-reactive by design.
-    // This section deliberately sits outside the light/dark theme as a full-bleed dark tile.
-    <section ref={sectionRef} className="py-20 lg:py-28" style={{ backgroundColor: "#232220" }}>
+    // Was a fixed #232220 tile with white cards, justified by a comment saying it
+    // "deliberately sits outside the light/dark theme". That comment covered one
+    // of the 48 hex literals in this file; the other 47 were a private palette
+    // forked from globals.css, and three of them failed WCAG AA in BOTH themes
+    // (#7a7a7a body text at 4.29:1, #e0e0e0 X icons at 1.32:1, #c4703f as text
+    // at 3.66:1). So the tile was not a light-mode problem being tolerated for
+    // design reasons, it was a contrast bug hiding behind one. Now the standard
+    // section pattern used by features/relevance-gap/ai-assisted: page surface
+    // outside, card surface inside, hairline border between.
+    <section ref={sectionRef} className="bg-background py-20 lg:py-28">
       <div className="container mx-auto px-4">
         <div className="mx-auto max-w-4xl">
           {/* Header */}
@@ -161,27 +168,10 @@ export function ComparisonSection() {
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.5 }}
           >
-            <h2
-              className="font-semibold text-white"
-              style={{
-                fontFamily: fontHeading,
-                fontSize: "34px",
-                letterSpacing: "-0.374px",
-                lineHeight: 1.47,
-              }}
-            >
+            <h2 className="font-heading text-foreground text-3xl font-semibold tracking-tight">
               What interview prep costs
             </h2>
-            <p
-              className="mx-auto mt-3 max-w-lg"
-              style={{
-                fontFamily: fontBody,
-                fontSize: "17px",
-                lineHeight: 1.47,
-                letterSpacing: "-0.374px",
-                color: "#cccccc",
-              }}
-            >
+            <p className="text-muted-foreground mx-auto mt-3 max-w-lg text-lg leading-relaxed">
               {`${MOCKS_FOR_IMPACT}+ mock interviews significantly improve pass rates. Here's what that investment looks like.`}
             </p>
           </motion.div>
@@ -365,16 +355,9 @@ export function ComparisonSection() {
             </motion.div>
           </div>
 
-          {/* Value statement — tagline: 21px/600 assertive on dark tile */}
+          {/* Value statement */}
           <motion.p
-            className="mb-10 text-center font-semibold"
-            style={{
-              fontFamily: fontHeading,
-              fontSize: "21px",
-              lineHeight: 1.19,
-              letterSpacing: "0.231px",
-              color: "#cccccc",
-            }}
+            className="font-heading text-foreground mb-10 text-center text-xl font-semibold"
             initial={{ opacity: 0 }}
             animate={isInView ? { opacity: 1 } : {}}
             transition={{ delay: 0.4, duration: 0.5 }}
@@ -447,44 +430,23 @@ export function ComparisonSection() {
             </div>
           </motion.div>
 
-          {/* CTA — button-primary: Action Blue pill */}
+          {/* CTA. The comment here read "Action Blue pill" while the button was
+              clay, a leftover from a different design system. It was also
+              #ffffff on #c4703f = 3.66:1, failing AA at 17px. */}
           <motion.div
             className="text-center"
             initial={{ opacity: 0 }}
             animate={isInView ? { opacity: 1 } : {}}
             transition={{ delay: 0.5, duration: 0.5 }}
           >
-            <Link href="/interview">
-              <button
-                className="inline-flex items-center font-medium transition-transform active:scale-95"
-                style={{
-                  fontFamily: fontBody,
-                  backgroundColor: "#c4703f",
-                  color: "#ffffff",
-                  borderRadius: "9999px",
-                  padding: "11px 28px",
-                  fontSize: "17px",
-                  letterSpacing: "-0.374px",
-                  lineHeight: 1.47,
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                Try your first mock free
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </button>
-            </Link>
-            <p
-              className="mt-3"
-              style={{
-                fontFamily: fontBody,
-                fontSize: "12px",
-                color: "#cccccc",
-                letterSpacing: "-0.12px",
-              }}
+            <Link
+              href="/interview"
+              className="bg-accent-strong text-accent-foreground hover:bg-accent-strong/90 focus-visible:ring-ring inline-flex items-center rounded-full px-7 py-3 text-lg font-medium transition-transform focus-visible:ring-2 focus-visible:ring-offset-2 active:scale-95"
             >
-              No credit card required
-            </p>
+              Try your first mock free
+              <ArrowRight aria-hidden className="ml-2 h-4 w-4" />
+            </Link>
+            <p className="text-muted-foreground mt-3 text-xs">No credit card required</p>
           </motion.div>
         </div>
       </div>
