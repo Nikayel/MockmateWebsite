@@ -81,6 +81,14 @@ Example visualization:
       expected: [],
       description: "Empty tree",
     },
+    // In both trees above the right spine reaches every level, so just walking right
+    // children (or preferring right, falling back to left) produced the whole answer. Here
+    // the right subtree stops early and the deepest visible node is a LEFT child.
+    {
+      input: { root: [1, 2, 3, 4] },
+      expected: [1, 3, 4],
+      description: "Deepest visible node is a left child; the right spine ends early",
+    },
   ],
 
   // Proactive AI Interviewer Fields
