@@ -159,55 +159,84 @@ function FeatureRow({
   human,
   codesparring,
   index,
-  fontBody,
 }: {
   feature: string
   leetcode: boolean | string
   human: boolean | string
   codesparring: boolean
   index: number
-  fontBody: string
 }) {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, amount: 0.5 })
 
+  /**
+   * Every cell used to be a bare icon with no text alternative, and the "no"
+   * state was #e0e0e0 on white — 1.32:1, which is invisible. So the single most
+   * important signal in the table, "this competitor does NOT do this", was
+   * unreadable by sight and absent entirely for a screen reader.
+   */
   const renderValue = (value: boolean | string, highlight = false) => {
     if (typeof value === "string") {
-      return (
-        <span style={{ fontFamily: fontBody, fontSize: "12px", color: "#7a7a7a" }}>{value}</span>
-      )
+      return <span className="text-muted-foreground text-xs">{value}</span>
     }
     if (value) {
-      return <Check className="h-4 w-4" style={{ color: highlight ? "#c4703f" : "#7a7a7a" }} />
+      return (
+        <>
+          <Check
+            aria-hidden
+            className={cn(
+              "mx-auto h-4 w-4",
+              highlight ? "text-accent-strong" : "text-muted-foreground"
+            )}
+          />
+          <span className="sr-only">Yes</span>
+        </>
+      )
     }
-    return <X className="h-4 w-4" style={{ color: "#e0e0e0" }} />
+    return (
+      <>
+        <X aria-hidden className="text-muted-foreground/60 mx-auto h-4 w-4" />
+        <span className="sr-only">No</span>
+      </>
+    )
   }
 
   return (
-    <motion.div
+    <motion.tr
       ref={ref}
-      className="grid grid-cols-[1fr_72px_72px_72px] items-center gap-2 py-3 last:border-0 sm:grid-cols-[1fr_88px_88px_88px]"
-      style={{ borderBottom: "1px solid #f0f0f0" }}
+      className="border-border border-b last:border-0"
       initial={{ opacity: 0 }}
       animate={isInView ? { opacity: 1 } : {}}
       transition={{ delay: index * 0.05, duration: 0.3 }}
     >
-      <span
-        style={{
-          fontFamily: fontBody,
-          fontSize: "14px",
-          color: "#1a1917",
-          letterSpacing: "-0.224px",
-        }}
-      >
+      <th scope="row" className="text-foreground py-3 pr-2 text-sm font-normal">
         {feature}
-      </span>
-      <div className="flex justify-center">{renderValue(leetcode)}</div>
-      <div className="flex justify-center">{renderValue(human)}</div>
-      <div className="flex justify-center">{renderValue(codesparring, true)}</div>
-    </motion.div>
+      </th>
+      <td className="py-3 text-center">{renderValue(leetcode)}</td>
+      <td className="py-3 text-center">{renderValue(human)}</td>
+      <td className="py-3 text-center">{renderValue(codesparring, true)}</td>
+    </motion.tr>
   )
 }
+
+/** The three compared offerings, in table-column order. */
+const COLUMNS = [
+  {
+    name: COMPETITOR_PRICING.leetcodePremium.name,
+    price: `$${COMPETITOR_PRICING.leetcodePremium.monthlyPrice}/mo`,
+    highlight: false,
+  },
+  {
+    name: COMPETITOR_PRICING.humanMock.name,
+    price: `$${COMPETITOR_PRICING.humanMock.perSessionMin}+`,
+    highlight: false,
+  },
+  {
+    name: "Ours",
+    price: `${getProPricing("website").monthly.priceDisplay}/mo`,
+    highlight: true,
+  },
+]
 
 export function ComparisonSection() {
   const sectionRef = useRef(null)
@@ -235,10 +264,6 @@ export function ComparisonSection() {
     },
     { feature: "Spaced repetition system", leetcode: false, human: false, codesparring: true },
   ]
-
-  // Shared font stacks from Design.md — resolved via CSS variables set in globals.css
-  const fontHeading = "var(--font-work-sans), system-ui, -apple-system, sans-serif"
-  const fontBody = "var(--font-open-sans), system-ui, -apple-system, sans-serif"
 
   return (
     // Was a fixed #232220 tile with white cards, justified by a comment saying it
@@ -313,68 +338,63 @@ export function ComparisonSection() {
             One month costs less than a single human mock session.
           </motion.p>
 
-          {/* Feature Comparison — white canvas card */}
+          {/* Feature Comparison. Was a grid of divs, so nothing announced it as a
+              table, nothing tied a check to its column, and at 360px the feature
+              column collapsed to about 56px and shredded every label. It is now a
+              real table that scrolls horizontally instead of crushing. */}
           <motion.div
-            className="mb-10 rounded-[18px] p-4 sm:p-6"
-            style={{ backgroundColor: "#ffffff", border: "1px solid #e0e0e0" }}
+            className="border-border bg-card mb-10 rounded-[18px] border p-4 sm:p-6"
             initial={{ opacity: 0, y: 16 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ delay: 0.3, duration: 0.5 }}
           >
-            <div
-              className="mb-1 grid grid-cols-[1fr_72px_72px_72px] items-end gap-2 pb-3 sm:grid-cols-[1fr_88px_88px_88px]"
-              style={{ borderBottom: "1px solid #e0e0e0" }}
-            >
-              <span
-                className="font-semibold uppercase"
-                style={{
-                  fontFamily: fontBody,
-                  fontSize: "12px",
-                  letterSpacing: "0.08em",
-                  color: "#7a7a7a",
-                }}
-              >
-                Feature
-              </span>
-              <div className="text-center">
-                <span
-                  className="block"
-                  style={{ fontFamily: fontBody, fontSize: "12px", color: "#7a7a7a" }}
-                >
-                  {COMPETITOR_PRICING.leetcodePremium.name}
-                </span>
-                <span style={{ fontFamily: fontBody, fontSize: "11px", color: "#7a7a7a" }}>
-                  {`$${COMPETITOR_PRICING.leetcodePremium.monthlyPrice}/mo`}
-                </span>
-              </div>
-              <div className="text-center">
-                <span
-                  className="block"
-                  style={{ fontFamily: fontBody, fontSize: "12px", color: "#7a7a7a" }}
-                >
-                  {COMPETITOR_PRICING.humanMock.name}
-                </span>
-                <span style={{ fontFamily: fontBody, fontSize: "11px", color: "#7a7a7a" }}>
-                  {`$${COMPETITOR_PRICING.humanMock.perSessionMin}+`}
-                </span>
-              </div>
-              <div className="text-center">
-                <span
-                  className="block font-semibold"
-                  style={{ fontFamily: fontBody, fontSize: "12px", color: "#c4703f" }}
-                >
-                  Ours
-                </span>
-                <span style={{ fontFamily: fontBody, fontSize: "11px", color: "#c4703f" }}>
-                  {proMonthly.priceDisplay}/mo
-                </span>
-              </div>
-            </div>
-
-            <div>
-              {features.map((row, index) => (
-                <FeatureRow key={row.feature} {...row} index={index} fontBody={fontBody} />
-              ))}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[420px] border-collapse text-left">
+                <caption className="sr-only">
+                  {`How CodeSparring compares with ${COMPETITOR_PRICING.leetcodePremium.fullName} and ${COMPETITOR_PRICING.humanMock.fullName}`}
+                </caption>
+                <thead>
+                  <tr className="border-border border-b">
+                    <th
+                      scope="col"
+                      className="text-muted-foreground pb-3 text-xs font-semibold tracking-[0.08em] uppercase"
+                    >
+                      Feature
+                    </th>
+                    {COLUMNS.map((column) => (
+                      <th
+                        key={column.name}
+                        scope="col"
+                        className="w-[72px] pb-3 text-center align-bottom sm:w-[88px]"
+                      >
+                        <span
+                          className={cn(
+                            "block text-xs",
+                            column.highlight
+                              ? "text-accent-strong font-semibold"
+                              : "text-muted-foreground"
+                          )}
+                        >
+                          {column.name}
+                        </span>
+                        <span
+                          className={cn(
+                            "text-[11px]",
+                            column.highlight ? "text-accent-strong" : "text-muted-foreground"
+                          )}
+                        >
+                          {column.price}
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {features.map((row, index) => (
+                    <FeatureRow key={row.feature} {...row} index={index} />
+                  ))}
+                </tbody>
+              </table>
             </div>
           </motion.div>
 
