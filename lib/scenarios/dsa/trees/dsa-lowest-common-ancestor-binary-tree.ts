@@ -15,18 +15,19 @@ export const lowestCommonAncestorBinaryTreeScenario: DSAScenario = {
 
 According to the definition of LCA on Wikipedia: "The lowest common ancestor is defined between two nodes p and q as the lowest node in T that has both p and q as descendants (where we allow a node to be a descendant of itself)."
 
-Example visualization:
+Example:
 
-          3       ← LCA of (5,1) = 3
-         / \\
-       [5]  [1]   ← p=5, q=1
-       / \\  / \\
-      6   2 0   8
-         / \\
-        7   4
+\`\`\`
+        3
+       / \\
+      5   1
+     / \\  / \\
+    6   2 0   8
+       / \\
+      7   4
+\`\`\`
 
-  LCA of (5, 4) = 5  (5 is ancestor of itself)
-  LCA of (5, 1) = 3  (3 is first common ancestor)`,
+The LCA of 5 and 1 is 3. The LCA of 5 and 4 is 5, because a node counts as a descendant of itself.`,
   examples: [
     {
       input: "root = [3,5,1,6,2,0,8,null,null,7,4], p = 5, q = 1",
