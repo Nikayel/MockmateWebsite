@@ -75,5 +75,13 @@ export const wordBreakScenario: DSAScenario = {
       expected: true,
       description: "Multiple ways to segment",
     },
+    // Every segmentable string above could also be built by always taking the longest word
+    // that fits, so that greedy pass never had to backtrack. Here "car" is the longest
+    // match at position 0 and it strands the "s"; only "ca" + "rs" works.
+    {
+      input: { s: "cars", wordDict: ["car", "ca", "rs"] },
+      expected: true,
+      description: "Longest-first matching strands the tail; a shorter first word works",
+    },
   ],
 }
