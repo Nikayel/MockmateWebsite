@@ -8,7 +8,7 @@ import { Check, ChevronDown } from "lucide-react"
 import { getProPricing, PRICING_CONFIG } from "@/lib/config"
 import { trackEvent } from "@/lib/analytics"
 import Link from "next/link"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { Feature } from "@/components/ui/feature-with-image-comparison"
 import { ComparisonSection } from "@/components/comparison-section"
@@ -59,6 +59,7 @@ function PlanFeature({ children, accent = false }: { children: string; accent?: 
 export function PricingPageClient({ faqs }: PricingPageClientProps) {
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("yearly")
   const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const prefersReducedMotion = useReducedMotion()
   const proPricing = getProPricing("website")
 
   const currentProPrice = billingPeriod === "yearly" ? proPricing.yearly : proPricing.monthly
@@ -217,44 +218,60 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
       <ComparisonSection />
 
       {/* FAQ Section */}
-      <section className="bg-background border-t border-white/5 py-12">
+      <section className="bg-background border-border border-t py-12">
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-2xl">
-            <h2 className="mb-6 text-center text-xl font-bold text-white">
+            <h2 className="font-heading text-foreground mb-6 text-center text-xl font-bold">
               Frequently Asked Questions
             </h2>
             <div className="space-y-2">
-              {faqs.map((faq, idx) => (
-                <div key={idx} className="overflow-hidden rounded-lg border border-white/10">
-                  <button
-                    onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
-                    className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-white/5"
+              {faqs.map((faq, idx) => {
+                const isOpen = openFaq === idx
+                return (
+                  <div
+                    key={faq.question}
+                    className="border-border overflow-hidden rounded-lg border"
                   >
-                    <span className="text-sm font-medium text-white">{faq.question}</span>
-                    <ChevronDown
-                      className={cn(
-                        "h-4 w-4 text-gray-500 transition-transform",
-                        openFaq === idx && "rotate-180"
-                      )}
-                    />
-                  </button>
-                  <AnimatePresence>
-                    {openFaq === idx && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
+                    <h3>
+                      <button
+                        type="button"
+                        id={`faq-trigger-${idx}`}
+                        aria-expanded={isOpen}
+                        aria-controls={`faq-panel-${idx}`}
+                        onClick={() => setOpenFaq(isOpen ? null : idx)}
+                        className="hover:bg-muted flex w-full items-center justify-between px-4 py-3 text-left transition-colors"
                       >
-                        <p className="px-4 pb-3 text-sm leading-relaxed text-gray-400">
-                          {faq.answer}
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              ))}
+                        <span className="text-foreground text-sm font-medium">{faq.question}</span>
+                        <ChevronDown
+                          aria-hidden
+                          className={cn(
+                            "text-muted-foreground h-4 w-4 shrink-0 transition-transform",
+                            isOpen && "rotate-180"
+                          )}
+                        />
+                      </button>
+                    </h3>
+                    <AnimatePresence initial={false}>
+                      {isOpen && (
+                        <motion.div
+                          id={`faq-panel-${idx}`}
+                          role="region"
+                          aria-labelledby={`faq-trigger-${idx}`}
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <p className="text-muted-foreground px-4 pb-3 text-sm leading-relaxed">
+                            {faq.answer}
+                          </p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
