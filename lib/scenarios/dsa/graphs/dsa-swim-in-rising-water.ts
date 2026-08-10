@@ -32,5 +32,20 @@ export const swimInRisingWaterScenario: DSAScenario = {
       description: "2x2 grid",
     },
     { input: { grid: [[0]] }, expected: 0, description: "Single cell" },
+    // In the 2x2 case the answer equals both the grid maximum and the larger corner, so
+    // `max(grid)`, `max(start, end)`, and a greedy walk that never backtracks all passed.
+    // Here the answer (7) is below the grid maximum (8) and above both corners, and the
+    // route that greedy takes first is walled off behind the 8.
+    {
+      input: {
+        grid: [
+          [0, 3, 4],
+          [1, 5, 7],
+          [2, 8, 6],
+        ],
+      },
+      expected: 7,
+      description: "Best route is neither the greedy descent nor the grid maximum",
+    },
   ],
 }
