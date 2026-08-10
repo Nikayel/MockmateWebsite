@@ -137,5 +137,50 @@ public:
       expected: false,
       description: "Three-node cycle",
     },
+    // The four cases above all happen to be decided by course 0 alone, which let a
+    // solution that returned after checking only the first course pass 4/4 in a real
+    // session. Everything below exists to kill specific wrong-but-plausible solutions.
+    {
+      input: {
+        numCourses: 4,
+        prerequisites: [
+          [2, 3],
+          [3, 2],
+        ],
+      },
+      expected: false,
+      description: "Cycle that does not involve course 0",
+    },
+    {
+      input: { numCourses: 3, prerequisites: [] },
+      expected: true,
+      description: "No prerequisites at all",
+    },
+    {
+      input: {
+        numCourses: 6,
+        prerequisites: [
+          [1, 0],
+          [3, 2],
+          [5, 4],
+        ],
+      },
+      expected: true,
+      description: "Disconnected components, all finishable",
+    },
+    {
+      input: {
+        numCourses: 5,
+        prerequisites: [
+          [1, 0],
+          [2, 0],
+          [3, 1],
+          [3, 2],
+          [4, 3],
+        ],
+      },
+      expected: true,
+      description: "Diamond dependency into a deep chain",
+    },
   ],
 }
