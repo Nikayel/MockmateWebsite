@@ -1,4 +1,6 @@
 import { Metadata } from "next"
+import { PRICING_CONFIG } from "@/lib/config"
+import { COMPETITOR_PRICING } from "@/lib/pricing-comparison"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
@@ -34,14 +36,12 @@ export default function VsInterviewingIoPage() {
       content: (
         <>
           <p>
-            The biggest difference is cost and availability. A single mock interview on
-            Interviewing.io typically costs between $150 and $250. This limits most candidates to
-            doing 1 or 2 mock interviews before their real onsite.
+            {`The biggest difference is cost and availability. A single mock interview on Interviewing.io typically costs between $${COMPETITOR_PRICING.humanMock.perSessionMin} and $${COMPETITOR_PRICING.humanMock.perSessionMax}. This limits most candidates to doing 1 or 2 mock interviews before their real onsite.`}
           </p>
           <p>
-            CodeSparring offers 35 AI mock interview sessions a month for a fraction of the cost of a
-            single human session. This allows you to practice <em>often</em>, building the muscle
-            memory needed to cure interview anxiety completely.
+            {`CodeSparring offers ${PRICING_CONFIG.pro.sessionsPerMonth} AI mock interview sessions a month for a fraction of the cost of a single human session. This allows you to practice `}
+            <em>often</em>
+            {`, building the muscle memory needed to cure interview anxiety completely.`}
           </p>
         </>
       ),

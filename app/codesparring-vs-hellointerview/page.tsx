@@ -1,4 +1,5 @@
 import { Metadata } from "next"
+import { COMPETITOR_PRICING } from "@/lib/pricing-comparison"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
@@ -73,8 +74,7 @@ export default function VsHelloInterviewPage() {
   const faqs = [
     {
       question: "Is CodeSparring cheaper than human mock interviews?",
-      answer:
-        "Yes. While human mock interviews can cost $150-$250 per hour, CodeSparring provides AI mock interviews for a fraction of that cost.",
+      answer: `Yes. While human mock interviews can cost $${COMPETITOR_PRICING.humanMock.perSessionMin}-$${COMPETITOR_PRICING.humanMock.perSessionMax} per session, CodeSparring provides AI mock interviews for a fraction of that cost.`,
     },
     {
       question: "Can I practice System Design on both?",
