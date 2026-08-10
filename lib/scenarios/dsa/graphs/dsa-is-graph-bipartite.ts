@@ -68,5 +68,28 @@ export const isGraphBipartiteScenario: DSAScenario = {
       expected: true,
       description: "Bipartite square",
     },
+    // Both cases above are connected and their odd cycle is a triangle, so a
+    // triangle-only check, an "every degree is even" heuristic, and a solution that
+    // explored only the component containing node 0 all passed.
+    {
+      input: {
+        graph: [
+          [1, 4],
+          [0, 2],
+          [1, 3],
+          [2, 4],
+          [3, 0],
+        ],
+      },
+      expected: false,
+      description: "Five-cycle: an odd cycle with no triangle, every degree even",
+    },
+    {
+      input: {
+        graph: [[1], [0], [3, 4], [2, 4], [2, 3]],
+      },
+      expected: false,
+      description: "Second component holds the odd cycle: every component must be checked",
+    },
   ],
 }
