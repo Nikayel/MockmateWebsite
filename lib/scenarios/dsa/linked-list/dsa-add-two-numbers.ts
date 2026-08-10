@@ -12,17 +12,16 @@ export const addTwoNumbersScenario: DSAScenario = {
   estimatedTime: 25,
   problemStatement: `You are given two non-empty linked lists representing two non-negative integers. The digits are stored in reverse order, and each node contains a single digit. Add the two numbers and return the sum as a linked list.
 
-Example visualization:
+Example:
 
-  l1: 2 → 4 → 3  (represents 342)
-  l2: 5 → 6 → 4  (represents 465)
-                 ─────────────────
-  Sum: 342 + 465 = 807
+\`\`\`
+l1: 2 → 4 → 3   represents 342
+l2: 5 → 6 → 4   represents 465
 
-  Process (right to left with carry):
-  2+5=7 → 4+6=10(carry 1) → 3+4+1=8
+342 + 465 = 807
 
-  Output: 7 → 0 → 8  (represents 807)`,
+Output: 7 → 0 → 8   represents 807
+\`\`\``,
   examples: [
     { input: "l1 = [2,4,3], l2 = [5,6,4]", output: "[7,0,8]", explanation: "342 + 465 = 807" },
     { input: "l1 = [0], l2 = [0]", output: "[0]" },
