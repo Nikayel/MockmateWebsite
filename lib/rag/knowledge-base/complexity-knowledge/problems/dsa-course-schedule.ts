@@ -33,7 +33,7 @@ export const courseScheduleComplexity: ProblemComplexityKnowledge = {
     },
   ],
   commonMistakes: [
-    "Using only visited (need visiting state for cycle detection)",
+    "Using one visited set that cannot distinguish 'in the current DFS path' from 'fully processed'. Note: a separate done set, three-state colors, or clearing a node's adjacency list once fully explored all validly provide the third state.",
     "Building graph wrong (prerequisite direction)",
     "Not handling disconnected components",
   ],

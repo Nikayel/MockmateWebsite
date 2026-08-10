@@ -670,9 +670,13 @@ ${enhancedProfile.insights.length > 0 ? `Key insight: ${enhancedProfile.insights
         context += `- When to use: ${approach.whenToUse}\n\n`
       }
 
+      context +=
+        "These are reference approaches, NOT an exhaustive list. Nonstandard bookkeeping that achieves the same guarantees is equally valid - judge what the candidate actually wrote, not whether it matches this list.\n\n"
+
       // Common mistakes to watch for
       if (complexity.commonMistakes.length > 0) {
-        context += "**Common Mistakes to Watch For:**\n"
+        context +=
+          "**Common Mistakes to Watch For** (verify against their ACTUAL code before treating one as present - different bookkeeping that achieves the same effect is NOT the mistake):\n"
         for (const mistake of complexity.commonMistakes) {
           context += `- ${mistake}\n`
         }
@@ -725,6 +729,10 @@ ${enhancedProfile.insights.length > 0 ? `Key insight: ${enhancedProfile.insights
 
 **SYSTEMATIC APPROACH TO INCORRECT ASSESSMENTS:**
 
+**FIRST, verify they are actually wrong:** check their claim against their ACTUAL code. If their method differs from the documented approaches but achieves the same guarantee, it is CORRECT - acknowledge neutrally and move on.
+
+**TWO-PROBE LIMIT:** ask at most TWO probing questions about any single concern. Still unresolved? Change tactics: pick a concrete input and have them trace their approach on it. If you cannot name an input where their approach fails, take that as strong evidence they are RIGHT - accept it and move on. NEVER rephrase the same question a third time.
+
 **If they give WRONG complexity:**
 - Step 1: Don't immediately correct them
 - Step 2: Probe their reasoning: "Walk me through how you arrived at [their stated complexity]"
@@ -751,7 +759,7 @@ ${enhancedProfile.insights.length > 0 ? `Key insight: ${enhancedProfile.insights
 - Ask about specific operations: "In [approach A], what's the cost of [operation]? How about in [approach B]?"
 
 **If they give RIGHT complexity but suboptimal approach:**
-- Acknowledge: "Good analysis"
+- Acknowledge neutrally ("Okay", "Alright")
 - Probe trade-offs: "Is there a way to improve the ${complexity?.approaches.some((a) => a.isOptimalTime && !a.isOptimalSpace) ? "space" : "time"} complexity?"
 - Discuss alternatives: "What if you used a different data structure?"
 
