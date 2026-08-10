@@ -12,15 +12,17 @@ export const binaryTreeZigzagScenario: DSAScenario = {
   estimatedTime: 25,
   problemStatement: `Given the root of a binary tree, return the zigzag level order traversal of its nodes' values. (i.e., from left to right, then right to left for the next level and alternate between).
 
-Example visualization:
+Example:
 
-        3        Level 0: [3]     → left to right
+\`\`\`
+      3
+     / \\
+    9  20
        / \\
-      9  20      Level 1: [20,9]  ← right to left
-         / \\
-        15  7    Level 2: [15,7]  → left to right
+      15  7
+\`\`\`
 
-  Output: [[3], [20, 9], [15, 7]]`,
+Output: [[3], [20, 9], [15, 7]]`,
   examples: [
     { input: "root = [3,9,20,null,null,15,7]", output: "[[3],[20,9],[15,7]]" },
     { input: "root = [1]", output: "[[1]]" },
