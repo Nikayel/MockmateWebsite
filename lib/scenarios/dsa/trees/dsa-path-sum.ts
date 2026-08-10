@@ -46,5 +46,13 @@ A leaf is a node with no children.`,
     },
     { input: { root: [1, 2, 3], targetSum: 5 }, expected: false, description: "No valid path" },
     { input: { root: [], targetSum: 0 }, expected: false, description: "Empty tree" },
+    // No case had a partial sum that hits the target at an INTERNAL node, so a solution
+    // that stopped at any matching node instead of requiring a leaf passed. Here the root
+    // alone equals the target, but 1->2 and 1->3 are the only root-to-leaf paths.
+    {
+      input: { root: [1, 2, 3], targetSum: 1 },
+      expected: false,
+      description: "Root alone matches, but the path must end at a leaf",
+    },
   ],
 }
