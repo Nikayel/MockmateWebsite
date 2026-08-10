@@ -73,5 +73,8 @@ You may assume that the input string is always valid; there are no extra white s
       expected: "abcabccdcdcdef",
       description: "Multiple patterns with suffix",
     },
+    // Every repeat count above is a single digit, so a solution that read one character as
+    // the count worked. A two-digit count needs the digits accumulated.
+    { input: { s: "10[a]" }, expected: "aaaaaaaaaa", description: "Two-digit repeat count" },
   ],
 }
