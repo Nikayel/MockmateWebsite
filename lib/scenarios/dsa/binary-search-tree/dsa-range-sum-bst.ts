@@ -12,20 +12,17 @@ export const dsaRangeSumBstScenario: DSAScenario = {
   estimatedTime: 15,
   problemStatement: `Given the root node of a binary search tree and two integers low and high, return the sum of values of all nodes with a value in the inclusive range [low, high].
 
-Example visualization:
+Example, with low = 7 and high = 15:
 
-           10          range = [7, 15]
-          /  \\
-         5   15
-        / \\    \\
-       3   7    18
+\`\`\`
+       10
+      /  \\
+     5   15
+    / \\    \\
+   3   7    18
+\`\`\`
 
-    Nodes in range [7, 15]: 7, 10, 15
-    Sum = 7 + 10 + 15 = 32
-
-    BST optimization:
-    - If node < low → skip left subtree
-    - If node > high → skip right subtree`,
+The values inside the range are 7, 10 and 15, so the answer is 32.`,
   examples: [
     {
       input: "root = [10,5,15,3,7,null,18], low = 7, high = 15",
