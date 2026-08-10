@@ -17,8 +17,15 @@ interface PricingPageClientProps {
   faqs: { question: string; answer: string }[]
 }
 
+type BillingPeriod = "monthly" | "yearly"
+
+const BILLING_PERIODS: { value: BillingPeriod; label: string }[] = [
+  { value: "monthly", label: "Monthly" },
+  { value: "yearly", label: "Annually" },
+]
+
 export function PricingPageClient({ faqs }: PricingPageClientProps) {
-  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("yearly")
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("yearly")
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const proPricing = getProPricing("website")
 
@@ -38,32 +45,42 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
             </h1>
           </div>
 
-          {/* Billing Toggle - Inline */}
+          {/* Billing Toggle. A radiogroup, not two loose buttons: a screen reader
+              needs to hear that these are two options of one setting and which one
+              is active. The "Save 25%" badge is always in the DOM and only fades,
+              so switching periods does not reflow the row. */}
           <div className="mb-5 flex justify-center">
-            <div className="inline-flex items-center gap-1 text-sm">
-              <button
-                onClick={() => setBillingPeriod("monthly")}
-                className={`rounded-full px-3 py-1 transition-all ${
-                  billingPeriod === "monthly"
-                    ? "bg-white/10 text-white"
-                    : "text-gray-500 hover:text-white"
-                }`}
+            <div
+              role="radiogroup"
+              aria-label="Billing period"
+              className="border-border inline-flex items-center gap-1 rounded-full border p-1 text-sm"
+            >
+              {BILLING_PERIODS.map((period) => (
+                <button
+                  key={period.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={billingPeriod === period.value}
+                  onClick={() => setBillingPeriod(period.value)}
+                  className={cn(
+                    "rounded-full px-3 py-1 transition-colors",
+                    billingPeriod === period.value
+                      ? "bg-muted text-foreground font-medium"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {period.label}
+                </button>
+              ))}
+              <span
+                aria-hidden={billingPeriod !== "yearly"}
+                className={cn(
+                  "text-neural ml-1 pr-2 text-xs font-medium transition-opacity",
+                  billingPeriod === "yearly" ? "opacity-100" : "opacity-0"
+                )}
               >
-                Monthly
-              </button>
-              <button
-                onClick={() => setBillingPeriod("yearly")}
-                className={`rounded-full px-3 py-1 transition-all ${
-                  billingPeriod === "yearly"
-                    ? "bg-white/10 text-white"
-                    : "text-gray-500 hover:text-white"
-                }`}
-              >
-                Annually
-              </button>
-              {billingPeriod === "yearly" && (
-                <span className="ml-1 text-xs text-green-400">Save 25%</span>
-              )}
+                {`Save ${proPricing.yearly.savingsPercent}%`}
+              </span>
             </div>
           </div>
 
