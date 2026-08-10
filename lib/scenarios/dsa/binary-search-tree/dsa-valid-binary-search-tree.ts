@@ -17,17 +17,18 @@ A valid BST is defined as follows:
 - The right subtree of a node contains only nodes with keys greater than the node's key.
 - Both the left and right subtrees must also be binary search trees.
 
-Example visualization:
+Example:
 
-    Valid BST:              Invalid BST:
-         5                       5
-        / \\                     / \\
-       3   7                   3   4  ← 4 < 5 (wrong!)
-      / \\   \\                 / \\
-     1   4   8               1   6  ← 6 > 5 (wrong!)
+\`\`\`
+Valid                  Invalid
+     5                      5
+    / \\                    / \\
+   3   7                  3   4
+  / \\   \\                / \\
+ 1   4   8              1   6
+\`\`\`
 
-    Check: all left < node < all right
-    Use min/max bounds while traversing`,
+The second tree fails twice: 4 sits to the right of 5 but is smaller, and 6 sits in the left subtree of 5 but is larger.`,
   examples: [
     {
       input: "root = [2,1,3]",
