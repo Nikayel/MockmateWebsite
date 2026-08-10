@@ -62,8 +62,24 @@ export function buildPythonWrapper(
   cleanCode: string,
   scenarioId: string
 ): string {
-  const record = testCase && typeof testCase === "object" ? (testCase as { input?: unknown }) : {}
+  const record =
+    testCase && typeof testCase === "object"
+      ? (testCase as { input?: unknown; expected?: unknown })
+      : {}
   const input = record.input && typeof record.input === "object" ? record.input : {}
+  /**
+   * Whether an absent answer should serialize as `[]` rather than `null`.
+   *
+   * A solution that correctly returns `None` — invert an empty tree, remove the only node,
+   * filter everything out — has to come back as `[]` to match a sequence answer key. That
+   * mapping used to key off the INPUT shape (a tree or list argument), which was wrong in
+   * both directions: `dsa-inorder-successor-bst` takes a `root` and legitimately answers
+   * `null` when no successor exists, so a correct solution was rewritten to `[]` and
+   * marked wrong on that case.
+   *
+   * The answer key knows what shape the answer is, so read it from there instead.
+   */
+  const expectsSequence = Array.isArray(record.expected)
   const inputRecord = input as Record<string, unknown>
   const inputKeys = Object.keys(inputRecord)
   const inputValues = Object.values(inputRecord)
@@ -165,6 +181,7 @@ ${code}
 _input = ${toPythonLiteral(inputValues)}
 _input_keys = ${toPythonLiteral(inputKeys)}
 _candidates = ${toPythonLiteral(candidates)}
+_expects_sequence = ${expectsSequence ? "True" : "False"}
 _tree_keywords = {"root", "tree", "node", "p", "q", "t1", "t2", "left", "right", "subroot"}
 _list_keywords = {"head", "list", "l1", "l2"}
 
@@ -200,21 +217,11 @@ else:
         raise Exception("No callable function found")
     _result = globals()[_functions[0]](*_processed_input)
 
-_had_tree_input = any(
-    isinstance(_input[index], list) and (_input_keys[index] if index < len(_input_keys) else "").lower() in _tree_keywords
-    for index in range(len(_input))
-)
-
-_had_list_input = any(
-    isinstance(_input[index], list) and (_input_keys[index] if index < len(_input_keys) else "").lower() in _list_keywords
-    for index in range(len(_input))
-)
-
 if isinstance(_result, TreeNode):
     _result = tree_to_array(_result)
 elif isinstance(_result, ListNode):
     _result = list_to_array(_result)
-elif _result is None and (_had_tree_input or _had_list_input):
+elif _result is None and _expects_sequence:
     _result = []
 
 _result
