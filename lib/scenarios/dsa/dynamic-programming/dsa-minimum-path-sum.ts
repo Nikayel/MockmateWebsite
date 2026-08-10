@@ -83,5 +83,20 @@ Note: You can only move either down or right at any point in time.`,
       expected: 3,
       description: "2x2 grid",
     },
+    // In every grid above the cheapest route ran along an edge (across the top then down
+    // the right side, or down the left then across the bottom), so a solution that only
+    // priced those two paths passed. Here the cheap cells form a staircase through the
+    // middle and both edge routes are far more expensive.
+    {
+      input: {
+        grid: [
+          [1, 9, 9],
+          [1, 1, 9],
+          [9, 1, 1],
+        ],
+      },
+      expected: 5,
+      description: "Cheapest route staircases through the middle, not along an edge",
+    },
   ],
 }
