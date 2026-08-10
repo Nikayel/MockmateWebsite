@@ -41,6 +41,13 @@ export const sortListScenario: DSAScenario = {
     },
     { input: { values: [] }, expected: [], description: "Empty list" },
     { input: { values: [1] }, expected: [1], description: "Single node" },
+    // Every list above has distinct values, so a solution that sorted a SET of the values
+    // passed. Sorting must keep duplicates, and this case is what says so.
+    {
+      input: { values: [3, 1, 3, 2] },
+      expected: [1, 2, 3, 3],
+      description: "Duplicate values must survive the sort",
+    },
   ],
 
   // Proactive AI Interviewer Fields
