@@ -223,6 +223,17 @@ impl LRUCache {
       expected: [null, null, null, null, -1],
       description: "Edge: LRU eviction (key 1 evicted)",
     },
+    // Only `get` was ever tested as a recency signal: the overwrite case never filled the
+    // cache, so nothing was evicted and a solution where `put` on an existing key failed to
+    // mark it recently used still passed. Here the overwrite of key 1 is what saves it.
+    {
+      input: {
+        operations: ["LRUCache", "put", "put", "put", "put", "get", "get"],
+        values: [[2], [1, 1], [2, 2], [1, 10], [3, 3], [2], [1]],
+      },
+      expected: [null, null, null, null, null, -1, 10],
+      description: "Edge: overwriting a key refreshes it, so key 2 is evicted instead",
+    },
     {
       input: {
         operations: ["LRUCache", "put", "put", "get", "put", "get"],
