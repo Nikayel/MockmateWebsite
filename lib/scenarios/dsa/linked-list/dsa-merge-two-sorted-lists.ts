@@ -12,18 +12,14 @@ export const mergeTwoSortedListsScenario: DSAScenario = {
   estimatedTime: 20,
   problemStatement: `You are given the heads of two sorted linked lists list1 and list2. Merge the two lists into one sorted list. The list should be made by splicing together the nodes of the first two lists. Return the head of the merged linked list.
 
-Example visualization:
+Example:
 
-  list1:  1 → 2 → 4
-  list2:  1 → 3 → 4
+\`\`\`
+list1:  1 → 2 → 4
+list2:  1 → 3 → 4
 
-  Merge process:
-  dummy → 1 → 1 → 2 → 3 → 4 → 4
-          ↑       ↑       ↑
-        from    from    from
-        list2   list1   both
-
-  Result: 1 → 1 → 2 → 3 → 4 → 4`,
+Result: 1 → 1 → 2 → 3 → 4 → 4
+\`\`\``,
   examples: [
     {
       input: "list1 = [1,2,4], list2 = [1,3,4]",
