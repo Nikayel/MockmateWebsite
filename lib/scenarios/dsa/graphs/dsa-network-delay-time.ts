@@ -39,5 +39,21 @@ export const networkDelayTimeScenario: DSAScenario = {
       description: "All reachable",
     },
     { input: { times: [[1, 2, 1]], n: 2, k: 2 }, expected: -1, description: "Unreachable" },
+    // Every edge above weighs 1 and no node has two routes into it, so a BFS that counted
+    // hops and ignored the weights passed, as did a DFS that kept the first route it found
+    // without relaxing. Here the two-hop route into node 3 is cheaper than the direct one.
+    {
+      input: {
+        times: [
+          [1, 2, 1],
+          [1, 3, 4],
+          [2, 3, 1],
+        ],
+        n: 3,
+        k: 1,
+      },
+      expected: 2,
+      description: "Cheaper two-hop route must beat the direct edge",
+    },
   ],
 }
