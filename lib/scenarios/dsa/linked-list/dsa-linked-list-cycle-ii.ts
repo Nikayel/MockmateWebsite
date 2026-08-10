@@ -64,6 +64,13 @@ Follow up: Can you solve it using O(1) memory?`,
     { input: { values: [1, 2], pos: 0 }, expected: 0, description: "Cycle at head" },
     { input: { values: [1], pos: -1 }, expected: null, description: "No cycle" },
     { input: { values: [1, 2, 3, 4, 5], pos: 2 }, expected: 2, description: "Cycle at middle" },
+    // All values above are distinct, so tracking VISITED VALUES rather than visited nodes
+    // looked correct. Here the repeated 1 would be reported as a cycle starting at index 0.
+    {
+      input: { values: [1, 2, 1], pos: -1 },
+      expected: null,
+      description: "Repeated value without a cycle",
+    },
   ],
 
   // Proactive AI Interviewer Fields
