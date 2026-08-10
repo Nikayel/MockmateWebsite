@@ -52,5 +52,23 @@ export const redundantConnectionScenario: DSAScenario = {
       expected: [1, 4],
       description: "Square with tail",
     },
+    // In both cases above the cycle-closing edge also happened to touch the highest-degree
+    // nodes, so "return the edge whose endpoints have the most connections" passed. Here
+    // the hub (node 1) sits outside the cycle, so that heuristic picks [1, 5] instead.
+    {
+      input: {
+        edges: [
+          [1, 2],
+          [1, 3],
+          [1, 4],
+          [1, 5],
+          [5, 6],
+          [6, 7],
+          [5, 7],
+        ],
+      },
+      expected: [5, 7],
+      description: "Cycle sits away from the highest-degree node",
+    },
   ],
 }
