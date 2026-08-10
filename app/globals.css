@@ -34,6 +34,12 @@
   --faint: #a8a39a;
   --neural: #1d9e75;
   /* Success green */
+  /* Green dark enough to be TEXT on a light surface, mirroring --accent-strong.
+     --neural itself measures 3.19:1 on the page and 3.39:1 on a card, so
+     `text-neural` fails WCAG AA (4.5:1) everywhere in light mode. This shade
+     clears it at 4.99 / 5.30 while still reading as the same success green.
+     Use it for green TEXT; --neural stays the fill/indicator value. */
+  --neural-strong: #157a5a;
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: #ffffff;
   --border: #e6e2d8;
@@ -120,6 +126,10 @@
   --faint: #8a8780;
   --neural: #4cc79b;
   /* Success green */
+  /* Dark mode's success green is already legible as text (8.5:1 on the
+     background), so the strong variant collapses onto it, exactly as
+     --accent-strong does. */
+  --neural-strong: #4cc79b;
   --destructive: oklch(0.62 0.16 15);
   /* Calmer Error #d96666 */
   --destructive-foreground: #ece9e1;
@@ -445,6 +455,8 @@
   /* Enables `text-accent-strong` — accent-coloured text that passes AA in both themes. */
   --color-accent-strong: var(--accent-strong);
   --color-neural: var(--neural);
+  /* Enables `text-neural-strong` — success-green text that passes AA in both themes. */
+  --color-neural-strong: var(--neural-strong);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
