@@ -38,5 +38,15 @@ An Anagram is a word or phrase formed by rearranging the letters of a different 
     { input: { s: "rat", t: "car" }, expected: false, description: "Not anagram" },
     { input: { s: "a", t: "a" }, expected: true, description: "Single char" },
     { input: { s: "ab", t: "a" }, expected: false, description: "Different lengths" },
+    // Every false case above differed in its set of letters or its length, so comparing
+    // character SETS passed. Anagrams need matching counts, not matching letters.
+    {
+      input: { s: "aab", t: "abb" },
+      expected: false,
+      description: "Same letters, different counts",
+    },
+    // And every pair differed in the sum of its character codes, so adding up ord() values
+    // passed too. Here both strings sum to 197.
+    { input: { s: "ad", t: "bc" }, expected: false, description: "Equal character-code sums" },
   ],
 }
