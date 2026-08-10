@@ -205,11 +205,16 @@ _had_tree_input = any(
     for index in range(len(_input))
 )
 
+_had_list_input = any(
+    isinstance(_input[index], list) and (_input_keys[index] if index < len(_input_keys) else "").lower() in _list_keywords
+    for index in range(len(_input))
+)
+
 if isinstance(_result, TreeNode):
     _result = tree_to_array(_result)
 elif isinstance(_result, ListNode):
     _result = list_to_array(_result)
-elif _result is None and _had_tree_input:
+elif _result is None and (_had_tree_input or _had_list_input):
     _result = []
 
 _result
