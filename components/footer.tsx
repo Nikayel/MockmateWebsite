@@ -1,5 +1,6 @@
-import { Github, Twitter, Mail } from "lucide-react"
+import { Mail } from "lucide-react"
 import Link from "next/link"
+import { APP_CONFIG } from "@/lib/config"
 import { Logo } from "@/components/Logo"
 import { LEARN_COURSE_LABEL, LEARN_HUB_PATH, trackPath } from "@/lib/tutorials/lesson-routes"
 import type { CourseId } from "@/lib/tutorials/types"
@@ -87,10 +88,24 @@ export function Footer() {
               next software engineering interview with realistic coding, system design, and bug-fix
               simulations.
             </p>
+            {/* These were three bare <svg>s carrying cursor-pointer and a hover
+                colour change: they looked and felt clickable, had no link, no
+                handler, and no accessible name, so nothing happened when you
+                clicked and a screen reader never saw them at all.
+
+                Only one of the three had a real destination. APP_CONFIG.githubUrl
+                (github.com/nikayel/codesparring) returns 404 and there is no
+                CodeSparring Twitter account, so linking those would just be a
+                working link to nothing. They are removed rather than faked; add
+                them back here when the accounts exist. */}
             <div className="flex space-x-4">
-              <Github className="text-muted-foreground hover:text-foreground h-5 w-5 cursor-pointer transition-colors" />
-              <Twitter className="text-muted-foreground hover:text-foreground h-5 w-5 cursor-pointer transition-colors" />
-              <Mail className="text-muted-foreground hover:text-foreground h-5 w-5 cursor-pointer transition-colors" />
+              <a
+                href={`mailto:${APP_CONFIG.supportEmail}`}
+                aria-label={`Email support at ${APP_CONFIG.supportEmail}`}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Mail aria-hidden className="h-5 w-5" />
+              </a>
             </div>
           </div>
 
