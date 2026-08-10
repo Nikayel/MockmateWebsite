@@ -269,15 +269,21 @@ export function Footer() {
                 </li>
                 <li>
                   <a
-                    href="mailto:support@codesparring.dev"
+                    href={`mailto:${APP_CONFIG.supportEmail}`}
                     className="text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Contact Support
                   </a>
                 </li>
                 <li>
+                  {/* Was https://github.com/nikayel/codesparring/issues, which
+                      404s: the repo at APP_CONFIG.githubUrl does not exist. A
+                      public "Report Issues" link that lands on a GitHub 404
+                      loses the report and reads as an abandoned project, so it
+                      goes to the address that is actually monitored until there
+                      is a real issue tracker to point at. */}
                   <a
-                    href="https://github.com/nikayel/codesparring/issues"
+                    href={`mailto:${APP_CONFIG.supportEmail}?subject=Bug%20report`}
                     className="text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Report Issues
