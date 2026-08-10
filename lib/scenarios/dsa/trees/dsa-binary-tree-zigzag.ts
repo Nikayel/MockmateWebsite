@@ -51,5 +51,13 @@ Example visualization:
     },
     { input: { root: [1] }, expected: [[1]], description: "Single node" },
     { input: { root: [] }, expected: [], description: "Empty tree" },
+    // The standard tree has only one node with children on its second level, so reversing
+    // the order children are ENQUEUED looks the same as reversing the level's values. On a
+    // full three-level tree the two come apart: that approach yields [6,7,4,5] here.
+    {
+      input: { root: [1, 2, 3, 4, 5, 6, 7] },
+      expected: [[1], [3, 2], [4, 5, 6, 7]],
+      description: "Full tree: reversing child order is not the same as reversing the level",
+    },
   ],
 }
