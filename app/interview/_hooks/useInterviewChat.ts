@@ -15,6 +15,8 @@ import {
   snapshotChatCode,
   type ChatCodeSnapshot,
 } from "@/lib/interview/code-change-note"
+import { buildTimeContextNote } from "@/lib/interview/time-context-note"
+import { computeElapsedSeconds } from "./useInterviewTimer"
 import { getGuidedChatState } from "@/lib/stores/guided-lab-store"
 import type { Scenario } from "@/lib/scenarios"
 import type { BugfixEvidenceEvent } from "@/lib/bugfix"
@@ -62,6 +64,8 @@ export interface UseInterviewChatOptions {
   experienceLevel: string
   showPostInterviewDiscussion: boolean
   targetCompany: string | null
+  /** Epoch ms when the interview clock started (useInterviewTimer), or null before it starts. */
+  interviewStartTime: number | null
 
   // ---- state setters (page owns the state) ----
   setChatInput: Dispatch<SetStateAction<string>>
@@ -272,6 +276,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
     experienceLevel,
     showPostInterviewDiscussion,
     targetCompany,
+    interviewStartTime,
     setChatInput,
     setInterviewerInput,
     setChatMessages,
@@ -429,6 +434,15 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           additionalContext += buildCodeChangeNote(
             lastSentCodeRef.current.lanes[lane],
             codeSnapshot
+          )
+        }
+
+        // Interviewer sends also carry the elapsed-time note (same carrier as the
+        // code note) so the model can follow its PACING rule.
+        if (isInterviewer && interviewStartTime != null) {
+          additionalContext += buildTimeContextNote(
+            computeElapsedSeconds(interviewStartTime, Date.now()),
+            selectedScenario?.estimatedTime
           )
         }
 

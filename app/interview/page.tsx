@@ -1595,6 +1595,7 @@ function InterviewPageContent() {
     experienceLevel,
     showPostInterviewDiscussion,
     targetCompany,
+    interviewStartTime: startTime,
     setChatInput,
     setInterviewerInput,
     setChatMessages,
