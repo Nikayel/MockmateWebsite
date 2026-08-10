@@ -48,5 +48,17 @@ Implement the StockSpanner class:
       expected: [null, 1, 1, 1, 2],
       description: "Basic operations",
     },
+    // The sequence above never needs more than one price popped at a time, and never
+    // repeats a price, so a solution that collapsed only the single previous span and one
+    // that compared with a strict less-than both passed. Here 75 absorbs two earlier spans
+    // at once, 85 absorbs two more, and the repeated 85 must still count the day it ties.
+    {
+      input: {
+        ops: ["StockSpanner", "next", "next", "next", "next", "next", "next", "next", "next"],
+        args: [[], [100], [80], [60], [70], [60], [75], [85], [85]],
+      },
+      expected: [null, 1, 1, 1, 2, 1, 4, 6, 7],
+      description: "Several spans collapse at once, and an equal price still counts",
+    },
   ],
 }
