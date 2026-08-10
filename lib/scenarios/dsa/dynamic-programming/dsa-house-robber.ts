@@ -68,5 +68,20 @@ export const houseRobberScenario: DSAScenario = {
       expected: 12,
       description: "Rob even indexed houses: 2 + 4 + 6 = 12",
     },
+    // In every case above the best plan was one of the two alternating sets, so
+    // max(sum of even indices, sum of odd indices) passed. Here the answer skips two
+    // houses in a row, which neither alternating set can do.
+    {
+      input: { nums: [2, 1, 1, 2] },
+      expected: 4,
+      description: "Best plan skips two houses in a row, so alternating sets fall short",
+    },
+    // And in every case above, repeatedly taking the largest remaining house happened to
+    // be optimal. Here taking the 4 blocks both 3s, which together are worth more.
+    {
+      input: { nums: [3, 4, 3] },
+      expected: 6,
+      description: "Taking the largest house first loses to its two neighbours",
+    },
   ],
 }
