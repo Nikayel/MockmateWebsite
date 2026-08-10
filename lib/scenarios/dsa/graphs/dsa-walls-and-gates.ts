@@ -18,20 +18,22 @@ export const wallsAndGatesScenario: DSAScenario = {
 
 Fill each empty room with the distance to its nearest gate. If impossible, leave as INF.
 
-Example visualization:
+Example:
 
-  Input:                    Output:
-  ┌────┬────┬────┬────┐     ┌────┬────┬────┬────┐
-  │ INF│ -1 │  0 │ INF│     │  3 │ -1 │  0 │  1 │
-  ├────┼────┼────┼────┤     ├────┼────┼────┼────┤
-  │ INF│ INF│ INF│ -1 │  →  │  2 │  2 │  1 │ -1 │
-  ├────┼────┼────┼────┤     ├────┼────┼────┼────┤
-  │ INF│ -1 │ INF│ -1 │     │  1 │ -1 │  2 │ -1 │
-  ├────┼────┼────┼────┤     ├────┼────┼────┼────┤
-  │  0 │ -1 │ INF│ INF│     │  0 │ -1 │  3 │  4 │
-  └────┴────┴────┴────┘     └────┴────┴────┴────┘
+\`\`\`
+Input                      Output
+┌────┬────┬────┬────┐      ┌────┬────┬────┬────┐
+│ INF│ -1 │  0 │ INF│      │  3 │ -1 │  0 │  1 │
+├────┼────┼────┼────┤      ├────┼────┼────┼────┤
+│ INF│ INF│ INF│ -1 │      │  2 │  2 │  1 │ -1 │
+├────┼────┼────┼────┤      ├────┼────┼────┼────┤
+│ INF│ -1 │ INF│ -1 │      │  1 │ -1 │  2 │ -1 │
+├────┼────┼────┼────┤      ├────┼────┼────┼────┤
+│  0 │ -1 │ INF│ INF│      │  0 │ -1 │  3 │  4 │
+└────┴────┴────┴────┘      └────┴────┴────┴────┘
+\`\`\`
 
-  Use multi-source BFS from all gates simultaneously`,
+Each room holds its distance to the closest gate, counted through empty rooms only.`,
   examples: [
     {
       input:
