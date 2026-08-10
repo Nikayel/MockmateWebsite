@@ -5,6 +5,12 @@ import { motion, useInView, useSpring, useTransform } from "framer-motion"
 import { Check, X, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { getProPricing } from "@/lib/config"
+import {
+  COMPETITOR_PRICING,
+  MOCKS_FOR_IMPACT,
+  getHumanMockCostBasis,
+  getHumanMockTotalCost,
+} from "@/lib/pricing-comparison"
 
 /**
  * Comparison Section - Professional Redesign
@@ -115,6 +121,7 @@ export function ComparisonSection() {
   const sectionRef = useRef(null)
   const isInView = useInView(sectionRef, { once: true, amount: 0.1 })
   const proMonthly = getProPricing("website").monthly
+  const humanMockCost = getHumanMockTotalCost()
 
   // "Available 24/7, no scheduling" and "Practice anytime, 24/7" were two rows
   // making the identical claim with identical values, which pads a six-row
@@ -175,8 +182,7 @@ export function ComparisonSection() {
                 color: "#cccccc",
               }}
             >
-              5+ mock interviews significantly improve pass rates. Here&apos;s what that investment
-              looks like.
+              {`${MOCKS_FOR_IMPACT}+ mock interviews significantly improve pass rates. Here's what that investment looks like.`}
             </p>
           </motion.div>
 
@@ -200,7 +206,7 @@ export function ComparisonSection() {
                     color: "#7a7a7a",
                   }}
                 >
-                  Human Mock Interviews
+                  {COMPETITOR_PRICING.humanMock.fullName}
                 </span>
                 <p
                   style={{
@@ -211,13 +217,13 @@ export function ComparisonSection() {
                     marginTop: "2px",
                   }}
                 >
-                  Interviewing.io, Pramp Pro, etc.
+                  {COMPETITOR_PRICING.humanMock.examples}
                 </p>
               </div>
 
               <div className="flex items-baseline gap-2">
                 <AnimatedPrice
-                  value={750}
+                  value={humanMockCost.min}
                   delay={300}
                   className="font-light"
                   style={{
@@ -229,7 +235,7 @@ export function ComparisonSection() {
                 />
                 <span style={{ fontFamily: fontBody, color: "#7a7a7a" }}>–</span>
                 <AnimatedPrice
-                  value={1125}
+                  value={humanMockCost.max}
                   delay={500}
                   className="font-light"
                   style={{
@@ -250,7 +256,7 @@ export function ComparisonSection() {
                   letterSpacing: "-0.12px",
                 }}
               >
-                $150–225 per session × 5 sessions
+                {getHumanMockCostBasis()}
               </p>
 
               <div className="mt-5 space-y-2 pt-5" style={{ borderTop: "1px solid #e0e0e0" }}>
@@ -404,10 +410,10 @@ export function ComparisonSection() {
                   className="block"
                   style={{ fontFamily: fontBody, fontSize: "12px", color: "#7a7a7a" }}
                 >
-                  LeetCode
+                  {COMPETITOR_PRICING.leetcodePremium.name}
                 </span>
                 <span style={{ fontFamily: fontBody, fontSize: "11px", color: "#7a7a7a" }}>
-                  $35/mo
+                  {`$${COMPETITOR_PRICING.leetcodePremium.monthlyPrice}/mo`}
                 </span>
               </div>
               <div className="text-center">
@@ -415,10 +421,10 @@ export function ComparisonSection() {
                   className="block"
                   style={{ fontFamily: fontBody, fontSize: "12px", color: "#7a7a7a" }}
                 >
-                  Human
+                  {COMPETITOR_PRICING.humanMock.name}
                 </span>
                 <span style={{ fontFamily: fontBody, fontSize: "11px", color: "#7a7a7a" }}>
-                  $150+
+                  {`$${COMPETITOR_PRICING.humanMock.perSessionMin}+`}
                 </span>
               </div>
               <div className="text-center">
