@@ -80,5 +80,12 @@ Note that:
       expected: 6,
       description: "Division expression",
     },
+    // Both divisions above are between positives, where truncating toward zero and flooring
+    // agree. They part company on a negative result: 7 / -3 truncates to -2, floors to -3.
+    {
+      input: { tokens: ["7", "-3", "/"] },
+      expected: -2,
+      description: "Negative division truncates toward zero",
+    },
   ],
 }
