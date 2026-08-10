@@ -54,6 +54,14 @@ A palindromic string reads the same backward as forward.`,
       expected: "bb",
       description: "Even length palindrome",
     },
+    // A popular wrong approach takes the longest substring that also appears in the reversed
+    // string, which is not always a palindrome. Every case above happened to agree with it.
+    // Here it returns "aaca", which reads the same in reverse only by coincidence.
+    {
+      input: { s: "aacabdkacaa" },
+      expected: "aca",
+      description: "Longest shared substring with the reverse is not a palindrome",
+    },
     {
       input: { s: "a" },
       expected: "a",
