@@ -67,5 +67,31 @@ export const graphValidTreeScenario: DSAScenario = {
       expected: false,
       description: "Has cycle",
     },
+    // A tree needs BOTH properties: acyclic and connected. The two cases above are decided
+    // by the cycle alone, so a cycle-check-only solution and an edge-count-only solution
+    // each passed. These split the two properties apart.
+    {
+      input: {
+        n: 4,
+        edges: [
+          [0, 1],
+          [2, 3],
+        ],
+      },
+      expected: false,
+      description: "Acyclic but disconnected: a forest is not a tree",
+    },
+    {
+      input: {
+        n: 4,
+        edges: [
+          [0, 1],
+          [1, 2],
+          [0, 2],
+        ],
+      },
+      expected: false,
+      description: "Exactly n-1 edges, but a cycle plus an isolated node",
+    },
   ],
 }
