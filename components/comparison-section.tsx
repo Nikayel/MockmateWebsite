@@ -84,6 +84,7 @@ function CostCard({
   highlighted = false,
   delay,
   isInView,
+  prefersReducedMotion,
   children,
 }: {
   label: string
@@ -93,6 +94,7 @@ function CostCard({
   highlighted?: boolean
   delay: number
   isInView: boolean
+  prefersReducedMotion: boolean
   children: React.ReactNode
 }) {
   return (
@@ -101,7 +103,7 @@ function CostCard({
         "bg-card rounded-[18px] p-6",
         highlighted ? "border-accent border-2" : "border-border border"
       )}
-      initial={{ opacity: 0, y: 16 }}
+      initial={prefersReducedMotion ? false : { opacity: 0, y: 16 }}
       animate={isInView ? { opacity: 1, y: 0 } : {}}
       transition={{ delay, duration: 0.5 }}
     >
@@ -168,6 +170,7 @@ function FeatureRow({
 }) {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, amount: 0.5 })
+  const prefersReducedMotion = useReducedMotion()
 
   /**
    * Every cell used to be a bare icon with no text alternative, and the "no"
@@ -209,7 +212,7 @@ function FeatureRow({
     <motion.tr
       ref={ref}
       className="border-border border-b last:border-0"
-      initial={{ opacity: 0 }}
+      initial={prefersReducedMotion ? false : { opacity: 0 }}
       animate={isInView ? { opacity: 1 } : {}}
       transition={{ delay: index * 0.05, duration: 0.3 }}
     >
@@ -245,6 +248,7 @@ const COLUMNS = [
 export function ComparisonSection() {
   const sectionRef = useRef(null)
   const isInView = useInView(sectionRef, { once: true, amount: 0.1 })
+  const prefersReducedMotion = useReducedMotion()
   const proMonthly = getProPricing("website").monthly
   const humanMockCost = getHumanMockTotalCost()
 
@@ -285,7 +289,7 @@ export function ComparisonSection() {
           {/* Header */}
           <motion.div
             className="mb-12 text-center"
-            initial={{ opacity: 0, y: 16 }}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 16 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.5 }}
           >
@@ -309,6 +313,7 @@ export function ComparisonSection() {
               ]}
               delay={0.1}
               isInView={isInView}
+              prefersReducedMotion={Boolean(prefersReducedMotion)}
             >
               <AnimatedPrice value={humanMockCost.min} delay={300} />
               <span className="text-muted-foreground">-</span>
@@ -326,6 +331,7 @@ export function ComparisonSection() {
               highlighted
               delay={0.2}
               isInView={isInView}
+              prefersReducedMotion={Boolean(prefersReducedMotion)}
             >
               <AnimatedPrice value={proMonthly.price} delay={700} />
               <span className="text-muted-foreground text-lg">/month</span>
@@ -335,7 +341,7 @@ export function ComparisonSection() {
           {/* Value statement */}
           <motion.p
             className="font-heading text-foreground mb-10 text-center text-xl font-semibold"
-            initial={{ opacity: 0 }}
+            initial={prefersReducedMotion ? false : { opacity: 0 }}
             animate={isInView ? { opacity: 1 } : {}}
             transition={{ delay: 0.4, duration: 0.5 }}
           >
@@ -348,7 +354,7 @@ export function ComparisonSection() {
               real table that scrolls horizontally instead of crushing. */}
           <motion.div
             className="border-border bg-card mb-10 rounded-[18px] border p-4 sm:p-6"
-            initial={{ opacity: 0, y: 16 }}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 16 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ delay: 0.3, duration: 0.5 }}
           >
@@ -407,7 +413,7 @@ export function ComparisonSection() {
               #ffffff on #c4703f = 3.66:1, failing AA at 17px. */}
           <motion.div
             className="text-center"
-            initial={{ opacity: 0 }}
+            initial={prefersReducedMotion ? false : { opacity: 0 }}
             animate={isInView ? { opacity: 1 } : {}}
             transition={{ delay: 0.5, duration: 0.5 }}
           >
