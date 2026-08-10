@@ -84,6 +84,14 @@ Example visualization:
       expected: true,
       description: "Empty tree is balanced",
     },
+    // Every unbalanced case above is unbalanced AT THE ROOT, so comparing just the root's
+    // two subtree heights passed. Here the root's subtrees differ by one, which looks fine,
+    // while node 2 is where the imbalance actually lives.
+    {
+      input: { root: [1, 2, 3, 4, null, 7, null, 6] },
+      expected: false,
+      description: "Root looks balanced; the imbalance is deeper in the left subtree",
+    },
   ],
 
   // Proactive AI Interviewer Fields
