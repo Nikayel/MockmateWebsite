@@ -44,5 +44,15 @@ Return true if there is a 132 pattern in nums, otherwise, return false.`,
     { input: { nums: [1, 2, 3, 4] }, expected: false, description: "Strictly increasing" },
     { input: { nums: [3, 1, 4, 2] }, expected: true, description: "Has 132 pattern" },
     { input: { nums: [-1, 3, 2, 0] }, expected: true, description: "Multiple patterns" },
+    // In both true cases the three elements sat next to each other, so scanning consecutive
+    // triples found them. Here the pattern is 1 (index 0), 4 (index 1), 3 (index 3).
+    {
+      input: { nums: [1, 4, 0, 3] },
+      expected: true,
+      description: "Pattern spans non-adjacent indices",
+    },
+    // And every false case was strictly increasing, so "does the array ever go down" passed.
+    // A decreasing array goes down constantly and still has no 132 pattern.
+    { input: { nums: [3, 2, 1] }, expected: false, description: "Decreasing, so still no pattern" },
   ],
 }
