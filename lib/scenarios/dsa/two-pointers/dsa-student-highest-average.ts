@@ -122,6 +122,21 @@ public:
       expected: "A",
       description: "A's average 90 equals B's single score",
     },
+    // In every case above the winner was also the first name in the list, the one with the
+    // highest TOTAL, and the one holding the single highest score, so all three shortcuts
+    // agreed with the real answer. Here P posts the top score of 100 and the larger total,
+    // but a 0 drags P's average to 50, so Q wins on 60.
+    {
+      input: {
+        records: [
+          ["P", 100],
+          ["P", 0],
+          ["Q", 60],
+        ],
+      },
+      expected: "Q",
+      description: "Top single score and top total both belong to the loser",
+    },
   ],
   fuzzyStatement: "Given a list of student scores, find who has the highest average.",
   clarifyingQuestions: [
