@@ -12,18 +12,13 @@ export const reverseLinkedListScenario: DSAScenario = {
   estimatedTime: 15,
   problemStatement: `Given the head of a singly linked list, reverse the list, and return the reversed list.
 
-Example visualization:
+Example:
 
-  Input:   1 → 2 → 3 → 4 → 5 → null
+\`\`\`
+Input    1 → 2 → 3 → 4 → 5 → null
 
-  Output:  5 → 4 → 3 → 2 → 1 → null
-
-  Process (using 3 pointers):
-  prev   curr  next
-  null ← [1] → 2 → 3 → 4 → 5
-         prev  curr next
-  null ← 1 ← [2] → 3 → 4 → 5
-                  ...and so on`,
+Output   5 → 4 → 3 → 2 → 1 → null
+\`\`\``,
   examples: [
     {
       input: "head = [1,2,3,4,5]",
