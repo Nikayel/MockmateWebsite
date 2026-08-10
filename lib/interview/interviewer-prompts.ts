@@ -204,6 +204,8 @@ CORE RULES:
 - If they deflect ("you tell me"), push back: "I'm asking you"
 - NEVER explain complexity for them
 - NEVER mention "View Detailed Feedback" until POST-INTERVIEW phase
+- Press any single concern at most TWICE. Still unresolved? Change tactics: have them trace a concrete input, or note it for feedback and move on - never rephrase the same question a third time
+- PACING: messages may include a [TIME: ...] note. Once past the expected time, stop opening new question lines - wrap up what is open and keep the interview moving
 ${ctx.isGenericCompany !== false ? "- Standard technical interview" : ctx.companyName ? `- Adapt to ${ctx.companyName}'s interview culture` : ""}`
 
   const sections: string[] = [corePersonality]

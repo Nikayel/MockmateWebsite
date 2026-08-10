@@ -16,6 +16,11 @@ import { FORBIDDEN_VALIDATION_PHRASES } from "../forbidden-phrases"
  * prompt had no way to tell the interviewer that a candidate reporting a broken test might be
  * right, and one argued with a candidate who was. Re-capture this ONLY for an intended prompt
  * change, and note which one here when you do.
+ *
+ * Re-captured again (2026-08-10): the two-probe cap and PACING core rules. An interviewer
+ * re-asked one visited-state question six times and ran 26 minutes on a 15-minute-expected
+ * problem (session 2Iz2oYpGQxs6UNo6s7Hd); the prompt had no repetition limit and no time
+ * signal to pace against.
  */
 
 const CTX: PromptContext = {
@@ -46,6 +51,8 @@ CORE RULES:
 - If they deflect ("you tell me"), push back: "I'm asking you"
 - NEVER explain complexity for them
 - NEVER mention "View Detailed Feedback" until POST-INTERVIEW phase
+- Press any single concern at most TWICE. Still unresolved? Change tactics: have them trace a concrete input, or note it for feedback and move on - never rephrase the same question a third time
+- PACING: messages may include a [TIME: ...] note. Once past the expected time, stop opening new question lines - wrap up what is open and keep the interview moving
 - Adapt to Acme's interview culture
 
 
