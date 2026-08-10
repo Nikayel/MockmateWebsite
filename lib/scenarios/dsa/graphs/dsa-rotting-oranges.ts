@@ -13,19 +13,20 @@ export const rottingOrangesScenario: DSAScenario = {
   estimatedTime: 25,
   problemStatement: `You are given an m x n grid where 0 is an empty cell, 1 is a fresh orange, and 2 is a rotten orange. Every minute, any fresh orange adjacent (4-directionally) to a rotten orange becomes rotten. Return the minimum number of minutes that must elapse until no cell has a fresh orange. If impossible, return -1.
 
-Example visualization:
+Example, minute by minute:
 
-  t=0          t=1          t=2          t=3          t=4
- ┌───┬───┬───┐ ┌───┬───┬───┐ ┌───┬───┬───┐ ┌───┬───┬───┐ ┌───┬───┬───┐
- │ 2 │ 1 │ 1 │ │ 2 │ 2 │ 1 │ │ 2 │ 2 │ 2 │ │ 2 │ 2 │ 2 │ │ 2 │ 2 │ 2 │
- ├───┼───┼───┤ ├───┼───┼───┤ ├───┼───┼───┤ ├───┼───┼───┤ ├───┼───┼───┤
- │ 1 │ 1 │ 0 │ │ 2 │ 1 │ 0 │ │ 2 │ 2 │ 0 │ │ 2 │ 2 │ 0 │ │ 2 │ 2 │ 0 │
- ├───┼───┼───┤ ├───┼───┼───┤ ├───┼───┼───┤ ├───┼───┼───┤ ├───┼───┼───┤
- │ 0 │ 1 │ 1 │ │ 0 │ 1 │ 1 │ │ 0 │ 2 │ 1 │ │ 0 │ 2 │ 2 │ │ 0 │ 2 │ 2 │
- └───┴───┴───┘ └───┴───┴───┘ └───┴───┴───┘ └───┴───┴───┘ └───┴───┴───┘
+\`\`\`
+ t=0          t=1          t=2          t=3          t=4
+┌───┬───┬───┐┌───┬───┬───┐┌───┬───┬───┐┌───┬───┬───┐┌───┬───┬───┐
+│ 2 │ 1 │ 1 ││ 2 │ 2 │ 1 ││ 2 │ 2 │ 2 ││ 2 │ 2 │ 2 ││ 2 │ 2 │ 2 │
+├───┼───┼───┤├───┼───┼───┤├───┼───┼───┤├───┼───┼───┤├───┼───┼───┤
+│ 1 │ 1 │ 0 ││ 2 │ 1 │ 0 ││ 2 │ 2 │ 0 ││ 2 │ 2 │ 0 ││ 2 │ 2 │ 0 │
+├───┼───┼───┤├───┼───┼───┤├───┼───┼───┤├───┼───┼───┤├───┼───┼───┤
+│ 0 │ 1 │ 1 ││ 0 │ 1 │ 1 ││ 0 │ 2 │ 1 ││ 0 │ 2 │ 2 ││ 0 │ 2 │ 2 │
+└───┴───┴───┘└───┴───┴───┘└───┴───┴───┘└───┴───┴───┘└───┴───┴───┘
+\`\`\`
 
-  0=empty, 1=fresh 🍊, 2=rotten 🟤
-  Answer: 4 minutes`,
+The last fresh orange turns at t = 4, so the answer is 4.`,
   examples: [
     { input: "grid = [[2,1,1],[1,1,0],[0,1,1]]", output: "4" },
     {
