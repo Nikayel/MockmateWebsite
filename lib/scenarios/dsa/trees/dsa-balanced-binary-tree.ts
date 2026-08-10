@@ -14,16 +14,18 @@ export const balancedBinaryTreeScenario: DSAScenario = {
 
 A height-balanced binary tree is a binary tree in which the depth of the two subtrees of every node never differs by more than one.
 
-Example visualization:
+Example:
 
-  Balanced (TRUE):        Not Balanced (FALSE):
-        3                       1
-       / \\                     / \\
-      9  20                   2   2
-         / \\                 / \\
-        15  7               3   3     ← height diff = 1
-                           / \\
-                          4   4       ← height diff = 2 at node 1`,
+\`\`\`
+Balanced (true)        Not balanced (false)
+      3                        1
+     / \\                      / \\
+    9  20                     2   2
+       / \\                   / \\
+      15  7                  3   3
+                            / \\
+                           4   4
+\`\`\``,
   examples: [
     {
       input: "root = [3,9,20,null,null,15,7]",
