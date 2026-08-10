@@ -48,5 +48,13 @@ Given rooms where rooms[i] is the set of keys in room i, return true if you can 
       expected: false,
       description: "Room 2 unreachable",
     },
+    // Both cases above are decided by walking the rooms in index order, so a solution that
+    // scanned 0, 1, 2, ... and assumed each room was already unlocked passed. Here room 1
+    // is only reachable via room 2, so index order visits it before holding its key.
+    {
+      input: { rooms: [[2, 3], [], [1], []] },
+      expected: true,
+      description: "Keys arrive out of index order",
+    },
   ],
 }
