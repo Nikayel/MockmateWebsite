@@ -54,6 +54,17 @@ describe("competitor comparison claims", () => {
     expect(getHumanMockCostMultiple()).toBe(Math.round(getHumanMockTotalCost().max / ours))
     expect(getHumanMockCostMultiple()).toBe(45)
   })
+
+  it("keeps the 'less than a single human mock session' claim true", () => {
+    // components/comparison-section.tsx renders "One month costs less than a
+    // single human mock session." as prose, 70px above a CTA, on both / and
+    // /pricing. It is an advertising claim with no code behind it, true only
+    // while Pro's monthly price stays under the CHEAPEST human session. This
+    // is the one assertion between a price rise and a false claim.
+    expect(PRICING_CONFIG.pro.website.monthly.price).toBeLessThan(
+      COMPETITOR_PRICING.humanMock.perSessionMin
+    )
+  })
 })
 
 describe("PRICING_CONFIG internal consistency", () => {
