@@ -53,5 +53,13 @@ Note: You may not engage in multiple transactions simultaneously (i.e., you must
     { input: { prices: [1, 2, 3, 0, 2] }, expected: 3, description: "With cooldown" },
     { input: { prices: [1] }, expected: 0, description: "Single day" },
     { input: { prices: [1, 2] }, expected: 1, description: "Simple profit" },
+    // In every case above the answer happened to equal max(prices) - min(prices), so that
+    // one-liner passed. It only works when the low comes first: here the high does, and no
+    // profitable trade exists at all.
+    {
+      input: { prices: [5, 1] },
+      expected: 0,
+      description: "Price only falls: the high comes before the low",
+    },
   ],
 }
