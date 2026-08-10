@@ -56,5 +56,22 @@ Return minimum number of moves to reach square n^2 starting from 1, or -1 if imp
       expected: 4,
       description: "With ladders",
     },
+    // The board above places its ladders where the row-reversal does not change which
+    // square a cell holds, so a solution that numbered the board left-to-right on every
+    // row (instead of boustrophedon) still passed. Here the only ladder sits on square 8,
+    // which the naive numbering reads as square 5: reachable one roll sooner, so that
+    // solution answers 1 instead of 2.
+    {
+      input: {
+        board: [
+          [-1, -1, -1, -1],
+          [-1, -1, -1, -1],
+          [16, -1, -1, -1],
+          [-1, -1, -1, -1],
+        ],
+      },
+      expected: 2,
+      description: "Ladder placement depends on the boustrophedon numbering",
+    },
   ],
 }
