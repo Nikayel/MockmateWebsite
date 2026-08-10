@@ -14,20 +14,19 @@ export const dsaLowestCommonAncestorBstScenario: DSAScenario = {
 
 According to the definition of LCA: "The lowest common ancestor is defined between two nodes p and q as the lowest node in T that has both p and q as descendants (where we allow a node to be a descendant of itself)."
 
-Example visualization:
+Example:
 
-            6        ← LCA(2,8) = 6 (split point)
-           / \\
-         [2]  [8]    p=2, q=8
-         / \\  / \\
-        0   4 7   9
-           / \\
-          3   5
+\`\`\`
+          6
+         / \\
+        2   8
+       / \\  / \\
+      0   4 7   9
+         / \\
+        3   5
+\`\`\`
 
-    BST property helps:
-    - Both p,q < node → go left
-    - Both p,q > node → go right
-    - Otherwise → current node is LCA`,
+The LCA of 2 and 8 is 6. The LCA of 2 and 4 is 2, because a node counts as a descendant of itself.`,
   examples: [
     {
       input: "root = [6,2,8,0,4,7,9,null,null,3,5], p = 2, q = 8",
