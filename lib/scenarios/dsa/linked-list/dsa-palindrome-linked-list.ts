@@ -12,20 +12,12 @@ export const palindromeLinkedListScenario: DSAScenario = {
   estimatedTime: 20,
   problemStatement: `Given the head of a singly linked list, return true if it is a palindrome or false otherwise.
 
-Example visualization:
+Example:
 
-  Input: 1 → 2 → 2 → 1
-
-  Step 1: Find middle (slow/fast pointers)
-          1 → 2 | 2 → 1
-
-  Step 2: Reverse second half
-          1 → 2   1 → 2
-
-  Step 3: Compare both halves
-          1 = 1 ✓   2 = 2 ✓
-
-  Output: true (is palindrome)`,
+\`\`\`
+1 → 2 → 2 → 1     reads the same in both directions, so true
+1 → 2             does not, so false
+\`\`\``,
   examples: [
     { input: "head = [1,2,2,1]", output: "true" },
     { input: "head = [1,2]", output: "false" },
