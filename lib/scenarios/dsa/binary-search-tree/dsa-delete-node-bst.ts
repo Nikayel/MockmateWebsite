@@ -16,19 +16,16 @@ Basically, the deletion can be divided into two stages:
 1. Search for a node to remove.
 2. If the node is found, delete the node.
 
-Example visualization (delete 3):
+Example, deleting the key 3:
 
-    Before:              After:
-        5                   5
-       / \\                 / \\
-     [3]  6      →        4   6
-     / \\                 /
-    2   4               2
-
-    Three cases:
-    1. Leaf node → just remove
-    2. One child → replace with child
-    3. Two children → replace with inorder successor`,
+\`\`\`
+Before                 After
+    5                    5
+   / \\                  / \\
+  3   6                 4   6
+ / \\                   /
+2   4                 2
+\`\`\``,
   examples: [
     {
       input: "root = [5,3,6,2,4,null,7], key = 3",
