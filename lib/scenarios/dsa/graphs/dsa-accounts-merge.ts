@@ -27,6 +27,9 @@ export const accountsMergeScenario: DSAScenario = {
     python: `def accountsMerge(accounts):\n    # Write your solution here\n    pass`,
   },
   optimalComplexity: { time: "O(n*k*α(n*k))", space: "O(n*k)" },
+  // The single original case merged two same-name accounts that also shared an email, so a
+  // solution that merged BY NAME (never looking at emails) passed it, as did one that only
+  // merged direct overlaps without transitive closure. Each added case kills one of those.
   testCases: [
     {
       input: {
@@ -41,6 +44,35 @@ export const accountsMergeScenario: DSAScenario = {
         ["Mary", "m@mail.com"],
       ],
       description: "Merge Johns",
+    },
+    {
+      input: {
+        accounts: [
+          ["John", "j1@mail.com"],
+          ["John", "j2@mail.com"],
+        ],
+      },
+      expected: [
+        ["John", "j1@mail.com"],
+        ["John", "j2@mail.com"],
+      ],
+      description: "Same name, no shared email: two different people stay separate",
+    },
+    {
+      input: {
+        accounts: [
+          ["Alex", "a@mail.com", "b@mail.com"],
+          ["Alex", "c@mail.com", "d@mail.com"],
+          ["Alex", "b@mail.com", "c@mail.com"],
+        ],
+      },
+      expected: [["Alex", "a@mail.com", "b@mail.com", "c@mail.com", "d@mail.com"]],
+      description: "Transitive merge: the third account bridges the first two",
+    },
+    {
+      input: { accounts: [["Solo", "only@mail.com"]] },
+      expected: [["Solo", "only@mail.com"]],
+      description: "Single account passes through",
     },
   ],
 }

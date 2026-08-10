@@ -65,6 +65,9 @@ Return the ordering of courses you should take to finish all courses. If there a
       description: "Simple dependency",
     },
     {
+      // The [2, 1] edge is load-bearing: without it this diamond admits several valid
+      // orders ([0,2,1,3] among them) while the validator compares exactly, so correct
+      // DFS-based solutions were failing. Every input here has exactly ONE valid order.
       input: {
         numCourses: 4,
         prerequisites: [
@@ -72,6 +75,7 @@ Return the ordering of courses you should take to finish all courses. If there a
           [2, 0],
           [3, 1],
           [3, 2],
+          [2, 1],
         ],
       },
       expected: [0, 1, 2, 3],
@@ -89,6 +93,25 @@ Return the ordering of courses you should take to finish all courses. If there a
       },
       expected: [],
       description: "Cycle - impossible",
+    },
+    // Every acyclic case above answers with 0,1,2,...  so a solution that checked for a
+    // cycle and then returned list(range(numCourses)) without ordering anything passed
+    // them all. These two force orders that differ from the course numbering.
+    {
+      input: { numCourses: 2, prerequisites: [[0, 1]] },
+      expected: [1, 0],
+      description: "Course 1 must come first",
+    },
+    {
+      input: {
+        numCourses: 3,
+        prerequisites: [
+          [0, 1],
+          [1, 2],
+        ],
+      },
+      expected: [2, 1, 0],
+      description: "Chain in reverse of the course numbering",
     },
   ],
 }

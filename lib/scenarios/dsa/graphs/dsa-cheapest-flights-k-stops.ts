@@ -64,5 +64,27 @@ export const cheapestFlightsKStopsScenario: DSAScenario = {
       expected: 500,
       description: "Direct only",
     },
+    // Both original cases had a reachable destination, so a solution with no -1 handling
+    // (returning 0 or garbage when no route exists) passed 2/2. These pin the -1 contract.
+    {
+      input: { n: 3, flights: [[0, 1, 100]], src: 0, dst: 2, k: 1 },
+      expected: -1,
+      description: "Destination unreachable: no route at any price",
+    },
+    {
+      input: {
+        n: 4,
+        flights: [
+          [0, 1, 100],
+          [1, 2, 100],
+          [2, 3, 100],
+        ],
+        src: 0,
+        dst: 3,
+        k: 0,
+      },
+      expected: -1,
+      description: "Route exists but needs more stops than k allows",
+    },
   ],
 }
