@@ -67,5 +67,8 @@ Given a string s, return true if it is a palindrome, or false otherwise.`,
     },
     { input: { s: "race a car" }, expected: false, description: "Not a palindrome" },
     { input: { s: " " }, expected: true, description: "Empty after cleanup" },
+    // No case contained a digit, so keeping only LETTERS passed. Digits are alphanumeric and
+    // must be kept: dropping the 0 here turns a non-palindrome into a single letter.
+    { input: { s: "0P" }, expected: false, description: "Digits count as alphanumeric" },
   ],
 }
