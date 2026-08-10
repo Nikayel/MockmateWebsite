@@ -204,7 +204,7 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
               candidates", an unsubstantiated usage claim sitting directly above a
               purchase button. The two guarantees are real and verifiable, so the
               line keeps those and drops the claim until there are users to cite. */}
-          <p className="mb-8 text-center text-xs text-gray-600">
+          <p className="text-muted-foreground mb-8 text-center text-xs">
             30-day money-back guarantee · Cancel anytime · No card required to start
           </p>
         </div>
