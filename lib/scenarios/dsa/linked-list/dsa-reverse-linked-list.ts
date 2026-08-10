@@ -75,6 +75,13 @@ Example visualization:
       expected: [2, 1],
       description: "Two nodes: [1,2] -> [2,1]",
     },
+    // Every list above is already ascending, so reversing it is the same as sorting it
+    // descending. An unsorted list is what separates the two.
+    {
+      input: { values: [3, 1, 2] },
+      expected: [2, 1, 3],
+      description: "Unsorted list: reversing is not sorting in descending order",
+    },
     {
       input: { values: [] },
       expected: [],
