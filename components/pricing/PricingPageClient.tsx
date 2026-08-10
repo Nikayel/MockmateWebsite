@@ -24,6 +24,38 @@ const BILLING_PERIODS: { value: BillingPeriod; label: string }[] = [
   { value: "yearly", label: "Annually" },
 ]
 
+/* Session counts are the enforced server quota, not copy: they must move with
+   PRICING_CONFIG or this page advertises a limit the server no longer grants. */
+const FREE_FEATURES = [
+  "20+ problems, unlimited practice",
+  `${PRICING_CONFIG.free.sessionsPerMonth} full interview sessions/month`,
+  "AI interviewer feedback",
+]
+
+const PRO_FEATURES = [
+  `${PRICING_CONFIG.pro.sessionsPerMonth} sessions/month`,
+  "Spaced repetition scheduling",
+  "Personalized study roadmap",
+  "Priority support",
+]
+
+/** One feature row. Written seven times by hand before, with three different
+ *  check-icon colours between the two cards. */
+function PlanFeature({ children, accent = false }: { children: string; accent?: boolean }) {
+  return (
+    <li className="flex items-center gap-2">
+      <Check
+        aria-hidden
+        className={cn(
+          "h-3.5 w-3.5 shrink-0",
+          accent ? "text-accent-strong" : "text-muted-foreground"
+        )}
+      />
+      {children}
+    </li>
+  )
+}
+
 export function PricingPageClient({ faqs }: PricingPageClientProps) {
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("yearly")
   const [openFaq, setOpenFaq] = useState<number | null>(null)
@@ -87,10 +119,20 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
           {/* Pricing Cards - Ultra Compact */}
           <div className="mx-auto mb-4 grid max-w-2xl grid-cols-1 gap-4 md:grid-cols-2">
             {/* Free Plan */}
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
-              <h3 className="mb-3 text-base font-semibold text-white">Free</h3>
+            <div className="border-border bg-card rounded-xl border p-5">
+              <h3 className="text-muted-foreground mb-3 text-xs font-semibold tracking-[0.12em] uppercase">
+                Free
+              </h3>
 
-              <div className="mb-2 text-4xl font-bold text-white">Free</div>
+              {/* The price block used to render the word "Free" a second time,
+                  directly under the "Free" heading. $0 states the same thing and
+                  reads as a price, which is what this slot is for. */}
+              <div className="mb-2 flex items-baseline gap-1">
+                <span className="font-heading text-foreground text-4xl font-bold">
+                  {PRICING_CONFIG.free.priceDisplay}
+                </span>
+                <span className="text-muted-foreground text-sm">forever</span>
+              </div>
 
               <Link
                 href="/interview"
@@ -98,47 +140,39 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
                   trackEvent("cta_click", { location: "pricing_free", destination: "/interview" })
                 }
               >
-                <Button
-                  variant="outline"
-                  className="mb-4 w-full border-white/20 text-white hover:bg-white/10"
-                >
+                <Button variant="outline" className="mb-4 w-full">
                   Start practicing free
                 </Button>
               </Link>
 
-              <p className="mb-2 text-xs text-gray-400">
+              <p className="text-muted-foreground mb-2 text-xs">
                 Try before you commit. Includes free Python, SQL, and System Design courses.
               </p>
 
-              <ul className="space-y-1.5 text-sm text-gray-400">
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-gray-500" />
-                  20+ problems, unlimited practice
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-gray-500" />
-                  {/* The number is the enforced quota, not copy: it must move with
-                      PRICING_CONFIG or this page advertises a limit the server no
-                      longer grants. */}
-                  {`${PRICING_CONFIG.free.sessionsPerMonth} full interview sessions/month`}
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-gray-500" />
-                  AI interviewer feedback
-                </li>
+              <ul className="text-muted-foreground space-y-1.5 text-sm">
+                {FREE_FEATURES.map((feature) => (
+                  <PlanFeature key={feature}>{feature}</PlanFeature>
+                ))}
               </ul>
             </div>
 
             {/* Pro Plan */}
-            <div className="from-accent/5 border-accent/50 rounded-xl border-2 bg-gradient-to-br to-transparent p-5">
-              <h3 className="mb-3 text-base font-semibold text-white">Pro</h3>
+            <div className="from-accent/8 border-accent bg-card rounded-xl border-2 bg-gradient-to-br to-transparent p-5">
+              <h3 className="text-accent-strong mb-3 text-xs font-semibold tracking-[0.12em] uppercase">
+                Pro
+              </h3>
 
-              <div className="mb-2 flex items-baseline gap-1">
-                <span className="text-accent text-4xl font-bold">
+              <div className="mb-1 flex items-baseline gap-1">
+                <span className="font-heading text-foreground text-4xl font-bold">
                   {currentProPrice.priceDisplay}
                 </span>
-                <span className="text-sm text-gray-400">{currentProPrice.period}</span>
+                <span className="text-muted-foreground text-sm">{currentProPrice.period}</span>
               </div>
+
+              {/* The yearly card showed "$19 /mo" with nothing saying it is billed
+                  as one $225 charge. That is the single most important thing a
+                  buyer needs before clicking Subscribe, and it was missing. */}
+              <p className="text-muted-foreground mb-3 text-xs">{currentProPrice.billingNote}</p>
 
               <Link
                 href="/upgrade"
@@ -150,31 +184,18 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
                   })
                 }
               >
-                <Button className="bg-accent hover:bg-accent/90 mb-4 w-full font-semibold text-black">
+                <Button className="bg-accent text-accent-foreground hover:bg-accent/90 mb-4 w-full font-semibold">
                   Subscribe
                 </Button>
               </Link>
 
-              <p className="mb-2 text-xs text-gray-400">Everything you need to get hired.</p>
-
-              <p className="mb-2 text-xs text-gray-500">Everything in Free, plus...</p>
-              <ul className="space-y-1.5 text-sm text-gray-300">
-                <li className="flex items-center gap-2">
-                  <Check className="text-accent h-3.5 w-3.5" />
-                  {`${PRICING_CONFIG.pro.sessionsPerMonth} sessions/month`}
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="text-accent h-3.5 w-3.5" />
-                  Spaced repetition scheduling
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="text-accent h-3.5 w-3.5" />
-                  Personalized study roadmap
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="text-accent h-3.5 w-3.5" />
-                  Priority support
-                </li>
+              <p className="text-muted-foreground mb-2 text-xs">Everything in Free, plus...</p>
+              <ul className="text-foreground space-y-1.5 text-sm">
+                {PRO_FEATURES.map((feature) => (
+                  <PlanFeature key={feature} accent>
+                    {feature}
+                  </PlanFeature>
+                ))}
               </ul>
             </div>
           </div>
