@@ -15,25 +15,25 @@ export const cloneGraphScenario: DSAScenario = {
 
 Each node in the graph contains a value (int) and a list (List[Node]) of its neighbors.
 
+\`\`\`
 class Node {
   public int val;
   public List<Node> neighbors;
 }
+\`\`\`
 
 Test case format: For simplicity, each node's value is the same as the node's index (1-indexed). The input is given as an adjacency list where adjList[i] is a list of neighbors for node i+1.
 
-Example visualization:
+Example:
 
-  Original Graph:          Cloned Graph:
-      1 ─── 2                 1' ─── 2'
-      │     │       →         │      │
-      │     │                 │      │
-      4 ─── 3                 4' ─── 3'
+\`\`\`
+  1 ─── 2
+  │     │
+  │     │
+  4 ─── 3
 
-  adjList = [[2,4],[1,3],[2,4],[1,3]]
-
-  Use HashMap: oldNode → newNode
-  DFS/BFS to traverse and clone`,
+adjList = [[2,4],[1,3],[2,4],[1,3]]
+\`\`\``,
   examples: [
     {
       input: "adjList = [[2,4],[1,3],[2,4],[1,3]]",
