@@ -76,6 +76,14 @@ Return the number of good nodes in the binary tree.`,
       expected: 1,
       description: "Single node",
     },
+    // In the trees above no value ever dips below an ancestor and then climbs back, so
+    // comparing each node with its PARENT instead of the maximum along the whole path gave
+    // the same count. Here node 2 beats its parent 1 but not its grandparent 3.
+    {
+      input: { root: [3, 1, null, 2] },
+      expected: 1,
+      description: "Value rises above its parent but stays under an earlier ancestor",
+    },
   ],
 
   // Proactive AI Interviewer Fields
