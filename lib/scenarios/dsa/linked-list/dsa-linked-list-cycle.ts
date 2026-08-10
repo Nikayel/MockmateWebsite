@@ -16,18 +16,17 @@ There is a cycle in a linked list if there is some node in the list that can be 
 
 Return true if there is a cycle in the linked list. Otherwise, return false.
 
-Example visualization:
+Example:
 
-  With cycle (pos=1):
-  3 → 2 → 0 → -4
-      ↑       ↓
-      └───────┘
+\`\`\`
+With a cycle (the tail links back to index 1)
+3 → 2 → 0 → -4
+    ↑        ↓
+    └────────┘
 
-  No cycle:
-  1 → 2 → 3 → 4 → null
-
-  Floyd's Algorithm: slow (1 step), fast (2 steps)
-  If they meet → cycle exists`,
+No cycle
+1 → 2 → 3 → 4 → null
+\`\`\``,
   examples: [
     {
       input: "head = [3,2,0,-4], pos = 1",
