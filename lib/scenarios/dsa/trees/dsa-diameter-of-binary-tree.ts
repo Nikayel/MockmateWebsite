@@ -16,16 +16,17 @@ The diameter of a binary tree is the length of the longest path between any two 
 
 The length of a path between two nodes is represented by the number of edges between them.
 
-Example visualization:
+Example:
 
-        1
-       / \\
-      2   3
+\`\`\`
+      1
      / \\
-    4   5
+    2   3
+   / \\
+  4   5
+\`\`\`
 
-  Longest path: 4 → 2 → 1 → 3  OR  5 → 2 → 1 → 3
-  Diameter = 3 edges`,
+The longest path runs 4 - 2 - 1 - 3 (or 5 - 2 - 1 - 3), which is 3 edges, so the diameter is 3.`,
   examples: [
     {
       input: "root = [1,2,3,4,5]",
