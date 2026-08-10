@@ -33,17 +33,31 @@ export const dsaTopKFrequentElementsScenario: DSAScenario = {
     python: `def topKFrequent(nums, k):\n    # Write your solution here\n    pass`,
   },
   optimalComplexity: { time: "O(n)", space: "O(n)" },
+  // Every case is compared as a set: the answer may be returned in any order, so a heap-based
+  // solution that emits [2,1] is as correct as a count-sorted one that emits [1,2].
+  //
+  // The first three cases also shared a flaw: the k most frequent values happened to be the
+  // first k distinct values AND the k smallest, so "take the first k you see" and
+  // "take the k smallest" both passed. The last case separates all three.
   testCases: [
     {
       input: { nums: [1, 1, 1, 2, 2, 3], k: 2 },
       expected: [1, 2],
       description: "Top 2 frequent",
+      compareAsSet: true,
     },
     { input: { nums: [1], k: 1 }, expected: [1], description: "Single element" },
     {
       input: { nums: [1, 2], k: 2 },
       expected: [1, 2],
       description: "All unique, same frequency",
+      compareAsSet: true,
+    },
+    {
+      input: { nums: [1, 2, 2, 3, 3, 3], k: 2 },
+      expected: [3, 2],
+      description: "Most frequent are neither the first seen nor the smallest",
+      compareAsSet: true,
     },
   ],
 }
