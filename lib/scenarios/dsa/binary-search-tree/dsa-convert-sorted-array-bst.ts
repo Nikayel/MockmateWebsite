@@ -14,21 +14,17 @@ export const dsaConvertSortedArrayBstScenario: DSAScenario = {
 
 A height-balanced binary tree is a binary tree in which the depth of the two subtrees of every node never differs by more than one.
 
-Example visualization:
+Example, for nums = [-10, -3, 0, 5, 9], one height-balanced answer is:
 
-    nums = [-10, -3, 0, 5, 9]
-                    ↑
-                  middle
+\`\`\`
+        0
+       / \\
+     -3   9
+     /   /
+  -10   5
+\`\`\`
 
-    Choose middle as root, recursively build:
-
-              0          ← middle of [-10,-3,0,5,9]
-             / \\
-           -3   9        ← middles of halves
-           /   /
-        -10   5
-
-    Result: Balanced BST with height ≈ log(n)`,
+More than one arrangement is valid, so any height-balanced BST over the same values is accepted.`,
   examples: [
     {
       input: "nums = [-10,-3,0,5,9]",
