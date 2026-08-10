@@ -9,29 +9,18 @@ export const courseScheduleScenario: DSAScenario = {
   companies: ["Amazon", "Meta", "Google", "Microsoft", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe", "fdse"],
   description: "Determine if you can finish all courses given prerequisites",
-  tags: ["graph", "topological-sort", "dfs", "bfs"],
+  // Order matters: the scenario list card shows the first two tags, so the neutral
+  // descriptors lead and the algorithm names stay behind them for search only.
+  tags: ["graph", "prerequisites", "topological-sort", "dfs", "bfs"],
   estimatedTime: 25,
-  problemStatement: `There are a total of numCourses courses you have to take, labeled from 0 to numCourses - 1. You are given an array prerequisites where prerequisites[i] = [ai, bi] indicates that you must take course bi first if you want to take course ai.
+  // The statement renders through MarkdownRenderer, so it is written as markdown: no ASCII
+  // diagrams (single line breaks collapse and garble them), and no approach naming — the
+  // strategy lives in `hints`, which the UI keeps behind click-to-reveal.
+  problemStatement: `There are a total of \`numCourses\` courses you have to take, labeled from \`0\` to \`numCourses - 1\`. You are given an array \`prerequisites\` where \`prerequisites[i] = [a, b]\` indicates that you must take course \`b\` first if you want to take course \`a\`.
 
-For example, the pair [0, 1], indicates that to take course 0 you have to first take course 1.
+For example, the pair \`[0, 1]\` indicates that to take course 0 you have to first take course 1.
 
-Return true if you can finish all courses. Otherwise, return false.
-
-Example visualization:
-
-  prerequisites = [[1,0], [2,1], [3,2]]
-
-  Dependency Graph:
-  0 → 1 → 2 → 3     ✓ Can finish (no cycle)
-
-  prerequisites = [[1,0], [0,1]]
-
-  Cycle detected:
-  0 → 1
-  ↑   ↓
-  └───┘             ✗ Cannot finish (cycle!)
-
-  Use: Topological Sort or DFS cycle detection`,
+Return \`true\` if you can finish all courses. Otherwise, return \`false\`.`,
   examples: [
     {
       input: "numCourses = 2, prerequisites = [[1,0]]",
@@ -41,7 +30,8 @@ Example visualization:
     {
       input: "numCourses = 2, prerequisites = [[1,0],[0,1]]",
       output: "false",
-      explanation: "To take course 1 you need course 0, and vice versa. Cycle detected.",
+      explanation:
+        "To take course 1 you must first take course 0, and to take course 0 you must first take course 1. So it is impossible.",
     },
   ],
   constraints: [
@@ -51,10 +41,13 @@ Example visualization:
     "0 <= ai, bi < numCourses",
     "All pairs prerequisites[i] are unique",
   ],
+  // Progressive reveal: each hint gives away strictly more than the one before it, so the
+  // first unlock nudges modeling while the last spells out the DFS mechanics.
   hints: [
-    "This problem is equivalent to detecting a cycle in a directed graph",
-    "Use topological sorting (Kahn's algorithm or DFS)",
-    "Track visited nodes and nodes in current path",
+    "Model the courses as a directed graph: each prerequisite pair [a, b] is an edge from b to a. The question then becomes a property of that graph.",
+    "You can finish all courses exactly when the graph has no cycle, so this is cycle detection in a directed graph.",
+    "Topological sort answers it constructively (Kahn's algorithm): repeatedly take any course whose remaining prerequisite count is zero. If you finish fewer than numCourses courses, a cycle blocked you.",
+    "For the DFS approach, give each node three states: unvisited, in the current recursion path, and done. Reaching a node that is already in the current path means a cycle.",
   ],
   starterCode: {
     javascript: `function canFinish(numCourses, prerequisites) {
