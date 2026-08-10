@@ -87,6 +87,14 @@ Example visualization:
       expected: false,
       description: "No cycle, single node",
     },
+    // Every list above has distinct values, so tracking VISITED VALUES instead of visited
+    // nodes was indistinguishable from real cycle detection. A repeated value is not a
+    // cycle, and this case is the one that says so.
+    {
+      input: { values: [1, 2, 1], pos: -1 },
+      expected: false,
+      description: "Repeated value without a cycle",
+    },
     {
       input: { values: [1, 2, 3, 4], pos: -1 },
       expected: false,
