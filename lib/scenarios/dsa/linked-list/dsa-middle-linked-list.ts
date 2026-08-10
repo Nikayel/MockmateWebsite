@@ -14,18 +14,17 @@ export const middleLinkedListScenario: DSAScenario = {
 
 If there are two middle nodes, return the second middle node.
 
-Example visualization:
+Example:
 
-  Odd length:    1 → 2 → [3] → 4 → 5
-                         ↑
-                       middle
+\`\`\`
+Odd length    1 → 2 → 3 → 4 → 5
+                      ↑
+                    middle
 
-  Even length:   1 → 2 → 3 → [4] → 5 → 6
-                             ↑
-                       second middle
-
-  Technique: slow (1 step) + fast (2 steps)
-  When fast reaches end, slow is at middle`,
+Even length   1 → 2 → 3 → 4 → 5 → 6
+                          ↑
+                    second middle
+\`\`\``,
   examples: [
     { input: "head = [1,2,3,4,5]", output: "[3,4,5]", explanation: "The middle node is 3." },
     {
