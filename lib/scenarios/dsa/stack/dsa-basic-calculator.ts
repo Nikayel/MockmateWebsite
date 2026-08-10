@@ -71,5 +71,11 @@ The expression string may contain:
     { input: { s: "1 + 1" }, expected: 2, description: "Simple addition" },
     { input: { s: " 2-1 + 2 " }, expected: 3, description: "Subtraction and addition" },
     { input: { s: "(1+(4+5+2)-3)+(6+8)" }, expected: 23, description: "Nested parentheses" },
+    // Every group above was added, never subtracted, so simply deleting the parentheses and
+    // summing the terms produced the same answer. A minus in front of a group is what makes
+    // the brackets matter.
+    { input: { s: "2-(1+2)" }, expected: -1, description: "A group that is subtracted" },
+    // And every number was a single digit, so accumulating digits was never required.
+    { input: { s: "12+3" }, expected: 15, description: "Multi-digit number" },
   ],
 }
