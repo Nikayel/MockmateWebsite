@@ -41,6 +41,9 @@ export const evaluateDivisionScenario: DSAScenario = {
     java: `class Solution {\n    public double[] calcEquation(List<List<String>> equations, double[] values, List<List<String>> queries) {\n        // Build graph and DFS for queries\n        return new double[0];\n    }\n}`,
   },
   optimalComplexity: { time: "O(Q * (V + E))", space: "O(V + E)" },
+  // The single original case only ever asked about variables in one connected component, so
+  // a solution that returned 1.0 whenever its search ran out (instead of -1.0) passed. The
+  // second case adds a disjoint component plus a self-query, the two contract corners.
   testCases: [
     {
       input: {
@@ -57,6 +60,22 @@ export const evaluateDivisionScenario: DSAScenario = {
       },
       expected: [6.0, 0.5, -1.0],
       description: "Chain division",
+    },
+    {
+      input: {
+        equations: [
+          ["a", "b"],
+          ["x", "y"],
+        ],
+        values: [2.0, 4.0],
+        queries: [
+          ["a", "x"],
+          ["a", "a"],
+          ["z", "z"],
+        ],
+      },
+      expected: [-1.0, 1.0, -1.0],
+      description: "Disjoint components, self-query of a known and of an unknown variable",
     },
   ],
 }
