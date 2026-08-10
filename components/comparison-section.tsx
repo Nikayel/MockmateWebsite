@@ -1,9 +1,10 @@
 "use client"
 
 import React, { useRef, useState, useEffect } from "react"
-import { motion, useInView, useSpring, useTransform } from "framer-motion"
+import { motion, useInView, useReducedMotion, useSpring, useTransform } from "framer-motion"
 import { Check, X, ArrowRight } from "lucide-react"
 import Link from "next/link"
+import { cn } from "@/lib/utils"
 import { getProPricing } from "@/lib/config"
 import {
   COMPETITOR_PRICING,
@@ -28,18 +29,22 @@ function AnimatedPrice({
   value,
   delay = 0,
   className = "",
-  style,
 }: {
   value: number
   delay?: number
   className?: string
-  style?: React.CSSProperties
 }) {
   const ref = useRef<HTMLSpanElement>(null)
   const isInView = useInView(ref, { once: true, amount: 0.5 })
+  const prefersReducedMotion = useReducedMotion()
   const spring = useSpring(0, { stiffness: 50, damping: 25 })
   const display = useTransform(spring, (v) => Math.floor(v).toLocaleString())
-  const [displayValue, setDisplayValue] = useState("0")
+  // Seeded with the REAL price, not "0". This used to start at "0" and only
+  // count up once the browser scrolled it into view, which meant the server
+  // rendered every price on the page as "$0" — what a crawler reads, what a
+  // no-JS visitor sees, and what shows for the split second before hydration.
+  // The count-up now starts from zero only when we are actually going to run it.
+  const [displayValue, setDisplayValue] = useState(() => value.toLocaleString())
 
   useEffect(() => {
     const unsubscribe = display.on("change", setDisplayValue)
@@ -47,16 +52,103 @@ function AnimatedPrice({
   }, [display])
 
   useEffect(() => {
-    if (isInView) {
-      const timer = setTimeout(() => spring.set(value), delay)
-      return () => clearTimeout(timer)
-    }
-  }, [isInView, value, spring, delay])
+    if (!isInView || prefersReducedMotion) return
+
+    setDisplayValue("0")
+    const timer = setTimeout(() => spring.set(value), delay)
+    return () => clearTimeout(timer)
+  }, [isInView, value, spring, delay, prefersReducedMotion])
 
   return (
-    <span ref={ref} className={className} style={style}>
+    <span
+      ref={ref}
+      className={cn("font-heading text-foreground text-4xl leading-tight font-light", className)}
+    >
       ${displayValue}
     </span>
+  )
+}
+
+type CostPoint = { included: boolean; text: string }
+
+/**
+ * One cost card. The two cards were ~90-line near-duplicates differing only in
+ * border weight, label colour, and check-icon colour, so a change to the shared
+ * 80% had to be made twice and the "not included" X only existed on one of them.
+ */
+function CostCard({
+  label,
+  sublabel,
+  note,
+  points,
+  highlighted = false,
+  delay,
+  isInView,
+  children,
+}: {
+  label: string
+  sublabel: string
+  note: string
+  points: CostPoint[]
+  highlighted?: boolean
+  delay: number
+  isInView: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <motion.div
+      className={cn(
+        "bg-card rounded-[18px] p-6",
+        highlighted ? "border-accent border-2" : "border-border border"
+      )}
+      initial={{ opacity: 0, y: 16 }}
+      animate={isInView ? { opacity: 1, y: 0 } : {}}
+      transition={{ delay, duration: 0.5 }}
+    >
+      <div className="mb-5">
+        <span
+          className={cn(
+            "text-sm font-semibold tracking-[0.08em] uppercase",
+            highlighted ? "text-accent-strong" : "text-muted-foreground"
+          )}
+        >
+          {label}
+        </span>
+        <p className="text-muted-foreground mt-0.5 text-xs">{sublabel}</p>
+      </div>
+
+      <div className="flex items-baseline gap-2">{children}</div>
+
+      <p className="text-muted-foreground mt-1.5 text-xs">{note}</p>
+
+      <div className="border-border mt-5 space-y-2 border-t pt-5">
+        {points.map((point) => (
+          <div
+            key={point.text}
+            className={cn(
+              "flex items-center gap-2 text-sm",
+              point.included ? "text-foreground" : "text-muted-foreground"
+            )}
+          >
+            {point.included ? (
+              <Check
+                aria-hidden
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0",
+                  highlighted ? "text-accent-strong" : "text-muted-foreground"
+                )}
+              />
+            ) : (
+              <X aria-hidden className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+            )}
+            {/* The icon was the only thing distinguishing "has this" from
+                "does not have this", so a screen reader heard both rows the same. */}
+            <span className="sr-only">{point.included ? "Included:" : "Not included:"}</span>
+            {point.text}
+          </div>
+        ))}
+      </div>
+    </motion.div>
   )
 }
 
@@ -178,181 +270,37 @@ export function ComparisonSection() {
 
           {/* Price Cards — white canvas on dark tile, hairline border, 18px radius */}
           <div className="mb-10 grid gap-6 sm:grid-cols-2">
-            {/* Human Mocks */}
-            <motion.div
-              className="rounded-[18px] p-6"
-              style={{ backgroundColor: "#ffffff", border: "1px solid #e0e0e0" }}
-              initial={{ opacity: 0, y: 16 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ delay: 0.1, duration: 0.5 }}
+            <CostCard
+              label={COMPETITOR_PRICING.humanMock.fullName}
+              sublabel={COMPETITOR_PRICING.humanMock.examples}
+              note={getHumanMockCostBasis()}
+              points={[
+                { included: true, text: "Real human feedback" },
+                { included: false, text: "Requires scheduling in advance" },
+              ]}
+              delay={0.1}
+              isInView={isInView}
             >
-              <div className="mb-5">
-                <span
-                  className="font-semibold uppercase"
-                  style={{
-                    fontFamily: fontBody,
-                    fontSize: "14px",
-                    letterSpacing: "0.08em",
-                    color: "#7a7a7a",
-                  }}
-                >
-                  {COMPETITOR_PRICING.humanMock.fullName}
-                </span>
-                <p
-                  style={{
-                    fontFamily: fontBody,
-                    fontSize: "12px",
-                    letterSpacing: "-0.12px",
-                    color: "#7a7a7a",
-                    marginTop: "2px",
-                  }}
-                >
-                  {COMPETITOR_PRICING.humanMock.examples}
-                </p>
-              </div>
+              <AnimatedPrice value={humanMockCost.min} delay={300} />
+              <span className="text-muted-foreground">-</span>
+              <AnimatedPrice value={humanMockCost.max} delay={500} />
+            </CostCard>
 
-              <div className="flex items-baseline gap-2">
-                <AnimatedPrice
-                  value={humanMockCost.min}
-                  delay={300}
-                  className="font-light"
-                  style={{
-                    fontFamily: fontHeading,
-                    fontSize: "40px",
-                    color: "#1a1917",
-                    lineHeight: 1.1,
-                  }}
-                />
-                <span style={{ fontFamily: fontBody, color: "#7a7a7a" }}>–</span>
-                <AnimatedPrice
-                  value={humanMockCost.max}
-                  delay={500}
-                  className="font-light"
-                  style={{
-                    fontFamily: fontHeading,
-                    fontSize: "40px",
-                    color: "#1a1917",
-                    lineHeight: 1.1,
-                  }}
-                />
-              </div>
-
-              <p
-                style={{
-                  fontFamily: fontBody,
-                  fontSize: "12px",
-                  color: "#7a7a7a",
-                  marginTop: "6px",
-                  letterSpacing: "-0.12px",
-                }}
-              >
-                {getHumanMockCostBasis()}
-              </p>
-
-              <div className="mt-5 space-y-2 pt-5" style={{ borderTop: "1px solid #e0e0e0" }}>
-                <div
-                  className="flex items-center gap-2"
-                  style={{ fontFamily: fontBody, fontSize: "14px", color: "#1a1917" }}
-                >
-                  <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#7a7a7a" }} />
-                  Real human feedback
-                </div>
-                <div
-                  className="flex items-center gap-2"
-                  style={{ fontFamily: fontBody, fontSize: "14px", color: "#7a7a7a" }}
-                >
-                  <X className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#7a7a7a" }} />
-                  Requires scheduling in advance
-                </div>
-              </div>
-            </motion.div>
-
-            {/* CodeSparring — Action Blue border to signal selection */}
-            <motion.div
-              className="rounded-[18px] p-6"
-              style={{ backgroundColor: "#ffffff", border: "2px solid #c4703f" }}
-              initial={{ opacity: 0, y: 16 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ delay: 0.2, duration: 0.5 }}
+            <CostCard
+              label="CodeSparring"
+              sublabel="AI mock interviews on demand"
+              note="Cancel anytime"
+              points={[
+                { included: true, text: "AI adapts to your skill level" },
+                { included: true, text: "Practice at 2am before your 9am interview" },
+              ]}
+              highlighted
+              delay={0.2}
+              isInView={isInView}
             >
-              <div className="mb-5">
-                <span
-                  className="font-semibold uppercase"
-                  style={{
-                    fontFamily: fontBody,
-                    fontSize: "14px",
-                    letterSpacing: "0.08em",
-                    color: "#c4703f",
-                  }}
-                >
-                  CodeSparring
-                </span>
-                <p
-                  style={{
-                    fontFamily: fontBody,
-                    fontSize: "12px",
-                    letterSpacing: "-0.12px",
-                    color: "#7a7a7a",
-                    marginTop: "2px",
-                  }}
-                >
-                  AI mock interviews on demand
-                </p>
-              </div>
-
-              <div className="flex items-baseline gap-1">
-                <AnimatedPrice
-                  value={proMonthly.price}
-                  delay={700}
-                  className="font-light"
-                  style={{
-                    fontFamily: fontHeading,
-                    fontSize: "40px",
-                    color: "#1a1917",
-                    lineHeight: 1.1,
-                  }}
-                />
-                <span
-                  style={{
-                    fontFamily: fontBody,
-                    fontSize: "17px",
-                    color: "#7a7a7a",
-                    letterSpacing: "-0.374px",
-                  }}
-                >
-                  /month
-                </span>
-              </div>
-
-              <p
-                style={{
-                  fontFamily: fontBody,
-                  fontSize: "12px",
-                  color: "#7a7a7a",
-                  marginTop: "6px",
-                  letterSpacing: "-0.12px",
-                }}
-              >
-                Cancel anytime
-              </p>
-
-              <div className="mt-5 space-y-2 pt-5" style={{ borderTop: "1px solid #e0e0e0" }}>
-                <div
-                  className="flex items-center gap-2"
-                  style={{ fontFamily: fontBody, fontSize: "14px", color: "#1a1917" }}
-                >
-                  <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#c4703f" }} />
-                  AI adapts to your skill level
-                </div>
-                <div
-                  className="flex items-center gap-2"
-                  style={{ fontFamily: fontBody, fontSize: "14px", color: "#1a1917" }}
-                >
-                  <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#c4703f" }} />
-                  Practice at 2am before your 9am interview
-                </div>
-              </div>
-            </motion.div>
+              <AnimatedPrice value={proMonthly.price} delay={700} />
+              <span className="text-muted-foreground text-lg">/month</span>
+            </CostCard>
           </div>
 
           {/* Value statement */}
