@@ -73,5 +73,27 @@ export const findPathExistsScenario: DSAScenario = {
       expected: false,
       description: "Disconnected",
     },
+    // Both cases above are reachable within two hops along edges listed source-first, so a
+    // solution that treated the edges as DIRECTED, and one that only checked one and two
+    // hops, both passed. Here every edge is listed in reverse and the path is three hops.
+    {
+      input: {
+        n: 4,
+        edges: [
+          [1, 0],
+          [2, 1],
+          [3, 2],
+        ],
+        source: 0,
+        destination: 3,
+      },
+      expected: true,
+      description: "Three hops, every edge listed in reverse: edges are undirected",
+    },
+    {
+      input: { n: 1, edges: [], source: 0, destination: 0 },
+      expected: true,
+      description: "Source is the destination",
+    },
   ],
 }
