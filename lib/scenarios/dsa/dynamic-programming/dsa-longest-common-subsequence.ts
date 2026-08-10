@@ -64,5 +64,13 @@ A common subsequence of two strings is a subsequence that is common to both stri
     { input: { text1: "abc", text2: "def" }, expected: 0, description: "No common chars" },
     { input: { text1: "bl", text2: "yby" }, expected: 1, description: "Single char LCS" },
     { input: { text1: "psnw", text2: "vozsh" }, expected: 1, description: "Complex case" },
+    // Wherever characters were shared above, they also appeared in the same relative order,
+    // so counting shared characters (or the size of the shared character set) matched the
+    // real answer. A subsequence must preserve order, and reversed strings say so.
+    {
+      input: { text1: "abc", text2: "cba" },
+      expected: 1,
+      description: "All characters shared but in reverse order",
+    },
   ],
 }
