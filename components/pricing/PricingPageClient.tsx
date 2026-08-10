@@ -10,11 +10,14 @@ import { trackEvent } from "@/lib/analytics"
 import Link from "next/link"
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { Feature } from "@/components/ui/feature-with-image-comparison"
 import { ComparisonSection } from "@/components/comparison-section"
 
 interface PricingPageClientProps {
   faqs: { question: string; answer: string }[]
+  /** The session preview, rendered on the server and passed in. Importing it
+   *  here would drag a static section across the "use client" boundary and
+   *  ship it as JS for no reason. */
+  children: React.ReactNode
 }
 
 type BillingPeriod = "monthly" | "yearly"
@@ -56,7 +59,7 @@ function PlanFeature({ children, accent = false }: { children: string; accent?: 
   )
 }
 
-export function PricingPageClient({ faqs }: PricingPageClientProps) {
+export function PricingPageClient({ faqs, children }: PricingPageClientProps) {
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("yearly")
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const prefersReducedMotion = useReducedMotion()
@@ -257,8 +260,8 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
           </div>
         </section>
 
-        {/* Visual Platform Comparison */}
-        <Feature />
+        {/* SessionPreview, rendered on the server (see props) */}
+        {children}
 
         {/* Cost & Feature Comparison Section */}
         <ComparisonSection />

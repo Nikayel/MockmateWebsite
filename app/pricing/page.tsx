@@ -1,6 +1,7 @@
 import { PRICING_CONFIG } from "@/lib/config"
 import { getLeetCodeSavingsPercent } from "@/lib/pricing-comparison"
 import { PricingPageClient } from "@/components/pricing/PricingPageClient"
+import { SessionPreview } from "@/components/pricing/SessionPreview"
 
 const { monthly, yearly } = PRICING_CONFIG.pro.website
 
@@ -51,7 +52,9 @@ export default function PricingPage() {
           an unrendered schema type is bytes on every page for no return. The faqs
           array below is still the real page content, just no longer duplicated
           into a graph nothing reads. */}
-      <PricingPageClient faqs={faqs} />
+      <PricingPageClient faqs={faqs}>
+        <SessionPreview />
+      </PricingPageClient>
     </>
   )
 }
