@@ -12,22 +12,15 @@ export const removeNthFromEndScenario: DSAScenario = {
   estimatedTime: 20,
   problemStatement: `Given the head of a linked list, remove the nth node from the end of the list and return its head.
 
-Example visualization (n=2):
+Example, with n = 2:
 
-  Input:   1 → 2 → 3 → [4] → 5
-                       ↑
-                  remove (2nd from end)
+\`\`\`
+Input    1 → 2 → 3 → 4 → 5
+                     ↑
+               second from the end
 
-  Two-pointer approach:
-  dummy → 1 → 2 → 3 → 4 → 5 → null
-  slow         fast
-  (fast moves n steps ahead first)
-
-  Then move both until fast hits null:
-  dummy → 1 → 2 → 3 → 4 → 5 → null
-              slow        fast
-
-  Remove slow.next → Output: 1 → 2 → 3 → 5`,
+Output   1 → 2 → 3 → 5
+\`\`\``,
   examples: [
     { input: "head = [1,2,3,4,5], n = 2", output: "[1,2,3,5]" },
     { input: "head = [1], n = 1", output: "[]" },
