@@ -14,16 +14,18 @@ export const subtreeOfAnotherTreeScenario: DSAScenario = {
 
 A subtree of a binary tree tree is a tree that consists of a node in tree and all of this node's descendants.
 
-Example visualization:
+Example:
 
-  root:           subRoot:
-      3              4
-     / \\            / \\
-   [4]  5          4   ← matches!
-   / \\            / \\
-  1   2          1   2
+\`\`\`
+root              subRoot
+    3                4
+   / \\              / \\
+  4   5            1   2
+ / \\
+1   2
+\`\`\`
 
-  The boxed subtree [4,1,2] matches subRoot → TRUE`,
+The subtree rooted at 4 has the same shape and values as subRoot, so the answer is true.`,
   examples: [
     {
       input: "root = [3,4,5,1,2], subRoot = [4,1,2]",
