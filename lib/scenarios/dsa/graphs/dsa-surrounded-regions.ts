@@ -84,5 +84,23 @@ Example visualization:
       ],
       description: "All border - none captured",
     },
+    // Neither case above has an interior O that survives, so flipping every interior cell,
+    // and sparing only the O's sitting ON the border rather than those connected to one,
+    // both passed. Here the middle O is interior but reaches the edge through (0, 1).
+    {
+      input: {
+        board: [
+          ["X", "O", "X"],
+          ["X", "O", "X"],
+          ["X", "X", "X"],
+        ],
+      },
+      expected: [
+        ["X", "O", "X"],
+        ["X", "O", "X"],
+        ["X", "X", "X"],
+      ],
+      description: "Interior O connected to the border survives",
+    },
   ],
 }
