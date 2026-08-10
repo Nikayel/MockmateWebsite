@@ -97,5 +97,14 @@ An Anagram is a word or phrase formed by rearranging the letters of a different 
       description: "No anagrams (order-independent comparison)",
       compareAsSet: true,
     },
+    // Wherever two words above shared a set of letters they also shared the counts, so
+    // keying on the distinct characters grouped them the same way. Anagrams need matching
+    // MULTISETS: "aab" and "abb" use the same two letters and are not anagrams.
+    {
+      input: { strs: ["aab", "abb"] },
+      expected: [["aab"], ["abb"]],
+      description: "Same letters, different counts, so not anagrams",
+      compareAsSet: true,
+    },
   ],
 }
