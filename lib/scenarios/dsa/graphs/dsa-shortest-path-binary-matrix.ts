@@ -13,18 +13,19 @@ export const shortestPathBinaryMatrixScenario: DSAScenario = {
   estimatedTime: 20,
   problemStatement: `Given an n x n binary matrix grid, return the length of the shortest clear path from top-left to bottom-right. A clear path connects 0s and can move in 8 directions. Return -1 if no such path exists.
 
-Example visualization:
+Example:
 
-  ┌───┬───┬───┐     8 directions:
-  │ 0 │ 0 │ 0 │       ↖ ↑ ↗
-  ├───┼───┼───┤       ← ● →
-  │ 1 │ 1 │ 0 │       ↙ ↓ ↘
-  ├───┼───┼───┤
-  │ 1 │ 1 │ 0 │
-  └───┴───┴───┘
+\`\`\`
+┌───┬───┬───┐        the 8 moves
+│ 0 │ 0 │ 0 │          ↖ ↑ ↗
+├───┼───┼───┤          ← ● →
+│ 1 │ 1 │ 0 │          ↙ ↓ ↘
+├───┼───┼───┤
+│ 1 │ 1 │ 0 │
+└───┴───┴───┘
+\`\`\`
 
-  Path: (0,0) → (0,1) → (0,2) → (1,2) → (2,2)
-  Length: 4 cells`,
+One clear path runs (0,0), (0,1), (0,2), (1,2), (2,2), which visits 4 cells.`,
   examples: [
     { input: "grid = [[0,1],[1,0]]", output: "2" },
     { input: "grid = [[0,0,0],[1,1,0],[1,1,0]]", output: "4" },
