@@ -67,5 +67,19 @@ export const dsaTwoSumBstScenario: DSAScenario = {
       expected: false,
       description: "Target does not exist",
     },
+    // Two cases were not enough to pin the problem down. k = 9 happens to be both the
+    // smallest plus the largest value AND a pair of neighbours in sorted order, so
+    // "check min + max" and "check adjacent pairs only" both passed; and no case asked for
+    // a k that a single node could reach on its own.
+    {
+      input: { root: [5, 3, 6, 2, 4, null, 7], k: 4 },
+      expected: false,
+      description: "2 + 2 would reach k, but one node cannot be used twice",
+    },
+    {
+      input: { root: [5, 3, 6, 2, 4, null, 7], k: 10 },
+      expected: true,
+      description: "The pair (3, 7) is neither adjacent in order nor the min and max",
+    },
   ],
 }
