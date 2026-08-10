@@ -31,19 +31,20 @@ Implement the LRUCache class:
 
 The functions get and put must each run in O(1) average time complexity.
 
-Example visualization (capacity=2):
+Example, with capacity 2:
 
-  ┌─────────────────────────────────────┐
-  │  HashMap: O(1) lookup               │
-  │  {1→NodeA, 2→NodeB}                 │
-  └─────────────────────────────────────┘
-            ↓           ↓
-  ┌──────────────────────────────────────────┐
-  │  Doubly Linked List (order of use):      │
-  │  HEAD ↔ [1,1] ↔ [2,2] ↔ TAIL             │
-  │         LRU     MRU                      │
-  │  (evict ←)      (← new items go here)    │
-  └──────────────────────────────────────────┘`,
+\`\`\`
+LRUCache(2)
+put(1, 1)     cache holds 1
+put(2, 2)     cache holds 1, 2
+get(1)   -> 1 reading 1 counts as using it
+put(3, 3)     over capacity, so 2 is evicted
+get(2)   -> -1
+put(4, 4)     over capacity, so 1 is evicted
+get(1)   -> -1
+get(3)   -> 3
+get(4)   -> 4
+\`\`\``,
   examples: [
     {
       input: "LRUCache(2); put(1,1); put(2,2); get(1); put(3,3); get(2)",
