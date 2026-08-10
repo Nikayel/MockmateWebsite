@@ -63,5 +63,13 @@ The successor of a node p is the node with the smallest key greater than p.val.`
       expected: 4,
       description: "Successor in right subtree",
     },
+    // Every tree above holds consecutive integers, so simply answering p + 1 whenever that
+    // value happens to be in the tree matched every case. Non-consecutive values separate
+    // "the next value in sorted order" from "one more than p".
+    {
+      input: { root: [10, 5, 15], p: 5 },
+      expected: 10,
+      description: "Non-consecutive values: the successor is not p + 1",
+    },
   ],
 }
