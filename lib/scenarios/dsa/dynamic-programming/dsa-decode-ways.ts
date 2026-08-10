@@ -65,5 +65,8 @@ Given a string s containing only digits, return the number of ways to decode it.
     { input: { s: "10" }, expected: 1, description: "Only J (10)" },
     { input: { s: "2101" }, expected: 1, description: "Complex with zeros" },
     { input: { s: "11106" }, expected: 2, description: "AAJ F or KJF" },
+    // No pair above falls in 27-29, so a solution whose two-digit test was <= 29 instead of
+    // <= 26 passed. The alphabet stops at 26, so "27" has exactly one decoding.
+    { input: { s: "27" }, expected: 1, description: "Two-digit pair above 26 is not a letter" },
   ],
 }
