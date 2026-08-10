@@ -14,15 +14,17 @@ export const maximumDepthBinaryTreeScenario: DSAScenario = {
 
 A binary tree's maximum depth is the number of nodes along the longest path from the root node down to the farthest leaf node.
 
-Example visualization:
+Example:
 
-      3         ← Level 1 (depth 1)
+\`\`\`
+      3
      / \\
-    9  20       ← Level 2 (depth 2)
+    9  20
        / \\
-      15  7     ← Level 3 (depth 3)
+      15  7
+\`\`\`
 
-  Maximum depth = 3`,
+The longest root-to-leaf path passes 3 nodes, so the maximum depth is 3.`,
   examples: [
     {
       input: "root = [3,9,20,null,null,15,7]",
