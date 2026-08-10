@@ -261,6 +261,13 @@ export function getComplexityRank(complexity: string): number {
     return 10
   }
 
+  // Linear in graph/multi-variable inputs: O(V+E), O(N+M), O(E), O(K)... Without
+  // this, O(V+E) fell to the unknown rank and the wrong_complexity guards flagged
+  // candidates who correctly said O(n+m) on graph problems.
+  if (/^O\([A-Z](\+[A-Z])?\)$/.test(normalized)) {
+    return 40
+  }
+
   return 50 // Unknown - treat as middle ground
 }
 
