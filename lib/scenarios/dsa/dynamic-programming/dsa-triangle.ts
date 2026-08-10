@@ -58,5 +58,15 @@ For each step, you may move to an adjacent number of the row below. More formall
     },
     { input: { triangle: [[-10]] }, expected: -10, description: "Single element" },
     { input: { triangle: [[2], [3, 4]] }, expected: 5, description: "Two rows" },
+    // Above, each row's smallest value happened to sit on the best path, so summing the row
+    // minima matched, and stepping to the cheaper neighbour each time did too. Here the
+    // cheap 2 leads into a wall of 9s while the expensive 9 opens onto the 1.
+    {
+      input: {
+        triangle: [[1], [2, 9], [9, 9, 1]],
+      },
+      expected: 11,
+      description: "Cheaper next step leads to the worse total",
+    },
   ],
 }
