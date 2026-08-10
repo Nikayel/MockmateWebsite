@@ -53,6 +53,13 @@ A valid BST is defined as follows:
       expected: false,
       description: "Invalid - 3 < 5 but in right subtree",
     },
+    // Every value above is distinct, so an inorder walk checking `<=` instead of `<` passed.
+    // A BST requires strictly less on the left, so a duplicate is invalid.
+    {
+      input: { root: [2, 2, 3] },
+      expected: false,
+      description: "Duplicate value: the left child must be strictly less",
+    },
   ],
 
   // Proactive AI Interviewer Fields
