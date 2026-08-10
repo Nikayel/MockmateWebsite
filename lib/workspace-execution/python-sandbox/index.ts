@@ -1,4 +1,5 @@
 export { buildPythonWrapper, PYTHON_WRAPPER_LINE_OFFSET } from "./dsa-wrapper"
+export { sanitizePythonTraceback } from "./traceback"
 export { executePythonClientSide } from "./dsa-runner"
 export { executeWorkspaceScenarioPythonClientSide } from "./workspace-runner"
 export {

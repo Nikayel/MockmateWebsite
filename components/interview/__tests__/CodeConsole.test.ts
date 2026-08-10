@@ -100,3 +100,45 @@ describe("formatErrorMessage", () => {
     expect(title).toMatch(/on line 62/)
   })
 })
+
+// The console once titled a candidate's `for course in numCourses:` (their line 15) as
+// "Type Error on line 527": the first `line N` in a raw Pyodide traceback is always a
+// Pyodide-internal frame, and the blanket offset regex then rewrote 597 into 527. These
+// pin the python path: last-<exec>-frame wins, internals never render, and sanitized
+// runner output is never adjusted a second time.
+describe("python traceback display", () => {
+  const OFFSET = 70 // PYTHON_WRAPPER_LINE_OFFSET, inlined so a drift fails loudly here
+  const raw = `Traceback (most recent call last):
+  File "/lib/python312.zip/_pyodide/_base.py", line 597, in eval_code_async
+    await CodeRunner(
+  File "/lib/python312.zip/_pyodide/_base.py", line 411, in run_async
+    coroutine = eval(self.code, globals, locals)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<exec>", line ${OFFSET + 61}, in <module>
+  File "<exec>", line ${OFFSET + 15}, in canFinish
+TypeError: 'int' object is not iterable`
+
+  it("titles a raw traceback with the candidate's own line", () => {
+    const { title } = formatErrorMessage(raw, "python", 19)
+    expect(title).toBe("🟠 Type Error on line 15")
+  })
+
+  it("renders details without Pyodide internals or wrapper frames", () => {
+    const { details } = formatErrorMessage(raw, "python", 19)
+    expect(details).toContain("line 15, in canFinish")
+    expect(details).toContain("TypeError: 'int' object is not iterable")
+    expect(details).not.toContain("_pyodide")
+    expect(details).not.toContain("eval_code_async")
+    expect(details).not.toContain("527")
+    expect(details).not.toContain("line 61")
+  })
+
+  it("uses sanitized runner output verbatim - no second offset subtraction", () => {
+    const sanitized = `Traceback (most recent call last):
+  line 15, in canFinish
+TypeError: 'int' object is not iterable`
+    const { title, details } = formatErrorMessage(sanitized, "python", 19)
+    expect(title).toBe("🟠 Type Error on line 15")
+    expect(details).toBe(sanitized)
+  })
+})

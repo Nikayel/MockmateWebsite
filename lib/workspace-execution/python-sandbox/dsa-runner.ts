@@ -2,6 +2,7 @@ import type { DsaExecutionResult, DsaTestResult } from "../types"
 import { validateResultEnhanced } from "@/lib/validators"
 import { stripComments } from "../js-sandbox/comments"
 import { buildPythonWrapper } from "./dsa-wrapper"
+import { sanitizePythonTraceback } from "./traceback"
 import { runPythonInWorker } from "./worker-runner"
 
 export async function executePythonClientSide(
@@ -14,6 +15,9 @@ export async function executePythonClientSide(
 
   try {
     const cleanCode = stripComments(code, "python")
+    // Errors are sanitized at birth so every consumer — the console, the test rows, the
+    // interviewer's context — sees candidate-space line numbers and no Pyodide internals.
+    const userCodeLineCount = code.split("\n").length
 
     for (let index = 0; index < testCases.length; index++) {
       const testCase = testCases[index] as {
@@ -33,7 +37,9 @@ export async function executePythonClientSide(
           expected: testCase.expected,
           actual: null,
           passed: false,
-          error: runResult.error || "Execution failed",
+          error: runResult.error
+            ? sanitizePythonTraceback(runResult.error, userCodeLineCount)
+            : "Execution failed",
         })
         continue
       }

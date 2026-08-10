@@ -9,6 +9,7 @@ export {
 export {
   buildPythonWrapper,
   PYTHON_WRAPPER_LINE_OFFSET,
+  sanitizePythonTraceback,
   executePythonClientSide,
   executeWorkspaceScenarioPythonClientSide,
   executePackOracleClientSide,

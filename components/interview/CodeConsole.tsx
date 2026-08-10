@@ -12,6 +12,7 @@ import { TerminalOutput, TERMINAL_PRE } from "./TerminalOutput"
 import {
   PYTHON_WRAPPER_LINE_OFFSET,
   JAVASCRIPT_WRAPPER_LINE_OFFSET,
+  sanitizePythonTraceback,
   type PackRunView,
 } from "@/lib/workspace-execution"
 import { HARNESS_ERROR_NOTICE, isHarnessError } from "@/lib/workspace-execution/harness-errors"
@@ -86,6 +87,32 @@ function parseErrorLineNumber(
   // JavaScript: "at line 5" or "line 5" or ":5:"
   // Python: "line 5" or ", line 5" or "File "<string>", line 5"
   // TypeScript: "(5,10)" or ":5:"
+
+  if (language === "python") {
+    // Sanitized runner output (see sanitizePythonTraceback) already speaks in the
+    // candidate's line numbers and carries no `File "` markers: use it verbatim.
+    if (!error.includes('File "')) {
+      const match = error.match(/line\s+(\d+)/i)
+      if (!match) return null
+      const lineNum = parseInt(match[1], 10)
+      if (lineNum < 1) return null
+      if (userCodeLineCount && lineNum > userCodeLineCount) return userCodeLineCount
+      return lineNum
+    }
+    // Raw Pyodide traceback: the FIRST "line N" is always a Pyodide-internal frame
+    // (eval_code_async and friends) — that is how "line 527" got shown for a bug on
+    // line 15. The deepest `<exec>` frame that lands inside the candidate's file is
+    // the one they can act on.
+    const execFrames = [...error.matchAll(/File\s+"<exec>",\s+line\s+(\d+)/gi)]
+    for (let index = execFrames.length - 1; index >= 0; index--) {
+      const adjusted = parseInt(execFrames[index][1], 10) - PYTHON_WRAPPER_LINE_OFFSET
+      if (adjusted >= 1 && (!userCodeLineCount || adjusted <= userCodeLineCount)) {
+        return adjusted
+      }
+    }
+    // No usable exec frame (e.g. `File "<string>"` sources): fall through to the
+    // generic patterns below.
+  }
 
   const patterns = [
     /File\s+"<string>",\s+line\s+(\d+)/i, // Python: File "<string>", line 5
@@ -282,20 +309,28 @@ export function formatErrorMessage(
   }
 
   // Clean up the error message for display
-  // Remove wrapper-specific file paths and adjust line numbers in the message
   let details = error
 
-  // Replace wrapper line numbers with adjusted ones in the error message
-  const wrapperOffset =
-    language === "python" ? PYTHON_WRAPPER_LINE_OFFSET : JAVASCRIPT_WRAPPER_LINE_OFFSET
-  details = details.replace(/line\s+(\d+)/gi, (match, num) => {
-    const adjusted = parseInt(num, 10) - wrapperOffset
-    return adjusted > 0 ? `line ${adjusted}` : match
-  })
+  if (language === "python") {
+    // One authority for Python traceback shaping. Text with `File "` markers is a raw
+    // traceback and gets rewritten into candidate-space; text without them was already
+    // sanitized by the runner and must NOT be adjusted again — the old blanket
+    // `line N - offset` regex here double-shifted sanitized numbers and also
+    // "corrected" Pyodide-internal frame numbers into plausible nonsense (597 → 527).
+    if (error.includes('File "')) {
+      details = sanitizePythonTraceback(error, userCodeLineCount ?? Number.MAX_SAFE_INTEGER)
+    }
+  } else {
+    // Replace wrapper line numbers with adjusted ones in the error message
+    details = details.replace(/line\s+(\d+)/gi, (match, num) => {
+      const adjusted = parseInt(num, 10) - JAVASCRIPT_WRAPPER_LINE_OFFSET
+      return adjusted > 0 ? `line ${adjusted}` : match
+    })
 
-  // Remove the cryptic piston file paths
-  details = details.replace(/File\s+"[^"]*\/piston\/[^"]*",\s*/gi, "At ")
-  details = details.replace(/\/piston\/jobs\/[a-f0-9-]+\/file\d+\.code/gi, "your code")
+    // Remove the cryptic piston file paths
+    details = details.replace(/File\s+"[^"]*\/piston\/[^"]*",\s*/gi, "At ")
+    details = details.replace(/\/piston\/jobs\/[a-f0-9-]+\/file\d+\.code/gi, "your code")
+  }
 
   return { title, details, hint: hints[errorType] }
 }
