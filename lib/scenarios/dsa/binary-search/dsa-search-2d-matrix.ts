@@ -57,6 +57,20 @@ export const dsaSearch2dMatrixScenario: DSAScenario = {
       expected: false,
       description: "Target not found",
     },
+    // The only value ever found sat in the FIRST row, so `target in matrix[0]` passed. A
+    // target further down the matrix is what makes the search span every row.
+    {
+      input: {
+        matrix: [
+          [1, 3, 5, 7],
+          [10, 11, 16, 20],
+          [23, 30, 34, 60],
+        ],
+        target: 16,
+      },
+      expected: true,
+      description: "Target sits in a later row, not the first",
+    },
   ],
 
   // Proactive AI Interviewer Fields
