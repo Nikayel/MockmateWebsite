@@ -50,5 +50,13 @@ Implement encode and decode functions.`,
     },
     { input: { strs: [""] }, expected: [""], description: "Empty string in list" },
     { input: { strs: [] }, expected: [], description: "Empty list" },
+    // No string above contains a separator character, so joining on "#" (or "," or any
+    // single delimiter) and splitting it back passed. The whole point of the problem is
+    // that the payload may contain whatever character the encoding uses.
+    {
+      input: { strs: ["a#b", "c,d", "3#x"] },
+      expected: ["a#b", "c,d", "3#x"],
+      description: "Payload contains the delimiter characters an encoding might use",
+    },
   ],
 }
