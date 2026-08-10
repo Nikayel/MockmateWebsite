@@ -116,6 +116,9 @@ export function ComparisonSection() {
   const isInView = useInView(sectionRef, { once: true, amount: 0.1 })
   const proMonthly = getProPricing("website").monthly
 
+  // "Available 24/7, no scheduling" and "Practice anytime, 24/7" were two rows
+  // making the identical claim with identical values, which pads a six-row
+  // comparison to look like it has more evidence than it does. Kept once.
   const features = [
     {
       feature: "Practice speaking through solutions",
@@ -132,7 +135,6 @@ export function ComparisonSection() {
       codesparring: true,
     },
     { feature: "Spaced repetition system", leetcode: false, human: false, codesparring: true },
-    { feature: "Practice anytime, 24/7", leetcode: true, human: false, codesparring: true },
   ]
 
   // Shared font stacks from Design.md — resolved via CSS variables set in globals.css
