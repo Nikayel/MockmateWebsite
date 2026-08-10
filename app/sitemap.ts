@@ -15,18 +15,21 @@
  * lesson are walked out of `lib/tutorials/course-catalog.ts` at build time. Nothing below hardcodes
  * a lesson id, a level, or a count.
  *
- * ## Why Learn URLs carry no `lastModified`
+ * ## Why only blog posts carry `lastModified`
  *
- * The honest value would be the last commit that touched the lesson's source file. It is not
- * available at build time: Vercel clones shallow (`--depth=10`) with no remote, so a `git log` on a
- * curriculum file almost always falls outside the fetched range and returns nothing. That would emit
- * either an empty value or, worse, the clone timestamp on every lesson, which tells a crawler the
- * entire corpus changes on every deploy and trains it to ignore the field. An absent `lastmod` is a
- * legal, well-understood sitemap and is strictly better than a wrong one, so Learn URLs omit it.
+ * For Learn URLs the honest value would be the last commit that touched the lesson's source file. It
+ * is not available at build time: Vercel clones shallow (`--depth=10`) with no remote, so a `git log`
+ * on a curriculum file almost always falls outside the fetched range and returns nothing. That would
+ * emit either an empty value or, worse, the clone timestamp on every lesson, which tells a crawler
+ * the entire corpus changes on every deploy and trains it to ignore the field. An absent `lastmod` is
+ * a legal, well-understood sitemap and is strictly better than a wrong one.
  *
- * The static marketing pages keep their pre-existing build-time timestamp. That is not defensible
- * either, but changing it is a behaviour change for sixty-odd unrelated URLs and is out of scope
- * here; it is recorded as a follow-up rather than fixed silently.
+ * The static pages now follow the same rule. They used to stamp the build time on every entry, which
+ * asserted "all sixty-odd of these changed today" on every deploy. Search Console's response to the
+ * 545-URL sitemap was to leave nearly all of it in "Discovered - currently not indexed", and a
+ * provably false lastmod on every recrawl is exactly the signal that earns that treatment. Blog
+ * posts are the one section that keeps the field, because their front-matter date is authored and
+ * true. `sitemap.test.ts` pins this: no entry outside `/blog/` may carry a `lastModified`.
  *
  * ## Size
  *
@@ -99,119 +102,99 @@ function buildLearnPages(): MetadataRoute.Sitemap {
 }
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const currentDate = new Date().toISOString()
-
   // Core marketing pages - high priority
   const marketingPages: MetadataRoute.Sitemap = [
     {
       url: absoluteUrl("/"),
-      lastModified: currentDate,
       changeFrequency: "weekly",
       priority: 1.0,
     },
     {
       url: absoluteUrl("/pricing"),
-      lastModified: currentDate,
       changeFrequency: "weekly",
       priority: 0.9,
     },
     {
       url: absoluteUrl("/why-codesparring"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: absoluteUrl("/docs"),
-      lastModified: currentDate,
       changeFrequency: "weekly",
       priority: 0.8,
     },
     // SEO Landing Pages
     {
       url: absoluteUrl("/ai-coding-interview-practice"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.9,
     },
     {
       url: absoluteUrl("/system-design-interview-practice"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.9,
     },
     {
       url: absoluteUrl("/bug-fix-interview-practice"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.9,
     },
     {
       url: absoluteUrl("/software-engineer-interview-practice"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.9,
     },
     {
       url: absoluteUrl("/new-grad-coding-interview-practice"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.9,
     },
     // Comparison Pages
     {
       url: absoluteUrl("/codesparring-vs-leetcode"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: absoluteUrl("/codesparring-vs-hellointerview"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: absoluteUrl("/codesparring-vs-interviewing-io"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: absoluteUrl("/codesparring-vs-pramp"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: absoluteUrl("/best-ai-coding-interview-tools"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     // Guides
     {
       url: absoluteUrl("/guides/how-to-practice-bug-fix-interviews"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: absoluteUrl("/guides/how-to-talk-through-coding-interviews"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     {
       url: absoluteUrl("/guides/what-is-a-real-world-coding-interview-round"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.8,
     },
     // Free Public Practice
     {
       url: absoluteUrl("/free-ai-coding-interview"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.9,
     },
@@ -219,13 +202,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // and were simply never listed here, so neither had a submitted path into the index.
     {
       url: absoluteUrl("/rounds"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.9,
     },
     {
       url: absoluteUrl("/labs"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.9,
     },
@@ -235,7 +216,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // their front matter: authoring a lab should put it in the sitemap, not require a second edit here.
   const caseLabPages: MetadataRoute.Sitemap = listCaseLabs().map((lab) => ({
     url: absoluteUrl(`/labs/${lab.id}`),
-    lastModified: currentDate,
     changeFrequency: "monthly" as const,
     priority: 0.8,
   }))
@@ -244,14 +224,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const interviewPrepPages: MetadataRoute.Sitemap = [
     {
       url: absoluteUrl("/interview-prep"),
-      lastModified: currentDate,
       changeFrequency: "weekly",
       priority: 0.9,
     },
     // Individual company prep pages
     ...ALL_COMPANIES.map((company) => ({
       url: absoluteUrl(`/interview-prep/${company.id}`),
-      lastModified: currentDate,
       changeFrequency: "monthly" as const,
       priority: 0.85,
     })),
@@ -261,7 +239,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const roadmapPages: MetadataRoute.Sitemap = [
     {
       url: absoluteUrl("/roadmap/preview"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.8,
     },
@@ -271,7 +248,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const blogListPage: MetadataRoute.Sitemap = [
     {
       url: absoluteUrl("/blog"),
-      lastModified: currentDate,
       changeFrequency: "weekly",
       priority: 0.9,
     },
@@ -290,25 +266,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const samplePages: MetadataRoute.Sitemap = [
     {
       url: absoluteUrl("/samples"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.7,
     },
     {
       url: absoluteUrl("/samples/two-sum-excellent"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.6,
     },
     {
       url: absoluteUrl("/samples/binary-tree-good"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.6,
     },
     {
       url: absoluteUrl("/samples/dynamic-programming-needs-work"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.6,
     },
@@ -318,25 +290,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const secondaryPages: MetadataRoute.Sitemap = [
     {
       url: absoluteUrl("/careers"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.5,
     },
     {
       url: absoluteUrl("/legal"),
-      lastModified: currentDate,
       changeFrequency: "yearly",
       priority: 0.3,
     },
     {
       url: absoluteUrl("/python-executor"),
-      lastModified: currentDate,
       changeFrequency: "monthly",
       priority: 0.5,
     },
     {
       url: absoluteUrl("/referral-terms"),
-      lastModified: currentDate,
       changeFrequency: "yearly",
       priority: 0.3,
     },

@@ -199,6 +199,20 @@ describe("sitemap", () => {
     expect(conflicts).toEqual([])
   })
 
+  it("stamps lastModified only where a real authored date exists: blog posts", () => {
+    // Everything else used to carry the build timestamp, which asserts "the whole site changed"
+    // on every deploy and trains a crawler to discount the field. An absent lastmod is legal and
+    // strictly better than a wrong one, so blog posts (front-matter date) are the only entries
+    // allowed to carry it.
+    const blogPostUrls = new Set(
+      getAllBlogPosts().map((post) => `${SITE_ORIGIN}/blog/${post.slug}`)
+    )
+    const stamped = entries.filter((entry) => entry.lastModified !== undefined)
+    const offenders = stamped.map((entry) => entry.url).filter((url) => !blogPostUrls.has(url))
+    expect(offenders).toEqual([])
+    expect(stamped.length).toBe(getAllBlogPosts().length)
+  })
+
   it("actually loaded the curriculum registries", () => {
     // A loose lower bound, not a pinned count: the corpus grows continuously. Its only job is to
     // fail loudly if a registry import silently resolves to an empty array, which would make every
