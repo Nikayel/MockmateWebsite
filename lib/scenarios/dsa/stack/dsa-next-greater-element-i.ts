@@ -53,5 +53,12 @@ Return an array ans of length nums1.length such that ans[i] is the next greater 
       expected: [3, -1],
       description: "Ascending array",
     },
+    // Wherever a next greater element existed it sat immediately after the value, so only
+    // looking at the following position passed. Here 3 has to skip past the smaller 2.
+    {
+      input: { nums1: [3], nums2: [1, 3, 2, 4] },
+      expected: [4],
+      description: "Next greater element is not the adjacent one",
+    },
   ],
 }
