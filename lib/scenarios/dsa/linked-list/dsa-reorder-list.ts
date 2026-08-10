@@ -12,20 +12,13 @@ export const reorderListScenario: DSAScenario = {
   estimatedTime: 25,
   problemStatement: `You are given the head of a singly linked-list. Reorder it to: L0 → Ln → L1 → Ln-1 → L2 → Ln-2 → ... You may not modify values in the list's nodes. Only nodes themselves may be changed.
 
-Example visualization:
+Example:
 
-  Input:   1 → 2 → 3 → 4 → 5
+\`\`\`
+Input    1 → 2 → 3 → 4 → 5
 
-  Step 1: Find middle → split into two halves
-          1 → 2 → 3    and    4 → 5
-
-  Step 2: Reverse second half
-          1 → 2 → 3    and    5 → 4
-
-  Step 3: Merge alternately
-          1 → 5 → 2 → 4 → 3
-
-  Output:  1 → 5 → 2 → 4 → 3`,
+Output   1 → 5 → 2 → 4 → 3
+\`\`\``,
   examples: [
     { input: "head = [1,2,3,4]", output: "[1,4,2,3]" },
     { input: "head = [1,2,3,4,5]", output: "[1,5,2,4,3]" },
