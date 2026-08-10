@@ -106,6 +106,12 @@ export async function POST(request: NextRequest) {
       hintsUsed: hintsUsed || 0,
       hintsTotal: 5, // Default assumption
       problemDifficulty: difficulty || "medium",
+      // Chat time is not coding time: without these counts analyzeTime charged
+      // the full wall clock - including every interviewer exchange - against a
+      // pure-coding budget (estimatedCommunicationMinutes was always 0 here).
+      interviewerMessagesCount: conversationTranscript?.filter((m) => m.role === "interviewer")
+        .length,
+      aiMessagesCount: conversationTranscript?.filter((m) => m.role === "ai_partner").length,
     }
 
     const masteryResult = calculateMasteryScore(masteryInput)
