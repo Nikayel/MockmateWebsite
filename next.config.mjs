@@ -26,11 +26,6 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'hebbkx1anhila5yf.public.blob.vercel-storage.com',
       },
-      {
-        // Used by the pricing page's "Traditional vs. Interactive" comparison.
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-      },
     ],
   },
   // Mark firebase-admin as a server-only package (Next.js 15+)
