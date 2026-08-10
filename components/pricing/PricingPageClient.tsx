@@ -33,7 +33,9 @@ export function PricingPageClient({ faqs }: PricingPageClientProps) {
         <div className="container mx-auto max-w-4xl px-4">
           {/* Minimal Header */}
           <div className="mb-4 text-center">
-            <h1 className="text-2xl font-bold text-white md:text-3xl">Choose Your Plan</h1>
+            <h1 className="font-heading text-foreground text-2xl font-bold md:text-3xl">
+              Choose Your Plan
+            </h1>
           </div>
 
           {/* Billing Toggle - Inline */}
