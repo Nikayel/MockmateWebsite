@@ -1,4 +1,8 @@
+import { PRICING_CONFIG } from "@/lib/config"
+import { getLeetCodeSavingsPercent } from "@/lib/pricing-comparison"
 import { PricingPageClient } from "@/components/pricing/PricingPageClient"
+
+const { monthly, yearly } = PRICING_CONFIG.pro.website
 
 /**
  * Pricing Page - Server Component
@@ -17,13 +21,11 @@ const faqs = [
   },
   {
     question: "Is there a free trial?",
-    answer:
-      "The free plan gives you 20+ problems with unlimited practice and 8 full interview sessions per month. Full AI feedback included, plus free Python, SQL, and System Design courses to build your fundamentals. No credit card required.",
+    answer: `The free plan gives you 20+ problems with unlimited practice and ${PRICING_CONFIG.free.sessionsPerMonth} full interview sessions per month. Full AI feedback included, plus free Python, SQL, and System Design courses to build your fundamentals. No credit card required.`,
   },
   {
     question: "How does billing work?",
-    answer:
-      "Pro subscriptions can be billed monthly ($25/mo) or yearly ($225/year, saving you $75). Yearly plans are charged as a one-time payment for 12 months of access.",
+    answer: `Pro subscriptions can be billed monthly (${monthly.priceDisplay}/mo) or yearly (${yearly.totalDisplay}/year, saving you $${yearly.savings}). Yearly plans are charged as a one-time payment for 12 months of access.`,
   },
   {
     question: "What if I'm not satisfied?",
@@ -32,8 +34,7 @@ const faqs = [
   },
   {
     question: "How is this different from LeetCode Premium?",
-    answer:
-      "LeetCode gives you problems. We give you a system. Our spaced repetition algorithm schedules reviews at the optimal time for long-term retention, plus you get AI-powered mock interviews that feel like the real thing. And we're 29% cheaper.",
+    answer: `LeetCode gives you problems. We give you a system. Our spaced repetition algorithm schedules reviews at the optimal time for long-term retention, plus you get AI-powered mock interviews that feel like the real thing. And we're ${getLeetCodeSavingsPercent()}% cheaper.`,
   },
   {
     question: "What counts as a 'scenario'?",
