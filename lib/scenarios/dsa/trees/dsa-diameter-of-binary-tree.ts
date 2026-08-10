@@ -83,6 +83,14 @@ Example visualization:
       expected: 0,
       description: "Single node - no edges",
     },
+    // Every case above has its longest path running through the root, so adding the root's
+    // two subtree heights passed. Here the root has one child, and the longest path (four
+    // edges, 6-4-2-5-7) lives entirely inside that subtree.
+    {
+      input: { root: [1, 2, null, 4, 5, 6, null, null, 7] },
+      expected: 4,
+      description: "Longest path does not pass through the root",
+    },
   ],
 
   // Proactive AI Interviewer Fields
