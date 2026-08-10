@@ -195,7 +195,11 @@ function FeatureRow({
     }
     return (
       <>
-        <X aria-hidden className="text-muted-foreground/60 mx-auto h-4 w-4" />
+        {/* Full strength, not /60. Fading it to 60% blends to #a7a49f on the
+            light card, which is 2.48:1 and still under the 3:1 floor WCAG 1.4.11
+            sets for a graphic that carries meaning. The X shape and the sr-only
+            label already mark it as the negative; it does not need to be faint. */}
+        <X aria-hidden className="text-muted-foreground mx-auto h-4 w-4" />
         <span className="sr-only">No</span>
       </>
     )
