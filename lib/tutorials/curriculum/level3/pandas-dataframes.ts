@@ -336,6 +336,8 @@ df.shape       # (3, 3)
 }
 \`\`\`
 
+Note the capital letter in that fix: \`int64\` is NumPy's integer dtype and has no way to spell "missing", while \`Int64\` is pandas' own nullable integer dtype, which stores whole numbers alongside a separate missing marker (\`pd.NA\`). Same width, different type, and the capital \`I\` is the only thing on the page that tells them apart. \`df["id"] = df["id"].astype("Int64")\` keeps ids printing as \`1\` rather than \`1.0\`.
+
 ## Selecting
 
 \`\`\`python
