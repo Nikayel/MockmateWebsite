@@ -2,6 +2,15 @@ import type { Scenario, ScenarioType } from "@/lib/scenarios"
 import { EXERCISE_TYPES } from "./scenario-display"
 
 /**
+ * The Debugging track's designed first click. One shared constant so the
+ * browser (pins it to the top of the track) and both card variants (render
+ * the "Start here" chip) can never disagree about which scenario it is.
+ * bugfix-onboarding: easy, 15 minutes, and the bug is a misplaced status
+ * guard inside a two-sum lookup, a first rep that pays off fast.
+ */
+export const STARTER_SCENARIO_ID = "bugfix-onboarding"
+
+/**
  * Derived, display-only context for a scenario card. Keeps the "what makes this
  * problem worth picking" logic in one place so the grid card and any compact
  * row variant stay consistent (no duplicated per-type formatting).

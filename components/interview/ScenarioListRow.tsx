@@ -8,6 +8,7 @@ import type { Scenario } from "@/lib/scenarios"
 import type { UsageLimit } from "@/lib/stores"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { getTypeConfig } from "./scenario-display"
+import { STARTER_SCENARIO_ID } from "./scenario-card-meta"
 
 interface ScenarioListRowProps {
   scenario: Scenario
@@ -72,7 +73,15 @@ export const ScenarioListRow = memo(function ScenarioListRow({
 
       {/* Title + meta (the flexible, truncating column) */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="text-foreground truncate font-medium">{scenario.title}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="text-foreground truncate font-medium">{scenario.title}</span>
+          {/* Same starter chip as the card view; the title truncates, the chip does not. */}
+          {scenario.id === STARTER_SCENARIO_ID && !isCompleted && (
+            <span className="bg-accent/10 text-accent-strong flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium">
+              Start here
+            </span>
+          )}
+        </span>
         <span className="text-muted-foreground flex items-center gap-2 truncate text-xs">
           <span className="sm:hidden">{typeConfig.label}</span>
           <span className="hidden items-center gap-1 sm:inline-flex">

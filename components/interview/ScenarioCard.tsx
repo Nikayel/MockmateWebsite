@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import type { Scenario, ScenarioType } from "@/lib/scenarios"
 import type { UsageLimit } from "@/lib/stores"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
-import { getScenarioCardContext } from "./scenario-card-meta"
+import { getScenarioCardContext, STARTER_SCENARIO_ID } from "./scenario-card-meta"
 
 interface ScenarioCardProps {
   scenario: Scenario
@@ -77,6 +77,13 @@ export const ScenarioCard = memo(function ScenarioCard({
           >
             {scenario.difficulty}
           </span>
+          {/* The designed first rep gets a quiet invitation; once solved, the
+              Solved chip carries the story instead. */}
+          {scenario.id === STARTER_SCENARIO_ID && !isCompleted && (
+            <span className="bg-accent/10 text-accent-strong rounded-full px-2 py-0.5 text-[11px] font-medium">
+              Start here
+            </span>
+          )}
         </div>
         {isCompleted && (
           <span className="bg-neural/10 text-neural inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium">
