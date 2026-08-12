@@ -446,7 +446,7 @@ with ThreadPoolExecutor(max_workers=4) as executor:
     print(list(executor.map(double, [1, 2, 3])))   # [2, 4, 6]
 \`\`\`
 
-\`executor.map\` returns results in **input order**, not completion order, even though the tasks finish out of order. Swap in \`ProcessPoolExecutor\` and the code is identical. For finer control, \`executor.submit(fn, x)\` returns a \`Future\`, and \`as_completed(futures)\` yields them as they finish. Two things to remember about \`map\`: it returns a **lazy iterator**, so wrap it in \`list(...)\` when you need a real list (the exercise does), and it re-raises a worker's exception when you iterate to that result, not when you call \`map\`.
+\`executor.map\` returns results in **input order**, not completion order, even though the tasks finish out of order. Swap in \`ProcessPoolExecutor\` and the code is identical. For finer control, \`executor.submit(fn, x)\` returns a \`Future\`, and \`as_completed(futures)\` yields them as they finish. Two things to remember about \`map\`: it returns a **lazy iterator**, so wrap it in \`list(...)\` when you need a real list (the demo above does), and it re-raises a worker's exception when you iterate to that result, not when you call \`map\`.
 
 \`\`\`cswidget
 {
@@ -482,7 +482,7 @@ Independent tasks are safe to parallelize. Shared mutable state is not. \`count 
 
 ### Running where there are no threads
 
-This in-browser sandbox (Pyodide/WASM) has no OS threads, so building a pool raises \`RuntimeError: can't start new thread\`. A portable \`run_all\` tries the pool and falls back to a sequential map, producing identical ordered results everywhere:
+This in-browser sandbox (Pyodide/WASM) has no OS threads, so building a pool raises \`RuntimeError: can't start new thread\`. A portable helper tries the pool and falls back to a sequential map, producing identical ordered results everywhere:
 
 \`\`\`python
 try:

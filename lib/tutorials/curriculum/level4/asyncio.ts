@@ -550,7 +550,7 @@ asyncio.run(main())   # [10, 20, 30] after ~0.1s total, not 0.3s
 
 ### Why this sandbox uses a helper
 
-\`asyncio.run\` refuses to start when a loop is already running and raises \`RuntimeError\`. This sandbox runs your code *inside* a loop, so it hands you \`run_coroutines(coros)\` instead. It drives each coroutine with \`coro.send(None)\` and reads the return value off the resulting \`StopIteration\`. That works because the sandbox \`fetch_one\` awaits nothing, so a single \`send\` finishes it. You still build real coroutines with \`fetch_one(n)\`; you just pass them to \`run_coroutines\` in place of \`asyncio.run(asyncio.gather(*coros))\`.
+\`asyncio.run\` refuses to start when a loop is already running and raises \`RuntimeError\`. This sandbox runs your code *inside* a loop, so the exercises hand you a stand-in for it. The warm-up gives you \`run_coroutines(coros)\`, which drives each coroutine with \`coro.send(None)\` and reads the return value off the resulting \`StopIteration\`. That works because its \`fetch_one\` awaits nothing, so a single \`send\` finishes it. The workspace exercise instead ships a small read-only loop of its own, with \`sleep\`, \`spawn\` and \`wait_all\` standing in for \`asyncio.sleep\`, \`asyncio.create_task\` and awaiting a \`gather\`. Either way you are writing real coroutines; only the door into the loop changes.
 
 \`\`\`cswidget
 {

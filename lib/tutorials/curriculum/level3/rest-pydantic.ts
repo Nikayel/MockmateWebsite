@@ -577,7 +577,7 @@ User(id=int(raw["id"]), name=str(raw["name"]), active=bool(raw["active"]))
 }
 \`\`\`
 
-Reach for \`raw["id"]\` (indexing), not \`raw.get("id")\`. Indexing raises \`KeyError\` on a missing field, which is the "a missing field should raise" behavior the Practice wants. \`.get\` would silently hand you \`None\` and push the failure downstream.
+Reach for \`raw["id"]\` (indexing), not \`raw.get("id")\`. Indexing raises \`KeyError\` on a missing field, so the absence is reported where it happened. \`.get\` would silently hand you \`None\` and push the failure downstream. When a boundary has to keep going instead of stopping at the first problem, ask \`"id" in raw\` first: that way a missing key is still a distinct, named outcome rather than a \`None\` you cannot tell apart from a real null.
 
 ### Pitfall: \`bool()\` of a string is almost always \`True\`
 

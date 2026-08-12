@@ -395,7 +395,7 @@ class Account:
 
 ### Across modules
 
-Hints behave identically when code spans files. In the \`stats\` package, \`stats/summary.py\` can import a helper (\`from stats.rounding import round2\`) and annotate \`average\` exactly as it would in a single file. The annotation documents the boundary so a caller in another module knows the shape without opening the source.
+Hints behave identically when code spans files. A module can import a class from a sibling module (\`from catalog.models import Shipment\`) and then annotate its own functions with that class exactly as it would in a single file. The annotation documents the boundary so a caller in another module knows the shape without opening the source.
 
 ### Pitfalls
 
@@ -424,7 +424,7 @@ Hints behave identically when code spans files. In the \`stats\` package, \`stat
 \`\`\`
 
 - **Hints are not runtime validation.** If you need to reject bad input at runtime, you still write an explicit check or reach for a validator like \`pydantic\`. \`-> float\` guarantees nothing on its own.
-- **\`round\` on floats can surprise you.** Two separate effects combine. First, \`round\` breaks exact ties to the nearest even digit, so \`round(2.5)\` is \`2\`, not \`3\`. Second, most decimals are not exactly representable: \`2.675\` is stored as \`2.67499...\`, so \`round(2.675, 2)\` returns \`2.67\`, not \`2.68\`, because the stored value is already below the tie. Expect small surprises when the Practice \`round2\` helper trims a mean to 2 decimals.
+- **\`round\` on floats can surprise you.** Two separate effects combine. First, \`round\` breaks exact ties to the nearest even digit, so \`round(2.5)\` is \`2\`, not \`3\`. Second, most decimals are not exactly representable: \`2.675\` is stored as \`2.67499...\`, so \`round(2.675, 2)\` returns \`2.67\`, not \`2.68\`, because the stored value is already below the tie. Expect small surprises when the Apply warm-up rounds a mean to 2 decimals.
 
 **Interview nuance:** the interpreter ignores type hints at runtime. They are stored in a function's \`__annotations__\` and read only by tools and libraries that opt in (checkers, editors, \`@dataclass\`, \`pydantic\`); the interpreter itself does zero type checking. So typed Python buys a build-time guarantee, not a runtime one, which is exactly why teams pair hints with \`mypy\` in CI rather than trusting them at the call site.
 

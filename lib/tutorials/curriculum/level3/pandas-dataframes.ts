@@ -443,7 +443,7 @@ df.dropna(subset=["amount"]) # drop the rows that are missing it
 
 ## What runs where
 
-\`pandas\` is not bundled into the Python build behind this browser sandbox, so \`import pandas\` fails here (and it would pull \`numpy\` in with it). In a real environment it is one \`pip install pandas\` (or \`uv add pandas\`) away, using the setup from "Running Python & installing packages". The exercises below build the same three mechanics over lists of dicts, missing values and all, so the model you take to the terminal already accounts for the parts that bite.
+\`pandas\` is not bundled into the Python build behind this browser sandbox, so \`import pandas\` fails here (and it would pull \`numpy\` in with it). In a real environment it is one \`pip install pandas\` (or \`uv add pandas\`) away, using the setup from "Running Python & installing packages". The exercises below build the same mechanics over lists of dicts, missing values and all, so the model you take to the terminal already accounts for the parts that bite.
 
 **Interview nuance:** for a data role, the question behind the question is almost always about missing data. Anyone can write \`groupby("region").sum()\`. The signal is knowing that a missing group key silently removes the row from the answer, that a missing value is skipped by the aggregation instead of poisoning it, and that one blank cell turns an integer column into \`float64\` and quietly breaks a join. Say what the default does, then say how you would check the total.`,
     demoCode: `# pandas is not bundled into this browser sandbox, so this demo builds the same three

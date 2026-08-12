@@ -503,7 +503,7 @@ sender.call_args_list        # [call('a'), call('b')]
 }
 \`\`\`
 
-This is why the Apply and Practice steps keep \`sender\` as a parameter: the driver passes in a recorder (Apply) or a real \`Mock\` (Practice), then asserts how you called it.
+This is why the Apply keeps \`sender\` as a parameter: its driver passes a recorder in and then asserts how you called it. The Practice works the same seam from the other side, on a billing service that takes its payment gateway as a parameter, and there the assertions on the recorder are yours to write.
 
 The recorder answers a handful of different questions, and mixing them up is why mock assertions pass when they should not:
 

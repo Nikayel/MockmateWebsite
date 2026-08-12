@@ -343,7 +343,7 @@ import app.coerce              # call it as app.coerce.coerce(...)
 from app.coerce import coerce  # call it as coerce(...)
 \`\`\`
 
-Here \`parse_config\` imports the read-only \`coerce\` helper and calls it. The type rule lives in exactly one place, so fixing it fixes every caller.
+In the Practice workspace the same thing happens across two modules: one imports the other, and both import shared constants from a read-only module. Each rule lives in exactly one place, so fixing it fixes every caller.
 
 ## Coercing a raw string to a type
 
@@ -437,7 +437,7 @@ Given \`"# db\\nhost = localhost\\nport = 8080"\`, this produces \`{"host": "loc
   "type": "check",
   "kind": "classify",
   "id": "which-lines-survive",
-  "prompt": "Sort each config line by what parse_config does with it.",
+  "prompt": "Sort each config line by what the parsing loop above does with it.",
   "buckets": ["Becomes an entry", "Skipped"],
   "items": [
     {
@@ -471,7 +471,7 @@ Given \`"# db\\nhost = localhost\\nport = 8080"\`, this produces \`{"host": "loc
       "feedback": "Key 'port' mapped to the int 8080. coerce trims the value and converts integer-looking text, so the caller gets a number rather than a padded string."
     }
   ],
-  "reveal": "Every guard in that loop exists because some real config file broke a parser that lacked it. Your Practice implementation has to survive all six of these lines, and the hidden tests check the awkward ones."
+  "reveal": "Every guard in that loop exists because some real config file broke a parser that lacked it. Your Practice reader has to survive all six of these lines, and the hidden tests check the awkward ones."
 }
 \`\`\``,
   },

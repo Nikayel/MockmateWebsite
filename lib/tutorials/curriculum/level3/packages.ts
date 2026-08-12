@@ -409,7 +409,7 @@ Read the arrows as "imports from". A healthy package is a graph you can walk in 
       "feedback": "Two dots means the parent of store, which is above the top-level package. Python stops you with 'attempted relative import beyond top-level package'."
     }
   ],
-  "reveal": "One rule covers all five: an import is resolved against the import path and the current package, never against the folder your file happens to sit in. In the Practice workspace, cart.py reaches catalog with the absolute form."
+  "reveal": "One rule covers all five: an import is resolved against the import path and the current package, never against the folder your file happens to sit in. In the Practice workspace, every module inside the package reaches its siblings with the absolute form."
 }
 \`\`\``,
     demoCode: `# one file now; a package next

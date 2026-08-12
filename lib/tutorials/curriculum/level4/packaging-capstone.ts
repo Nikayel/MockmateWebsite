@@ -579,7 +579,7 @@ def run_tests(record):
 export const packagingCapstoneLesson: PythonLesson = {
   id: "py-l4-packaging-capstone",
   title: "Packaging & a production capstone",
-  summary: "Build a typed, tested, packaged order service that integrates the whole track.",
+  summary: "Build a typed, tested, packaged feed reader that integrates the whole track.",
   estimatedMinutes: 45,
   difficulty: "hard",
   skills: ["packaging", "capstone", "type-hints", "testing"],
@@ -587,14 +587,14 @@ export const packagingCapstoneLesson: PythonLesson = {
     estimatedMinutes: 7,
     markdown: `## Packaging: the last mile
 
-Your code only creates value once someone else can run it. Packaging is how you hand a colleague \`pip install orders\` instead of a folder and a prayer. A published package pins your version, declares its dependencies, and installs the same way on every machine, which is exactly what CI, Docker images, and teammates depend on.
+Your code only creates value once someone else can run it. Packaging is how you hand a colleague \`pip install feedstore\` instead of a folder and a prayer. A published package pins your version, declares its dependencies, and installs the same way on every machine, which is exactly what CI, Docker images, and teammates depend on.
 
 ### What a wheel actually is
 
 A **wheel** (\`.whl\`) is a zip of your importable code plus metadata, named to a fixed convention. \`pyproject.toml\` is the single source of truth: the \`[project]\` table declares \`name\`, \`version\`, \`requires-python\`, and \`dependencies\`, plus a \`dev\` extra for \`pytest\`, \`ruff\`, and \`mypy\`. A \`[build-system]\` table names the build backend that turns the project into artifacts.
 
 \`\`\`bash
-uv build        # writes dist/orders-1.0.0.tar.gz and dist/orders-1.0.0-py3-none-any.whl
+uv build        # writes dist/feedstore-1.0.0.tar.gz and dist/feedstore-1.0.0-py3-none-any.whl
 uv publish      # uploads those artifacts to a package index (PyPI)
 \`\`\`
 
@@ -647,7 +647,7 @@ print(summarize(rows))
 # {'count': 2, 'paid': 1, 'revenue': 10.0}
 \`\`\`
 
-\`count\` is every order, \`paid\` is how many cleared, and \`revenue\` sums only the paid amounts. In the capstone, a read-only \`parse_order\` does this coercion for you, turning each raw dict into a typed \`Order\`.
+\`count\` is every order, \`paid\` is how many cleared, and \`revenue\` sums only the paid amounts. The capstone package has the same job at two boundaries: raw environment values become typed settings, and the raw text of a feed becomes rows.
 
 \`\`\`cswidget
 {
@@ -721,7 +721,7 @@ print(summarize(rows))
   "options": [
     {
       "label": "As a float, rounded to two decimals whenever it is displayed",
-      "feedback": "Simplest, and it is what the capstone does because the numbers are small and rounded exactly once. In a payments service the drift eventually shows up as a ledger that does not balance, and nobody can tell you which cent went missing."
+      "feedback": "Simplest, and it is what the warm-up does because the numbers are small and rounded exactly once. In a payments service the drift eventually shows up as a ledger that does not balance, and nobody can tell you which cent went missing."
     },
     {
       "label": "As an integer number of cents, converted to a display amount only at the boundary",

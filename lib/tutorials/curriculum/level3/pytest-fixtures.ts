@@ -764,7 +764,7 @@ def test_restock(stock, additions, expected):
 
 Two rows means two independent results, so a failure names the row instead of just "\`test_restock\` failed".
 
-The demo below shows the \`restock\` you will build. It copies \`stock\` with \`dict(stock)\`, then adds each quantity onto \`result.get(item, 0)\`, returning a new dict. This sandbox has no \`pytest\` installed, so the practice tests express the same ideas directly: a helper builds the base stock and a list of case tuples is looped over. The concepts (shared setup, a table of cases) are identical; only the injection machinery differs.
+The demo below shows the \`restock\` you will build. It copies \`stock\` with \`dict(stock)\`, then adds each quantity onto \`result.get(item, 0)\`, returning a new dict. This sandbox has no \`pytest\` installed, so the Practice ships \`minipytest\`, a small read-only stand-in offering the same three pieces under the same names: \`@fixture\` with \`yield\` teardown, \`@parametrize\`, and \`param(..., raises=...)\`. Only the machinery is smaller, so what you write there transfers.
 
 ### Pitfall: shared mutable fixtures
 
@@ -800,7 +800,7 @@ def base_stock():
     return {"apple": 5}
 \`\`\`
 
-Now every test in the module gets the same dict. If \`restock\` mutates its input (for example \`result = stock\` instead of \`result = dict(stock)\`, which makes \`result\` and \`stock\` the same object), one test's change bleeds into the next, and tests pass or fail depending on order. The Practice suite checks exactly this: return a new dict and never touch \`stock\`.
+Now every test in the module gets the same dict. If \`restock\` mutates its input (for example \`result = stock\` instead of \`result = dict(stock)\`, which makes \`result\` and \`stock\` the same object), one test's change bleeds into the next, and tests pass or fail depending on order. The Practice module carries the same hazard in a different disguise: one mutable object shared where each user of it should have had its own.
 
 \`\`\`cswidget
 {

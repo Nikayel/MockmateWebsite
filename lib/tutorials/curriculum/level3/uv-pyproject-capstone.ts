@@ -432,7 +432,7 @@ todo = "todo.cli:main"
 
 The \`[project]\` table holds metadata: the package \`name\`, its \`version\`, and its \`dependencies\`. Note that \`dependencies\` are ranges (\`httpx>=0.27\`), a statement of intent, not exact pins. The \`[project.scripts]\` table wires a console command (\`todo\`) to a function (\`main\` in \`todo.cli\`), so installing the package gives you a runnable CLI.
 
-Your capstone project is laid out this way: a \`todo/\` package directory holds modules like \`tasks.py\` (sample tasks) and \`report.py\` (where \`summary\` lives), with \`pyproject.toml\` at the root naming the package.
+Your capstone project is laid out this way: a \`shiftlog/\` package directory holds one module per job, with \`pyproject.toml\` at the root naming the package and pointing its console script at the function that runs the command.
 
 ### \`uv\`: resolve, lock, run
 
@@ -494,7 +494,7 @@ The mental model is two tiers. \`pyproject.toml\` declares intent as version ran
       "feedback": "It holds compiled binaries built for one machine and one Python version, and it is large. Anyone can regenerate it with uv sync in seconds."
     },
     {
-      "label": "the todo/ package source",
+      "label": "the shiftlog/ package source",
       "bucket": "Commit it",
       "feedback": "Your actual code. This is the part no tool can regenerate."
     },

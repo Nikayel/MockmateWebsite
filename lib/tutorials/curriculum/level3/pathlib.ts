@@ -325,7 +325,7 @@ numbers = [int(line) for line in text.splitlines() if line.strip()]
 print(sum(numbers))   # 60
 \`\`\`
 
-\`splitlines()\` breaks on line boundaries and drops the \`\\n\` characters. The \`if line.strip()\` guard skips blank or whitespace-only lines so \`int()\` never receives an empty string. \`int()\` itself strips surrounding whitespace, so \`int(" 10 ")\` returns \`10\` without extra work. This is exactly the shape both exercises want: first sum the numbers in a string, then read a real file with \`Path(path).read_text()\` and run the same pipeline.
+\`splitlines()\` breaks on line boundaries and drops the \`\\n\` characters. The \`if line.strip()\` guard skips blank or whitespace-only lines so \`int()\` never receives an empty string. \`int()\` itself strips surrounding whitespace, so \`int(" 10 ")\` returns \`10\` without extra work. That is the shape of the Apply warm-up: sum the numbers in a string. The Practice reads real files with \`Path(path).read_text()\` and runs a line-by-line pipeline like this one over each of them.
 
 ## Pitfalls
 

@@ -375,7 +375,7 @@ def test_mixed_transactions():
     assert result == 85               # assert
 \`\`\`
 
-Test-driven development runs this loop backwards: write the failing test first (red), then write the smallest code that makes it pass (green). Here the tests already exist. Your job is to implement \`balance_after\` so \`start + sum(transactions)\` produces the expected total and the suite turns green. The Practice puts that same function in a \`bank/account.py\` package with a real test file, plus hidden cases you cannot peek at.
+Test-driven development runs this loop backwards: write the failing test first (red), then write the smallest code that makes it pass (green). In the Apply warm-up the tests already exist, and your job is to implement \`balance_after\` so \`start + sum(transactions)\` produces the expected total and the suite turns green. The Practice turns that around: you are handed a documented module and you write the suite for it, and a hidden grader decides whether your tests would actually catch a broken build.
 
 ## Pitfall: a test that never runs still "passes"
 

@@ -496,7 +496,7 @@ print(fib(10))   # 55
 print(fib(30))   # 832040, instant thanks to the cache
 \`\`\`
 
-\`@lru_cache(maxsize=None)\` keeps every result; in Python 3.9+ the shorthand is \`@functools.cache\`. This is exactly what the exercises ask for: a memoized \`fib\` where each \`n\` is computed once.
+\`@lru_cache(maxsize=None)\` keeps every result; in Python 3.9+ the shorthand is \`@functools.cache\`. This is exactly what the warm-up asks for: a memoized \`fib\` where each \`n\` is computed once.
 
 ### Generators for memory
 

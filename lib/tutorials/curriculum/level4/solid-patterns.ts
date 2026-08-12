@@ -473,7 +473,7 @@ def price_for(kind, amount):
 print(price_for("member", 100))   # 90.0
 \`\`\`
 
-Adding a \`vip\` tier is one new function plus one dict entry. \`price_for\` itself never changes. That is open/closed in three lines, and it is exactly what you will build: first inline, then behind a \`pricing\` package.
+Adding a \`vip\` tier is one new function plus one dict entry. \`price_for\` itself never changes. That is open/closed in three lines, and it is exactly what you will build: first inline in the Apply, then across a multi-file package in the Practice.
 
 \`\`\`cswidget
 {

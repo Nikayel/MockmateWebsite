@@ -634,7 +634,7 @@ Because \`run\` receives its input, a test can call \`run(["mul", "4", "5"])\` a
       "feedback": "There is a real point buried in here: you do want at least one test that goes through the actual entry point. That is an integration test though. Making it the only way to test your logic is what makes a suite slow and brittle."
     }
   ],
-  "reveal": "The same split shows up everywhere: parsing and I/O at the edge, decisions in the middle. It is why the Practice exercise hands run its argv rather than letting it reach for sys.argv."
+  "reveal": "The same split shows up everywhere: parsing and I/O at the edge, decisions in the middle. It is why the Practice exercise hands main its argv and has it return its output, rather than letting it reach for sys.argv and print."
 }
 \`\`\`
 
