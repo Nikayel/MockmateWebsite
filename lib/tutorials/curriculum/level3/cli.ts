@@ -1,4 +1,5 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -24,9 +25,11 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // without any dispatch at all.
 // ───────────────────────────────────────────────────────────────────────────
 
-const CLI_README = `# Ticket TOOL-72: logtail takes options
-
-\`logtail\` currently accepts a command and some filenames and nothing else. Support said "it does
+const CLI_README = buildBrief({
+  lesson: "py-l3-cli",
+  kind: "ticket",
+  headline: "logtail takes options",
+  body: `\`logtail\` currently accepts a command and some filenames and nothing else. Support said "it does
 not even take --limit", so this ticket adds real option handling. Two files need work:
 \`cli/parser.py\` (argv to options) and \`cli/dispatch.py\` (commands, help, exit codes).
 
@@ -98,8 +101,8 @@ commands:
 \`\`\`
 
 The help is read off \`COMMANDS\`, so a command added tomorrow shows up without anyone editing the
-help. Some tests are hidden.
-`
+help.`,
+})
 
 const CLI_ERRORS = String.raw`"""The one error type the parser raises and the dispatcher catches."""
 
@@ -691,7 +694,7 @@ command and two integer arguments and return \`add\` or \`mul\` of them.
   practice: {
     id: "py-l3-cli-practice",
     executionMode: "workspace",
-    prompt: `Implement option handling for \`logtail\`, the small log tool in this workspace. Ticket TOOL-72
+    prompt: `Implement option handling for \`logtail\`, the small log tool in this workspace. The ticket
 says it must accept \`--limit 10\`, \`--limit=10\`, the short forms, a \`--\` after which a
 filename starting with a dash is still a filename, and it must answer a mistyped option with a
 clear message and exit code \`2\` rather than a traceback.

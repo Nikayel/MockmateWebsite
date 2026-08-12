@@ -1,9 +1,12 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const LG_README = `# The nightly meter import drops rows on the floor
-
-The overnight job that imports smart-meter readings finishes green every morning, and finance keeps
+const LG_README = buildBrief({
+  lesson: "py-l3-logging-errors",
+  kind: "bug-report",
+  headline: "The nightly meter import drops rows on the floor",
+  body: `The overnight job that imports smart-meter readings finishes green every morning, and finance keeps
 asking why the billed totals are short. The job wraps its loop in \`except Exception: continue\`, so
 every row it cannot read disappears without a trace. Your ticket: one bad row must not abort the
 run, and it must not vanish either.
@@ -63,10 +66,8 @@ logger.warning("some message %s and %s", first_value, second_value)
 
 That is the lazy-formatting habit from the lesson, and it is checked: the tests read your records
 back through \`ingest/runlog.py\` (read-only) and look at both the formatted message and the
-arguments you passed.
-
-Some tests are hidden.
-`
+arguments you passed.`,
+})
 
 const LG_RUNLOG = String.raw`"""Read-only. The capture the tests read your log records back out of.
 

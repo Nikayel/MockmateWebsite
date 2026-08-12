@@ -1,13 +1,16 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ───────────────────────────────────────────────────────────────────────────
 // L3-M4: Files, Data & Robustness
 // ───────────────────────────────────────────────────────────────────────────
 
-const PL_README = `# Summarize the nightly sensor export
-
-Every night a job drops sensor readings into \`exports/\`. The folders are created by whoever
+const PL_README = buildBrief({
+  lesson: "py-l3-pathlib",
+  kind: "ticket",
+  headline: "Summarize the nightly sensor export",
+  body: `Every night a job drops sensor readings into \`exports/\`. The folders are created by whoever
 installed each sensor, so the tree is uneven: some readings sit at the top, some are nested two
 directories deep, and unrelated files sit alongside them. The reporting job that reads this tree
 was written against a flat directory and misses most of it.
@@ -46,10 +49,8 @@ file's location relative to \`root\`, written with forward slashes.
 
 \`\`\`python
 {"path": "north/alpha.csv", "stem": "alpha", "readings": 2, "total": 30, "skipped": 0}
-\`\`\`
-
-Some tests are hidden.
-`
+\`\`\``,
+})
 
 const PL_ALPHA = "s1,10\ns2,20\n"
 const PL_NOTES = "installed the north sensors on tuesday\n"

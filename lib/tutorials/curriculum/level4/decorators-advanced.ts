@@ -3,6 +3,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ── Practice workspace: the ingest retry decorator ────────────────────────────
@@ -20,9 +21,11 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // The sandbox has no clock guarantees and no network, so failures come from a read-only scripted
 // feed rather than from sleeping or retrying a socket.
 
-const RETRY_README = `# The ingest jobs give up too early
-
-The nightly ingest talks to a feed that fails at random. Right now a single blip fails the whole
+const RETRY_README = buildBrief({
+  lesson: "py-l4-decorators-advanced",
+  kind: "bug-report",
+  headline: "the ingest jobs give up too early",
+  body: `The nightly ingest talks to a feed that fails at random. Right now a single blip fails the whole
 run, and the fix that was tried last week retried everything, including the corrupt records that
 will never succeed.
 
@@ -53,8 +56,8 @@ factory:
 
 \`ingest/feed.py\` is read-only. It is a scripted stand-in for the network: \`FEED.program([...])\`
 queues the outcomes the next reads will produce, and \`FEED.calls\` records what it was asked for.
-Some tests are hidden.
-`
+`,
+})
 
 const RETRY_FEED = String.raw`"""Read-only scripted stand-in for the ingest feed.
 

@@ -29,6 +29,7 @@
  * lines, a three-line repair).
  */
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 
 const EMPTY_INIT = ""
 
@@ -74,9 +75,12 @@ print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
 // Apply: the usage report's filter expressions
 // ───────────────────────────────────────────────────────────────────────────
 
-const FILTERS_README = `# Filter expressions for the usage report
-
-**The assistant's pull request.** Adds filter expressions to the usage report so a caller can
+const FILTERS_README = buildBrief({
+  lesson: "py-l5-unsafe-sink",
+  slot: "apply",
+  kind: "ticket",
+  headline: "filter expressions for the usage report",
+  body: `**The assistant's pull request.** Adds filter expressions to the usage report so a caller can
 narrow the rows without a new endpoint. \`match(row, expression)\` returns \`True\` when the row
 satisfies the expression. Every feature test passes.
 
@@ -94,9 +98,8 @@ The grammar is five rules, exactly:
 5. \`match\` returns \`True\` or \`False\`, and raises \`ValueError\` for anything else
 
 The visible suite holds the assistant's feature tests, which pass today, and two audit probes,
-which do not. The feature tests stay green so a repair that deletes the feature still fails. Some
-tests are hidden.
-`
+which do not. The feature tests stay green so a repair that deletes the feature still fails.`,
+})
 
 const FILTERS_DATA = String.raw`"""The rows the usage report renders. Read-only, shared by both suites."""
 
@@ -283,9 +286,11 @@ def run_tests(record):
 // Practice: the document service's fetch-by-path
 // ───────────────────────────────────────────────────────────────────────────
 
-const DOCSTORE_README = `# Serve a document by relative path
-
-**The assistant's pull request.** Adds fetch-by-relative-path to the team's document endpoint, so
+const DOCSTORE_README = buildBrief({
+  lesson: "py-l5-unsafe-sink",
+  kind: "ticket",
+  headline: "serve a document by relative path",
+  body: `**The assistant's pull request.** Adds fetch-by-relative-path to the team's document endpoint, so
 a caller can ask for \`guide.md\` instead of the team adding a route per document. The tests pass.
 
 **The reviewer's brief.** Audit \`docstore/service.py\` and repair \`fetch(rel_path)\`.
@@ -297,8 +302,8 @@ The contract:
 - a path that resolves under \`docs/\` but names no document raises \`LookupError\`
 - the documents that were served before are still served
 
-\`docstore/storage.py\` is the read-only store. Some tests are hidden.
-`
+\`docstore/storage.py\` is the read-only store.`,
+})
 
 const DOCSTORE_STORAGE = String.raw`"""The in-memory document store. Read-only."""
 

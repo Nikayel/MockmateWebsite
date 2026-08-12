@@ -1,4 +1,5 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -17,9 +18,11 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // a class-level dict inside the descriptor passes every single-instance test.
 // ───────────────────────────────────────────────────────────────────────────
 
-const SETTINGS_README = `# DEV-318: device profiles need real settings
-
-\`schema/profiles.py\` (read-only) declares device profiles by listing settings in the class body,
+const SETTINGS_README = buildBrief({
+  lesson: "py-l4-descriptors-metaclasses",
+  kind: "ticket",
+  headline: "device profiles need real settings",
+  body: `\`schema/profiles.py\` (read-only) declares device profiles by listing settings in the class body,
 for example \`brightness = Setting(minimum=0, maximum=100, default=50)\`. Nothing behind those
 declarations is implemented yet. Two files are yours.
 
@@ -44,9 +47,8 @@ declarations is implemented yet. Two files are yours.
 - a constructor \`Profile(**overrides)\` that applies each override through the same validation a
   plain assignment gets, and raises \`ValueError\` for a name that is not a declared setting
 - \`settings_snapshot()\`, returning a dict from every declared setting name to its current value
-
-Some tests are hidden.
-`
+`,
+})
 
 const SETTINGS_FIELDS_STARTER = String.raw`class Setting:
     """One declared, validated setting on a device profile (see README.md)."""

@@ -1,4 +1,5 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -13,9 +14,11 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // of array programming (shape checks, per-column broadcasting, axis=0 vs axis=1
 // aggregation, boolean masks, missing values that keep the shape) by hand.
 
-const TABLE_README = `# Repair the calibration report
-
-The overnight calibration report has been wrong since a sensor started dropping readings. The old
+const TABLE_README = buildBrief({
+  lesson: "py-l3-numpy-arrays",
+  kind: "ticket",
+  headline: "Repair the calibration report",
+  body: `The overnight calibration report has been wrong since a sensor started dropping readings. The old
 job deleted any row containing a gap, so the report silently shrank and the per-column totals came
 out low. The rewrite keeps every row and fills the gaps instead.
 
@@ -61,10 +64,8 @@ not a column index here and has to be rejected.
 {"shape": (3, 2), "row_totals": [...], "column_totals": [...], "grand_total": 198}
 \`\`\`
 
-It must call the \`readings.transform\` functions rather than repeat their work.
-
-Some tests are hidden.
-`
+It must call the \`readings.transform\` functions rather than repeat their work.`,
+})
 
 const TRANSFORM_STARTER = String.raw`"""Shape checks, gap filling and per-column offsets. See README.md for the contract."""
 

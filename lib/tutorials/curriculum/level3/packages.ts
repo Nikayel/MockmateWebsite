@@ -1,13 +1,16 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ───────────────────────────────────────────────────────────────────────────
 // L3-M1: Project Structure & Packaging  (py-l3-packages)
 // ───────────────────────────────────────────────────────────────────────────
 
-const PKG_README = `# Finish the reportkit split
-
-\`reportkit\` reads lines out of a log file and summarises them. It used to be one module. A
+const PKG_README = buildBrief({
+  lesson: "py-l3-packages",
+  kind: "ticket",
+  headline: "Finish the reportkit split",
+  body: `\`reportkit\` reads lines out of a log file and summarises them. It used to be one module. A
 teammate started splitting it up, got halfway, and left for the week.
 
 ## Where the migration got to
@@ -53,10 +56,8 @@ internal: they must not be reachable as \`reportkit.rank\` or \`reportkit.SEVERI
 
 Imports inside the package point one way, towards a leaf. \`levels.py\` is that leaf, so it imports
 nothing from \`reportkit.report\` or \`reportkit.scan\`. The tests check this, and they import
-through the documented public path, so correct function bodies in the wrong place still fail.
-
-Some tests are hidden.
-`
+through the documented public path, so correct function bodies in the wrong place still fail.`,
+})
 
 const PKG_REPORT = String.raw`"""Read-only. Already migrated: it imports from levels and scan, and from nothing else."""
 from reportkit.levels import rank

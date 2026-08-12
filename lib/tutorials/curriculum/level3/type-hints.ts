@@ -1,13 +1,16 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ───────────────────────────────────────────────────────────────────────────
 // L3-M2: Type Hints & Static Typing
 // ───────────────────────────────────────────────────────────────────────────
 
-const TH_README = `# The carrier export loader
-
-Every night a carrier drops a CSV of shipments. Each column arrives as a **string**, and the
+const TH_README = buildBrief({
+  lesson: "py-l3-type-hints",
+  kind: "ticket",
+  headline: "The carrier export loader",
+  body: `Every night a carrier drops a CSV of shipments. Each column arrives as a **string**, and the
 loader turns those strings into real Python values. The team's rule is that the class declaration
 is the single source of truth: what a field is called and what type it holds is written once, in
 the annotations, and the loader follows it.
@@ -49,8 +52,8 @@ def count_heavier_than(shipments: list[Shipment], grams: int) -> int: ...
   order they arrived in, relative to each other. An empty list gives an empty list.
 - \`count_heavier_than\` returns how many shipments weigh strictly more than \`grams\`.
 
-An unannotated function that computes the right answer still fails. Some tests are hidden.
-`
+An unannotated function that computes the right answer still fails.`,
+})
 
 const TH_COERCION = String.raw`"""Raw-column converters, keyed by the type a field declares. Read-only."""
 

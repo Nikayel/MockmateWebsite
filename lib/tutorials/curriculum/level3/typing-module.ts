@@ -1,4 +1,5 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -11,9 +12,11 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // input that has to narrow past the bool-is-an-int trap, and a Protocol that lets a test pass in
 // its own sink with no inheritance. Two editable files: the narrowing logic and the sink module.
 
-const TM_README = `# Ticket CFG-214: the config loader treats three different states as one
-
-The deploy config is read from a dict. Last week a service came up with no proxy because the
+const TM_README = buildBrief({
+  lesson: "py-l3-typing-module",
+  kind: "ticket",
+  headline: "the config loader treats three different states as one",
+  body: `The deploy config is read from a dict. Last week a service came up with no proxy because the
 loader could not tell "the key is absent" from "the key is present and set to null" from
 "the key is present and set to an empty string". All three took the same branch and all three
 got the same default. Ops needs them reported separately.
@@ -46,10 +49,8 @@ name either one.
 - \`ListSink\` conforms to it by shape and keeps every written line in \`self.lines\`.
 - \`emit(sink, keys, settings)\` writes one line per key, formatted \`"key=state"\` where the
   state comes from \`classify_value\`, and returns how many lines it wrote. It raises
-  \`TypeError\` when the sink cannot take a line.
-
-Some tests are hidden.
-`
+  \`TypeError\` when the sink cannot take a line.`,
+})
 
 const TM_FEED = String.raw`"""Read-only sample of the deploy config as the loader receives it."""
 
@@ -523,7 +524,7 @@ Annotate the return as \`-> dict | None\`.`,
   practice: {
     id: "py-l3-typing-module-practice",
     executionMode: "workspace",
-    prompt: `Close ticket CFG-214. A service came up with no proxy because the config loader could not tell
+    prompt: `Close the config-loader ticket. A service came up with no proxy because the config loader could not tell
 an absent key from a key set to \`None\` from a key set to an empty string, so all three got the
 same default.
 

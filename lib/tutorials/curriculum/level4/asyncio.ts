@@ -1,9 +1,12 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const BATCH_README = `# Ticket: the thumbnail batch loader reads one blob at a time
-
-The media service loads a batch of blobs before it renders a page. Two complaints are open on it.
+const BATCH_README = buildBrief({
+  lesson: "py-l4-asyncio",
+  kind: "ticket",
+  headline: "the thumbnail batch loader reads one blob at a time",
+  body: `The media service loads a batch of blobs before it renders a page. Two complaints are open on it.
 
 Latency: a batch of five keys takes as long as the five reads added together, because the loader
 awaits each key before starting the next one. The reads are I/O, so they should overlap.
@@ -39,9 +42,8 @@ instead of seconds, so the ordering is the same on every run. The tests call
 meter that records how many reads were in flight at once and what tick the batch finished on. The
 tests read that meter, so a loader that awaits its keys one at a time fails even when its results
 are correct.
-
-Some tests are hidden.
-`
+`,
+})
 
 const KERNEL_MODULE = String.raw`"""A tiny deterministic stand-in for the asyncio event loop. Read-only.
 

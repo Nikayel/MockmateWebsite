@@ -34,6 +34,7 @@
  * test in an unfamiliar record(name, fn) shape, watches it go red, and only then makes the fix.
  */
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 
 const EMPTY_INIT = ""
 
@@ -90,9 +91,12 @@ print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
 // Apply workspace: admin search (a result repeats at the top of page 2)
 // ───────────────────────────────────────────────────────────────────────────
 
-const APPLY_README = `# Bug report: a search result shows up twice
-
-Support says a row from the end of page 1 shows up again at the top of page 2 in admin
+const APPLY_README = buildBrief({
+  lesson: "py-l5-pin-the-seam",
+  slot: "apply",
+  kind: "bug-report",
+  headline: "a search result shows up twice",
+  body: `Support says a row from the end of page 1 shows up again at the top of page 2 in admin
 search. They cannot tell us which query it happens on, and page 1 itself looks right.
 
 \`search/service.py\` is the endpoint: it filters rows and calls \`search/pagination.py\` with
@@ -109,9 +113,9 @@ Two things to do, in this order:
 against the current one, and its failure messages tell you what is still missing.
 \`tests/test_pagination.py\` is read-only too, and checks the repaired \`page\` on its own.
 
-Some tests are hidden. They check \`page\` at more page sizes and through the endpoint that
-reported the bug.
-`
+The hidden tests check \`page\` at more page sizes and through the endpoint that
+reported the bug.`,
+})
 
 const SEARCH_PAGINATION_STARTER = String.raw`"""Windowing for the admin search results."""
 
@@ -393,9 +397,11 @@ def run_tests(record):
 // Practice workspace: the nightly export job (a dropped remainder)
 // ───────────────────────────────────────────────────────────────────────────
 
-const PRACTICE_README = `# Bug report: the nightly export sometimes misses rows
-
-Ops says the nightly export sometimes comes up a few rows short against the source table.
+const PRACTICE_README = buildBrief({
+  lesson: "py-l5-pin-the-seam",
+  kind: "bug-report",
+  headline: "the nightly export sometimes misses rows",
+  body: `Ops says the nightly export sometimes comes up a few rows short against the source table.
 They cannot say which nights, and nobody can point at the deploy that started it.
 
 \`export/batching.py\` splits the rows into batches. \`export/writer.py\` formats each batch
@@ -409,10 +415,8 @@ Two things to do, in this order:
 
 A hidden audit runs your regression test against the old build and against the current one.
 It only passes when your test fails on the old build and passes after your fix, so write the
-test first and watch it go red.
-
-Some tests are hidden.
-`
+test first and watch it go red.`,
+})
 
 const EXPORT_BATCHING_STARTER = String.raw`"""Batching for the nightly export job."""
 

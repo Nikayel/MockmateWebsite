@@ -3,6 +3,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -27,9 +28,11 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // only passes when the learner isolates state with ledger.reset().
 // ───────────────────────────────────────────────────────────────────────────
 
-const DISPATCH_README = `# Ticket BILL-482: a customer was charged twice
-
-Support has a customer whose card shows two identical charges for one invoice. The nightly
+const DISPATCH_README = buildBrief({
+  lesson: "py-l4-testing-tooling",
+  kind: "bug-report",
+  headline: "a customer was charged twice",
+  body: `Support has a customer whose card shows two identical charges for one invoice. The nightly
 run reported the expected number of invoices, so nothing looked wrong in the logs.
 
 \`billing/dispatch.py\` charges invoices through an injected \`gateway\`, which is why a test can
@@ -51,9 +54,8 @@ several broken builds of \`dispatch\`, and against the code in the repo. Your su
 on every broken build and pass on the current one, so a test that asserts nothing specific is
 rejected by name. It also runs your suite twice in a row without clearing the ledger between
 runs.
-
-Some tests are hidden.
-`
+`,
+})
 
 const BILLING_LEDGER = String.raw`"""Which invoices this process has already charged (read-only).
 
@@ -94,7 +96,7 @@ def _charge_one(gateway, invoice):
 
 def dispatch(gateway, invoices):
     """Charge every invoice not already charged; return how many were charged."""
-    # TODO: ticket BILL-482 says one invoice reaches the gateway more than once.
+    # TODO: ticket CS-023 says one invoice reaches the gateway more than once.
     charged = 0
     for invoice in invoices:
         if ledger.already_charged(invoice["id"]):
@@ -127,7 +129,7 @@ def dispatch(gateway, invoices):
     return charged
 `
 
-const DISPATCH_TEST_REGRESSION_STARTER = String.raw`# Tests for ticket BILL-482.
+const DISPATCH_TEST_REGRESSION_STARTER = String.raw`# Tests for ticket CS-023.
 #
 # Call the function as dispatch.dispatch(...) so the audit can swap builds under it.
 # Keep run_tests(record) as the entry point, and keep the worked example below.
@@ -155,7 +157,7 @@ def run_tests(record):
     # The audit tells you by name which broken build your suite still lets through.
 `
 
-const DISPATCH_TEST_REGRESSION_REFERENCE = String.raw`# Tests for ticket BILL-482.
+const DISPATCH_TEST_REGRESSION_REFERENCE = String.raw`# Tests for ticket CS-023.
 #
 # Call the function as dispatch.dispatch(...) so the audit can swap builds under it.
 # Keep run_tests(record) as the entry point, and keep the worked example below.
@@ -689,7 +691,7 @@ def run(messages):
   practice: {
     id: "py-l4-testing-tooling-practice",
     executionMode: "workspace",
-    prompt: `Write the tests for ticket BILL-482 in \`tests/test_regression.py\`, then fix
+    prompt: `Write the tests for ticket CS-023 in \`tests/test_regression.py\`, then fix
 \`billing/dispatch.py\`. A customer was charged twice for one invoice while the nightly run
 reported the expected number of invoices. \`dispatch(gateway, invoices)\` takes its gateway as a
 parameter, and \`billing/ledger.py\` is a record shared by every test in the run.
@@ -739,7 +741,7 @@ suite still lets through. Some tests are hidden.`,
           role: "test",
           language: "python",
           content: DISPATCH_TEST_REGRESSION_STARTER,
-          description: "Write your tests for BILL-482 here",
+          description: "Write your tests for CS-023 here",
         },
         {
           path: "tests/test_audit.py",

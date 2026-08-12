@@ -1,4 +1,5 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -20,9 +21,11 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // service (resolution plus fallback). Neither can be left untouched.
 // ───────────────────────────────────────────────────────────────────────────
 
-const QUOTES_README = `# Ticket OPS-318: onboard Glacier Freight
-
-We add a shipping carrier most weeks, and every time someone edits the dispatcher a released
+const QUOTES_README = buildBrief({
+  lesson: "py-l4-solid-patterns",
+  kind: "ticket",
+  headline: "onboard Glacier Freight",
+  body: `We add a shipping carrier most weeks, and every time someone edits the dispatcher a released
 carrier breaks. From this sprint on, a carrier is a module that registers itself, and the quote
 service resolves carriers through a registry it is handed.
 
@@ -49,8 +52,9 @@ Config lives in \`dispatch/rates.py\` under \`"glacier"\`.
 registered quotes at \`FALLBACK_CODE\` instead of raising, and the fallback's config is read under
 the code actually used.
 
-Both \`dispatch/carriers/glacier.py\` and \`dispatch/quotes.py\` need work. Some tests are hidden.
-`
+Both \`dispatch/carriers/glacier.py\` and \`dispatch/quotes.py\` need work.
+`,
+})
 
 const QUOTES_REGISTRY = String.raw`"""The carrier registry: the one place a code maps to a carrier factory.
 

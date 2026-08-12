@@ -15,6 +15,7 @@
  * "py-l5-real-codebases" module.
  */
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 
 const EMPTY_INIT = ""
 
@@ -75,9 +76,12 @@ print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
 // Apply workspace: the orders service (cart preview vs checkout summary)
 // ───────────────────────────────────────────────────────────────────────────
 
-const APPLY_README = `# Bug report: cart and checkout disagree on shipping
-
-Support ticket 4471: a customer with a 6000 cent cart saw a 599 cent shipping line in the
+const APPLY_README = buildBrief({
+  lesson: "py-l5-where-the-rule-lives",
+  slot: "apply",
+  kind: "bug-report",
+  headline: "cart and checkout disagree on shipping",
+  body: `Support ticket 4471: a customer with a 6000 cent cart saw a 599 cent shipping line in the
 cart preview, then free shipping on the checkout summary. Oversized carts disagree between
 the two screens as well.
 
@@ -89,10 +93,8 @@ Repair the disagreement. \`orders/pricing.py\` and \`orders/cart.py\` are read-o
 \`orders/checkout.py\` may change. Checkout must take its shipping figure from the module that
 owns the rule. Recomputing the figure in checkout leaves two copies of the rule in place, and
 reading it off another surface that already displays one ties the payment screen to a
-browsing screen.
-
-Some tests are hidden.
-`
+browsing screen.`,
+})
 
 const ORDERS_PRICING = String.raw`"""Shipping pricing rules.
 
@@ -331,19 +333,19 @@ def run_tests(record):
 // Practice workspace: the helpdesk service (ticket list vs ticket page)
 // ───────────────────────────────────────────────────────────────────────────
 
-const PRACTICE_README = `# Bug report: list and page disagree about escalation
-
-Ticket 982 is priority urgent and 6 hours old. The ticket page shows it as Escalated, but
+const PRACTICE_README = buildBrief({
+  lesson: "py-l5-where-the-rule-lives",
+  kind: "bug-report",
+  headline: "list and page disagree about escalation",
+  body: `Ticket 982 is priority urgent and 6 hours old. The ticket page shows it as Escalated, but
 the ticket list shows it as Normal, so nobody picks it up.
 
 The escalation rule is documented in \`helpdesk/rules.py\`, the authoritative definition.
 \`helpdesk/ticket_page.py\` and \`helpdesk/ticket_list.py\` both display an escalation flag.
 
 Repair the disagreement so both views follow the documented rule. Only
-\`helpdesk/ticket_list.py\` may change.
-
-Some tests are hidden.
-`
+\`helpdesk/ticket_list.py\` may change.`,
+})
 
 const HELPDESK_RULES = String.raw`"""Escalation rules.
 

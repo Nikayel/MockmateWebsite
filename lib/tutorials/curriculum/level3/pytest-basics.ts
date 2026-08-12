@@ -1,4 +1,5 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { EMPTY_INIT } from "../workspace-runner"
 import { buildPytestRunner } from "./pytest-runner"
 
@@ -22,9 +23,11 @@ import { buildPytestRunner } from "./pytest-runner"
 // The third build is the code in cart/shipping.py, so the learner also makes one small repair.
 // ───────────────────────────────────────────────────────────────────────────
 
-const SHIPPING_README = `# Write the tests for the shipping rule
-
-\`cart/shipping.py\` charges shipping on a cart subtotal. Four behaviours are documented, and one
+const SHIPPING_README = buildBrief({
+  lesson: "py-l3-pytest-basics",
+  kind: "ticket",
+  headline: "Write the tests for the shipping rule",
+  body: `\`cart/shipping.py\` charges shipping on a cart subtotal. Four behaviours are documented, and one
 of them is wrong in the code:
 
 1. A standard order under 5000 cents pays 500 cents of shipping.
@@ -45,8 +48,8 @@ manager that behaves like \`pytest.raises\`. Everything else is ordinary pytest:
 
 A hidden grader runs your suite against three broken builds of \`shipping_cost\` and against the
 code in the repo. It only passes when your suite catches every broken build, so a test that
-asserts nothing specific is named and rejected. Some tests are hidden.
-`
+asserts nothing specific is named and rejected.`,
+})
 
 const SHIPPING_SHIM = String.raw`"""A stand-in for pytest.raises, because this sandbox has no pytest installed.
 

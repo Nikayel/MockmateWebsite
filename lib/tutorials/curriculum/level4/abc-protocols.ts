@@ -3,6 +3,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ── Practice workspace: one export pipeline that uses BOTH tools at once ────────────────────
@@ -10,9 +11,11 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // choosing between nominal (ABC) and structural (Protocol) conformance and knowing which of the
 // two the interpreter actually enforces, and when.
 
-const EXPORT_README = String.raw`# Wire up the export pipeline
-
-The reporting service renders rows through two different kinds of writer, and the two kinds
+const EXPORT_README = buildBrief({
+  lesson: "py-l4-abc-protocols",
+  kind: "ticket",
+  headline: "wire up the export pipeline",
+  body: String.raw`The reporting service renders rows through two different kinds of writer, and the two kinds
 conform to the contract in two different ways.
 
 ## Read-only background
@@ -47,9 +50,8 @@ A row is a dict shaped like \`{"id": "a1", "amount": 30}\`.
   construction is refused.
 - \`export_rows(renderer, rows)\` returns the header line followed by one rendered line per row.
   It must reuse the base class helper whenever the renderer is entitled to it.
-
-Some tests are hidden.
-`
+`,
+})
 
 const EXPORT_BASE = String.raw`from abc import ABC, abstractmethod
 

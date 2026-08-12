@@ -1,4 +1,5 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -21,9 +22,11 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // files and survives bad input.
 // ───────────────────────────────────────────────────────────────────────────
 
-const CAP_README = `# Capstone: the \`shiftlog\` command
-
-A workshop drops one plain-text log per day into a folder, and the office manager wants a single
+const CAP_README = buildBrief({
+  lesson: "py-l3-uv-pyproject-capstone",
+  kind: "capstone",
+  headline: "the `shiftlog` command",
+  body: `A workshop drops one plain-text log per day into a folder, and the office manager wants a single
 total per person at the end of the week. You are writing the tool that reads that folder.
 
 Four files are yours: \`shiftlog/records.py\`, \`shiftlog/store.py\`, \`shiftlog/cli.py\`, and
@@ -81,8 +84,8 @@ the problem. Otherwise it returns:
 {"files": 2, "entries": 4, "skipped": ["mon.log:3"], "totals": {"alice": 75, "bob": 30}}
 \`\`\`
 
-\`totals\` sums each worker's minutes across every file. Some tests are hidden.
-`
+\`totals\` sums each worker's minutes across every file.`,
+})
 
 const CAP_PYPROJECT_STARTER = String.raw`[project]
 name = "shiftlog"

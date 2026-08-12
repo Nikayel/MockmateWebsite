@@ -1,9 +1,12 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const API_README = `# Ticket: the storefront sync fails without saying which field broke
-
-The nightly job reads accounts from the storefront API and each account carries a list of orders.
+const API_README = buildBrief({
+  lesson: "py-l3-rest-pydantic",
+  kind: "ticket",
+  headline: "the storefront sync fails without saying which field broke",
+  body: `The nightly job reads accounts from the storefront API and each account carries a list of orders.
 When a payload is wrong the job dies on the first bad value with a bare \`TypeError\`, so support
 cannot tell whether one order was malformed or the whole account was. Rebuild the boundary so it
 reports **every** problem it found, and names the exact field path of each one.
@@ -61,10 +64,8 @@ that fail contribute their errors and are left out.
 Keys the payload carries that are not listed above are ignored, because the API adds fields without
 warning and a new one must not break last week's job.
 
-Errors come back in field order: \`id\`, \`name\`, \`email\`, \`nickname\`, then the orders by index.
-
-Some tests are hidden.
-`
+Errors come back in field order: \`id\`, \`name\`, \`email\`, \`nickname\`, then the orders by index.`,
+})
 
 const API_CLIENT = String.raw`"""Stand-in for an httpx call. Returns canned raw JSON bodies, so runs are deterministic."""
 

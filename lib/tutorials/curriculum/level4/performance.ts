@@ -3,11 +3,14 @@
 // ───────────────────────────────────────────────────────────────────────────
 
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const PERF_README = `# Ticket PERF-214: the nightly billing rollup times out
-
-The rollup that turns usage events into per-account invoices used to finish in seconds. Since the
+const PERF_README = buildBrief({
+  lesson: "py-l4-performance",
+  kind: "bug-report",
+  headline: "the nightly billing rollup times out",
+  body: `The rollup that turns usage events into per-account invoices used to finish in seconds. Since the
 plan catalog grew it takes over an hour, and the profile blames two things: the catalog is walked
 again for every single event, and the rate engine is asked for the same rate thousands of times.
 
@@ -53,9 +56,8 @@ describe the same invoice, so they must not reach the rate engine twice.
   appear in the result at all.
 - Whatever the event count, \`catalog.probes\` must not exceed \`len(catalog)\` when \`summarize\`
   returns.
-
-Some tests are hidden.
-`
+`,
+})
 
 const PERF_INSTRUMENT = String.raw`"""Read-only. Counts how much of the catalog your code actually touches."""
 
@@ -618,7 +620,7 @@ def fib(n):
   practice: {
     id: "py-l4-performance-practice",
     executionMode: "workspace",
-    prompt: `Repair the nightly billing rollup on ticket PERF-214. It has stopped finishing inside its
+    prompt: `Repair the nightly billing rollup on ticket CS-021. It has stopped finishing inside its
 window: the profile shows the plan catalog being walked again for every usage event, and the rate
 engine being asked for the same rate thousands of times.
 

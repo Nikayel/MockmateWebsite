@@ -1,4 +1,5 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { EMPTY_INIT, buildRunner } from "../workspace-runner"
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -13,9 +14,11 @@ import { EMPTY_INIT, buildRunner } from "../workspace-runner"
 // order independence); the hidden suite grades the module on its own.
 // ───────────────────────────────────────────────────────────────────────────
 
-const PRACTICE_README = `# Ticket: the room booking suite is order dependent
-
-The booking ledger has no suite worth the name. The tests that exist build their own setup by
+const PRACTICE_README = buildBrief({
+  lesson: "py-l3-pytest-fixtures",
+  kind: "ticket",
+  headline: "the room booking suite is order dependent",
+  body: `The booking ledger has no suite worth the name. The tests that exist build their own setup by
 hand, four of them are the same body with a different number pasted in, and the whole file goes
 green or red depending on which test happens to run first.
 
@@ -51,8 +54,8 @@ This sandbox has no \`pytest\`, so \`minipytest.py\` is a read-only stand-in wit
 
 \`tests/test_report.py\` and \`tests/test_shape.py\` are read-only. The first runs your suite and
 reports each case by name. The second checks the properties above and tells you which one is
-missing. Some tests are hidden.
-`
+missing.`,
+})
 
 const MINIPYTEST = String.raw`"""A very small stand-in for the parts of pytest this lesson uses (read-only).
 

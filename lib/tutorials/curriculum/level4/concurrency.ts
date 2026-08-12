@@ -3,11 +3,14 @@
 // ───────────────────────────────────────────────────────────────────────────
 
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const CONC_README = `# Ticket OPS-812: the asset sweep reports the wrong sizes
-
-The nightly sweep fetches every asset path and writes a size report. Since it was moved onto an
+const CONC_README = buildBrief({
+  lesson: "py-l4-concurrency",
+  kind: "bug-report",
+  headline: "the asset sweep reports the wrong sizes",
+  body: `The nightly sweep fetches every asset path and writes a size report. Since it was moved onto an
 executor the report has been wrong: sizes land against the wrong paths, and a vendor outage last
 week produced a report of zeros instead of an alert.
 
@@ -37,9 +40,8 @@ time out, and unknown paths are permanent failures.
 \`\`\`
 
 \`run_batch(executor, ["/a", "/b"])\` is \`{"sizes": [10, 20], "retried": []}\`.
-
-Some tests are hidden.
-`
+`,
+})
 
 const CONC_EXECUTOR = String.raw`"""A stand-in for concurrent.futures, because this runtime has no OS threads.
 
@@ -564,7 +566,7 @@ order. (This is the sequential baseline; the workspace step parallelizes it.)
   practice: {
     id: "py-l4-concurrency-practice",
     executionMode: "workspace",
-    prompt: `Repair the nightly asset sweep (ticket OPS-812). Since it moved onto an executor, sizes
+    prompt: `Repair the nightly asset sweep (ticket CS-019). Since it moved onto an executor, sizes
 land against the wrong paths and a vendor outage produced a report of zeros instead of an alert.
 
 This runtime has no OS threads, so \`harness/executor.py\` is a fake executor that finishes work in

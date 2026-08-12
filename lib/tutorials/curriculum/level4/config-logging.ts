@@ -1,9 +1,12 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const CFG_README = `# Postmortem: the startup log printed a database password
-
-The billing service logs one \`app.startup\` record on boot. Last week that record was shipped to the
+const CFG_README = buildBrief({
+  lesson: "py-l4-config-logging",
+  kind: "postmortem",
+  headline: "the startup log printed a database password",
+  body: `The billing service logs one \`app.startup\` record on boot. Last week that record was shipped to the
 log aggregator with a live database password inside it, because the redactor only looked at the top
 level of the config and the password sits one level down, inside the parsed \`database\` value. The
 same review found a second gap: when an operator asks why \`port\` is 9200, nobody can say which
@@ -80,9 +83,10 @@ tell a key was configured without ever seeing it. \`sources\` names the winning 
 the next incident can answer "where did this value come from" from the log alone. Layer names are
 safe to log; they are not values.
 
-Some tests are hidden. One of them serializes the whole record to JSON and asserts that no secret
+One hidden test serializes the whole record to JSON and asserts that no secret
 value appears anywhere in the text.
-`
+`,
+})
 
 const CFG_SPEC = String.raw`"""Read-only config contract shared by the loader and the logger."""
 

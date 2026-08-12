@@ -1,4 +1,5 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -17,9 +18,11 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // the entry point must both work with zero further edits.
 // ───────────────────────────────────────────────────────────────────────────
 
-const CAPSTONE_README = `# Capstone: ship the \`feedstore\` package
-
-A partner publishes a scored item feed over a connection that drops. Your job is the package that
+const CAPSTONE_README = buildBrief({
+  lesson: "py-l4-packaging-capstone",
+  kind: "capstone",
+  headline: "ship the `feedstore` package",
+  body: `A partner publishes a scored item feed over a connection that drops. Your job is the package that
 reads it: settings from the environment, a parser chosen by format name, a fetch that survives a
 flaky source, and one public entry point a caller can use without knowing any of that.
 
@@ -67,8 +70,9 @@ The package's public face. Callers import from \`feedstore\`, never from a submo
 mapping into settings and runs one pipeline over the given transport.
 
 Anyone must be able to add a format, or hand you a different source, using only those public
-names. Some tests are hidden.
-`
+names.
+`,
+})
 
 const CAPSTONE_PYPROJECT = String.raw`# The build backend a frontend (pip, uv, build) installs before it can build this project.
 # Without this table there is nothing to turn the source tree into a wheel.

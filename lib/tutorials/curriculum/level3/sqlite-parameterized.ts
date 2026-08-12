@@ -1,9 +1,12 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const DBKIT_README = `# Ship the data-access module
-
-Your team's data-access module goes out with the next release and the security review sent it back.
+const DBKIT_README = buildBrief({
+  lesson: "py-l3-sqlite-parameterized",
+  kind: "ticket",
+  headline: "Ship the data-access module",
+  body: `Your team's data-access module goes out with the next release and the security review sent it back.
 Implement the three helpers in \`dbkit/queries.py\`.
 
 **\`build_insert(columns, values)\`** returns a \`(sql, params)\` pair for the \`users\` table. The SQL
@@ -23,10 +26,8 @@ these four markers: a \`{\` (an f-string hole), \` + \` (concatenation, with a s
 a \`%\` (percent formatting), or the text \`.format(\`. Keep the original order.
 
 **\`rows_to_dicts(columns, rows)\`** turns the driver's tuples into dicts, since \`fetchall\` hands
-back \`(1, "Ada")\` and the rest of your program wants \`{"id": 1, "name": "Ada"}\`.
-
-Some tests are hidden.
-`
+back \`(1, "Ada")\` and the rest of your program wants \`{"id": 1, "name": "Ada"}\`.`,
+})
 
 const DBKIT_QUERIES_STARTER = String.raw`def build_insert(columns, values):
     """Return (sql, params) for an INSERT into users (see README.md)."""

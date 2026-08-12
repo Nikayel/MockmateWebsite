@@ -1,9 +1,12 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const LEDGER_README = `# The spend-by-category report is wrong
-
-Finance rebuilt the monthly report and the numbers do not add up. The transaction feed and the
+const LEDGER_README = buildBrief({
+  lesson: "py-l3-pandas-dataframes",
+  kind: "bug-report",
+  headline: "The spend-by-category report is wrong",
+  body: `Finance rebuilt the monthly report and the numbers do not add up. The transaction feed and the
 category reference table come from two different systems, so the join does not match on every row,
 and one merchant terminal sends a blank amount when a sale is voided.
 
@@ -46,10 +49,8 @@ These take the joined rows.
 tied on total come back in alphabetical order.
 
 **\`unmatched_total(rows)\`** returns the total amount of the rows that matched no category, counting
-a missing amount as \`0\`.
-
-Some tests are hidden.
-`
+a missing amount as \`0\`.`,
+})
 
 const LEDGER_FEED = String.raw`TRANSACTIONS = [
     {"txn_id": "t1", "category_id": "c1", "amount": "40"},

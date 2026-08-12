@@ -1,4 +1,5 @@
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ---------------------------------------------------------------------------
@@ -7,9 +8,11 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // value is, the rules module decides what type that text becomes.
 // ---------------------------------------------------------------------------
 
-const README = `# Ticket DEP-412: the deploy tool reads settings files nobody agrees on
-
-Every service in the fleet ships a \`deploy.settings\` file, and the files in the wild are messier
+const README = buildBrief({
+  lesson: "py-l3-parse-config",
+  kind: "ticket",
+  headline: "the deploy tool reads settings files nobody agrees on",
+  body: `Every service in the fleet ships a \`deploy.settings\` file, and the files in the wild are messier
 than the parser that reads them. A release went out authenticating with the literal text
 \`abc123 # rotate me\`, because the operator wrote \`token = abc123 # rotate me\` and the parser kept
 the comment. Another crashed because a password deliberately quoted as \`"  hunter2  "\` had its
@@ -83,10 +86,8 @@ typed_value("greeting", " hi ")    # ' hi ' unchanged, greeting is not declared
 - \`build_settings\` reads \`text\` through \`split_entries\` and returns one dict of typed values.
   When a key appears more than once, the **last** entry wins.
 - \`missing_keys\` reports **every** required key from \`REQUIRED_KEYS\` that is absent, sorted, so an
-  operator fixes the file in one pass. A key set to the empty string counts as present.
-
-Some tests are hidden.
-`
+  operator fixes the file in one pass. A key set to the empty string counts as present.`,
+})
 
 const SPEC = String.raw`"""Read-only settings contract shared by the reader and the rules."""
 
@@ -608,7 +609,7 @@ otherwise return the trimmed string. Examples: \`"42"\` → \`42\`, \`"-3"\` →
   practice: {
     id: "py-l3-parse-config-practice",
     executionMode: "workspace",
-    prompt: `Repair the deploy tool's settings reader after ticket DEP-412: one release authenticated with
+    prompt: `Repair the deploy tool's settings reader: one release authenticated with
 a token that still had its inline comment glued on, one crashed on a quoted password whose spaces
 were trimmed away, one booted with \`port\` set to the word "eighty", and one booted with no host
 because the checker stopped at the first missing key.

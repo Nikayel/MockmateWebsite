@@ -22,6 +22,7 @@
  * level5/index.ts inside the "py-l5-real-codebases" module.
  */
 import type { PythonLesson } from "../../types"
+import { buildBrief } from "../brief"
 
 const EMPTY_INIT = ""
 
@@ -79,9 +80,12 @@ print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
 // Apply workspace: the metrics pipeline (ops alerts vs the usage report)
 // ───────────────────────────────────────────────────────────────────────────
 
-const APPLY_README = `# Change log: the usage fix landed, the alerts now fire early
-
-Yesterday's ticket was that sessions shorter than a minute billed zero minutes on the usage
+const APPLY_README = buildBrief({
+  lesson: "py-l5-the-other-caller",
+  slot: "apply",
+  kind: "change-log",
+  headline: "the usage fix landed, the alerts now fire early",
+  body: `Yesterday's ticket was that sessions shorter than a minute billed zero minutes on the usage
 report. A generated change edited \`pipeline/duration.py\` so \`minutes\` rounds up. The usage
 suite went green and the change shipped.
 
@@ -92,9 +96,9 @@ has to work without touching their module.
 Keep yesterday's billing behavior and give ops their thresholds back. \`pipeline/duration.py\`
 and \`pipeline/usage.py\` are yours to edit, and every suite has to pass at the same time.
 
-Some tests are hidden. They check the same two contracts at durations the visible suites do not
-name, so a repair that only satisfies the seconds you can read will not be enough.
-`
+The hidden tests check the same two contracts at durations the visible suites do not
+name, so a repair that only satisfies the seconds you can read will not be enough.`,
+})
 
 const PIPELINE_DURATION_STARTER = String.raw`"""Elapsed time helpers for the metrics pipeline."""
 
@@ -321,9 +325,11 @@ def run_tests(record):
 // Practice workspace: the back office (payroll periods vs the weekly report)
 // ───────────────────────────────────────────────────────────────────────────
 
-const PRACTICE_README = `# Change log: report weeks moved to Sunday, payroll grouping broke
-
-A generated change edited \`backoffice/weeks.py\` so \`week_start\` returns the Sunday of the
+const PRACTICE_README = buildBrief({
+  lesson: "py-l5-the-other-caller",
+  kind: "change-log",
+  headline: "report weeks moved to Sunday, payroll grouping broke",
+  body: `A generated change edited \`backoffice/weeks.py\` so \`week_start\` returns the Sunday of the
 week. The analytics weekly report wanted Sunday weeks, and the report has looked right ever
 since.
 
@@ -332,10 +338,8 @@ Finance reports that pay periods have been grouped wrong since that change.
 Monday and that is not negotiable.
 
 Give payroll its Monday weeks back without giving up the report's Sunday weeks.
-\`backoffice/weeks.py\` and \`backoffice/analytics.py\` are yours to edit.
-
-Some tests are hidden.
-`
+\`backoffice/weeks.py\` and \`backoffice/analytics.py\` are yours to edit.`,
+})
 
 const BACKOFFICE_WEEKS_STARTER = String.raw`"""Calendar helpers shared by the back office reports."""
 
