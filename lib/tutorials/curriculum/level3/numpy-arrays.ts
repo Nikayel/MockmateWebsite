@@ -8,163 +8,326 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // prose and grade a pure-Python model of the same mechanic.
 // ───────────────────────────────────────────────────────────────────────────
 
-const VECTOR_README = `# Build the array model
+// ── Practice workspace: a 2D measurement table, modelled over lists of lists ──
+// numpy is unavailable here (see the note above), so the practice grades the mechanics
+// of array programming (shape checks, per-column broadcasting, axis=0 vs axis=1
+// aggregation, boolean masks, missing values that keep the shape) by hand.
 
-The analytics job dropped every fractional reading last quarter and nobody could say why until
-somebody printed the dtype. Build the model that explains it. Implement \`Vector\` in
-\`nparray/vector.py\`, a minimal fixed-dtype array.
+const TABLE_README = `# Repair the calibration report
 
-**\`__init__(self, values, dtype=None)\`**
+The overnight calibration report has been wrong since a sensor started dropping readings. The old
+job deleted any row containing a gap, so the report silently shrank and the per-column totals came
+out low. The rewrite keeps every row and fills the gaps instead.
 
-- When \`dtype\` is \`None\`, infer it: \`"float64"\` if any value is a \`float\`, otherwise \`"int64"\`.
-- Store it on \`self.dtype\`, then cast **every** value to that dtype into \`self.values\`.
+A **table** is a list of rows, every row the same length. A gap is \`None\`. All graded numbers are
+integers.
+
+## \`readings/transform.py\`
+
+**\`check_rectangular(table)\`** returns the shape as \`(rows, columns)\`. An empty table is \`(0, 0)\`.
+If the rows are not all the same length, raise \`ValueError\`.
+
+**\`fill_missing(table)\`** returns a new table with every \`None\` replaced by the floor of the mean of
+the values that column actually has, using \`//\`. A column with no values at all fills with \`0\`. The
+shape never changes and no row is dropped.
+
+**\`apply_offsets(table, offsets)\`** adds a per-column calibration offset to every row. \`offsets\` is
+one row of numbers, one entry per column, and it applies down all the rows. Raise \`ValueError\` if it
+does not have one entry per column.
 
 \`\`\`python
-Vector([1, 2, 3]).dtype        # "int64",   values [1, 2, 3]
-Vector([1, 2, 3.5]).dtype      # "float64", values [1.0, 2.0, 3.5]
-Vector([1.5, 2.9], dtype="int64").values   # [1, 2], the fraction is gone
+fill_missing([[10, 20], [30, None], [50, 60]])   # [[10, 20], [30, 40], [50, 60]]
+apply_offsets([[10, 20], [30, 40]], [1, -5])     # [[11, 15], [31, 35]]
 \`\`\`
 
-**\`_combine(self, other, op)\`** does the elementwise work for both operators:
+## \`readings/summary.py\`
 
-- If \`other\` is a \`Vector\`, the lengths must match. Raise \`ValueError\` when they do not, otherwise
-  apply \`op\` pairwise.
-- Otherwise \`other\` is a scalar: broadcast it across every element.
-- Either way, return a **new** \`Vector\`. Never mutate \`self\`.
+**\`row_totals(table)\`** totals each row, so a 3x2 table gives 3 numbers.
 
-**\`sum(self)\`** returns the total of the values (\`0\` for an empty vector).
+**\`column_totals(table)\`** totals each column, so a 3x2 table gives 2 numbers. An empty table gives
+\`[]\`.
 
-\`__add__\`, \`__mul__\`, \`__eq__\` and \`__repr__\` are already written for you. Some tests are hidden.
+**\`mask_above(table, column, threshold)\`** returns one boolean per row: \`True\` where that row's value
+in \`column\` is strictly greater than \`threshold\`. Raise \`ValueError\` if \`column\` is not a real column
+index.
+
+**\`select_rows(table, mask)\`** keeps the rows whose mask entry is \`True\`, in order. Raise
+\`ValueError\` if the mask does not have one entry per row.
+
+**\`summarize(table, offsets)\`** is the report itself. Fill the gaps, apply the offsets, then return:
+
+\`\`\`python
+{"shape": (3, 2), "row_totals": [...], "column_totals": [...], "grand_total": 198}
+\`\`\`
+
+It must call the \`readings.transform\` functions rather than repeat their work.
+
+Some tests are hidden.
 `
 
-const VECTOR_STARTER = String.raw`class Vector:
-    """A minimal fixed-dtype array: one dtype for the whole block of values."""
+const TRANSFORM_STARTER = String.raw`"""Shape checks, gap filling and per-column offsets. See README.md for the contract."""
 
-    def __init__(self, values, dtype=None):
-        # TODO: infer the dtype when it is None, then cast every value to it.
-        self.dtype = "int64"
-        self.values = []
 
-    def _combine(self, other, op):
-        # TODO: elementwise when other is a Vector (raise ValueError on a length
-        # mismatch), broadcast when it is a scalar. Return a new Vector.
-        return Vector([])
+def check_rectangular(table):
+    # TODO: return (rows, columns), and raise ValueError when the rows differ in length.
+    return (0, 0)
 
-    def sum(self):
-        # TODO: return the total of self.values.
-        return 0
 
-    # ---- already written for you ----
+def fill_missing(table):
+    # TODO: replace every None with a value derived from its own column, keeping the shape.
+    return []
 
-    def __add__(self, other):
-        return self._combine(other, lambda a, b: a + b)
 
-    def __mul__(self, other):
-        return self._combine(other, lambda a, b: a * b)
-
-    def __eq__(self, other):
-        return isinstance(other, Vector) and self.dtype == other.dtype and self.values == other.values
-
-    def __repr__(self):
-        return "Vector(" + repr(self.values) + ", dtype=" + repr(self.dtype) + ")"
+def apply_offsets(table, offsets):
+    # TODO: add the matching per-column offset to every value, rejecting a wrong-width offsets row.
+    return []
 `
 
-const VECTOR_REFERENCE = String.raw`class Vector:
-    """A minimal fixed-dtype array: one dtype for the whole block of values."""
+const TRANSFORM_REFERENCE = String.raw`"""Shape checks, gap filling and per-column offsets. See README.md for the contract."""
 
-    def __init__(self, values, dtype=None):
-        if dtype is None:
-            dtype = "float64" if any(isinstance(value, float) for value in values) else "int64"
-        cast = float if dtype == "float64" else int
-        self.dtype = dtype
-        self.values = [cast(value) for value in values]
 
-    def _combine(self, other, op):
-        if isinstance(other, Vector):
-            if len(other.values) != len(self.values):
-                raise ValueError("operands could not be broadcast together")
-            return Vector([op(a, b) for a, b in zip(self.values, other.values)])
-        return Vector([op(value, other) for value in self.values])
+def check_rectangular(table):
+    if not table:
+        return (0, 0)
+    width = len(table[0])
+    for row in table:
+        if len(row) != width:
+            raise ValueError("ragged table: rows have different lengths")
+    return (len(table), width)
 
-    def sum(self):
-        total = 0
-        for value in self.values:
-            total = total + value
-        return total
 
-    # ---- already written for you ----
+def fill_missing(table):
+    _, columns = check_rectangular(table)
+    fills = []
+    for index in range(columns):
+        known = [row[index] for row in table if row[index] is not None]
+        fills.append(sum(known) // len(known) if known else 0)
+    return [
+        [fills[index] if value is None else value for index, value in enumerate(row)]
+        for row in table
+    ]
 
-    def __add__(self, other):
-        return self._combine(other, lambda a, b: a + b)
 
-    def __mul__(self, other):
-        return self._combine(other, lambda a, b: a * b)
-
-    def __eq__(self, other):
-        return isinstance(other, Vector) and self.dtype == other.dtype and self.values == other.values
-
-    def __repr__(self):
-        return "Vector(" + repr(self.values) + ", dtype=" + repr(self.dtype) + ")"
+def apply_offsets(table, offsets):
+    _, columns = check_rectangular(table)
+    if len(offsets) != columns:
+        raise ValueError("offsets must have one entry per column")
+    return [[value + offsets[index] for index, value in enumerate(row)] for row in table]
 `
 
-const VECTOR_TEST = String.raw`from nparray.vector import Vector
+const SUMMARY_STARTER = String.raw`"""Axis aggregation, masks and the report. See README.md for the contract."""
+
+from readings.transform import apply_offsets, check_rectangular, fill_missing
+
+
+def row_totals(table):
+    # TODO: one total per row.
+    return []
+
+
+def column_totals(table):
+    # TODO: one total per column.
+    return []
+
+
+def mask_above(table, column, threshold):
+    # TODO: one boolean per row, rejecting a column index that does not exist.
+    return []
+
+
+def select_rows(table, mask):
+    # TODO: keep the rows the mask marks, rejecting a mask of the wrong length.
+    return []
+
+
+def summarize(table, offsets):
+    # TODO: fill, offset, then report the shape and both aggregations.
+    return {}
+`
+
+const SUMMARY_REFERENCE = String.raw`"""Axis aggregation, masks and the report. See README.md for the contract."""
+
+from readings.transform import apply_offsets, check_rectangular, fill_missing
+
+
+def row_totals(table):
+    check_rectangular(table)
+    return [sum(row) for row in table]
+
+
+def column_totals(table):
+    _, columns = check_rectangular(table)
+    return [sum(row[index] for row in table) for index in range(columns)]
+
+
+def mask_above(table, column, threshold):
+    _, columns = check_rectangular(table)
+    if not isinstance(column, int) or column < 0 or column >= columns:
+        raise ValueError("column index is not a column of this table")
+    return [row[column] > threshold for row in table]
+
+
+def select_rows(table, mask):
+    rows, _ = check_rectangular(table)
+    if len(mask) != rows:
+        raise ValueError("mask must have one entry per row")
+    return [row for row, keep in zip(table, mask) if keep]
+
+
+def summarize(table, offsets):
+    adjusted = apply_offsets(fill_missing(table), offsets)
+    totals = row_totals(adjusted)
+    return {
+        "shape": check_rectangular(adjusted),
+        "row_totals": totals,
+        "column_totals": column_totals(adjusted),
+        "grand_total": sum(totals),
+    }
+`
+
+const TRANSFORM_TEST = String.raw`from readings.transform import apply_offsets, check_rectangular, fill_missing
 
 
 def run_tests(record):
-    def infers_int64_for_whole_numbers():
-        vector = Vector([1, 2, 3])
-        assert vector.dtype == "int64", f"got {vector.dtype!r}"
-        assert vector.values == [1, 2, 3], f"got {vector.values!r}"
+    def reports_the_shape():
+        shape = check_rectangular([[1, 2, 3], [4, 5, 6]])
+        assert shape == (2, 3), f"expected (2, 3), got {shape!r}"
 
-    def one_float_promotes_the_whole_array():
-        vector = Vector([1, 2, 3.5])
-        assert vector.dtype == "float64", f"got {vector.dtype!r}"
-        assert vector.values == [1.0, 2.0, 3.5], f"got {vector.values!r}"
+    def fills_a_gap_from_its_own_column():
+        filled = fill_missing([[10, 20], [30, None], [50, 60]])
+        expected = [[10, 20], [30, 40], [50, 60]]
+        assert filled == expected, f"expected {expected}, got {filled!r}"
 
-    def broadcasts_a_scalar():
-        result = Vector([1, 2, 3]) * 2
-        assert result.values == [2, 4, 6], f"got {result!r}"
-        assert result.dtype == "int64", f"got {result.dtype!r}"
+    def filling_keeps_every_row():
+        filled = fill_missing([[1, None], [None, None], [3, 4]])
+        assert len(filled) == 3, f"expected 3 rows kept, got {len(filled)}"
 
-    def adds_elementwise():
-        result = Vector([1, 2, 3]) + Vector([10, 20, 30])
-        assert result.values == [11, 22, 33], f"got {result!r}"
+    def offsets_apply_down_every_row():
+        result = apply_offsets([[10, 20], [30, 40], [50, 60]], [1, -5])
+        expected = [[11, 15], [31, 35], [51, 55]]
+        assert result == expected, f"expected {expected}, got {result!r}"
 
-    record("infers int64 for whole numbers", infers_int64_for_whole_numbers)
-    record("one float promotes the whole array", one_float_promotes_the_whole_array)
-    record("broadcasts a scalar", broadcasts_a_scalar)
-    record("adds elementwise", adds_elementwise)
-`
-
-const VECTOR_TEST_HIDDEN = String.raw`from nparray.vector import Vector
-
-
-def run_tests(record):
-    def an_explicit_int_dtype_truncates():
-        vector = Vector([1.5, 2.9], dtype="int64")
-        assert vector.values == [1, 2], f"got {vector.values!r}"
-
-    def mismatched_lengths_raise():
+    def a_wrong_width_offsets_row_is_rejected():
         try:
-            Vector([1, 2, 3]) + Vector([1, 2])
+            apply_offsets([[1, 2], [3, 4]], [1, 2, 3])
             raised = False
         except ValueError:
             raised = True
-        assert raised, "adding different lengths should raise ValueError"
+        assert raised, "expected ValueError for 3 offsets against 2 columns, got no error"
 
-    def sums_the_values():
-        assert Vector([1, 2, 3]).sum() == 6
-        assert Vector([]).sum() == 0
+    record("reports the shape", reports_the_shape)
+    record("fills a gap from its own column", fills_a_gap_from_its_own_column)
+    record("filling keeps every row", filling_keeps_every_row)
+    record("offsets apply down every row", offsets_apply_down_every_row)
+    record("a wrong-width offsets row is rejected", a_wrong_width_offsets_row_is_rejected)
+`
 
-    def a_float_scalar_promotes_the_result():
-        result = Vector([1, 2, 3]) * 0.5
-        assert result.dtype == "float64", f"got {result.dtype!r}"
-        assert result.values == [0.5, 1.0, 1.5], f"got {result.values!r}"
+const SUMMARY_TEST = String.raw`from readings.summary import (
+    column_totals,
+    mask_above,
+    row_totals,
+    select_rows,
+    summarize,
+)
 
-    record("an explicit int dtype truncates", an_explicit_int_dtype_truncates)
-    record("mismatched lengths raise ValueError", mismatched_lengths_raise)
-    record("sums the values", sums_the_values)
-    record("a float scalar promotes the result", a_float_scalar_promotes_the_result)
+
+def run_tests(record):
+    table = [[11, 15], [31, 35], [51, 55]]
+
+    def totals_across_each_row():
+        result = row_totals(table)
+        assert result == [26, 66, 106], f"expected [26, 66, 106], got {result!r}"
+
+    def totals_down_each_column():
+        result = column_totals(table)
+        assert result == [93, 105], f"expected [93, 105], got {result!r}"
+
+    def a_mask_marks_the_rows_above_a_threshold():
+        result = mask_above(table, 0, 30)
+        assert result == [False, True, True], f"expected [False, True, True], got {result!r}"
+
+    def a_mask_selects_rows():
+        result = select_rows(table, [False, True, True])
+        expected = [[31, 35], [51, 55]]
+        assert result == expected, f"expected {expected}, got {result!r}"
+
+    def the_report_fills_then_offsets():
+        report = summarize([[10, 20], [30, None], [50, 60]], [1, -5])
+        assert report["shape"] == (3, 2), f"expected (3, 2), got {report['shape']!r}"
+        assert report["row_totals"] == [26, 66, 106], f"expected [26, 66, 106], got {report['row_totals']!r}"
+        assert report["column_totals"] == [93, 105], f"expected [93, 105], got {report['column_totals']!r}"
+        assert report["grand_total"] == 198, f"expected 198, got {report['grand_total']!r}"
+
+    record("totals across each row", totals_across_each_row)
+    record("totals down each column", totals_down_each_column)
+    record("a mask marks the rows above a threshold", a_mask_marks_the_rows_above_a_threshold)
+    record("a mask selects rows", a_mask_selects_rows)
+    record("the report fills then offsets", the_report_fills_then_offsets)
+`
+
+const READINGS_TEST_HIDDEN = String.raw`from readings.summary import column_totals, mask_above, row_totals, select_rows, summarize
+from readings.transform import check_rectangular, fill_missing
+
+
+def run_tests(record):
+    def a_ragged_table_is_rejected():
+        try:
+            check_rectangular([[1, 2], [3]])
+            raised = False
+        except ValueError:
+            raised = True
+        assert raised, "expected ValueError for rows of length 2 and 1, got no error"
+
+    def an_empty_table_has_shape_zero_by_zero():
+        shape = check_rectangular([])
+        assert shape == (0, 0), f"expected (0, 0), got {shape!r}"
+        assert row_totals([]) == [], f"expected [], got {row_totals([])!r}"
+        assert column_totals([]) == [], f"expected [], got {column_totals([])!r}"
+
+    def a_column_of_only_gaps_fills_with_zero():
+        filled = fill_missing([[1, None], [3, None]])
+        expected = [[1, 0], [3, 0]]
+        assert filled == expected, f"expected {expected}, got {filled!r}"
+
+    def the_fill_value_floors():
+        filled = fill_missing([[1], [2], [None]])
+        assert filled == [[1], [2], [1]], f"expected [[1], [2], [1]], got {filled!r}"
+
+    def an_out_of_range_column_is_rejected():
+        try:
+            mask_above([[1, 2], [3, 4]], 5, 0)
+            raised = False
+        except ValueError:
+            raised = True
+        assert raised, "expected ValueError for column 5 of a 2-column table, got no error"
+
+    def a_wrong_length_mask_is_rejected():
+        try:
+            select_rows([[1], [2], [3]], [True, False])
+            raised = False
+        except ValueError:
+            raised = True
+        assert raised, "expected ValueError for a 2-entry mask over 3 rows, got no error"
+
+    def a_mask_that_keeps_nothing_gives_an_empty_table():
+        result = select_rows([[1], [2]], [False, False])
+        assert result == [], f"expected [], got {result!r}"
+
+    def the_report_handles_negatives_and_a_single_row():
+        report = summarize([[-4, 6]], [4, -6])
+        assert report["shape"] == (1, 2), f"expected (1, 2), got {report['shape']!r}"
+        assert report["row_totals"] == [0], f"expected [0], got {report['row_totals']!r}"
+        assert report["column_totals"] == [0, 0], f"expected [0, 0], got {report['column_totals']!r}"
+        assert report["grand_total"] == 0, f"expected 0, got {report['grand_total']!r}"
+
+    record("a ragged table is rejected", a_ragged_table_is_rejected)
+    record("an empty table has shape (0, 0)", an_empty_table_has_shape_zero_by_zero)
+    record("a column of only gaps fills with zero", a_column_of_only_gaps_fills_with_zero)
+    record("the fill value floors", the_fill_value_floors)
+    record("an out-of-range column is rejected", an_out_of_range_column_is_rejected)
+    record("a wrong-length mask is rejected", a_wrong_length_mask_is_rejected)
+    record("a mask that keeps nothing gives an empty table", a_mask_that_keeps_nothing_gives_an_empty_table)
+    record("the report handles negatives and a single row", the_report_handles_negatives_and_a_single_row)
 `
 
 export const numpyArraysLesson: PythonLesson = {
@@ -389,33 +552,44 @@ across every element. Return a new list either way: \`([1, 2, 3], 10)\` gives \`
   practice: {
     id: "py-l3-numpy-arrays-practice",
     executionMode: "workspace",
-    prompt: `Your team's analytics job dropped every fractional reading last quarter, and nobody could say
-why until somebody printed the dtype. Build the model that explains it: implement \`Vector\` in
-\`nparray/vector.py\` so it infers a single dtype and casts every value to it, combines elementwise
-with another \`Vector\` (raising \`ValueError\` on a length mismatch), broadcasts a scalar, and sums its
-values. The operators are already written for you. Some tests are hidden.`,
+    prompt: `Repair the overnight calibration report. It has been wrong since one sensor started
+dropping readings: the old job deleted any row that contained a gap, so the report quietly shrank and
+every column total came out low.
+
+Implement the transform layer in \`readings/transform.py\` and the summary layer in
+\`readings/summary.py\`. Between them they have to check that the table is rectangular, fill the gaps
+without losing a single row, apply a per-column calibration offset across the whole table, total the
+values both per row and per column, select rows with a boolean mask, and assemble the report.
+\`README.md\` has the exact contract for each function. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      '`any(isinstance(value, float) for value in values)` decides between `"float64"` and `"int64"`.',
-      "Pick the cast function once (`float` or `int`), then apply it in one comprehension over `values`.",
-      "In `_combine`, `isinstance(other, Vector)` separates the elementwise case from the broadcast case. Both return a new `Vector`.",
+      "Two different totals come out of the same table. One walks each row; the other walks one column index across all the rows. Write them separately and the axis confusion goes away.",
+      "`fill_missing` needs a value per column before it can rewrite anything, so gather each column's known values first, then rebuild the rows using `enumerate(row)` to know which column you are in.",
+      "`offsets` is one row that applies to every row, so `apply_offsets` is `[[value + offsets[index] for index, value in enumerate(row)] for row in table]` once you have rejected a wrong-width `offsets`. `summarize` is `apply_offsets(fill_missing(table), offsets)` followed by the two totals.",
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "nparray/vector.py",
-      editableFilePaths: ["nparray/vector.py"],
-      visibleTestPaths: ["tests/test_vector.py"],
-      hiddenTestPaths: ["tests/test_vector_hidden.py"],
+      primaryFilePath: "readings/transform.py",
+      editableFilePaths: ["readings/transform.py", "readings/summary.py"],
+      visibleTestPaths: ["tests/test_transform.py", "tests/test_summary.py"],
+      hiddenTestPaths: ["tests/test_readings_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
-        { path: "README.md", role: "docs", language: "markdown", content: VECTOR_README },
-        { path: "nparray/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        { path: "README.md", role: "docs", language: "markdown", content: TABLE_README },
+        { path: "readings/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "nparray/vector.py",
+          path: "readings/transform.py",
           role: "editable",
           language: "python",
-          content: VECTOR_STARTER,
-          description: "Implement Vector here",
+          content: TRANSFORM_STARTER,
+          description: "Shape, gap filling and per-column offsets",
+        },
+        {
+          path: "readings/summary.py",
+          role: "editable",
+          language: "python",
+          content: SUMMARY_STARTER,
+          description: "Aggregation, masks and the report",
         },
         {
           path: "tests/__init__.py",
@@ -425,17 +599,24 @@ values. The operators are already written for you. Some tests are hidden.`,
           hidden: true,
         },
         {
-          path: "tests/test_vector.py",
+          path: "tests/test_transform.py",
           role: "test",
           language: "python",
-          content: VECTOR_TEST,
-          description: "Visible vector tests",
+          content: TRANSFORM_TEST,
+          description: "Visible transform tests",
         },
         {
-          path: "tests/test_vector_hidden.py",
+          path: "tests/test_summary.py",
           role: "test",
           language: "python",
-          content: VECTOR_TEST_HIDDEN,
+          content: SUMMARY_TEST,
+          description: "Visible summary tests",
+        },
+        {
+          path: "tests/test_readings_hidden.py",
+          role: "test",
+          language: "python",
+          content: READINGS_TEST_HIDDEN,
           hidden: true,
           description: "Hidden edge-case tests",
         },
@@ -444,8 +625,9 @@ values. The operators are already written for you. Some tests are hidden.`,
           role: "test",
           language: "python",
           content: buildRunner([
-            { module: "test_vector", label: "visible vector" },
-            { module: "test_vector_hidden", label: "hidden vector" },
+            { module: "test_transform", label: "visible transform" },
+            { module: "test_summary", label: "visible summary" },
+            { module: "test_readings_hidden", label: "hidden readings" },
           ]),
           hidden: true,
           description: "Workspace test runner",
@@ -453,10 +635,16 @@ values. The operators are already written for you. Some tests are hidden.`,
       ],
       referenceFiles: [
         {
-          path: "nparray/vector.py",
+          path: "readings/transform.py",
           role: "editable",
           language: "python",
-          content: VECTOR_REFERENCE,
+          content: TRANSFORM_REFERENCE,
+        },
+        {
+          path: "readings/summary.py",
+          role: "editable",
+          language: "python",
+          content: SUMMARY_REFERENCE,
         },
       ],
     },
