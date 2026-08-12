@@ -1900,9 +1900,13 @@ function InterviewPageContent() {
       <h1 className="sr-only">Mock Interview Environment</h1>
       {!isInterviewMode && <Header />}
 
-      {/* Guest Mode Banner - Sticky below header */}
+      {/* Guest Mode Banner - fixed below the header when it exists, at the very
+          top in the chrome-less interview view */}
       {hasGuestBanner && (
-        <GuestModeBanner onSignUp={() => router.push("/login?redirect=interview")} />
+        <GuestModeBanner
+          belowHeader={!isInterviewMode}
+          onSignUp={() => router.push("/login?redirect=interview")}
+        />
       )}
 
       {/* Scenario Browser (Pattern / basket style) */}
@@ -1919,10 +1923,13 @@ function InterviewPageContent() {
         />
       )}
 
-      {/* Interview Interface */}
+      {/* Interview Interface. Top padding clears the fixed guest banner (h-9 +
+          hairline) so it never covers the session's top bar. */}
       {!showScenarioBrowser && (
         <section
-          className={`from-card to-background flex flex-col bg-gradient-to-b pt-1.5 pb-1.5 ${
+          className={`from-card to-background flex flex-col bg-gradient-to-b pb-1.5 ${
+            hasGuestBanner ? "pt-[42px]" : "pt-1.5"
+          } ${
             isResultView
               ? "min-h-dvh overflow-x-hidden overflow-y-auto"
               : // `h-dvh`, not `h-screen`. On iOS Safari `100vh` is the height
