@@ -5,68 +5,353 @@
 import type { PythonLesson } from "../../types"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const PERF_README = `# Make a slow function fast
+const PERF_README = `# Ticket PERF-214: the nightly billing rollup times out
 
-\`fib\` computes Fibonacci numbers by naive recursion, which recomputes the same subproblems
-exponentially. Implement \`fib(n)\` in \`perf/compute.py\` with \`functools.lru_cache\` so each \`n\`
-is computed once.
+The rollup that turns usage events into per-account invoices used to finish in seconds. Since the
+plan catalog grew it takes over an hour, and the profile blames two things: the catalog is walked
+again for every single event, and the rate engine is asked for the same rate thousands of times.
 
-\`fib(0)\` is \`0\`, \`fib(1)\` is \`1\`, \`fib(10)\` is \`55\`. Some tests are hidden.
+Timing is not graded here, because timing is noise. Two read-only modules count work instead:
+
+- \`hotpath/instrument.py\` gives \`ProbeList\`, the catalog wrapper. Every element it hands out
+  (through iteration, indexing or \`in\`) adds one to \`catalog.probes\`. \`len(catalog)\` is free.
+- \`hotpath/rates.py\` gives \`compute_rate(code, tier)\`, the expensive engine. Every call is appended
+  to \`rates.CALLS\`. \`rates.reset()\` empties that log.
+
+## What you write
+
+### \`hotpath/pricing.py\`
+
+\`normalize(code)\` turns a raw plan code into its canonical form: surrounding whitespace and case do
+not matter, and the aliases in \`ALIASES\` map to their canonical code. \`normalize("  Professional ")\`
+is \`"pro"\`.
+
+\`rate_for(code, tier)\` returns \`compute_rate\` for the canonical code. \`rate_for("PRO", 3)\` is
+\`5500\` (cents). Any group of codes that normalize to the same thing must reach the rate engine at
+most once per \`tier\`.
+
+\`monthly_cost(code, usage)\` returns \`rate_for(code, usage["seats"]) * usage["seats"] + 300 * usage["gb"]\`,
+where \`usage\` is a plain dict with the keys \`"seats"\` and \`"gb"\` (\`"gb"\` is the overage, already
+net of the allowance). Callers pass fresh dicts every time, and two dicts holding the same pairs
+describe the same invoice, so they must not reach the rate engine twice.
+
+\`clear_caches()\` empties whatever you cached. The tests call it before they count.
+
+### \`hotpath/rollup.py\`
+
+\`summarize(events, catalog)\` returns \`{account_id: total_cents}\`.
+
+- \`catalog\` is a \`ProbeList\` of dicts like \`{"code": "Pro", "gb_included": 10}\`. Catalog codes are
+  raw too.
+- Each event looks like \`{"account": "a1", "plan": " PRO ", "seats": 3, "gb": 14}\`.
+- An event costs \`monthly_cost\` of its plan with \`"gb"\` set to the amount above the catalog
+  allowance, never below zero.
+- An account's total is the sum of its events.
+- An event whose plan is not in the catalog is ignored. An account with no billable events does not
+  appear in the result at all.
+- Whatever the event count, \`catalog.probes\` must not exceed \`len(catalog)\` when \`summarize\`
+  returns.
+
+Some tests are hidden.
 `
 
-const PERF_COMPUTE_STARTER = String.raw`from functools import lru_cache
+const PERF_INSTRUMENT = String.raw`"""Read-only. Counts how much of the catalog your code actually touches."""
 
 
-def fib(n):
-    """Return the nth Fibonacci number (0, 1, 1, 2, 3, 5, ...), see README.md."""
-    # TODO: add @lru_cache above this def, and recurse: fib(n-1) + fib(n-2) with a base case.
-    return 0
+class ProbeList:
+    """A catalog feed that records every element it hands out."""
+
+    def __init__(self, items):
+        self._items = list(items)
+        self.probes = 0
+
+    def __len__(self):
+        # Asking how big the catalog is costs nothing.
+        return len(self._items)
+
+    def __iter__(self):
+        for item in self._items:
+            self.probes += 1
+            yield item
+
+    def __getitem__(self, index):
+        self.probes += 1
+        return self._items[index]
+
+    def __contains__(self, value):
+        for item in self._items:
+            self.probes += 1
+            if item == value:
+                return True
+        return False
 `
 
-const PERF_COMPUTE_REFERENCE = String.raw`from functools import lru_cache
+const PERF_RATES = String.raw`"""Read-only. The expensive rate engine, with a call log instead of a stopwatch."""
+
+BASE_CENTS = {"pro": 4000, "team": 2500, "solo": 1200, "edu": 600}
+
+CALLS = []
+
+
+def reset():
+    """Empty the call log."""
+    del CALLS[:]
+
+
+def compute_rate(code, tier):
+    """Return the per-seat rate in cents for a canonical plan code. Every call is logged."""
+    CALLS.append((code, tier))
+    if code not in BASE_CENTS:
+        raise KeyError(code)
+    return BASE_CENTS[code] + 500 * tier
+`
+
+const PERF_PRICING_STARTER = String.raw`from functools import lru_cache
+
+from hotpath import rates
+
+ALIASES = {"professional": "pro", "startup": "team", "student": "edu"}
+
+
+def normalize(code):
+    """Return the canonical form of a raw plan code, see README.md."""
+    # TODO: fold away the differences that do not change which plan this is.
+    return code
+
+
+def rate_for(code, tier):
+    """Return the per-seat rate in cents for a raw plan code, see README.md."""
+    # TODO: reach rates.compute_rate at most once per canonical code and tier.
+    return rates.compute_rate(code, tier)
+
+
+def monthly_cost(code, usage):
+    """Return the monthly cost in cents for a raw plan code and a usage dict, see README.md."""
+    # TODO: two usage dicts holding the same pairs must not repeat the work.
+    return rate_for(code, usage["seats"]) * usage["seats"] + 300 * usage["gb"]
+
+
+def clear_caches():
+    """Empty every cache this module holds."""
+    # TODO: the tests call this before they count rate-engine calls.
+    return None
+`
+
+const PERF_PRICING_REFERENCE = String.raw`from functools import lru_cache
+
+from hotpath import rates
+
+ALIASES = {"professional": "pro", "startup": "team", "student": "edu"}
+
+
+def normalize(code):
+    cleaned = code.strip().lower()
+    return ALIASES.get(cleaned, cleaned)
 
 
 @lru_cache(maxsize=None)
-def fib(n):
-    if n < 2:
-        return n
-    return fib(n - 1) + fib(n - 2)
+def _rate(canonical, tier):
+    return rates.compute_rate(canonical, tier)
+
+
+def rate_for(code, tier):
+    return _rate(normalize(code), tier)
+
+
+@lru_cache(maxsize=None)
+def _cost(canonical, seats, gb):
+    return _rate(canonical, seats) * seats + 300 * gb
+
+
+def monthly_cost(code, usage):
+    return _cost(normalize(code), usage["seats"], usage["gb"])
+
+
+def clear_caches():
+    _rate.cache_clear()
+    _cost.cache_clear()
 `
 
-const PERF_TEST = String.raw`from perf.compute import fib
+const PERF_ROLLUP_STARTER = String.raw`from hotpath.pricing import monthly_cost, normalize
+
+
+def summarize(events, catalog):
+    """Return {account_id: total_cents} for one billing run, see README.md."""
+    # TODO: keep catalog.probes at or below len(catalog) however many events arrive.
+    totals = {}
+    for event in events:
+        for plan in catalog:
+            if normalize(plan["code"]) == normalize(event["plan"]):
+                gb = event["gb"] - plan["gb_included"]
+                cost = monthly_cost(event["plan"], {"seats": event["seats"], "gb": gb})
+                totals[event["account"]] = totals.get(event["account"], 0) + cost
+    return totals
+`
+
+const PERF_ROLLUP_REFERENCE = String.raw`from hotpath.pricing import monthly_cost, normalize
+
+
+def summarize(events, catalog):
+    allowance = {}
+    for plan in catalog:
+        allowance[normalize(plan["code"])] = plan["gb_included"]
+
+    totals = {}
+    for event in events:
+        code = normalize(event["plan"])
+        if code not in allowance:
+            continue
+        overage = event["gb"] - allowance[code]
+        if overage < 0:
+            overage = 0
+        cost = monthly_cost(code, {"seats": event["seats"], "gb": overage})
+        totals[event["account"]] = totals.get(event["account"], 0) + cost
+    return totals
+`
+
+const PERF_TEST_PRICING = String.raw`from hotpath import pricing, rates
 
 
 def run_tests(record):
-    def base_cases():
-        assert fib(0) == 0 and fib(1) == 1, f"got fib(0)={fib(0)}, fib(1)={fib(1)}"
+    def canonical_codes():
+        got = [pricing.normalize("  PRO "), pricing.normalize("Professional"), pricing.normalize("team")]
+        expected = ["pro", "pro", "team"]
+        assert got == expected, f"expected {expected!r}, got {got!r}"
 
-    def small_value():
-        assert fib(10) == 55, f"expected 55, got {fib(10)!r}"
+    def rate_matches_the_engine():
+        got = pricing.rate_for("PRO", 3)
+        assert got == 5500, f"expected 5500, got {got!r}"
 
-    record("base cases", base_cases)
-    record("fib(10) is 55", small_value)
+    def equivalent_codes_share_one_entry():
+        pricing.clear_caches()
+        rates.reset()
+        for raw in ("pro", "PRO", "  Professional  ", "professional"):
+            pricing.rate_for(raw, 2)
+        assert rates.CALLS == [("pro", 2)], f"expected [('pro', 2)], got {rates.CALLS!r}"
+
+    record("normalize folds case, spaces and aliases", canonical_codes)
+    record("rate_for('PRO', 3) is 5500", rate_matches_the_engine)
+    record("four spellings, one rate-engine call", equivalent_codes_share_one_entry)
 `
 
-const PERF_TEST_HIDDEN = String.raw`from perf.compute import fib
+const PERF_TEST_ROLLUP = String.raw`from hotpath import pricing
+from hotpath.instrument import ProbeList
+from hotpath.rollup import summarize
+
+CATALOG = [
+    {"code": "Pro", "gb_included": 10},
+    {"code": "team", "gb_included": 5},
+    {"code": "SOLO", "gb_included": 2},
+]
 
 
 def run_tests(record):
-    def larger_value():
-        assert fib(20) == 6765, f"expected 6765, got {fib(20)!r}"
+    def totals_per_account():
+        pricing.clear_caches()
+        events = [
+            {"account": "a1", "plan": "professional", "seats": 3, "gb": 10},
+            {"account": "a1", "plan": "solo", "seats": 1, "gb": 4},
+        ]
+        got = summarize(events, ProbeList(CATALOG))
+        # pro: 5500 * 3 seats, no overage. solo: 1700 * 1 seat, plus 2gb over at 300.
+        assert got == {"a1": 18800}, f"expected {{'a1': 18800}}, got {got!r}"
 
-    def cached_is_fast():
-        # With lru_cache this returns instantly; the value must still be correct.
-        assert fib(30) == 832040, f"expected 832040, got {fib(30)!r}"
+    def catalog_is_walked_once():
+        pricing.clear_caches()
+        catalog = ProbeList(CATALOG)
+        events = [{"account": "a%d" % i, "plan": "team", "seats": 2, "gb": 5} for i in range(40)]
+        summarize(events, catalog)
+        assert catalog.probes <= len(catalog), (
+            f"expected at most {len(catalog)} catalog probes for 40 events, got {catalog.probes}"
+        )
 
-    record("fib(20) is 6765", larger_value)
-    record("fib(30) is 832040", cached_is_fast)
+    record("one account, two plans, totals summed", totals_per_account)
+    record("40 events still walk the catalog once", catalog_is_walked_once)
+`
+
+const PERF_TEST_PRICING_HIDDEN = String.raw`from hotpath import pricing, rates
+
+
+def run_tests(record):
+    def usage_dicts_are_accepted():
+        pricing.clear_caches()
+        rates.reset()
+        got = pricing.monthly_cost("Pro", {"seats": 2, "gb": 4})
+        # rate_for('pro', 2) is 5000, times 2 seats, plus 4gb at 300.
+        assert got == 11200, f"expected 11200, got {got!r}"
+
+    def equal_usage_reuses_the_cache():
+        pricing.clear_caches()
+        rates.reset()
+        for _ in range(5):
+            pricing.monthly_cost(" TEAM ", {"gb": 3, "seats": 4})
+            pricing.monthly_cost("startup", {"seats": 4, "gb": 3})
+        assert rates.CALLS == [("team", 4)], f"expected [('team', 4)], got {rates.CALLS!r}"
+
+    def different_usage_costs_differently():
+        pricing.clear_caches()
+        got = (
+            pricing.monthly_cost("solo", {"seats": 1, "gb": 0}),
+            pricing.monthly_cost("solo", {"seats": 2, "gb": 0}),
+        )
+        assert got == (1700, 4400), f"expected (1700, 4400), got {got!r}"
+
+    record("monthly_cost takes a plain dict", usage_dicts_are_accepted)
+    record("ten equal invoices, one rate-engine call", equal_usage_reuses_the_cache)
+    record("the cache does not blur different usage", different_usage_costs_differently)
+`
+
+const PERF_TEST_ROLLUP_HIDDEN = String.raw`from hotpath import pricing, rates
+from hotpath.instrument import ProbeList
+from hotpath.rollup import summarize
+
+CATALOG = [
+    {"code": "Pro", "gb_included": 10},
+    {"code": "team", "gb_included": 5},
+    {"code": "SOLO", "gb_included": 2},
+]
+
+
+def run_tests(record):
+    def unknown_plans_are_dropped():
+        pricing.clear_caches()
+        events = [
+            {"account": "z9", "plan": "ghost", "seats": 9, "gb": 9},
+            {"account": "a1", "plan": "Team", "seats": 1, "gb": 5},
+        ]
+        got = summarize(events, ProbeList(CATALOG))
+        assert got == {"a1": 3000}, f"expected {{'a1': 3000}}, got {got!r}"
+
+    def usage_under_the_allowance_is_not_negative():
+        pricing.clear_caches()
+        events = [{"account": "a1", "plan": "pro", "seats": 1, "gb": 2}]
+        got = summarize(events, ProbeList(CATALOG))
+        assert got == {"a1": 4500}, f"expected {{'a1': 4500}}, got {got!r}"
+
+    def no_events_is_an_empty_result():
+        pricing.clear_caches()
+        catalog = ProbeList(CATALOG)
+        got = summarize([], catalog)
+        assert got == {}, f"expected {{}}, got {got!r}"
+
+    def repeated_shapes_price_once():
+        pricing.clear_caches()
+        rates.reset()
+        events = [{"account": "a%d" % i, "plan": "PRO", "seats": 2, "gb": 12} for i in range(50)]
+        summarize(events, ProbeList(CATALOG))
+        assert rates.CALLS == [("pro", 2)], f"expected [('pro', 2)], got {rates.CALLS!r}"
+
+    record("plans missing from the catalog are dropped", unknown_plans_are_dropped)
+    record("usage below the allowance bills no overage", usage_under_the_allowance_is_not_negative)
+    record("no events returns an empty dict", no_events_is_an_empty_result)
+    record("50 identical events, one rate-engine call", repeated_shapes_price_once)
 `
 
 export const performanceLesson: PythonLesson = {
   id: "py-l4-performance",
   title: "Profiling, complexity & caching",
   summary: "Find the hot path, fix complexity, and memoize repeated work with lru_cache.",
-  estimatedMinutes: 20,
+  estimatedMinutes: 28,
   difficulty: "hard",
   skills: ["performance", "lru-cache", "complexity", "profiling"],
   teach: {
@@ -333,31 +618,60 @@ def fib(n):
   practice: {
     id: "py-l4-performance-practice",
     executionMode: "workspace",
-    prompt: `Implement \`fib(n)\` in \`perf/compute.py\` with \`functools.lru_cache\` so the recursion is
-memoized (each \`n\` computed once). It must return correct Fibonacci values, including for larger
-\`n\`. Some tests are hidden.`,
+    prompt: `Repair the nightly billing rollup on ticket PERF-214. It has stopped finishing inside its
+window: the profile shows the plan catalog being walked again for every usage event, and the rate
+engine being asked for the same rate thousands of times.
+
+Nothing here is graded on the clock. \`hotpath/instrument.py\` counts every catalog element your
+code touches, and \`hotpath/rates.py\` logs every call to the rate engine, so the tests assert on
+work done rather than on time taken.
+
+Fill in \`hotpath/pricing.py\` (canonical plan codes, rates and monthly cost) and
+\`hotpath/rollup.py\` (\`summarize(events, catalog)\`). \`README.md\` has the exact contract, including
+what the catalog probe budget is and which events are dropped. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "Decorate the function: `@lru_cache(maxsize=None)` above `def fib(n):`.",
-      "Base case `if n < 2: return n`, else `fib(n - 1) + fib(n - 2)`.",
-      "The cache is what keeps `fib(30)` instant instead of exponential.",
+      "Both counters punish the same habit: work repeated inside a loop that could have been done once outside it. The catalog is a scan; the rate engine is a repeat.",
+      "In `rollup`, read the catalog once into a dict keyed by the canonical code, then each event is one hash lookup. In `pricing`, the cache has to sit behind `normalize`, or four spellings of one plan become four cache entries.",
+      "`lru_cache` keys on the arguments, so they must be hashable: a `usage` dict cannot be one. Take the dict apart at the boundary and pass `seats` and `gb` to a cached inner function, then expose `cache_clear()` on each cached function from `clear_caches()`.",
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "perf/compute.py",
-      editableFilePaths: ["perf/compute.py"],
-      visibleTestPaths: ["tests/test_compute.py"],
-      hiddenTestPaths: ["tests/test_compute_hidden.py"],
+      primaryFilePath: "hotpath/pricing.py",
+      editableFilePaths: ["hotpath/pricing.py", "hotpath/rollup.py"],
+      visibleTestPaths: ["tests/test_pricing.py", "tests/test_rollup.py"],
+      hiddenTestPaths: ["tests/test_pricing_hidden.py", "tests/test_rollup_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
         { path: "README.md", role: "docs", language: "markdown", content: PERF_README },
-        { path: "perf/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        { path: "hotpath/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "perf/compute.py",
+          path: "hotpath/instrument.py",
+          role: "readonly",
+          language: "python",
+          content: PERF_INSTRUMENT,
+          description: "Read-only: the catalog probe counter",
+        },
+        {
+          path: "hotpath/rates.py",
+          role: "readonly",
+          language: "python",
+          content: PERF_RATES,
+          description: "Read-only: the rate engine and its call log",
+        },
+        {
+          path: "hotpath/pricing.py",
           role: "editable",
           language: "python",
-          content: PERF_COMPUTE_STARTER,
-          description: "Implement a memoized fib here",
+          content: PERF_PRICING_STARTER,
+          description: "Canonical codes, cached rates and monthly cost",
+        },
+        {
+          path: "hotpath/rollup.py",
+          role: "editable",
+          language: "python",
+          content: PERF_ROLLUP_STARTER,
+          description: "The accidentally quadratic rollup",
         },
         {
           path: "tests/__init__.py",
@@ -367,27 +681,44 @@ memoized (each \`n\` computed once). It must return correct Fibonacci values, in
           hidden: true,
         },
         {
-          path: "tests/test_compute.py",
+          path: "tests/test_pricing.py",
           role: "test",
           language: "python",
-          content: PERF_TEST,
-          description: "Visible performance tests",
+          content: PERF_TEST_PRICING,
+          description: "Visible pricing tests",
         },
         {
-          path: "tests/test_compute_hidden.py",
+          path: "tests/test_rollup.py",
           role: "test",
           language: "python",
-          content: PERF_TEST_HIDDEN,
+          content: PERF_TEST_ROLLUP,
+          description: "Visible rollup tests",
+        },
+        {
+          path: "tests/test_pricing_hidden.py",
+          role: "test",
+          language: "python",
+          content: PERF_TEST_PRICING_HIDDEN,
           hidden: true,
-          description: "Hidden larger-value tests",
+          description: "Hidden cache-key tests",
+        },
+        {
+          path: "tests/test_rollup_hidden.py",
+          role: "test",
+          language: "python",
+          content: PERF_TEST_ROLLUP_HIDDEN,
+          hidden: true,
+          description: "Hidden rollup edge cases",
         },
         {
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
           content: buildRunner([
-            { module: "test_compute", label: "visible compute" },
-            { module: "test_compute_hidden", label: "hidden compute" },
+            { module: "test_pricing", label: "visible pricing" },
+            { module: "test_rollup", label: "visible rollup" },
+            { module: "test_pricing_hidden", label: "hidden pricing" },
+            { module: "test_rollup_hidden", label: "hidden rollup" },
           ]),
           hidden: true,
           description: "Workspace test runner",
@@ -395,10 +726,16 @@ memoized (each \`n\` computed once). It must return correct Fibonacci values, in
       ],
       referenceFiles: [
         {
-          path: "perf/compute.py",
+          path: "hotpath/pricing.py",
           role: "editable",
           language: "python",
-          content: PERF_COMPUTE_REFERENCE,
+          content: PERF_PRICING_REFERENCE,
+        },
+        {
+          path: "hotpath/rollup.py",
+          role: "editable",
+          language: "python",
+          content: PERF_ROLLUP_REFERENCE,
         },
       ],
     },
