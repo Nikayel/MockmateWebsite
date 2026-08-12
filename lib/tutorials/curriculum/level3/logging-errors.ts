@@ -1,79 +1,256 @@
 import type { PythonLesson } from "../../types"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const LG_README = `# Robust totals with an error boundary
+const LG_README = `# The nightly meter import drops rows on the floor
 
-\`processing/parsing.py\` (read-only) has \`to_amount(raw)\`, which converts text to an int and
-**raises** \`ValueError\` on bad input. Implement \`safe_total(raws)\` in \`processing/totals.py\` so
-it totals every value that parses and **skips** the ones that don't (a clean error boundary).
+The overnight job that imports smart-meter readings finishes green every morning, and finance keeps
+asking why the billed totals are short. The job wraps its loop in \`except Exception: continue\`, so
+every row it cannot read disappears without a trace. Your ticket: one bad row must not abort the
+run, and it must not vanish either.
 
-Example: \`safe_total(["1", "x", "3"])\` is \`4\`. Some tests are hidden.
+Two files to write.
+
+## \`ingest/record.py\` is the boundary for a single row
+
+\`parse_reading(row)\` takes one row like \`{"meter": "m-01", "kwh": "120"}\` and returns the reading
+as an int. When the row cannot be read, it raises \`BadReading(row, reason)\` from
+\`ingest/errors.py\` (read-only), which carries the offending row so the caller can report it. The
+three reasons, and their constants in that module:
+
+| Situation | Reason constant |
+| --- | --- |
+| the row has no \`"kwh"\` key | \`MISSING_KWH\` |
+| \`int()\` rejects the \`"kwh"\` text | \`UNPARSABLE_KWH\` |
+| the reading parses but is below zero | \`NEGATIVE_KWH\` |
+
+The first two of those start life as some other exception. Keep that original exception attached as
+the cause of the \`BadReading\`, so the traceback still shows what actually went wrong.
+
+Anything else is not a bad row, it is a broken export: a \`"kwh"\` of \`None\` means the upstream
+system wrote a null, and that must stop the run rather than be filed as one skipped meter.
+
+## \`ingest/batch.py\` decides the policy
+
+\`import_batch(rows, source)\` walks the rows and returns:
+
+\`\`\`python
+{"total": 240, "imported": 2, "failures": [{"meter": "m-02", "reason": "unparsable kwh"}]}
+\`\`\`
+
+\`total\` is the sum of the readings that were imported, \`imported\` counts them, and \`failures\`
+lists one entry per unreadable row in the order they were met. \`source\` is the export handle from
+\`ingest/source.py\` (read-only); it must be closed before \`import_batch\` returns, and also on the
+way out when an error leaves the function.
+
+Some tests are hidden.
 `
 
-const LG_PARSING = String.raw`def to_amount(raw):
-    """Convert raw text to an int amount. Raises ValueError on bad input."""
-    return int(raw)
+const LG_ERRORS = String.raw`"""Read-only. The error vocabulary the import job reports with."""
+
+MISSING_KWH = "missing kwh"
+UNPARSABLE_KWH = "unparsable kwh"
+NEGATIVE_KWH = "negative kwh"
+
+
+class BadReading(Exception):
+    """One row could not be read. Carries the offending row so the caller can report it."""
+
+    def __init__(self, row, reason):
+        super().__init__(reason)
+        self.row = row
+        self.reason = reason
 `
 
-const LG_TOTALS_STARTER = String.raw`from processing.parsing import to_amount
+const LG_SOURCE = String.raw`"""Read-only. A stand-in for the nightly export handle.
+
+The real one holds a file and a network session. This sandbox has neither, so it only
+records whether it was closed.
+"""
 
 
-def safe_total(raws):
-    """Total the values that parse, skipping any that raise ValueError (see README.md)."""
-    # TODO: try to_amount(raw) for each; skip the ones that raise.
+class ReadingSource:
+    def __init__(self, name="nightly-export"):
+        self.name = name
+        self.closed = False
+        self.close_count = 0
+
+    def close(self):
+        self.closed = True
+        self.close_count += 1
+`
+
+const LG_RECORD_STARTER = String.raw`from ingest.errors import BadReading, MISSING_KWH, NEGATIVE_KWH, UNPARSABLE_KWH
+
+
+def parse_reading(row):
+    """Return one row's reading as an int, or raise BadReading (see README.md)."""
+    # TODO: return the reading, and raise BadReading with the matching reason when you cannot.
     return 0
 `
 
-const LG_TOTALS_REFERENCE = String.raw`from processing.parsing import to_amount
+const LG_RECORD_REFERENCE = String.raw`from ingest.errors import BadReading, MISSING_KWH, NEGATIVE_KWH, UNPARSABLE_KWH
 
 
-def safe_total(raws):
+def parse_reading(row):
+    try:
+        raw = row["kwh"]
+    except KeyError as err:
+        raise BadReading(row, MISSING_KWH) from err
+
+    try:
+        kwh = int(raw)
+    except ValueError as err:
+        raise BadReading(row, UNPARSABLE_KWH) from err
+
+    if kwh < 0:
+        raise BadReading(row, NEGATIVE_KWH)
+    return kwh
+`
+
+const LG_BATCH_STARTER = String.raw`from ingest.errors import BadReading
+from ingest.record import parse_reading
+
+
+def import_batch(rows, source):
+    """Import every readable row and report the rest (see README.md)."""
+    # TODO: build the total, the imported count and the failures list, and close the source.
+    return {"total": 0, "imported": 0, "failures": []}
+`
+
+const LG_BATCH_REFERENCE = String.raw`from ingest.errors import BadReading
+from ingest.record import parse_reading
+
+
+def import_batch(rows, source):
     total = 0
-    for raw in raws:
+    imported = 0
+    failures = []
+    try:
+        for row in rows:
+            try:
+                kwh = parse_reading(row)
+            except BadReading as err:
+                failures.append({"meter": err.row.get("meter"), "reason": err.reason})
+                continue
+            total += kwh
+            imported += 1
+    finally:
+        source.close()
+    return {"total": total, "imported": imported, "failures": failures}
+`
+
+const LG_TEST = String.raw`from ingest.batch import import_batch
+from ingest.errors import BadReading, MISSING_KWH, UNPARSABLE_KWH
+from ingest.record import parse_reading
+from ingest.source import ReadingSource
+
+
+def run_tests(record):
+    def parses_a_good_row():
+        got = parse_reading({"meter": "m-01", "kwh": "120"})
+        assert got == 120, f"expected 120, got {got!r}"
+
+    def bad_row_raises_carrying_the_row():
+        row = {"meter": "m-02"}
         try:
-            total += to_amount(raw)
-        except ValueError:
-            continue
-    return total
+            parse_reading(row)
+        except BadReading as err:
+            assert err.reason == MISSING_KWH, f"expected {MISSING_KWH!r}, got {err.reason!r}"
+            assert err.row is row, f"expected the offending row, got {err.row!r}"
+        else:
+            raise AssertionError("expected BadReading, got a normal return")
+
+    def imports_every_readable_row():
+        source = ReadingSource()
+        got = import_batch([{"meter": "m-01", "kwh": "120"}, {"meter": "m-02", "kwh": "20"}], source)
+        assert got["total"] == 140, f"expected total 140, got {got['total']!r}"
+        assert got["imported"] == 2, f"expected imported 2, got {got['imported']!r}"
+        assert got["failures"] == [], f"expected no failures, got {got['failures']!r}"
+
+    def one_bad_row_is_reported_not_dropped():
+        source = ReadingSource()
+        rows = [
+            {"meter": "m-01", "kwh": "120"},
+            {"meter": "m-02", "kwh": "twelve"},
+            {"meter": "m-03", "kwh": "20"},
+        ]
+        got = import_batch(rows, source)
+        assert got["total"] == 140, f"expected total 140, got {got['total']!r}"
+        assert got["imported"] == 2, f"expected imported 2, got {got['imported']!r}"
+        expected = [{"meter": "m-02", "reason": UNPARSABLE_KWH}]
+        assert got["failures"] == expected, f"expected {expected!r}, got {got['failures']!r}"
+
+    def closes_the_source_on_the_happy_path():
+        source = ReadingSource()
+        import_batch([{"meter": "m-01", "kwh": "5"}], source)
+        assert source.closed is True, f"expected closed True, got {source.closed!r}"
+        assert source.close_count == 1, f"expected close_count 1, got {source.close_count!r}"
+
+    record("parses a good row", parses_a_good_row)
+    record("a bad row raises BadReading carrying the row", bad_row_raises_carrying_the_row)
+    record("imports every readable row", imports_every_readable_row)
+    record("one bad row is reported, not dropped", one_bad_row_is_reported_not_dropped)
+    record("closes the source on the happy path", closes_the_source_on_the_happy_path)
 `
 
-const LG_TEST = String.raw`from processing.totals import safe_total
+const LG_TEST_HIDDEN = String.raw`from ingest.batch import import_batch
+from ingest.errors import BadReading, NEGATIVE_KWH, UNPARSABLE_KWH
+from ingest.record import parse_reading
+from ingest.source import ReadingSource
 
 
 def run_tests(record):
-    def sums_valid_amounts():
-        assert safe_total(["1", "2", "3"]) == 6, f"got {safe_total(['1','2','3'])!r}"
+    def keeps_the_original_error_as_the_cause():
+        try:
+            parse_reading({"meter": "m-09", "kwh": "twelve"})
+        except BadReading as err:
+            assert err.reason == UNPARSABLE_KWH, f"expected {UNPARSABLE_KWH!r}, got {err.reason!r}"
+            assert isinstance(err.__cause__, ValueError), (
+                f"expected the ValueError kept as __cause__, got {err.__cause__!r}"
+            )
+        else:
+            raise AssertionError("expected BadReading, got a normal return")
 
-    def skips_invalid_amounts():
-        assert safe_total(["1", "x", "3"]) == 4, f"got {safe_total(['1','x','3'])!r}"
+    def a_negative_reading_is_a_failure():
+        source = ReadingSource()
+        rows = [{"meter": "m-01", "kwh": "-4"}, {"meter": "m-02", "kwh": "nope"}]
+        got = import_batch(rows, source)
+        assert got["total"] == 0, f"expected total 0, got {got['total']!r}"
+        expected = [
+            {"meter": "m-01", "reason": NEGATIVE_KWH},
+            {"meter": "m-02", "reason": UNPARSABLE_KWH},
+        ]
+        assert got["failures"] == expected, f"expected {expected!r}, got {got['failures']!r}"
 
-    def empty_list_is_zero():
-        assert safe_total([]) == 0
+    def a_null_reading_stops_the_run():
+        source = ReadingSource()
+        rows = [{"meter": "m-01", "kwh": "10"}, {"meter": "m-02", "kwh": None}]
+        try:
+            got = import_batch(rows, source)
+        except TypeError:
+            pass
+        else:
+            raise AssertionError(f"expected TypeError to escape, got a result of {got!r}")
+        assert source.closed is True, f"expected the source closed anyway, got {source.closed!r}"
 
-    record("sums valid amounts", sums_valid_amounts)
-    record("skips invalid amounts", skips_invalid_amounts)
-    record("empty list totals 0", empty_list_is_zero)
-`
+    def an_empty_batch_reports_nothing():
+        source = ReadingSource()
+        got = import_batch([], source)
+        expected = {"total": 0, "imported": 0, "failures": []}
+        assert got == expected, f"expected {expected!r}, got {got!r}"
+        assert source.closed is True, f"expected closed True, got {source.closed!r}"
 
-const LG_TEST_HIDDEN = String.raw`from processing.totals import safe_total
-
-
-def run_tests(record):
-    def skips_blank_strings():
-        assert safe_total(["10", " ", "5"]) == 15, f"got {safe_total(['10',' ','5'])!r}"
-
-    def all_invalid_is_zero():
-        assert safe_total(["a", "b"]) == 0, f"got {safe_total(['a','b'])!r}"
-
-    record("skips blank strings", skips_blank_strings)
-    record("all invalid totals 0", all_invalid_is_zero)
+    record("keeps the original error as the cause", keeps_the_original_error_as_the_cause)
+    record("a negative reading is a failure", a_negative_reading_is_a_failure)
+    record("a null reading stops the run", a_null_reading_stops_the_run)
+    record("an empty batch reports nothing", an_empty_batch_reports_nothing)
 `
 
 export const loggingErrorsLesson: PythonLesson = {
   id: "py-l3-logging-errors",
   title: "Error boundaries & logging habits",
   summary: "Use logging instead of print and design where errors get caught.",
-  estimatedMinutes: 17,
+  estimatedMinutes: 22,
   difficulty: "medium",
   skills: ["logging", "exceptions", "error-boundaries", "robustness"],
   teach: {
@@ -302,43 +479,63 @@ integers, **skipping** any that don't.
   practice: {
     id: "py-l3-logging-errors-practice",
     executionMode: "workspace",
-    prompt: `Implement \`safe_total(raws)\` in \`processing/totals.py\`: use the read-only \`to_amount\` helper
-(which raises \`ValueError\` on bad input) to total the valid values, skipping the rest. Some tests
-are hidden.`,
+    prompt: `Repair the nightly meter import, which finishes green every morning while finance reports the
+billed totals are short. Its loop catches everything and continues, so unreadable rows disappear
+without a trace.
+
+Implement \`parse_reading(row)\` in \`ingest/record.py\` and \`import_batch(rows, source)\` in
+\`ingest/batch.py\`. One unreadable row must not abort the run, and it must not vanish either:
+\`import_batch\` returns the imported total and count alongside a list of the rows it could not read.
+A \`"kwh"\` of \`None\` is a broken export rather than a bad row, and has to stop the run. The README
+has the exact reason constants and the shape of the returned report. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "`to_amount` is imported for you. Call it inside a `try`.",
-      "Catch `ValueError` and `continue` to skip bad records.",
-      "Return the accumulated total.",
+      "Two different jobs. `parse_reading` decides that one row is unreadable; `import_batch` decides what the run does about it. Neither should do the other's work.",
+      "In `parse_reading`, a missing key and an unparsable value arrive as two different exceptions. Catch each one narrowly and re-raise it as a `BadReading`, using `raise ... from err` so the original is kept as the cause. Leave anything you did not name alone so it travels on up.",
+      "In `import_batch`, `except BadReading as err:` gives you `err.row` and `err.reason` for the failures entry, then `continue`. Wrap the whole loop in `try: ... finally: source.close()` so the source closes on both the normal exit and the escaping error.",
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "processing/totals.py",
-      editableFilePaths: ["processing/totals.py"],
-      visibleTestPaths: ["tests/test_totals.py"],
-      hiddenTestPaths: ["tests/test_totals_hidden.py"],
+      primaryFilePath: "ingest/record.py",
+      editableFilePaths: ["ingest/record.py", "ingest/batch.py"],
+      visibleTestPaths: ["tests/test_import.py"],
+      hiddenTestPaths: ["tests/test_import_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
         { path: "README.md", role: "docs", language: "markdown", content: LG_README },
         {
-          path: "processing/__init__.py",
+          path: "ingest/__init__.py",
           role: "readonly",
           language: "python",
           content: EMPTY_INIT,
         },
         {
-          path: "processing/parsing.py",
+          path: "ingest/errors.py",
           role: "readonly",
           language: "python",
-          content: LG_PARSING,
-          description: "to_amount helper (read-only, raises on bad input)",
+          content: LG_ERRORS,
+          description: "BadReading and the reason constants (read-only)",
         },
         {
-          path: "processing/totals.py",
+          path: "ingest/source.py",
+          role: "readonly",
+          language: "python",
+          content: LG_SOURCE,
+          description: "The export handle that has to be closed (read-only)",
+        },
+        {
+          path: "ingest/record.py",
           role: "editable",
           language: "python",
-          content: LG_TOTALS_STARTER,
-          description: "Implement safe_total here",
+          content: LG_RECORD_STARTER,
+          description: "The per-row boundary: implement parse_reading here",
+        },
+        {
+          path: "ingest/batch.py",
+          role: "editable",
+          language: "python",
+          content: LG_BATCH_STARTER,
+          description: "The batch policy: implement import_batch here",
         },
         {
           path: "tests/__init__.py",
@@ -348,14 +545,14 @@ are hidden.`,
           hidden: true,
         },
         {
-          path: "tests/test_totals.py",
+          path: "tests/test_import.py",
           role: "test",
           language: "python",
           content: LG_TEST,
-          description: "Visible error-boundary tests",
+          description: "Visible import tests",
         },
         {
-          path: "tests/test_totals_hidden.py",
+          path: "tests/test_import_hidden.py",
           role: "test",
           language: "python",
           content: LG_TEST_HIDDEN,
@@ -367,8 +564,8 @@ are hidden.`,
           role: "test",
           language: "python",
           content: buildRunner([
-            { module: "test_totals", label: "visible totals" },
-            { module: "test_totals_hidden", label: "hidden totals" },
+            { module: "test_import", label: "visible import" },
+            { module: "test_import_hidden", label: "hidden import" },
           ]),
           hidden: true,
           description: "Workspace test runner",
@@ -376,10 +573,16 @@ are hidden.`,
       ],
       referenceFiles: [
         {
-          path: "processing/totals.py",
+          path: "ingest/record.py",
           role: "editable",
           language: "python",
-          content: LG_TOTALS_REFERENCE,
+          content: LG_RECORD_REFERENCE,
+        },
+        {
+          path: "ingest/batch.py",
+          role: "editable",
+          language: "python",
+          content: LG_BATCH_REFERENCE,
         },
       ],
     },
