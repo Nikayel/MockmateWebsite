@@ -301,11 +301,11 @@ export const descriptorsMetaclassesLesson: PythonLesson = {
   id: "py-l4-descriptors-metaclasses",
   title: "Descriptors & a peek at metaclasses",
   summary: "Customize attribute access with a descriptor and understand how classes are created.",
-  estimatedMinutes: 60,
+  estimatedMinutes: 66,
   difficulty: "hard",
   skills: ["descriptors", "metaclasses", "attributes", "metaprogramming"],
   teach: {
-    estimatedMinutes: 7,
+    estimatedMinutes: 9,
     markdown: `## Attribute access you can't route around
 
 When a rule like "a balance is never negative" lives in one setter, someone eventually assigns the field from another code path and skips the check. A **descriptor** moves that rule off the value and onto the *attribute itself*, so every read and write of an account's \`balance\` goes through the same code no matter who touches it. This is how ORMs, typed config, and form fields validate assignments in real systems. It is also a favorite interview topic because it reveals whether you understand Python's attribute machinery instead of just its syntax.
@@ -394,6 +394,12 @@ print(a.x)   # 2  (b clobbered a)
 
 - **Descriptor as an instance attribute.** \`balance = Positive()\` must sit in the class body. Assign it inside \`__init__\` and Python never invokes the protocol; it is just a normal attribute.
 
+### Two flavors, and which one wins
+
+Descriptors come in two flavors, and the difference decides precedence. A **data descriptor** defines \`__set__\` or \`__delete__\` and *wins over* the instance \`__dict__\`, so its \`__get__\` runs even when the instance dict already holds an entry under that name. A **non-data descriptor** defines only \`__get__\` and *loses to* the instance dict, so an entry there shadows it. \`@property\` is a data descriptor, which is why you cannot shadow one by assigning to the instance.
+
+\`functools.cached_property\` is the non-data counterpart. Decorate a method with it and the first access computes the value and writes it into \`instance.__dict__\` under the attribute's own name. Because a non-data descriptor loses to the instance dict, every later access finds that entry first and the method never runs again. It is the standard way to cache a value derived from data that does not change.
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -422,7 +428,7 @@ print(a.x)   # 2  (b clobbered a)
 }
 \`\`\`
 
-**Interview nuance:** descriptors come in two flavors and the difference decides precedence. A **data descriptor** defines \`__set__\` or \`__delete__\` and *wins over* the instance \`__dict__\`. A **non-data descriptor** defines only \`__get__\` and *loses to* it. That is why \`@property\` (data) cannot be shadowed by an instance attribute, while \`functools.cached_property\` (non-data) writes its result into \`instance.__dict__\` on first access and is then read straight from the dict on later calls, skipping recomputation.
+**Interview nuance:** the practical consequence is that \`cached_property\` is only safe when the inputs cannot change. Nothing invalidates that dict entry, so a cached value quietly goes stale after a write to the fields it was derived from, and the only way back is \`del instance.attr\`. When the value must track mutable state, take the recomputation and use \`@property\`.
 
 ### The peek at metaclasses
 
@@ -461,7 +467,27 @@ You will rarely write one. \`abc.ABCMeta\`, \`enum.Enum\`, and Django models use
   ],
   "reveal": "A class is an object, so anything you can do while building it you can usually also do to it afterwards. That is why the jobs people reach for metaclasses for (registering subclasses, validating a class body, adding methods) are almost always better served by a class decorator or by __init_subclass__, both of which a reviewer can read without knowing the metaclass protocol."
 }
-\`\`\``,
+\`\`\`
+
+### \`__init_subclass__\`, the hook you will actually use
+
+\`__init_subclass__\` is a hook you define **once on a base class**, and Python calls it automatically every time someone defines a subclass of it. It is implicitly a \`classmethod\`, and the class it receives as \`cls\` is the **new subclass**, not the base. Any keyword arguments in the class statement (\`class Csv(Reader, delimiter=",")\`) arrive as keyword arguments, so always accept \`**kwargs\` and pass them on with \`super().__init_subclass__(**kwargs)\`.
+
+It runs after the subclass body has finished executing, which is the property that makes it useful: \`vars(cls)\` already holds everything that body declared, in declaration order.
+
+\`\`\`python
+class Reader:
+    REGISTRY = {}
+
+    def __init_subclass__(cls, fmt, **kwargs):
+        super().__init_subclass__(**kwargs)
+        Reader.REGISTRY[fmt] = cls
+
+class CsvReader(Reader, fmt="csv"): ...
+print(Reader.REGISTRY)   # {'csv': <class 'CsvReader'>}
+\`\`\`
+
+A metaclass would do the same job, but it changes the *type* of every class involved, which then has to stay compatible with the metaclass of every other base you mix in. \`__init_subclass__\` is an ordinary method on an ordinary class, so it composes without that risk and a reader who has never met \`type.__new__\` can still follow it. Reach for a metaclass only when you need to control the namespace *before* the class body is executed. Note also that a subclass's own \`__init_subclass__\` applies to *its* subclasses, so if you write a registry per subclass, assign a new dict onto \`cls\` rather than mutating an inherited one, or every class shares the base's.`,
     demoCode: `class Positive:
     def __set_name__(self, owner, name):
         self.storage_name = "_" + name
