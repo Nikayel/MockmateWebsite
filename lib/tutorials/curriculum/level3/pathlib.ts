@@ -5,73 +5,227 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // L3-M4: Files, Data & Robustness
 // ───────────────────────────────────────────────────────────────────────────
 
-const PL_README = `# Total a scores file with pathlib
+const PL_README = `# Summarize the nightly sensor export
 
-Read real files with \`pathlib\`. Implement \`total_score(path)\` in \`reports/scores.py\` so it reads
-the file at \`path\` and returns the **sum of the integer on each non-blank line**.
+Every night a job drops sensor readings into \`exports/\`. The folders are created by whoever
+installed each sensor, so the tree is uneven: some readings sit at the top, some are nested two
+directories deep, and unrelated files sit alongside them. The reporting job that reads this tree
+was written against a flat directory and misses most of it.
 
-The \`data/\` folder holds the score files. Blank lines are skipped. Some tests are hidden.
+Two modules are yours.
+
+## \`catalog/discovery.py\`
+
+**\`find_reading_files(root)\`** returns every reading file anywhere under \`root\`, at any depth,
+as a list of \`Path\` objects sorted by their POSIX string form. A reading file is one whose
+suffix is \`.csv\`. Anything else in the tree is not a reading file.
+
+**\`summary_path(source)\`** returns the \`Path\` where a source file's summary belongs: the same
+directory, the same filename, and \`.txt\` in place of the \`.csv\` extension.
+
+\`\`\`python
+summary_path(Path("exports/north/alpha.csv"))   # Path("exports/north/alpha.txt")
+\`\`\`
+
+## \`catalog/summarize.py\`
+
+**\`summarize_file(path)\`** reads one reading file and returns
+
+\`\`\`python
+{"stem": "alpha", "readings": 2, "total": 30, "skipped": 0}
+\`\`\`
+
+Each line holds a sensor id and an integer reading separated by a comma, like \`s1,10\`. A line
+that does not split into exactly two pieces, or whose second piece is not an integer, is
+**skipped**: it counts in \`skipped\` and contributes nothing to \`readings\` or \`total\`. Blank
+lines are ignored entirely and count nowhere. \`stem\` is the filename without its extension.
+
+**\`summarize_tree(root)\`** returns one summary per reading file under \`root\`, in the order
+\`find_reading_files\` gives them. Each summary is the dict above plus a \`"path"\` key holding the
+file's location relative to \`root\`, written with forward slashes.
+
+\`\`\`python
+{"path": "north/alpha.csv", "stem": "alpha", "readings": 2, "total": 30, "skipped": 0}
+\`\`\`
+
+Some tests are hidden.
 `
 
-const PL_SCORES = "10\n20\n30\n"
-const PL_SCORES2 = "5\n5\n5\n5\n"
-const PL_SCORES_BLANKS = "3\n\n4\n"
-const PL_SCORES_EMPTY = ""
+const PL_ALPHA = "s1,10\ns2,20\n"
+const PL_NOTES = "installed the north sensors on tuesday\n"
+const PL_BETA = "s1,5\nbroken\ns3,7\ns4,notanumber\n"
+const PL_GAMMA = "s9,4\n\n"
+const PL_EMPTY = ""
 
-const PL_SCORES_STARTER = String.raw`from pathlib import Path
+const PL_DISCOVERY_STARTER = String.raw`from pathlib import Path
 
 
-def total_score(path):
-    """Sum the integer on each non-blank line of the file at path (see README.md)."""
-    # TODO: read the file with pathlib, then sum its integer lines.
-    return 0
+def find_reading_files(root):
+    """Return every reading file under root, sorted (see README.md)."""
+    # TODO: collect the reading files at any depth under root, in sorted order.
+    return []
+
+
+def summary_path(source):
+    """Return the Path of the summary file that belongs to source (see README.md)."""
+    # TODO: build the summary location from the source path.
+    return Path(source)
 `
 
-const PL_SCORES_REFERENCE = String.raw`from pathlib import Path
+const PL_DISCOVERY_REFERENCE = String.raw`from pathlib import Path
 
 
-def total_score(path):
-    text = Path(path).read_text()
-    return sum(int(line) for line in text.splitlines() if line.strip())
+def find_reading_files(root):
+    found = Path(root).rglob("*.csv")
+    return sorted(found, key=lambda path: path.as_posix())
+
+
+def summary_path(source):
+    return Path(source).with_suffix(".txt")
 `
 
-const PL_TEST = String.raw`from reports.scores import total_score
+const PL_SUMMARIZE_STARTER = String.raw`from pathlib import Path
+
+from catalog.discovery import find_reading_files
+
+
+def summarize_file(path):
+    """Return the reading counts for one file (see README.md)."""
+    # TODO: read the file and count readings, their total, and skipped lines.
+    return {"stem": "", "readings": 0, "total": 0, "skipped": 0}
+
+
+def summarize_tree(root):
+    """Return one summary per reading file under root (see README.md)."""
+    # TODO: summarize every reading file and label each summary with its location under root.
+    return []
+`
+
+const PL_SUMMARIZE_REFERENCE = String.raw`from pathlib import Path
+
+from catalog.discovery import find_reading_files
+
+
+def summarize_file(path):
+    source = Path(path)
+    readings = 0
+    total = 0
+    skipped = 0
+    for line in source.read_text().splitlines():
+        if not line.strip():
+            continue
+        parts = line.split(",")
+        if len(parts) != 2:
+            skipped += 1
+            continue
+        try:
+            value = int(parts[1])
+        except ValueError:
+            skipped += 1
+            continue
+        readings += 1
+        total += value
+    return {"stem": source.stem, "readings": readings, "total": total, "skipped": skipped}
+
+
+def summarize_tree(root):
+    base = Path(root)
+    summaries = []
+    for source in find_reading_files(base):
+        summary = summarize_file(source)
+        summary["path"] = source.relative_to(base).as_posix()
+        summaries.append(summary)
+    return summaries
+`
+
+const PL_TEST = String.raw`from pathlib import Path
+
+from catalog.discovery import find_reading_files, summary_path
+from catalog.summarize import summarize_file, summarize_tree
 
 
 def run_tests(record):
-    def sums_the_scores_file():
-        result = total_score("data/scores.txt")
-        assert result == 60, f"expected 60, got {result!r}"
+    def finds_only_reading_files():
+        found = [path.as_posix() for path in find_reading_files("exports/north")]
+        expected = ["exports/north/alpha.csv"]
+        assert found == expected, f"expected {expected}, got {found!r}"
 
-    def sums_another_file():
-        result = total_score("data/scores2.txt")
-        assert result == 20, f"expected 20, got {result!r}"
+    def summary_sits_next_to_its_source():
+        result = summary_path(Path("exports/north/alpha.csv")).as_posix()
+        assert result == "exports/north/alpha.txt", f"expected 'exports/north/alpha.txt', got {result!r}"
 
-    record("sums the scores file", sums_the_scores_file)
-    record("sums another file", sums_another_file)
+    def summarizes_one_file():
+        result = summarize_file("exports/north/alpha.csv")
+        expected = {"stem": "alpha", "readings": 2, "total": 30, "skipped": 0}
+        assert result == expected, f"expected {expected}, got {result!r}"
+
+    def labels_each_summary_with_its_location():
+        result = summarize_tree("exports/north")
+        expected = [
+            {"path": "alpha.csv", "stem": "alpha", "readings": 2, "total": 30, "skipped": 0}
+        ]
+        assert result == expected, f"expected {expected}, got {result!r}"
+
+    record("finds only reading files", finds_only_reading_files)
+    record("summary sits next to its source", summary_sits_next_to_its_source)
+    record("summarizes one file", summarizes_one_file)
+    record("labels each summary with its location", labels_each_summary_with_its_location)
 `
 
-const PL_TEST_HIDDEN = String.raw`from reports.scores import total_score
+const PL_TEST_HIDDEN = String.raw`from pathlib import Path
+
+from catalog.discovery import find_reading_files, summary_path
+from catalog.summarize import summarize_file, summarize_tree
 
 
 def run_tests(record):
-    def ignores_blank_lines():
-        result = total_score("data/with_blanks.txt")
-        assert result == 7, f"expected 7, got {result!r}"
+    def walks_the_whole_tree():
+        found = [path.as_posix() for path in find_reading_files("exports")]
+        expected = [
+            "exports/empty.csv",
+            "exports/north/alpha.csv",
+            "exports/south/beta.2.csv",
+            "exports/south/deep/gamma.csv",
+        ]
+        assert found == expected, f"expected {expected}, got {found!r}"
 
-    def empty_file_is_zero():
-        result = total_score("data/empty.txt")
-        assert result == 0, f"expected 0, got {result!r}"
+    def keeps_a_dot_inside_the_filename():
+        result = summary_path(Path("exports/south/beta.2.csv")).as_posix()
+        expected = "exports/south/beta.2.txt"
+        assert result == expected, f"expected {expected!r}, got {result!r}"
 
-    record("ignores blank lines", ignores_blank_lines)
-    record("empty file totals 0", empty_file_is_zero)
+    def counts_malformed_lines_as_skipped():
+        result = summarize_file("exports/south/beta.2.csv")
+        expected = {"stem": "beta.2", "readings": 2, "total": 12, "skipped": 2}
+        assert result == expected, f"expected {expected}, got {result!r}"
+
+    def an_empty_file_summarizes_to_zeros():
+        result = summarize_file("exports/empty.csv")
+        expected = {"stem": "empty", "readings": 0, "total": 0, "skipped": 0}
+        assert result == expected, f"expected {expected}, got {result!r}"
+
+    def summarizes_every_file_in_the_tree():
+        result = summarize_tree("exports")
+        expected = [
+            {"path": "empty.csv", "stem": "empty", "readings": 0, "total": 0, "skipped": 0},
+            {"path": "north/alpha.csv", "stem": "alpha", "readings": 2, "total": 30, "skipped": 0},
+            {"path": "south/beta.2.csv", "stem": "beta.2", "readings": 2, "total": 12, "skipped": 2},
+            {"path": "south/deep/gamma.csv", "stem": "gamma", "readings": 1, "total": 4, "skipped": 0},
+        ]
+        assert result == expected, f"expected {expected}, got {result!r}"
+
+    record("walks the whole tree", walks_the_whole_tree)
+    record("keeps a dot inside the filename", keeps_a_dot_inside_the_filename)
+    record("counts malformed lines as skipped", counts_malformed_lines_as_skipped)
+    record("an empty file summarizes to zeros", an_empty_file_summarizes_to_zeros)
+    record("summarizes every file in the tree", summarizes_every_file_in_the_tree)
 `
 
 export const pathlibLesson: PythonLesson = {
   id: "py-l3-pathlib",
   title: "pathlib & file processing",
   summary: "Read and transform real files in a project with pathlib.",
-  estimatedMinutes: 17,
+  estimatedMinutes: 22,
   difficulty: "medium",
   skills: ["pathlib", "files", "text-processing", "io"],
   teach: {
@@ -273,47 +427,52 @@ For \`"10\\n20\\n30"\` return \`60\`. Skip blank lines.`,
   practice: {
     id: "py-l3-pathlib-practice",
     executionMode: "workspace",
-    prompt: `Implement \`total_score(path)\` in \`reports/scores.py\`: read the file at \`path\` with \`pathlib\`
-and return the sum of the integer on each non-blank line. The score files live in \`data/\`. Some
-tests are hidden.`,
+    prompt: `Repair the nightly sensor report, which only ever sees the files sitting directly in
+\`exports/\` and misses everything the install teams nested inside subfolders. Implement
+\`find_reading_files\` and \`summary_path\` in \`catalog/discovery.py\`, then \`summarize_file\` and
+\`summarize_tree\` in \`catalog/summarize.py\`. The tree holds reading files at several depths, a file
+that is not a reading file at all, a file whose name has a dot inside it, an export that came back
+empty, and lines the sensor wrote badly. The README gives the exact shape of every return value.
+Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "Read the file: `Path(path).read_text()`.",
-      "Split and guard: `for line in text.splitlines() if line.strip()`.",
-      "Sum the parsed ints with a generator expression.",
+      "Discovery is recursive: a reading file counts no matter how many directories down it sits, and the only thing that makes it a reading file is its suffix.",
+      "Build the summary location out of the source path's own methods rather than by cutting the filename at a dot, because one of these filenames has a dot in the middle of it. For the tree, ask `find_reading_files` for the files and describe each one relative to the root you were given.",
+      '`Path(root).rglob("*.csv")` walks every depth, `sorted(..., key=lambda p: p.as_posix())` fixes the order, `source.with_suffix(".txt")` renames safely, and `source.relative_to(root).as_posix()` gives the label.',
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "reports/scores.py",
-      editableFilePaths: ["reports/scores.py"],
-      visibleTestPaths: ["tests/test_scores.py"],
-      hiddenTestPaths: ["tests/test_scores_hidden.py"],
+      primaryFilePath: "catalog/discovery.py",
+      editableFilePaths: ["catalog/discovery.py", "catalog/summarize.py"],
+      visibleTestPaths: ["tests/test_catalog.py"],
+      hiddenTestPaths: ["tests/test_catalog_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
         { path: "README.md", role: "docs", language: "markdown", content: PL_README },
-        { path: "data/scores.txt", role: "readonly", language: "text", content: PL_SCORES },
-        { path: "data/scores2.txt", role: "readonly", language: "text", content: PL_SCORES2 },
+        { path: "exports/empty.csv", role: "readonly", language: "text", content: PL_EMPTY },
+        { path: "exports/north/alpha.csv", role: "readonly", language: "text", content: PL_ALPHA },
+        { path: "exports/north/notes.txt", role: "readonly", language: "text", content: PL_NOTES },
+        { path: "exports/south/beta.2.csv", role: "readonly", language: "text", content: PL_BETA },
         {
-          path: "data/with_blanks.txt",
+          path: "exports/south/deep/gamma.csv",
           role: "readonly",
           language: "text",
-          content: PL_SCORES_BLANKS,
-          hidden: true,
+          content: PL_GAMMA,
         },
+        { path: "catalog/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "data/empty.txt",
-          role: "readonly",
-          language: "text",
-          content: PL_SCORES_EMPTY,
-          hidden: true,
-        },
-        { path: "reports/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
-        {
-          path: "reports/scores.py",
+          path: "catalog/discovery.py",
           role: "editable",
           language: "python",
-          content: PL_SCORES_STARTER,
-          description: "Implement total_score here",
+          content: PL_DISCOVERY_STARTER,
+          description: "Find the reading files and place their summaries",
+        },
+        {
+          path: "catalog/summarize.py",
+          role: "editable",
+          language: "python",
+          content: PL_SUMMARIZE_STARTER,
+          description: "Parse one file, then summarize the tree",
         },
         {
           path: "tests/__init__.py",
@@ -323,14 +482,14 @@ tests are hidden.`,
           hidden: true,
         },
         {
-          path: "tests/test_scores.py",
+          path: "tests/test_catalog.py",
           role: "test",
           language: "python",
           content: PL_TEST,
-          description: "Visible file-reading tests",
+          description: "Visible discovery and summary tests",
         },
         {
-          path: "tests/test_scores_hidden.py",
+          path: "tests/test_catalog_hidden.py",
           role: "test",
           language: "python",
           content: PL_TEST_HIDDEN,
@@ -342,8 +501,8 @@ tests are hidden.`,
           role: "test",
           language: "python",
           content: buildRunner([
-            { module: "test_scores", label: "visible scores" },
-            { module: "test_scores_hidden", label: "hidden scores" },
+            { module: "test_catalog", label: "visible catalog" },
+            { module: "test_catalog_hidden", label: "hidden catalog" },
           ]),
           hidden: true,
           description: "Workspace test runner",
@@ -351,10 +510,16 @@ tests are hidden.`,
       ],
       referenceFiles: [
         {
-          path: "reports/scores.py",
+          path: "catalog/discovery.py",
           role: "editable",
           language: "python",
-          content: PL_SCORES_REFERENCE,
+          content: PL_DISCOVERY_REFERENCE,
+        },
+        {
+          path: "catalog/summarize.py",
+          role: "editable",
+          language: "python",
+          content: PL_SUMMARIZE_REFERENCE,
         },
       ],
     },
