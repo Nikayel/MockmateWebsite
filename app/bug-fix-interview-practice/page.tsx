@@ -5,7 +5,7 @@ import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 export const metadata: Metadata = {
   title: "Bug-Fix Interview Practice",
   description:
-    "Practice debugging and bug-fix interviews with an AI interviewer. Learn to navigate existing codebases, trace errors, and apply robust fixes under pressure.",
+    "Practice debugging interview rounds with an AI interviewer: a broken codebase, a failing test, and a verified pack that runs your fix against the suite.",
   alternates: {
     canonical: "/bug-fix-interview-practice",
   },
@@ -14,64 +14,65 @@ export const metadata: Metadata = {
 export default function BugFixInterviewPracticePage() {
   const contentSections = [
     {
-      heading: "The Rise of the Bug-Fix Interview",
+      heading: "The debugging round",
       content: (
         <>
           <p>
-            Companies are moving away from pure algorithmic puzzle questions and toward practical,
-            "real-world" interview rounds. The Bug-Fix interview is becoming increasingly common at
-            companies like Stripe, Palantir, and Netflix.
+            Not every interview round starts from a blank editor. Some hand you an existing codebase
+            with a failing test and ask you to find out why. You are debugging, not building from
+            scratch: reading code you did not write, forming a hypothesis, and checking it before
+            you touch anything.
           </p>
           <p>
-            Instead of writing code from scratch, you are given an existing (often messy) codebase
-            with a failing test or a reported issue. Your task is to find the bug, explain why it's
-            happening, and deploy a fix without breaking existing functionality.
+            It is a round that is hard to fake, and hard to practice with a plain problem set, since
+            those start from nothing. CodeSparring&apos;s debugging rounds start from a real, broken
+            codebase with a failing test, and a verified pack runs your code against the actual test
+            suite, not a guess at whether your fix looks right.
           </p>
         </>
       ),
     },
     {
-      heading: "What We Test in Bug-Fix Rounds",
+      heading: "What the round tests",
       content: (
-        <>
-          <p>Our AI simulator evaluates you on the specific skills needed for debugging:</p>
-          <ul className="mt-4 list-disc space-y-2 pl-6">
-            <li>
-              <strong>Code Comprehension:</strong> How quickly can you understand code you didn't
-              write?
-            </li>
-            <li>
-              <strong>Systematic Tracing:</strong> Do you use print statements/debuggers logically,
-              or do you guess and check?
-            </li>
-            <li>
-              <strong>Root Cause Analysis:</strong> Can you explain <em>why</em> the bug occurred,
-              rather than just patching the symptom?
-            </li>
-            <li>
-              <strong>Regression Prevention:</strong> Does your fix break other edge cases?
-            </li>
-          </ul>
-        </>
+        <ul className="list-disc space-y-2 pl-6">
+          <li>
+            <strong>Reading unfamiliar code:</strong> how fast you can orient yourself in a file you
+            did not write.
+          </li>
+          <li>
+            <strong>Forming a hypothesis:</strong> stating what you think is wrong before you start
+            changing things.
+          </li>
+          <li>
+            <strong>Verifying it:</strong> running the failing test and checking your fix against
+            the real suite, not assuming it worked.
+          </li>
+          <li>
+            <strong>Not breaking the rest:</strong> a fix that passes the one test you were shown
+            but breaks another is not a fix.
+          </li>
+        </ul>
       ),
     },
     {
-      heading: "How to Practice Debugging",
+      heading: "How a session runs",
       content: (
         <>
           <p>
-            Practicing bug-fixes requires realistic scenarios. LeetCode doesn't offer this.
-            CodeSparring provides realistic bug-fix scenarios in JavaScript and Python, each with a
-            failing test you run in your browser.
+            You get an editor with a real, multi-file project and a test that is failing. An AI
+            interviewer, playing the role of a teammate, asks what you think is going on before you
+            start editing. Code execution happens in your browser: Python runs on Pyodide,
+            JavaScript and TypeScript run sandboxed, and you see the actual stack trace when a test
+            fails.
           </p>
           <p>
-            You'll be dropped into an editor with a broken application and an AI interviewer acting
-            as your "Tech Lead." You must communicate your hypothesis, run the code, and discuss
-            your proposed fix before implementing it. New to the format? Start with our{" "}
-            <Link href="/guides/how-to-practice-bug-fix-interviews">
-              guide to practicing bug-fix interviews
-            </Link>
-            .
+            State your hypothesis before you touch the code, something like: &quot;the pagination
+            logic looks off by one, I want to log the index here to check.&quot; Say it out loud or
+            type it, then verify it by running the test. See both the bug-fix and case lab formats
+            on the <Link href="/rounds">rounds page</Link>, or go deeper with{" "}
+            <Link href="/labs">case labs</Link>, longer engineering scenarios modeled on real
+            company work.
           </p>
         </>
       ),
@@ -80,27 +81,27 @@ export default function BugFixInterviewPracticePage() {
 
   const faqs = [
     {
-      question: "What languages are supported for bug-fix interviews?",
+      question: "What languages do the debugging rounds support?",
       answer:
-        "Bug-fix scenarios run in JavaScript and Python. You run the code and test suites directly in your browser and see the stack traces in real time.",
+        "Python, JavaScript, and TypeScript run in your browser, Python through Pyodide and JavaScript/TypeScript sandboxed. You run the real test suite and see the actual stack traces, not a simulated result.",
     },
     {
-      question: "Do I get to run the code?",
+      question: "Do I actually run the code, or just describe the fix?",
       answer:
-        "Yes. Our in-browser execution environment allows you to run the code, execute test suites, and see the stack traces in real-time.",
+        "You run it. A verified pack runs your code against the real test suite behind the scenario, so passing means the fix works, not that it sounds right.",
     },
     {
-      question: "How do I communicate during a bug-fix interview?",
+      question: "How should I communicate during a debugging round?",
       answer:
-        "Always state your hypothesis out loud before making changes. For example: 'I suspect the issue is an off-by-one error in the pagination logic. I'm going to log the index here to verify.'",
+        "State your hypothesis before you change anything, then verify it by running the test instead of assuming you're right. Something like: I think this is an off-by-one error in the pagination logic, so I'm going to log the index to check.",
     },
   ]
 
   return (
     <LandingPageTemplate
-      title="Bug-Fix Interview Practice"
-      subtitle="Master Real-World Debugging"
-      heroDescription="Drop into broken codebases, trace errors, and communicate your root cause analysis. Prepare for the practical interview rounds used by Stripe, Palantir, and modern tech companies."
+      title="Bug-fix interview practice"
+      subtitle="Debugging"
+      heroDescription="Get dropped into a broken codebase with a failing test. State your hypothesis, run the code, and fix it while an AI interviewer asks what you think is going on. A verified pack checks your fix against the real test suite."
       primaryKeyword="bug-fix interview"
       contentSections={contentSections}
       faqs={faqs}
