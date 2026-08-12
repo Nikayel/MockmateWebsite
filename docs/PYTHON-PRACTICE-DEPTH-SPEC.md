@@ -80,6 +80,40 @@ number.
 - The hint ladder goes from a nudge, to the shape of the approach, to the specific call. Never
   paste the answer into hint 3.
 
+## The brief is a ticket, and tickets are centrally numbered
+
+Every workspace ships a `README.md` written as a work item, because "here is a ticket, go fix it" is
+the situation the exercise simulates. Ticket identity is **not** the author's to invent.
+
+Build the brief with `buildBrief` from `lib/tutorials/curriculum/brief`:
+
+```ts
+import { buildBrief } from "../brief"
+
+const README = buildBrief({
+  lesson: "py-l4-concurrency",
+  // slot defaults to "practice"; pass "apply" for an apply-phase workspace
+  kind: "bug-report", // ticket | bug-report | change-log | postmortem | capstone
+  headline: "the asset sweep reports the wrong sizes",
+  body: `...hand-written markdown...`,
+})
+```
+
+- The `CS-###` number is resolved from the registry in
+  `lib/tutorials/curriculum/brief/ticket-registry.ts`. You never pass one, and an unregistered
+  lesson throws at import rather than shipping a made-up number.
+- To add a brief, append one entry to `TICKETS` with `nextTicketId()`. Numbers are append-only:
+  never reuse, never renumber, never reorder. A shipped ticket number is content a learner has seen.
+- The number encodes nothing about course, level or module, deliberately, so content can move
+  without renumbering. The same registry serves every course and every future language.
+- Do not write the `#` heading or a "some tests are hidden" line into the body. `buildBrief` emits
+  both, so their wording stays identical across the corpus. Pass `hiddenTests: false` if the
+  exercise genuinely has no hidden suite.
+
+`lib/tutorials/__tests__/brief-tickets.test.ts` enforces all of this: ids unique and well formed,
+the list strictly increasing, registry and corpus a bijection, and every brief opening with the
+heading its own registered ticket produces. A new lesson that skips the registry fails the suite.
+
 ## Mechanical contract
 
 Verified by `lib/tutorials/__tests__/python-workspace-references.test.ts`, which runs every

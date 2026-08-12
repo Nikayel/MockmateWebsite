@@ -92,6 +92,18 @@ CodeSparring is an AI-powered coding interview practice platform built in the `M
 - Prefer focused tests over broad brittle tests.
 - Run the smallest useful verification first, then broader checks when risk justifies it.
 
+### Learn Curriculum
+
+- A multi-file exercise ships a `README.md` written as a work ticket. Build it with `buildBrief`
+  from `lib/tutorials/curriculum/brief` and register the lesson in that module's `TICKETS` list.
+  Ticket numbers (`CS-###`) are centrally allocated and append-only: never invent one at the call
+  site, never reuse or renumber a shipped one. This is course-agnostic and applies to any new
+  language track. See `docs/PYTHON-PRACTICE-DEPTH-SPEC.md`.
+- The Practice phase must be a different, harder problem than Apply, not the same exercise moved
+  into a package. Same spec doc carries the rules.
+- Workspace test runners come from `lib/tutorials/curriculum/workspace-runner.ts`. Do not hand-roll
+  one per lesson.
+
 ## Standard Commands
 
 - Development server: `pnpm dev`
