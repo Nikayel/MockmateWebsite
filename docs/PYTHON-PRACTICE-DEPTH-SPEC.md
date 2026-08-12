@@ -23,12 +23,49 @@ security-review scenario with three distinct functions across a data-access modu
 
 ## What a Practice exercise must be
 
-### 1. A different problem in the same skill
+### 0. The closure rule, which outranks everything below
+
+**Every _fact_ the solution needs must be recoverable from the teach section, the workspace's
+read-only files, or the README. Every _decision_ must not be.**
+
+A fact is an API, a syntax, a signature, a semantic ("`future.result()` re-raises the worker's
+exception"). If the reference solution uses it, the teach section demonstrates it at least once in
+a runnable code fence. A name-drop in prose is not a demonstration.
+
+A decision is which data structure to reach for, where a check belongs, how to keep two collections
+aligned. Those stay the learner's to invent, and no starter may pre-write them.
+
+This is the rule that resolves "too hard" without producing "too easy". Scaffolding governs what
+the learner is TOLD; difficulty governs what they must FIGURE OUT. Removing a cliff is not removing
+the climb. When a Practice needs something the teach section never demonstrated, extend the teach
+section or split the lesson. Never answer it by pre-filling the starter.
+
+### 0b. The ramp rule: Apply is the rung, not a warm-up
+
+**Apply must exercise the lesson's actual skill, and must sit within one conceptual step of
+Practice.** An Apply in a different topic is not a gentler version of Practice, it is a missing
+rung, and every gap it leaves gets paid for at the top of the cliff.
+
+Wrong, and shipped: `py-l4-concurrency` teaches thread pools, then Apply asks for
+`[n * 2 for n in numbers]`. It touches no executor, no future, no ordering problem. Practice then
+demanded six new ideas at once and read as impossible. The defect was in Apply.
+
+Measured at the time this rule was written: the median Apply reference solution across the
+curriculum was 5 lines, against a median Practice of 37.5, a **10x** jump, reaching **47x** in the
+worst case. Treat a ratio above roughly 12x as a design smell to justify or fix.
+
+### 1. A different surface, the same schema
 
 Practice must exercise the lesson's skill on a **different task, different data, and a different
 function surface** than Apply. Do not reuse the Apply function name, signature, or examples.
 
+"Different problem" means a changed surface, not a changed subject. The point is retrieval: the
+learner reconstructs the schema because it no longer looks familiar. A Practice that invents a new
+domain with its own harness, error classes and contract is not retrieval practice, it is an
+untaught second lesson wearing the first one's name.
+
 Wrong: Apply implements `average(nums)`, Practice implements `average(values)` in a package.
+Wrong: Apply doubles a list, Practice orchestrates a retry scheduler against a fake executor.
 Right: Apply implements `average(nums)`, Practice builds a typed `summarize(rows)` that returns a
 dataclass and has to decide what `Optional` means for a column that is missing rather than empty.
 
@@ -40,7 +77,8 @@ regression, a migration. The deliverable sentence still leads (see the house sty
 
 ### 3. Genuinely harder, in depth rather than volume
 
-Practice must add at least **two** of these:
+Practice must add **at least one and at most two** of these. This is a ceiling as well as a floor:
+taking four of them at once is how a Practice becomes a cliff.
 
 - an edge case Apply never had to consider (empty, missing, duplicate, unordered, boundary)
 - a second concept the lesson taught but Apply left unused
@@ -50,12 +88,40 @@ Practice must add at least **two** of these:
 
 Do not make it harder by adding volume of identical work (ten more branches of the same shape).
 
+**One new skill per Practice.** Practice may combine concepts the lesson taught. It may not require
+a skill the lesson never named. A retry policy inside a concurrency practice is a second lesson: if
+you want it, teach it, or drop it.
+
+**Hidden tests probe edges, they never spring traps.** A hidden test may cover an edge the visible
+suite omits. It may not punish a design constraint the README never stated. If a hidden test grades
+duplicate inputs, the README says duplicates occur. The test for this: could a learner make a
+reasonable design choice, pass every visible test, and fail a hidden one on a rule nobody told them?
+If yes, state the rule.
+
+**Budget the time and state it.** Practice carries its own `estimatedMinutes`, and the lesson total
+must equal teach plus apply plus practice. Derive it by counting lines to read and lines to write,
+and record the count in a source comment so the next author can check it rather than re-guess.
+`level5/unsafe-sink.ts` is the model. A wrong estimate is not a cosmetic problem: it is how a
+75-minute exercise shipped advertised as 28, and an estimate the learner blows past by 3x reads to
+them as their own failure.
+
+**Prefer the tool a real engineer would reach for.** When the sandbox forces a fake harness, that
+harness may impose at most **one** artificial constraint. Four at once means the learner is
+practicing your harness, not the skill. Never grade a shape you would reject in code review: a
+function that returns a value on one branch and raises on another is a bad signature, and requiring
+it teaches a bad habit in the name of filling a second file.
+
 ### 4. Multi-file editing, where the skill supports it
 
 Practice must have **two or more editable files** whenever the skill has a natural seam. Typical
 seams: the implementation and its registry; the model and its validator; the worker and its
 runner; the module and the test that pins it. Both editable files must carry real work, so a
 learner cannot pass while leaving one untouched.
+
+The seam must already exist in the problem. A second editable file is permitted only when it holds
+work that is testable on its own, without the first file. If you find yourself inventing a contract
+so the second file has something to do, the skill has one seam: keep one file. This requirement is
+a permission, not a quota.
 
 Where a skill genuinely has one seam (a single descriptor, a single decorator factory), keep one
 editable file and buy the depth from criteria 3 instead. Do not invent a second file to hit a

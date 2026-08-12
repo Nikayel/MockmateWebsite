@@ -148,8 +148,20 @@ was for.
   Ticket numbers (`CS-###`) are centrally allocated and append-only: never invent one at the call
   site, never reuse or renumber a shipped one. This is course-agnostic and applies to any new
   language track. See `docs/PYTHON-PRACTICE-DEPTH-SPEC.md`.
-- The Practice phase must be a different, harder problem than Apply, not the same exercise moved
-  into a package. Same spec doc carries the rules.
+- The Practice phase must be a different problem in the same skill as Apply, not the same exercise
+  moved into a package. Depth means transfer and retrieval, not new machinery. Same spec doc carries
+  the rules.
+- The closure rule governs difficulty: every FACT the solution needs (an API, a signature, a
+  semantic) must be recoverable from the teach section, the read-only files, or the README, and the
+  teach section must have demonstrated it in a runnable code fence rather than named it in prose.
+  Every DECISION (which structure to reach for, where a check belongs) stays the learner's, and no
+  starter may pre-write one. Scaffolding is what the learner is told; difficulty is what they must
+  figure out. Answer "this is too hard" by teaching the missing fact, never by filling in the
+  starter.
+- Apply is the rung between Teach and Practice, so it must exercise the lesson's actual skill and
+  sit within one conceptual step of Practice. An Apply in a different topic is a missing rung, and
+  the gap gets paid at the top of the cliff. A Practice more than roughly 12x the size of its Apply
+  needs justifying.
 - Workspace test runners come from `lib/tutorials/curriculum/workspace-runner.ts`. Do not hand-roll
   one per lesson.
 
