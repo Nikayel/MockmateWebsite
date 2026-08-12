@@ -1,5 +1,5 @@
 import { WhyCodesparringPageClient } from "@/components/why-codesparring/WhyCodesparringPageClient"
-import { HowToJsonLd } from "@/components/seo/JsonLd"
+import { WebPageJsonLd } from "@/components/seo/JsonLd"
 
 /**
  * Why CodeSparring Page - Server Component
@@ -57,11 +57,16 @@ const sciencePrinciples = [
   },
 ]
 
-export default function WhySkilonPage() {
+export default function WhyCodesparringPage() {
   return (
     <>
-      {/* JSON-LD for SEO - rendered server-side */}
-      <HowToJsonLd />
+      {/* JSON-LD for SEO - rendered server-side. HowToJsonLd used to mount here; Google retired
+          HowTo rich results in September 2023, so it was bytes and hype copy for no return. */}
+      <WebPageJsonLd
+        title="Why CodeSparring"
+        description="The retention science behind CodeSparring: spaced repetition, active recall, and interleaving applied to interview preparation."
+        url="/why-codesparring"
+      />
       <WhyCodesparringPageClient sciencePrinciples={sciencePrinciples} />
     </>
   )

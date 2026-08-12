@@ -24,7 +24,7 @@ const interviewTypes = [
   {
     title: "DSA Patterns",
     description:
-      "Master 15+ core algorithmic patterns. From Sliding Windows to Advanced Graphs, learn to recognize patterns rather than memorizing problems.",
+      "Train on 170+ DSA scenarios across 18 patterns, from sliding windows to advanced graphs. Learn to recognize patterns rather than memorizing problems.",
     icon: Workflow,
     glowColor: "rgba(56, 189, 248, 0.4)", // Sky
     textColor: "text-sky-400",
@@ -93,7 +93,11 @@ const interviewTypes = [
     icon: Lock,
     glowColor: "rgba(250, 204, 21, 0.4)", // Yellow
     textColor: "text-yellow-400",
-    features: ["Python and SQL curricula", "System Design fundamentals", "Graded, in-browser exercises"],
+    features: [
+      "Python and SQL curricula",
+      "System Design fundamentals",
+      "Graded, in-browser exercises",
+    ],
   },
 ]
 
@@ -102,7 +106,7 @@ const practiceJourneyData = [
     id: 1,
     title: "Learn Patterns",
     date: "Week 1",
-    content: "Build intuition for the 15+ core algorithmic patterns used in every FAANG interview.",
+    content: "Build intuition for the 18 algorithmic patterns FAANG interviews draw from.",
     category: "Foundation",
     icon: Brain,
     relatedIds: [2, 3],

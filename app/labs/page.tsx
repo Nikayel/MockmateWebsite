@@ -14,7 +14,7 @@ export const metadata = canonicalPageMetadata({
   path: "/labs",
   title: "Case Labs",
   description:
-    "Company-style, end-to-end engineering case labs — scope, design, and build inside a real codebase.",
+    "Company-style engineering case labs: scope, design, and build inside a real codebase, including a billing webhook idempotency lab built on event ordering and deduplication.",
 })
 
 export default function CaseLabsGalleryPage() {

@@ -245,44 +245,8 @@ export function WebPageJsonLd({
   )
 }
 
-// How-To Schema - for the why-codesparring page explaining the process
-export function HowToJsonLd() {
-  const schema = {
-    "@context": "https://schema.org",
-    "@type": "HowTo",
-    name: "How to Prepare for Coding Interviews with CodeSparring",
-    description:
-      "A science-backed approach to acing coding interviews using spaced repetition and AI-powered practice.",
-    step: [
-      {
-        "@type": "HowToStep",
-        name: "Create Your Roadmap",
-        text: "Enter your interview date and target company. Our AI generates your personalized study plan based on your timeline and skill level.",
-        position: 1,
-      },
-      {
-        "@type": "HowToStep",
-        name: "Practice Smart",
-        text: "Follow daily recommendations. We track your performance and optimize review timing using spaced repetition.",
-        position: 2,
-      },
-      {
-        "@type": "HowToStep",
-        name: "Ace Your Interview",
-        text: "Arrive confident with patterns deeply embedded in long-term memory through science-backed learning techniques.",
-        position: 3,
-      },
-    ],
-    totalTime: "P30D",
-  }
-
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
-    />
-  )
-}
+// HowToJsonLd was removed 2026-08-12: Google retired HowTo rich results in September 2023, its
+// copy failed the no-hype voice rules, and its only mount (why-codesparring) now uses WebPageJsonLd.
 
 // Article Schema - for blog posts (improves SERP appearance)
 export function ArticleJsonLd({

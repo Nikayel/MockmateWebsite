@@ -19,7 +19,7 @@ import { LearnPathTopBar } from "@/components/tutorials/LearnPathTopBar"
 export const metadata: Metadata = learnTrackMetadata({
   courseId: "data-engineering",
   description:
-    "Learn data engineering against a live in-browser database. SQL, cloud platforms, and pipelines, each read, applied, and practiced the way internship interviews test them.",
+    "Free data engineering course against a live in-browser database: SQL, cloud, warehouses, streaming, and Spark, the way data engineering interviews test them.",
 })
 
 const LOOP_PHASES = ["Read", "Apply", "Practice"]

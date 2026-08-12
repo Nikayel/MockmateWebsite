@@ -41,7 +41,7 @@ import { HomepagePositioningFAQJsonLd } from "@/components/seo/JsonLd"
 export const metadata: Metadata = {
   title: "Practice the Interview Rounds LeetCode Skips",
   description:
-    "Mock interviews with an AI that reacts as you work: a failing test to debug, a real-world case to design, and honest feedback on how you explained it.",
+    "AI mock interviews for DSA, debugging, and system design, with feedback on how you explained your solution. Includes free Python, data engineering, and system design courses.",
   alternates: {
     canonical: "/",
   },

@@ -21,7 +21,7 @@ export const metadata: Metadata = learnTrackMetadata({
   // Kept under the 155-character budget `truncateForDescription` enforces, so the drills survive
   // instead of being the part Google cuts off.
   description:
-    "Learn system design the way interviews test it: read a concept, write your own design answer, then drill a full timed round with an AI interviewer.",
+    "Free system design course taught the way interviews test it: read a concept, write your own design answer, then drill a timed round with an AI interviewer.",
 })
 
 const LOOP_PHASES = ["Read", "Design"]

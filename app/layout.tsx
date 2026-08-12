@@ -52,7 +52,7 @@ const siteConfig = {
   name: "CodeSparring",
   tagline: "AI Technical Interview Practice for Coding, System Design, and Real-World Rounds",
   description:
-    "Practice technical interviews with an AI interviewer. CodeSparring helps engineers prepare for coding, system design, bug-fix, and real-world interview rounds, plus free Python, SQL, and System Design courses, with feedback, hints, and performance tracking.",
+    "Practice technical interviews with an AI interviewer. CodeSparring helps software engineers and data engineers prepare for coding, system design, bug-fix, and real-world interview rounds, plus free Python, Data Engineering, and System Design courses, with feedback, hints, and performance tracking.",
   // One origin for the whole app, from lib/seo/site.ts. This was a fourth private copy of the apex
   // literal, and the copies are what let the site publish canonicals against a redirecting host.
   url: SITE_ORIGIN,
@@ -91,6 +91,11 @@ export const metadata: Metadata = {
     "cheap mock interviews",
     "Interviewing.io alternative",
     "voice coding interview practice",
+    // Data engineering keywords - the role half of the audience
+    "data engineering interview prep",
+    "data engineer mock interview",
+    "SQL interview practice",
+    "system design interview practice",
     // Long-tail keywords
     "tech interview preparation",
     "software engineering interview",
