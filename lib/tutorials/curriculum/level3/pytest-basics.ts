@@ -333,7 +333,7 @@ export const pytestBasicsLesson: PythonLesson = {
   difficulty: "medium",
   skills: ["pytest", "testing", "assertions", "tdd"],
   teach: {
-    estimatedMinutes: 5,
+    estimatedMinutes: 6,
     markdown: `## Why tests are the code that guards your code
 
 When you change \`balance_after\` six months from now, the only thing standing between a clean refactor and a corrupted account balance is a test that still remembers what "correct" meant. On a real team, a pull request without tests is a pull request nobody can safely merge, because reviewers cannot tell whether it works, only that it compiles. \`pytest\` is the tool most Python shops reach for because it turns "I think this works" into a repeatable, machine-checkable claim.
@@ -381,6 +381,20 @@ def test_mixed_transactions():
     result = balance_after(start, txns)  # act
     assert result == 85               # assert
 \`\`\`
+
+### Testing the error path
+
+Some behaviour is a raise, not a return value, and you cannot assert on a call that never comes back. \`pytest.raises\` is a context manager for that case: it runs the block, and the test passes only if the block raises the exception you named.
+
+\`\`\`python
+import pytest
+
+def test_a_negative_deposit_is_rejected():
+    with pytest.raises(ValueError):
+        balance_after(-1, [])
+\`\`\`
+
+If the block raises nothing, the test fails with \`DID NOT RAISE\`. If it raises something else, that exception surfaces as the failure. Name the narrowest exception type you actually expect: \`pytest.raises(Exception)\` passes for a typo in the call as readily as for the rejection you meant to pin. (The Practice workspace has no \`pytest\` installed, so it ships a \`raises\` shim you import from \`tests/pytest_shim.py\`, used exactly the same way.)
 
 Test-driven development runs this loop backwards: write the failing test first (red), then write the smallest code that makes it pass (green). In the Apply warm-up the tests already exist, and your job is to implement \`balance_after\` so \`start + sum(transactions)\` produces the expected total and the suite turns green. The Practice turns that around: you are handed a documented module and you write the suite for it, and a hidden grader decides whether your tests would actually catch a broken build.
 
