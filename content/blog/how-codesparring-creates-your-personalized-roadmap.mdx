@@ -1,6 +1,6 @@
 ---
 title: "How CodeSparring Creates Your Personalized Interview Roadmap"
-description: "A deep dive into the algorithm behind our AI-powered study plans. Learn how we combine company data, spaced repetition, and your skill assessment to build the optimal path to your interview."
+description: "A detailed look at the algorithm behind our AI-powered study plans. Learn how we combine company data, spaced repetition, and your skill assessment to build the optimal path to your interview."
 date: "2026-01-05"
 author: "Nikayel Ali Jamal"
 category: "product"
@@ -10,7 +10,7 @@ featured: true
 
 "Just follow this 14-day study plan."
 
-You've seen them everywhere—generic roadmaps that ignore whether you're interviewing at Google or a startup, whether your interview is in 2 weeks or 3 months, whether you're a new grad or a senior engineer.
+You've seen them everywhere: generic roadmaps that ignore whether you're interviewing at Google or a startup, whether your interview is in 2 weeks or 3 months, whether you're a new grad or a senior engineer.
 
 **Generic plans produce generic results.** Here's how we do it differently.
 
@@ -20,27 +20,27 @@ When you create a roadmap on CodeSparring, we ask for three things:
 
 ### 1. Your Target Company
 
-Not all tech interviews are the same. Here's actual data from our company database:
+Not all tech interviews are the same. Here's how company focus tends to differ:
 
 | Company | Top Pattern | Hard Problems | Interview Style |
 |---------|-------------|---------------|-----------------|
-| Google | Binary Search (85%) | 30% | Moderate pace, hints provided |
-| Meta | Arrays & Trees (85%) | 20% | Fast pace, 2 problems/round |
-| Amazon | Arrays (90%) | 20% | LP questions every round |
-| Netflix | Graphs (90%) | 40% | Optimal solution required |
+| Google | Binary search | Common | Moderate pace, hints provided |
+| Meta | Arrays and trees | Occasional | Fast pace, 2 problems a round |
+| Amazon | Arrays | Occasional | LP questions every round |
+| Netflix | Graphs | Frequent | Optimal solution required |
 
-Preparing for Netflix? You need 2x the graph practice and harder problems.
+For Netflix, plan on more graph practice and harder problems.
 
-Preparing for Meta? Speed matters—you need to solve 2 problems in 45 minutes.
+For Meta, speed matters. You need to solve 2 problems in 45 minutes.
 
-[Browse all 19 company prep guides →](/interview-prep)
+[Browse our company prep guides →](/interview-prep)
 
 ### 2. Your Interview Date
 
 Time changes everything:
 
 **30 days until interview:**
-- Cover all 15 patterns
+- Cover all 18 patterns
 - 2-3 problems per pattern
 - Mix of difficulty levels
 - Built-in review cycles
@@ -48,7 +48,7 @@ Time changes everything:
 **7 days until interview:**
 - Focus on top 5 patterns for your company
 - High-frequency "must-know" problems only
-- No time for deep exploration—just pattern recognition
+- No time for deep exploration, just pattern recognition
 
 **90 days until interview:**
 - Deep pattern mastery
@@ -75,19 +75,16 @@ Here's a simplified view of how we prioritize problems:
 
 ### Step 1: Score Every Pattern
 
-For each of the 15 DSA patterns, we calculate a priority score:
+For each of the 18 DSA patterns, we calculate a priority score:
 
 ```
-Priority = (Company Weight × 35%) +
-           (Must-Know Questions × 25%) +
-           (Your Knowledge Gap × 20%) +
-           (Time Efficiency × 15%) +
-           (Prerequisites Met × 5%)
+Priority = Company Weight + Must-Know Questions +
+           Your Knowledge Gap + Time Efficiency + Prerequisites Met
 ```
 
-**Company Weight**: How often this pattern appears at your target company. Google heavily tests Binary Search (85% frequency). Meta loves Trees (85%).
+**Company Weight**: How often this pattern appears at your target company. Google leans heavily on binary search. Meta leans on trees.
 
-**Must-Know Questions**: Critical problems that appear repeatedly. Two Sum, LRU Cache, Number of Islands—these are non-negotiable for certain companies.
+**Must-Know Questions**: Critical problems that appear repeatedly. Two Sum, LRU Cache, Number of Islands: these are non-negotiable for certain companies.
 
 **Knowledge Gap**: If you marked "Sliding Window" as "unknown" but it's critical for your company, it gets bumped up significantly.
 
@@ -102,11 +99,11 @@ Once patterns are prioritized, we allocate problems to each day:
 1. **Theme each day**: "Day 3: Sliding Window" keeps your focus clear
 2. **Progressive difficulty**: Start easy, ramp to hard within each pattern
 3. **Time-box to your availability**: 2 hours/day? You get 3-4 problems. 4 hours? 5-6 problems.
-4. **Buffer days**: We don't schedule 100% capacity—life happens
+4. **Buffer days**: We don't schedule 100% capacity. Life happens
 
 ### Step 3: Build in Spaced Repetition
 
-This is where magic happens. Problems you struggle with automatically get scheduled for review:
+This step matters most. Problems you struggle with automatically get scheduled for review:
 
 ```
 Day 1: Solve "Longest Substring Without Repeating" → Struggled
@@ -136,26 +133,26 @@ Milestones keep you on track and give you a sense of progress.
 | Fixed difficulty curve | Adapts to your current level |
 | No review system | Spaced repetition built-in |
 | Arbitrary timelines | Optimized for YOUR interview date |
-| Static list | Dynamic—adjusts as you progress |
+| Static list | Dynamic: adjusts as you progress |
 
 ## Real Example: 30-Day Google Prep
 
 Here's what an intermediate candidate preparing for Google would see:
 
 **Days 1-7: Foundation Patterns**
-- Arrays & Hashing (8 problems) - 95% frequency at Google
-- Binary Search (6 problems) - 85% frequency
-- Two Pointers (4 problems) - 60% frequency
+- Arrays & Hashing (8 problems)
+- Binary Search (6 problems)
+- Two Pointers (4 problems)
 
 **Days 8-14: Core Structures**
-- Trees (7 problems) - 80% frequency
-- BFS/DFS (6 problems) - 75% frequency each
+- Trees (7 problems)
+- BFS/DFS (6 problems each)
 - First review cycle begins
 
 **Days 15-21: Advanced Patterns**
-- Dynamic Programming (5 problems) - 70% frequency
-- Backtracking (3 problems) - 50% frequency
-- Heap (4 problems) - 55% frequency
+- Dynamic Programming (5 problems)
+- Backtracking (3 problems)
+- Heap (4 problems)
 
 **Days 22-28: Polish**
 - Review weak patterns (algorithm-selected)
@@ -178,12 +175,12 @@ Let's say you're an intern preparing for Amazon with 30 days:
 - Patterns: "Arrays - practiced", "DP - unknown", "Trees - seen"
 
 **Algorithm Output:**
-- Arrays & Hashing: Priority 95 (high frequency, you know it—maintain)
-- Trees: Priority 88 (high frequency, knowledge gap—focus here)
-- DP: Priority 75 (lower frequency at Amazon, unknown—but less critical for interns)
-- Leadership Principles prep: Added (Amazon-specific requirement)
+- Arrays & Hashing: High priority. Common at Amazon, and you already know it, so this stays in maintenance mode
+- Trees: High priority. Common at Amazon and a knowledge gap, so this becomes a focus area
+- DP: Lower priority. Less central at Amazon, and less critical at the intern level
+- Leadership Principles prep: Added, since it's an Amazon-specific requirement
 
-An intern at Amazon should focus on solid fundamentals and LP stories—not grinding Hard DP problems.
+An intern at Amazon should focus on solid fundamentals and LP stories, not grinding hard DP problems.
 
 ## Why Personalization Matters
 
@@ -205,9 +202,9 @@ That requires:
 
 ## Get Your Personalized Roadmap
 
-Ready to stop guessing and start preparing strategically?
+Stop guessing and start preparing strategically. Personalized roadmaps are part of CodeSparring Pro.
 
-1. **Pick your company** from our database of 19 top tech firms
+1. **Pick your company** from our database of top tech firms
 2. **Set your interview date**
 3. **Complete a 2-minute skill assessment**
 4. **Get your personalized day-by-day plan**

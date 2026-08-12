@@ -16,15 +16,15 @@ This isn't a personal failing. It's neuroscience.
 
 In 1885, German psychologist Hermann Ebbinghaus discovered something uncomfortable: we forget *fast*.
 
-| Time After Learning | Retention Rate |
-|---------------------|----------------|
-| 20 minutes | 58% |
-| 1 hour | 44% |
-| 1 day | 33% |
-| 1 week | 25% |
-| 1 month | 21% |
+| Time After Learning | Retention |
+|---------------------|-----------|
+| 20 minutes | Mostly retained |
+| 1 hour | Partially retained |
+| 1 day | Significantly faded |
+| 1 week | Mostly forgotten |
+| 1 month | Largely forgotten |
 
-**Within a week, you've lost 75% of what you learned.** This isn't about intelligence—it's how human memory works by default.
+**Within a week, you've lost most of what you learned.** This isn't about intelligence. It's how human memory works by default.
 
 ## Why LeetCode Grinding Fails
 
@@ -36,19 +36,19 @@ Most developers approach interview prep like this:
 4. Never look at it again
 5. Wonder why they can't solve similar problems in interviews
 
-This is called **massed practice**—cramming everything in one session. It feels productive because you're solving problems. But your brain is storing the solution in short-term memory, not encoding it for long-term retrieval.
+This is called **massed practice**: cramming everything in one session. It feels productive because you're solving problems. But your brain is storing the solution in short-term memory, not encoding it for long-term retrieval.
 
 **The result?** You "know" Two Sum exists but can't implement it under pressure.
 
 ## The Science of Retention
 
-Three principles from cognitive psychology can transform your prep:
+Three principles from cognitive psychology apply directly to your prep:
 
 ### 1. The Spacing Effect (1885)
 
 Distributing practice over time beats cramming every time.
 
-**Study:** Cepeda et al. (2006) found spaced learning improves retention by 10-30% compared to massed practice, even with the same total study time.
+**Study:** Cepeda et al. (2006) found spaced learning produces meaningfully better long-term retention than massed practice, even with the same total study time.
 
 **For coding interviews:**
 - Don't solve a problem once and move on
@@ -59,7 +59,7 @@ Distributing practice over time beats cramming every time.
 
 Testing yourself retrieves memories better than re-reading solutions.
 
-**Study:** Roediger & Karpicke (2006) showed testing produces 50% better long-term retention than studying.
+**Study:** Roediger & Karpicke (2006) showed testing produces meaningfully better long-term retention than restudying.
 
 **For coding interviews:**
 - Don't just read editorial solutions
@@ -70,7 +70,7 @@ Testing yourself retrieves memories better than re-reading solutions.
 
 Mixing problem types beats practicing one type at a time.
 
-**Study:** Rohrer & Taylor (2007) found interleaving improves transfer by 43%.
+**Study:** Rohrer & Taylor (2007) found interleaving improves transfer to new problems compared to blocked practice.
 
 **For coding interviews:**
 - Don't do 20 Two Pointer problems in a row
@@ -110,21 +110,21 @@ Here's another retention issue: you solve "Two Sum" but can't recognize "Two Sum
 
 The 15 core DSA patterns:
 
-1. **Two Pointers** — Two Sum II, Container With Most Water
-2. **Sliding Window** — Longest Substring, Maximum Sum Subarray
-3. **Fast & Slow Pointers** — Linked List Cycle, Happy Number
-4. **Merge Intervals** — Meeting Rooms, Insert Interval
-5. **Cyclic Sort** — Find Duplicate, Missing Number
-6. **In-Place Reversal** — Reverse Linked List, Rotate List
-7. **BFS** — Binary Tree Level Order, Word Ladder
-8. **DFS** — Path Sum, Number of Islands
-9. **Two Heaps** — Find Median, Sliding Window Median
-10. **Subsets** — Permutations, Combinations
-11. **Modified Binary Search** — Rotated Array, Peak Element
-12. **Top K Elements** — Top K Frequent, K Closest Points
-13. **K-way Merge** — Merge K Sorted Lists
-14. **Dynamic Programming** — Coin Change, LCS, Knapsack
-15. **Topological Sort** — Course Schedule, Alien Dictionary
+1. **Two Pointers**: Two Sum II, Container With Most Water
+2. **Sliding Window**: Longest Substring, Maximum Sum Subarray
+3. **Fast & Slow Pointers**: Linked List Cycle, Happy Number
+4. **Merge Intervals**: Meeting Rooms, Insert Interval
+5. **Cyclic Sort**: Find Duplicate, Missing Number
+6. **In-Place Reversal**: Reverse Linked List, Rotate List
+7. **BFS**: Binary Tree Level Order, Word Ladder
+8. **DFS**: Path Sum, Number of Islands
+9. **Two Heaps**: Find Median, Sliding Window Median
+10. **Subsets**: Permutations, Combinations
+11. **Modified Binary Search**: Rotated Array, Peak Element
+12. **Top K Elements**: Top K Frequent, K Closest Points
+13. **K-way Merge**: Merge K Sorted Lists
+14. **Dynamic Programming**: Coin Change, LCS, Knapsack
+15. **Topological Sort**: Course Schedule, Alien Dictionary
 
 **When you learn patterns, not problems, you can solve problems you've never seen before.** That's the difference between 300 problems memorized and 15 patterns mastered.
 
@@ -170,7 +170,7 @@ We built the spaced repetition system that we wished existed:
 - Skip a day? Schedule adjusts automatically
 
 **Pattern-First Learning**
-- 200+ problems organized by 15 core patterns
+- 170+ problems organized by 18 core patterns
 - Each review reinforces the pattern, not just the problem
 - Pattern mastery tracking shows gaps
 
@@ -182,21 +182,20 @@ We built the spaced repetition system that we wished existed:
 **No Spreadsheets Required**
 - Dashboard shows today's reviews
 - Notification system reminds you before patterns decay
-- Progress visible across all 15 patterns
+- Progress visible across all 18 patterns
 
-## The Math of Retention
+## The Retention Trade-off
 
-Let's run the numbers.
+Let's think through it.
 
 **Without spaced repetition:**
 - Solve 300 problems in 3 months
-- Retain ~25% after 1 week of no practice
-- Effective knowledge: ~75 problems
+- Most of that knowledge fades within weeks of no practice
+- Only a fraction stays usable under interview pressure
 
 **With spaced repetition:**
-- Solve 100 problems in 3 months (with reviews)
-- Retain ~90% after 1 month
-- Effective knowledge: ~90 problems
+- Solve 100 problems in 3 months, with reviews built in
+- Most of what you solved stays retrievable months later
 
 **Fewer problems. Better retention. Less time wasted.**
 
@@ -208,6 +207,6 @@ You have two choices:
 1. Keep grinding and hope you remember enough
 2. Use the science and actually retain what you learn
 
-CodeSparring's free tier includes 2 practice scenarios per month with full spaced repetition tracking. See how it feels to actually remember problems.
+CodeSparring's free plan includes 8 full interview sessions a month with complete AI feedback, no card required. Spaced repetition scheduling is part of Pro. See how it feels to actually remember what you practice.
 
 [Start your first review session →](/interview)
