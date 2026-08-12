@@ -451,11 +451,11 @@ export const asyncioLesson: PythonLesson = {
   id: "py-l4-asyncio",
   title: "async / await & asyncio",
   summary: "Run many I/O tasks concurrently with coroutines and asyncio.gather.",
-  estimatedMinutes: 45,
+  estimatedMinutes: 50,
   difficulty: "hard",
   skills: ["asyncio", "async-await", "coroutines", "concurrency"],
   teach: {
-    estimatedMinutes: 7,
+    estimatedMinutes: 9,
     markdown: `## Concurrency on one thread
 
 A web service that fetches 50 URLs spends almost all its time *waiting* on the network, not computing. Threads can overlap that waiting, but you pay for context switches, GIL contention, and locks around shared state. \`asyncio\` overlaps it on a single thread: while one task waits, the loop runs another. Because a task runs uninterrupted until its next \`await\`, you rarely reach for a lock. This is the default tool for I/O-bound fan-out (many network calls or database queries) in modern Python.
@@ -483,7 +483,7 @@ coro = fetch_one(1)   # nothing has run yet; coro is a coroutine object
   "options": [
     {
       "label": "It runs in the background on the loop, which is what fire and forget means",
-      "feedback": "Tempting, because that is genuinely what you want and it is what asyncio.create_task or a TaskGroup would give you. A bare call only builds the coroutine object. Nothing has told the loop it exists."
+      "feedback": "Tempting, because that is genuinely what you want and it is what asyncio.create_task, or a TaskGroup (a block that owns the tasks started inside it and waits for them on exit), would give you. A bare call only builds the coroutine object. Nothing has told the loop it exists."
     },
     {
       "label": "Nothing runs. You get a coroutine object and a RuntimeWarning that it was never awaited",
@@ -563,6 +563,24 @@ asyncio.run(main())   # [10, 20, 30] after ~0.1s total, not 0.3s
 }
 \`\`\`
 
+### Capping how much runs at once
+
+\`gather\` has no brakes. Hand it 5000 keys and it starts 5000 reads, which is how you exhaust a connection pool, trip a rate limit, or hold 5000 partial responses in memory at once. Real services therefore fan out *bounded*: start everything, but never let more than N of them be in flight.
+
+The tool for that is a **semaphore**, which is just a counter of free slots. Acquiring waits while the count is zero and decrements it otherwise; releasing increments it and lets one waiter through. In asyncio it is \`asyncio.Semaphore(n)\`, and the acquire/release pair is what \`async with\` manages for you:
+
+\`\`\`python
+limit = asyncio.Semaphore(2)
+
+async def fetch_bounded(n):
+    async with limit:          # waits here while two reads are already in flight
+        return await fetch_one(n)
+
+await asyncio.gather(*(fetch_bounded(n) for n in range(50)))
+\`\`\`
+
+Two details make or break a hand-rolled version. The slot has to be released in a \`finally\`, or one exception leaks a slot and the gate slowly closes forever. And the wait for a free slot must contain an \`await\`: scheduling is cooperative, so a loop that spins without yielding never lets the task holding the slot run far enough to give it back, and the whole service deadlocks.
+
 ### Why this sandbox uses a helper
 
 \`asyncio.run\` refuses to start when a loop is already running and raises \`RuntimeError\`. This sandbox runs your code *inside* a loop, so the exercises hand you a stand-in for it. The warm-up gives you \`run_coroutines(coros)\`, which drives each coroutine with \`coro.send(None)\` and reads the return value off the resulting \`StopIteration\`. That works because its \`fetch_one\` awaits nothing, so a single \`send\` finishes it. The workspace exercise instead ships a small read-only loop of its own, with \`sleep\`, \`spawn\` and \`wait_all\` standing in for \`asyncio.sleep\`, \`asyncio.create_task\` and awaiting a \`gather\`. Either way you are writing real coroutines; only the door into the loop changes.
@@ -598,6 +616,8 @@ asyncio.run(main())   # [10, 20, 30] after ~0.1s total, not 0.3s
 ### Pitfall: a coroutine you never drive
 
 Calling \`fetch_one(5)\` and treating the result like a number does nothing useful. The body never runs, and Python warns \`RuntimeWarning: coroutine 'fetch_one' was never awaited\`. A coroutine only executes when something awaits it, gathers it, or runs it on a loop. The reverse trap is just as common: never put a blocking call (\`time.sleep\`, a synchronous DB driver, a heavy compute loop) inside a coroutine, because it freezes the whole thread and no other task can make progress.
+
+When you have no async version of a call, move it off the loop instead. \`await asyncio.to_thread(fn, *args)\` runs \`fn\` on a worker thread and gives you back something awaitable, so the loop stays free while it blocks. \`loop.run_in_executor(pool, fn, *args)\` is the older, lower-level form of the same idea, and the one to use when you want to choose the pool yourself, a process pool included.
 
 **Interview nuance:** asyncio is *cooperative*, not preemptive. The event loop can only switch tasks at an \`await\`; it cannot interrupt running code. So \`gather\` speeds up work that spends its time awaiting real I/O, but a CPU-bound coroutine (or a stray \`time.sleep\`) starves every other task on the loop. That is the core reason asyncio scales I/O-bound fan-out yet does nothing for CPU-bound work, where you reach for processes instead.
 
