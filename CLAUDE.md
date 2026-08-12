@@ -92,8 +92,57 @@ CodeSparring is an AI-powered coding interview practice platform built in the `M
 - Prefer focused tests over broad brittle tests.
 - Run the smallest useful verification first, then broader checks when risk justifies it.
 
+### Agentic Engineering
+
+Rules for running fleets of coding agents on this repo. Each one is here because skipping it
+already cost us a rewrite.
+
+**Build the verifier before the sweep.** A parallel content or refactor sweep is only as safe as the
+check that catches a bad edit. Write and land that check first, on the code as it stands, and
+confirm it fails when the defect is present. `lib/tutorials/__tests__/python-workspace-references.test.ts`
+is the reference example: it materializes every workspace and runs it, so 23 concurrent rewrites
+became reviewable instead of hopeful.
+
+**Separate diagnosis from repair.** Scan with read-only agents, collect findings, decide scope, then
+launch fix agents against a written list. An agent that finds and fixes in one pass will fix what it
+found first and never see the pattern. A negative result from a scan is a result: record it and stop,
+rather than manufacturing work to justify the run.
+
+**Partition by file, not by topic.** Concurrent agents sharing a file will clobber each other, and a
+shared barrel or index is the usual casualty. Give each agent a disjoint set of paths and say so in
+the prompt.
+
+**Concurrent agents must `git add` explicit paths.** Never `git add -A` or `git add .` while a
+sibling agent is working: it sweeps their half-finished edits into your commit. `lint-staged` also
+runs `git stash` on commit, which is hostile to concurrency, so keep commits small and staged
+precisely. Commit with `git -c commit.gpgsign=false` on this volume.
+
+**Verify agent reports yourself.** Agents report success they did not achieve. Before relaying a
+result, check `git log` for the commits, run the suite, and read a sample of the diff. Silent commit
+failures and confidently wrong summaries are both routine.
+
+**Enforce conventions with a test, not a document.** A rule in prose is a rule that drifts. If a
+convention matters, make the build fail when it is broken. `lib/tutorials/curriculum/brief/ticket-registry.ts`
+plus its test is the shape to copy: a central allocator, an append-only list, and a bijection test
+against the live corpus so a new call site cannot quietly opt out.
+
+**Point adversarial verifiers at the finished work.** Automation checks what it was told to check.
+A verifier agent asked to attack the result finds unfair hidden tests, hint text that leaks the
+answer, and factually false claims in prose, none of which any assertion was watching for.
+
+**Check a rule's purpose, not just its letter.** Rules drift into their own opposite. The curriculum's
+spoiler rule ("hints carry the approach") quietly grew to let hints own definitions, which put
+required vocabulary behind an opt-in disclosure. When you enforce a rule at scale, re-derive what it
+was for.
+
 ### Learn Curriculum
 
+- Teach prose owns every term the graded work requires. A hint may restate a definition, never be
+  its only home: hints are opt-in, so a definition that lives only there is unreachable for the
+  learner who needs it most. The spoiler rule still holds (statements state the problem, hints carry
+  the approach) and this is its corollary, not an exception.
+- Introduce vocabulary before the check that leans on it. A predict-then-reveal check is good design
+  and should keep its position; move the definition up to meet it rather than moving the check down.
 - A multi-file exercise ships a `README.md` written as a work ticket. Build it with `buildBrief`
   from `lib/tutorials/curriculum/brief` and register the lesson in that module's `TICKETS` list.
   Ticket numbers (`CS-###`) are centrally allocated and append-only: never invent one at the call
