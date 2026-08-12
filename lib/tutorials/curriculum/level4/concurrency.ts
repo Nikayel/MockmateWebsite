@@ -363,6 +363,8 @@ The reason overlapping waits pays off so enormously is that the costs are not cl
 
 Read the gap between the bottom rung and the top one and the decision rule below almost writes itself: if your program is sitting on the top rung, giving it more cores changes nothing, but letting the waits overlap changes everything.
 
+The standard tool for overlapping those waits is a **thread pool**. A \`ThreadPoolExecutor\` keeps a fixed number of threads alive, called **workers**, and feeds each one the next task as it comes free. You rent, say, eight workers once instead of paying to create a thread per item. Hold that picture for the next question, because the obvious prediction about it is wrong.
+
 \`\`\`cswidget
 {
   "type": "check",
