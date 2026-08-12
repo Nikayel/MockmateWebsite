@@ -1,9 +1,7 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Button } from "@/components/ui/button"
 import { LandingPageBreadcrumb } from "@/components/seo/LandingPageBreadcrumb"
 import { TrackedCtaLink } from "@/components/seo/TrackedCtaLink"
-import { Terminal, CheckCircle2, ArrowRight } from "lucide-react"
 
 interface FAQ {
   question: string
@@ -22,6 +20,18 @@ interface LandingPageTemplateProps {
   primaryKeyword: string
 }
 
+/**
+ * Shared shell for the acquisition pages (landing, comparison, and guide
+ * routes). Everything here rides the platform theme tokens so a visitor who
+ * lands from search sees the same surface they get after clicking through:
+ * background/foreground/muted for color, border for hairlines, accent-strong
+ * for link text, and the same primary button recipe as the homepage hero.
+ * No hardcoded palettes: the old template was a fixed black page with its own
+ * orange, which read as a different site than the product it was selling.
+ */
+const PRIMARY_CTA_CLASSES =
+  "bg-foreground text-background hover:bg-foreground/90 inline-flex rounded-[8px] px-8 py-3.5 text-base font-semibold transition-colors duration-200"
+
 export function LandingPageTemplate({
   title,
   subtitle,
@@ -31,111 +41,108 @@ export function LandingPageTemplate({
   primaryKeyword,
 }: LandingPageTemplateProps) {
   return (
-    <main className="min-h-screen bg-black">
+    <main className="bg-background text-foreground font-ui min-h-screen">
       {/* One mount here covers all fourteen landing, comparison and guide pages that render through
           this template, none of which previously published a breadcrumb. */}
       <LandingPageBreadcrumb title={title} />
       <Header />
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden border-b border-white/5 pt-32 pb-16 md:pt-40 md:pb-24">
-        <div className="bg-[radial-gradient(ellipse_at_top,rgba(196, 112, 63,0.1)_0%,rgba(0,0,0,0)_70%)] absolute inset-0" />
-        <div className="relative z-10 container mx-auto max-w-4xl px-4 text-center">
-          <span className="mb-6 inline-block rounded-full bg-[#c4703f]/10 px-4 py-1.5 text-sm font-semibold text-[#c4703f]">
+      {/* Hero */}
+      <section className="border-border border-b pt-32 pb-16 md:pt-40 md:pb-20">
+        <div className="container mx-auto max-w-3xl px-4 text-center">
+          <span className="border-border bg-background/40 text-muted-foreground mb-7 inline-flex rounded-full border px-4 py-1.5 text-[12px] font-medium tracking-[0.02em]">
             {subtitle}
           </span>
-          <h1 className="font-heading mb-6 text-4xl font-extrabold tracking-tight text-white md:text-6xl lg:text-7xl">
+          <h1 className="text-foreground mb-5 text-[clamp(2.25rem,4.5vw,3.25rem)] leading-[1.08] font-semibold tracking-[-0.03em]">
             {title}
           </h1>
-          <p className="mx-auto mb-10 max-w-2xl text-lg text-gray-400 md:text-xl">
+          <p className="text-muted-foreground mx-auto mb-9 max-w-2xl text-base leading-7 sm:text-lg sm:leading-8">
             {heroDescription}
           </p>
-          <div className="flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-6">
-            <TrackedCtaLink href="/interview" location="seo_landing_hero" keyword={primaryKeyword}>
-              <Button
-                size="lg"
-                className="h-14 bg-[#c4703f] px-8 text-lg font-bold text-black hover:bg-[#c4703f]/90"
-              >
-                Start practicing free
-                <Terminal className="ml-2 h-5 w-5" />
-              </Button>
+          <div className="flex flex-col items-center">
+            <TrackedCtaLink
+              href="/interview"
+              location="seo_landing_hero"
+              keyword={primaryKeyword}
+              className={PRIMARY_CTA_CLASSES}
+            >
+              Start practicing free
             </TrackedCtaLink>
+            <span className="text-muted-foreground mt-2.5 text-[12px]">
+              No credit card required.
+            </span>
           </div>
         </div>
       </section>
 
-      {/* Main Content */}
-      <section className="py-16 md:py-24">
-        <div className="container mx-auto max-w-3xl px-4">
-          <article className="prose prose-invert prose-lg prose-headings:font-heading prose-a:text-[#c4703f] hover:prose-a:text-[#c4703f]/80 max-w-none">
+      {/* Page content */}
+      <section className="py-14 md:py-20">
+        <div className="container mx-auto max-w-2xl px-4">
+          <article className="[&_a]:text-accent-strong [&_a]:decoration-accent-strong/30 [&_a:hover]:decoration-accent-strong [&_strong]:text-foreground [&_a]:underline [&_a]:underline-offset-4 [&_strong]:font-medium">
             {contentSections.map((section, index) => (
-              <div key={index} className="mb-12">
-                <h2 className="mb-6 text-3xl font-bold text-white">{section.heading}</h2>
-                <div className="space-y-4 leading-relaxed text-gray-300">{section.content}</div>
+              <div key={index} className="mb-12 last:mb-0">
+                <h2 className="text-foreground mb-4 text-xl font-semibold tracking-[-0.02em] sm:text-2xl">
+                  {section.heading}
+                </h2>
+                <div className="text-muted-foreground space-y-4 leading-7">{section.content}</div>
               </div>
             ))}
           </article>
         </div>
       </section>
 
-      {/* Feature Highlight CTA */}
-      <section className="border-y border-white/5 bg-zinc-900/50 py-16 md:py-24">
-        <div className="container mx-auto max-w-4xl px-4 text-center">
-          <h2 className="mb-6 text-3xl font-bold text-white">
-            Ready to master the {primaryKeyword}?
+      {/* CTA band */}
+      <section className="border-border bg-muted/40 border-y py-14 md:py-20">
+        <div className="container mx-auto max-w-3xl px-4 text-center">
+          <h2 className="text-foreground mb-4 text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">
+            See where you actually stand.
           </h2>
-          <p className="mb-8 text-xl text-gray-400">
-            Train the way real interviews actually run, with an AI interviewer that reacts as you
-            work and grades every round.
+          <p className="text-muted-foreground mx-auto mb-10 max-w-xl leading-7">
+            One interviewer, a real editor, and a score you can act on.
           </p>
-          <div className="mb-10 grid grid-cols-1 gap-6 text-left md:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-black p-6">
-              <CheckCircle2 className="mb-4 h-8 w-8 text-[#c4703f]" />
-              <h3 className="mb-2 text-lg font-bold text-white">Voice & Text Practice</h3>
-              <p className="text-sm text-gray-400">
-                Practice communicating your thoughts out loud, just like a real interview.
+          <div className="mx-auto mb-10 grid max-w-2xl gap-8 text-left sm:grid-cols-3">
+            <div>
+              <p className="text-foreground text-sm font-semibold">Voice or text</p>
+              <p className="text-muted-foreground mt-1 text-sm leading-6">
+                Talk through your approach out loud, or type it.
               </p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-black p-6">
-              <CheckCircle2 className="mb-4 h-8 w-8 text-[#c4703f]" />
-              <h3 className="mb-2 text-lg font-bold text-white">Instant AI Feedback</h3>
-              <p className="text-sm text-gray-400">
-                Get scored on problem-solving, communication, and coding efficiency.
+            <div>
+              <p className="text-foreground text-sm font-semibold">Scored like a real loop</p>
+              <p className="text-muted-foreground mt-1 text-sm leading-6">
+                Communication, problem solving, and code quality, not just passing tests.
               </p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-black p-6">
-              <CheckCircle2 className="mb-4 h-8 w-8 text-[#c4703f]" />
-              <h3 className="mb-2 text-lg font-bold text-white">15+ DSA Patterns</h3>
-              <p className="text-sm text-gray-400">
-                Comprehensive coverage of all patterns tested by FAANG companies.
+            <div>
+              <p className="text-foreground text-sm font-semibold">Free to start</p>
+              <p className="text-muted-foreground mt-1 text-sm leading-6">
+                8 full sessions a month on the free plan. No card.
               </p>
             </div>
           </div>
-          <TrackedCtaLink href="/interview" location="seo_landing_footer" keyword={primaryKeyword}>
-            <Button
-              size="lg"
-              variant="outline"
-              className="h-14 border-white/20 px-8 text-lg font-bold text-white hover:bg-white hover:text-black"
-            >
-              Start practicing free
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
+          <TrackedCtaLink
+            href="/interview"
+            location="seo_landing_footer"
+            keyword={primaryKeyword}
+            className={PRIMARY_CTA_CLASSES}
+          >
+            Start practicing free
           </TrackedCtaLink>
         </div>
       </section>
 
-      {/* FAQ Section */}
+      {/* FAQ */}
       {faqs && faqs.length > 0 && (
-        <section className="py-16 md:py-24">
-          <div className="container mx-auto max-w-3xl px-4">
-            <h2 className="mb-10 text-center text-3xl font-bold text-white">
-              Frequently Asked Questions
+        <section className="py-14 md:py-20">
+          <div className="container mx-auto max-w-2xl px-4">
+            <h2 className="text-foreground mb-6 text-2xl font-semibold tracking-[-0.02em]">
+              Frequently asked questions
             </h2>
-            <div className="space-y-6">
+            <div className="divide-border divide-y">
               {faqs.map((faq, index) => (
-                <div key={index} className="rounded-2xl border border-white/5 bg-zinc-900/40 p-6">
-                  <h3 className="mb-3 text-xl font-bold text-white">{faq.question}</h3>
-                  <p className="leading-relaxed text-gray-400">{faq.answer}</p>
+                <div key={index} className="py-5">
+                  <h3 className="text-foreground text-base font-semibold">{faq.question}</h3>
+                  <p className="text-muted-foreground mt-2 leading-7">{faq.answer}</p>
                 </div>
               ))}
             </div>
