@@ -1,12 +1,11 @@
 import { Metadata } from "next"
 import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
-import { trackPath } from "@/lib/tutorials/lesson-routes"
 
 export const metadata: Metadata = {
   title: "System Design Interview Practice",
   description:
-    "Practice system design interviews with an AI interviewer. Master scalability, trade-offs, and architecture for FAANG senior engineering rounds.",
+    "Practice system design interviews with an AI interviewer, plus a free course covering the fundamentals, from load balancers to consistency models.",
   alternates: {
     canonical: "/system-design-interview-practice",
   },
@@ -15,60 +14,63 @@ export const metadata: Metadata = {
 export default function SystemDesignInterviewPracticePage() {
   const contentSections = [
     {
-      heading: "Why System Design Interviews are Different",
+      heading: "Why system design interviews are different",
       content: (
         <>
           <p>
-            Unlike coding rounds that have a definitive right or wrong answer, system design
-            interviews are open-ended discussions. They test your ability to navigate ambiguity,
-            weigh architectural trade-offs, and design systems that scale.
+            A coding problem has a right answer. System design does not: it is an open-ended
+            conversation about trade-offs, and about how you handle ambiguity when there is no
+            single correct diagram. That is also what makes it hard to practice alone. A book can
+            explain consistency models and load balancers. It will not ask a follow-up question when
+            your answer leaves a gap.
           </p>
           <p>
-            Because of this ambiguity, practicing alone is incredibly difficult. Reading "Designing
-            Data-Intensive Applications" is great, but it doesn't prepare you for an interviewer
-            asking, "What happens if our database node goes down?" midway through your explanation.
-          </p>
-          <p>
-            If the concepts themselves are still shaky, start with our free{" "}
-            <Link href={trackPath("system-design")}>System Design course</Link>. It takes one
-            building block at a time, from load balancers to consistency models, and makes you write
-            your own answer before it shows you a model one.
+            If the fundamentals are still shaky, start with the free{" "}
+            <Link href="/learn/system-design">System Design course</Link>. It takes one building
+            block at a time, from load balancers to consistency models, and has you write your own
+            answer before it shows you a model one.
           </p>
         </>
       ),
     },
     {
-      heading: "Simulating the Design Discussion",
+      heading: "Practicing the conversation",
       content: (
         <>
           <p>
-            Our AI interviewer is trained on real-world system design rubrics. When you practice a
-            scenario like "Design Twitter" or "Design a Rate Limiter," the AI will:
+            System design rounds usually start with clarifying requirements: who uses the system,
+            how much traffic, and what has to stay available versus what has to stay consistent.
+            From there the conversation moves through rough estimation, component choices, and the
+            trade-offs behind each one.
           </p>
-          <ul className="mt-4 list-disc space-y-2 pl-6">
-            <li>Ask you to clarify functional and non-functional requirements.</li>
-            <li>Prompt you to perform back-of-the-envelope capacity estimations.</li>
-            <li>Challenge your choice of database (SQL vs NoSQL) or caching strategy.</li>
+          <p>
+            CodeSparring&apos;s system design drills let you practice that conversation with an AI
+            interviewer that probes the choices you make, by voice or text, instead of grading a
+            static write-up.
+          </p>
+        </>
+      ),
+    },
+    {
+      heading: "What these rounds tend to cover",
+      content: (
+        <>
+          <ul className="list-disc space-y-2 pl-6">
             <li>
-              Inject artificial constraints (e.g., "Assume we have a 10x spike in traffic during the
-              Super Bowl").
+              Clarifying functional and non-functional requirements before proposing anything.
             </li>
+            <li>
+              Rough capacity estimates: traffic, storage, and where the bottleneck is likely to be.
+            </li>
+            <li>
+              Trade-offs between consistency and availability, and between database or caching
+              choices.
+            </li>
+            <li>Single points of failure, and how the design degrades under load.</li>
           </ul>
-        </>
-      ),
-    },
-    {
-      heading: "Mastering Trade-offs and Bottlenecks",
-      content: (
-        <>
-          <p>
-            Senior engineers aren't expected to design perfect systems; they are expected to design
-            systems that make the right compromises for the product's needs.
-          </p>
-          <p>
-            CodeSparring grades your performance specifically on your ability to articulate
-            trade-offs (e.g., Consistency vs Availability in CAP theorem) and your ability to
-            identify and resolve single points of failure (SPOFs) and bottlenecks.
+          <p className="mt-4">
+            These are general characteristics of system design interviews, not a fixed script. Every
+            interviewer pushes on different parts.
           </p>
         </>
       ),
@@ -77,27 +79,27 @@ export default function SystemDesignInterviewPracticePage() {
 
   const faqs = [
     {
-      question: "Can I draw diagrams during the mock interview?",
-      answer:
-        "Currently, CodeSparring focuses on verbal and text-based architectural descriptions, simulating the conversational aspect of system design. We recommend using a physical whiteboard while talking to the AI to practice the full experience.",
-    },
-    {
       question: "Are system design interviews only for senior engineers?",
       answer:
-        "While they are heavily weighted for Senior (L5+) roles, many companies are starting to ask simplified system design questions to Mid-level (L4) and even New Grad engineers to test their fundamental understanding of web architecture.",
+        "They are weighted more heavily for senior roles, but simplified versions now show up for mid-level and even some new grad loops, usually scoped to a single API or a basic data model rather than a distributed system.",
     },
     {
-      question: "What topics should I know before practicing?",
+      question: "Do I need to know the fundamentals before I start?",
       answer:
-        "You should be familiar with load balancing, caching strategies, database sharding/replication, message queues (Kafka/RabbitMQ), and microservices vs monolith architectures.",
+        "It helps. The free System Design course covers the building blocks, load balancers, caching, databases, consistency models, before you try a live discussion. You can also start directly if you want to see where the gaps are first.",
+    },
+    {
+      question: "What should I read up on beforehand?",
+      answer:
+        "Load balancing, caching, database sharding and replication, message queues, and the trade-offs between a monolith and microservices come up often. None of it needs to be memorized perfectly. The interview tests how you reason through it, not whether you recite a definition.",
     },
   ]
 
   return (
     <LandingPageTemplate
-      title="System Design Interview Practice"
-      subtitle="Architect at Scale"
-      heroDescription="Navigate ambiguity and master architectural trade-offs. Practice open-ended system design discussions with an AI that challenges your design choices and tests your scalability knowledge."
+      title="System design interview practice"
+      subtitle="System design"
+      heroDescription="System design interviews are open-ended: you weigh trade-offs and defend them as an interviewer pushes back. Practice that conversation with an AI interviewer, or start with the free course if the fundamentals are still shaky."
       primaryKeyword="system design interview"
       contentSections={contentSections}
       faqs={faqs}
