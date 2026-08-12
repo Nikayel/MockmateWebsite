@@ -186,7 +186,12 @@ async function record(suite, name, fn) {
 
 export const bugfixOnboardingScenario: BugFixScenario = {
   id: "bugfix-onboarding",
-  title: "Onboarding: Adjustment Reconciliation Lookup",
+  // The bank's designed first rep (pinned first in the Debugging track, see
+  // STARTER_SCENARIO_ID). The lookup is two-sum with a status guard, so anyone
+  // with DSA instincts recognizes the shape in seconds; the title says
+  // "warm-up" so the easiest card in the bank reads like one instead of
+  // hiding behind reconciliation jargon. The id is FROZEN (progress-keyed).
+  title: "Warm-up: the adjustment matcher pairs money that's already settled",
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "easy",
