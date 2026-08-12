@@ -1,12 +1,11 @@
 import { Metadata } from "next"
 import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
-import { trackPath } from "@/lib/tutorials/lesson-routes"
 
 export const metadata: Metadata = {
-  title: "AI Coding Interview Practice Simulator",
+  title: "AI Coding Interview Practice",
   description:
-    "Master coding interviews with an AI interviewer. Practice data structures, algorithms, and real-world coding problems with instant, actionable feedback.",
+    "Practice coding interviews with an AI interviewer that reacts as you work: real editor, real tests, and a scored rubric across 18 interview patterns.",
   alternates: {
     canonical: "/ai-coding-interview-practice",
   },
@@ -15,76 +14,68 @@ export const metadata: Metadata = {
 export default function AICodingInterviewPracticePage() {
   const contentSections = [
     {
-      heading: "Why Practice Coding Interviews with AI?",
+      heading: "What makes it feel like a real interview",
       content: (
         <>
           <p>
-            Passing a coding interview isn't just about solving the problem. It's about how you
-            communicate your thought process. While platforms like LeetCode test your ability to
-            pass test cases, they don't prepare you for the pressure of a real human interviewer
-            asking follow-up questions or asking you to optimize your code.
+            Solving a problem alone tells you whether your code passes. It does not tell you whether
+            you can carry a conversation while you write it. CodeSparring&apos;s AI interviewer
+            follows what you do as you work: it asks why you chose an approach, what happens at the
+            edges, and whether a faster solution exists. Talk it through out loud or type it.
           </p>
           <p>
-            An AI coding interview simulator bridges this gap. It listens to you explain your
-            approach, provides hints if you get stuck, and grades you on the same rubric used by
-            FAANG companies: problem-solving, coding ability, communication, and verification. See
-            how it stacks up in our{" "}
-            <Link href="/codesparring-vs-leetcode">CodeSparring vs LeetCode</Link> and{" "}
-            <Link href="/codesparring-vs-hellointerview">CodeSparring vs HelloInterview</Link>{" "}
-            comparisons.
+            You can open the workspace and run a problem&apos;s tests without an account. The
+            interviewer itself needs a free account, one click with Google or GitHub, and the free
+            plan includes 8 full sessions a month with complete feedback, no card required.
           </p>
         </>
       ),
     },
     {
-      heading: "Mastering the 15 Core DSA Patterns",
+      heading: "170+ scenarios across 18 patterns",
       content: (
         <>
           <p>
-            You don't need to memorize 1,000 LeetCode problems to pass an interview. You need to
-            deeply understand the underlying patterns. CodeSparring's AI mock interviews are
-            structured around the 15 core patterns that cover 90% of technical interview questions,
-            including:
+            DSA interviews draw on a smaller set of patterns than any problem count suggests.
+            CodeSparring&apos;s scenarios are organized around 18 of them:
           </p>
           <ul className="mt-4 list-disc space-y-2 pl-6">
+            <li>Arrays and hashing, two pointers, and sliding window.</li>
+            <li>Stacks, binary search, and linked lists.</li>
+            <li>Trees, tries, heaps, and backtracking.</li>
+            <li>Graphs, advanced graphs, and dynamic programming.</li>
+            <li>Greedy, intervals, math and geometry, and bit manipulation.</li>
+          </ul>
+          <p className="mt-4">
+            If a language, not the pattern, is what slows you down, the free{" "}
+            <Link href="/learn/python">Python course</Link> covers the fundamentals these problems
+            lean on, with graded exercises that run in the browser.
+          </p>
+        </>
+      ),
+    },
+    {
+      heading: "What you get back",
+      content: (
+        <>
+          <ul className="list-disc space-y-2 pl-6">
             <li>
-              <strong>Two Pointers & Sliding Window:</strong> Essential for array and string
-              manipulation.
+              A scored rubric covering communication, problem solving, and code quality, not just
+              whether the tests pass.
             </li>
             <li>
-              <strong>Breadth-First & Depth-First Search:</strong> The backbone of tree and graph
-              problems.
+              Session history and per-pattern progress, so you can see where to practice next.
             </li>
             <li>
-              <strong>Dynamic Programming:</strong> Mastering overlapping subproblems and optimal
-              substructure.
-            </li>
-            <li>
-              <strong>Top K Elements & Merge Intervals:</strong> Advanced heap and sorting
-              techniques.
+              On Pro, spaced repetition scheduling and a personalized roadmap that resurfaces the
+              patterns you struggled with.
             </li>
           </ul>
           <p className="mt-4">
-            If the language is what slows you down rather than the pattern, our free{" "}
-            <Link href={trackPath("python")}>Python course</Link> covers the behaviour these
-            problems lean on, with graded exercises that run in the browser.
-          </p>
-        </>
-      ),
-    },
-    {
-      heading: "Actionable Feedback on Your Performance",
-      content: (
-        <>
-          <p>
-            After every practice round, our AI analyzes your performance across multiple dimensions.
-            Did you jump straight into coding without clarifying the constraints? Did you use an
-            O(N^2) approach when an O(N) solution existed? Was your variable naming clear?
-          </p>
-          <p>
-            You receive a comprehensive scorecard highlighting exactly what went well and what needs
-            improvement, along with a spaced-repetition plan to ensure you don't forget the concepts
-            you struggled with.
+            DSA is one round. CodeSparring also runs{" "}
+            <Link href="/rounds">bug-fix and case lab rounds</Link> set in real codebases, and
+            system design drills, for practice past algorithms. Browse{" "}
+            <Link href="/samples">graded sample sessions</Link> to see what feedback looks like.
           </p>
         </>
       ),
@@ -93,27 +84,27 @@ export default function AICodingInterviewPracticePage() {
 
   const faqs = [
     {
-      question: "How does an AI mock interview compare to a human mock interview?",
+      question: "How does this compare to a human mock interview?",
       answer:
-        "Human mock interviews (like Pramp or Interviewing.io) are incredibly valuable, but they are expensive and difficult to schedule. Our AI simulator provides 80% of the value of a human interviewer (dynamic feedback, voice interaction, realistic pressure) at a fraction of the cost, available 24/7.",
+        "Human mock interviews, like interviewing.io or Pramp Pro, typically run $150 to $225 a session, and a real engineer brings judgment an AI cannot fully replicate. CodeSparring is available any time, from free (8 sessions a month) to $25 a month for 35. Many candidates use both: AI sessions for repetition, a human session closer to the real interview.",
     },
     {
-      question: "Can I use voice to talk to the AI?",
+      question: "Can I use voice to talk through my solution?",
       answer:
-        "Yes! CodeSparring features low-latency voice integration. You can talk through your solution out loud, and the AI will respond to your ideas in real-time, exactly like a real interviewer.",
+        "Yes. Voice or text, your choice. The interviewer follows what you say and what you edit in the code.",
     },
     {
-      question: "Are the questions similar to LeetCode?",
+      question: "Are the questions the same as LeetCode?",
       answer:
-        "Our question bank covers the same fundamental data structures and algorithms as LeetCode, but our scenarios are specifically designed to be conversational. They test your ability to gather requirements and handle shifting constraints.",
+        "The underlying data structures and algorithms are the ones you would find anywhere. The difference is the format: the interviewer asks about your approach and follows up on the choices you make, instead of only checking whether your output matches an expected result.",
     },
   ]
 
   return (
     <LandingPageTemplate
-      title="AI Coding Interview Practice"
-      subtitle="Master the Technical Screen"
-      heroDescription="Stop grinding test cases in silence. Practice with an AI interviewer that listens to your approach, gives hints when you're stuck, and grades your communication and code efficiency."
+      title="AI coding interview practice"
+      subtitle="Practice"
+      heroDescription="Pick a problem, talk through your approach, and write code against tests that run. The AI interviewer follows what you do and asks about your choices, across 170+ scenarios in 18 interview patterns."
       primaryKeyword="coding interview"
       contentSections={contentSections}
       faqs={faqs}
