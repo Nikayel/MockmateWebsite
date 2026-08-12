@@ -1,11 +1,11 @@
 import { Metadata } from "next"
-import { COMPETITOR_PRICING } from "@/lib/pricing-comparison"
+import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
-  title: "CodeSparring vs HelloInterview | AI Mock Interview Comparison",
+  title: "CodeSparring vs Hello Interview | AI Mock Interview Comparison",
   description:
-    "Compare CodeSparring and HelloInterview. Find the best AI technical interview platform for coding, system design, and software engineering prep.",
+    "Compare CodeSparring and Hello Interview for technical interview prep, from data structures and debugging rounds to system design.",
   alternates: {
     canonical: "/codesparring-vs-hellointerview",
   },
@@ -14,80 +14,83 @@ export const metadata: Metadata = {
 export default function VsHelloInterviewPage() {
   const contentSections = [
     {
-      heading: "The New Era of AI Mock Interviews",
+      heading: "What Hello Interview does well",
       content: (
-        <>
-          <p>
-            Both CodeSparring and HelloInterview represent the next generation of technical
-            interview preparation: using Large Language Models to simulate the dynamic,
-            conversational nature of real interviews.
-          </p>
-          <p>
-            While both platforms are significantly better than grinding algorithms in silence, they
-            have different philosophies and feature sets when it comes to preparing software
-            engineers for their next role.
-          </p>
-        </>
+        <p>
+          Hello Interview is built around system design: structured prep content plus AI-run mock
+          interviews for a round that is genuinely hard to rehearse without another person in the
+          loop. If system design is your gap, that focus is worth something.
+        </p>
       ),
     },
     {
-      heading: "Where CodeSparring Excels",
+      heading: "Where CodeSparring covers more ground",
       content: (
         <>
           <p>
-            CodeSparring is built strictly around the <strong>Full Engineering Loop</strong>. Our
-            core philosophy is that you shouldn't just practice algorithms; you should practice the
-            exact formats you'll see at FAANG companies.
+            CodeSparring also runs system design drills and a free{" "}
+            <Link href="/learn/system-design">System Design</Link> course you can work through
+            before you practice. Beyond design, it covers the rest of the loop too.
           </p>
-          <ul className="mt-4 list-disc space-y-2 pl-6">
+          <ul className="list-disc space-y-2 pl-6">
             <li>
-              <strong>Bug-Fix & Real-World Scenarios:</strong> CodeSparring offers unique
-              environments where you jump into broken codebases to fix bugs, rather than just
-              writing greenfield algorithms.
+              <strong>Data structures and algorithms:</strong> 170+ scenarios across 18 interview
+              patterns, each one a conversation instead of a submission box.
             </li>
             <li>
-              <strong>Low-Latency Voice Integration:</strong> Our voice-first approach forces you to
-              practice the physical act of talking through a problem while typing.
+              <strong>Debugging rounds:</strong> a real codebase with a failing test. You diagnose
+              the bug and fix it, and a verified pack runs your fix against the same suite a
+              reviewer would use. <Link href="/rounds">See a round</Link>.
             </li>
             <li>
-              <strong>Spaced Repetition:</strong> CodeSparring integrates spaced-repetition
-              scheduling for the concepts you fail, ensuring you actually learn from your mistakes.
+              <strong>Case labs:</strong> Palantir-style forward-deployed scenarios like a 911
+              dispatch system, an ontology build, a usage rollup, and a Stripe billing webhook.{" "}
+              <Link href="/labs">Browse the labs</Link>.
             </li>
           </ul>
+          <p>
+            Every round, whatever the format, is scored on communication, problem solving, and code
+            quality, with a rubric, session history, and per-pattern progress you can look back on.
+          </p>
         </>
       ),
     },
     {
-      heading: "Choosing the Right Tool",
+      heading: "When to use which",
       content: (
-        <>
-          <p>
-            Both tools offer fantastic AI feedback. If you are looking for specialized real-world
-            scenarios (like debugging legacy code or adding functionality to an existing repo) and a
-            deeply integrated voice experience, CodeSparring is the ideal choice.
-          </p>
-        </>
+        <p>
+          If system design is the one round you need to shore up, Hello Interview's focused content
+          is a reasonable place to spend your time. If you want one place that covers DSA,
+          debugging, case labs, and system design, with your progress tracked across all of them,
+          that is the shape CodeSparring is built for.
+        </p>
       ),
     },
   ]
 
   const faqs = [
     {
-      question: "Is CodeSparring cheaper than human mock interviews?",
-      answer: `Yes. While human mock interviews can cost $${COMPETITOR_PRICING.humanMock.perSessionMin}-$${COMPETITOR_PRICING.humanMock.perSessionMax} per session, CodeSparring provides AI mock interviews for a fraction of that cost.`,
+      question: "Does CodeSparring cover system design like Hello Interview?",
+      answer:
+        "Yes. System design drills exist alongside the DSA and debugging tracks, and the free System Design course in Learn covers the fundamentals before you practice.",
     },
     {
-      question: "Can I practice System Design on both?",
+      question: "What does CodeSparring have beyond algorithm questions?",
       answer:
-        "Yes, both platforms support conversational system design scenarios, allowing you to practice architectural trade-offs. CodeSparring also includes a free System Design curriculum you can work through to build the fundamentals before you practice.",
+        "Debugging rounds drop you into a real codebase with a failing test to diagnose and fix. Case labs go further: forward-deployed style scenarios like a 911 dispatch system, an ontology build, a usage rollup, and a Stripe billing webhook.",
+    },
+    {
+      question: "Is there a free plan?",
+      answer:
+        "Yes. The free plan includes 8 full interview sessions a month with complete AI feedback, no card required.",
     },
   ]
 
   return (
     <LandingPageTemplate
-      title="CodeSparring vs HelloInterview"
-      subtitle="Compare AI Mock Interviewers"
-      heroDescription="Looking for the best AI interviewer? Compare features, pricing, and interview scenarios between CodeSparring and HelloInterview to make the right choice for your prep."
+      title="CodeSparring vs Hello Interview"
+      subtitle="Comparison"
+      heroDescription="Hello Interview focuses on system design prep and AI mock interviews. CodeSparring covers that plus data structures and algorithms, debugging rounds, and case labs, all scored on the same rubric."
       primaryKeyword="AI mock interviewer"
       contentSections={contentSections}
       faqs={faqs}
