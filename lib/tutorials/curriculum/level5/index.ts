@@ -1637,28 +1637,6 @@ for n in range(1, 200):
     assert decode(encode(original)) == original
 \`\`\`
 
-### Invariant
-
-Something must be true of the output no matter what went in. Splitting a bill preserves the total. Sorting preserves the multiset of elements. A discount never produces a negative price.
-
-\`\`\`python
-parts = split_evenly(total, count)
-assert sum(parts) == total                  # nothing was created or lost
-assert max(parts) - min(parts) <= 1         # the split is actually even
-\`\`\`
-
-### Idempotence
-
-Applying it twice is the same as applying it once. True of normalizing, trimming, deduplicating, and most "clean this up" functions, and very often false in the implementation.
-
-\`\`\`python
-assert normalize(normalize(text)) == normalize(text)
-\`\`\`
-
-### Agreement with something obviously correct
-
-A slow, dull, clearly-right implementation is a specification you can execute. The fast one must agree with it on every input.
-
 \`\`\`cswidget
 {
   "type": "check",
@@ -1686,6 +1664,36 @@ A slow, dull, clearly-right implementation is a specification you can execute. T
   ]
 }
 \`\`\`
+
+### Invariant
+
+Something must be true of the output no matter what went in. Splitting a bill preserves the total. Sorting preserves the multiset of elements. A discount never produces a negative price.
+
+\`\`\`python
+parts = split_evenly(total, count)
+assert sum(parts) == total                  # nothing was created or lost
+assert max(parts) - min(parts) <= 1         # the split is actually even
+\`\`\`
+
+### Idempotence
+
+Applying it twice is the same as applying it once. True of normalizing, trimming, deduplicating, and most "clean this up" functions, and very often false in the implementation.
+
+\`\`\`python
+assert normalize(normalize(text)) == normalize(text)
+\`\`\`
+
+### Agreement with something obviously correct
+
+A slow, dull, clearly-right implementation is a specification you can execute. Write the version that is too slow to ship and too simple to be wrong, then assert that the one you actually ship agrees with it on every input you can generate. The claim is not about any single answer, it is that two independent routes to the answer never diverge.
+
+\`\`\`python
+for n in range(1, 200):
+    nums = list(range(n))
+    assert count_pairs_fast(nums, 7) == count_pairs_slow(nums, 7)
+\`\`\`
+
+This one earns a lesson of its own: the next lesson builds the reference and the search loop that drives it.
 
 ## Searching for the smallest violation
 
