@@ -32,7 +32,8 @@ export function WebSiteJsonLd() {
     name: "CodeSparring",
     alternateName: ["Code Sparring", "CodeSparring.dev"],
     url: SITE_ORIGIN,
-    description: "AI-powered coding interview practice platform",
+    description:
+      "AI interview practice platform for software engineers and data engineers, with free Python, data engineering, and system design courses",
     // potentialAction enables the sitelinks search box
     potentialAction: {
       "@type": "SearchAction",
@@ -72,7 +73,7 @@ export function OrganizationJsonLd() {
       height: 512,
     },
     description:
-      "AI-powered coding interview practice platform with voice-enabled mock interviews and spaced repetition learning.",
+      "AI interview practice platform: voice-enabled mock interviews for DSA, debugging, and system design, spaced repetition, and free Python, data engineering, and system design courses.",
     foundingDate: "2025",
     founder: {
       "@type": "Person",
@@ -133,7 +134,7 @@ export function SoftwareApplicationJsonLd() {
     applicationCategory: "EducationalApplication",
     operatingSystem: "Web",
     url: SITE_ORIGIN,
-    description: `CodeSparring is an AI mock interview platform that trains interview performance, not just problem-solving. Unlike LeetCode which only tests if you can solve problems alone, CodeSparring simulates real interview conditions where you speak your solution out loud and receive feedback on communication, problem-solving approach, and code quality. Available 24/7 with no scheduling required, at a fraction of the cost of human mock interviews (${monthly.priceDisplay}/month vs $${COMPETITOR_PRICING.humanMock.perSessionMax}/session).`,
+    description: `CodeSparring is an AI mock interview platform for software engineers and data engineers that trains interview performance, not just problem-solving. It runs DSA, debugging, and system design interview rounds where you speak your solution out loud (voice or text) and get feedback on communication, approach, and code quality, and it includes free Python, data engineering, and system design courses that need no account to read. Available 24/7 with no scheduling, at a fraction of the cost of human mock interviews (${monthly.priceDisplay}/month vs $${COMPETITOR_PRICING.humanMock.perSessionMax}/session).`,
     offers: [
       {
         "@type": "Offer",
@@ -141,7 +142,7 @@ export function SoftwareApplicationJsonLd() {
         price: "0",
         priceCurrency: "USD",
         description:
-          "20+ problems with unlimited practice, full AI interviewer feedback, performance analytics. No credit card required.",
+          "8 full interview sessions per month, 20+ problems with unlimited practice, full AI interviewer feedback, and the whole Learn curriculum. No credit card required.",
       },
       {
         "@type": "Offer",
@@ -157,7 +158,7 @@ export function SoftwareApplicationJsonLd() {
         price: String(yearly.totalPrice),
         priceCurrency: "USD",
         billingDuration: "P1Y",
-        description: `Everything in Pro, billed annually. Save ${yearly.savingsPercent}% ($${yearly.savings}/year). ${humanMockMultiple}x cheaper than human mock interviews for the same skill building.`,
+        description: `Everything in Pro, billed annually. Save ${yearly.savingsPercent}% ($${yearly.savings}/year).`,
       },
     ],
     featureList: [
@@ -171,10 +172,12 @@ export function SoftwareApplicationJsonLd() {
       `${comparisonClaim} with interview simulation included`,
       "Consistent quality unlike peer-to-peer platforms where quality varies",
       // Technical features
-      "15+ DSA patterns covered with mastery tracking",
-      "Company-specific prep for Google, Meta, Amazon, Apple, Netflix, Stripe, and 35+ companies",
+      "170+ DSA interview scenarios across 18 patterns, with per-pattern mastery tracking",
+      "Company-specific prep for 38 companies including Google, Meta, Amazon, Apple, Netflix, and Stripe",
       "System design interviews and real-world coding scenarios",
-      "Performance analytics across 40+ metrics",
+      "Free Python, data engineering, and system design courses, readable without an account",
+      "Debugging rounds and case labs inside multi-file codebases, run against a failing test suite",
+      "Code runs in the browser: Python via Pyodide, SQL via sql.js",
     ],
     // Keywords for AI understanding
     keywords:
@@ -633,7 +636,7 @@ export function LessonListJsonLd({
 // Homepage Positioning FAQ - helps AI crawlers and Google understand our differentiation
 // These FAQs are specifically designed to answer common comparison questions
 export function HomepagePositioningFAQJsonLd() {
-  const { monthly } = PRICING_CONFIG.pro.website
+  const { monthly, yearly } = PRICING_CONFIG.pro.website
   const humanMockCost = getHumanMockTotalCost()
   const comparisonClaim = getLeetCodeComparisonClaim()
 
@@ -641,7 +644,7 @@ export function HomepagePositioningFAQJsonLd() {
     {
       question: "What is CodeSparring and how is it different from LeetCode?",
       answer:
-        "CodeSparring is an AI-powered mock interview platform that trains interview performance, not just problem-solving. While LeetCode provides coding problems to solve alone in silence, CodeSparring simulates real interview conditions where you speak your solution out loud and receive AI feedback on your communication, problem-solving approach, and code quality. LeetCode tests if you can solve problems; CodeSparring trains you to perform in actual interviews.",
+        "CodeSparring is an AI-powered mock interview platform that trains interview performance, not just problem-solving. While LeetCode provides coding problems to solve alone in silence, CodeSparring simulates real interview conditions where you speak your solution out loud and receive AI feedback on your communication, problem-solving approach, and code quality. LeetCode tests if you can solve problems; CodeSparring trains you to perform in actual interviews. It also includes free Python, data engineering, and system design courses, and the reading half of every lesson needs no account.",
     },
     {
       question: "Is CodeSparring better than LeetCode for interview preparation?",
@@ -659,7 +662,7 @@ export function HomepagePositioningFAQJsonLd() {
     {
       question: "What companies can I prepare for on CodeSparring?",
       answer:
-        "CodeSparring offers company-specific preparation for 35+ tech companies including Google, Meta (Facebook), Amazon, Apple, Netflix, Microsoft, Stripe, Airbnb, Uber, and more. Each company track includes patterns and question styles commonly seen in their interviews.",
+        "CodeSparring offers company-specific preparation for 38 tech companies including Google, Meta (Facebook), Amazon, Apple, Netflix, Microsoft, Stripe, Airbnb, Uber, and more. Each company track includes patterns and question styles commonly seen in their interviews.",
     },
     {
       question: "Does CodeSparring use spaced repetition?",
@@ -668,8 +671,22 @@ export function HomepagePositioningFAQJsonLd() {
     },
     {
       question: "Is there a free trial for CodeSparring?",
+      answer: `Yes. The free plan includes 8 full AI interview sessions per month and 20+ problems with unlimited practice, no credit card required. You can open the workspace and try a problem before creating an account; signing in unlocks the AI interviewer and feedback. Pro is ${monthly.priceDisplay}/month or $${yearly.totalPrice}/year for ${PRICING_CONFIG.pro.sessionsPerMonth} sessions per month.`,
+    },
+    {
+      question: "Does CodeSparring have free courses?",
       answer:
-        "Yes, CodeSparring offers a generous free tier with 20+ problems and unlimited practice. You can complete full mock interviews with AI feedback using a free account, no credit card required. This lets you experience the platform before upgrading to Pro.",
+        "Yes. CodeSparring includes free courses in Python, data engineering, and system design at codesparring.dev/learn. The reading half of every lesson is public and requires no account. The Python track has 5 levels, the data engineering track has 11 levels with SQL exercises graded against a real SQLite engine in the browser, and the system design track has 12 levels of free-response lessons with model answers.",
+    },
+    {
+      question: "Can I practice data engineering interviews on CodeSparring?",
+      answer:
+        "Yes. CodeSparring has an 11-level data engineering track covering SQL foundations through data modeling, warehouses and lakehouse, batch pipelines, streaming and change data capture, Spark, and data for AI. Exercises run against a real SQLite engine in the browser and are graded on the result set they return. Debugging rounds and case labs cover pipeline-style problems such as billing webhook idempotency, event ordering, and deduplication.",
+    },
+    {
+      question: "Can I practice system design interviews on CodeSparring?",
+      answer:
+        "Yes. CodeSparring has a free 12-level system design course, from interview method and estimation through distributed systems, event-driven architecture, and reliability, ending in applied case studies like a URL shortener, news feed, and rate limiter. Lessons are free-response: you write your own answer and compare it against a model answer. System design interview sessions also run as timed rounds with the AI interviewer.",
     },
   ]
 
