@@ -5,75 +5,444 @@
 import type { PythonLesson } from "../../types"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const MOCK_README = `# Test with a mock, design for testability
+// ───────────────────────────────────────────────────────────────────────────
+// Practice workspace: billing dispatch (a customer was charged twice)
+//
+// The learner is on the AUTHORING side of the tests, following the precedent set by
+// `py-l5-pin-the-seam`: a `role: "test"` file sits in `editableFilePaths` (the overlay honors
+// editableFilePaths regardless of role), and a build-swapping audit grades what they wrote.
+//
+// The bug is deliberately invisible in the return value: a refactor left the old
+// `gateway.charge(...)` line in place next to the new `_charge_one` helper, so the count comes
+// back right while every customer is charged twice. Only an assertion on the mock's call history
+// can see it, which is exactly the skill this lesson teaches.
+//
+// The audit runs the learner's suite against four broken builds, so a tautology
+// (`assert True`) and a single narrow test both fail by name:
+//   _old_build          charges twice          -> forces a call_count assertion
+//   _never_charges      calls nothing          -> rejects a suite that asserts nothing real
+//   _ignores_the_ledger recharges paid rows    -> forces a second dispatch in the suite
+//   _swapped_args       charge(cents, id)      -> forces an assertion on the arguments
+// A fifth check runs the suite twice in a row without clearing the shared ledger, so the suite
+// only passes when the learner isolates state with ledger.reset().
+// ───────────────────────────────────────────────────────────────────────────
 
-Write code that's easy to test by **injecting** its dependency. Implement \`send_all(sender,
-messages)\` in \`notify/service.py\` so it calls \`sender(message)\` for every message and returns how
-many were sent.
+const DISPATCH_README = `# Ticket BILL-482: a customer was charged twice
 
-The tests pass a \`unittest.mock.Mock\` as \`sender\` and assert how it was called. \`send_all(sender,
-["a", "b"])\` returns \`2\` and calls \`sender\` twice. Some tests are hidden.
+Support has a customer whose card shows two identical charges for one invoice. The nightly
+run reported the expected number of invoices, so nothing looked wrong in the logs.
+
+\`billing/dispatch.py\` charges invoices through an injected \`gateway\`, which is why a test can
+hand it a \`unittest.mock.Mock\` and read the call history. \`billing/ledger.py\` is read-only: it
+records which invoices this process has already charged, and it is shared by every test in the
+run.
+
+Two things to do, in this order:
+
+1. Write the tests in \`tests/test_regression.py\`. Call the function as
+   \`dispatch.dispatch(...)\` and keep \`run_tests(record)\` as the entry point.
+2. Fix \`billing/dispatch.py\`.
+
+\`tests/test_audit.py\` is read-only and grades the tests you write. It runs your suite against
+several broken builds of \`dispatch\`, and against the code in the repo. Your suite has to fail
+on every broken build and pass on the current one, so a test that asserts nothing specific is
+rejected by name. It also runs your suite twice in a row without clearing the ledger between
+runs.
+
+Some tests are hidden.
 `
 
-const MOCK_SERVICE_STARTER = String.raw`def send_all(sender, messages):
-    """Call sender(message) for each message; return how many were sent (see README.md)."""
-    # TODO: loop messages, call sender(message), count them.
-    return 0
+const BILLING_LEDGER = String.raw`"""Which invoices this process has already charged (read-only).
+
+Every test in the run shares this record, so a test that does not clear it hands its leftovers
+to the next one.
+"""
+
+charged_ids = set()
+
+
+def already_charged(invoice_id):
+    """Return True if this invoice has been charged since the last reset."""
+    return invoice_id in charged_ids
+
+
+def remember(invoice_id):
+    """Record that this invoice has been charged."""
+    charged_ids.add(invoice_id)
+
+
+def reset():
+    """Clear the record. Call this at the start of a test to isolate it."""
+    charged_ids.clear()
 `
 
-const MOCK_SERVICE_REFERENCE = String.raw`def send_all(sender, messages):
-    count = 0
-    for message in messages:
-        sender(message)
-        count += 1
-    return count
+const BILLING_DISPATCH_STARTER = String.raw`"""Charge every unpaid invoice through the injected gateway (see README.md)."""
+
+from billing import ledger
+
+# Generated change under review: the per-invoice work moved into _charge_one.
+
+
+def _charge_one(gateway, invoice):
+    """Charge one invoice and record it in the ledger."""
+    gateway.charge(invoice["id"], invoice["cents"])
+    ledger.remember(invoice["id"])
+
+
+def dispatch(gateway, invoices):
+    """Charge every invoice not already charged; return how many were charged."""
+    # TODO: ticket BILL-482 says one invoice reaches the gateway more than once.
+    charged = 0
+    for invoice in invoices:
+        if ledger.already_charged(invoice["id"]):
+            continue
+        _charge_one(gateway, invoice)
+        gateway.charge(invoice["id"], invoice["cents"])
+        charged += 1
+    return charged
 `
 
-const MOCK_TEST = String.raw`from unittest.mock import Mock
+const BILLING_DISPATCH_REFERENCE = String.raw`"""Charge every unpaid invoice through the injected gateway (see README.md)."""
 
-from notify.service import send_all
+from billing import ledger
+
+
+def _charge_one(gateway, invoice):
+    """Charge one invoice and record it in the ledger."""
+    gateway.charge(invoice["id"], invoice["cents"])
+    ledger.remember(invoice["id"])
+
+
+def dispatch(gateway, invoices):
+    """Charge every invoice not already charged; return how many were charged."""
+    charged = 0
+    for invoice in invoices:
+        if ledger.already_charged(invoice["id"]):
+            continue
+        _charge_one(gateway, invoice)
+        charged += 1
+    return charged
+`
+
+const DISPATCH_TEST_REGRESSION_STARTER = String.raw`# Tests for ticket BILL-482.
+#
+# Call the function as dispatch.dispatch(...) so the audit can swap builds under it.
+# Keep run_tests(record) as the entry point, and keep the worked example below.
+
+from unittest.mock import Mock, call
+
+from billing import dispatch, ledger
+
+INVOICES = [{"id": "inv-1", "cents": 500}, {"id": "inv-2", "cents": 250}]
 
 
 def run_tests(record):
-    def sends_each_message():
-        sender = Mock()
-        result = send_all(sender, ["a", "b"])
-        assert result == 2, f"expected 2, got {result!r}"
-        assert sender.call_count == 2, f"expected 2 calls, got {sender.call_count}"
+    def dispatch_reports_how_many_it_charged():
+        ledger.reset()
+        gateway = Mock()
+        charged = dispatch.dispatch(gateway, INVOICES)
+        assert charged == 2, f"two unpaid invoices should report 2, got {charged!r}"
 
-    def no_messages_sends_nothing():
-        sender = Mock()
-        assert send_all(sender, []) == 0
-        assert sender.call_count == 0
+    record("dispatch reports how many it charged", dispatch_reports_how_many_it_charged)
 
-    record("sends each message", sends_each_message)
-    record("no messages sends nothing", no_messages_sends_nothing)
+    # TODO: add the tests the ticket needs. The example above passes on the shipped code,
+    # so it cannot be the one that catches the double charge.
+    #
+    # Define each test as a nested function, then register it with record("a name", the_function).
+    # The audit tells you by name which broken build your suite still lets through.
 `
 
-const MOCK_TEST_HIDDEN = String.raw`from unittest.mock import Mock
+const DISPATCH_TEST_REGRESSION_REFERENCE = String.raw`# Tests for ticket BILL-482.
+#
+# Call the function as dispatch.dispatch(...) so the audit can swap builds under it.
+# Keep run_tests(record) as the entry point, and keep the worked example below.
 
-from notify.service import send_all
+from unittest.mock import Mock, call
+
+from billing import dispatch, ledger
+
+INVOICES = [{"id": "inv-1", "cents": 500}, {"id": "inv-2", "cents": 250}]
 
 
 def run_tests(record):
-    def calls_with_the_right_args():
-        sender = Mock()
-        send_all(sender, ["hello", "world"])
-        sender.assert_any_call("hello")
-        sender.assert_any_call("world")
+    def dispatch_reports_how_many_it_charged():
+        ledger.reset()
+        gateway = Mock()
+        charged = dispatch.dispatch(gateway, INVOICES)
+        assert charged == 2, f"two unpaid invoices should report 2, got {charged!r}"
 
-    def returns_the_count():
-        assert send_all(Mock(), ["x", "y", "z"]) == 3
+    def each_invoice_reaches_the_gateway_once():
+        ledger.reset()
+        gateway = Mock()
+        dispatch.dispatch(gateway, INVOICES)
+        assert gateway.charge.call_count == 2, (
+            f"two invoices should mean two charge calls, got {gateway.charge.call_count}"
+        )
 
-    record("calls sender with each message", calls_with_the_right_args)
-    record("returns the number sent", returns_the_count)
+    def each_charge_carries_the_id_then_the_amount():
+        ledger.reset()
+        gateway = Mock()
+        dispatch.dispatch(gateway, INVOICES)
+        expected = [call("inv-1", 500), call("inv-2", 250)]
+        assert gateway.charge.call_args_list == expected, (
+            f"expected {expected!r}, got {gateway.charge.call_args_list!r}"
+        )
+
+    def an_invoice_already_charged_is_left_alone():
+        ledger.reset()
+        dispatch.dispatch(Mock(), INVOICES)
+        gateway = Mock()
+        charged = dispatch.dispatch(gateway, INVOICES)
+        assert charged == 0, f"the second run should charge nothing, got {charged!r}"
+        assert gateway.charge.call_count == 0, (
+            f"a charged invoice should not be charged again, got "
+            f"{gateway.charge.call_count} calls"
+        )
+
+    record("dispatch reports how many it charged", dispatch_reports_how_many_it_charged)
+    record("each invoice reaches the gateway once", each_invoice_reaches_the_gateway_once)
+    record("each charge carries the id then the amount", each_charge_carries_the_id_then_the_amount)
+    record("an invoice already charged is left alone", an_invoice_already_charged_is_left_alone)
+`
+
+const DISPATCH_TEST_AUDIT = String.raw`"""Audit suite (read-only). It grades the tests you write in tests/test_regression.py.
+
+It runs your suite against several broken builds of dispatch and against the code in the repo.
+A suite that passes on a broken build did not test anything that build gets wrong, so each
+failure message below names the build that got through. You do not have to read the machinery.
+"""
+
+from billing import dispatch, ledger
+
+INVOICES = [{"id": "inv-1", "cents": 500}, {"id": "inv-2", "cents": 250}]
+
+
+def _old_build(gateway, invoices):
+    """Frozen copy of the build that shipped the double charge. Do not edit."""
+    charged = 0
+    for invoice in invoices:
+        if ledger.already_charged(invoice["id"]):
+            continue
+        gateway.charge(invoice["id"], invoice["cents"])
+        ledger.remember(invoice["id"])
+        gateway.charge(invoice["id"], invoice["cents"])
+        charged += 1
+    return charged
+
+
+def _never_charges(gateway, invoices):
+    """Reports the right count and never touches the gateway."""
+    return len([i for i in invoices if not ledger.already_charged(i["id"])])
+
+
+def _ignores_the_ledger(gateway, invoices):
+    """Charges every invoice it is handed, including ones already paid."""
+    for invoice in invoices:
+        gateway.charge(invoice["id"], invoice["cents"])
+        ledger.remember(invoice["id"])
+    return len(invoices)
+
+
+def _swapped_args(gateway, invoices):
+    """Passes the amount where the gateway expects the invoice id."""
+    charged = 0
+    for invoice in invoices:
+        if ledger.already_charged(invoice["id"]):
+            continue
+        gateway.charge(invoice["cents"], invoice["id"])
+        ledger.remember(invoice["id"])
+        charged += 1
+    return charged
+
+
+def _run_suite(build, reset_first=True):
+    """Run tests/test_regression.py once with dispatch.dispatch swapped for build."""
+    from tests import test_regression
+
+    outcomes = []
+
+    def record(name, fn):
+        try:
+            fn()
+            outcomes.append((name, True, ""))
+        except Exception as exc:
+            outcomes.append((name, False, str(exc) or type(exc).__name__))
+
+    if reset_first:
+        ledger.reset()
+    original = dispatch.dispatch
+    setattr(dispatch, "dispatch", build)
+    try:
+        test_regression.run_tests(record)
+    except Exception as exc:
+        outcomes.append(("run_tests raised outside a recorded test", False, str(exc)))
+    finally:
+        setattr(dispatch, "dispatch", original)
+        ledger.reset()
+    return outcomes
+
+
+def _red_names(build):
+    return [name for name, passed, _ in _run_suite(build) if not passed]
+
+
+def run_tests(record):
+    def your_suite_records_more_than_the_example():
+        outcomes = _run_suite(dispatch.dispatch)
+        assert len(outcomes) >= 2, (
+            f"tests/test_regression.py recorded {len(outcomes)} test(s); the worked example "
+            f"alone cannot catch the ticket, so register at least one more with record(name, fn)"
+        )
+
+    def your_suite_catches_the_double_charge():
+        assert _red_names(_old_build), (
+            "your suite passes on the build that charges every invoice twice; the count it "
+            "returns is right on that build, so assert something the count cannot see"
+        )
+
+    def your_suite_rejects_a_gateway_that_is_never_called():
+        assert _red_names(_never_charges), (
+            "your suite passes on a build that never calls the gateway at all, so it is not "
+            "yet asserting that any charge happened"
+        )
+
+    def your_suite_catches_a_recharged_invoice():
+        assert _red_names(_ignores_the_ledger), (
+            "your suite passes on a build that charges invoices the ledger already recorded; "
+            "dispatch twice in one test and assert the second run charges nothing"
+        )
+
+    def your_suite_catches_the_wrong_arguments():
+        assert _red_names(_swapped_args), (
+            "your suite passes on a build that calls gateway.charge(cents, id); assert what "
+            "the gateway was called WITH, not only how often"
+        )
+
+    def your_suite_passes_on_the_current_build():
+        red = [
+            f"{name}: {error}"
+            for name, passed, error in _run_suite(dispatch.dispatch)
+            if not passed
+        ]
+        assert not red, (
+            "your suite fails on the current build, so now make the fix in "
+            "billing/dispatch.py (" + "; ".join(red) + ")"
+        )
+
+    def your_suite_can_run_twice_in_a_row():
+        _run_suite(dispatch.dispatch)
+        red = [
+            f"{name}: {error}"
+            for name, passed, error in _run_suite(dispatch.dispatch, reset_first=False)
+            if not passed
+        ]
+        assert not red, (
+            "your suite passes on a clean ledger and fails on a second run, so its tests leak "
+            "into each other; clear the shared state at the start of each one ("
+            + "; ".join(red)
+            + ")"
+        )
+
+    record("your suite records more than the example", your_suite_records_more_than_the_example)
+    record("your suite catches the double charge", your_suite_catches_the_double_charge)
+    record(
+        "your suite rejects a gateway that is never called",
+        your_suite_rejects_a_gateway_that_is_never_called,
+    )
+    record("your suite catches a recharged invoice", your_suite_catches_a_recharged_invoice)
+    record("your suite catches the wrong arguments", your_suite_catches_the_wrong_arguments)
+    record("your suite passes on the current build", your_suite_passes_on_the_current_build)
+    record("your suite can run twice in a row", your_suite_can_run_twice_in_a_row)
+`
+
+const DISPATCH_TEST_HIDDEN = String.raw`"""Hidden checks on the repaired dispatch(), independent of the tests you wrote.
+
+Your suite proves you can pin the ticket. These prove the repair holds on invoice counts and
+mixes your tests never used. Each one clears the ledger first, so a leftover from one check
+cannot decide another.
+"""
+
+from unittest.mock import Mock, call
+
+from billing import dispatch, ledger
+
+
+def _invoices(count):
+    return [{"id": f"inv-{n}", "cents": n * 100} for n in range(1, count + 1)]
+
+
+def run_tests(record):
+    def every_invoice_is_charged_exactly_once():
+        for count in [1, 3, 5]:
+            ledger.reset()
+            gateway = Mock()
+            charged = dispatch.dispatch(gateway, _invoices(count))
+            assert charged == count, f"expected {count} charged, got {charged!r}"
+            assert gateway.charge.call_count == count, (
+                f"{count} invoices should mean {count} charge calls, got "
+                f"{gateway.charge.call_count}"
+            )
+
+    def the_gateway_gets_the_id_then_the_amount():
+        ledger.reset()
+        gateway = Mock()
+        dispatch.dispatch(gateway, _invoices(3))
+        expected = [call("inv-1", 100), call("inv-2", 200), call("inv-3", 300)]
+        assert gateway.charge.call_args_list == expected, (
+            f"expected {expected!r}, got {gateway.charge.call_args_list!r}"
+        )
+
+    def a_repeated_run_charges_nothing():
+        ledger.reset()
+        rows = _invoices(4)
+        dispatch.dispatch(Mock(), rows)
+        gateway = Mock()
+        charged = dispatch.dispatch(gateway, rows)
+        assert charged == 0, f"the second run should charge nothing, got {charged!r}"
+        assert gateway.charge.call_count == 0, (
+            f"expected 0 charge calls on the second run, got {gateway.charge.call_count}"
+        )
+
+    def only_the_new_invoices_are_charged():
+        ledger.reset()
+        dispatch.dispatch(Mock(), _invoices(2))
+        gateway = Mock()
+        charged = dispatch.dispatch(gateway, _invoices(4))
+        assert charged == 2, f"only inv-3 and inv-4 are new, expected 2, got {charged!r}"
+        expected = [call("inv-3", 300), call("inv-4", 400)]
+        assert gateway.charge.call_args_list == expected, (
+            f"expected {expected!r}, got {gateway.charge.call_args_list!r}"
+        )
+
+    def no_invoices_means_no_calls():
+        ledger.reset()
+        gateway = Mock()
+        charged = dispatch.dispatch(gateway, [])
+        assert charged == 0, f"an empty run should report 0, got {charged!r}"
+        assert gateway.charge.call_count == 0, (
+            f"an empty run should call the gateway 0 times, got {gateway.charge.call_count}"
+        )
+
+    def dispatch_leaves_the_invoice_rows_alone():
+        ledger.reset()
+        rows = _invoices(3)
+        before = [dict(row) for row in rows]
+        dispatch.dispatch(Mock(), rows)
+        assert rows == before, f"dispatch must not change the rows it is handed, got {rows!r}"
+
+    record("every invoice is charged exactly once", every_invoice_is_charged_exactly_once)
+    record("the gateway gets the id then the amount", the_gateway_gets_the_id_then_the_amount)
+    record("a repeated run charges nothing", a_repeated_run_charges_nothing)
+    record("only the new invoices are charged", only_the_new_invoices_are_charged)
+    record("no invoices means no calls", no_invoices_means_no_calls)
+    record("dispatch leaves the invoice rows alone", dispatch_leaves_the_invoice_rows_alone)
 `
 
 export const testingToolingLesson: PythonLesson = {
   id: "py-l4-testing-tooling",
   title: "Mocking, coverage & modern tooling",
   summary: "Design code for testability, mock its dependencies, and know the modern tool stack.",
-  estimatedMinutes: 20,
+  estimatedMinutes: 32,
   difficulty: "hard",
   skills: ["mocking", "testing", "ruff", "mypy"],
   teach: {
@@ -317,31 +686,43 @@ def run(messages):
   practice: {
     id: "py-l4-testing-tooling-practice",
     executionMode: "workspace",
-    prompt: `Implement \`send_all(sender, messages)\` in \`notify/service.py\`: call the injected \`sender\` once
-per message and return the number sent. The tests pass a \`Mock\` and assert how it was called, so
-keep \`sender\` as an injected parameter. Some tests are hidden.`,
+    prompt: `Write the tests for ticket BILL-482 in \`tests/test_regression.py\`, then fix
+\`billing/dispatch.py\`. A customer was charged twice for one invoice while the nightly run
+reported the expected number of invoices. \`dispatch(gateway, invoices)\` takes its gateway as a
+parameter, and \`billing/ledger.py\` is a record shared by every test in the run.
+
+Call the function as \`dispatch.dispatch(...)\`. The read-only audit in \`tests/test_audit.py\` runs
+your suite against several broken builds and against the current one, and names the ones your
+suite still lets through. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "Loop the messages and call `sender(message)` for each.",
-      "Keep a running count and return it.",
-      "Because `sender` is a parameter, a test can pass a `Mock()` and inspect `call_count`.",
+      "The count the nightly run reported was right, so nothing you can learn from the return value catches this ticket. Ask the mock what happened instead.",
+      "A `Mock()` passed as the gateway records `gateway.charge.call_count` and `gateway.charge.call_args_list`, and comparing the list against `[call(...), call(...)]` pins how many calls happened, with which arguments, in which order.",
+      "The ledger is shared, so call `ledger.reset()` at the start of every test; to prove a paid invoice is skipped, dispatch the same rows twice in one test and assert the second gateway saw nothing.",
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "notify/service.py",
-      editableFilePaths: ["notify/service.py"],
-      visibleTestPaths: ["tests/test_service.py"],
-      hiddenTestPaths: ["tests/test_service_hidden.py"],
+      primaryFilePath: "tests/test_regression.py",
+      editableFilePaths: ["tests/test_regression.py", "billing/dispatch.py"],
+      visibleTestPaths: ["tests/test_regression.py", "tests/test_audit.py"],
+      hiddenTestPaths: ["tests/test_dispatch_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
-        { path: "README.md", role: "docs", language: "markdown", content: MOCK_README },
-        { path: "notify/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        { path: "README.md", role: "docs", language: "markdown", content: DISPATCH_README },
+        { path: "billing/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "notify/service.py",
+          path: "billing/ledger.py",
+          role: "readonly",
+          language: "python",
+          content: BILLING_LEDGER,
+          description: "The shared record of charged invoices (read-only)",
+        },
+        {
+          path: "billing/dispatch.py",
           role: "editable",
           language: "python",
-          content: MOCK_SERVICE_STARTER,
-          description: "Implement send_all here",
+          content: BILLING_DISPATCH_STARTER,
+          description: "Repair dispatch here, after your tests are red",
         },
         {
           path: "tests/__init__.py",
@@ -351,27 +732,35 @@ keep \`sender\` as an injected parameter. Some tests are hidden.`,
           hidden: true,
         },
         {
-          path: "tests/test_service.py",
+          path: "tests/test_regression.py",
           role: "test",
           language: "python",
-          content: MOCK_TEST,
-          description: "Visible mock-based tests",
+          content: DISPATCH_TEST_REGRESSION_STARTER,
+          description: "Write your tests for BILL-482 here",
         },
         {
-          path: "tests/test_service_hidden.py",
+          path: "tests/test_audit.py",
           role: "test",
           language: "python",
-          content: MOCK_TEST_HIDDEN,
+          content: DISPATCH_TEST_AUDIT,
+          description: "Audit suite that grades the tests you write (read-only)",
+        },
+        {
+          path: "tests/test_dispatch_hidden.py",
+          role: "test",
+          language: "python",
+          content: DISPATCH_TEST_HIDDEN,
           hidden: true,
-          description: "Hidden mock-call tests",
+          description: "Hidden checks on the repaired dispatch()",
         },
         {
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
           content: buildRunner([
-            { module: "test_service", label: "visible service" },
-            { module: "test_service_hidden", label: "hidden service" },
+            { module: "test_regression", label: "visible regression" },
+            { module: "test_audit", label: "visible audit" },
+            { module: "test_dispatch_hidden", label: "hidden dispatch" },
           ]),
           hidden: true,
           description: "Workspace test runner",
@@ -379,10 +768,16 @@ keep \`sender\` as an injected parameter. Some tests are hidden.`,
       ],
       referenceFiles: [
         {
-          path: "notify/service.py",
+          path: "tests/test_regression.py",
           role: "editable",
           language: "python",
-          content: MOCK_SERVICE_REFERENCE,
+          content: DISPATCH_TEST_REGRESSION_REFERENCE,
+        },
+        {
+          path: "billing/dispatch.py",
+          role: "editable",
+          language: "python",
+          content: BILLING_DISPATCH_REFERENCE,
         },
       ],
     },
