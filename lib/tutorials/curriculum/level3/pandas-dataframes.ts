@@ -1,165 +1,268 @@
 import type { PythonLesson } from "../../types"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const TABLE_README = `# Total the weekly sales export
+const LEDGER_README = `# The spend-by-category report is wrong
 
-The export arrives as CSV **text** in an API response, not as a file on disk, and two cells came
-through blank. Implement the three helpers in \`frame/table.py\`. \`frame/sample.py\` (read-only) holds
-the export as \`SALES_CSV\`.
+Finance rebuilt the monthly report and the numbers do not add up. The transaction feed and the
+category reference table come from two different systems, so the join does not match on every row,
+and one merchant terminal sends a blank amount when a sale is voided.
 
-**\`read_csv(text)\`** returns one dict per data row, keyed by the header names. Type each cell:
+\`ledger/feed.py\` (read-only) holds \`TRANSACTIONS\` (raw rows, every field arriving as text) and
+\`CATEGORIES\` (a dict mapping category id to category name). You edit two files.
 
-- a blank cell (or one that is only whitespace) becomes \`None\`, the stand-in for pandas' \`NaN\`
-- an integer-looking cell, with an optional leading \`-\`, becomes an \`int\`
-- anything else stays a trimmed string
+## \`ledger/clean.py\`
 
-**\`filter_rows(rows, column, minimum)\`** keeps the rows whose value in \`column\` is not \`None\` and is
-at least \`minimum\`. A missing value never passes a comparison, which is how a real boolean mask
-treats \`NaN\`.
+**\`clean_transactions(raw_rows)\`** returns a new list of new dicts, one per raw row, with the keys
+\`txn_id\`, \`category_id\` and \`amount\`:
 
-**\`group_sum(rows, key_column, value_column)\`** returns a dict of totals per key:
+- \`category_id\`: trimmed, and a blank or whitespace-only id becomes \`None\`
+- \`amount\`: a blank or whitespace-only cell becomes \`None\`, otherwise the whole number it spells,
+  which may be negative for a refund
+- \`txn_id\` is copied through unchanged
 
-- a row whose **key** is \`None\` is dropped entirely, exactly as \`groupby\` drops \`NaN\` keys
-- a row whose **value** is \`None\` still counts toward its group, contributing \`0\`
+The raw rows you were handed must be exactly as they were when this returns.
+
+**\`attach_category(rows, categories)\`** returns a new list of new dicts, each row copied through
+with one extra key, \`category\`, holding the name that \`categories\` gives for that row's
+\`category_id\`. A row whose id is missing, or whose id is not in \`categories\` at all, gets \`None\`.
+This is a left join: no row is ever dropped.
+
+## \`ledger/report.py\`
+
+These take the joined rows.
+
+**\`category_report(rows, categories)\`** returns a dict keyed by category **name**, with a value of
+\`{"total": int, "count": int, "average": int}\`:
+
+- every name in \`categories\` appears, including one that no transaction reached
+- \`total\` sums the amounts that are present, \`count\` counts the rows that had one
+- a row with a missing amount contributes to neither
+- \`average\` is \`total / count\` rounded to a whole number, or \`0\` when \`count\` is \`0\`
+- rows with no matched category belong to none of these buckets
+
+**\`rank_categories(report)\`** returns the category names as a list, highest \`total\` first. Names
+tied on total come back in alphabetical order.
+
+**\`unmatched_total(rows)\`** returns the total amount of the rows that matched no category, counting
+a missing amount as \`0\`.
 
 Some tests are hidden.
 `
 
-const TABLE_SAMPLE = String.raw`SALES_CSV = """region,rep,amount
-west,Ada,100
-east,Sam,250
-west,Mo,50
-,Kim,75
-east,Lee,
-north,Rio,-25
-"""
+const LEDGER_FEED = String.raw`TRANSACTIONS = [
+    {"txn_id": "t1", "category_id": "c1", "amount": "40"},
+    {"txn_id": "t2", "category_id": "c2", "amount": "15"},
+    {"txn_id": "t3", "category_id": "c1", "amount": "  "},
+    {"txn_id": "t4", "category_id": "c9", "amount": "70"},
+    {"txn_id": "t5", "category_id": "", "amount": "5"},
+    {"txn_id": "t6", "category_id": "c2", "amount": "25"},
+]
+
+CATEGORIES = {"c1": "Groceries", "c2": "Transport", "c3": "Books"}
 `
 
-const TABLE_STARTER = String.raw`import csv
-import io
-
-
-def read_csv(text):
-    """Parse CSV text into a list of typed row dicts (see README.md)."""
-    # TODO: csv.DictReader(io.StringIO(text.strip())) gives you raw string cells.
-    # Blank -> None, integer-looking -> int, otherwise the trimmed string.
+const LEDGER_CLEAN_STARTER = String.raw`def clean_transactions(raw_rows):
+    """Type the raw feed rows (see README.md)."""
+    # TODO: return new dicts with a trimmed category_id and a whole-number amount,
+    # using None for either one when the cell is blank. Leave raw_rows untouched.
     return []
 
 
-def filter_rows(rows, column, minimum):
-    """Keep the rows whose column value is present and at least minimum."""
-    # TODO: a None value never passes the comparison.
+def attach_category(rows, categories):
+    """Left-join each row to its category name (see README.md)."""
+    # TODO: every row survives, and carries a "category" key.
     return []
+`
+
+const LEDGER_CLEAN_REFERENCE = String.raw`def clean_transactions(raw_rows):
+    cleaned = []
+    for raw in raw_rows:
+        category_id = (raw.get("category_id") or "").strip() or None
+        amount_text = (raw.get("amount") or "").strip()
+        cleaned.append(
+            {
+                "txn_id": raw["txn_id"],
+                "category_id": category_id,
+                "amount": int(amount_text) if amount_text else None,
+            }
+        )
+    return cleaned
 
 
-def group_sum(rows, key_column, value_column):
-    """Total value_column per key_column (see README.md)."""
-    # TODO: drop a row whose key is None; count a None value as 0.
+def attach_category(rows, categories):
+    return [{**row, "category": categories.get(row["category_id"])} for row in rows]
+`
+
+const LEDGER_REPORT_STARTER = String.raw`def category_report(rows, categories):
+    """Summarise the joined rows per category name (see README.md)."""
+    # TODO: every known category needs an entry, present or not. A missing amount
+    # is not a zero-value transaction, so it must not reach total, count or average.
     return {}
+
+
+def rank_categories(report):
+    """Order the category names by total, highest first (see README.md)."""
+    # TODO: decide what happens to two categories on the same total.
+    return []
+
+
+def unmatched_total(rows):
+    """Total the rows that matched no category (see README.md)."""
+    # TODO: a missing amount counts as 0 here.
+    return 0
 `
 
-const TABLE_REFERENCE = String.raw`import csv
-import io
-
-
-def read_csv(text):
-    reader = csv.DictReader(io.StringIO(text.strip()))
-    rows = []
-    for raw in reader:
-        row = {}
-        for column, cell in raw.items():
-            value = (cell or "").strip()
-            if not value:
-                row[column] = None
-            elif value.lstrip("-").isdigit():
-                row[column] = int(value)
-            else:
-                row[column] = value
-        rows.append(row)
-    return rows
-
-
-def filter_rows(rows, column, minimum):
-    return [row for row in rows if row[column] is not None and row[column] >= minimum]
-
-
-def group_sum(rows, key_column, value_column):
-    totals = {}
+const LEDGER_REPORT_REFERENCE = String.raw`def category_report(rows, categories):
+    report = {name: {"total": 0, "count": 0, "average": 0} for name in categories.values()}
     for row in rows:
-        key = row[key_column]
-        if key is None:
+        name = row["category"]
+        if name not in report:
             continue
-        value = row[value_column]
-        if value is None:
-            value = 0
-        totals[key] = totals.get(key, 0) + value
-    return totals
+        amount = row["amount"]
+        if amount is None:
+            continue
+        report[name]["total"] += amount
+        report[name]["count"] += 1
+    for entry in report.values():
+        if entry["count"]:
+            entry["average"] = round(entry["total"] / entry["count"])
+    return report
+
+
+def rank_categories(report):
+    return sorted(report, key=lambda name: (-report[name]["total"], name))
+
+
+def unmatched_total(rows):
+    total = 0
+    for row in rows:
+        if row["category"] is None and row["amount"] is not None:
+            total += row["amount"]
+    return total
 `
 
-const TABLE_TEST = String.raw`from frame.sample import SALES_CSV
-from frame.table import filter_rows, group_sum, read_csv
+const LEDGER_TEST = String.raw`from ledger.clean import attach_category, clean_transactions
+from ledger.feed import CATEGORIES, TRANSACTIONS
+from ledger.report import category_report, rank_categories, unmatched_total
+
+
+def joined():
+    return attach_category(clean_transactions(TRANSACTIONS), CATEGORIES)
 
 
 def run_tests(record):
-    def types_each_cell():
-        rows = read_csv(SALES_CSV)
+    def types_the_feed():
+        rows = clean_transactions(TRANSACTIONS)
         assert len(rows) == 6, f"expected 6 rows, got {len(rows)}"
-        assert rows[0] == {"region": "west", "rep": "Ada", "amount": 100}, f"got {rows[0]!r}"
+        expected = {"txn_id": "t1", "category_id": "c1", "amount": 40}
+        assert rows[0] == expected, f"expected {expected!r}, got {rows[0]!r}"
+        assert rows[2]["amount"] is None, f"expected a blank amount to be None, got {rows[2]!r}"
+        assert rows[4]["category_id"] is None, f"expected a blank id to be None, got {rows[4]!r}"
 
-    def a_blank_cell_becomes_none():
-        rows = read_csv(SALES_CSV)
-        assert rows[3]["region"] is None, f"got {rows[3]!r}"
-        assert rows[4]["amount"] is None, f"got {rows[4]!r}"
+    def joins_every_row():
+        rows = joined()
+        assert len(rows) == 6, f"a left join keeps every row, expected 6, got {len(rows)}"
+        names = [row["category"] for row in rows]
+        want = ["Groceries", "Transport", "Groceries", None, None, "Transport"]
+        assert names == want, f"expected {want!r}, got {names!r}"
 
-    def filters_on_a_minimum():
-        rows = read_csv(SALES_CSV)
-        kept = [row["rep"] for row in filter_rows(rows, "amount", 100)]
-        assert kept == ["Ada", "Sam"], f"got {kept!r}"
+    def reports_per_category():
+        report = category_report(joined(), CATEGORIES)
+        want = {
+            "Groceries": {"total": 40, "count": 1, "average": 40},
+            "Transport": {"total": 40, "count": 2, "average": 20},
+            "Books": {"total": 0, "count": 0, "average": 0},
+        }
+        assert report == want, f"expected {want!r}, got {report!r}"
 
-    def totals_by_group():
-        rows = read_csv(SALES_CSV)
-        totals = group_sum(rows, "region", "amount")
-        assert totals == {"west": 150, "east": 250, "north": -25}, f"got {totals!r}"
+    def ranks_by_total():
+        order = rank_categories(category_report(joined(), CATEGORIES))
+        want = ["Groceries", "Transport", "Books"]
+        assert order == want, f"expected {want!r}, got {order!r}"
 
-    record("types each cell", types_each_cell)
-    record("a blank cell becomes None", a_blank_cell_becomes_none)
-    record("filters on a minimum", filters_on_a_minimum)
-    record("totals by group", totals_by_group)
+    def totals_the_unmatched_rows():
+        result = unmatched_total(joined())
+        assert result == 75, f"expected 75 from the two unmatched rows, got {result!r}"
+
+    record("types the feed", types_the_feed)
+    record("joins every row", joins_every_row)
+    record("reports per category", reports_per_category)
+    record("ranks by total", ranks_by_total)
+    record("totals the unmatched rows", totals_the_unmatched_rows)
 `
 
-const TABLE_TEST_HIDDEN = String.raw`from frame.table import filter_rows, group_sum, read_csv
+const LEDGER_TEST_HIDDEN = String.raw`from ledger.clean import attach_category, clean_transactions
+from ledger.report import category_report, rank_categories, unmatched_total
 
 
 def run_tests(record):
-    def a_missing_key_drops_the_row():
-        rows = [{"region": "west", "amount": 10}, {"region": None, "amount": 999}]
-        result = group_sum(rows, "region", "amount")
-        assert result == {"west": 10}, f"a None key must not become a bucket, got {result!r}"
+    def the_raw_rows_are_left_alone():
+        raw = [{"txn_id": "t1", "category_id": " c1 ", "amount": "40"}]
+        cleaned = clean_transactions(raw)
+        assert raw[0]["amount"] == "40", f"clean_transactions edited its input: {raw[0]!r}"
+        assert cleaned[0]["category_id"] == "c1", f"expected 'c1', got {cleaned[0]['category_id']!r}"
 
-    def a_missing_value_counts_as_zero():
-        rows = [{"region": "east", "amount": None}, {"region": "east", "amount": 5}]
-        result = group_sum(rows, "region", "amount")
-        assert result == {"east": 5}, f"a None value must not break the sum, got {result!r}"
+    def a_refund_stays_negative():
+        cleaned = clean_transactions([{"txn_id": "t9", "category_id": "c1", "amount": "-30"}])
+        assert cleaned[0]["amount"] == -30, f"expected -30, got {cleaned[0]['amount']!r}"
 
-    def a_minimum_nothing_meets_returns_empty():
-        rows = [{"amount": 1}, {"amount": None}]
-        assert filter_rows(rows, "amount", 100) == []
+    def an_unknown_id_becomes_no_category():
+        rows = attach_category(
+            [{"txn_id": "t1", "category_id": "c404", "amount": 10}], {"c1": "Groceries"}
+        )
+        assert rows[0]["category"] is None, f"expected None, got {rows[0]['category']!r}"
 
-    def parses_a_negative_integer():
-        rows = read_csv("region,amount\nsouth,-25\n")
-        assert rows == [{"region": "south", "amount": -25}], f"got {rows!r}"
+    def an_unmatched_row_never_becomes_a_bucket():
+        rows = [{"category": None, "amount": 500}, {"category": "Books", "amount": 20}]
+        report = category_report(rows, {"c3": "Books"})
+        want = {"Books": {"total": 20, "count": 1, "average": 20}}
+        assert report == want, f"an unmatched row must not add a bucket, expected {want!r}, got {report!r}"
 
-    record("a missing key drops the row", a_missing_key_drops_the_row)
-    record("a missing value counts as zero", a_missing_value_counts_as_zero)
-    record("a minimum nothing meets returns empty", a_minimum_nothing_meets_returns_empty)
-    record("parses a negative integer", parses_a_negative_integer)
+    def an_empty_category_still_reports():
+        report = category_report([], {"c3": "Books"})
+        want = {"Books": {"total": 0, "count": 0, "average": 0}}
+        assert report == want, f"expected {want!r}, got {report!r}"
+
+    def a_missing_amount_does_not_move_the_average():
+        rows = [
+            {"category": "Books", "amount": 10},
+            {"category": "Books", "amount": None},
+            {"category": "Books", "amount": 20},
+        ]
+        entry = category_report(rows, {"c3": "Books"})["Books"]
+        want = {"total": 30, "count": 2, "average": 15}
+        assert entry == want, f"a missing amount is not a zero, expected {want!r}, got {entry!r}"
+
+    def a_tie_is_broken_alphabetically():
+        report = {
+            "Transport": {"total": 40, "count": 1, "average": 40},
+            "Groceries": {"total": 40, "count": 1, "average": 40},
+            "Books": {"total": 90, "count": 1, "average": 90},
+        }
+        order = rank_categories(report)
+        want = ["Books", "Groceries", "Transport"]
+        assert order == want, f"expected {want!r}, got {order!r}"
+
+    def a_missing_amount_counts_as_zero_when_unmatched():
+        rows = [{"category": None, "amount": None}, {"category": None, "amount": 7}]
+        result = unmatched_total(rows)
+        assert result == 7, f"expected 7, got {result!r}"
+
+    record("the raw rows are left alone", the_raw_rows_are_left_alone)
+    record("a refund stays negative", a_refund_stays_negative)
+    record("an unknown id becomes no category", an_unknown_id_becomes_no_category)
+    record("an unmatched row never becomes a bucket", an_unmatched_row_never_becomes_a_bucket)
+    record("an empty category still reports", an_empty_category_still_reports)
+    record("a missing amount does not move the average", a_missing_amount_does_not_move_the_average)
+    record("a tie is broken alphabetically", a_tie_is_broken_alphabetically)
+    record("a missing amount counts as zero when unmatched", a_missing_amount_counts_as_zero_when_unmatched)
 `
 
 export const pandasDataframesLesson: PythonLesson = {
   id: "py-l3-pandas-dataframes",
   title: "pandas: DataFrames, filtering & groupby",
   summary: "Load a CSV, select and filter rows, total by group, and survive missing values.",
-  estimatedMinutes: 20,
+  estimatedMinutes: 25,
   difficulty: "medium",
   skills: ["csv", "data-modeling", "filtering", "dicts"],
   teach: {
@@ -419,40 +522,51 @@ Treat a whitespace-only cell as blank.`,
   practice: {
     id: "py-l3-pandas-dataframes-practice",
     executionMode: "workspace",
-    prompt: `The weekly sales export arrives as CSV text in an API response rather than a file on disk, and
-two cells came through blank. Implement the three helpers in \`frame/table.py\`: \`read_csv\` (typed row
-dicts, blanks becoming \`None\`), \`filter_rows\` (a boolean-mask filter that a missing value never
-passes), and \`group_sum\` (totals per key, dropping rows whose key is missing and counting a missing
-value as zero). The README spells out each rule. Some tests are hidden.`,
+    prompt: `Repair the monthly spend-by-category report. Finance says the totals are short, one
+category has vanished from the output, and an average looks too low.
+
+The transaction feed and the category reference table come from two different systems, so some
+transactions carry a category id that the reference table does not have, and a voided sale arrives
+with a blank amount. Implement the two cleaning helpers in \`ledger/clean.py\` and the three
+reporting helpers in \`ledger/report.py\`. The README states what each one owes its caller,
+including what happens to a category nothing was spent in and to a row that matched nothing.
+Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "`csv.DictReader(io.StringIO(text.strip()))` yields one dict of raw strings per row, keyed by the header.",
-      "Type each cell in order: blank first (`None`), then integer-looking (`int(value)`), then the trimmed string.",
-      "In `group_sum`, `continue` past a row whose key is `None`, and accumulate with `totals.get(key, 0) + value`.",
+      "Two rows never match the reference table, and one row has no amount. Decide what each of those is worth before you write the totals loop, because they are not worth the same thing.",
+      "Build the report dict from `categories.values()` first, so a category with no transactions is already present with zeros, then walk the rows and add to the buckets that exist.",
+      'A missing amount must skip both `total` and `count`, or the average is computed over a row that never happened. For ties, `sorted(report, key=lambda name: (-report[name]["total"], name))` sorts on total descending and name ascending in one pass.',
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "frame/table.py",
-      editableFilePaths: ["frame/table.py"],
-      visibleTestPaths: ["tests/test_table.py"],
-      hiddenTestPaths: ["tests/test_table_hidden.py"],
+      primaryFilePath: "ledger/clean.py",
+      editableFilePaths: ["ledger/clean.py", "ledger/report.py"],
+      visibleTestPaths: ["tests/test_ledger.py"],
+      hiddenTestPaths: ["tests/test_ledger_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
-        { path: "README.md", role: "docs", language: "markdown", content: TABLE_README },
-        { path: "frame/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        { path: "README.md", role: "docs", language: "markdown", content: LEDGER_README },
+        { path: "ledger/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "frame/sample.py",
+          path: "ledger/feed.py",
           role: "readonly",
           language: "python",
-          content: TABLE_SAMPLE,
-          description: "The weekly export, as CSV text (read-only)",
+          content: LEDGER_FEED,
+          description: "The transaction feed and the category reference table (read-only)",
         },
         {
-          path: "frame/table.py",
+          path: "ledger/clean.py",
           role: "editable",
           language: "python",
-          content: TABLE_STARTER,
-          description: "Implement the three helpers here",
+          content: LEDGER_CLEAN_STARTER,
+          description: "Type the rows and join them to their categories",
+        },
+        {
+          path: "ledger/report.py",
+          role: "editable",
+          language: "python",
+          content: LEDGER_REPORT_STARTER,
+          description: "Summarise, rank, and account for the unmatched rows",
         },
         {
           path: "tests/__init__.py",
@@ -462,17 +576,17 @@ value as zero). The README spells out each rule. Some tests are hidden.`,
           hidden: true,
         },
         {
-          path: "tests/test_table.py",
+          path: "tests/test_ledger.py",
           role: "test",
           language: "python",
-          content: TABLE_TEST,
-          description: "Visible table tests",
+          content: LEDGER_TEST,
+          description: "Visible ledger tests",
         },
         {
-          path: "tests/test_table_hidden.py",
+          path: "tests/test_ledger_hidden.py",
           role: "test",
           language: "python",
-          content: TABLE_TEST_HIDDEN,
+          content: LEDGER_TEST_HIDDEN,
           hidden: true,
           description: "Hidden edge-case tests",
         },
@@ -481,8 +595,8 @@ value as zero). The README spells out each rule. Some tests are hidden.`,
           role: "test",
           language: "python",
           content: buildRunner([
-            { module: "test_table", label: "visible table" },
-            { module: "test_table_hidden", label: "hidden table" },
+            { module: "test_ledger", label: "visible ledger" },
+            { module: "test_ledger_hidden", label: "hidden ledger" },
           ]),
           hidden: true,
           description: "Workspace test runner",
@@ -490,10 +604,16 @@ value as zero). The README spells out each rule. Some tests are hidden.`,
       ],
       referenceFiles: [
         {
-          path: "frame/table.py",
+          path: "ledger/clean.py",
           role: "editable",
           language: "python",
-          content: TABLE_REFERENCE,
+          content: LEDGER_CLEAN_REFERENCE,
+        },
+        {
+          path: "ledger/report.py",
+          role: "editable",
+          language: "python",
+          content: LEDGER_REPORT_REFERENCE,
         },
       ],
     },
