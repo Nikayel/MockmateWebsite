@@ -3064,11 +3064,13 @@ Python hides iteration behind operators and methods that look like single steps.
 **Membership in a list.**
 
 \`\`\`python
-seen = []
-for n in nums:
-    if n in seen:        # scans every element of seen
-        return True
-    seen.append(n)
+def has_duplicate(nums):
+    seen = []
+    for n in nums:
+        if n in seen:        # scans every element of seen
+            return True
+        seen.append(n)
+    return False
 \`\`\`
 
 \`n in seen\` is a loop wearing a keyword. Inside another loop it is quadratic. \`n in some_set\` and \`key in some_dict\` are not, which is why the fix is usually a one-word change.
@@ -3107,7 +3109,7 @@ Correct, and it repeats identical work per iteration. Hoisting it above the loop
   "type": "check",
   "kind": "predict",
   "id": "membership-in-list",
-  "prompt": "A generated has_duplicate keeps a list called seen and tests if n in seen inside its loop. What is its cost on a list of n distinct values, and what is the smallest fix?",
+  "prompt": "The has_duplicate above keeps a list called seen and tests if n in seen inside its loop. What is its cost on a list of n distinct values, and what is the smallest fix?",
   "options": [
     {
       "label": "Linear, and no fix is needed, because the loop runs once per element",
@@ -3434,6 +3436,8 @@ answer = client.complete(prompt)     # one network call: slow, metered, failure-
 
 A line like that in the middle of a request handler, with nothing around it, is the same defect as an unwrapped call to a payment provider. It happens to be written by the person most excited about the feature, which is why it so often ships.
 
+One piece of background makes the damage visible. A web server does not start a fresh process per visitor. It keeps a fixed pool of **workers**, and one in-flight request holds one worker from that pool for as long as it runs, including the time it spends waiting on somebody else's server. Requests that arrive when every worker is busy wait in a queue. So the number of requests your service can have in flight at once is a number chosen in a config file, and a slow dependency spends it.
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -3514,7 +3518,7 @@ def call_with_retry(client, prompt, attempts=3):
     {
       "label": "A 400 saying the request exceeds the context limit",
       "bucket": "Do not retry",
-      "feedback": "The request is too big and will still be too big next time. This needs shorter input, not another attempt."
+      "feedback": "The context limit is the ceiling on how much text one request may carry, prompt and answer together. The request is over it and will still be over it next time, so this needs shorter input, not another attempt."
     }
   ]
 }
@@ -3524,7 +3528,7 @@ def call_with_retry(client, prompt, attempts=3):
 
 A retry sends the same request again, which is fine when the call only reads. It is not fine when the call causes something.
 
-If the model call is one step in a flow that also charges a card, sends an email, or writes a row, ask what happens when step three fails after step two succeeded. The answer is usually that the retry must not repeat step two, which means the write needs an idempotency key or the retry has to be scoped to just the model call. This is the same reasoning you would apply to any external write, and generated code almost never includes it, because nothing in the prompt mentioned it.
+If the model call is one step in a flow that also charges a card, sends an email, or writes a row, ask what happens when step three fails after step two succeeded. The answer is usually that the retry must not repeat step two, which means the write needs an idempotency key or the retry has to be scoped to just the model call. An idempotency key is an id you generate for the attempt and send with the write, so the receiver recognises a repeat and performs the work once. Note it is a different thing from the idempotence property you asserted earlier: that was a claim about a function, this is a token you pass to a service to make one become true. This is the same reasoning you would apply to any external write, and generated code almost never includes it, because nothing in the prompt mentioned it.
 
 \`\`\`cswidget
 {
@@ -3893,7 +3897,7 @@ def parse_review(raw):
 
 Every line is answering a question you would otherwise be answering at 3am.
 
-**Locate the object.** Take everything from the first \`{\` to the last \`}\`. Crude, and it handles the overwhelmingly common case of an object wrapped in friendly prose or a code fence.
+**Locate the object.** Take everything from the first \`{\` to the last \`}\`. Crude, and it handles the overwhelmingly common case of an object wrapped in friendly prose, or in a code fence, the pair of triple-backtick lines a model puts around anything it thinks of as code.
 
 **Parse defensively.** \`json.loads\` raises on bad input, so the \`try\` is how failure becomes a return value instead of an escape.
 
