@@ -328,10 +328,14 @@ function UpgradePageContent() {
 
           {/* Trust line. The third clause used to read "Used by engineers at
               Google, Meta, Amazon", an unsubstantiated endorsement on the checkout
-              path. The two guarantees are real; the claim was not. */}
+              path. The two guarantees are real; the claim was not. The middle
+              clause tracks the billing period: yearly is a one-time charge with
+              no subscription, so "cancel anytime" is monthly-only truth. */}
           {!isProUser && (
             <p className="text-muted-foreground text-center text-xs">
-              30-day money-back guarantee · Cancel anytime · No card required to start
+              30-day money-back guarantee ·{" "}
+              {billingPeriod === "monthly" ? "Cancel anytime" : "One payment, never auto-renews"} ·
+              No card required to start
             </p>
           )}
 

@@ -186,7 +186,8 @@ export function PricingPageClient({ faqs, children }: PricingPageClientProps) {
                 </Button>
 
                 <p className="text-muted-foreground mb-2 text-xs">
-                  Try before you commit. Includes free Python, SQL, and System Design courses.
+                  Try before you commit. Includes free Python, Data Engineering, and System Design
+                  courses.
                 </p>
 
                 <ul className="text-muted-foreground space-y-1.5 text-sm">
@@ -253,9 +254,14 @@ export function PricingPageClient({ faqs, children }: PricingPageClientProps) {
             {/* Trust line. The third clause used to read "Used by Palantir & FAANG
               candidates", an unsubstantiated usage claim sitting directly above a
               purchase button. The two guarantees are real and verifiable, so the
-              line keeps those and drops the claim until there are users to cite. */}
+              line keeps those and drops the claim until there are users to cite.
+              The middle clause tracks the billing period: yearly is a one-time
+              charge with no subscription, so "cancel anytime" is monthly-only
+              truth. */}
             <p className="text-muted-foreground mb-8 text-center text-xs">
-              30-day money-back guarantee · Cancel anytime · No card required to start
+              30-day money-back guarantee ·{" "}
+              {billingPeriod === "monthly" ? "Cancel anytime" : "One payment, never auto-renews"} ·
+              No card required to start
             </p>
           </div>
         </section>

@@ -16,13 +16,17 @@ const { monthly, yearly } = PRICING_CONFIG.pro.website
 // FAQ data - defined server-side for SEO
 const faqs = [
   {
+    // Monthly and yearly have different mechanics: monthly is a Stripe
+    // subscription, yearly is a single one-time charge for 12 months (see
+    // app/api/create-checkout mode selection). "Cancel anytime" must not be
+    // promised for a plan that has no subscription to cancel.
     question: "Can I cancel anytime?",
     answer:
-      "Yes, you can cancel your subscription at any time. You'll continue to have access to Pro features until the end of your billing period. No questions asked.",
+      "Monthly Pro is a subscription you can cancel at any time, and you keep access until the end of the billing period. Yearly Pro is a single one-time payment for 12 months of access: it never auto-renews, so there is nothing to cancel. The 30-day money-back guarantee applies to both.",
   },
   {
     question: "Is there a free trial?",
-    answer: `The free plan gives you 20+ problems with unlimited practice and ${PRICING_CONFIG.free.sessionsPerMonth} full interview sessions per month. Full AI feedback included, plus free Python, SQL, and System Design courses to build your fundamentals. No credit card required.`,
+    answer: `The free plan gives you 20+ problems with unlimited practice and ${PRICING_CONFIG.free.sessionsPerMonth} full interview sessions per month. Full AI feedback included, plus free Python, Data Engineering, and System Design courses to build your fundamentals, none of which use interview sessions. No credit card required.`,
   },
   {
     question: "How does billing work?",
