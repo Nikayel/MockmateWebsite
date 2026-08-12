@@ -130,7 +130,7 @@ export const sqliteParameterizedLesson: PythonLesson = {
 
 The SQL course on this platform teaches the query language: \`SELECT\`, joins, aggregation, window functions. This lesson teaches the other half, the part that lives in your Python file. Writing a correct query is not enough if the code around it splices user input into the statement, forgets to commit, or hands the rest of the program a tuple when it expected a record.
 
-\`sqlite3\` is in the standard library, so there is nothing to install. Every driver you will meet later (\`psycopg\` for Postgres, \`mysqlclient\`, \`pyodbc\`) follows the same DB-API shape, so the four moves below transfer unchanged.
+\`sqlite3\` is in the standard library, so there is nothing to install. Every driver you will meet later (\`psycopg\` for Postgres, \`mysqlclient\`, \`pyodbc\`) follows the same DB-API shape (DB-API is the standard database interface every Python driver implements, PEP 249), so the four moves below transfer unchanged.
 
 ### Connect, execute, fetch
 
@@ -170,6 +170,25 @@ The connection is the session, the cursor is the thing that runs a statement and
   ]
 }
 \`\`\`
+
+### Turning rows into dicts
+
+A tuple ties the rest of your program to the column order in one \`SELECT\`. Give the values their names at the boundary instead. The names are on the cursor: \`cur.description\` is one entry per column, and the first item of each entry is the column name.
+
+\`\`\`python
+cur.execute("SELECT id, name FROM users")
+columns = [col[0] for col in cur.description]     # ['id', 'name']
+rows = [dict(zip(columns, row)) for row in cur.fetchall()]
+# [{'id': 1, 'name': 'Ada'}, {'id': 2, 'name': 'Sam'}]
+\`\`\`
+
+\`zip\` pairs each column name with the value in the same position, and \`dict\` makes a record out of the pairs. The driver can also do it for you: set a **row factory**, a function the connection calls for every row, and \`fetchall\` returns those instead of tuples.
+
+\`\`\`python
+conn.row_factory = sqlite3.Row      # rows support row["name"] and index access
+\`\`\`
+
+Either way the rule is the same: convert once, where the query runs, so nothing downstream has to know what order the columns came back in.
 
 ### Never build the query text out of values
 
