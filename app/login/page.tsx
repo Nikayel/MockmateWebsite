@@ -534,7 +534,7 @@ function LoginPageContent() {
               </h1>
               <p className="text-muted-foreground text-sm">
                 {isTrialUsed
-                  ? "Create a free account to keep your score and continue practicing."
+                  ? "Create a free account to keep your score: 8 full AI sessions a month, no card required."
                   : "Sign in to sit your next round."}
               </p>
             </motion.div>
