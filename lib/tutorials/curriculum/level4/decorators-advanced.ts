@@ -433,7 +433,7 @@ export const decoratorsAdvancedLesson: PythonLesson = {
     estimatedMinutes: 6,
     markdown: `## Decorators that take arguments
 
-Real decorators almost always need configuration. \`@retry(times=3)\`, \`@lru_cache(maxsize=128)\`, and Flask's \`@app.route("/users")\` all take arguments, because you cannot hardcode a retry count or a route into the decorator itself. A decorator that accepts arguments is called a decorator factory, and it is the pattern you reach for whenever the behavior you are adding needs to be tuned per function.
+Real decorators almost always need configuration. \`@retry(times=3)\`, \`@lru_cache(maxsize=128)\` (which remembers the last 128 results so a repeated call skips the work), and Flask's \`@app.route("/users")\` all take arguments, because you cannot hardcode a retry count or a route into the decorator itself. A decorator that accepts arguments is called a decorator factory, and it is the pattern you reach for whenever the behavior you are adding needs to be tuned per function.
 
 ### The three-layer model
 
