@@ -6,17 +6,19 @@ const CFG_README = `# Postmortem: the startup log printed a database password
 The billing service logs one \`app.startup\` record on boot. Last week that record was shipped to the
 log aggregator with a live database password inside it, because the redactor only looked at the top
 level of the config and the password sits one level down, inside the parsed \`database\` value. The
-same review found that nobody can say which config layer a value came from.
+same review found a second gap: when an operator asks why \`port\` is 9200, nobody can say which
+config layer that value came from. Both findings are yours to close.
 
 Two files are yours. \`service/spec.py\` and \`service/errors.py\` are read-only.
 
 ## \`service/config.py\`
 
 \`\`\`python
-load_settings(file_values, env, overrides=None)
+load_settings(file_values, env, overrides=None)     # the values
+settings_sources(file_values, env, overrides=None)  # where each value came from
 \`\`\`
 
-Returns one settings dict built from four layers. Later layers win:
+\`load_settings\` returns one settings dict built from four layers. Later layers win:
 
 1. \`DEFAULTS\` from \`spec.py\`
 2. \`file_values\`, keyed by field name (\`"port"\`, \`"database"\`, ...)
@@ -31,11 +33,26 @@ Rules that hold for every layer:
 - String values are coerced to the type \`FIELD_TYPES\` names: \`"int"\`, \`"bool"\`
   (\`true\`/\`1\`/\`yes\` and \`false\`/\`0\`/\`no\`, any case), \`"json"\`, or \`"str"\`. A value that is already
   a non-string is taken as-is, since an override can pass a real \`int\`.
+- The three parsed types tolerate surrounding whitespace, so \`" 90 "\` is \`90\`. A \`"str"\` field is
+  the value the operator wrote, whitespace included: \`region=" eu "\` stays \`" eu "\`. Trimming a
+  string field would quietly change a value nobody asked you to change.
 - A string that will not coerce raises \`ConfigError\` (from \`service/errors.py\`) whose message
   contains the **field name**, so an operator reading the crash knows which variable to fix.
 
 \`\`\`python
 load_settings({"port": "9000"}, {"APP_PORT": "9100"}, {"port": 9200})["port"]  # 9200
+\`\`\`
+
+\`settings_sources\` answers the postmortem's second finding. It takes the same three arguments and
+returns a dict mapping every field in the settings to the name of the layer whose value won, drawn
+from \`LAYER_NAMES\` in \`spec.py\`: \`"defaults"\`, \`"file"\`, \`"env"\`, or \`"override"\`. It applies
+the same skip rules as \`load_settings\` (unknown keys, the wrong env prefix, and blank env values
+never win a field), and it reports attribution rather than validating, so it does not coerce and
+does not raise \`ConfigError\`.
+
+\`\`\`python
+settings_sources({"port": "9000"}, {"APP_PORT": "9100"}, {"port": 9200})["port"]   # "override"
+settings_sources({}, {})["region"]                                                # "defaults"
 \`\`\`
 
 ## \`service/log_record.py\`
@@ -50,11 +67,18 @@ build_startup_record(file_values, env, overrides=None)
 any depth. \`build_startup_record\` returns:
 
 \`\`\`python
-{"event": "app.startup", "config": <the redacted settings>, "secrets_present": [<field names>]}
+{
+    "event": "app.startup",
+    "config": <the redacted settings>,
+    "secrets_present": [<field names>],
+    "sources": <the settings_sources map>,
+}
 \`\`\`
 
 \`secrets_present\` is the sorted list of secret-named fields that are set, so an on-call engineer can
-tell a key was configured without ever seeing it.
+tell a key was configured without ever seeing it. \`sources\` names the winning layer per field, so
+the next incident can answer "where did this value come from" from the log alone. Layer names are
+safe to log; they are not values.
 
 Some tests are hidden. One of them serializes the whole record to JSON and asserts that no secret
 value appears anywhere in the text.
@@ -76,6 +100,9 @@ DEFAULTS = {"port": 8000, "max_retries": 3, "debug": False, "region": "us-east-1
 
 ENV_PREFIX = "APP_"
 
+# The layer names settings_sources reports, weakest first.
+LAYER_NAMES = ("defaults", "file", "env", "override")
+
 SECRET_HINTS = ("token", "secret", "password", "api_key", "apikey")
 
 REDACTED = "[redacted]"
@@ -88,7 +115,7 @@ const CFG_ERRORS = String.raw`class ConfigError(ValueError):
 const CFG_CONFIG_STARTER = String.raw`import json
 
 from service.errors import ConfigError
-from service.spec import DEFAULTS, ENV_PREFIX, FIELD_TYPES
+from service.spec import DEFAULTS, ENV_PREFIX, FIELD_TYPES, LAYER_NAMES
 
 
 def coerce_value(field, value):
@@ -101,12 +128,19 @@ def load_settings(file_values, env, overrides=None):
     """Merge the defaults, file, env, and override layers (see README.md)."""
     # TODO: apply the four layers in precedence order, skipping keys the spec does not name.
     return dict(DEFAULTS)
+
+
+def settings_sources(file_values, env, overrides=None):
+    """Report which layer each field's winning value came from (see README.md)."""
+    # TODO: walk the same layers in the same order under the same skip rules, but record
+    # the layer name instead of the value.
+    return {field: LAYER_NAMES[0] for field in DEFAULTS}
 `
 
 const CFG_CONFIG_REFERENCE = String.raw`import json
 
 from service.errors import ConfigError
-from service.spec import DEFAULTS, ENV_PREFIX, FIELD_TYPES
+from service.spec import DEFAULTS, ENV_PREFIX, FIELD_TYPES, LAYER_NAMES
 
 TRUE_WORDS = ("true", "1", "yes")
 FALSE_WORDS = ("false", "0", "no")
@@ -134,19 +168,17 @@ def coerce_value(field, value):
             return json.loads(text)
         except ValueError:
             raise ConfigError(f"{field}: expected JSON, got {value!r}")
+    # A "str" field is left exactly as the operator wrote it, whitespace included.
     return value
 
 
-def _apply(settings, values):
-    for field, value in values.items():
-        if field in FIELD_TYPES:
-            settings[field] = coerce_value(field, value)
+def _declared(values):
+    return {field: value for field, value in (values or {}).items() if field in FIELD_TYPES}
 
 
-def load_settings(file_values, env, overrides=None):
-    settings = dict(DEFAULTS)
-    _apply(settings, file_values)
-    for name, value in env.items():
+def _from_env(env):
+    values = {}
+    for name, value in (env or {}).items():
         if not name.startswith(ENV_PREFIX):
             continue
         field = name[len(ENV_PREFIX):].lower()
@@ -154,12 +186,36 @@ def load_settings(file_values, env, overrides=None):
             continue
         if isinstance(value, str) and value.strip() == "":
             continue
-        settings[field] = coerce_value(field, value)
-    _apply(settings, overrides or {})
+        values[field] = value
+    return values
+
+
+def _layers(file_values, env, overrides):
+    """The three layers above the defaults, weakest first, with skipped keys already dropped.
+
+    Both public functions walk this, so the layering rules live in exactly one place.
+    """
+    filtered = (_declared(file_values), _from_env(env), _declared(overrides))
+    return list(zip(LAYER_NAMES[1:], filtered))
+
+
+def load_settings(file_values, env, overrides=None):
+    settings = dict(DEFAULTS)
+    for _, values in _layers(file_values, env, overrides):
+        for field, value in values.items():
+            settings[field] = coerce_value(field, value)
     return settings
+
+
+def settings_sources(file_values, env, overrides=None):
+    sources = {field: LAYER_NAMES[0] for field in DEFAULTS}
+    for layer, values in _layers(file_values, env, overrides):
+        for field in values:
+            sources[field] = layer
+    return sources
 `
 
-const CFG_LOG_STARTER = String.raw`from service.config import load_settings
+const CFG_LOG_STARTER = String.raw`from service.config import load_settings, settings_sources
 from service.spec import REDACTED, SECRET_HINTS
 
 
@@ -177,11 +233,12 @@ def redact_record(value):
 
 def build_startup_record(file_values, env, overrides=None):
     """Build the app.startup log record (see README.md)."""
-    # TODO: load the settings, redact them, and list which secret fields are set.
-    return {"event": "app.startup", "config": {}, "secrets_present": []}
+    # TODO: load the settings, redact them, list which secret fields are set, and attach
+    # the per-field layer attribution.
+    return {"event": "app.startup", "config": {}, "secrets_present": [], "sources": {}}
 `
 
-const CFG_LOG_REFERENCE = String.raw`from service.config import load_settings
+const CFG_LOG_REFERENCE = String.raw`from service.config import load_settings, settings_sources
 from service.spec import REDACTED, SECRET_HINTS
 
 
@@ -207,10 +264,11 @@ def build_startup_record(file_values, env, overrides=None):
         "event": "app.startup",
         "config": redact_record(settings),
         "secrets_present": sorted(field for field in settings if is_secret_key(field)),
+        "sources": settings_sources(file_values, env, overrides),
     }
 `
 
-const CFG_TEST_CONFIG = String.raw`from service.config import load_settings
+const CFG_TEST_CONFIG = String.raw`from service.config import load_settings, settings_sources
 from service.errors import ConfigError
 
 
@@ -244,9 +302,24 @@ def run_tests(record):
         else:
             raise AssertionError("expected ConfigError for APP_PORT='eight thousand', got no error")
 
+    def sources_name_the_winning_layer():
+        sources = settings_sources(
+            {"port": "9000", "region": "eu-west-1"},
+            {"APP_PORT": "9100", "APP_MAX_RETRIES": "5"},
+            {"port": 9200},
+        )
+        expected = {
+            "port": "override",
+            "max_retries": "env",
+            "region": "file",
+            "debug": "defaults",
+        }
+        assert sources == expected, f"expected {expected}, got {sources!r}"
+
     record("later layers win", later_layers_win)
     record("coerces each declared type", coerces_each_declared_type)
     record("a bad integer names the field", bad_integer_names_the_field)
+    record("sources name the winning layer", sources_name_the_winning_layer)
 `
 
 const CFG_TEST_LOG = String.raw`from service.log_record import build_startup_record, is_secret_key, redact_record
@@ -282,7 +355,7 @@ def run_tests(record):
 
 const CFG_TEST_HIDDEN = String.raw`import json
 
-from service.config import load_settings
+from service.config import load_settings, settings_sources
 from service.errors import ConfigError
 from service.log_record import build_startup_record, redact_record
 
@@ -336,7 +409,41 @@ def run_tests(record):
             assert leaked not in dumped, f"{leaked!r} reached the log record: {dumped}"
         assert "db1" in dumped, f"expected the non-secret host to survive, got {dumped}"
 
+    def only_parsed_types_tolerate_whitespace():
+        settings = load_settings({"port": " 90 ", "region": " eu "}, {})
+        assert settings["port"] == 90, f"expected port 90 from ' 90 ', got {settings['port']!r}"
+        assert settings["region"] == " eu ", (
+            f"expected a str field to keep the value as written, got {settings['region']!r}"
+        )
+
+    def a_skipped_layer_never_wins_a_source():
+        sources = settings_sources(
+            {"port": "7000", "colour": "red"},
+            {"APP_PORT": "   ", "PORT": "1", "APP_TIMEOUT": "9"},
+        )
+        assert sources["port"] == "file", (
+            f"expected 'file' to win port when the env value is blank, got {sources['port']!r}"
+        )
+        assert "colour" not in sources and "timeout" not in sources, (
+            f"expected keys the spec does not name to be absent, got {sources!r}"
+        )
+
+    def the_startup_record_carries_its_attribution():
+        result = build_startup_record({"port": "9000"}, {"APP_REGION": "eu-west-1"})
+        assert result["sources"]["port"] == "file", (
+            f"expected port attributed to 'file', got {result['sources']!r}"
+        )
+        assert result["sources"]["region"] == "env", (
+            f"expected region attributed to 'env', got {result['sources']!r}"
+        )
+        assert result["sources"]["max_retries"] == "defaults", (
+            f"expected max_retries attributed to 'defaults', got {result['sources']!r}"
+        )
+
     record("a blank env value is not set", blank_env_value_is_not_set)
+    record("only the parsed types tolerate whitespace", only_parsed_types_tolerate_whitespace)
+    record("a skipped layer never wins a source", a_skipped_layer_never_wins_a_source)
+    record("the startup record carries its attribution", the_startup_record_carries_its_attribution)
     record("unknown keys are ignored", unknown_keys_are_ignored)
     record("bad JSON and bad bool name their fields", bad_json_and_bad_bool_name_their_fields)
     record("redaction reaches into lists", redaction_reaches_into_lists)
@@ -347,7 +454,7 @@ export const configLoggingLesson: PythonLesson = {
   id: "py-l4-config-logging",
   title: "Configuration, secrets & structured logging",
   summary: "Load typed config from the environment, keep secrets safe, and log structured records.",
-  estimatedMinutes: 20,
+  estimatedMinutes: 55,
   difficulty: "hard",
   skills: ["configuration", "secrets", "structured-logging", "twelve-factor"],
   teach: {
@@ -563,24 +670,26 @@ print(load_config({"PORT": "9000", "DEBUG": "true", "SECRET": "x"}))`,
 went out with a live database password in it, and nobody could say which config layer any value came
 from.
 
-In \`service/config.py\`, implement \`coerce_value(field, value)\` and
-\`load_settings(file_values, env, overrides=None)\`. The settings come from four layers, later ones
-winning: the spec's \`DEFAULTS\`, then \`file_values\`, then \`env\` (keyed by \`ENV_PREFIX\` plus the
-upper-cased field name), then \`overrides\`. Keys the spec does not name are ignored, an env value that
-is blank or whitespace counts as not set, and a string that will not coerce to its declared type
-raises \`ConfigError\` with the field name in the message.
+In \`service/config.py\`, implement \`coerce_value(field, value)\`,
+\`load_settings(file_values, env, overrides=None)\` and \`settings_sources(...)\`. The settings come
+from four layers, later ones winning: the spec's \`DEFAULTS\`, then \`file_values\`, then \`env\`
+(keyed by \`ENV_PREFIX\` plus the upper-cased field name), then \`overrides\`. Keys the spec does not
+name are ignored, an env value that is blank or whitespace counts as not set, and a string that will
+not coerce to its declared type raises \`ConfigError\` with the field name in the message.
+\`settings_sources\` walks the same layers under the same rules and reports which one won each
+field, by the names in \`LAYER_NAMES\`.
 
 In \`service/log_record.py\`, implement \`is_secret_key\`, \`redact_record\`, and
-\`build_startup_record\`. The record is
-\`{"event": "app.startup", "config": <redacted settings>, "secrets_present": <sorted field names>}\`.
-No secret value may appear anywhere in it, at any depth.
+\`build_startup_record\`. The record is \`{"event": "app.startup", "config": <redacted settings>,
+"secrets_present": <sorted field names>, "sources": <the layer per field>}\`. No secret value may
+appear anywhere in it, at any depth.
 
 \`README.md\` has the full contract. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "Each layer is the same merge step with a different key shape, so the env layer is the only one that has to translate a name and skip blanks.",
-      "Coercion belongs in one function keyed off `FIELD_TYPES[field]`, and it returns a non-string value untouched so a typed override passes straight through. Every failure path raises `ConfigError` with an f-string that starts with the field name.",
-      "Redaction has to recurse: for a dict, replace the value when `is_secret_key(key)` and otherwise call `redact_record` on it; for a list, map over the items; for anything else return the value. `field = name[len(ENV_PREFIX):].lower()` is the env translation.",
+      "Each layer is the same merge step with a different key shape, so the env layer is the only one that has to translate a name and skip blanks. `load_settings` and `settings_sources` apply the identical rules and differ only in what they record, which is worth noticing before you write the second one.",
+      "Coercion belongs in one function keyed off `FIELD_TYPES[field]`, and it returns a non-string value untouched so a typed override passes straight through. Every failure path raises `ConfigError` with an f-string that starts with the field name. If you reduce each layer to a plain field-to-value dict first, the two public functions become the same loop over the same list.",
+      "Redaction is recursive over three cases: a dict (replace the value when `is_secret_key(key)`, otherwise recurse into it), a list (recurse over the items), and anything else (return it). Slicing the prefix off an env name with `len(ENV_PREFIX)` and lowering the rest is the env translation. `settings_sources` starts every `DEFAULTS` field at the weakest layer name and lets later layers overwrite it.",
     ],
     workspace: {
       language: "python",

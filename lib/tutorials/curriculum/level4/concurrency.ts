@@ -245,11 +245,12 @@ def run_tests(record):
 
     def transient_failure_is_retried_once():
         error = TransientError("timed out reading /a")
-        assert policy.should_retry(error, 1) is True, (
-            f"expected True on attempt 1, got {policy.should_retry(error, 1)!r}"
+        assert policy.should_retry(error, 1), (
+            f"expected a transient failure on attempt 1 to be worth retrying, got "
+            f"{policy.should_retry(error, 1)!r}"
         )
-        assert policy.should_retry(error, policy.MAX_ATTEMPTS) is False, (
-            "expected False once MAX_ATTEMPTS attempts are used, got "
+        assert not policy.should_retry(error, policy.MAX_ATTEMPTS), (
+            "expected no retry once MAX_ATTEMPTS attempts are used, got "
             f"{policy.should_retry(error, policy.MAX_ATTEMPTS)!r}"
         )
 
@@ -284,8 +285,9 @@ def run_tests(record):
 
     def permanent_failure_is_never_retried():
         error = PermanentError("no such path: /missing")
-        assert policy.should_retry(error, 1) is False, (
-            f"expected False for a permanent failure, got {policy.should_retry(error, 1)!r}"
+        assert not policy.should_retry(error, 1), (
+            f"expected a permanent failure never to be retried, got "
+            f"{policy.should_retry(error, 1)!r}"
         )
 
     def exhausted_transient_is_recorded_as_zero():
@@ -308,10 +310,11 @@ def run_tests(record):
             f"expected ['/flaky-2', '/flaky-1'] in input order, got {result['retried']!r}"
         )
 
-    def every_url_is_fetched_once_when_nothing_fails():
+    def each_entry_is_fetched_exactly_once_when_nothing_fails():
         sweep(["/a", "/b", "/a"])
         assert fetch_module.call_count("/a") == 2, (
-            f"expected /a fetched twice for two entries, got {fetch_module.call_count('/a')}"
+            f"expected one fetch per entry, so 2 for the two '/a' entries, got "
+            f"{fetch_module.call_count('/a')}"
         )
 
     record("a permanent failure reaches the caller", permanent_failure_reaches_the_caller)
@@ -319,14 +322,17 @@ def run_tests(record):
     record("an exhausted transient failure records zero", exhausted_transient_is_recorded_as_zero)
     record("one dead url does not sink the batch", a_url_that_never_succeeds_does_not_sink_the_batch)
     record("two flaky urls keep their places", two_flaky_urls_keep_their_places)
-    record("no url is fetched more than it needs", every_url_is_fetched_once_when_nothing_fails)
+    record(
+        "each entry is fetched exactly once when nothing fails",
+        each_entry_is_fetched_exactly_once_when_nothing_fails,
+    )
 `
 
 export const concurrencyLesson: PythonLesson = {
   id: "py-l4-concurrency",
   title: "Threads, the GIL & concurrent.futures",
   summary: "Choose a concurrency model and parallelize a batch with a thread pool.",
-  estimatedMinutes: 26,
+  estimatedMinutes: 40,
   difficulty: "hard",
   skills: ["concurrency", "threading", "concurrent-futures", "gil"],
   teach: {
@@ -576,7 +582,7 @@ for the full contract. Some tests are hidden.`,
     hints: [
       "A finished future tells you nothing about where it belongs, so decide what you record beside each future at submit time.",
       "Fill a results list you sized up front rather than appending, and keep an attempt count per position. Retries are a second pass over the positions that failed and are worth trying again.",
-      "In `run_batch`, build `pending = {executor.submit(fetch, urls[i]): i for i in wave}`, then `for future in as_completed(list(pending)):` call `future.result()` inside a `try` and hand the exception to the policy. In `policy.give_up`, `raise error` for a permanent failure instead of returning a size.",
+      "The future you get back from `executor.submit` is itself hashable, so a dict from future to position is enough bookkeeping to pair `as_completed` output with the url it came from. `future.result()` is where a failure re-appears, so that call belongs inside a `try` and the caught exception goes to the policy. In `policy.give_up`, a permanent failure is the one case that leaves the function by being raised rather than returned.",
     ],
     workspace: {
       language: "python",

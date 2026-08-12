@@ -25,10 +25,15 @@ moment; \`release()\` gives the slot back.
 
 ## The sandbox loop
 
-This page already runs inside an event loop, so \`asyncio.run\` raises \`RuntimeError\` and
-\`asyncio.gather\` is not available to you. \`pipeline/kernel.py\` (read-only) is a deterministic
-stand-in with the same shape: \`sleep\`, \`spawn\` (create_task), \`wait_all\`, \`run\`, and
-\`yield_now\`. Time is counted in ticks. The tests call \`kernel.run(fetch_batch(keys))\` for you.
+This page already runs inside an event loop, so \`asyncio.run\` raises \`RuntimeError\`: it refuses
+to start a second loop on a thread that already has one running. That is the entry point only.
+\`asyncio.gather\`, \`create_task\` and \`sleep\` all work perfectly well inside a running loop.
+
+What this exercise needs on top of that is a clock it can assert on, so \`pipeline/kernel.py\`
+(read-only) is a deterministic stand-in for the loop with the same shape: \`sleep\`, \`spawn\`
+(create_task), \`wait_all\` (awaiting a gather), \`run\`, and \`yield_now\`. Time is counted in ticks
+instead of seconds, so the ordering is the same on every run. The tests call
+\`kernel.run(fetch_batch(keys))\` for you.
 
 \`pipeline/store.py\` (read-only) holds \`load(key)\`, which suspends for the key's latency, and a
 meter that records how many reads were in flight at once and what tick the batch finished on. The
@@ -40,9 +45,11 @@ Some tests are hidden.
 
 const KERNEL_MODULE = String.raw`"""A tiny deterministic stand-in for the asyncio event loop. Read-only.
 
-This sandbox is already running inside an event loop, so asyncio.run raises RuntimeError and
-asyncio.gather is unavailable to you. Everything here mirrors the asyncio API you would really
-use, on a simulated clock that counts ticks instead of seconds:
+This sandbox is already running inside an event loop, so asyncio.run raises RuntimeError: it will
+not start a second loop on a thread that already has one. The rest of the asyncio API is fine
+inside a running loop, gather included. What this exercise needs beyond that is a clock the tests
+can assert on, so everything here mirrors the asyncio API you would really use, on a simulated
+clock that counts ticks instead of seconds:
 
     sleep(ticks)      stands in for asyncio.sleep
     spawn(coro)       stands in for asyncio.create_task
@@ -244,8 +251,6 @@ async def load(key):
 
 const GATE_STARTER = String.raw`"""The concurrency bound for the batch loader."""
 
-from pipeline import kernel
-
 MAX_IN_FLIGHT = 2
 
 
@@ -367,7 +372,14 @@ def run_tests(record):
     def bound_is_respected_and_used():
         batch(["alpha", "bravo", "charlie", "delta", "echo"])
         peak = store.METER.peak_in_flight
-        assert peak == 2, f"expected peak in flight of exactly 2, got {peak}"
+        assert peak <= 2, (
+            f"expected never more than 2 reads in flight, got {peak}; the gate let too many "
+            f"holders past acquire()"
+        )
+        assert peak >= 2, (
+            f"expected the reads to overlap up to the bound, got a peak of {peak}; with 5 keys "
+            f"and a limit of 2 a loader that overlaps at all reaches 2 in flight"
+        )
         assert store.METER.started == 5, (
             f"expected all 5 keys to be loaded, got {store.METER.started}"
         )
@@ -420,9 +432,10 @@ def run_tests(record):
     def loads_overlap_instead_of_queueing():
         batch(["alpha", "charlie", "echo"])
         elapsed = store.METER.last_tick
-        assert elapsed == 3, (
-            f"expected the batch to finish at tick 3 (loads of 3, 2 and 1 ticks overlapping "
-            f"two at a time), got tick {elapsed}; awaiting the keys one at a time costs 6"
+        assert elapsed <= 4, (
+            f"expected the batch to finish by tick 4 (loads of 3, 2 and 1 ticks, overlapping "
+            f"two at a time), got tick {elapsed}; awaiting the keys one at a time costs 6. "
+            f"Exactly where in that budget you land depends on how your gate hands slots on."
         )
 
     record("empty batch returns an empty list", empty_batch)
@@ -436,7 +449,7 @@ export const asyncioLesson: PythonLesson = {
   id: "py-l4-asyncio",
   title: "async / await & asyncio",
   summary: "Run many I/O tasks concurrently with coroutines and asyncio.gather.",
-  estimatedMinutes: 28,
+  estimatedMinutes: 45,
   difficulty: "hard",
   skills: ["asyncio", "async-await", "coroutines", "concurrency"],
   teach: {
@@ -500,7 +513,7 @@ coro = fetch_one(1)   # nothing has run yet; coro is a coroutine object
     { "stack": ["event loop", "fetch_one(2)"], "note": "The loop starts task 2 while task 1's I/O is still in flight." },
     { "stack": ["event loop"], "note": "Task 2 awaits as well. Two waits now overlap on one thread." },
     { "stack": ["event loop", "fetch_one(3)"], "note": "And task 3. All three waits are in flight together." },
-    { "stack": ["event loop"], "note": "The loop has nothing runnable and simply waits for whichever I/O finishes first." },
+    { "stack": ["event loop"], "note": "The loop has nothing runnable, so it waits for whichever I/O finishes first." },
     { "stack": ["event loop", "fetch_one(1)"], "returning": "result 1", "note": "Task 1's I/O completed. The loop resumes it exactly where it paused, and it returns." }
   ],
   "caption": "The stack is never deeper than one task, because only one coroutine runs at a time. What overlaps is the WAITING, not the executing. That is also why a blocking call inside a coroutine is fatal: the loop cannot take control back until an await, so nothing else on this thread can progress."
@@ -704,7 +717,7 @@ a loader that returns the right entries the slow way still fails. Some tests are
     hints: [
       "Awaiting a read finishes it before the next one starts. The loop can only overlap work it has been told about, so every key has to be handed to the loop before you wait on any of them.",
       "`kernel.spawn(coro)` registers a coroutine and hands back a Task immediately; `kernel.wait_all(tasks)` suspends until they are all done, and each Task carries `.result`. The bound belongs inside the per-key coroutine, around the read itself, so a slot is taken before `load(key)` and released whether it succeeds or raises.",
-      "`Gate.acquire` cannot return while the gate is full: loop until a slot frees, awaiting `kernel.yield_now()` inside that loop so the holders get a chance to run and release. In `_load_one`, wrap `await load(key)` in `try`/`except LoadError as exc` and return the error record from the except branch, with the release in a `finally`.",
+      "`Gate.acquire` is a wait loop: it cannot return while the gate is full, and the only way another task ever gets to release a slot is if you await something inside that loop. `kernel.yield_now()` is the await that gives the loop a turn without costing a tick. In `_load_one`, the slot has to come back whether the read returned or raised, which is the job `finally` exists for, and the error record is what the `LoadError` handler returns instead of re-raising.",
     ],
     workspace: {
       language: "python",

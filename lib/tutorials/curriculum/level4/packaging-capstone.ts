@@ -62,14 +62,21 @@ parses with the parser for \`source_format\`, keeps the rows whose \`score\` is 
 The package's public face. Callers import from \`feedstore\`, never from a submodule, so the names
 \`Settings\`, \`load_settings\`, \`Pipeline\`, \`register\`, \`get_parser\`, \`UnknownFormatError\`,
 \`TransportError\`, \`FlakyTransport\`, and \`run_feed\` must all be reachable there and listed in
-\`__all__\`. \`run_feed(env, transport)\` is the entry point: it turns the env mapping into settings
-and runs one pipeline over the given transport.
+\`__all__\`. \`PARSERS\` is not one of them: the table stays internal, and callers reach it through
+\`register\` and \`get_parser\`. \`run_feed(env, transport)\` is the entry point: it turns the env
+mapping into settings and runs one pipeline over the given transport.
 
 Anyone must be able to add a format, or hand you a different source, using only those public
 names. Some tests are hidden.
 `
 
-const CAPSTONE_PYPROJECT = String.raw`[project]
+const CAPSTONE_PYPROJECT = String.raw`# The build backend a frontend (pip, uv, build) installs before it can build this project.
+# Without this table there is nothing to turn the source tree into a wheel.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
 name = "feedstore"
 version = "1.0.0"
 description = "Read a scored partner feed from a flaky source"
@@ -356,12 +363,13 @@ names this package owes them.
 """
 
 from feedstore.config import Settings, load_settings
-from feedstore.parsers import PARSERS, UnknownFormatError, get_parser, register
+from feedstore.parsers import UnknownFormatError, get_parser, register
 from feedstore.pipeline import Pipeline
 from feedstore.transport import FlakyTransport, TransportError
 
+# Exactly the nine names README.md promises callers. PARSERS is deliberately not one of them:
+# the table is an implementation detail, reached through register() and get_parser().
 __all__ = [
-    "PARSERS",
     "FlakyTransport",
     "Pipeline",
     "Settings",
@@ -580,7 +588,7 @@ export const packagingCapstoneLesson: PythonLesson = {
   id: "py-l4-packaging-capstone",
   title: "Packaging & a production capstone",
   summary: "Build a typed, tested, packaged feed reader that integrates the whole track.",
-  estimatedMinutes: 45,
+  estimatedMinutes: 85,
   difficulty: "hard",
   skills: ["packaging", "capstone", "type-hints", "testing"],
   teach: {
@@ -818,9 +826,8 @@ inside the package. Start with \`README.md\`. Some tests are hidden.`,
     starterCode: "",
     hints: [
       "Build it in dependency order: settings first, then the registry, then the pipeline that uses both, then the exports that expose them.",
-      '`register(name)` takes the name and returns the real decorator, which stores the function in `PARSERS` and returns it unchanged so `@register("csv")` leaves `parse_csv` callable.',
-      "`Pipeline.fetch` loops `for attempt in range(1, self.settings.max_attempts + 1)`, sets `self.attempts = attempt`, returns `self.transport.fetch()`, and keeps the caught `TransportError` so it can re-raise the last one after the loop.",
-      "`__init__.py` imports the public names from the submodules, lists them in `__all__`, and defines `run_feed(env, transport)` as `Pipeline(load_settings(env), transport).run()`.",
+      '`register("csv")` is called before the function it decorates is bound, so `register` is a factory: it takes the name, and the thing it returns is the actual decorator that receives the parser. That inner decorator has to hand the parser back unchanged, or `parse_csv` stops being callable on its own.',
+      "`Pipeline.fetch` is a bounded retry loop, so its counter has to be visible on `self.attempts` after every path through it, including the failing one, and the last `TransportError` has to outlive the `except` block that caught it if it is going to be re-raised afterwards. `__init__.py` does no work of its own beyond `run_feed`, which is one line composing `load_settings` and `Pipeline`.",
     ],
     workspace: {
       language: "python",
