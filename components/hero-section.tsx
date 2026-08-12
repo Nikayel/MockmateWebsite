@@ -5,33 +5,44 @@ import Link from "next/link"
 import { motion, useReducedMotion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
 import { trackEvent } from "@/lib/analytics"
-import { SessionReplay } from "@/components/home/SessionReplay"
+import { DynamicThreeOrb } from "@/components/three/DynamicThreeOrb"
 
 /**
  * Hero Section — theme-aware, premium minimal.
  *
  * One focal column (mono headline → one-line subhead → asymmetric primary CTA +
- * ghost link) above an auto-playing scripted session replay. The replay
- * replaced the decorative three.js orb: the hero's whole claim is "an AI
- * interviewer that reacts as you work", and the replay is the only element on
- * the page that shows that happening. Every surface is driven by the theme
- * tokens so the hero crossfades with the rest of the page when the theme
- * flips; a barely-there dot texture carries depth.
+ * ghost link) over a cursor-sensitive 3D orb. Every surface is driven by the
+ * theme tokens (var(--bg)/foreground/accent) so the hero crossfades with the
+ * rest of the page when the theme flips. A radial scrim keeps the centered copy
+ * readable over the orb; a barely-there dot texture carries depth.
  *
- * The full replay (play/pause + chapter scrubber) lives at /rounds, linked in
- * the caption under the frame.
+ * The "two rounds" product mockup that used to live here now has its own home
+ * at /rounds (linked below the CTAs).
  */
 export function HeroSection() {
   const reduceMotion = useReducedMotion()
 
   return (
-    <section className="bg-background text-foreground font-ui relative flex min-h-[100svh] flex-col items-center overflow-hidden px-4 pt-[clamp(6rem,12vh,9rem)] pb-16 text-center md:px-16">
+    <section className="bg-background text-foreground font-ui relative flex min-h-[100svh] flex-col items-center overflow-hidden px-4 pt-[clamp(8rem,18vh,13rem)] pb-16 text-center md:px-16">
+      {/* Cursor-sensitive orb — sits behind everything, recolors with the theme.
+          three.js is code-split out of the initial bundle (decorative background). */}
+      <DynamicThreeOrb variant="hero" />
+
       {/* Barely-there dot texture (theme hairline) for depth. */}
       <div
         className="pointer-events-none absolute inset-0 z-[1] opacity-60"
         style={{
           backgroundImage: "radial-gradient(var(--line) 1px, transparent 1px)",
           backgroundSize: "23px 23px",
+        }}
+      />
+      {/* Soft radial scrim — lifts copy contrast a touch without hiding the orb
+          (text legibility is mainly carried by the token text-shadow below). */}
+      <div
+        className="pointer-events-none absolute inset-0 z-[1]"
+        style={{
+          background: "radial-gradient(ellipse 58% 52% at 50% 44%, var(--bg) 8%, transparent 70%)",
+          opacity: 0.7,
         }}
       />
 
@@ -130,19 +141,16 @@ export function HeroSection() {
             </Link>
           </motion.div>
 
-          {/* The proof: an auto-playing scripted replay of a representative
-              session. Labeled honestly in its own chrome ("Scripted demo");
-              the caption links the full scrubber version at /rounds. */}
-          <motion.div variants={staggerItem} className="mt-14 w-full max-w-3xl">
-            <SessionReplay mode="loop" />
+          {/* Pointer to the relocated "two rounds" mockup. */}
+          <motion.div variants={staggerItem} className="mt-10">
             <Link
               href="/rounds"
               onClick={() =>
                 trackEvent("cta_click", { location: "hero_rounds", destination: "/rounds" })
               }
-              className="text-muted-foreground hover:text-foreground group mt-3 inline-flex items-center gap-1.5 text-sm font-medium tracking-[0.02em] transition-colors duration-200"
+              className="text-muted-foreground hover:text-foreground group inline-flex items-center gap-1.5 text-sm font-medium tracking-[0.02em] transition-colors duration-200"
             >
-              Watch the 60-second version
+              See the two rounds, one session
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
           </motion.div>
