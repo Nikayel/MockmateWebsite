@@ -150,6 +150,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.9,
     },
+    {
+      url: absoluteUrl("/data-engineer-interview-practice"),
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
     // Comparison Pages
     {
       url: absoluteUrl("/codesparring-vs-leetcode"),

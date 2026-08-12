@@ -47,7 +47,7 @@ import { listCaseLabs } from "@/lib/labs/case-labs"
  * This is intentionally a literal. Adding a marketing page should be a deliberate act that shows up
  * as a one-line diff here, not something that silently changes the shape of the sitemap.
  */
-const STATIC_PAGE_COUNT = 31
+const STATIC_PAGE_COUNT = 32
 
 /** Learn URLs only, so the derived half can be checked independently of the hand-listed half. */
 function learnUrls(urls: string[]): string[] {

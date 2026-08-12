@@ -57,6 +57,7 @@ export const FOOTER_GUIDE_LINKS: readonly FooterTrackLink[] = [
   { label: "AI coding interview practice", href: "/ai-coding-interview-practice" },
   { label: "System design interviews", href: "/system-design-interview-practice" },
   { label: "Software engineer interviews", href: "/software-engineer-interview-practice" },
+  { label: "Data engineer interviews", href: "/data-engineer-interview-practice" },
   { label: "New grad interviews", href: "/new-grad-coding-interview-practice" },
   { label: "Free AI mock interview", href: "/free-ai-coding-interview" },
   { label: "Best AI interview tools", href: "/best-ai-coding-interview-tools" },
@@ -84,9 +85,9 @@ export function Footer() {
               </span>
             </div>
             <p className="text-muted-foreground text-sm">
-              CodeSparring.dev is the premier AI technical interview practice platform. Master your
-              next software engineering interview with realistic coding, system design, and bug-fix
-              simulations.
+              AI interview practice for software engineers and data engineers: coding, system
+              design, and bug-fix rounds with a voice-enabled interviewer, plus free Python, data
+              engineering, and system design courses.
             </p>
             {/* These were three bare <svg>s carrying cursor-pointer and a hover
                 colour change: they looked and felt clickable, had no link, no
