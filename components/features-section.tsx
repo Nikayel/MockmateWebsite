@@ -89,12 +89,12 @@ const interviewTypes = [
   {
     title: "Guided Learning",
     description:
-      "Build the fundamentals with graded exercises that run right in your browser. Work through Python, SQL, and System Design tracks with instant feedback on every answer.",
+      "Build the fundamentals with graded exercises that run right in your browser. Work through free Python, Data Engineering, and System Design tracks with instant feedback on every answer.",
     icon: Lock,
     glowColor: "rgba(250, 204, 21, 0.4)", // Yellow
     textColor: "text-yellow-400",
     features: [
-      "Python and SQL curricula",
+      "Python and Data Engineering curricula",
       "System Design fundamentals",
       "Graded, in-browser exercises",
     ],
