@@ -1,103 +1,420 @@
 import type { PythonLesson } from "../../types"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const API_README = `# Fetch then validate
+const API_README = `# Ticket: the storefront sync fails without saying which field broke
 
-Never trust raw external data. Validate it at the boundary. \`api/client.py\` (read-only) simulates
-an HTTP fetch returning a raw dict. Implement \`parse_user(raw)\` in \`api/models.py\` so it coerces
-the fields into a typed \`User\` dataclass:
+The nightly job reads accounts from the storefront API and each account carries a list of orders.
+When a payload is wrong the job dies on the first bad value with a bare \`TypeError\`, so support
+cannot tell whether one order was malformed or the whole account was. Rebuild the boundary so it
+reports **every** problem it found, and names the exact field path of each one.
 
-- \`id\` -> \`int\`
-- \`name\` -> \`str\`
-- \`active\` -> \`bool\`
+\`storefront/api.py\` (a stand-in for httpx, no network here) and \`storefront/models.py\` are
+read-only. Two files are yours.
 
-A missing field should raise (a \`KeyError\` is fine). Some tests are hidden.
+## \`storefront/fields.py\`
+
+Three value-level coercers. Each takes \`(value, path)\` and returns a \`(value, error)\` pair:
+on success \`(coerced_value, None)\`, on failure \`(None, "<path>: expected <type>, got <value!r>")\`.
+
+- \`as_int(value, path)\` accepts an \`int\`, or a \`str\` that \`int()\` parses (\`"1004"\`). A \`bool\` is
+  rejected even though \`True\` is an \`int\` in Python, because a flag is not an id.
+- \`as_str(value, path)\` accepts a \`str\` and nothing else. It does **not** stringify a number: an
+  \`id\` arriving where a \`name\` belongs is a bug worth surfacing.
+- \`as_bool(value, path)\` accepts \`True\`/\`False\`, the ints \`1\`/\`0\`, and the strings \`"true"\`/\`"false"\`
+  in any case. Everything else is an error.
+
+\`\`\`python
+as_int("1004", "id")        # (1004, None)
+as_int(None, "orders[1].id")  # (None, "orders[1].id: expected int, got None")
+\`\`\`
+
+## \`storefront/parse.py\`
+
+\`\`\`python
+parse_order(raw, path)   # -> (Order or None, [errors])
+parse_account(raw)       # -> (Account or None, [errors])
+\`\`\`
+
+Both collect errors instead of raising, and both return \`None\` for the object when their error list
+is not empty. \`parse_order\` requires \`id\` (int), \`total\` (int), and \`paid\` (bool), and prefixes
+every path with the \`path\` it was given, so a bad total in the second order reads
+\`orders[1].total: expected int, got 'abc'\`.
+
+\`parse_account\` fills an \`Account\` from \`models.py\` and treats its fields three different ways:
+
+| field | rule | a missing key | a \`None\` value |
+| --- | --- | --- | --- |
+| \`id\`, \`name\` | required, never null | \`"id: missing"\` | an \`expected\` error |
+| \`email\` | required key, nullable value | \`"email: missing"\` | kept as \`None\` |
+| \`nickname\` | optional | \`None\` | \`None\` |
+
+\`orders\` is required and must be a list: a missing key gives \`"orders: missing"\` and a non-list
+gives \`"orders: expected list, got <value!r>"\`. Orders that parse are collected in order; orders
+that fail contribute their errors and are left out.
+
+Keys the payload carries that are not listed above are ignored, because the API adds fields without
+warning and a new one must not break last week's job.
+
+Errors come back in field order: \`id\`, \`name\`, \`email\`, \`nickname\`, then the orders by index.
+
+Some tests are hidden.
 `
 
-const API_CLIENT = String.raw`def fetch_user(user_id):
-    """Pretend to GET /users/{id} and return the raw JSON body (httpx would do this for real)."""
-    data = {
-        "1": {"id": "1", "name": "Ada", "active": 1},
-        "2": {"id": "2", "name": "Sam", "active": 0},
-    }
-    return data[str(user_id)]
+const API_CLIENT = String.raw`"""Stand-in for an httpx call. Returns canned raw JSON bodies, so runs are deterministic."""
+
+_ACCOUNTS = {
+    "1004": {
+        "id": "1004",
+        "name": "Ada Lovelace",
+        "email": None,
+        "plan_tier": "gold",
+        "orders": [
+            {"id": 1, "total": 2599, "paid": "true", "currency": "USD"},
+            {"id": 2, "total": 400, "paid": 0},
+        ],
+    },
+    "1005": {
+        "id": 1005,
+        "name": "Sam Reed",
+        "email": "sam@example.com",
+        "orders": [
+            {"id": 7, "total": 1200, "paid": True},
+            {"id": 8, "total": "abc", "paid": True},
+        ],
+    },
+}
+
+
+def fetch_account(account_id):
+    """Pretend to GET /accounts/{id} and return the raw, untrusted JSON body."""
+    return _ACCOUNTS[str(account_id)]
 `
 
-const API_MODELS_STARTER = String.raw`from dataclasses import dataclass
+const API_MODELS = String.raw`"""Read-only target shapes. Annotations here are documentation; parse.py does the enforcing."""
+
+from dataclasses import dataclass, field
+from typing import List, Optional
 
 
 @dataclass
-class User:
+class Order:
     id: int
-    name: str
-    active: bool
-
-
-def parse_user(raw):
-    """Validate a raw user dict into a typed User (see README.md)."""
-    # TODO: coerce raw["id"], raw["name"], raw["active"] and build a User.
-    return None
-`
-
-const API_MODELS_REFERENCE = String.raw`from dataclasses import dataclass
+    total: int
+    paid: bool
 
 
 @dataclass
-class User:
+class Account:
     id: int
     name: str
-    active: bool
-
-
-def parse_user(raw):
-    return User(id=int(raw["id"]), name=str(raw["name"]), active=bool(raw["active"]))
+    email: Optional[str]
+    nickname: Optional[str]
+    orders: List[Order] = field(default_factory=list)
 `
 
-const API_TEST = String.raw`from api.client import fetch_user
-from api.models import User, parse_user
+const API_FIELDS_STARTER = String.raw`def as_int(value, path):
+    """Return (int, None) or (None, error) for one raw value (see README.md)."""
+    # TODO: accept ints and int-like strings, reject bools and everything else.
+    return None, None
 
 
-def run_tests(record):
-    def coerces_field_types():
-        result = parse_user({"id": "1", "name": "Ada", "active": 1})
-        assert result == User(1, "Ada", True), f"got {result!r}"
+def as_str(value, path):
+    """Return (str, None) or (None, error) for one raw value (see README.md)."""
+    # TODO: accept only a real str.
+    return None, None
 
-    def parses_inactive_user():
-        result = parse_user({"id": 2, "name": "Sam", "active": 0})
-        assert result == User(2, "Sam", False), f"got {result!r}"
 
-    def validates_fetched_data():
-        assert parse_user(fetch_user(1)) == User(1, "Ada", True)
-
-    record("coerces field types", coerces_field_types)
-    record("parses an inactive user", parses_inactive_user)
-    record("validates fetched data", validates_fetched_data)
+def as_bool(value, path):
+    """Return (bool, None) or (None, error) for one raw value (see README.md)."""
+    # TODO: accept the listed true/false spellings and reject the rest.
+    return None, None
 `
 
-const API_TEST_HIDDEN = String.raw`from api.models import User, parse_user
-
-
-def run_tests(record):
-    def coerces_a_string_id():
-        assert parse_user({"id": "99", "name": "Mo", "active": True}) == User(99, "Mo", True)
-
-    def missing_field_raises():
+const API_FIELDS_REFERENCE = String.raw`def as_int(value, path):
+    if isinstance(value, bool):
+        return None, f"{path}: expected int, got {value!r}"
+    if isinstance(value, int):
+        return value, None
+    if isinstance(value, str):
         try:
-            parse_user({"id": 1, "name": "X"})  # no "active"
-            raised = False
-        except KeyError:
-            raised = True
-        assert raised, "a missing field should raise"
+            return int(value), None
+        except ValueError:
+            pass
+    return None, f"{path}: expected int, got {value!r}"
 
-    record("coerces a string id", coerces_a_string_id)
-    record("missing field raises", missing_field_raises)
+
+def as_str(value, path):
+    if isinstance(value, str):
+        return value, None
+    return None, f"{path}: expected str, got {value!r}"
+
+
+def as_bool(value, path):
+    if isinstance(value, bool):
+        return value, None
+    if isinstance(value, str):
+        lowered = value.lower()
+        if lowered == "true":
+            return True, None
+        if lowered == "false":
+            return False, None
+    elif isinstance(value, int):
+        if value == 1:
+            return True, None
+        if value == 0:
+            return False, None
+    return None, f"{path}: expected bool, got {value!r}"
+`
+
+const API_PARSE_STARTER = String.raw`from storefront.fields import as_bool, as_int, as_str
+from storefront.models import Account, Order
+
+ORDER_FIELDS = (("id", as_int), ("total", as_int), ("paid", as_bool))
+
+
+def parse_order(raw, path):
+    """Return (Order, []) or (None, errors) for one raw order (see README.md)."""
+    # TODO: coerce each ORDER_FIELDS entry under "<path>.<field>" and collect every error.
+    return None, []
+
+
+def parse_account(raw):
+    """Return (Account, []) or (None, errors) for one raw account (see README.md)."""
+    # TODO: apply the required / nullable / optional rules, then parse the nested orders.
+    return None, []
+`
+
+const API_PARSE_REFERENCE = String.raw`from storefront.fields import as_bool, as_int, as_str
+from storefront.models import Account, Order
+
+ORDER_FIELDS = (("id", as_int), ("total", as_int), ("paid", as_bool))
+
+
+def parse_order(raw, path):
+    values = {}
+    errors = []
+    for name, coerce in ORDER_FIELDS:
+        if name not in raw:
+            errors.append(f"{path}.{name}: missing")
+            continue
+        value, error = coerce(raw[name], f"{path}.{name}")
+        if error is not None:
+            errors.append(error)
+        else:
+            values[name] = value
+    if errors:
+        return None, errors
+    return Order(id=values["id"], total=values["total"], paid=values["paid"]), []
+
+
+def parse_account(raw):
+    values = {"email": None, "nickname": None}
+    errors = []
+
+    for name, coerce in (("id", as_int), ("name", as_str)):
+        if name not in raw:
+            errors.append(f"{name}: missing")
+            continue
+        value, error = coerce(raw[name], name)
+        if error is not None:
+            errors.append(error)
+        else:
+            values[name] = value
+
+    if "email" not in raw:
+        errors.append("email: missing")
+    elif raw["email"] is not None:
+        value, error = as_str(raw["email"], "email")
+        if error is not None:
+            errors.append(error)
+        else:
+            values["email"] = value
+
+    if raw.get("nickname") is not None:
+        value, error = as_str(raw["nickname"], "nickname")
+        if error is not None:
+            errors.append(error)
+        else:
+            values["nickname"] = value
+
+    orders = []
+    if "orders" not in raw:
+        errors.append("orders: missing")
+    elif not isinstance(raw["orders"], list):
+        errors.append(f"orders: expected list, got {raw['orders']!r}")
+    else:
+        for index, item in enumerate(raw["orders"]):
+            order, order_errors = parse_order(item, f"orders[{index}]")
+            errors.extend(order_errors)
+            if order is not None:
+                orders.append(order)
+
+    if errors:
+        return None, errors
+    return Account(
+        id=values["id"],
+        name=values["name"],
+        email=values["email"],
+        nickname=values["nickname"],
+        orders=orders,
+    ), []
+`
+
+const API_FIELDS_TEST = String.raw`from storefront.fields import as_bool, as_int, as_str
+
+
+def run_tests(record):
+    def coerces_an_int_like_string():
+        value, error = as_int("1004", "id")
+        assert (value, error) == (1004, None), f"expected (1004, None), got {(value, error)!r}"
+
+    def names_the_path_of_a_bad_int():
+        value, error = as_int(None, "orders[1].id")
+        expected = "orders[1].id: expected int, got None"
+        assert value is None, f"expected None on failure, got {value!r}"
+        assert error == expected, f"expected {expected!r}, got {error!r}"
+
+    def refuses_to_stringify_a_number():
+        value, error = as_str(1004, "name")
+        expected = "name: expected str, got 1004"
+        assert value is None, f"expected None on failure, got {value!r}"
+        assert error == expected, f"expected {expected!r}, got {error!r}"
+
+    def reads_the_written_out_booleans():
+        for raw, want in (("true", True), ("FALSE", False), (1, True), (0, False)):
+            value, error = as_bool(raw, "paid")
+            assert (value, error) == (want, None), (
+                f"as_bool({raw!r}) expected ({want}, None), got {(value, error)!r}"
+            )
+
+    record("coerces an int-like string", coerces_an_int_like_string)
+    record("names the path of a bad int", names_the_path_of_a_bad_int)
+    record("refuses to stringify a number", refuses_to_stringify_a_number)
+    record("reads the written-out booleans", reads_the_written_out_booleans)
+`
+
+const API_PARSE_TEST = String.raw`from storefront.api import fetch_account
+from storefront.models import Account, Order
+from storefront.parse import parse_account, parse_order
+
+
+def run_tests(record):
+    def parses_a_clean_order():
+        order, errors = parse_order({"id": 7, "total": 1200, "paid": True}, "orders[0]")
+        assert errors == [], f"expected no errors, got {errors!r}"
+        assert order == Order(7, 1200, True), f"expected Order(7, 1200, True), got {order!r}"
+
+    def parses_a_fetched_account():
+        account, errors = parse_account(fetch_account(1004))
+        assert errors == [], f"expected no errors, got {errors!r}"
+        expected = Account(
+            id=1004,
+            name="Ada Lovelace",
+            email=None,
+            nickname=None,
+            orders=[Order(1, 2599, True), Order(2, 400, False)],
+        )
+        assert account == expected, f"expected {expected!r}, got {account!r}"
+
+    def reports_the_failing_order_by_path():
+        account, errors = parse_account(fetch_account(1005))
+        expected = ["orders[1].total: expected int, got 'abc'"]
+        assert errors == expected, f"expected {expected!r}, got {errors!r}"
+        assert account is None, f"expected None when errors exist, got {account!r}"
+
+    def collects_every_error_not_only_the_first():
+        raw = {"id": "x", "name": 12, "email": "a@b.c", "orders": []}
+        account, errors = parse_account(raw)
+        expected = ["id: expected int, got 'x'", "name: expected str, got 12"]
+        assert errors == expected, f"expected {expected!r}, got {errors!r}"
+        assert account is None, f"expected None when errors exist, got {account!r}"
+
+    record("parses a clean order", parses_a_clean_order)
+    record("parses a fetched account", parses_a_fetched_account)
+    record("reports the failing order by path", reports_the_failing_order_by_path)
+    record("collects every error, not only the first", collects_every_error_not_only_the_first)
+`
+
+const API_PARSE_TEST_HIDDEN = String.raw`from storefront.models import Account, Order
+from storefront.parse import parse_account, parse_order
+
+BASE = {"id": 1, "name": "Ada", "email": None, "orders": []}
+
+
+def with_fields(**changes):
+    raw = dict(BASE)
+    raw.update(changes)
+    return raw
+
+
+def run_tests(record):
+    def missing_email_key_differs_from_a_null_email():
+        raw = dict(BASE)
+        del raw["email"]
+        _, errors = parse_account(raw)
+        assert errors == ["email: missing"], f"expected ['email: missing'], got {errors!r}"
+
+        account, errors = parse_account(BASE)
+        assert errors == [], f"a null email is allowed, got {errors!r}"
+        assert account.email is None, f"expected email None, got {account.email!r}"
+
+    def optional_nickname_is_absent_without_complaint():
+        account, errors = parse_account(with_fields(nickname="ada"))
+        assert errors == [], f"expected no errors, got {errors!r}"
+        assert account.nickname == "ada", f"expected 'ada', got {account.nickname!r}"
+
+        account, errors = parse_account(BASE)
+        assert errors == [], f"expected no errors, got {errors!r}"
+        assert account.nickname is None, f"expected None, got {account.nickname!r}"
+
+    def unknown_fields_are_ignored():
+        account, errors = parse_account(with_fields(loyalty_points=5, beta_flags=["x"]))
+        assert errors == [], f"a new API field must not break the parse, got {errors!r}"
+        assert account == Account(1, "Ada", None, None, []), f"got {account!r}"
+
+    def a_bool_is_not_an_id():
+        _, errors = parse_order({"id": True, "total": 10, "paid": False}, "orders[0]")
+        expected = ["orders[0].id: expected int, got True"]
+        assert errors == expected, f"expected {expected!r}, got {errors!r}"
+
+    def a_missing_order_field_is_named():
+        _, errors = parse_order({"id": 3}, "orders[2]")
+        expected = ["orders[2].total: missing", "orders[2].paid: missing"]
+        assert errors == expected, f"expected {expected!r}, got {errors!r}"
+
+    def orders_must_be_a_list_and_good_ones_still_load():
+        _, errors = parse_account(with_fields(orders="none"))
+        expected = ["orders: expected list, got 'none'"]
+        assert errors == expected, f"expected {expected!r}, got {errors!r}"
+
+        _, errors = parse_account(
+            with_fields(
+                orders=[
+                    {"id": 1, "total": 5, "paid": "yes"},
+                    {"id": 2, "total": 6, "paid": "false"},
+                    {"id": "no", "total": 7, "paid": True},
+                ]
+            )
+        )
+        expected = [
+            "orders[0].paid: expected bool, got 'yes'",
+            "orders[2].id: expected int, got 'no'",
+        ]
+        assert errors == expected, f"expected {expected!r}, got {errors!r}"
+
+    record("a missing email key differs from a null email", missing_email_key_differs_from_a_null_email)
+    record("an optional nickname may be absent", optional_nickname_is_absent_without_complaint)
+    record("unknown fields are ignored", unknown_fields_are_ignored)
+    record("a bool is not an id", a_bool_is_not_an_id)
+    record("a missing order field is named", a_missing_order_field_is_named)
+    record("orders must be a list", orders_must_be_a_list_and_good_ones_still_load)
 `
 
 export const restPydanticLesson: PythonLesson = {
   id: "py-l3-rest-pydantic",
   title: "Validating API data at the boundary (httpx/pydantic preview)",
   summary: "Fetch external JSON and validate it into a typed model at the boundary.",
-  estimatedMinutes: 20,
+  estimatedMinutes: 28,
   difficulty: "hard",
   skills: ["validation", "dataclasses", "data-boundary", "type-coercion"],
   teach: {
@@ -342,38 +659,62 @@ For \`{"id": "1", "name": "Ada", "active": 1}\` return \`{"id": 1, "name": "Ada"
   practice: {
     id: "py-l3-rest-pydantic-practice",
     executionMode: "workspace",
-    prompt: `Implement \`parse_user(raw)\` in \`api/models.py\`: validate a raw user dict into the typed \`User\`
-dataclass, coercing \`id\` to \`int\`, \`name\` to \`str\`, and \`active\` to \`bool\`. A missing field
-should raise. Some tests are hidden.`,
+    prompt: `Rebuild the storefront sync boundary so a bad payload reports every problem and names the field
+path of each one, instead of dying on the first bad value.
+
+Write the value coercers in \`storefront/fields.py\` and the shape validation in
+\`storefront/parse.py\`. An account carries a list of orders, so an error has to read
+\`orders[1].total: expected int, got 'abc'\`. \`email\` is required but may be null, \`nickname\` may be
+absent entirely, and fields the API adds later must be ignored rather than rejected. \`README.md\`
+has the full contract. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      'Build the dataclass: `User(id=int(raw["id"]), ...)`.',
-      'Indexing a missing key (`raw["active"]`) already raises `KeyError`. That\'s the desired behaviour.',
-      "Coerce `active` with `bool(...)`.",
+      "Nothing raises here. A coercer hands back a pair, and the callers above it decide what to do with the error half.",
+      'In `parse_account`, keep one `errors` list and append to it as you go. Ask `"email" in raw` before you look at `raw["email"]`, because a missing key and a null value are two different outcomes.',
+      '`isinstance(True, int)` is `True`, so `as_int` has to check `isinstance(value, bool)` first and reject. For the nested orders, call `parse_order(item, f"orders[{index}]")` inside `enumerate` and `errors.extend(...)` what comes back.',
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "api/models.py",
-      editableFilePaths: ["api/models.py"],
-      visibleTestPaths: ["tests/test_models.py"],
-      hiddenTestPaths: ["tests/test_models_hidden.py"],
+      primaryFilePath: "storefront/parse.py",
+      editableFilePaths: ["storefront/fields.py", "storefront/parse.py"],
+      visibleTestPaths: ["tests/test_fields.py", "tests/test_parse.py"],
+      hiddenTestPaths: ["tests/test_parse_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
         { path: "README.md", role: "docs", language: "markdown", content: API_README },
-        { path: "api/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "api/client.py",
+          path: "storefront/__init__.py",
+          role: "readonly",
+          language: "python",
+          content: EMPTY_INIT,
+        },
+        {
+          path: "storefront/api.py",
           role: "readonly",
           language: "python",
           content: API_CLIENT,
           description: "Simulated HTTP client (read-only)",
         },
         {
-          path: "api/models.py",
+          path: "storefront/models.py",
+          role: "readonly",
+          language: "python",
+          content: API_MODELS,
+          description: "Target dataclasses (read-only)",
+        },
+        {
+          path: "storefront/fields.py",
           role: "editable",
           language: "python",
-          content: API_MODELS_STARTER,
-          description: "Implement parse_user here",
+          content: API_FIELDS_STARTER,
+          description: "Value-level coercers",
+        },
+        {
+          path: "storefront/parse.py",
+          role: "editable",
+          language: "python",
+          content: API_PARSE_STARTER,
+          description: "Shape validation and field paths",
         },
         {
           path: "tests/__init__.py",
@@ -383,17 +724,24 @@ should raise. Some tests are hidden.`,
           hidden: true,
         },
         {
-          path: "tests/test_models.py",
+          path: "tests/test_fields.py",
           role: "test",
           language: "python",
-          content: API_TEST,
-          description: "Visible validation tests",
+          content: API_FIELDS_TEST,
+          description: "Visible coercer tests",
         },
         {
-          path: "tests/test_models_hidden.py",
+          path: "tests/test_parse.py",
           role: "test",
           language: "python",
-          content: API_TEST_HIDDEN,
+          content: API_PARSE_TEST,
+          description: "Visible parsing tests",
+        },
+        {
+          path: "tests/test_parse_hidden.py",
+          role: "test",
+          language: "python",
+          content: API_PARSE_TEST_HIDDEN,
           hidden: true,
           description: "Hidden edge-case tests",
         },
@@ -402,8 +750,9 @@ should raise. Some tests are hidden.`,
           role: "test",
           language: "python",
           content: buildRunner([
-            { module: "test_models", label: "visible models" },
-            { module: "test_models_hidden", label: "hidden models" },
+            { module: "test_fields", label: "visible fields" },
+            { module: "test_parse", label: "visible parse" },
+            { module: "test_parse_hidden", label: "hidden parse" },
           ]),
           hidden: true,
           description: "Workspace test runner",
@@ -411,10 +760,16 @@ should raise. Some tests are hidden.`,
       ],
       referenceFiles: [
         {
-          path: "api/models.py",
+          path: "storefront/fields.py",
           role: "editable",
           language: "python",
-          content: API_MODELS_REFERENCE,
+          content: API_FIELDS_REFERENCE,
+        },
+        {
+          path: "storefront/parse.py",
+          role: "editable",
+          language: "python",
+          content: API_PARSE_REFERENCE,
         },
       ],
     },
