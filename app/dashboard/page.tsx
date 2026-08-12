@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import { Header } from "@/components/header"
@@ -104,6 +104,21 @@ export default function DashboardPage() {
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showTour, setShowTour] = useState(false)
+  // ?tour=1 is the hand-off from the interview page's post-submit onboarding
+  // ("take the tour" chosen there, tour targets live here). Read via
+  // window.location instead of useSearchParams to avoid a Suspense boundary
+  // requirement, and stripped immediately so a refresh doesn't replay it.
+  const tourRequestedRef = useRef(false)
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("tour") === "1") {
+      tourRequestedRef.current = true
+      params.delete("tour")
+      const query = params.toString()
+      window.history.replaceState(null, "", window.location.pathname + (query ? `?${query}` : ""))
+    }
+  }, [])
   const [sessionsError, setSessionsError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
 
@@ -209,6 +224,13 @@ export default function DashboardPage() {
 
         if (userProfile && !userProfile.onboarding_completed) {
           setShowOnboarding(true)
+        } else if (tourRequestedRef.current) {
+          // Arrived from the interview page's post-submit onboarding with
+          // "take the tour" chosen (?tour=1). The tour's data-tour targets
+          // only exist once the dashboard has loaded, so it opens here, not
+          // in a mount effect.
+          tourRequestedRef.current = false
+          setShowTour(true)
         }
 
         if (sessionsSnap === SESSIONS_FETCH_ERROR) {
@@ -360,6 +382,7 @@ export default function DashboardPage() {
         isOpen={showOnboarding}
         userId={firebaseUser?.uid || ""}
         userName={userName}
+        onSkip={() => setShowOnboarding(false)}
         onComplete={async (takeTour: boolean) => {
           setShowOnboarding(false)
           if (takeTour) {

@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth-context"
 import type { Profile } from "@/lib/types"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { SignupPrompt } from "@/components/SignupPrompt"
+import { OnboardingModal } from "@/components/OnboardingModal"
 import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
 import type { CompanyId } from "@/lib/data/company-questions/types"
@@ -515,6 +516,37 @@ function InterviewPageContent() {
     if (selectedScenario?.type !== "bugfix" || !user || cachedUserProfile) return
     void getCachedUserProfile()
   }, [cachedUserProfile, getCachedUserProfile, selectedScenario?.type, user])
+
+  // Post-submit onboarding. New accounts that go straight into a session
+  // (above all guest-trial converts, who signed in mid-session specifically to
+  // continue it) must never be interrupted by the preference wizard; the
+  // natural pause is right after they submit and their feedback renders. Offer
+  // it once per mount, a beat after the score lands so the score gets read
+  // first. Signed-in only: guests get SignupPrompt in this slot instead.
+  const [showPostSubmitOnboarding, setShowPostSubmitOnboarding] = useState(false)
+  const postSubmitOnboardingOfferedRef = useRef(false)
+  useEffect(() => {
+    if (
+      isGuestMode ||
+      !user ||
+      !showFeedback ||
+      performanceScore === null ||
+      postSubmitOnboardingOfferedRef.current
+    ) {
+      return
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let cancelled = false
+    void getCachedUserProfile().then((profile) => {
+      if (cancelled || !profile || profile.onboarding_completed) return
+      postSubmitOnboardingOfferedRef.current = true
+      timer = setTimeout(() => setShowPostSubmitOnboarding(true), 4000)
+    })
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+    }
+  }, [isGuestMode, user, showFeedback, performanceScore, getCachedUserProfile])
 
   // State for collapsible optimal approach section (collapsed by default to not give away solution)
   const [showOptimalApproach, setShowOptimalApproach] = useState(false)
@@ -2082,6 +2114,25 @@ function InterviewPageContent() {
             setShowSignupPrompt(false)
             // Note: markFreeTrialUsed() is already called in SignupPrompt component
           }}
+        />
+      )}
+
+      {/* Post-submit onboarding for signed-in users who haven't completed it
+          (see the offer effect above). Completing here means the dashboard
+          never has to interrupt them; "take the tour" hands off to the
+          dashboard, where the tour's targets live. */}
+      {user && (
+        <OnboardingModal
+          isOpen={showPostSubmitOnboarding}
+          userId={user.id}
+          onComplete={(takeTour: boolean) => {
+            setShowPostSubmitOnboarding(false)
+            setCachedUserProfile((prev) => (prev ? { ...prev, onboarding_completed: true } : prev))
+            if (takeTour) {
+              router.push("/dashboard?tour=1")
+            }
+          }}
+          onSkip={() => setShowPostSubmitOnboarding(false)}
         />
       )}
 

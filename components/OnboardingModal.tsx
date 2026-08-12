@@ -17,9 +17,23 @@ interface OnboardingModalProps {
   userId: string
   userName?: string
   onComplete: (showTour: boolean) => void
+  /**
+   * Renders a quiet "Skip for now" escape hatch. Skipping does NOT set
+   * onboarding_completed, so the wizard re-offers on the next dashboard visit;
+   * it only closes this showing. Every mount should pass this: a first-run
+   * modal with no way out taxes exactly the moment a new user is deciding
+   * whether to stay.
+   */
+  onSkip?: () => void
 }
 
-export function OnboardingModal({ isOpen, userId, userName, onComplete }: OnboardingModalProps) {
+export function OnboardingModal({
+  isOpen,
+  userId,
+  userName,
+  onComplete,
+  onSkip,
+}: OnboardingModalProps) {
   const [step, setStep] = useState(0)
   const [selectedRole, setSelectedRole] = useState<string | null>(null)
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null)
@@ -151,6 +165,18 @@ export function OnboardingModal({ isOpen, userId, userName, onComplete }: Onboar
           <div className="sr-only" aria-live="polite" aria-atomic="true">
             {stepAnnouncement}
           </div>
+
+          {onSkip && (
+            <div className="flex justify-end px-4 pt-3">
+              <button
+                type="button"
+                onClick={onSkip}
+                className="text-muted-foreground hover:text-foreground text-xs font-medium transition-colors"
+              >
+                Skip for now
+              </button>
+            </div>
+          )}
 
           <AnimatePresence mode="wait">
             {/* Step 0: Welcome */}
