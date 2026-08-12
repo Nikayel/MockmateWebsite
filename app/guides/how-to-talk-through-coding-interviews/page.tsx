@@ -1,10 +1,11 @@
 import { Metadata } from "next"
+import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
   title: "How to Talk Through Coding Interviews",
   description:
-    "Learn how to communicate effectively during a software engineering interview. Stop coding in silence and start articulating your thought process.",
+    "How to narrate your thinking in a coding interview: clarify the question, say the brute force out loud, then talk through your fix before you type.",
   alternates: {
     canonical: "/guides/how-to-talk-through-coding-interviews",
   },
@@ -13,64 +14,65 @@ export const metadata: Metadata = {
 export default function TalkThroughGuidePage() {
   const contentSections = [
     {
-      heading: "The Silent Failure",
+      heading: "The silent failure",
       content: (
         <>
           <p>
-            The most common mistake candidates make during a technical interview is reading the
-            prompt, saying "Okay, I think I know how to do this," and then silently typing for 20
-            minutes.
+            The most common failure in a technical interview is not a wrong answer. It is reading
+            the prompt, saying "okay, I think I know how to do this," and then going quiet for 20
+            minutes while you type.
           </p>
           <p>
-            Even if you produce perfectly working code, you have failed the interview. Interviewers
-            are not just evaluating your code; they are evaluating what it would be like to work
-            with you on a team. If you can't communicate your technical decisions, you are a
-            liability.
+            Working code delivered in silence still costs you the interview. The interviewer is not
+            only checking your output. They are watching how you think, and silence gives them
+            nothing to evaluate. If you cannot narrate a decision, they have to guess whether you
+            understood the problem or got lucky.
           </p>
         </>
       ),
     },
     {
-      heading: "The 'Think Out Loud' Framework",
+      heading: "A framework for narrating your thinking",
       content: (
         <>
-          <p>
-            To pass modern technical screens, you need to adopt a strict communication protocol:
-          </p>
+          <p>Use the same sequence every time so it becomes automatic under pressure.</p>
           <ol className="mt-4 list-decimal space-y-2 pl-6">
             <li>
-              <strong>Clarify:</strong> Repeat the question back in your own words. Ask about
-              constraints (e.g., "Can the array contain negative numbers?").
+              <strong>Clarify first.</strong> Repeat the question in your own words and ask about
+              constraints: can the array be empty, can numbers be negative, is the input sorted.
             </li>
             <li>
-              <strong>Brute Force:</strong> Verbally describe the naive O(N^2) solution. This proves
-              you have a baseline understanding and buys you time to think of an optimal approach.
+              <strong>Say the brute force out loud.</strong> Describe the naive approach, even at
+              O(n^2), before you touch the optimal one. It proves you understood the problem and
+              buys you time to think.
             </li>
             <li>
-              <strong>Optimize:</strong> Discuss how you might use a Hash Map or Two Pointers to
-              bring the time complexity down to O(N). Ask the interviewer: "Does this approach sound
-              good to you?" before you start typing.
+              <strong>Propose the optimization, then check in.</strong> "I think a hash map gets
+              this to O(n). Does that sound right to you?" Wait for a response before you start
+              typing.
             </li>
             <li>
-              <strong>Narrate as You Type:</strong> "Now I'm creating the hash map to store the
-              frequencies..." Keep a steady stream of consciousness.
+              <strong>Narrate as you type.</strong> "This loop builds the frequency count, this one
+              checks it." A few words per line is enough. Total silence is the only wrong amount.
             </li>
           </ol>
         </>
       ),
     },
     {
-      heading: "Practicing Your Communication",
+      heading: "Practicing this before it counts",
       content: (
         <>
           <p>
-            You cannot practice this by staring at LeetCode. You have to physically open your mouth
-            and speak.
+            Solving problems alone does not train this, because nothing you say gets evaluated. You
+            need something that reacts to what you say and follows up when you skip a step.
           </p>
           <p>
-            CodeSparring's AI simulator is specifically built to grade your communication. It uses
-            voice-recognition to ensure you are narrating your steps and penalizes you if you spend
-            too much time coding in silence.
+            CodeSparring's AI interviewer follows your code as you write it and asks about the
+            choices you make, in voice or text. Sessions are scored on communication alongside
+            problem solving and code quality, so going quiet costs you even when the code ends up
+            correct. See what a scored session looks like in the{" "}
+            <Link href="/samples">sample sessions</Link>.
           </p>
         </>
       ),
@@ -81,15 +83,25 @@ export default function TalkThroughGuidePage() {
     {
       question: "What if I get stuck while talking?",
       answer:
-        "It is perfectly fine to say: 'I need a minute to think through this specific edge case.' Silence is okay if it is declared. Undeclared silence is what makes interviewers nervous.",
+        "Say so directly: 'I need a minute to think through this edge case.' Declared silence reads as control. Undeclared silence is what makes interviewers nervous.",
+    },
+    {
+      question: "Do I need to narrate every single line?",
+      answer:
+        "No. Narrate decisions, not syntax. You do not need to say 'now I am writing a for loop.' You do need to say why you are reaching for a hash map before you write it.",
+    },
+    {
+      question: "Is voice or text better for practicing this?",
+      answer:
+        "Voice forces you to actually produce the words instead of composing them silently in your head, which is closer to a real interview. Text is a reasonable place to start if you are not ready for that yet.",
     },
   ]
 
   return (
     <LandingPageTemplate
-      title="How to Talk Through Coding Interviews"
-      subtitle="Communication is Key"
-      heroDescription="Coding is only half the battle. Learn the frameworks and techniques to effectively communicate your thought process during technical interviews."
+      title="How to talk through coding interviews"
+      subtitle="Guide"
+      heroDescription="Working code is not enough if you solve it in silence. Here is what to say, and when, from your first read of the prompt to the last line you type."
       primaryKeyword="talk through coding interviews"
       contentSections={contentSections}
       faqs={faqs}
