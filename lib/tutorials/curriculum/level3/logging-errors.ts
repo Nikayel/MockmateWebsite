@@ -409,7 +409,7 @@ export const loggingErrorsLesson: PythonLesson = {
   difficulty: "medium",
   skills: ["logging", "exceptions", "error-boundaries", "robustness"],
   teach: {
-    estimatedMinutes: 5,
+    estimatedMinutes: 6,
     markdown: `## Logging and where to handle errors
 
 ### Why this matters
@@ -514,6 +514,24 @@ print(safe_total(["1", "x", "3"]))   # 4
 \`\`\`
 
 \`int("x")\` raises \`ValueError\`, the loop swallows just that one, and \`1 + 3\` gives \`4\`.
+
+### Re-raising: \`raise ... from err\`
+
+The other move at a boundary is to translate: catch the low-level exception and raise your own, so callers handle one error type instead of every library's. Name the caught exception with \`as err\` and re-raise \`from err\`:
+
+\`\`\`python
+class BadRow(Exception):
+    pass
+
+
+def reading(row):
+    try:
+        return int(row["kwh"])
+    except KeyError as err:
+        raise BadRow("no kwh column") from err
+\`\`\`
+
+\`from err\` sets \`__cause__\` on the new exception to the original one, so nothing is lost. The traceback then prints both, oldest first, joined by the line "The above exception was the direct cause of the following exception". Callers get your type; whoever reads the log still sees the \`KeyError\` and the line that raised it. Drop the \`from err\` and Python still chains it implicitly, as \`__context__\`, under the vaguer wording "During handling of the above exception, another exception occurred"; being explicit says you meant the translation. Use \`from None\` when the original really is noise and you want it suppressed.
 
 ### Pitfalls
 
