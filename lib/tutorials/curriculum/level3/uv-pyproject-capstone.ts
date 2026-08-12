@@ -7,12 +7,14 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // The last exercise of the level composes the level's skills instead of drilling one: a package
 // laid out under a real pyproject.toml, files read off disk with pathlib, a validating boundary
 // that turns text into a typed record, an error boundary that keeps one bad line from ending the
-// run, and a CLI entry point. Three editable files with distinct jobs: the record parser, the
-// directory reader, and the command.
+// run, and a CLI entry point. Four editable files with distinct jobs: the record parser, the
+// directory reader, the command, and the packaging declaration that names it.
 //
-// The pyproject.toml is load-bearing rather than decoration: a hidden test reads the
-// [project.scripts] declaration out of it and imports main through that path, so the layout and
-// the declared entry point have to agree.
+// The pyproject.toml is load-bearing rather than decoration, and it is editable: the shipped
+// [project.scripts] entry points at a module a refactor deleted. Every hidden test that touches
+// the command reaches it by reading that declaration and importing through it, so the learner has
+// to make the declaration and the layout agree. That is the only place the "packaging" skill in
+// this lesson is actually exercised, so it is graded rather than read.
 //
 // Deliberately simpler than py-l4-packaging-capstone (no registry, no decorator factory, no
 // injected transport, no __init__ export surface): this one is about a small tool that reads
@@ -24,8 +26,20 @@ const CAP_README = `# Capstone: the \`shiftlog\` command
 A workshop drops one plain-text log per day into a folder, and the office manager wants a single
 total per person at the end of the week. You are writing the tool that reads that folder.
 
-Three files are yours: \`shiftlog/records.py\`, \`shiftlog/store.py\`, and \`shiftlog/cli.py\`.
-Read \`pyproject.toml\` too, because it declares which function the \`shiftlog\` command runs.
+Four files are yours: \`shiftlog/records.py\`, \`shiftlog/store.py\`, \`shiftlog/cli.py\`, and
+\`pyproject.toml\`.
+
+## \`pyproject.toml\`
+
+The project used to be one module, \`shiftlog/main.py\`, holding a function called \`run\`. That
+module is gone: the work now lives in the three modules below. \`[project.scripts]\` still names
+the old path, so installing this package would wire the \`shiftlog\` command to something that no
+longer exists.
+
+Declare the console script correctly. An entry in \`[project.scripts]\` reads
+\`command = "import.path.to.module:function"\`, and the tests reach your code through whatever that
+line says rather than by importing \`shiftlog.cli\` themselves. If the declaration and the layout
+disagree, nothing runs.
 
 ## The log format
 
@@ -70,7 +84,22 @@ the problem. Otherwise it returns:
 \`totals\` sums each worker's minutes across every file. Some tests are hidden.
 `
 
-const CAP_PYPROJECT = String.raw`[project]
+const CAP_PYPROJECT_STARTER = String.raw`[project]
+name = "shiftlog"
+version = "0.1.0"
+description = "Total the minutes in a folder of workshop shift logs"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+# TODO: shiftlog/main.py is gone. Point this at the function that runs the command now.
+shiftlog = "shiftlog.main:run"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+`
+
+const CAP_PYPROJECT_REFERENCE = String.raw`[project]
 name = "shiftlog"
 version = "0.1.0"
 description = "Total the minutes in a folder of workshop shift logs"
@@ -322,9 +351,28 @@ def entry_point():
     text = Path("pyproject.toml").read_text()
     match = re.search(r"^\s*shiftlog\s*=\s*\"([^\"]+)\"", text, re.MULTILINE)
     assert match, "expected pyproject.toml to declare a shiftlog console script"
-    module_name, _, attribute = match.group(1).partition(":")
-    module = importlib.import_module(module_name)
-    return getattr(module, attribute)
+    declared = match.group(1)
+    module_name, _, attribute = declared.partition(":")
+    try:
+        module = importlib.import_module(module_name)
+    except ImportError:
+        raise AssertionError(
+            "pyproject.toml declares the shiftlog command as "
+            + repr(declared)
+            + ", but there is no module "
+            + repr(module_name)
+            + " in this project"
+        )
+    run = getattr(module, attribute, None)
+    assert run is not None, (
+        "pyproject.toml declares the shiftlog command as "
+        + repr(declared)
+        + ", but "
+        + repr(module_name)
+        + " has no "
+        + repr(attribute)
+    )
+    return run
 
 
 def run_tests(record):
@@ -407,7 +455,7 @@ export const uvPyprojectCapstoneLesson: PythonLesson = {
   id: "py-l3-uv-pyproject-capstone",
   title: "Dependencies, pyproject & a mini capstone",
   summary: "Understand pyproject.toml/uv and extend a small, tested multi-file project.",
-  estimatedMinutes: 34,
+  estimatedMinutes: 55,
   difficulty: "hard",
   skills: ["pyproject", "uv", "packaging", "capstone"],
   teach: {
@@ -631,28 +679,39 @@ For \`[{"title": "a", "done": True}, {"title": "b", "done": False}]\` return
     id: "py-l3-uv-pyproject-capstone-practice",
     executionMode: "workspace",
     prompt: `Capstone: build the \`shiftlog\` command that totals a folder of workshop shift logs.
-Three files are yours. \`shiftlog/records.py\` turns one raw line into a checked \`Entry\`,
+Four files are yours. \`shiftlog/records.py\` turns one raw line into a checked \`Entry\`,
 \`shiftlog/store.py\` reads the directory's log files and keeps going past the lines it cannot
-use, and \`shiftlog/cli.py\` holds \`main(argv)\`, the function \`pyproject.toml\` declares as the
-command. Bad lines are reported, never fatal. Start with \`README.md\`, and read
-\`pyproject.toml\` for the entry point the command has to reach. Some tests are hidden.`,
+use, and \`shiftlog/cli.py\` holds \`main(argv)\`. \`pyproject.toml\` still declares the console
+script that a refactor left behind, and the tests reach your command through that declaration, so
+it has to name where the code actually lives. Bad lines are reported, never fatal. Start with
+\`README.md\`. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "Build it bottom up: one line first, then a directory of files, then the command over that directory. Each layer only calls the one below it.",
+      "Build it bottom up: one line, then a directory of files, then the command over that directory, then the declaration that points at the command. Each layer only calls the one below it.",
       "`parse_line` has three outcomes, so decide them in order: nothing to report (blank or `#`), then a valid `worker: minutes`, then everything else is a `BadLineError`. `str.isdigit()` is a quick way to reject minutes that are negative, fractional, or not numbers at all.",
-      '`log_files` is `sorted(Path(directory).glob("*.log"))`, which skips other extensions and subfolders for free. In `collect_entries`, `enumerate(path.read_text().splitlines(), start=1)` gives you the line number, and wrapping the `parse_line` call in `try` / `except BadLineError` is what turns a bad line into an appended `"name:number"` instead of a crash.',
-      "`main` validates before it works: `len(argv) != 1` and `not Path(argv[0]).is_dir()` are both `ValueError`. Then total per worker with `totals[entry.worker] = totals.get(entry.worker, 0) + entry.minutes`.",
+      "`Path.glob` with a pattern matches the top level of a directory only, which is the rule the README states about subfolders, and sorting the paths it yields orders them by name. In `collect_entries` the line number has to come from `enumerate`'s `start`, and the `try` belongs around the single `parse_line` call so one rejection costs you that line and nothing more. `main` validates both bad call shapes before it reads anything. If the entry-point test says it cannot find your command, the fix is the `module.path:function` string in `[project.scripts]`, not the Python.",
     ],
     workspace: {
       language: "python",
       primaryFilePath: "shiftlog/records.py",
-      editableFilePaths: ["shiftlog/records.py", "shiftlog/store.py", "shiftlog/cli.py"],
+      editableFilePaths: [
+        "shiftlog/records.py",
+        "shiftlog/store.py",
+        "shiftlog/cli.py",
+        "pyproject.toml",
+      ],
       visibleTestPaths: ["tests/test_shiftlog.py"],
       hiddenTestPaths: ["tests/test_shiftlog_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
         { path: "README.md", role: "docs", language: "markdown", content: CAP_README },
-        { path: "pyproject.toml", role: "docs", language: "text", content: CAP_PYPROJECT },
+        {
+          path: "pyproject.toml",
+          role: "editable",
+          language: "text",
+          content: CAP_PYPROJECT_STARTER,
+          description: "Declare the console script the command is reached through",
+        },
         { path: "shiftlog/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
           path: "shiftlog/records.py",
@@ -710,6 +769,12 @@ command. Bad lines are reported, never fatal. Start with \`README.md\`, and read
         },
       ],
       referenceFiles: [
+        {
+          path: "pyproject.toml",
+          role: "editable",
+          language: "text",
+          content: CAP_PYPROJECT_REFERENCE,
+        },
         {
           path: "shiftlog/records.py",
           role: "editable",

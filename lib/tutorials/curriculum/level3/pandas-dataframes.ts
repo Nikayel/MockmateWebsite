@@ -37,7 +37,9 @@ These take the joined rows.
 - every name in \`categories\` appears, including one that no transaction reached
 - \`total\` sums the amounts that are present, \`count\` counts the rows that had one
 - a row with a missing amount contributes to neither
-- \`average\` is \`total / count\` rounded to a whole number, or \`0\` when \`count\` is \`0\`
+- \`average\` is \`total / count\` rounded to the nearest whole number, or \`0\` when \`count\` is \`0\`.
+  Refunds make a total negative, and rounding toward the nearest value is not the same as
+  truncating toward negative infinity, so \`-10\` over \`3\` rows averages \`-3\`
 - rows with no matched category belong to none of these buckets
 
 **\`rank_categories(report)\`** returns the category names as a list, highest \`total\` first. Names
@@ -199,7 +201,10 @@ def run_tests(record):
     def the_raw_rows_are_left_alone():
         raw = [{"txn_id": "t1", "category_id": " c1 ", "amount": "40"}]
         cleaned = clean_transactions(raw)
-        assert raw[0]["amount"] == "40", f"clean_transactions edited its input: {raw[0]!r}"
+        assert raw[0] == {"txn_id": "t1", "category_id": " c1 ", "amount": "40"}, (
+            "clean_transactions edited its input instead of building new dicts: "
+            f"{raw[0]!r}"
+        )
         assert cleaned[0]["category_id"] == "c1", f"expected 'c1', got {cleaned[0]['category_id']!r}"
 
     def a_refund_stays_negative():
@@ -233,6 +238,19 @@ def run_tests(record):
         want = {"total": 30, "count": 2, "average": 15}
         assert entry == want, f"a missing amount is not a zero, expected {want!r}, got {entry!r}"
 
+    def a_refunded_category_rounds_to_the_nearest():
+        rows = [
+            {"category": "Books", "amount": -3},
+            {"category": "Books", "amount": -3},
+            {"category": "Books", "amount": -4},
+        ]
+        entry = category_report(rows, {"c3": "Books"})["Books"]
+        want = {"total": -10, "count": 3, "average": -3}
+        assert entry == want, (
+            "-10 over 3 rows rounds to -3, while floor division gives -4: "
+            f"expected {want!r}, got {entry!r}"
+        )
+
     def a_tie_is_broken_alphabetically():
         report = {
             "Transport": {"total": 40, "count": 1, "average": 40},
@@ -254,6 +272,7 @@ def run_tests(record):
     record("an unmatched row never becomes a bucket", an_unmatched_row_never_becomes_a_bucket)
     record("an empty category still reports", an_empty_category_still_reports)
     record("a missing amount does not move the average", a_missing_amount_does_not_move_the_average)
+    record("a refunded category rounds to the nearest", a_refunded_category_rounds_to_the_nearest)
     record("a tie is broken alphabetically", a_tie_is_broken_alphabetically)
     record("a missing amount counts as zero when unmatched", a_missing_amount_counts_as_zero_when_unmatched)
 `
@@ -262,7 +281,7 @@ export const pandasDataframesLesson: PythonLesson = {
   id: "py-l3-pandas-dataframes",
   title: "pandas: DataFrames, filtering & groupby",
   summary: "Load a CSV, select and filter rows, total by group, and survive missing values.",
-  estimatedMinutes: 25,
+  estimatedMinutes: 42,
   difficulty: "medium",
   skills: ["csv", "data-modeling", "filtering", "dicts"],
   teach: {
@@ -535,7 +554,7 @@ Some tests are hidden.`,
     hints: [
       "Two rows never match the reference table, and one row has no amount. Decide what each of those is worth before you write the totals loop, because they are not worth the same thing.",
       "Build the report dict from `categories.values()` first, so a category with no transactions is already present with zeros, then walk the rows and add to the buckets that exist.",
-      'A missing amount must skip both `total` and `count`, or the average is computed over a row that never happened. For ties, `sorted(report, key=lambda name: (-report[name]["total"], name))` sorts on total descending and name ascending in one pass.',
+      "A missing amount must skip both `total` and `count`, or the average is computed over a row that never happened. Note that refunds put negative totals through the average, where rounding to the nearest whole number and floor division disagree. For the ranking, one `sorted` call with a tuple key can sort on total descending and name ascending at once, given that negating the total flips only that half of the comparison.",
     ],
     workspace: {
       language: "python",

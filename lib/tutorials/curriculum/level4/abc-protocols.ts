@@ -112,10 +112,7 @@ class HalfBuiltExporter(Exporter):
         return "id,amount"
 `
 
-const EXPORT_EXPORTERS_STARTER = String.raw`from pipeline.base import Exporter
-
-
-class CsvExporter:
+const EXPORT_EXPORTERS_STARTER = String.raw`class CsvExporter:
     # TODO: make CsvExporter conform to the Exporter contract the way that earns render_all.
     def header(self):
         return ""
@@ -320,7 +317,7 @@ export const abcProtocolsLesson: PythonLesson = {
   id: "py-l4-abc-protocols",
   title: "ABCs & Protocols",
   summary: "Define interfaces with abc and Protocol, then program to the abstraction.",
-  estimatedMinutes: 28,
+  estimatedMinutes: 45,
   difficulty: "hard",
   skills: ["abc", "protocols", "interfaces", "polymorphism"],
   teach: {
@@ -435,7 +432,7 @@ This is structural (duck) typing made checkable. A third-party \`Circle\` you ca
     {
       "label": "You want the interpreter itself to refuse a half-finished implementation",
       "bucket": "Reach for an ABC",
-      "feedback": "@abstractmethod is the only one of the two with a runtime gate. Protocol conformance is checked by mypy, never by the interpreter."
+      "feedback": "@abstractmethod is the only one of the two that refuses the object outright: instantiating a class with an unimplemented abstract method raises TypeError. A Protocol never blocks construction. It can be checked at runtime, but only if you opt in with @runtime_checkable and only by asking isinstance yourself, and even then it just looks for the method names."
     },
     {
       "label": "You want mypy to verify that two unrelated classes both satisfy one contract",
@@ -584,7 +581,7 @@ Some tests are hidden.`,
     hints: [
       "Two of the classes in play satisfy the contract by having the right methods, and one satisfies it by declaring a parent. Only one of those two facts buys you inherited code.",
       "`classify` has to test the stricter contract first, because a nominal conformer is also a structural one. `try_construct` needs a `try`/`except` around the call itself, not around a later method call.",
-      "`isinstance(renderer, Exporter)` answers the nominal question and `isinstance(renderer, Renderer)` answers the structural one, because `Renderer` is decorated `@runtime_checkable`. In `export_rows`, take the nominal branch through `renderer.render_all(rows)`.",
+      "You can ask `isinstance` about both contracts, including the protocol, because `pipeline/contracts.py` decorates it `@runtime_checkable`. So `classify` is not two different kinds of check, it is the same check twice in the right order. `export_rows` has two branches for the same reason: one of them rebuilds the header-plus-rows list itself, and the other has already inherited a method that does exactly that.",
     ],
     workspace: {
       language: "python",

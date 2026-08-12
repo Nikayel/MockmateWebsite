@@ -105,10 +105,7 @@ class ScriptedFeed:
 FEED = ScriptedFeed()
 `
 
-const RETRY_STARTER = String.raw`import functools
-
-
-def retry(times, on):
+const RETRY_STARTER = String.raw`def retry(times, on):
     """Build a decorator that retries the exceptions named by on (see README.md)."""
 
     def decorator(fn):
@@ -426,7 +423,7 @@ export const decoratorsAdvancedLesson: PythonLesson = {
   id: "py-l4-decorators-advanced",
   title: "Decorators with arguments & functools.wraps",
   summary: "Write a parameterized, well-behaved decorator that preserves the wrapped function.",
-  estimatedMinutes: 28,
+  estimatedMinutes: 55,
   difficulty: "hard",
   skills: ["decorators", "functools", "closures", "metaprogramming"],
   teach: {
@@ -700,8 +697,8 @@ arguments untouched. \`ingest/feed.py\` is read-only. Some tests are hidden.`,
     starterCode: "",
     hints: [
       "Two of the three layers run once at the `@` line and one runs per call. The attempt total has to survive every call to one function without leaking into the next function the same decorator is applied to, so ask which of the three layers has exactly that lifetime.",
-      "A counter defined in `decorator(fn)`, above the `def wrapper` line, is created once per decorated function. Keep it in a dict so the wrapper can mutate it through the closure, and hang that same dict on the wrapper as an attribute before returning it. For the retry loop itself: `for _ in range(times)`, `try` the call and return its result, `except on as exc` to remember the failure, and raise the remembered one after the loop.",
-      "`except on as exc` accepts a tuple of exception classes directly, so an error missing from `on` is never caught and leaves from the attempt that raised it. In `ingest/jobs.py`, `fetch_page` needs `@retry(times=4, on=(TransientError,))`, and `purge_stale` retries two error classes in two attempts.",
+      "A name bound inside `decorator(fn)`, above the `def wrapper` line, is created once per decorated function. Make the counter a mutable container so the wrapper can update it through the closure rather than rebinding it, and hand the same container back out as the wrapper's `stats`.",
+      "`except on as exc` accepts a tuple of exception classes directly, so anything missing from `on` is never caught and leaves from the attempt that raised it. Two gotchas around that: the caught exception is gone once the `except` block ends, so keep the one you want to re-raise in a name of your own, and a bare wrapper reports its own `__name__`, which is what `functools.wraps(fn)` is for. In `ingest/jobs.py` the two `@` lines are the README table, one row each.",
     ],
     workspace: {
       language: "python",

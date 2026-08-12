@@ -13,8 +13,10 @@ again for every single event, and the rate engine is asked for the same rate tho
 
 Timing is not graded here, because timing is noise. Two read-only modules count work instead:
 
-- \`hotpath/instrument.py\` gives \`ProbeList\`, the catalog wrapper. Every element it hands out
-  (through iteration, indexing or \`in\`) adds one to \`catalog.probes\`. \`len(catalog)\` is free.
+- \`hotpath/instrument.py\` gives \`ProbeList\`, the catalog wrapper. It charges you one probe per
+  element it touches: iterating adds one per element yielded, \`catalog[i]\` adds one, and
+  \`value in catalog\` adds one for every element it scans before it stops, so a value that is not
+  there costs the whole catalog. \`len(catalog)\` is free.
 - \`hotpath/rates.py\` gives \`compute_rate(code, tier)\`, the expensive engine. Every call is appended
   to \`rates.CALLS\`. \`rates.reset()\` empties that log.
 
@@ -106,9 +108,7 @@ def compute_rate(code, tier):
     return BASE_CENTS[code] + 500 * tier
 `
 
-const PERF_PRICING_STARTER = String.raw`from functools import lru_cache
-
-from hotpath import rates
+const PERF_PRICING_STARTER = String.raw`from hotpath import rates
 
 ALIASES = {"professional": "pro", "startup": "team", "student": "edu"}
 
@@ -351,7 +351,7 @@ export const performanceLesson: PythonLesson = {
   id: "py-l4-performance",
   title: "Profiling, complexity & caching",
   summary: "Find the hot path, fix complexity, and memoize repeated work with lru_cache.",
-  estimatedMinutes: 28,
+  estimatedMinutes: 55,
   difficulty: "hard",
   skills: ["performance", "lru-cache", "complexity", "profiling"],
   teach: {
@@ -633,7 +633,7 @@ what the catalog probe budget is and which events are dropped. Some tests are hi
     hints: [
       "Both counters punish the same habit: work repeated inside a loop that could have been done once outside it. The catalog is a scan; the rate engine is a repeat.",
       "In `rollup`, read the catalog once into a dict keyed by the canonical code, then each event is one hash lookup. In `pricing`, the cache has to sit behind `normalize`, or four spellings of one plan become four cache entries.",
-      "`lru_cache` keys on the arguments, so they must be hashable: a `usage` dict cannot be one. Take the dict apart at the boundary and pass `seats` and `gb` to a cached inner function, then expose `cache_clear()` on each cached function from `clear_caches()`.",
+      "The gotcha is the cache key: `lru_cache` hashes every argument it is given, and a `usage` dict is not hashable, so a cached function cannot take one. Whatever you end up caching, `clear_caches()` has to be able to empty it, and every `lru_cache`-decorated function carries its own `cache_clear()`.",
     ],
     workspace: {
       language: "python",

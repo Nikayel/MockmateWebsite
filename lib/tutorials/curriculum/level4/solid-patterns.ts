@@ -357,7 +357,7 @@ export const solidPatternsLesson: PythonLesson = {
   id: "py-l4-solid-patterns",
   title: "SOLID & design patterns (factory, strategy)",
   summary: "Refactor toward SOLID with pluggable strategies selected by a factory.",
-  estimatedMinutes: 28,
+  estimatedMinutes: 50,
   difficulty: "hard",
   skills: ["solid", "strategy-pattern", "factory-pattern", "design"],
   teach: {
@@ -593,7 +593,7 @@ are hidden.`,
     hints: [
       "Two things are missing. Nothing has registered a carrier under `glacier`, and `quote_parcel` never asks the registry it was handed for anything.",
       "A carrier module registers a factory that takes its config and returns a function closing over it, so `dispatch/carriers/standard.py` is the shape to copy. In the service, resolve the code first: if the lookup comes back `None`, quote under `FALLBACK_CODE` instead, and read the config under whichever code you ended up using.",
-      '`register_carrier("glacier", build_quote)` at the bottom of the carrier module. In the service, `factory = registry.lookup(resolved)` and then `factory(configs[resolved])(parcel)`. Round the weight up with `-(-grams // 1000)`.',
+      "Two gotchas. The `register_carrier` call has to run when the module is imported rather than from inside `build_quote`, because the package import is the only thing that ever touches a new carrier file. And in the service, `configs` has to be indexed by the code you resolved to, not the code you were asked for, or a fallback quote prices an unknown carrier against a config that does not exist. Glacier's chargeable weight also has a floor that Standard Post does not have, so a 200g parcel still bills a whole kilo.",
     ],
     workspace: {
       language: "python",

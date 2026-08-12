@@ -49,7 +49,8 @@ apply_offsets([[10, 20], [30, 40]], [1, -5])     # [[11, 15], [31, 35]]
 
 **\`mask_above(table, column, threshold)\`** returns one boolean per row: \`True\` where that row's value
 in \`column\` is strictly greater than \`threshold\`. Raise \`ValueError\` if \`column\` is not a real column
-index.
+index. Python counts a \`bool\` as an \`int\`, so \`True\` reaches an index check looking like \`1\`: it is
+not a column index here and has to be rejected.
 
 **\`select_rows(table, mask)\`** keeps the rows whose mask entry is \`True\`, in order. Raise
 \`ValueError\` if the mask does not have one entry per row.
@@ -162,7 +163,9 @@ def column_totals(table):
 
 def mask_above(table, column, threshold):
     _, columns = check_rectangular(table)
-    if not isinstance(column, int) or column < 0 or column >= columns:
+    if isinstance(column, bool) or not isinstance(column, int):
+        raise ValueError("column index is not a column of this table")
+    if column < 0 or column >= columns:
         raise ValueError("column index is not a column of this table")
     return [row[column] > threshold for row in table]
 
@@ -301,6 +304,14 @@ def run_tests(record):
             raised = True
         assert raised, "expected ValueError for column 5 of a 2-column table, got no error"
 
+    def a_boolean_is_not_a_column_index():
+        try:
+            mask_above([[1, 2], [3, 4]], True, 0)
+            raised = False
+        except ValueError:
+            raised = True
+        assert raised, "expected ValueError for True as a column index, got no error"
+
     def a_wrong_length_mask_is_rejected():
         try:
             select_rows([[1], [2], [3]], [True, False])
@@ -325,6 +336,7 @@ def run_tests(record):
     record("a column of only gaps fills with zero", a_column_of_only_gaps_fills_with_zero)
     record("the fill value floors", the_fill_value_floors)
     record("an out-of-range column is rejected", an_out_of_range_column_is_rejected)
+    record("a boolean is not a column index", a_boolean_is_not_a_column_index)
     record("a wrong-length mask is rejected", a_wrong_length_mask_is_rejected)
     record("a mask that keeps nothing gives an empty table", a_mask_that_keeps_nothing_gives_an_empty_table)
     record("the report handles negatives and a single row", the_report_handles_negatives_and_a_single_row)
@@ -334,7 +346,7 @@ export const numpyArraysLesson: PythonLesson = {
   id: "py-l3-numpy-arrays",
   title: "numpy: arrays, dtypes & whole-array operations",
   summary: "Why a fixed-dtype array beats a list of ints, and what that promise costs you.",
-  estimatedMinutes: 18,
+  estimatedMinutes: 45,
   difficulty: "medium",
   skills: ["data-structures", "performance", "type-coercion", "iteration"],
   teach: {
@@ -565,7 +577,7 @@ values both per row and per column, select rows with a boolean mask, and assembl
     hints: [
       "Two different totals come out of the same table. One walks each row; the other walks one column index across all the rows. Write them separately and the axis confusion goes away.",
       "`fill_missing` needs a value per column before it can rewrite anything, so gather each column's known values first, then rebuild the rows using `enumerate(row)` to know which column you are in.",
-      "`offsets` is one row that applies to every row, so `apply_offsets` is `[[value + offsets[index] for index, value in enumerate(row)] for row in table]` once you have rejected a wrong-width `offsets`. `summarize` is `apply_offsets(fill_missing(table), offsets)` followed by the two totals.",
+      "Two traps sit in the validation. `check_rectangular` gives you the width, so compare `len(offsets)` against it before you add anything. And `isinstance(True, int)` is `True`, so a column index check that only asks for an `int` lets `True` through as column 1: rule out `bool` first. `summarize` composes the transform functions in the order the README states rather than redoing their work.",
     ],
     workspace: {
       language: "python",

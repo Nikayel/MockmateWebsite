@@ -225,7 +225,7 @@ export const pathlibLesson: PythonLesson = {
   id: "py-l3-pathlib",
   title: "pathlib & file processing",
   summary: "Read and transform real files in a project with pathlib.",
-  estimatedMinutes: 22,
+  estimatedMinutes: 35,
   difficulty: "medium",
   skills: ["pathlib", "files", "text-processing", "io"],
   teach: {
@@ -438,7 +438,7 @@ Some tests are hidden.`,
     hints: [
       "Discovery is recursive: a reading file counts no matter how many directories down it sits, and the only thing that makes it a reading file is its suffix.",
       "Build the summary location out of the source path's own methods rather than by cutting the filename at a dot, because one of these filenames has a dot in the middle of it. For the tree, ask `find_reading_files` for the files and describe each one relative to the root you were given.",
-      '`Path(root).rglob("*.csv")` walks every depth, `sorted(..., key=lambda p: p.as_posix())` fixes the order, `source.with_suffix(".txt")` renames safely, and `source.relative_to(root).as_posix()` gives the label.',
+      "Four `Path` methods carry this exercise: `rglob` for the recursive search, `with_suffix` for the rename that respects a dot in the middle of a name, `relative_to` for the label, and `as_posix` wherever the answer has to be a forward-slash string rather than a `Path`. Note that sorting `Path` objects is not the same as sorting their POSIX strings, so pass `sorted` a key.",
     ],
     workspace: {
       language: "python",

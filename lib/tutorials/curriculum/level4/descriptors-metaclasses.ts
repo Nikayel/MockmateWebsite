@@ -58,7 +58,8 @@ const SETTINGS_FIELDS_STARTER = String.raw`class Setting:
 
     def __set_name__(self, owner, name):
         self.name = name
-        # TODO: record a storage name this descriptor does not itself own.
+        # TODO: every profile object needs its own value for this setting, so work out here,
+        # once, what that per-profile value will be called.
 
     def __get__(self, instance, owner):
         # TODO: handle class-level access, and reads that happen before any write.
@@ -298,7 +299,7 @@ export const descriptorsMetaclassesLesson: PythonLesson = {
   id: "py-l4-descriptors-metaclasses",
   title: "Descriptors & a peek at metaclasses",
   summary: "Customize attribute access with a descriptor and understand how classes are created.",
-  estimatedMinutes: 28,
+  estimatedMinutes: 60,
   difficulty: "hard",
   skills: ["descriptors", "metaclasses", "attributes", "metaprogramming"],
   teach: {
@@ -558,7 +559,7 @@ Some tests are hidden.`,
     hints: [
       "One `Setting` object is created per declared name when the class body runs, and every profile object shares it, so decide where a written value has to live before you write `__set__`. In `schema/profile.py`, note that the registry has to be built once per subclass rather than once per profile object.",
       "`__set_name__` is where each descriptor can learn a storage name of its own, `__get__` is called with `instance` set to `None` for class-level access, and `getattr` takes a third argument for the name that was never written. `__init_subclass__` runs as each subclass is created and can read the class body it was given.",
-      'In `__get__`: `if instance is None: return self`, then `return getattr(instance, self.storage_name, self.default)`. In `__init_subclass__`, start from `getattr(base, "SETTINGS", {})` for each entry in `cls.__bases__`, then add the entries of `vars(cls)` whose value passes `isinstance(value, Setting)`, and assign the result to `cls.SETTINGS`.',
+      "The bug the hidden tests hunt for is where `__set__` puts the value. A dict living on the `Setting` object still has one dict per declared setting, shared by every profile object, and it passes every single-instance test before failing the moment two profiles exist. Reach for `setattr` on `instance` instead. On the registry side, `cls.__bases__` is where an inherited entry has to come from and `vars(cls)` is what this class body just declared, in declaration order; because `__init_subclass__` is handed the subclass, what you build has to be assigned onto `cls` rather than mutated in place, or every profile ends up sharing the base registry.",
     ],
     workspace: {
       language: "python",

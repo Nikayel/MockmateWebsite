@@ -226,7 +226,7 @@ export const packagesLesson: PythonLesson = {
   id: "py-l3-packages",
   title: "Modules, packages & project layout",
   summary: "Split logic across a real Python package with an __init__.py and cross-module imports.",
-  estimatedMinutes: 24,
+  estimatedMinutes: 35,
   difficulty: "medium",
   skills: ["packages", "modules", "imports", "project-structure"],
   teach: {
@@ -480,7 +480,7 @@ has the ranks and the exact behaviour. Some tests are hidden.`,
     hints: [
       "Two modules import each other right now: `report.py` imports `scan`, and `scan.py` imports `report`. Ask what `scan.py` actually needs, and which module should own it.",
       "Point every arrow at `levels.py`. It defines the table and `rank`, and imports nothing from `reportkit`. Then `scan.py` imports `rank` from `levels`, `report.py` already does the same, and `__init__.py` sits on top pulling the three public names up to the package root.",
-      "In `scan.py` the top line becomes `from reportkit.levels import rank`. In `__init__.py`, import the public names from the module that defines each one, then set `__all__` to a list of those three strings. A name you never import into `__init__.py` is not reachable as `reportkit.<name>`, which is how `rank` stays internal.",
+      "`__init__.py` makes a name reachable as `reportkit.<name>` by importing it, and nothing else does, so the way `rank` stays internal is that the front door never mentions it. `__all__` is a separate promise on top of that: it is a list of plain strings and it does not import anything by itself. In `scan.py`, remember that a word is only a severity when `rank` scores it above the default the lookup returns for a name it does not know.",
     ],
     workspace: {
       language: "python",

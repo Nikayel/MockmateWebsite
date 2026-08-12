@@ -88,13 +88,16 @@ STANDARD_CENTS = 500
 EXPRESS_CENTS = 1500
 
 
+# TODO: one of the four behaviours README.md documents is wrong in this module.
+# Your tests decide which one.
+
+
 def shipping_cost(subtotal_cents, express=False):
     """Return the shipping charge in cents for this subtotal."""
     if subtotal_cents < 0:
         raise ValueError("subtotal_cents must not be negative")
     if express:
         return EXPRESS_CENTS
-    # TODO: one of the four documented behaviours is wrong here. Your tests decide which.
     if subtotal_cents > FREE_SHIPPING_THRESHOLD_CENTS:
         return 0
     return STANDARD_CENTS
@@ -323,7 +326,7 @@ export const pytestBasicsLesson: PythonLesson = {
   title: "pytest assertions & structure",
   summary:
     "Implement a module against a pytest suite, then write your own suite for a documented shipping rule and fix the bug it catches.",
-  estimatedMinutes: 24,
+  estimatedMinutes: 40,
   difficulty: "medium",
   skills: ["pytest", "testing", "assertions", "tdd"],
   teach: {
@@ -477,7 +480,7 @@ broken builds of the module and names the ones it still lets through. Some tests
     hints: [
       "Work down the list in `README.md` one line at a time. Each documented behaviour is one test, named for what it asserts, and each test compares the returned number against the number you expect.",
       "The grader's broken builds each break exactly one behaviour, so a suite that tests only the standard charge passes three of them. Cover express and the free threshold at the boundary value itself, not a comfortable distance away from it.",
-      "For the error path, `with raises(ValueError): shipping.shipping_cost(-1)` from `tests/pytest_shim.py`. Then compare the threshold comparison in `cart/shipping.py` against behaviour 2 in the README.",
+      "The error path needs the `raises` context manager already imported from `tests/pytest_shim.py`, because a call that raises can never be compared to a return value. For the fix, the bug is an off-by-one at the boundary: pick the subtotal the README calls out by name, work out what the module returns for exactly that number, and the wrong comparison names itself.",
     ],
     workspace: {
       language: "python",

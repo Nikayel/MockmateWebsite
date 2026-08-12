@@ -37,6 +37,9 @@ hand it a \`unittest.mock.Mock\` and read the call history. \`billing/ledger.py\
 records which invoices this process has already charged, and it is shared by every test in the
 run.
 
+\`dispatch(gateway, invoices)\` charges every invoice the ledger has not already recorded and
+returns how many it charged. It reads the invoice rows it is handed and leaves them unchanged.
+
 Two things to do, in this order:
 
 1. Write the tests in \`tests/test_regression.py\`. Call the function as
@@ -442,7 +445,7 @@ export const testingToolingLesson: PythonLesson = {
   id: "py-l4-testing-tooling",
   title: "Mocking, coverage & modern tooling",
   summary: "Design code for testability, mock its dependencies, and know the modern tool stack.",
-  estimatedMinutes: 32,
+  estimatedMinutes: 55,
   difficulty: "hard",
   skills: ["mocking", "testing", "ruff", "mypy"],
   teach: {
@@ -698,7 +701,7 @@ suite still lets through. Some tests are hidden.`,
     hints: [
       "The count the nightly run reported was right, so nothing you can learn from the return value catches this ticket. Ask the mock what happened instead.",
       "A `Mock()` passed as the gateway records `gateway.charge.call_count` and `gateway.charge.call_args_list`, and comparing the list against `[call(...), call(...)]` pins how many calls happened, with which arguments, in which order.",
-      "The ledger is shared, so call `ledger.reset()` at the start of every test; to prove a paid invoice is skipped, dispatch the same rows twice in one test and assert the second gateway saw nothing.",
+      "The ledger is shared and nothing clears it for you, so a suite without `ledger.reset()` at the start of each test passes once and then fails when the audit runs it a second time. Note also that one of the broken builds recharges rows that were already paid, which no single dispatch call can see.",
     ],
     workspace: {
       language: "python",
