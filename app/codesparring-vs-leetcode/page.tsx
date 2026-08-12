@@ -1,11 +1,12 @@
 import { Metadata } from "next"
 import Link from "next/link"
+import { COMPETITOR_PRICING } from "@/lib/pricing-comparison"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
-  title: "CodeSparring vs LeetCode: Which is Better for Interview Prep?",
+  title: "CodeSparring vs LeetCode: Which Is Better for Interview Prep?",
   description:
-    "Compare CodeSparring and LeetCode for technical interview prep. See why practicing communication with an AI beats silently passing test cases.",
+    "Compare CodeSparring and LeetCode for interview prep. See what each is built for, and when a mock interview matters more than another solved problem.",
   alternates: {
     canonical: "/codesparring-vs-leetcode",
   },
@@ -14,63 +15,64 @@ export const metadata: Metadata = {
 export default function VsLeetCodePage() {
   const contentSections = [
     {
-      heading: "The LeetCode Trap",
+      heading: "What LeetCode does well",
       content: (
         <>
           <p>
-            LeetCode is the gold standard for learning Data Structures and Algorithms. However, it
-            creates a false sense of security. Many engineers can solve 300+ LeetCode problems but
-            still fail real interviews. Why? Because LeetCode tests your ability to write code that
-            passes edge cases in a vacuum.
+            LeetCode has the largest problem bank around, and it is still the standard place to
+            learn data structures and algorithms in the first place. If a pattern like two pointers
+            or dynamic programming has not clicked yet, drilling LeetCode until it does is time well
+            spent.
           </p>
           <p>
-            Real interviews test your ability to <strong>communicate</strong> your thought process,
-            clarify requirements, handle hints, and discuss Big O complexity under pressure. If you
-            grind LeetCode in silence, you are missing 50% of the rubric.
+            What it cannot do is put someone across the table from you. LeetCode tests whether your
+            code passes. Interviews test whether you can carry a round while someone watches, asks
+            questions, and reacts to what you say.
           </p>
         </>
       ),
     },
     {
-      heading: "How CodeSparring Fills the Gap",
+      heading: "What CodeSparring adds",
       content: (
         <>
           <p>
-            CodeSparring is designed to be the final step after you've learned the basics. Instead
-            of an empty text box with a "Run" button, you get an interactive AI interviewer.
+            CodeSparring's AI interviewer reacts as you work. It asks about the choices you make,
+            follows the edits to your code, and takes the conversation by voice or text. You leave
+            with a scored rubric covering communication, problem solving, and code quality, not just
+            whether the tests pass.
           </p>
-          <ul className="mt-4 list-disc space-y-2 pl-6">
-            <li>
-              <strong>Voice Interaction:</strong> Talk through your solution out loud before coding.
-            </li>
-            <li>
-              <strong>Dynamic Constraints:</strong> Just like a real interviewer, the AI will change
-              requirements mid-interview to see how you adapt.
-            </li>
-            <li>
-              <strong>Holistic Scoring:</strong> Get graded on your communication, problem-solving,
-              code efficiency, and verification skills, not just whether your code compiles.
-            </li>
-          </ul>
+          <p>
+            The DSA bank covers 170+ scenarios across 18 interview patterns: arrays and hashing, two
+            pointers, sliding window, stack, binary search, linked list, trees, tries, heaps,
+            backtracking, graphs, advanced graphs, 1-D DP, 2-D DP, greedy, intervals, math and
+            geometry, and bit manipulation. Each one plays out as a conversation, not a submission
+            box.
+          </p>
+          <p>
+            Some interviews do not start from a blank file, either. You get handed a real codebase
+            with a failing test and asked to find and fix the bug. CodeSparring runs these as{" "}
+            <Link href="/rounds">debugging rounds</Link>: a verified pack runs your fix against the
+            same test suite a reviewer would use, so passing means the bug is actually gone.
+          </p>
         </>
       ),
     },
     {
-      heading: "When to use which?",
+      heading: "When to use which",
       content: (
         <>
           <p>
-            <strong>Build your fundamentals for free on CodeSparring.</strong> Our free{" "}
-            <Link href="/learn/python">Python</Link>,{" "}
+            Build your fundamentals wherever you like. LeetCode's bank works for that, and so do
+            CodeSparring's free <Link href="/learn/python">Python</Link>,{" "}
             <Link href="/learn/data-engineering">SQL</Link>, and{" "}
-            <Link href="/learn/system-design">System Design</Link> tracks teach the core concepts
-            with graded exercises that run in your browser, so you don't have to outsource the
-            basics to a separate problem grinder.
+            <Link href="/learn/system-design">System Design</Link> courses, which run in your
+            browser.
           </p>
           <p>
-            <strong>Use CodeSparring to prepare for the interview.</strong> Once you know the
-            patterns, use CodeSparring to practice the soft skills, timing, and pressure of a real
-            technical screen.
+            Once the patterns feel familiar, use CodeSparring to rehearse the round itself: thinking
+            out loud, taking questions on your approach, and writing code while someone watches. The
+            free plan includes 8 full sessions a month with complete feedback, no card required.
           </p>
         </>
       ),
@@ -81,20 +83,24 @@ export default function VsLeetCodePage() {
     {
       question: "Does CodeSparring have LeetCode-style questions?",
       answer:
-        "Yes, our question bank covers the same 15 core patterns (Arrays, DP, Graphs, etc.) but structures them as conversational scenarios rather than isolated algorithmic puzzles.",
+        "Yes. The DSA bank spans 170+ scenarios across 18 patterns, from arrays and hashing to graphs and dynamic programming. The difference is that each one is a conversation with an interviewer, not a submission box.",
     },
     {
-      question: "Can I use both?",
+      question: "Do I need an account to try it?",
       answer:
-        "Absolutely! The best candidates use LeetCode for repetition and CodeSparring for mock interviews.",
+        "You can open the workspace and run a problem without one. The AI interviewer needs a free account, which takes one click with Google or GitHub.",
+    },
+    {
+      question: "How does the price compare to LeetCode Premium?",
+      answer: `LeetCode Premium runs $${COMPETITOR_PRICING.leetcodePremium.monthlyPrice} a month. CodeSparring's free plan costs nothing and includes 8 full interview sessions a month. Pro is $25 a month, or $225 billed yearly, for 35 sessions, spaced repetition, and a personalized roadmap.`,
     },
   ]
 
   return (
     <LandingPageTemplate
       title="CodeSparring vs LeetCode"
-      subtitle="Beyond Passing Test Cases"
-      heroDescription="LeetCode teaches you the algorithms. CodeSparring teaches you how to pass the interview. Compare the two platforms and learn why communication matters."
+      subtitle="Comparison"
+      heroDescription="LeetCode is where most people learn the patterns. CodeSparring is where you practice the rounds LeetCode skips: thinking out loud, taking follow-up questions, and debugging code that is not yours."
       primaryKeyword="interview simulator"
       contentSections={contentSections}
       faqs={faqs}
