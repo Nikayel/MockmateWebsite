@@ -273,6 +273,20 @@ store/
 }
 \`\`\`
 
+### The front door and \`__all__\`
+
+\`__init__.py\` is the package's front door. A name is reachable as \`store.<name>\` only because the front door imported it, so what you leave out of that file stays internal.
+
+\`\`\`python
+# store/__init__.py
+from store.catalog import price_of
+from store.cart import cart_total
+
+__all__ = ["cart_total", "price_of"]
+\`\`\`
+
+\`__all__\` is a plain list of strings naming the package's public API. It imports nothing by itself: the two import lines above do that work, and \`__all__\` only declares which of the names now present are the supported ones. Its one mechanical effect is on the star form, \`from store import *\`, which copies exactly the names listed there. Everything else it buys is documentation: readers, linters, and \`help()\` treat it as the published surface, so a name that is importable but absent from \`__all__\` reads as internal.
+
 ### Importing across modules
 
 Inside \`cart.py\`, reach a sibling module by its package-qualified path:
