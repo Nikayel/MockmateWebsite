@@ -17,7 +17,8 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import type { Scenario } from "@/lib/scenarios"
-import type { BugSymptom } from "@/lib/scenarios/types"
+import type { BugSymptom, BugFixScenario } from "@/lib/scenarios/types"
+import { resolveReporterNote } from "@/lib/scenarios/bugfix-quality"
 import type { GuidedLabConfig } from "@/lib/bugfix/guided-lab/types"
 import type { WorkspaceContextFile } from "../_types"
 import { BugfixBrief } from "./_sub/BugfixBrief"
@@ -121,6 +122,12 @@ export const ProblemColumn = memo(function ProblemColumn({
   const visibleLogs = scenarioDetails?.visibleLogs ?? []
   const guidedLab = scenarioDetails?.guidedLab
 
+  // Only the scenarios that actually authored a report get one quoted; see resolveReporterNote.
+  const reporterNote =
+    isBugfix && selectedScenario
+      ? resolveReporterNote(selectedScenario as BugFixScenario)
+      : undefined
+
   // The explorer only earns its own region when there is a real codebase behind it.
   // Upload-style scenarios keep the inline uploader at the foot of the brief.
   const showFileTree = isWorkspaceScenario(selectedScenario) && workspaceContext.length > 0
@@ -198,6 +205,7 @@ export const ProblemColumn = memo(function ProblemColumn({
                         task={scenarioDetails?.task}
                         symptom={scenarioDetails?.symptom}
                         acceptance={successCriteria}
+                        reporterNote={reporterNote}
                         report={
                           realInterviewMode && scenarioDetails?.fuzzyStatement
                             ? scenarioDetails.fuzzyStatement

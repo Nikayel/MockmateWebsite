@@ -261,8 +261,10 @@ Finance support approves a manual invoice adjustment when the review queue shows
     caveat:
       "Adjustments with no reconciled row in the ledger, credits, and no-match cases resolve correctly.",
   },
+  // Voiced like its siblings now that the note renders as an attributed quote in the brief. It was
+  // the one report written as a third-person narrator, which read as nobody's words once quoted.
   userReport:
-    "Finance support approved an adjustment that the queue explained with a ledger row already consumed by an earlier adjustment. That account double-counts the row now, and support wants to know which queue explanations they can still trust.",
+    "Finance support here. I approved an adjustment the queue explained with a ledger row an earlier adjustment had already used. That account double-counts the row now, and we need to know which queue explanations we can still trust.",
   observedSymptoms: [
     "Two adjustments this week were explained using a ledger row whose status was reconciled, and one was approved before review caught it.",
     "Adjustments whose ledger holds no reconciled row, credits, no-match cases, and legacy rows with missing amounts all behave normally.",

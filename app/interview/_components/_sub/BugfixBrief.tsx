@@ -91,6 +91,19 @@ interface BugfixBriefProps {
   acceptance?: string[]
   /** The incident narrative. The ONLY copy, and collapsed by default. */
   report?: string
+  /**
+   * The reporter's own words: who noticed, and what they saw. Rendered as a quote above the
+   * narrative, because that is the order a real ticket arrives in.
+   *
+   * Every scenario authors one and `bugfix-quality.ts` lints it for tone and root-cause leaks, but
+   * until now nothing rendered it: the field was declared on the panel's type and never read, so
+   * eleven carefully written incident reports reached no candidate.
+   *
+   * The CALLER decides whether a genuine report exists. `withBugfixIncidentDefaults` falls back to
+   * the scenario description, and printing that here would restore exactly the say-it-three-times
+   * duplication this brief was built to remove.
+   */
+  reporterNote?: string
   /** Fallback when a scenario has no authored `task` yet. */
   fallbackStatement?: string
   /** Real-interview mode shows a deliberately vaguer statement. */
@@ -168,6 +181,7 @@ export function BugfixBrief({
   symptom,
   acceptance = [],
   report,
+  reporterNote,
   fallbackStatement,
   isFuzzy,
 }: BugfixBriefProps) {
@@ -194,15 +208,23 @@ export function BugfixBrief({
       )}
 
       {/* 2. The incident — what system this is, who noticed, and what may not
-             change. Visible: this is the ticket, not an appendix to it. */}
-      {report && task && (
+             change. Visible: this is the ticket, not an appendix to it.
+             The reporter's words lead, because that is how the ticket arrived. */}
+      {(report || reporterNote) && task && (
         <div className="space-y-1.5">
           <div className={LABEL}>The incident</div>
           <div className="border-border/70 bg-card/40 rounded-lg border px-3 py-2.5">
-            <MarkdownRenderer
-              content={extractIncidentNarrative(report)}
-              className="text-muted-foreground text-[12.5px] leading-relaxed"
-            />
+            {reporterNote && (
+              <blockquote className="border-muted-foreground/30 text-foreground/80 mb-2.5 border-l-2 pl-2.5 text-[12.5px] leading-relaxed italic">
+                {reporterNote}
+              </blockquote>
+            )}
+            {report && (
+              <MarkdownRenderer
+                content={extractIncidentNarrative(report)}
+                className="text-muted-foreground text-[12.5px] leading-relaxed"
+              />
+            )}
           </div>
         </div>
       )}

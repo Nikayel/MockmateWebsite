@@ -206,3 +206,25 @@ export function validateBugfixScenarioQuality(scenario: BugFixScenario): BugfixQ
 
   return issues
 }
+
+/**
+ * The reporter's own words, or `undefined` when the scenario never authored any.
+ *
+ * `userReport` cannot be trusted on its own: {@link withBugfixIncidentDefaults} fills it from
+ * `description` so the required-field validation always passes, which means every scenario has one
+ * whether or not a human wrote it. Rendering the defaulted copy beside the narrative would print the
+ * same sentence twice, which is the duplication the bugfix brief was built to remove.
+ *
+ * Lives here rather than in the panel because the defaulting rule that creates the ambiguity lives
+ * here. The inverse belongs next to it, and being a plain function it is testable without mounting
+ * the interview UI.
+ */
+export function resolveReporterNote(scenario: BugFixScenario): string | undefined {
+  const note = scenario.userReport?.trim()
+  if (!note) return undefined
+  // Equal to the description means the defaulter supplied it, not an author.
+  if (note === scenario.description?.trim()) return undefined
+  // Some statements open on the report itself; quoting it above would repeat it.
+  if (scenario.problemStatement?.includes(note)) return undefined
+  return note
+}
