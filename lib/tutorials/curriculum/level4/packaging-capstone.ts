@@ -1,22 +1,78 @@
 import type { PythonLesson } from "../../types"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const CAPSTONE_README = `# Capstone: a typed, tested order service
+// ───────────────────────────────────────────────────────────────────────────
+// Practice workspace: the feedstore package (the Level 4 capstone)
+//
+// This is the last exercise of the level, so it composes the level's skills rather than
+// drilling one: config parsing (config-logging), a decorator factory that registers into a
+// strategy table plus the factory lookup over it (decorators-advanced + solid-patterns),
+// duck-typed dependency injection over a fake flaky transport (abc-protocols; the sandbox has
+// no network, so the transport is a read-only stand-in), and packaging proper, where the
+// graded surface is what `__init__.py` exports and every test imports from the package root.
+//
+// Four editable files, each with a distinct job: settings, the registry, the pipeline, and the
+// package's public face. The hidden suite grades the seams, not the numbers: a brand new format
+// registered through the public `register` decorator and a stranger transport object injected at
+// the entry point must both work with zero further edits.
+// ───────────────────────────────────────────────────────────────────────────
 
-Bring it all together: packages, type hints, dataclasses, validation, and tests. The \`orders\`
-package has a \`pyproject.toml\`, a typed \`Order\` model with \`parse_order\` (read-only), and sample
-data. Implement \`summarize(raw_orders)\` in \`orders/report.py\` so it:
+const CAPSTONE_README = `# Capstone: ship the \`feedstore\` package
 
-1. parses each raw order with the read-only \`parse_order\`
-2. returns \`{"count": <all>, "paid": <paid only>, "revenue": <sum of paid amounts, rounded to 2>}\`
+A partner publishes a scored item feed over a connection that drops. Your job is the package that
+reads it: settings from the environment, a parser chosen by format name, a fetch that survives a
+flaky source, and one public entry point a caller can use without knowing any of that.
 
-Only **paid** orders count toward revenue. Some tests are hidden.
+Four files are yours. \`feedstore/transport.py\` is read-only.
+
+## \`feedstore/config.py\`
+
+\`load_settings(env)\` returns a \`Settings\` with three fields read from a raw env mapping:
+
+| env key | field | default |
+| --- | --- | --- |
+| \`FEED_FORMAT\` | \`source_format\` | \`"csv"\` |
+| \`FEED_MAX_ATTEMPTS\` | \`max_attempts\` (int) | \`3\` |
+| \`FEED_MIN_SCORE\` | \`min_score\` (int) | \`0\` |
+
+A key that is missing, empty, or only whitespace takes the default. A \`max_attempts\` below 1
+is unusable, so \`load_settings\` raises \`ValueError\` for it.
+
+## \`feedstore/parsers.py\`
+
+\`register(name)\` is a decorator that adds the decorated parser to \`PARSERS\` under \`name\` and
+leaves the function itself usable. \`get_parser(name)\` returns the registered parser, or raises
+\`UnknownFormatError\` naming the format it could not find. \`parse_csv\` and \`parse_pipe\` are
+written for you and must end up registered as \`"csv"\` and \`"pipe"\`.
+
+## \`feedstore/pipeline.py\`
+
+\`Pipeline(settings, transport)\` runs one feed. \`fetch()\` calls \`transport.fetch()\`, retries a
+\`TransportError\` until \`max_attempts\` calls have been made, and re-raises the last error if
+every attempt fails. It records how many calls it made in \`self.attempts\`. \`run()\` fetches,
+parses with the parser for \`source_format\`, keeps the rows whose \`score\` is at least
+\`min_score\`, and returns:
+
+\`\`\`python
+{"format": "csv", "attempts": 1, "parsed": 3, "kept": 2}
+\`\`\`
+
+## \`feedstore/__init__.py\`
+
+The package's public face. Callers import from \`feedstore\`, never from a submodule, so the names
+\`Settings\`, \`load_settings\`, \`Pipeline\`, \`register\`, \`get_parser\`, \`UnknownFormatError\`,
+\`TransportError\`, \`FlakyTransport\`, and \`run_feed\` must all be reachable there and listed in
+\`__all__\`. \`run_feed(env, transport)\` is the entry point: it turns the env mapping into settings
+and runs one pipeline over the given transport.
+
+Anyone must be able to add a format, or hand you a different source, using only those public
+names. Some tests are hidden.
 `
 
 const CAPSTONE_PYPROJECT = String.raw`[project]
-name = "orders"
+name = "feedstore"
 version = "1.0.0"
-description = "A typed, tested order-summary service"
+description = "Read a scored partner feed from a flaky source"
 requires-python = ">=3.11"
 dependencies = []
 
@@ -30,85 +86,501 @@ line-length = 100
 testpaths = ["tests"]
 `
 
-const CAPSTONE_MODELS = String.raw`from dataclasses import dataclass
+const CAPSTONE_TRANSPORT = String.raw`"""The feed source (read-only).
+
+The real client speaks HTTP. This sandbox has no network and no threads, so FlakyTransport
+stands in for it: it hands back a canned payload and can be told to fail the first few calls
+the way a real connection does.
+"""
 
 
-@dataclass
-class Order:
-    id: int
-    amount: float
-    paid: bool
+class TransportError(RuntimeError):
+    """Raised when one fetch attempt fails. A later attempt may still succeed."""
 
 
-def parse_order(raw):
-    """Validate a raw order dict into a typed Order (coercing field types)."""
-    return Order(id=int(raw["id"]), amount=float(raw["amount"]), paid=bool(raw["paid"]))
+class FlakyTransport:
+    """A feed source that fails its first fail_times calls, then succeeds."""
+
+    def __init__(self, payload, fail_times=0):
+        self.payload = payload
+        self.fail_times = fail_times
+        self.calls = 0
+
+    def fetch(self):
+        self.calls += 1
+        if self.calls <= self.fail_times:
+            raise TransportError("fetch attempt " + str(self.calls) + " failed")
+        return self.payload
 `
 
-const CAPSTONE_REPORT_STARTER = String.raw`from orders.models import parse_order
+const CAPSTONE_CONFIG_STARTER = String.raw`"""Settings for one feed run. See README.md for the env keys and defaults."""
+
+from dataclasses import dataclass
+
+DEFAULT_FORMAT = "csv"
+DEFAULT_MAX_ATTEMPTS = 3
+DEFAULT_MIN_SCORE = 0
 
 
-def summarize(raw_orders):
-    """Parse the raw orders and report count / paid / revenue (see README.md)."""
-    # TODO: parse each raw order, then total count, paid count, and paid revenue (round 2).
-    return {}
+@dataclass(frozen=True)
+class Settings:
+    source_format: str
+    max_attempts: int
+    min_score: int
+
+
+def load_settings(env):
+    """Build Settings from a raw env mapping (see README.md)."""
+    # TODO: read the three env keys, fall back to the defaults above when a value is
+    # missing or blank, give the two numeric fields their numeric type, and reject an
+    # attempt count that cannot run.
+    raise NotImplementedError("load_settings")
 `
 
-const CAPSTONE_REPORT_REFERENCE = String.raw`from orders.models import parse_order
+const CAPSTONE_CONFIG_REFERENCE = String.raw`"""Settings for one feed run. See README.md for the env keys and defaults."""
+
+from dataclasses import dataclass
+
+DEFAULT_FORMAT = "csv"
+DEFAULT_MAX_ATTEMPTS = 3
+DEFAULT_MIN_SCORE = 0
 
 
-def summarize(raw_orders):
-    orders = [parse_order(raw) for raw in raw_orders]
-    paid = [order for order in orders if order.paid]
-    return {
-        "count": len(orders),
-        "paid": len(paid),
-        "revenue": round(sum(order.amount for order in paid), 2),
-    }
+@dataclass(frozen=True)
+class Settings:
+    source_format: str
+    max_attempts: int
+    min_score: int
+
+
+def _value(env, key, default):
+    raw = env.get(key)
+    if raw is None:
+        return default
+    text = str(raw).strip()
+    return text if text else default
+
+
+def load_settings(env):
+    """Build Settings from a raw env mapping (see README.md)."""
+    max_attempts = int(_value(env, "FEED_MAX_ATTEMPTS", DEFAULT_MAX_ATTEMPTS))
+    if max_attempts < 1:
+        raise ValueError("FEED_MAX_ATTEMPTS must be at least 1, got " + str(max_attempts))
+    return Settings(
+        source_format=_value(env, "FEED_FORMAT", DEFAULT_FORMAT),
+        max_attempts=max_attempts,
+        min_score=int(_value(env, "FEED_MIN_SCORE", DEFAULT_MIN_SCORE)),
+    )
 `
 
-const CAPSTONE_TEST = String.raw`from orders.report import summarize
+const CAPSTONE_PARSERS_STARTER = String.raw`"""Feed parsers and the registry that picks one by format name."""
+
+PARSERS = {}
+
+
+class UnknownFormatError(LookupError):
+    """Raised when no parser is registered under a requested format name."""
+
+
+def register(name):
+    """Decorator: add the decorated parser to PARSERS under name."""
+    # TODO: store the decorated function under name and hand the function back so it
+    # stays callable on its own.
+    raise NotImplementedError("register")
+
+
+def get_parser(name):
+    """Return the parser registered under name."""
+    # TODO: look name up, and raise UnknownFormatError naming it when nothing is there.
+    raise NotImplementedError("get_parser")
+
+
+# TODO: register parse_csv under "csv" and parse_pipe under "pipe" without editing their bodies.
+
+
+def parse_csv(text):
+    rows = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        item_id, score = line.split(",")
+        rows.append({"id": item_id.strip(), "score": int(score)})
+    return rows
+
+
+def parse_pipe(text):
+    rows = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        item_id, score = line.split("|")
+        rows.append({"id": item_id.strip(), "score": int(score)})
+    return rows
+`
+
+const CAPSTONE_PARSERS_REFERENCE = String.raw`"""Feed parsers and the registry that picks one by format name."""
+
+PARSERS = {}
+
+
+class UnknownFormatError(LookupError):
+    """Raised when no parser is registered under a requested format name."""
+
+
+def register(name):
+    """Decorator: add the decorated parser to PARSERS under name."""
+
+    def decorate(parser):
+        PARSERS[name] = parser
+        return parser
+
+    return decorate
+
+
+def get_parser(name):
+    """Return the parser registered under name."""
+    if name not in PARSERS:
+        raise UnknownFormatError("no parser registered for format " + repr(name))
+    return PARSERS[name]
+
+
+@register("csv")
+def parse_csv(text):
+    rows = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        item_id, score = line.split(",")
+        rows.append({"id": item_id.strip(), "score": int(score)})
+    return rows
+
+
+@register("pipe")
+def parse_pipe(text):
+    rows = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        item_id, score = line.split("|")
+        rows.append({"id": item_id.strip(), "score": int(score)})
+    return rows
+`
+
+const CAPSTONE_PIPELINE_STARTER = String.raw`"""One feed run: fetch, parse, filter, report. See README.md."""
+
+from feedstore.parsers import get_parser
+from feedstore.transport import TransportError
+
+
+class Pipeline:
+    def __init__(self, settings, transport):
+        self.settings = settings
+        self.transport = transport
+        self.attempts = 0
+
+    def fetch(self):
+        """Return the raw feed text, surviving a transport that fails (see README.md)."""
+        # TODO: call the transport, keep going while the settings still allow another call,
+        # record how many calls you made, and let the last failure out if none succeed.
+        raise NotImplementedError("Pipeline.fetch")
+
+    def run(self):
+        """Return the report for one feed run (see README.md)."""
+        # TODO: fetch, parse with the parser for this run's format, keep the rows that
+        # clear the score floor, and report the four keys.
+        raise NotImplementedError("Pipeline.run")
+`
+
+const CAPSTONE_PIPELINE_REFERENCE = String.raw`"""One feed run: fetch, parse, filter, report. See README.md."""
+
+from feedstore.parsers import get_parser
+from feedstore.transport import TransportError
+
+
+class Pipeline:
+    def __init__(self, settings, transport):
+        self.settings = settings
+        self.transport = transport
+        self.attempts = 0
+
+    def fetch(self):
+        """Return the raw feed text, surviving a transport that fails (see README.md)."""
+        last_error = None
+        for attempt in range(1, self.settings.max_attempts + 1):
+            self.attempts = attempt
+            try:
+                return self.transport.fetch()
+            except TransportError as error:
+                last_error = error
+        raise last_error
+
+    def run(self):
+        """Return the report for one feed run (see README.md)."""
+        text = self.fetch()
+        rows = get_parser(self.settings.source_format)(text)
+        kept = [row for row in rows if row["score"] >= self.settings.min_score]
+        return {
+            "format": self.settings.source_format,
+            "attempts": self.attempts,
+            "parsed": len(rows),
+            "kept": len(kept),
+        }
+`
+
+const CAPSTONE_INIT_STARTER = String.raw`"""feedstore: read a scored partner feed from a flaky source.
+
+Callers import from this package root, never from a submodule. See README.md for the
+names this package owes them.
+"""
+
+# TODO: re-export the package's public names from the submodules that define them, and list
+# every public name in __all__.
+
+__all__ = []
+
+
+def run_feed(env, transport):
+    """Entry point: run one feed for the given environment and source (see README.md)."""
+    # TODO: turn the env mapping into settings, then run one pipeline over the transport.
+    raise NotImplementedError("run_feed")
+`
+
+const CAPSTONE_INIT_REFERENCE = String.raw`"""feedstore: read a scored partner feed from a flaky source.
+
+Callers import from this package root, never from a submodule. See README.md for the
+names this package owes them.
+"""
+
+from feedstore.config import Settings, load_settings
+from feedstore.parsers import PARSERS, UnknownFormatError, get_parser, register
+from feedstore.pipeline import Pipeline
+from feedstore.transport import FlakyTransport, TransportError
+
+__all__ = [
+    "PARSERS",
+    "FlakyTransport",
+    "Pipeline",
+    "Settings",
+    "TransportError",
+    "UnknownFormatError",
+    "get_parser",
+    "load_settings",
+    "register",
+    "run_feed",
+]
+
+
+def run_feed(env, transport):
+    """Entry point: run one feed for the given environment and source (see README.md)."""
+    return Pipeline(load_settings(env), transport).run()
+`
+
+const CAPSTONE_TEST = String.raw`"""Visible capstone tests: the contract, read through the package's public API."""
+
+import feedstore
+
+CSV_FEED = "a1,7\nb2,3\nc3,9\n"
+
+PUBLIC_NAMES = [
+    "FlakyTransport",
+    "Pipeline",
+    "Settings",
+    "TransportError",
+    "UnknownFormatError",
+    "get_parser",
+    "load_settings",
+    "register",
+    "run_feed",
+]
 
 
 def run_tests(record):
-    def summarizes_mixed_orders():
-        raw = [
-            {"id": 1, "amount": "10.0", "paid": True},
-            {"id": 2, "amount": "5.0", "paid": False},
-        ]
-        assert summarize(raw) == {"count": 2, "paid": 1, "revenue": 10.0}, f"got {summarize(raw)!r}"
+    def empty_env_uses_defaults():
+        from feedstore import load_settings
 
-    def empty_is_zeroed():
-        assert summarize([]) == {"count": 0, "paid": 0, "revenue": 0}
+        settings = load_settings({})
+        got = (settings.source_format, settings.max_attempts, settings.min_score)
+        assert got == ("csv", 3, 0), f"expected ('csv', 3, 0) from an empty env, got {got!r}"
 
-    record("summarizes mixed orders", summarizes_mixed_orders)
-    record("empty input is zeroed", empty_is_zeroed)
+    def env_values_are_read_and_typed():
+        from feedstore import load_settings
+
+        settings = load_settings(
+            {"FEED_FORMAT": "pipe", "FEED_MAX_ATTEMPTS": "5", "FEED_MIN_SCORE": "4"}
+        )
+        got = (settings.source_format, settings.max_attempts, settings.min_score)
+        assert got == ("pipe", 5, 4), f"expected ('pipe', 5, 4), got {got!r}"
+        assert isinstance(settings.max_attempts, int), (
+            f"expected max_attempts to be an int, got {type(settings.max_attempts).__name__}"
+        )
+
+    def builtin_parsers_are_registered():
+        from feedstore import get_parser
+
+        csv_rows = get_parser("csv")("a1,7\n")
+        assert csv_rows == [{"id": "a1", "score": 7}], (
+            f"expected [{{'id': 'a1', 'score': 7}}] from the csv parser, got {csv_rows!r}"
+        )
+        pipe_rows = get_parser("pipe")("b2|3\n")
+        assert pipe_rows == [{"id": "b2", "score": 3}], (
+            f"expected [{{'id': 'b2', 'score': 3}}] from the pipe parser, got {pipe_rows!r}"
+        )
+
+    def run_feed_reports_one_clean_run():
+        from feedstore import FlakyTransport, run_feed
+
+        report = run_feed({"FEED_MIN_SCORE": "5"}, FlakyTransport(CSV_FEED))
+        expected = {"format": "csv", "attempts": 1, "parsed": 3, "kept": 2}
+        assert report == expected, f"expected {expected!r} from run_feed, got {report!r}"
+
+    def public_names_live_on_the_package_root():
+        missing = [name for name in PUBLIC_NAMES if not hasattr(feedstore, name)]
+        assert missing == [], f"expected these names on the feedstore package, missing {missing!r}"
+        unlisted = [name for name in PUBLIC_NAMES if name not in getattr(feedstore, "__all__", [])]
+        assert unlisted == [], (
+            f"expected every public name in feedstore.__all__, missing {unlisted!r}"
+        )
+
+    record("an empty env falls back to the defaults", empty_env_uses_defaults)
+    record("env values are read and given their type", env_values_are_read_and_typed)
+    record("csv and pipe are registered in the parser table", builtin_parsers_are_registered)
+    record("run_feed reports one clean run", run_feed_reports_one_clean_run)
+    record("the public names live on the package root", public_names_live_on_the_package_root)
 `
 
-const CAPSTONE_TEST_HIDDEN = String.raw`from orders.report import summarize
+const CAPSTONE_TEST_HIDDEN = String.raw`"""Hidden capstone tests: the edges, and whether the seams hold.
+
+Two of these grade composition rather than values. A new format registered through the public
+decorator must reach the pipeline with no other edit, and a source object this package has never
+seen must run through the entry point, because the pipeline was handed its transport rather
+than building one.
+"""
+
+CSV_FEED = "a1,7\nb2,3\nc3,9\n"
+
+
+class StrangerSource:
+    """A feed source from outside this package. It only promises fetch()."""
+
+    def __init__(self, payload):
+        self.payload = payload
+        self.calls = 0
+
+    def fetch(self):
+        self.calls += 1
+        return self.payload
 
 
 def run_tests(record):
-    def all_paid():
-        raw = [
-            {"id": 1, "amount": "3.0", "paid": True},
-            {"id": 2, "amount": "7.0", "paid": True},
-        ]
-        assert summarize(raw) == {"count": 2, "paid": 2, "revenue": 10.0}
+    def blank_values_fall_back():
+        from feedstore import load_settings
 
-    def none_paid():
-        raw = [{"id": 1, "amount": "9.0", "paid": False}]
-        assert summarize(raw) == {"count": 1, "paid": 0, "revenue": 0}
+        settings = load_settings(
+            {"FEED_FORMAT": "   ", "FEED_MAX_ATTEMPTS": "", "FEED_MIN_SCORE": " "}
+        )
+        got = (settings.source_format, settings.max_attempts, settings.min_score)
+        assert got == ("csv", 3, 0), f"expected ('csv', 3, 0) from blank values, got {got!r}"
 
-    record("all orders paid", all_paid)
-    record("no orders paid", none_paid)
+    def unusable_attempt_count_is_rejected():
+        from feedstore import load_settings
+
+        try:
+            settings = load_settings({"FEED_MAX_ATTEMPTS": "0"})
+        except ValueError:
+            return
+        raise AssertionError(
+            f"expected ValueError for FEED_MAX_ATTEMPTS=0, got Settings {settings!r}"
+        )
+
+    def a_failing_source_is_retried_within_budget():
+        from feedstore import FlakyTransport, run_feed
+
+        source = FlakyTransport(CSV_FEED, fail_times=2)
+        report = run_feed({"FEED_MAX_ATTEMPTS": "3"}, source)
+        assert report["attempts"] == 3, (
+            f"expected attempts to be 3 after two failures, got {report['attempts']!r}"
+        )
+        assert report["parsed"] == 3, f"expected parsed to be 3, got {report['parsed']!r}"
+        assert source.calls == 3, f"expected the source to be called 3 times, got {source.calls!r}"
+
+    def a_source_that_never_recovers_raises():
+        from feedstore import FlakyTransport, TransportError, run_feed
+
+        source = FlakyTransport(CSV_FEED, fail_times=9)
+        try:
+            report = run_feed({"FEED_MAX_ATTEMPTS": "2"}, source)
+        except TransportError:
+            assert source.calls == 2, (
+                f"expected exactly 2 attempts before giving up, got {source.calls!r}"
+            )
+            return
+        raise AssertionError(f"expected TransportError after 2 failures, got report {report!r}")
+
+    def a_new_format_plugs_in_through_the_public_api():
+        from feedstore import FlakyTransport, register, run_feed
+
+        @register("tsv")
+        def parse_tsv(text):
+            rows = []
+            for line in text.splitlines():
+                if not line.strip():
+                    continue
+                item_id, score = line.split("\t")
+                rows.append({"id": item_id.strip(), "score": int(score)})
+            return rows
+
+        direct = parse_tsv("z9\t2\n")
+        assert direct == [{"id": "z9", "score": 2}], (
+            f"expected register to hand the parser back callable, got {direct!r}"
+        )
+        feed = "z9\t2\nz8\t8\n"
+        report = run_feed({"FEED_FORMAT": "tsv", "FEED_MIN_SCORE": "5"}, FlakyTransport(feed))
+        expected = {"format": "tsv", "attempts": 1, "parsed": 2, "kept": 1}
+        assert report == expected, (
+            f"expected {expected!r} once tsv was registered through the public API, got {report!r}"
+        )
+
+    def an_unregistered_format_is_named_in_the_error():
+        from feedstore import FlakyTransport, UnknownFormatError, run_feed
+
+        try:
+            report = run_feed({"FEED_FORMAT": "xml"}, FlakyTransport(CSV_FEED))
+        except UnknownFormatError as error:
+            assert "xml" in str(error), (
+                f"expected the error to name the missing format 'xml', got {str(error)!r}"
+            )
+            return
+        raise AssertionError(f"expected UnknownFormatError for format 'xml', got {report!r}")
+
+    def a_foreign_source_runs_through_the_entry_point():
+        from feedstore import run_feed
+
+        source = StrangerSource(CSV_FEED)
+        report = run_feed({"FEED_MIN_SCORE": "8"}, source)
+        expected = {"format": "csv", "attempts": 1, "parsed": 3, "kept": 1}
+        assert report == expected, (
+            f"expected {expected!r} from a foreign source object, got {report!r}"
+        )
+        assert source.calls == 1, f"expected the source to be fetched once, got {source.calls!r}"
+
+    record("blank env values fall back to the defaults", blank_values_fall_back)
+    record("an attempt count below 1 is rejected", unusable_attempt_count_is_rejected)
+    record("a failing source is retried within budget", a_failing_source_is_retried_within_budget)
+    record("a source that never recovers raises", a_source_that_never_recovers_raises)
+    record("a new format plugs in through the public API", a_new_format_plugs_in_through_the_public_api)
+    record("an unregistered format is named in the error", an_unregistered_format_is_named_in_the_error)
+    record("a foreign source runs through the entry point", a_foreign_source_runs_through_the_entry_point)
 `
 
 export const packagingCapstoneLesson: PythonLesson = {
   id: "py-l4-packaging-capstone",
   title: "Packaging & a production capstone",
   summary: "Build a typed, tested, packaged order service that integrates the whole track.",
-  estimatedMinutes: 25,
+  estimatedMinutes: 45,
   difficulty: "hard",
   skills: ["packaging", "capstone", "type-hints", "testing"],
   teach: {
@@ -336,40 +808,69 @@ For one paid \`"10.0"\` and one unpaid \`"5.0"\`, revenue is \`10.0\`.`,
   practice: {
     id: "py-l4-packaging-capstone-practice",
     executionMode: "workspace",
-    prompt: `Capstone: implement \`summarize(raw_orders)\` in \`orders/report.py\`. Parse each raw order with
-the read-only \`parse_order\` (into a typed \`Order\`), then return
-\`{"count", "paid", "revenue"}\` where revenue sums **paid** orders' amounts, rounded to 2 decimals.
-Some tests are hidden.`,
+    prompt: `Capstone: ship the \`feedstore\` package so a caller can read one partner feed through its
+public API alone. Four files are yours: \`feedstore/config.py\` builds the run's settings from an
+env mapping, \`feedstore/parsers.py\` holds the parser registry and its lookup,
+\`feedstore/pipeline.py\` runs a feed against a source that sometimes fails, and
+\`feedstore/__init__.py\` is the package's public face and its \`run_feed\` entry point.
+\`feedstore/transport.py\` is read-only. Adding a format or swapping the source must take no edit
+inside the package. Start with \`README.md\`. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "Parse first: `[parse_order(raw) for raw in raw_orders]`.",
-      "Paid orders are those with `order.paid` truthy.",
-      "`revenue` is `round(sum(o.amount for o in paid), 2)`.",
+      "Build it in dependency order: settings first, then the registry, then the pipeline that uses both, then the exports that expose them.",
+      '`register(name)` takes the name and returns the real decorator, which stores the function in `PARSERS` and returns it unchanged so `@register("csv")` leaves `parse_csv` callable.',
+      "`Pipeline.fetch` loops `for attempt in range(1, self.settings.max_attempts + 1)`, sets `self.attempts = attempt`, returns `self.transport.fetch()`, and keeps the caught `TransportError` so it can re-raise the last one after the loop.",
+      "`__init__.py` imports the public names from the submodules, lists them in `__all__`, and defines `run_feed(env, transport)` as `Pipeline(load_settings(env), transport).run()`.",
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "orders/report.py",
-      editableFilePaths: ["orders/report.py"],
-      visibleTestPaths: ["tests/test_orders_report.py"],
-      hiddenTestPaths: ["tests/test_orders_report_hidden.py"],
+      primaryFilePath: "feedstore/config.py",
+      editableFilePaths: [
+        "feedstore/config.py",
+        "feedstore/parsers.py",
+        "feedstore/pipeline.py",
+        "feedstore/__init__.py",
+      ],
+      visibleTestPaths: ["tests/test_feedstore.py"],
+      hiddenTestPaths: ["tests/test_feedstore_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
         { path: "README.md", role: "docs", language: "markdown", content: CAPSTONE_README },
         { path: "pyproject.toml", role: "docs", language: "text", content: CAPSTONE_PYPROJECT },
-        { path: "orders/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "orders/models.py",
-          role: "readonly",
-          language: "python",
-          content: CAPSTONE_MODELS,
-          description: "Typed Order model + parse_order (read-only)",
-        },
-        {
-          path: "orders/report.py",
+          path: "feedstore/__init__.py",
           role: "editable",
           language: "python",
-          content: CAPSTONE_REPORT_STARTER,
-          description: "Implement summarize here",
+          content: CAPSTONE_INIT_STARTER,
+          description: "The public API surface and the run_feed entry point",
+        },
+        {
+          path: "feedstore/config.py",
+          role: "editable",
+          language: "python",
+          content: CAPSTONE_CONFIG_STARTER,
+          description: "Build Settings from the environment",
+        },
+        {
+          path: "feedstore/parsers.py",
+          role: "editable",
+          language: "python",
+          content: CAPSTONE_PARSERS_STARTER,
+          description: "The parser registry and its lookup",
+        },
+        {
+          path: "feedstore/pipeline.py",
+          role: "editable",
+          language: "python",
+          content: CAPSTONE_PIPELINE_STARTER,
+          description: "Fetch with retries, parse, filter, report",
+        },
+        {
+          path: "feedstore/transport.py",
+          role: "readonly",
+          language: "python",
+          content: CAPSTONE_TRANSPORT,
+          description: "The stand-in feed source (read-only)",
         },
         {
           path: "tests/__init__.py",
@@ -379,14 +880,14 @@ Some tests are hidden.`,
           hidden: true,
         },
         {
-          path: "tests/test_orders_report.py",
+          path: "tests/test_feedstore.py",
           role: "test",
           language: "python",
           content: CAPSTONE_TEST,
           description: "Visible capstone tests",
         },
         {
-          path: "tests/test_orders_report_hidden.py",
+          path: "tests/test_feedstore_hidden.py",
           role: "test",
           language: "python",
           content: CAPSTONE_TEST_HIDDEN,
@@ -398,8 +899,8 @@ Some tests are hidden.`,
           role: "test",
           language: "python",
           content: buildRunner([
-            { module: "test_orders_report", label: "visible report" },
-            { module: "test_orders_report_hidden", label: "hidden report" },
+            { module: "test_feedstore", label: "visible feedstore" },
+            { module: "test_feedstore_hidden", label: "hidden feedstore" },
           ]),
           hidden: true,
           description: "Workspace test runner",
@@ -407,10 +908,28 @@ Some tests are hidden.`,
       ],
       referenceFiles: [
         {
-          path: "orders/report.py",
+          path: "feedstore/__init__.py",
           role: "editable",
           language: "python",
-          content: CAPSTONE_REPORT_REFERENCE,
+          content: CAPSTONE_INIT_REFERENCE,
+        },
+        {
+          path: "feedstore/config.py",
+          role: "editable",
+          language: "python",
+          content: CAPSTONE_CONFIG_REFERENCE,
+        },
+        {
+          path: "feedstore/parsers.py",
+          role: "editable",
+          language: "python",
+          content: CAPSTONE_PARSERS_REFERENCE,
+        },
+        {
+          path: "feedstore/pipeline.py",
+          role: "editable",
+          language: "python",
+          content: CAPSTONE_PIPELINE_REFERENCE,
         },
       ],
     },
