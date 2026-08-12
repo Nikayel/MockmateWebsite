@@ -372,7 +372,7 @@ class Rectangle(Shape):
     },
     {
       "label": "Never, because Python does not enforce abstract methods",
-      "feedback": "True of a bare base class whose method body is just pass, and true of Protocols. But abc.ABC installs a real runtime gate: ABCMeta refuses to build an instance while any abstract name is unimplemented."
+      "feedback": "True of a bare base class whose method body is just pass, and true of Protocols. But abc.ABC installs a real runtime gate: ABCMeta, the machinery a class picks up by subclassing ABC, refuses to build an instance while any abstract name is unimplemented."
     }
   ]
 }
