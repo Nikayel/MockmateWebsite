@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { CheckCircle2, Lock, Play, RotateCcw } from "lucide-react"
+import { BookOpen, CheckCircle2, Lock, Play, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
+import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { TestResultsPanel } from "@/components/interview/TestResultsPanel"
 import { ColdStartNote } from "./ColdStartNote"
 import { ExerciseBrief, type ExerciseBriefMeta } from "./ExerciseBrief"
@@ -76,6 +77,20 @@ export function WorkspaceExerciseRunner({
   const editablePaths = useMemo(() => new Set(workspace.editableFilePaths), [workspace])
   const isEditable = (file: WorkspaceScenarioFile) =>
     file.role === "editable" || editablePaths.has(file.path)
+
+  /**
+   * The brief (`README.md`) is prose, not source, so it renders as markdown rather than going
+   * through the code editor. Until now every tab used `CodeMirrorEditor`, which meant the one file
+   * the learner MUST read to understand the task was displayed as raw markdown: literal `#` and
+   * `**`, tables as pipe soup, in a monospace gutter-numbered editor. That is the least readable
+   * possible presentation for the most important file in the workspace.
+   *
+   * Gated on BOTH the docs role and the markdown language, and asserted read-only, so an editable
+   * or non-markdown file can never lose its editor. There are no editable markdown files in the
+   * corpus today (32 docs files, all read-only) and this keeps it that way by construction.
+   */
+  const isRenderedDoc = (file: WorkspaceScenarioFile) =>
+    file.role === "docs" && file.language === "markdown" && !isEditable(file)
 
   const visibleFiles = useMemo(() => workspace.files.filter((file) => !file.hidden), [workspace])
 
@@ -200,34 +215,46 @@ export function WorkspaceExerciseRunner({
                     : "text-muted-foreground hover:text-foreground",
                 ].join(" ")}
               >
-                {!isEditable(file) && <Lock className="h-3 w-3" aria-label="read-only" />}
+                {isRenderedDoc(file) ? (
+                  // A rendered brief is not a locked editor, so the padlock would misdescribe it.
+                  <BookOpen className="h-3 w-3" aria-label="brief" />
+                ) : (
+                  !isEditable(file) && <Lock className="h-3 w-3" aria-label="read-only" />
+                )}
                 {file.path}
               </button>
             )
           })}
         </div>
 
-        {activeFile && (
-          <CodeMirrorErrorBoundary>
-            <CodeMirrorEditor
-              value={
-                isEditable(activeFile)
-                  ? (edits[activeFile.path] ?? activeFile.content)
-                  : activeFile.content
-              }
-              onChange={
-                isEditable(activeFile)
-                  ? (value) => applyEdits({ ...edits, [activeFile.path]: value })
-                  : undefined
-              }
-              language={activeFile.language}
-              readOnly={!isEditable(activeFile)}
-              autoHeight
-              minHeight={340}
-              // Cap at ~22 lines (22px line-height + 16px content padding), then scroll internally.
-              maxHeight={500}
-            />
-          </CodeMirrorErrorBoundary>
+        {activeFile && isRenderedDoc(activeFile) ? (
+          // Same height envelope as the editor below, so switching tabs does not jump the page.
+          <div className="bg-card max-h-[500px] min-h-[340px] overflow-y-auto px-5 py-4">
+            <MarkdownRenderer content={activeFile.content} />
+          </div>
+        ) : (
+          activeFile && (
+            <CodeMirrorErrorBoundary>
+              <CodeMirrorEditor
+                value={
+                  isEditable(activeFile)
+                    ? (edits[activeFile.path] ?? activeFile.content)
+                    : activeFile.content
+                }
+                onChange={
+                  isEditable(activeFile)
+                    ? (value) => applyEdits({ ...edits, [activeFile.path]: value })
+                    : undefined
+                }
+                language={activeFile.language}
+                readOnly={!isEditable(activeFile)}
+                autoHeight
+                minHeight={340}
+                // Cap at ~22 lines (22px line-height + 16px content padding), then scroll internally.
+                maxHeight={500}
+              />
+            </CodeMirrorErrorBoundary>
+          )
         )}
       </div>
 
