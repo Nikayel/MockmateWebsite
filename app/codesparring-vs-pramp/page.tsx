@@ -1,10 +1,11 @@
 import { Metadata } from "next"
+import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
   title: "CodeSparring vs Pramp | Mock Interview Comparison",
   description:
-    "Compare CodeSparring to Pramp (now Exponent Practice). Find out why practicing with an AI interviewer is often more effective than peer-to-peer mock interviews.",
+    "Compare CodeSparring and Pramp for mock interview practice. See how AI interviewer sessions differ from peer-to-peer swaps, and when each is worth your time.",
   alternates: {
     canonical: "/codesparring-vs-pramp",
   },
@@ -13,50 +14,55 @@ export const metadata: Metadata = {
 export default function VsPrampPage() {
   const contentSections = [
     {
-      heading: "Peer-to-Peer vs AI Interviews",
+      heading: "What Pramp does well",
       content: (
         <>
           <p>
-            Pramp is a popular platform that pairs you with another engineer for a peer-to-peer mock
-            interview. You spend 30 minutes interviewing them, and they spend 30 minutes
-            interviewing you. It's free and a great way to start practicing speaking out loud. Since
-            July 2024, Pramp is part of Exponent and its practice tool is now called Exponent
-            Practice, though the peer-to-peer format is unchanged.
+            Pramp matches you with another engineer and splits an hour: you interview them for
+            thirty minutes, then they interview you, at no cost. It is a real way to practice
+            thinking out loud, and playing the interviewer for once is its own kind of practice,
+            since you have to read someone else's code and decide what to ask about it.
           </p>
           <p>
-            CodeSparring replaces the peer with an advanced AI. Instead of splitting your time
-            50/50, you spend 100% of your time being interviewed.
+            The trade-off is consistency. Both sides of a Pramp match are still learning, so the
+            quality of the questions, the hints, and the feedback shifts from one session to the
+            next.
           </p>
         </>
       ),
     },
     {
-      heading: "The Quality Control Problem",
+      heading: "What CodeSparring adds",
       content: (
         <>
           <p>
-            The main challenge with peer-to-peer platforms like Pramp is quality control. Your
-            experience entirely depends on the skill level of the random peer you match with.
-            Sometimes you get a great partner; often, you get someone who doesn't understand the
-            problem they are supposed to be interviewing you on, resulting in poor feedback.
+            CodeSparring's AI interviewer gives you the same bar every session. It probes the
+            choices you make, follows the edits to your code, and takes the conversation by voice or
+            text. You are not splitting the hour, and you are not waiting on a partner's schedule to
+            line up with yours. You leave with a rubric covering communication, problem solving, and
+            code quality, the same rubric every time.
           </p>
           <p>
-            CodeSparring's AI provides a consistent, high-bar experience every single time. The AI
-            deeply understands the optimal solution, the time complexity, and exactly what hints to
-            give you to keep you moving without giving away the answer.
+            The free plan includes 8 full sessions a month with complete AI feedback, no card
+            required. <Link href="/pricing">Pro</Link> adds 35 sessions a month, spaced repetition
+            scheduling, and a personalized roadmap.
           </p>
         </>
       ),
     },
     {
-      heading: "Scheduling and Flexibility",
+      heading: "When to use which",
       content: (
         <>
           <p>
-            Pramp requires scheduling a time slot and committing to a full hour (since you have to
-            interview the other person). CodeSparring is entirely on-demand. Have 20 minutes before
-            work? You can spin up an AI interview instantly, pause it if needed, and review your
-            feedback immediately.
+            If you want practice on both sides of an interview, or you like trading time with
+            another engineer instead of paying for anything, Pramp is worth doing. If you want the
+            same quality bar every time, on your own schedule, graded against a rubric instead of
+            another learner's read on your code, that is what CodeSparring is built for.
+          </p>
+          <p>
+            Plenty of people use both: Pramp for the peer-swap experience, CodeSparring for
+            consistent, scored reps in between.
           </p>
         </>
       ),
@@ -67,20 +73,25 @@ export default function VsPrampPage() {
     {
       question: "Is CodeSparring free like Pramp?",
       answer:
-        "CodeSparring offers free practice rounds so you can experience the AI, along with a Pro tier for more monthly sessions and advanced real-world scenarios.",
+        "The free plan includes 8 full interview sessions a month with complete AI feedback, no card required. Pro exists for people who want 35 sessions a month plus spaced repetition and a personalized roadmap.",
     },
     {
-      question: "Will the AI actually judge my communication skills?",
+      question: "Does the AI grade communication the way a peer would?",
       answer:
-        "Yes! Our platform explicitly grades you on communication, including whether you asked clarifying questions, stated your assumptions, and explained your code clearly while typing.",
+        "Yes. Every session is scored on communication, problem solving, and code quality, including whether you asked clarifying questions and explained your approach as you worked, not just whether the final code passed.",
+    },
+    {
+      question: "Do I need to schedule a session in advance?",
+      answer:
+        "No. CodeSparring is on demand, so you can start a session whenever you have time instead of coordinating a time slot with a partner.",
     },
   ]
 
   return (
     <LandingPageTemplate
       title="CodeSparring vs Pramp"
-      subtitle="Consistent, On-Demand Practice"
-      heroDescription="Pramp is great for peer-to-peer practice, but the quality is hit-or-miss. Discover why an AI interviewer gives you consistent, high-quality feedback on every session, on demand."
+      subtitle="Comparison"
+      heroDescription="Pramp pairs you with another engineer for a peer-to-peer mock interview, split evenly between candidate and interviewer. CodeSparring pairs you with an AI interviewer instead, so every minute goes to your round."
       primaryKeyword="peer-to-peer mock interview"
       contentSections={contentSections}
       faqs={faqs}
