@@ -321,7 +321,8 @@ def test_a_negative_subtotal_is_rejected():
 export const pytestBasicsLesson: PythonLesson = {
   id: "py-l3-pytest-basics",
   title: "pytest assertions & structure",
-  summary: "Make a suite of pytest tests pass by implementing the module they cover.",
+  summary:
+    "Implement a module against a pytest suite, then write your own suite for a documented shipping rule and fix the bug it catches.",
   estimatedMinutes: 24,
   difficulty: "medium",
   skills: ["pytest", "testing", "assertions", "tdd"],

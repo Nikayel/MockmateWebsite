@@ -485,7 +485,7 @@ Treat a whitespace-only cell as blank.`,
     pass`,
     hints: [
       "Strip every cell first, then split them into the blank ones and the filled ones.",
-      '`value.lstrip("-").isdigit()` is the integer-looking test, the same one `coerce` used.',
+      '`value.lstrip("-").isdigit()` is the integer-looking test: it allows one leading minus and then digits only.',
       'If any filled cell fails that test, return `"object"`. Otherwise a blank means `"float64"` and no blank means `"int64"`.',
     ],
     referenceSolution: `def infer_dtype(cells):
