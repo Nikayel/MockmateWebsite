@@ -465,7 +465,7 @@ export const configLoggingLesson: PythonLesson = {
     estimatedMinutes: 7,
     markdown: `## Config lives in the environment, not in your code
 
-A service that hard-codes its port, database URL, or feature flags can only run in one place. Twelve-factor apps push all of that into environment variables so a single build artifact runs unchanged in dev, staging, and prod. You change behavior by changing the environment, never by editing and redeploying code. That is also why the demo's \`load_config\` takes an \`env\` dict as an argument instead of reaching into \`os.environ\` directly: passing the environment in keeps the function pure and trivial to test.
+A service that hard-codes its port, database URL, or feature flags can only run in one place. Twelve-factor apps, named for a widely used checklist for services that must run identically everywhere, push all of that into environment variables so a single build artifact runs unchanged in dev, staging, and prod. You change behavior by changing the environment, never by editing and redeploying code. That is also why the demo's \`load_config\` takes an \`env\` dict as an argument instead of reaching into \`os.environ\` directly: passing the environment in keeps the function pure and trivial to test.
 
 ### Environment values are always strings
 
@@ -521,7 +521,7 @@ has_secret = "SECRET" in env    # a True/False flag is safe to emit; the value i
   "type": "check",
   "kind": "predict",
   "id": "safe-way-to-log-a-secret",
-  "prompt": "During an incident nobody can tell which API key a pod was started with. Which line is actually safe to add to the startup log?",
+  "prompt": "During an incident nobody can tell which API key a process was started with. Which line is actually safe to add to the startup log?",
   "options": [
     {
       "label": "Log the first four characters, key[:4] plus an ellipsis, so you can tell keys apart",
@@ -537,7 +537,7 @@ has_secret = "SECRET" in env    # a True/False flag is safe to emit; the value i
       "feedback": "The reasoning holds right up until the incident where someone raises the log level to debug the incident. Log level is a runtime setting, not a security boundary."
     },
     {
-      "label": "Log a SHA-256 of the key, so you can compare pods without exposing anything",
+      "label": "Log a SHA-256 of the key, so you can compare processes without exposing anything",
       "feedback": "Better than the alternatives above and genuinely used for correlation. It is still a stable fingerprint of a secret, and if the secret has low entropy the hash can be guessed offline, so it is not free."
     }
   ]
