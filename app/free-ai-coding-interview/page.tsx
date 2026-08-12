@@ -39,7 +39,7 @@ export default function FreePracticePage() {
             or GitHub unlocks the interviewer itself: the free plan includes 8 full AI sessions a
             month. If you want to build fundamentals first, the free{" "}
             <Link href="/learn/python">Python</Link>,{" "}
-            <Link href="/learn/data-engineering">SQL</Link>, and{" "}
+            <Link href="/learn/data-engineering">Data Engineering</Link>, and{" "}
             <Link href="/learn/system-design">System Design</Link> courses run in your browser.
           </p>
         </>

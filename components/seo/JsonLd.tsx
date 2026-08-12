@@ -638,6 +638,11 @@ export function HomepagePositioningFAQJsonLd() {
       answer: `Yes. The free plan includes 8 full AI interview sessions per month and 20+ problems with unlimited practice, no credit card required. You can open the workspace and try a problem before creating an account; signing in unlocks the AI interviewer and feedback. Pro is ${monthly.priceDisplay}/month or $${yearly.totalPrice}/year for ${PRICING_CONFIG.pro.sessionsPerMonth} sessions per month.`,
     },
     {
+      question: "Is CodeSparring good for beginners?",
+      answer:
+        "Yes. You do not need to finish LeetCode first. The free Python, data engineering, and system design courses start at the fundamentals, more than 40 of the DSA interview scenarios are rated easy, and the first scenario is a guided warm-up. Experienced candidates go straight to timed rounds, debugging, and system design, and the personalized roadmap adjusts to your measured level either way.",
+    },
+    {
       question: "Does CodeSparring have free courses?",
       answer:
         "Yes. CodeSparring includes free courses in Python, data engineering, and system design at codesparring.dev/learn. The reading half of every lesson is public and requires no account. The Python track has 5 levels, the data engineering track has 11 levels with SQL exercises graded against a real SQLite engine in the browser, and the system design track has 12 levels of free-response lessons with model answers.",

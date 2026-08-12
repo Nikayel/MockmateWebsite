@@ -171,16 +171,24 @@ export default function BestAIToolsPage() {
     {
       heading: "When to use which",
       content: (
-        <p>
-          Use LeetCode or NeetCode to build pattern fluency early. Add an AI interviewer, ours or
-          another, when you want repeated practice explaining your approach and getting feedback on
-          communication, not just correctness. If you are targeting data roles, Interview Query and
-          StrataScratch drill the question banks while{" "}
-          <Link href="/data-engineer-interview-practice">CodeSparring&apos;s DE practice</Link>{" "}
-          covers the conversational rounds and the free curriculum underneath. Book a session with
-          interviewing.io, or trade peer sessions on Exponent Practice, closer to a loop that
-          actually matters, once the goal shifts from repetition to a realistic dry run.
-        </p>
+        <>
+          <p>
+            Build fundamentals wherever you like. LeetCode and NeetCode work, and so do
+            CodeSparring&apos;s free Python, data engineering, and system design courses, which
+            start at the fundamentals and run in the browser. You do not need to finish a problem
+            bank before your first mock: more than 40 of CodeSparring&apos;s DSA scenarios are rated
+            easy and the first one is a guided warm-up, so starting with the conversation works too.
+          </p>
+          <p>
+            Add an AI interviewer, ours or another, whenever you want practice explaining your
+            approach and feedback on communication, not just correctness. If you are targeting data
+            roles, Interview Query and StrataScratch drill the question banks while{" "}
+            <Link href="/data-engineer-interview-practice">CodeSparring&apos;s DE practice</Link>{" "}
+            covers the conversational rounds and the free curriculum underneath. Book a session with
+            interviewing.io, or trade peer sessions on Exponent Practice, closer to a loop that
+            actually matters, once the goal shifts from repetition to a realistic dry run.
+          </p>
+        </>
       ),
     },
   ]
@@ -195,6 +203,11 @@ export default function BestAIToolsPage() {
       question: "Is LeetCode still worth using alongside CodeSparring?",
       answer:
         "Yes. LeetCode's problem bank is larger and is still the fastest way to drill a specific pattern once you know where you are weak. CodeSparring's scenarios are built to practice the conversation around a problem, not to replace a large problem bank.",
+    },
+    {
+      question: "Is CodeSparring for beginners or experienced engineers?",
+      answer:
+        "Both. The free courses start at the fundamentals, more than 40 DSA scenarios are rated easy, and the first scenario is a guided warm-up, so you can start here without finishing LeetCode first. The bank also runs through medium and hard scenarios, debugging rounds, and system design for candidates deep into prep, and the personalized roadmap adjusts to your measured level.",
     },
     {
       question: "Which of these tools work for data engineering interviews?",

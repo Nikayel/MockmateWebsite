@@ -179,6 +179,10 @@ The Learn curriculum's reading half is free on every plan and requires no accoun
 ## Who it is for
 
 - Software engineers preparing for technical interviews at any level.
+- Beginners included: nothing requires prior LeetCode. The courses start at the fundamentals, 47
+  of the DSA scenarios were rated easy on 2026-08-12, the first scenario in the browse list is a
+  guided warm-up, and the personalized roadmap adapts to measured skill. Starting here and adding
+  a problem bank later works just as well as the reverse.
 - Students and new grads applying for internships and first roles.
 - Data engineering and analytics candidates, who are the Data Engineering track's primary
   audience: an 11-level curriculum plus debugging rounds and case labs built on pipeline failure

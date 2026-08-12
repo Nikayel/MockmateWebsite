@@ -65,14 +65,16 @@ export default function VsLeetCodePage() {
           <p>
             Build your fundamentals wherever you like. LeetCode's bank works for that, and so do
             CodeSparring's free <Link href="/learn/python">Python</Link>,{" "}
-            <Link href="/learn/data-engineering">SQL</Link>, and{" "}
-            <Link href="/learn/system-design">System Design</Link> courses, which run in your
-            browser.
+            <Link href="/learn/data-engineering">Data Engineering</Link>, and{" "}
+            <Link href="/learn/system-design">System Design</Link> courses, which start at the
+            fundamentals and run in your browser.
           </p>
           <p>
-            Once the patterns feel familiar, use CodeSparring to rehearse the round itself: thinking
-            out loud, taking questions on your approach, and writing code while someone watches. The
-            free plan includes 8 full sessions a month with complete feedback, no card required.
+            You also do not have to wait until the patterns feel familiar: more than 40 of the DSA
+            scenarios are rated easy and the first one is a guided warm-up, so rehearsing the round
+            itself, thinking out loud, taking questions on your approach, and writing code while
+            someone watches, can start on day one. The free plan includes 8 full sessions a month
+            with complete feedback, no card required.
           </p>
         </>
       ),
