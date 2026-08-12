@@ -3,6 +3,7 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { DynamicThreeOrb } from "@/components/three/DynamicThreeOrb"
+import { SessionReplay } from "@/components/home/SessionReplay"
 import { Bug, Bot, Layers, CheckCircle2, Building2 } from "lucide-react"
 import { motion } from "framer-motion"
 
@@ -56,6 +57,33 @@ export function RoundsPageClient() {
             <p className="text-muted-foreground mx-auto max-w-xl text-xl leading-relaxed">
               A failing test to debug, and a real-world case to design — with an AI interviewer that
               reacts as you work.
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* The 60-second replay: same scripted session as the homepage loop,
+          here with real pacing, play/pause, and chapter jumps. */}
+      <section className="relative z-10 pb-24">
+        <div className="container mx-auto px-4">
+          <motion.p
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            className="text-muted-foreground mx-auto mb-8 max-w-[1000px] text-xs tracking-widest uppercase"
+          >
+            Watch a session, 60 seconds
+          </motion.p>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mx-auto w-full max-w-[1000px]"
+          >
+            <SessionReplay mode="full" />
+            <p className="text-muted-foreground mt-3 text-xs">
+              A scripted demo of the real session format: the interviewer reads your code, your
+              tests actually run, and the round ends with a score.
             </p>
           </motion.div>
         </div>
