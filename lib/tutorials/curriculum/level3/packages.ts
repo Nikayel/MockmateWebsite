@@ -1,117 +1,232 @@
 import type { PythonLesson } from "../../types"
+import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ───────────────────────────────────────────────────────────────────────────
 // L3-M1: Project Structure & Packaging  (py-l3-packages)
 // ───────────────────────────────────────────────────────────────────────────
 
-const PKG_README = `# A tiny store package
+const PKG_README = `# Finish the reportkit split
 
-Turn one file into a real **package**. The \`store/\` folder is a package (it has an
-\`__init__.py\`). \`store/catalog.py\` (read-only) knows item prices; your job is \`store/cart.py\`.
+\`reportkit\` reads lines out of a log file and summarises them. It used to be one module. A
+teammate started splitting it up, got halfway, and left for the week.
 
-Implement \`cart_total(names)\` so it returns the **total price** of the items named in \`names\`,
-looking up each price with the read-only \`price_of\` helper from \`store.catalog\`. Unknown items
-cost 0.
+## Where the migration got to
 
-Run the tests. Some are hidden.
+\`reportkit/report.py\` is **read-only and already updated**. It expects two things:
+
+- \`rank(name)\` imported from \`reportkit.levels\`
+- \`severity_of(line)\` and \`worst(lines)\` imported from \`reportkit.scan\`
+
+\`reportkit/levels.py\` is empty. \`reportkit/scan.py\` still reaches back into \`reportkit.report\`
+for the severity table, which no longer lives there. \`reportkit/__init__.py\` is empty, so the
+package exports nothing.
+
+## What the package has to do
+
+**\`levels.py\`** owns the severity table and \`rank(name)\`, which returns the rank of a severity
+name. The ranks are \`DEBUG\` 1, \`INFO\` 2, \`WARNING\` 3, \`ERROR\` 4, \`CRITICAL\` 5. Any other
+name ranks 0.
+
+**\`scan.py\`** owns two functions over log lines. A line's severity is its first word, but only
+when that word is a known severity. Anything else, including a blank line, is \`"UNKNOWN"\`.
+
+\`\`\`python
+severity_of("ERROR disk full")   # "ERROR"
+severity_of("disk full")         # "UNKNOWN"
+worst(["INFO ok", "ERROR down"]) # "ERROR"
+worst([])                        # "UNKNOWN"
+\`\`\`
+
+\`worst(lines)\` returns the highest-ranked severity that appears in \`lines\`.
+
+**\`__init__.py\`** is the package's front door. The documented public import is:
+
+\`\`\`python
+from reportkit import build_report, severity_of, worst
+\`\`\`
+
+Those three names, and only those three, are the public API. \`rank\` and the severity table are
+internal: they must not be reachable as \`reportkit.rank\` or \`reportkit.SEVERITY_ORDER\`, and
+\`reportkit.__all__\` must list exactly the three public names.
+
+## The layout rule
+
+Imports inside the package point one way, towards a leaf. \`levels.py\` is that leaf, so it imports
+nothing from \`reportkit.report\` or \`reportkit.scan\`. The tests check this, and they import
+through the documented public path, so correct function bodies in the wrong place still fail.
+
+Some tests are hidden.
 `
 
-const PKG_CATALOG = String.raw`PRICES = {"apple": 3, "bread": 2, "milk": 4}
+const PKG_REPORT = String.raw`"""Read-only. Already migrated: it imports from levels and scan, and from nothing else."""
+from reportkit.levels import rank
+from reportkit.scan import severity_of, worst
 
 
-def price_of(name):
-    """Return the price of a named item, or 0 if it isn't sold."""
-    return PRICES.get(name, 0)
+def build_report(lines):
+    """Summarise log lines: how many of each severity, the worst one, and the line count."""
+    counts = {}
+    for line in lines:
+        name = severity_of(line)
+        counts[name] = counts.get(name, 0) + 1
+    ordered = sorted(counts.items(), key=lambda pair: (-rank(pair[0]), pair[0]))
+    return {"counts": dict(ordered), "worst": worst(lines), "total": len(lines)}
 `
 
-const PKG_CART_STARTER = String.raw`from store.catalog import price_of
+const PKG_LEVELS_STARTER = String.raw`"""The severity table and its lookup (see README.md).
 
+This module is the leaf of the package: nothing inside reportkit may be imported here.
+"""
 
-def cart_total(names):
-    """Total the price of every item name in the cart (see README.md)."""
-    # TODO: look up each name with price_of(...) and add the prices up.
-    return 0
+# TODO: give the severity table a home here, and expose rank(name) over it.
 `
 
-const PKG_CART_REFERENCE = String.raw`from store.catalog import price_of
+const PKG_LEVELS_REFERENCE = String.raw`"""The severity table and its lookup. The leaf of the package: it imports nothing from reportkit."""
+
+SEVERITY_ORDER = {"DEBUG": 1, "INFO": 2, "WARNING": 3, "ERROR": 4, "CRITICAL": 5}
 
 
-def cart_total(names):
-    return sum(price_of(name) for name in names)
+def rank(name):
+    return SEVERITY_ORDER.get(name, 0)
 `
 
-const PKG_TEST = String.raw`from store.cart import cart_total
+const PKG_SCAN_STARTER = String.raw`from reportkit.report import SEVERITY_ORDER
+
+# TODO: that import points the wrong way. Import what this module needs from where it now lives.
+
+
+def severity_of(line):
+    """Return the severity name a log line reports (see README.md)."""
+    # TODO: read the first word and decide whether it is a severity at all.
+    return "UNKNOWN"
+
+
+def worst(lines):
+    """Return the highest-ranked severity present in the lines (see README.md)."""
+    # TODO: compare the lines by rank, not alphabetically.
+    return "UNKNOWN"
+`
+
+const PKG_SCAN_REFERENCE = String.raw`from reportkit.levels import rank
+
+
+def severity_of(line):
+    words = line.split()
+    if not words:
+        return "UNKNOWN"
+    name = words[0]
+    return name if rank(name) > 0 else "UNKNOWN"
+
+
+def worst(lines):
+    highest = "UNKNOWN"
+    for line in lines:
+        name = severity_of(line)
+        if rank(name) > rank(highest):
+            highest = name
+    return highest
+`
+
+const PKG_INIT_STARTER = String.raw`"""The reportkit package (see README.md)."""
+
+# TODO: make the documented public import work, and pin the public API.
+`
+
+const PKG_INIT_REFERENCE = String.raw`"""The reportkit package: summarise log lines."""
+from reportkit.report import build_report
+from reportkit.scan import severity_of, worst
+
+__all__ = ["build_report", "severity_of", "worst"]
+`
+
+const PKG_TEST = String.raw`import reportkit
 
 
 def run_tests(record):
-    def sums_known_items():
-        result = cart_total(["apple", "bread"])
-        assert result == 5, f"expected 5, got {result!r}"
+    def public_path_exposes_three_names():
+        missing = [n for n in ("build_report", "severity_of", "worst") if not hasattr(reportkit, n)]
+        assert missing == [], f"expected 'from reportkit import build_report, severity_of, worst' to work, missing {missing!r}"
 
-    def empty_cart_is_zero():
-        result = cart_total([])
-        assert result == 0, f"expected 0, got {result!r}"
+    def severity_is_the_first_word():
+        result = reportkit.severity_of("ERROR disk full")
+        assert result == "ERROR", f"expected 'ERROR', got {result!r}"
+        result = reportkit.severity_of("WARNING queue is long")
+        assert result == "WARNING", f"expected 'WARNING', got {result!r}"
 
-    def unknown_item_is_free():
-        result = cart_total(["apple", "candy"])
-        assert result == 3, f"expected 3, got {result!r}"
+    def a_line_with_no_severity_is_unknown():
+        result = reportkit.severity_of("disk full")
+        assert result == "UNKNOWN", f"expected 'UNKNOWN', got {result!r}"
 
-    record("sums known items", sums_known_items)
-    record("empty cart totals 0", empty_cart_is_zero)
-    record("unknown items count as 0", unknown_item_is_free)
+    def worst_compares_by_rank():
+        lines = ["INFO started", "ERROR disk full", "WARNING slow"]
+        result = reportkit.worst(lines)
+        assert result == "ERROR", f"expected 'ERROR', got {result!r}"
+
+    def build_report_counts_every_line():
+        result = reportkit.build_report(["INFO a", "ERROR b", "INFO c"])
+        expected = {"counts": {"ERROR": 1, "INFO": 2}, "worst": "ERROR", "total": 3}
+        assert result == expected, f"expected {expected!r}, got {result!r}"
+
+    record("the documented public import works", public_path_exposes_three_names)
+    record("severity is the first word", severity_is_the_first_word)
+    record("a line with no severity is UNKNOWN", a_line_with_no_severity_is_unknown)
+    record("worst compares by rank", worst_compares_by_rank)
+    record("build_report counts every line", build_report_counts_every_line)
 `
 
-const PKG_TEST_HIDDEN = String.raw`from store.cart import cart_total
+const PKG_TEST_HIDDEN = String.raw`import os
+
+import reportkit
 
 
 def run_tests(record):
-    def repeated_items_add_up():
-        result = cart_total(["milk", "milk"])
-        assert result == 8, f"expected 8, got {result!r}"
+    def all_pins_exactly_the_public_api():
+        exported = sorted(getattr(reportkit, "__all__", []))
+        expected = ["build_report", "severity_of", "worst"]
+        assert exported == expected, f"expected reportkit.__all__ to be {expected!r}, got {exported!r}"
 
-    def mixes_known_and_unknown():
-        result = cart_total(["apple", "milk", "x"])
-        assert result == 7, f"expected 7, got {result!r}"
+    def internals_are_not_on_the_package_root():
+        leaked = [n for n in ("rank", "SEVERITY_ORDER") if hasattr(reportkit, n)]
+        assert leaked == [], f"expected no internals on the package root, got {leaked!r}"
 
-    record("repeated items add up", repeated_items_add_up)
-    record("mix of known and unknown", mixes_known_and_unknown)
-`
+    def levels_imports_nothing_from_the_package():
+        with open(os.path.join("reportkit", "levels.py")) as handle:
+            source = handle.read()
+        pointers = [t for t in ("reportkit.report", "reportkit.scan", "from .report", "from .scan") if t in source]
+        assert pointers == [], f"expected levels.py to be a leaf, but it references {pointers!r}"
 
-const PKG_RUNNER = String.raw`import json
-import os
-import sys
-import traceback
+    def empty_input_has_no_worst():
+        result = reportkit.worst([])
+        assert result == "UNKNOWN", f"expected 'UNKNOWN', got {result!r}"
+        result = reportkit.severity_of("")
+        assert result == "UNKNOWN", f"expected 'UNKNOWN', got {result!r}"
+        result = reportkit.build_report([])
+        expected = {"counts": {}, "worst": "UNKNOWN", "total": 0}
+        assert result == expected, f"expected {expected!r}, got {result!r}"
 
-sys.path.insert(0, os.getcwd())
-from tests import test_cart, test_cart_hidden
+    def counts_are_ordered_worst_first():
+        lines = ["DEBUG a", "ERROR b", "WARNING c", "totally unlabelled"]
+        keys = list(reportkit.build_report(lines)["counts"])
+        expected = ["ERROR", "WARNING", "DEBUG", "UNKNOWN"]
+        assert keys == expected, f"expected counts keyed {expected!r}, got {keys!r}"
 
-results = []
+    def critical_outranks_error():
+        result = reportkit.worst(["ERROR down", "CRITICAL data loss", "INFO ok"])
+        assert result == "CRITICAL", f"expected 'CRITICAL', got {result!r}"
 
-
-def record_factory(suite):
-    def record(name, fn):
-        is_hidden = "hidden" in suite.lower()
-        try:
-            fn()
-            results.append({"suite": suite, "name": name, "passed": True, "error": None, "isHidden": is_hidden})
-        except AssertionError as exc:
-            results.append({"suite": suite, "name": name, "passed": False, "error": str(exc) or (name + " failed"), "isHidden": is_hidden})
-        except Exception as exc:
-            results.append({"suite": suite, "name": name, "passed": False, "error": str(exc) or traceback.format_exc(), "isHidden": is_hidden})
-
-    return record
-
-
-test_cart.run_tests(record_factory("visible cart"))
-test_cart_hidden.run_tests(record_factory("hidden cart"))
-print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
+    record("__all__ pins exactly the public API", all_pins_exactly_the_public_api)
+    record("internals stay off the package root", internals_are_not_on_the_package_root)
+    record("levels.py is a leaf", levels_imports_nothing_from_the_package)
+    record("empty input has no worst", empty_input_has_no_worst)
+    record("counts are ordered worst first", counts_are_ordered_worst_first)
+    record("CRITICAL outranks ERROR", critical_outranks_error)
 `
 
 export const packagesLesson: PythonLesson = {
   id: "py-l3-packages",
   title: "Modules, packages & project layout",
   summary: "Split logic across a real Python package with an __init__.py and cross-module imports.",
-  estimatedMinutes: 18,
+  estimatedMinutes: 24,
   difficulty: "medium",
   skills: ["packages", "modules", "imports", "project-structure"],
   teach: {
@@ -351,70 +466,111 @@ For \`prices = {"apple": 3, "bread": 2}\` and \`names = ["apple", "bread"]\`, re
   practice: {
     id: "py-l3-packages-practice",
     executionMode: "workspace",
-    prompt: `Now build it as a package. Implement \`cart_total(names)\` in \`store/cart.py\` using the
-read-only \`price_of\` helper imported from \`store.catalog\`. Unknown items cost 0. Open the visible
-test to see expected behaviour; some tests are hidden.`,
+    prompt: `Finish a half-done package split. A teammate started breaking \`reportkit\` into modules and
+stopped in the middle: \`reportkit/report.py\` is already migrated and read-only, \`reportkit/levels.py\`
+is empty, \`reportkit/scan.py\` still imports the severity table out of \`reportkit.report\`, and
+\`reportkit/__init__.py\` exports nothing.
+
+Give \`levels.py\` the severity table and its \`rank(name)\` lookup, implement \`severity_of(line)\`
+and \`worst(lines)\` in \`scan.py\`, and wire \`__init__.py\` so \`from reportkit import build_report,
+severity_of, worst\` works and \`__all__\` lists exactly those three names. \`rank\` and the severity
+table stay internal, and \`levels.py\` must import nothing from the rest of the package. The README
+has the ranks and the exact behaviour. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "`price_of` is already imported from `store.catalog`. Call it on each name.",
-      "Sum across the cart: `sum(price_of(name) for name in names)`.",
-      "The `store/__init__.py` is what makes `from store.catalog import ...` work.",
+      "Two modules import each other right now: `report.py` imports `scan`, and `scan.py` imports `report`. Ask what `scan.py` actually needs, and which module should own it.",
+      "Point every arrow at `levels.py`. It defines the table and `rank`, and imports nothing from `reportkit`. Then `scan.py` imports `rank` from `levels`, `report.py` already does the same, and `__init__.py` sits on top pulling the three public names up to the package root.",
+      "In `scan.py` the top line becomes `from reportkit.levels import rank`. In `__init__.py`, import the public names from the module that defines each one, then set `__all__` to a list of those three strings. A name you never import into `__init__.py` is not reachable as `reportkit.<name>`, which is how `rank` stays internal.",
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "store/cart.py",
-      editableFilePaths: ["store/cart.py"],
-      visibleTestPaths: ["tests/test_cart.py"],
-      hiddenTestPaths: ["tests/test_cart_hidden.py"],
+      primaryFilePath: "reportkit/scan.py",
+      editableFilePaths: ["reportkit/levels.py", "reportkit/scan.py", "reportkit/__init__.py"],
+      visibleTestPaths: ["tests/test_reportkit.py"],
+      hiddenTestPaths: ["tests/test_reportkit_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
         { path: "README.md", role: "docs", language: "markdown", content: PKG_README },
-        { path: "store/__init__.py", role: "readonly", language: "python", content: "" },
         {
-          path: "store/catalog.py",
-          role: "readonly",
-          language: "python",
-          content: PKG_CATALOG,
-          description: "Item prices + price_of (read-only)",
-        },
-        {
-          path: "store/cart.py",
+          path: "reportkit/__init__.py",
           role: "editable",
           language: "python",
-          content: PKG_CART_STARTER,
-          description: "Implement cart_total here",
+          content: PKG_INIT_STARTER,
+          description: "The package front door: public imports and __all__",
         },
-        { path: "tests/__init__.py", role: "test", language: "python", content: "", hidden: true },
         {
-          path: "tests/test_cart.py",
+          path: "reportkit/levels.py",
+          role: "editable",
+          language: "python",
+          content: PKG_LEVELS_STARTER,
+          description: "The leaf: severity table + rank",
+        },
+        {
+          path: "reportkit/scan.py",
+          role: "editable",
+          language: "python",
+          content: PKG_SCAN_STARTER,
+          description: "severity_of and worst, plus one import pointing the wrong way",
+        },
+        {
+          path: "reportkit/report.py",
+          role: "readonly",
+          language: "python",
+          content: PKG_REPORT,
+          description: "build_report (read-only, already migrated)",
+        },
+        {
+          path: "tests/__init__.py",
+          role: "test",
+          language: "python",
+          content: EMPTY_INIT,
+          hidden: true,
+        },
+        {
+          path: "tests/test_reportkit.py",
           role: "test",
           language: "python",
           content: PKG_TEST,
-          description: "Visible cart tests",
+          description: "Visible package tests",
         },
         {
-          path: "tests/test_cart_hidden.py",
+          path: "tests/test_reportkit_hidden.py",
           role: "test",
           language: "python",
           content: PKG_TEST_HIDDEN,
           hidden: true,
-          description: "Hidden edge-case tests",
+          description: "Hidden layout and edge-case tests",
         },
         {
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: PKG_RUNNER,
+          content: buildRunner([
+            { module: "test_reportkit", label: "visible reportkit" },
+            { module: "test_reportkit_hidden", label: "hidden reportkit" },
+          ]),
           hidden: true,
           description: "Workspace test runner",
         },
       ],
       referenceFiles: [
         {
-          path: "store/cart.py",
+          path: "reportkit/__init__.py",
           role: "editable",
           language: "python",
-          content: PKG_CART_REFERENCE,
+          content: PKG_INIT_REFERENCE,
+        },
+        {
+          path: "reportkit/levels.py",
+          role: "editable",
+          language: "python",
+          content: PKG_LEVELS_REFERENCE,
+        },
+        {
+          path: "reportkit/scan.py",
+          role: "editable",
+          language: "python",
+          content: PKG_SCAN_REFERENCE,
         },
       ],
     },
