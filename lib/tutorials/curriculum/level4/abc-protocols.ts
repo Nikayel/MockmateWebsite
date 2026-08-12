@@ -5,108 +5,322 @@
 import type { PythonLesson } from "../../types"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const ABC_README = `# Program to an interface with ABCs
+// ── Practice workspace: one export pipeline that uses BOTH tools at once ────────────────────
+// The practice exercise is deliberately unrelated to the apply Rectangle: the graded skill is
+// choosing between nominal (ABC) and structural (Protocol) conformance and knowing which of the
+// two the interpreter actually enforces, and when.
 
-\`shapes/base.py\` (read-only) defines an abstract base class \`Shape\` with an abstract \`area()\`.
-\`shapes/square.py\` (read-only) is a worked example. Implement \`Rectangle(Shape)\` in
-\`shapes/rectangle.py\`: store \`width\` and \`height\` and return \`width * height\` from \`area()\`.
+const EXPORT_README = String.raw`# Wire up the export pipeline
 
-The read-only \`total_area(shapes)\` sums any shapes' areas through the abstraction. Some tests are
-hidden.
+The reporting service renders rows through two different kinds of writer, and the two kinds
+conform to the contract in two different ways.
+
+## Read-only background
+
+- \`pipeline/base.py\` defines the abstract base class \`Exporter\`. It declares \`header()\` and
+  \`render(row)\` abstract, and it ships one concrete helper, \`render_all(rows)\`, that every
+  subclass inherits.
+- \`pipeline/contracts.py\` defines the runtime-checkable protocol \`Renderer\`, which describes
+  the same two methods as a shape rather than as a parent.
+- \`pipeline/vendor.py\` holds three classes you cannot edit: \`VendorTsvWriter\`,
+  \`VendorCounter\` (it never got a \`render\`), and \`HalfBuiltExporter\` (a teammate's
+  in-progress \`Exporter\` subclass whose \`render\` never landed).
+
+A row is a dict shaped like \`{"id": "a1", "amount": 30}\`.
+
+## What to write
+
+### \`pipeline/exporters.py\`
+
+- \`CsvExporter\` must conform nominally, so that it inherits \`render_all\` from the base.
+  \`header()\` returns \`"id,amount"\` and \`render(row)\` returns \`"a1,30"\`.
+- \`AuditLine\` is vendored into another service that must not receive the \`Exporter\`
+  hierarchy, so it must conform structurally and must not inherit anything of ours.
+  \`header()\` returns \`"event"\` and \`render(row)\` returns \`"a1=30"\`.
+
+### \`pipeline/registry.py\`
+
+- \`classify(renderer)\` returns \`"nominal"\`, \`"structural"\`, or \`"none"\`.
+- \`register(registry, key, renderer)\` stores the renderer under \`key\` and returns the
+  registry, but raises \`TypeError\` when the renderer does not satisfy the contract.
+- \`try_construct(factory)\` calls \`factory()\` and returns the instance, or \`None\` when
+  construction is refused.
+- \`export_rows(renderer, rows)\` returns the header line followed by one rendered line per row.
+  It must reuse the base class helper whenever the renderer is entitled to it.
+
+Some tests are hidden.
 `
 
-const ABC_BASE = String.raw`from abc import ABC, abstractmethod
+const EXPORT_BASE = String.raw`from abc import ABC, abstractmethod
 
 
-class Shape(ABC):
+class Exporter(ABC):
+    """Nominal contract: you conform by inheriting, and you inherit render_all in return."""
+
     @abstractmethod
-    def area(self):
-        """Return the area of the shape."""
+    def header(self):
+        """Return the header line."""
         raise NotImplementedError
+
+    @abstractmethod
+    def render(self, row):
+        """Return one rendered line for a row dict."""
+        raise NotImplementedError
+
+    def render_all(self, rows):
+        return [self.header()] + [self.render(row) for row in rows]
 `
 
-const ABC_SQUARE = String.raw`from shapes.base import Shape
+const EXPORT_CONTRACTS = String.raw`from typing import Protocol, runtime_checkable
 
 
-class Square(Shape):
-    def __init__(self, side):
-        self.side = side
+@runtime_checkable
+class Renderer(Protocol):
+    """Structural contract: anything with these two methods counts, whatever its parents."""
 
-    def area(self):
-        return self.side * self.side
+    def header(self):
+        ...
+
+    def render(self, row):
+        ...
 `
 
-const ABC_REPORT = String.raw`def total_area(shapes):
-    """Sum the area of every shape, programming to the Shape abstraction."""
-    return sum(shape.area() for shape in shapes)
+const EXPORT_VENDOR = String.raw`from pipeline.base import Exporter
+
+
+class VendorTsvWriter:
+    """Ships in a package you cannot edit, so it can never subclass Exporter."""
+
+    def header(self):
+        return "id\tamount"
+
+    def render(self, row):
+        return f"{row['id']}\t{row['amount']}"
+
+
+class VendorCounter:
+    """Also vendored, but it never got a render method."""
+
+    def header(self):
+        return "count"
+
+
+class HalfBuiltExporter(Exporter):
+    """A teammate's branch: header landed, render did not."""
+
+    def header(self):
+        return "id,amount"
 `
 
-const ABC_RECTANGLE_STARTER = String.raw`from shapes.base import Shape
+const EXPORT_EXPORTERS_STARTER = String.raw`from pipeline.base import Exporter
 
 
-class Rectangle(Shape):
-    def __init__(self, width, height):
-        self.width = width
-        self.height = height
+class CsvExporter:
+    # TODO: make CsvExporter conform to the Exporter contract the way that earns render_all.
+    def header(self):
+        return ""
 
-    def area(self):
-        # TODO: return width * height.
-        return 0
+    def render(self, row):
+        return ""
+
+
+class AuditLine:
+    # TODO: make AuditLine conform to the Renderer contract without inheriting from us.
+    def header(self):
+        return ""
+
+    def render(self, row):
+        return ""
 `
 
-const ABC_RECTANGLE_REFERENCE = String.raw`from shapes.base import Shape
+const EXPORT_EXPORTERS_REFERENCE = String.raw`from pipeline.base import Exporter
 
 
-class Rectangle(Shape):
-    def __init__(self, width, height):
-        self.width = width
-        self.height = height
+class CsvExporter(Exporter):
+    def header(self):
+        return "id,amount"
 
-    def area(self):
-        return self.width * self.height
+    def render(self, row):
+        return f"{row['id']},{row['amount']}"
+
+
+class AuditLine:
+    def header(self):
+        return "event"
+
+    def render(self, row):
+        return f"{row['id']}={row['amount']}"
 `
 
-const ABC_TEST = String.raw`from shapes.rectangle import Rectangle
-from shapes.square import Square
-from shapes.report import total_area
+const EXPORT_REGISTRY_STARTER = String.raw`from pipeline.base import Exporter
+from pipeline.contracts import Renderer
+
+
+def classify(renderer):
+    """Return "nominal", "structural", or "none". See README.md."""
+    # TODO: report how this renderer conforms, checking the stricter contract first.
+    return "none"
+
+
+def register(registry, key, renderer):
+    """Store renderer under key and return registry. See README.md."""
+    # TODO: refuse renderers that satisfy neither contract.
+    registry[key] = renderer
+    return registry
+
+
+def try_construct(factory):
+    """Call factory() and return the instance, or None if it is refused. See README.md."""
+    # TODO: decide which failure this has to survive, and when that failure happens.
+    return factory()
+
+
+def export_rows(renderer, rows):
+    """Return the header line plus one line per row. See README.md."""
+    # TODO: reuse the base class helper when the renderer is entitled to it.
+    return []
+`
+
+const EXPORT_REGISTRY_REFERENCE = String.raw`from pipeline.base import Exporter
+from pipeline.contracts import Renderer
+
+
+def classify(renderer):
+    """Return "nominal", "structural", or "none"."""
+    if isinstance(renderer, Exporter):
+        return "nominal"
+    if isinstance(renderer, Renderer):
+        return "structural"
+    return "none"
+
+
+def register(registry, key, renderer):
+    """Store renderer under key and return registry."""
+    if classify(renderer) == "none":
+        raise TypeError(f"{type(renderer).__name__} does not satisfy the Renderer contract")
+    registry[key] = renderer
+    return registry
+
+
+def try_construct(factory):
+    """Call factory() and return the instance, or None if it is refused."""
+    try:
+        return factory()
+    except TypeError:
+        return None
+
+
+def export_rows(renderer, rows):
+    """Return the header line plus one line per row."""
+    if isinstance(renderer, Exporter):
+        return renderer.render_all(rows)
+    return [renderer.header()] + [renderer.render(row) for row in rows]
+`
+
+const EXPORT_TEST = String.raw`from pipeline.exporters import AuditLine, CsvExporter
+from pipeline.registry import classify, export_rows, register
+from pipeline.vendor import VendorCounter, VendorTsvWriter
+
+ROWS = [{"id": "a1", "amount": 30}, {"id": "b2", "amount": 7}]
 
 
 def run_tests(record):
-    def rectangle_area():
-        assert Rectangle(3, 4).area() == 12, f"got {Rectangle(3, 4).area()!r}"
+    def csv_renders_one_row():
+        line = CsvExporter().render(ROWS[0])
+        assert line == "a1,30", f"expected 'a1,30', got {line!r}"
 
-    def polymorphic_total():
-        assert total_area([Rectangle(2, 3), Square(4)]) == 22
+    def csv_inherits_render_all():
+        lines = CsvExporter().render_all(ROWS)
+        expected = ["id,amount", "a1,30", "b2,7"]
+        assert lines == expected, f"expected {expected}, got {lines!r}"
 
-    record("rectangle area", rectangle_area)
-    record("total_area over mixed shapes", polymorphic_total)
-`
+    def classify_reports_how_each_one_conforms():
+        assert classify(CsvExporter()) == "nominal", (
+            f"expected 'nominal' for CsvExporter, got {classify(CsvExporter())!r}"
+        )
+        assert classify(VendorTsvWriter()) == "structural", (
+            f"expected 'structural' for VendorTsvWriter, got {classify(VendorTsvWriter())!r}"
+        )
+        assert classify(VendorCounter()) == "none", (
+            f"expected 'none' for VendorCounter, got {classify(VendorCounter())!r}"
+        )
 
-const ABC_TEST_HIDDEN = String.raw`from shapes.base import Shape
-from shapes.rectangle import Rectangle
-
-
-def run_tests(record):
-    def larger_rectangle():
-        assert Rectangle(5, 5).area() == 25
-
-    def abstract_base_cannot_be_instantiated():
+    def register_keeps_conformers_and_rejects_the_rest():
+        registry = {}
+        returned = register(registry, "csv", CsvExporter())
+        assert returned is registry, f"expected register to return the same dict, got {returned!r}"
+        assert list(registry) == ["csv"], f"expected keys ['csv'], got {list(registry)!r}"
         try:
-            Shape()
-            raised = False
+            register(registry, "counter", VendorCounter())
+            raised = "nothing"
         except TypeError:
-            raised = True
-        assert raised, "Shape() should raise TypeError (it is abstract)"
+            raised = "TypeError"
+        assert raised == "TypeError", f"expected TypeError for VendorCounter, got {raised}"
 
-    record("larger rectangle", larger_rectangle)
-    record("abstract base cannot be instantiated", abstract_base_cannot_be_instantiated)
+    def audit_line_exports_structurally():
+        lines = export_rows(AuditLine(), ROWS)
+        expected = ["event", "a1=30", "b2=7"]
+        assert lines == expected, f"expected {expected}, got {lines!r}"
+
+    record("csv renders one row", csv_renders_one_row)
+    record("csv inherits render_all", csv_inherits_render_all)
+    record("classify reports how each one conforms", classify_reports_how_each_one_conforms)
+    record("register rejects non-conformers", register_keeps_conformers_and_rejects_the_rest)
+    record("audit line exports structurally", audit_line_exports_structurally)
+`
+
+const EXPORT_TEST_HIDDEN = String.raw`from pipeline.base import Exporter
+from pipeline.exporters import AuditLine, CsvExporter
+from pipeline.registry import export_rows, try_construct
+from pipeline.vendor import HalfBuiltExporter, VendorCounter, VendorTsvWriter
+
+ROWS = [{"id": "a1", "amount": 30}, {"id": "b2", "amount": 7}]
+
+
+def run_tests(record):
+    def audit_line_does_not_inherit():
+        assert not issubclass(AuditLine, Exporter), (
+            f"expected AuditLine to be no subclass of Exporter, got mro {AuditLine.__mro__!r}"
+        )
+        has_helper = hasattr(AuditLine(), "render_all")
+        assert has_helper is False, (
+            f"expected AuditLine to carry no render_all, got hasattr {has_helper!r}"
+        )
+
+    def incomplete_abc_subclass_is_refused_at_construction():
+        built = try_construct(HalfBuiltExporter)
+        assert built is None, f"expected None for HalfBuiltExporter, got {built!r}"
+
+    def incomplete_duck_class_still_constructs():
+        built = try_construct(VendorCounter)
+        assert built is not None, "expected an instance for VendorCounter, got None"
+        assert isinstance(built, VendorCounter), (
+            f"expected a VendorCounter instance, got {type(built).__name__}"
+        )
+
+    def vendor_exports_without_the_base_helper():
+        lines = export_rows(VendorTsvWriter(), ROWS)
+        expected = ["id\tamount", "a1\t30", "b2\t7"]
+        assert lines == expected, f"expected {expected}, got {lines!r}"
+
+    def empty_rows_still_produce_a_header():
+        csv_lines = export_rows(CsvExporter(), [])
+        assert csv_lines == ["id,amount"], f"expected ['id,amount'], got {csv_lines!r}"
+        audit_lines = export_rows(AuditLine(), [])
+        assert audit_lines == ["event"], f"expected ['event'], got {audit_lines!r}"
+
+    record("audit line does not inherit", audit_line_does_not_inherit)
+    record("incomplete ABC subclass refused at construction", incomplete_abc_subclass_is_refused_at_construction)
+    record("incomplete duck class still constructs", incomplete_duck_class_still_constructs)
+    record("vendor exports without the base helper", vendor_exports_without_the_base_helper)
+    record("empty rows still produce a header", empty_rows_still_produce_a_header)
 `
 
 export const abcProtocolsLesson: PythonLesson = {
   id: "py-l4-abc-protocols",
   title: "ABCs & Protocols",
   summary: "Define interfaces with abc and Protocol, then program to the abstraction.",
-  estimatedMinutes: 20,
+  estimatedMinutes: 28,
   difficulty: "hard",
   skills: ["abc", "protocols", "interfaces", "polymorphism"],
   teach: {
@@ -356,52 +570,66 @@ def run(width, height):
   practice: {
     id: "py-l4-abc-protocols-practice",
     executionMode: "workspace",
-    prompt: `Implement \`Rectangle(Shape)\` in \`shapes/rectangle.py\`: subclass the abstract \`Shape\`, store
-\`width\` and \`height\`, and return \`width * height\` from \`area()\`. It must work polymorphically
-with \`total_area\`. Some tests are hidden.`,
+    prompt: `Finish the reporting service's export pipeline, which has to carry two kinds of writer at
+once: writers you own, and writers that ship from a vendor package nobody here can edit.
+
+Write the two exporters in \`pipeline/exporters.py\` and the four registry functions in
+\`pipeline/registry.py\`, to the contract in \`README.md\`. \`CsvExporter\` must end up with the
+base class helper \`render_all\`; \`AuditLine\` must end up without it. The registry has to sort
+vendor classes into the ones that satisfy the contract and the ones that do not, and it has to
+survive a teammate's half-finished subclass without crashing the run.
+
+Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "Subclass the base: `class Rectangle(Shape):`.",
-      "Implement `area(self)` to satisfy the abstract method: return `self.width * self.height`.",
-      "Because you override `area`, `Rectangle` becomes concrete and can be instantiated.",
+      "Two of the classes in play satisfy the contract by having the right methods, and one satisfies it by declaring a parent. Only one of those two facts buys you inherited code.",
+      "`classify` has to test the stricter contract first, because a nominal conformer is also a structural one. `try_construct` needs a `try`/`except` around the call itself, not around a later method call.",
+      "`isinstance(renderer, Exporter)` answers the nominal question and `isinstance(renderer, Renderer)` answers the structural one, because `Renderer` is decorated `@runtime_checkable`. In `export_rows`, take the nominal branch through `renderer.render_all(rows)`.",
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "shapes/rectangle.py",
-      editableFilePaths: ["shapes/rectangle.py"],
-      visibleTestPaths: ["tests/test_shapes.py"],
-      hiddenTestPaths: ["tests/test_shapes_hidden.py"],
+      primaryFilePath: "pipeline/exporters.py",
+      editableFilePaths: ["pipeline/exporters.py", "pipeline/registry.py"],
+      visibleTestPaths: ["tests/test_pipeline.py"],
+      hiddenTestPaths: ["tests/test_pipeline_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
-        { path: "README.md", role: "docs", language: "markdown", content: ABC_README },
-        { path: "shapes/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        { path: "README.md", role: "docs", language: "markdown", content: EXPORT_README },
+        { path: "pipeline/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "shapes/base.py",
+          path: "pipeline/base.py",
           role: "readonly",
           language: "python",
-          content: ABC_BASE,
-          description: "Shape abstract base class (read-only)",
+          content: EXPORT_BASE,
+          description: "Exporter abstract base class (read-only)",
         },
         {
-          path: "shapes/square.py",
+          path: "pipeline/contracts.py",
           role: "readonly",
           language: "python",
-          content: ABC_SQUARE,
-          description: "Worked Square example (read-only)",
+          content: EXPORT_CONTRACTS,
+          description: "Renderer protocol (read-only)",
         },
         {
-          path: "shapes/report.py",
+          path: "pipeline/vendor.py",
           role: "readonly",
           language: "python",
-          content: ABC_REPORT,
-          description: "total_area over the abstraction (read-only)",
+          content: EXPORT_VENDOR,
+          description: "Vendor and half-finished classes you cannot edit (read-only)",
         },
         {
-          path: "shapes/rectangle.py",
+          path: "pipeline/exporters.py",
           role: "editable",
           language: "python",
-          content: ABC_RECTANGLE_STARTER,
-          description: "Implement Rectangle here",
+          content: EXPORT_EXPORTERS_STARTER,
+          description: "Write CsvExporter and AuditLine here",
+        },
+        {
+          path: "pipeline/registry.py",
+          role: "editable",
+          language: "python",
+          content: EXPORT_REGISTRY_STARTER,
+          description: "Write classify, register, try_construct, and export_rows here",
         },
         {
           path: "tests/__init__.py",
@@ -411,27 +639,27 @@ with \`total_area\`. Some tests are hidden.`,
           hidden: true,
         },
         {
-          path: "tests/test_shapes.py",
+          path: "tests/test_pipeline.py",
           role: "test",
           language: "python",
-          content: ABC_TEST,
-          description: "Visible shape tests",
+          content: EXPORT_TEST,
+          description: "Visible pipeline tests",
         },
         {
-          path: "tests/test_shapes_hidden.py",
+          path: "tests/test_pipeline_hidden.py",
           role: "test",
           language: "python",
-          content: ABC_TEST_HIDDEN,
+          content: EXPORT_TEST_HIDDEN,
           hidden: true,
-          description: "Hidden abstract-class tests",
+          description: "Hidden conformance and construction tests",
         },
         {
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
           content: buildRunner([
-            { module: "test_shapes", label: "visible shapes" },
-            { module: "test_shapes_hidden", label: "hidden shapes" },
+            { module: "test_pipeline", label: "visible pipeline" },
+            { module: "test_pipeline_hidden", label: "hidden pipeline" },
           ]),
           hidden: true,
           description: "Workspace test runner",
@@ -439,10 +667,16 @@ with \`total_area\`. Some tests are hidden.`,
       ],
       referenceFiles: [
         {
-          path: "shapes/rectangle.py",
+          path: "pipeline/exporters.py",
           role: "editable",
           language: "python",
-          content: ABC_RECTANGLE_REFERENCE,
+          content: EXPORT_EXPORTERS_REFERENCE,
+        },
+        {
+          path: "pipeline/registry.py",
+          role: "editable",
+          language: "python",
+          content: EXPORT_REGISTRY_REFERENCE,
         },
       ],
     },
