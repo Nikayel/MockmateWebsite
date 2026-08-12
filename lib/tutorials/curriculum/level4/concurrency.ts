@@ -5,83 +5,328 @@
 import type { PythonLesson } from "../../types"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const CONC_README = `# Parallelize a batch with concurrent.futures
+const CONC_README = `# Ticket OPS-812: the asset sweep reports the wrong sizes
 
-\`jobs/worker.py\` (read-only) has \`double(n)\`. Implement \`run_all(numbers)\` in \`jobs/runner.py\`
-so it maps \`double\` over every number with a \`concurrent.futures.ThreadPoolExecutor\`, returning
-the results **in input order**.
+The nightly sweep fetches every asset path and writes a size report. Since it was moved onto an
+executor the report has been wrong: sizes land against the wrong paths, and a vendor outage last
+week produced a report of zeros instead of an alert.
 
-Some runtimes have no OS threads (this in-browser sandbox is one), where starting a pool raises
-\`RuntimeError\`. Catch it and **fall back to a sequential map**. The ordered results are identical
-either way.
+This sandbox has **no OS threads**, so \`harness/executor.py\` (read-only) is a fake executor that
+runs each call immediately and then hands the futures back in a **completion order that is not
+input order**. A future carries no index and no url, only \`.result()\`, which re-raises whatever
+the call raised. That is faithful to the real thing, and it is why order and error handling have
+to be bookkeeping you write rather than something you inherit.
 
-\`run_all([1, 2, 3])\` is \`[2, 4, 6]\`. Some tests are hidden.
+\`workers/fetch.py\` (read-only) exposes \`fetch(url)\`, \`TransientError\`, \`PermanentError\`, and
+\`reset_calls()\`. Some paths succeed, some fail once and succeed on the next attempt, some always
+time out, and unknown paths are permanent failures.
+
+## What to build
+
+**\`pipeline/policy.py\`** owns the failure policy:
+
+- \`should_retry(error, attempts)\` is true only for a transient failure that has not yet used
+  \`MAX_ATTEMPTS\` attempts.
+- \`give_up(url, error)\` handles a failure that will not be retried again: a transient failure is
+  recorded as size \`0\`, and a permanent failure must reach the caller instead of being recorded.
+
+**\`pipeline/collector.py\`** owns \`run_batch(executor, urls)\`, which returns:
+
+\`\`\`python
+{"sizes": [<int per url, in INPUT order>], "retried": [<urls that took a second attempt, in input order>]}
+\`\`\`
+
+\`run_batch(executor, ["/a", "/b"])\` is \`{"sizes": [10, 20], "retried": []}\`.
+
+Some tests are hidden.
 `
 
-const CONC_WORKER = String.raw`def double(n):
-    """A unit of work (stands in for an I/O-bound task)."""
-    return n * 2
+const CONC_EXECUTOR = String.raw`"""A stand-in for concurrent.futures, because this runtime has no OS threads.
+
+The behaviour that matters is preserved: submitted work produces a future, a future holds
+either a value or the exception the call raised, and completion order is not input order.
+"""
+
+
+class FakeFuture:
+    """One submitted call. The work has already run; the outcome is stored here."""
+
+    def __init__(self, fn, arg):
+        try:
+            self._value = fn(arg)
+            self._error = None
+        except Exception as error:  # noqa: BLE001 - a future stores any failure
+            self._value = None
+            self._error = error
+
+    def result(self):
+        """Return the value, or re-raise the exception the call raised."""
+        if self._error is not None:
+            raise self._error
+        return self._value
+
+
+class OutOfOrderExecutor:
+    """Runs each submitted call immediately and returns a future for it."""
+
+    def submit(self, fn, arg):
+        return FakeFuture(fn, arg)
+
+
+def as_completed(futures):
+    """Yield the futures in completion order, which is deliberately not input order."""
+    futures = list(futures)
+    for future in futures[1::2] + futures[0::2][::-1]:
+        yield future
 `
 
-const CONC_RUNNER_STARTER = String.raw`from concurrent.futures import ThreadPoolExecutor
-
-from jobs.worker import double
+const CONC_FETCH = String.raw`"""The read-only asset service. Deterministic, so failures are reproducible."""
 
 
-def run_all(numbers):
-    """Run double over every number with a thread pool; return results in order (see README.md)."""
-    # TODO: map the double worker over numbers with a ThreadPoolExecutor, but fall back
-    # to a sequential map if the runtime has no threads (catch RuntimeError).
-    return []
+class TransientError(Exception):
+    """A timeout or a blip. Trying again may work."""
+
+
+class PermanentError(Exception):
+    """The path is wrong. Trying again will never work."""
+
+
+_SIZES = {"/a": 10, "/b": 20, "/c": 30, "/d": 40, "/e": 50}
+_FLAKY = {"/flaky-1": 11, "/flaky-2": 22}
+_ALWAYS_SLOW = "/timeout"
+
+_calls = {}
+
+
+def reset_calls():
+    """Forget how many times each url has been fetched (tests call this first)."""
+    _calls.clear()
+
+
+def call_count(url):
+    return _calls.get(url, 0)
+
+
+def fetch(url):
+    _calls[url] = _calls.get(url, 0) + 1
+    if url in _SIZES:
+        return _SIZES[url]
+    if url in _FLAKY:
+        if _calls[url] == 1:
+            raise TransientError("timed out reading " + url)
+        return _FLAKY[url]
+    if url == _ALWAYS_SLOW:
+        raise TransientError("timed out reading " + url)
+    raise PermanentError("no such path: " + url)
 `
 
-const CONC_RUNNER_REFERENCE = String.raw`from concurrent.futures import ThreadPoolExecutor
+const CONC_POLICY_STARTER = String.raw`from workers.fetch import PermanentError, TransientError
 
-from jobs.worker import double
+MAX_ATTEMPTS = 2
 
 
-def run_all(numbers):
-    try:
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            return list(executor.map(double, numbers))
-    except RuntimeError:
-        # No OS threads here (e.g. the browser sandbox), same ordered results, run sequentially.
-        return [double(n) for n in numbers]
+def should_retry(error, attempts):
+    """Is this failure worth another attempt? See README.md."""
+    # TODO: allow another attempt only for failures that could succeed later,
+    # and only while attempts are still available.
+    return False
+
+
+def give_up(url, error):
+    """Settle a failure that will not be retried again. See README.md."""
+    # TODO: decide what a failure becomes once retrying is over: a recorded size,
+    # or something the caller has to deal with.
+    return 0
 `
 
-const CONC_TEST = String.raw`from jobs.runner import run_all
+const CONC_POLICY_REFERENCE = String.raw`from workers.fetch import PermanentError, TransientError
+
+MAX_ATTEMPTS = 2
+
+
+def should_retry(error, attempts):
+    return isinstance(error, TransientError) and attempts < MAX_ATTEMPTS
+
+
+def give_up(url, error):
+    if isinstance(error, TransientError):
+        # Out of attempts: record it as empty rather than failing the whole sweep.
+        return 0
+    # PermanentError (and anything unrecognised) is not this function's to swallow.
+    raise error
+`
+
+const CONC_COLLECTOR_STARTER = String.raw`from harness.executor import as_completed
+from workers.fetch import fetch
+
+from pipeline import policy
+
+
+def run_batch(executor, urls):
+    """Fetch every url through the executor and report sizes. See README.md."""
+    # TODO: submit every url, pair each finished future back to the url it came from,
+    # apply the policy to failures, and return sizes in input order plus the retried urls.
+    return {"sizes": [], "retried": []}
+`
+
+const CONC_COLLECTOR_REFERENCE = String.raw`from harness.executor import as_completed
+from workers.fetch import fetch
+
+from pipeline import policy
+
+
+def run_batch(executor, urls):
+    sizes = [None] * len(urls)
+    attempts = [0] * len(urls)
+    was_retried = [False] * len(urls)
+
+    wave = list(range(len(urls)))
+    while wave:
+        # The future itself carries no index, so the index has to be kept beside it.
+        pending = {}
+        for index in wave:
+            attempts[index] += 1
+            pending[executor.submit(fetch, urls[index])] = index
+
+        next_wave = []
+        for future in as_completed(list(pending)):
+            index = pending[future]
+            try:
+                sizes[index] = future.result()
+            except Exception as error:  # noqa: BLE001 - the policy decides what it means
+                if policy.should_retry(error, attempts[index]):
+                    was_retried[index] = True
+                    next_wave.append(index)
+                else:
+                    sizes[index] = policy.give_up(urls[index], error)
+        wave = next_wave
+
+    return {
+        "sizes": sizes,
+        "retried": [url for url, retried in zip(urls, was_retried) if retried],
+    }
+`
+
+const CONC_TEST = String.raw`from harness.executor import OutOfOrderExecutor
+from pipeline import policy
+from pipeline.collector import run_batch
+from workers import fetch as fetch_module
+from workers.fetch import TransientError
+
+
+def sweep(urls):
+    fetch_module.reset_calls()
+    return run_batch(OutOfOrderExecutor(), urls)
 
 
 def run_tests(record):
-    def maps_in_order():
-        assert run_all([1, 2, 3]) == [2, 4, 6], f"got {run_all([1, 2, 3])!r}"
+    def sizes_follow_input_order():
+        result = sweep(["/a", "/b", "/c", "/d"])
+        assert result["sizes"] == [10, 20, 30, 40], (
+            f"expected [10, 20, 30, 40] in input order, got {result['sizes']!r}"
+        )
 
-    def empty_input():
-        assert run_all([]) == []
+    def clean_batch_retries_nothing():
+        result = sweep(["/a", "/b"])
+        assert result["retried"] == [], f"expected [], got {result['retried']!r}"
 
-    record("maps over the batch in order", maps_in_order)
-    record("empty input returns empty", empty_input)
+    def empty_batch():
+        result = sweep([])
+        assert result == {"sizes": [], "retried": []}, (
+            f"expected {{'sizes': [], 'retried': []}}, got {result!r}"
+        )
+
+    def flaky_url_recovers_at_its_own_index():
+        result = sweep(["/a", "/flaky-1", "/c"])
+        assert result["sizes"] == [10, 11, 30], f"expected [10, 11, 30], got {result['sizes']!r}"
+        assert result["retried"] == ["/flaky-1"], (
+            f"expected ['/flaky-1'], got {result['retried']!r}"
+        )
+
+    def transient_failure_is_retried_once():
+        error = TransientError("timed out reading /a")
+        assert policy.should_retry(error, 1) is True, (
+            f"expected True on attempt 1, got {policy.should_retry(error, 1)!r}"
+        )
+        assert policy.should_retry(error, policy.MAX_ATTEMPTS) is False, (
+            "expected False once MAX_ATTEMPTS attempts are used, got "
+            f"{policy.should_retry(error, policy.MAX_ATTEMPTS)!r}"
+        )
+
+    record("sizes come back in input order", sizes_follow_input_order)
+    record("a clean batch reports no retries", clean_batch_retries_nothing)
+    record("an empty batch returns empty lists", empty_batch)
+    record("a flaky url recovers at its own index", flaky_url_recovers_at_its_own_index)
+    record("transient failures are retried, but not forever", transient_failure_is_retried_once)
 `
 
-const CONC_TEST_HIDDEN = String.raw`from jobs.runner import run_all
+const CONC_TEST_HIDDEN = String.raw`from harness.executor import OutOfOrderExecutor
+from pipeline import policy
+from pipeline.collector import run_batch
+from workers import fetch as fetch_module
+from workers.fetch import PermanentError, TransientError
+
+
+def sweep(urls):
+    fetch_module.reset_calls()
+    return run_batch(OutOfOrderExecutor(), urls)
 
 
 def run_tests(record):
-    def single_item():
-        assert run_all([10]) == [20]
+    def permanent_failure_reaches_the_caller():
+        raised = None
+        try:
+            sweep(["/a", "/missing", "/c"])
+        except PermanentError as error:
+            raised = error
+        assert raised is not None, "expected PermanentError to propagate out of run_batch, got no error"
+        assert "/missing" in str(raised), f"expected the url in the message, got {str(raised)!r}"
 
-    def negatives_and_zero():
-        assert run_all([5, 0, -1]) == [10, 0, -2]
+    def permanent_failure_is_never_retried():
+        error = PermanentError("no such path: /missing")
+        assert policy.should_retry(error, 1) is False, (
+            f"expected False for a permanent failure, got {policy.should_retry(error, 1)!r}"
+        )
 
-    record("single item", single_item)
-    record("negatives and zero", negatives_and_zero)
+    def exhausted_transient_is_recorded_as_zero():
+        value = policy.give_up("/timeout", TransientError("timed out reading /timeout"))
+        assert value == 0, f"expected 0, got {value!r}"
+
+    def a_url_that_never_succeeds_does_not_sink_the_batch():
+        result = sweep(["/a", "/timeout", "/e"])
+        assert result["sizes"] == [10, 0, 50], f"expected [10, 0, 50], got {result['sizes']!r}"
+        assert result["retried"] == ["/timeout"], (
+            f"expected ['/timeout'], got {result['retried']!r}"
+        )
+
+    def two_flaky_urls_keep_their_places():
+        result = sweep(["/flaky-2", "/b", "/flaky-1", "/d"])
+        assert result["sizes"] == [22, 20, 11, 40], (
+            f"expected [22, 20, 11, 40], got {result['sizes']!r}"
+        )
+        assert result["retried"] == ["/flaky-2", "/flaky-1"], (
+            f"expected ['/flaky-2', '/flaky-1'] in input order, got {result['retried']!r}"
+        )
+
+    def every_url_is_fetched_once_when_nothing_fails():
+        sweep(["/a", "/b", "/a"])
+        assert fetch_module.call_count("/a") == 2, (
+            f"expected /a fetched twice for two entries, got {fetch_module.call_count('/a')}"
+        )
+
+    record("a permanent failure reaches the caller", permanent_failure_reaches_the_caller)
+    record("a permanent failure is never retried", permanent_failure_is_never_retried)
+    record("an exhausted transient failure records zero", exhausted_transient_is_recorded_as_zero)
+    record("one dead url does not sink the batch", a_url_that_never_succeeds_does_not_sink_the_batch)
+    record("two flaky urls keep their places", two_flaky_urls_keep_their_places)
+    record("no url is fetched more than it needs", every_url_is_fetched_once_when_nothing_fails)
 `
 
 export const concurrencyLesson: PythonLesson = {
   id: "py-l4-concurrency",
   title: "Threads, the GIL & concurrent.futures",
   summary: "Choose a concurrency model and parallelize a batch with a thread pool.",
-  estimatedMinutes: 20,
+  estimatedMinutes: 26,
   difficulty: "hard",
   skills: ["concurrency", "threading", "concurrent-futures", "gil"],
   teach: {
@@ -313,39 +558,65 @@ order. (This is the sequential baseline; the workspace step parallelizes it.)
   practice: {
     id: "py-l4-concurrency-practice",
     executionMode: "workspace",
-    prompt: `Implement \`run_all(numbers)\` in \`jobs/runner.py\`: map the read-only \`double\` worker over
-\`numbers\` with a \`concurrent.futures.ThreadPoolExecutor\`, returning the results in input order.
-This sandbox has **no OS threads**, so catch the \`RuntimeError\` and fall back to a sequential map.
-Some tests are hidden.`,
+    prompt: `Repair the nightly asset sweep (ticket OPS-812). Since it moved onto an executor, sizes
+land against the wrong paths and a vendor outage produced a report of zeros instead of an alert.
+
+This runtime has no OS threads, so \`harness/executor.py\` is a fake executor that finishes work in
+an order that is not input order, and its futures carry no url and no index. Two files are yours:
+
+- \`pipeline/policy.py\`: \`should_retry(error, attempts)\` and \`give_up(url, error)\` decide which
+  failures deserve another attempt, which are recorded as size \`0\`, and which must reach the caller.
+- \`pipeline/collector.py\`: \`run_batch(executor, urls)\` returns
+  \`{"sizes": [...], "retried": [...]}\` with sizes in **input order** and the retried urls in input
+  order.
+
+\`run_batch(executor, ["/a", "/b"])\` is \`{"sizes": [10, 20], "retried": []}\`. Read \`README.md\`
+for the full contract. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "Open a pool inside a `try:`. `with ThreadPoolExecutor(max_workers=4) as executor: return list(executor.map(double, numbers))`.",
-      "`executor.map(double, numbers)` runs the work and preserves order.",
-      "Add `except RuntimeError: return [double(n) for n in numbers]` so it still works where threads are unavailable.",
+      "A finished future tells you nothing about where it belongs, so decide what you record beside each future at submit time.",
+      "Fill a results list you sized up front rather than appending, and keep an attempt count per position. Retries are a second pass over the positions that failed and are worth trying again.",
+      "In `run_batch`, build `pending = {executor.submit(fetch, urls[i]): i for i in wave}`, then `for future in as_completed(list(pending)):` call `future.result()` inside a `try` and hand the exception to the policy. In `policy.give_up`, `raise error` for a permanent failure instead of returning a size.",
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "jobs/runner.py",
-      editableFilePaths: ["jobs/runner.py"],
-      visibleTestPaths: ["tests/test_runner.py"],
-      hiddenTestPaths: ["tests/test_runner_hidden.py"],
+      primaryFilePath: "pipeline/collector.py",
+      editableFilePaths: ["pipeline/collector.py", "pipeline/policy.py"],
+      visibleTestPaths: ["tests/test_sweep.py"],
+      hiddenTestPaths: ["tests/test_sweep_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
         { path: "README.md", role: "docs", language: "markdown", content: CONC_README },
-        { path: "jobs/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        { path: "harness/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "jobs/worker.py",
+          path: "harness/executor.py",
           role: "readonly",
           language: "python",
-          content: CONC_WORKER,
-          description: "The unit of work (read-only)",
+          content: CONC_EXECUTOR,
+          description: "The fake executor and as_completed (read-only)",
         },
+        { path: "workers/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "jobs/runner.py",
+          path: "workers/fetch.py",
+          role: "readonly",
+          language: "python",
+          content: CONC_FETCH,
+          description: "The asset service being fetched (read-only)",
+        },
+        { path: "pipeline/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        {
+          path: "pipeline/policy.py",
           role: "editable",
           language: "python",
-          content: CONC_RUNNER_STARTER,
-          description: "Implement run_all here",
+          content: CONC_POLICY_STARTER,
+          description: "Decide what each failure means",
+        },
+        {
+          path: "pipeline/collector.py",
+          role: "editable",
+          language: "python",
+          content: CONC_COLLECTOR_STARTER,
+          description: "Submit the work and collect results in order",
         },
         {
           path: "tests/__init__.py",
@@ -355,27 +626,27 @@ Some tests are hidden.`,
           hidden: true,
         },
         {
-          path: "tests/test_runner.py",
+          path: "tests/test_sweep.py",
           role: "test",
           language: "python",
           content: CONC_TEST,
-          description: "Visible concurrency tests",
+          description: "Visible sweep tests",
         },
         {
-          path: "tests/test_runner_hidden.py",
+          path: "tests/test_sweep_hidden.py",
           role: "test",
           language: "python",
           content: CONC_TEST_HIDDEN,
           hidden: true,
-          description: "Hidden concurrency tests",
+          description: "Hidden sweep tests",
         },
         {
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
           content: buildRunner([
-            { module: "test_runner", label: "visible runner" },
-            { module: "test_runner_hidden", label: "hidden runner" },
+            { module: "test_sweep", label: "visible sweep" },
+            { module: "test_sweep_hidden", label: "hidden sweep" },
           ]),
           hidden: true,
           description: "Workspace test runner",
@@ -383,10 +654,16 @@ Some tests are hidden.`,
       ],
       referenceFiles: [
         {
-          path: "jobs/runner.py",
+          path: "pipeline/policy.py",
           role: "editable",
           language: "python",
-          content: CONC_RUNNER_REFERENCE,
+          content: CONC_POLICY_REFERENCE,
+        },
+        {
+          path: "pipeline/collector.py",
+          role: "editable",
+          language: "python",
+          content: CONC_COLLECTOR_REFERENCE,
         },
       ],
     },
