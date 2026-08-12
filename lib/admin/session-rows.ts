@@ -17,6 +17,14 @@
 import { sessionTitle, sessionType, type SessionDocFields } from "./session-fields"
 import { ABANDONED_AFTER_HOURS, type SessionListStatus } from "./session-query"
 
+/** Coarse Vercel-geo location captured when a guest session was created. */
+export interface SessionGuestGeo {
+  /** ISO 3166-1 alpha-2, e.g. "BD". */
+  country: string
+  region: string | null
+  city: string | null
+}
+
 /** One row of the session list. Every field here is rendered by the table. */
 export interface SessionListRow {
   sessionId: string
@@ -25,6 +33,12 @@ export interface SessionListRow {
   /** Email for a registered user, "Guest" for a guest, the id when no profile exists. */
   userLabel: string
   isGuest: boolean
+  /**
+   * Where the guest trial came from, at country/region/city resolution (the
+   * raw IP is never stored). Null for registered users' sessions and for
+   * guest documents written before capture existed.
+   */
+  guestGeo: SessionGuestGeo | null
   scenarioTitle: string
   sessionType: string
   difficulty: string
@@ -71,6 +85,7 @@ export interface SessionScoreBreakdown {
 export interface SessionRowSource extends SessionDocFields {
   user_id?: unknown
   is_guest?: unknown
+  geo?: unknown
   difficulty?: unknown
   pattern?: unknown
   target_company?: unknown
@@ -173,6 +188,24 @@ export function sessionUserLabel(session: SessionRowSource, email: string | null
   return email ?? toOptionalString(session.user_id) ?? "Unknown"
 }
 
+/**
+ * The geo block written by the guest-session route, validated field by field.
+ * Only guest sessions carry it; anything malformed reads as absent.
+ */
+export function toGuestGeo(session: SessionRowSource): SessionGuestGeo | null {
+  if (session.is_guest !== true) return null
+  const geo = session.geo
+  if (!geo || typeof geo !== "object") return null
+  const raw = geo as Record<string, unknown>
+  const country = toOptionalString(raw.country)
+  if (!country) return null
+  return {
+    country,
+    region: toOptionalString(raw.region),
+    city: toOptionalString(raw.city),
+  }
+}
+
 export function toSessionListRow(
   sessionId: string,
   session: SessionRowSource,
@@ -184,6 +217,7 @@ export function toSessionListRow(
     userId: toOptionalString(session.user_id),
     userLabel: sessionUserLabel(session, email),
     isGuest: session.is_guest === true,
+    guestGeo: toGuestGeo(session),
     scenarioTitle: sessionTitle(session),
     sessionType: sessionType(session),
     difficulty: toOptionalString(session.difficulty) ?? "unknown",

@@ -24,6 +24,15 @@ import {
 // Mark route as dynamic
 export const dynamic = "force-dynamic"
 
+/** Vercel URI-encodes the city header; a malformed value must not 500 the route. */
+function safeDecodeURIComponent(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
 /**
  * Validate guest ID format
  */
@@ -107,6 +116,15 @@ export async function POST(request: NextRequest) {
       Date.now() + SESSION.GUEST_EXPIRY_DAYS * 24 * 60 * 60 * 1000
     ).toISOString()
 
+    // Coarse location from Vercel's edge geo headers (country/region/city).
+    // Deliberately NOT the raw IP: "where do guests try from?" needs at most a
+    // city-level answer in the admin list, and skipping the IP keeps personal
+    // data out of a document its guest can never log back into. Absent
+    // locally (no Vercel edge), so geo is null in dev.
+    const geoCountry = request.headers.get("x-vercel-ip-country")
+    const geoRegion = request.headers.get("x-vercel-ip-country-region")
+    const geoCity = request.headers.get("x-vercel-ip-city")
+
     const sessionData = {
       id: sessionRef.id,
       user_id: guestId,
@@ -120,6 +138,13 @@ export async function POST(request: NextRequest) {
       created_at: now,
       updated_at: now,
       expires_at: expiresAt,
+      geo: geoCountry
+        ? {
+            country: geoCountry,
+            region: geoRegion || null,
+            city: geoCity ? safeDecodeURIComponent(geoCity) : null,
+          }
+        : null,
     }
 
     await sessionRef.set(sessionData)

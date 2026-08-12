@@ -63,6 +63,7 @@ describe("toSessionListRow: projection", () => {
         "completedAt",
         "difficulty",
         "durationMinutes",
+        "guestGeo",
         "isGuest",
         "performanceScore",
         "scenarioTitle",
@@ -74,6 +75,38 @@ describe("toSessionListRow: projection", () => {
         "userLabel",
       ].sort()
     )
+  })
+
+  it("carries guest geo only for guest sessions, validated field by field", () => {
+    const guestGeoSession = {
+      ...FULL_SESSION,
+      is_guest: true,
+      geo: { country: "BD", region: "B", city: "Chattogram" },
+    }
+    expect(toSessionListRow("sess_g", guestGeoSession, null, NOW).guestGeo).toEqual({
+      country: "BD",
+      region: "B",
+      city: "Chattogram",
+    })
+
+    // A registered user's session never reports geo, even if the field exists.
+    expect(
+      toSessionListRow(
+        "sess_u",
+        { ...FULL_SESSION, geo: { country: "US" } },
+        "dev@example.com",
+        NOW
+      ).guestGeo
+    ).toBeNull()
+
+    // Pre-capture guest documents and malformed blocks read as absent.
+    expect(
+      toSessionListRow("sess_old", { ...FULL_SESSION, is_guest: true }, null, NOW).guestGeo
+    ).toBeNull()
+    expect(
+      toSessionListRow("sess_bad", { ...FULL_SESSION, is_guest: true, geo: "BD" }, null, NOW)
+        .guestGeo
+    ).toBeNull()
   })
 
   it("never ships the model output, the private notes, or a neighbouring PII field", () => {

@@ -56,6 +56,16 @@ import type { SessionListStatus } from "@/lib/admin/session-query"
 
 const PAGE_SIZE = 25
 
+/**
+ * "BD" -> the regional-indicator flag emoji. Guest rows carry only coarse geo
+ * (country/region/city, never an IP); anything that is not two letters
+ * renders as no flag rather than garbage codepoints.
+ */
+function countryFlag(country: string): string {
+  if (!/^[A-Za-z]{2}$/.test(country)) return ""
+  return String.fromCodePoint(...[...country.toUpperCase()].map((c) => 127397 + c.charCodeAt(0)))
+}
+
 interface SessionFilters {
   status: SessionListStatus
   type: string
@@ -210,7 +220,16 @@ export default function SessionsPage() {
       label: "User",
       render: (_value, row) =>
         row.isGuest || !row.userId ? (
-          <span className="text-gray-400">{row.userLabel}</span>
+          <div>
+            <span className="text-gray-400">{row.userLabel}</span>
+            {/* Coarse trial origin (country/region/city; no IP is stored). */}
+            {row.guestGeo && (
+              <div className="text-xs text-gray-500">
+                {countryFlag(row.guestGeo.country)}{" "}
+                {[row.guestGeo.city, row.guestGeo.country].filter(Boolean).join(", ")}
+              </div>
+            )}
+          </div>
         ) : (
           <button
             type="button"
