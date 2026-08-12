@@ -1,75 +1,346 @@
 import type { PythonLesson } from "../../types"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const CFG_README = `# Load typed config from the environment
+const CFG_README = `# Postmortem: the startup log printed a database password
 
-Twelve-factor apps read config from the **environment**, with defaults and type coercion, and never
-leak secrets. \`config/defaults.py\` (read-only) holds the defaults. Implement \`load_config(env)\` in
-\`config/settings.py\` so it returns:
+The billing service logs one \`app.startup\` record on boot. Last week that record was shipped to the
+log aggregator with a live database password inside it, because the redactor only looked at the top
+level of the config and the password sits one level down, inside the parsed \`database\` value. The
+same review found that nobody can say which config layer a value came from.
+
+Two files are yours. \`service/spec.py\` and \`service/errors.py\` are read-only.
+
+## \`service/config.py\`
 
 \`\`\`python
-{"port": <int>, "debug": <bool>, "has_secret": <bool>}
+load_settings(file_values, env, overrides=None)
 \`\`\`
 
-- \`port\`: \`int\` of \`env["PORT"]\` or the default
-- \`debug\`: \`True\` only when \`env["DEBUG"]\` is \`"true"\` (case-insensitive), else the default
-- \`has_secret\`: whether \`"SECRET"\` is in \`env\` (record presence, never the value)
+Returns one settings dict built from four layers. Later layers win:
 
-Some tests are hidden.
+1. \`DEFAULTS\` from \`spec.py\`
+2. \`file_values\`, keyed by field name (\`"port"\`, \`"database"\`, ...)
+3. \`env\`, keyed by \`ENV_PREFIX\` plus the upper-cased field name (\`"APP_PORT"\`)
+4. \`overrides\`, keyed by field name
+
+Rules that hold for every layer:
+
+- A key that is not in \`FIELD_TYPES\` is ignored, and so is an env name that does not start with
+  \`ENV_PREFIX\`.
+- An env value that is empty or only whitespace counts as **not set**, so the layer below it stands.
+- String values are coerced to the type \`FIELD_TYPES\` names: \`"int"\`, \`"bool"\`
+  (\`true\`/\`1\`/\`yes\` and \`false\`/\`0\`/\`no\`, any case), \`"json"\`, or \`"str"\`. A value that is already
+  a non-string is taken as-is, since an override can pass a real \`int\`.
+- A string that will not coerce raises \`ConfigError\` (from \`service/errors.py\`) whose message
+  contains the **field name**, so an operator reading the crash knows which variable to fix.
+
+\`\`\`python
+load_settings({"port": "9000"}, {"APP_PORT": "9100"}, {"port": 9200})["port"]  # 9200
+\`\`\`
+
+## \`service/log_record.py\`
+
+\`\`\`python
+is_secret_key(key)          # True when the key names a secret
+redact_record(value)        # a copy with every secret value replaced by REDACTED
+build_startup_record(file_values, env, overrides=None)
+\`\`\`
+
+\`is_secret_key\` uses the \`SECRET_HINTS\` in \`spec.py\`. \`redact_record\` walks dicts **and lists** to
+any depth. \`build_startup_record\` returns:
+
+\`\`\`python
+{"event": "app.startup", "config": <the redacted settings>, "secrets_present": [<field names>]}
+\`\`\`
+
+\`secrets_present\` is the sorted list of secret-named fields that are set, so an on-call engineer can
+tell a key was configured without ever seeing it.
+
+Some tests are hidden. One of them serializes the whole record to JSON and asserts that no secret
+value appears anywhere in the text.
 `
 
-const CFG_DEFAULTS = String.raw`DEFAULTS = {"PORT": "8000", "DEBUG": "false"}
+const CFG_SPEC = String.raw`"""Read-only config contract shared by the loader and the logger."""
+
+FIELD_TYPES = {
+    "port": "int",
+    "max_retries": "int",
+    "debug": "bool",
+    "region": "str",
+    "api_token": "str",
+    "db_password": "str",
+    "database": "json",
+}
+
+DEFAULTS = {"port": 8000, "max_retries": 3, "debug": False, "region": "us-east-1"}
+
+ENV_PREFIX = "APP_"
+
+SECRET_HINTS = ("token", "secret", "password", "api_key", "apikey")
+
+REDACTED = "[redacted]"
 `
 
-const CFG_SETTINGS_STARTER = String.raw`from config.defaults import DEFAULTS
-
-
-def load_config(env):
-    """Turn an env dict into typed settings (see README.md)."""
-    # TODO: coerce PORT to int, DEBUG to bool, and record whether SECRET is present.
-    return {}
+const CFG_ERRORS = String.raw`class ConfigError(ValueError):
+    """Raised when a config value cannot be coerced to the type the spec names."""
 `
 
-const CFG_SETTINGS_REFERENCE = String.raw`from config.defaults import DEFAULTS
+const CFG_CONFIG_STARTER = String.raw`import json
+
+from service.errors import ConfigError
+from service.spec import DEFAULTS, ENV_PREFIX, FIELD_TYPES
 
 
-def load_config(env):
-    port = int(env.get("PORT", DEFAULTS["PORT"]))
-    debug = env.get("DEBUG", DEFAULTS["DEBUG"]).lower() == "true"
-    return {"port": port, "debug": debug, "has_secret": "SECRET" in env}
+def coerce_value(field, value):
+    """Turn one raw value into the type FIELD_TYPES names (see README.md)."""
+    # TODO: coerce strings by field type and raise ConfigError naming the field when that fails.
+    return value
+
+
+def load_settings(file_values, env, overrides=None):
+    """Merge the defaults, file, env, and override layers (see README.md)."""
+    # TODO: apply the four layers in precedence order, skipping keys the spec does not name.
+    return dict(DEFAULTS)
 `
 
-const CFG_TEST = String.raw`from config.settings import load_config
+const CFG_CONFIG_REFERENCE = String.raw`import json
+
+from service.errors import ConfigError
+from service.spec import DEFAULTS, ENV_PREFIX, FIELD_TYPES
+
+TRUE_WORDS = ("true", "1", "yes")
+FALSE_WORDS = ("false", "0", "no")
+
+
+def coerce_value(field, value):
+    if not isinstance(value, str):
+        return value
+    kind = FIELD_TYPES[field]
+    text = value.strip()
+    if kind == "int":
+        try:
+            return int(text)
+        except ValueError:
+            raise ConfigError(f"{field}: expected an integer, got {value!r}")
+    if kind == "bool":
+        lowered = text.lower()
+        if lowered in TRUE_WORDS:
+            return True
+        if lowered in FALSE_WORDS:
+            return False
+        raise ConfigError(f"{field}: expected a boolean, got {value!r}")
+    if kind == "json":
+        try:
+            return json.loads(text)
+        except ValueError:
+            raise ConfigError(f"{field}: expected JSON, got {value!r}")
+    return value
+
+
+def _apply(settings, values):
+    for field, value in values.items():
+        if field in FIELD_TYPES:
+            settings[field] = coerce_value(field, value)
+
+
+def load_settings(file_values, env, overrides=None):
+    settings = dict(DEFAULTS)
+    _apply(settings, file_values)
+    for name, value in env.items():
+        if not name.startswith(ENV_PREFIX):
+            continue
+        field = name[len(ENV_PREFIX):].lower()
+        if field not in FIELD_TYPES:
+            continue
+        if isinstance(value, str) and value.strip() == "":
+            continue
+        settings[field] = coerce_value(field, value)
+    _apply(settings, overrides or {})
+    return settings
+`
+
+const CFG_LOG_STARTER = String.raw`from service.config import load_settings
+from service.spec import REDACTED, SECRET_HINTS
+
+
+def is_secret_key(key):
+    """Report whether this key names a secret (see README.md)."""
+    # TODO: decide from SECRET_HINTS, ignoring case.
+    return False
+
+
+def redact_record(value):
+    """Return a copy with every secret value replaced by REDACTED (see README.md)."""
+    # TODO: handle nested dicts and lists, not only the top level.
+    return value
+
+
+def build_startup_record(file_values, env, overrides=None):
+    """Build the app.startup log record (see README.md)."""
+    # TODO: load the settings, redact them, and list which secret fields are set.
+    return {"event": "app.startup", "config": {}, "secrets_present": []}
+`
+
+const CFG_LOG_REFERENCE = String.raw`from service.config import load_settings
+from service.spec import REDACTED, SECRET_HINTS
+
+
+def is_secret_key(key):
+    lowered = str(key).lower()
+    return any(hint in lowered for hint in SECRET_HINTS)
+
+
+def redact_record(value):
+    if isinstance(value, dict):
+        return {
+            key: REDACTED if is_secret_key(key) else redact_record(inner)
+            for key, inner in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [redact_record(item) for item in value]
+    return value
+
+
+def build_startup_record(file_values, env, overrides=None):
+    settings = load_settings(file_values, env, overrides)
+    return {
+        "event": "app.startup",
+        "config": redact_record(settings),
+        "secrets_present": sorted(field for field in settings if is_secret_key(field)),
+    }
+`
+
+const CFG_TEST_CONFIG = String.raw`from service.config import load_settings
+from service.errors import ConfigError
 
 
 def run_tests(record):
-    def reads_and_coerces():
-        result = load_config({"PORT": "9000", "DEBUG": "true", "SECRET": "abc"})
-        assert result == {"port": 9000, "debug": True, "has_secret": True}, f"got {result!r}"
+    def later_layers_win():
+        settings = load_settings(
+            {"port": "9000", "region": "eu-west-1"},
+            {"APP_PORT": "9100", "APP_MAX_RETRIES": "5"},
+            {"port": 9200},
+        )
+        assert settings["port"] == 9200, f"expected port 9200, got {settings['port']!r}"
+        assert settings["max_retries"] == 5, f"expected max_retries 5, got {settings['max_retries']!r}"
+        assert settings["region"] == "eu-west-1", f"expected region 'eu-west-1', got {settings['region']!r}"
+        assert settings["debug"] is False, f"expected debug False from the defaults, got {settings['debug']!r}"
 
-    def applies_defaults():
-        result = load_config({})
-        assert result == {"port": 8000, "debug": False, "has_secret": False}, f"got {result!r}"
+    def coerces_each_declared_type():
+        settings = load_settings(
+            {"debug": "YES", "database": '{"host": "db1", "password": "hunter2"}'},
+            {"APP_PORT": "9000"},
+        )
+        assert settings["debug"] is True, f"expected debug True for 'YES', got {settings['debug']!r}"
+        assert settings["port"] == 9000, f"expected port 9000 as an int, got {settings['port']!r}"
+        expected_db = {"host": "db1", "password": "hunter2"}
+        assert settings["database"] == expected_db, f"expected {expected_db}, got {settings['database']!r}"
 
-    record("reads and coerces env", reads_and_coerces)
-    record("applies defaults", applies_defaults)
+    def bad_integer_names_the_field():
+        try:
+            load_settings({}, {"APP_PORT": "eight thousand"})
+        except ConfigError as exc:
+            assert "port" in str(exc), f"expected the message to name 'port', got {str(exc)!r}"
+        else:
+            raise AssertionError("expected ConfigError for APP_PORT='eight thousand', got no error")
+
+    record("later layers win", later_layers_win)
+    record("coerces each declared type", coerces_each_declared_type)
+    record("a bad integer names the field", bad_integer_names_the_field)
 `
 
-const CFG_TEST_HIDDEN = String.raw`from config.settings import load_config
+const CFG_TEST_LOG = String.raw`from service.log_record import build_startup_record, is_secret_key, redact_record
 
 
 def run_tests(record):
-    def debug_is_case_insensitive():
-        result = load_config({"DEBUG": "TRUE"})
-        assert result == {"port": 8000, "debug": True, "has_secret": False}, f"got {result!r}"
+    def spots_secret_keys_by_hint():
+        for key in ("api_token", "DB_PASSWORD", "stripe_api_key"):
+            assert is_secret_key(key) is True, f"expected {key!r} to be secret, got False"
+        for key in ("port", "region", "database"):
+            assert is_secret_key(key) is False, f"expected {key!r} to be public, got True"
 
-    def never_exposes_secret_value():
-        result = load_config({"PORT": "3000", "SECRET": "topsecret"})
-        assert result == {"port": 3000, "debug": False, "has_secret": True}, f"got {result!r}"
-        assert "topsecret" not in result.values(), "the secret value must not be in the config"
+    def redacts_a_nested_password():
+        redacted = redact_record({"database": {"host": "db1", "password": "hunter2"}})
+        expected = {"database": {"host": "db1", "password": "[redacted]"}}
+        assert redacted == expected, f"expected {expected}, got {redacted!r}"
 
-    record("DEBUG is case-insensitive", debug_is_case_insensitive)
-    record("never exposes the secret value", never_exposes_secret_value)
+    def startup_record_lists_secret_fields():
+        result = build_startup_record({"api_token": "tok-123", "db_password": "hunter2"}, {})
+        assert result["event"] == "app.startup", f"expected event 'app.startup', got {result['event']!r}"
+        expected_names = ["api_token", "db_password"]
+        assert result["secrets_present"] == expected_names, (
+            f"expected secrets_present {expected_names}, got {result['secrets_present']!r}"
+        )
+        assert result["config"]["api_token"] == "[redacted]", (
+            f"expected the token redacted, got {result['config']['api_token']!r}"
+        )
+
+    record("spots secret keys by hint", spots_secret_keys_by_hint)
+    record("redacts a nested password", redacts_a_nested_password)
+    record("the startup record lists secret fields", startup_record_lists_secret_fields)
+`
+
+const CFG_TEST_HIDDEN = String.raw`import json
+
+from service.config import load_settings
+from service.errors import ConfigError
+from service.log_record import build_startup_record, redact_record
+
+
+def run_tests(record):
+    def blank_env_value_is_not_set():
+        settings = load_settings({"port": "7000"}, {"APP_PORT": "   ", "APP_REGION": ""})
+        assert settings["port"] == 7000, f"expected the file value 7000 to stand, got {settings['port']!r}"
+        assert settings["region"] == "us-east-1", (
+            f"expected the default region 'us-east-1', got {settings['region']!r}"
+        )
+
+    def unknown_keys_are_ignored():
+        settings = load_settings({"colour": "red"}, {"PORT": "1", "APP_TIMEOUT": "9"})
+        assert "colour" not in settings, f"'colour' is not in the spec, got {settings!r}"
+        assert "timeout" not in settings, f"'timeout' is not in the spec, got {settings!r}"
+        assert settings["port"] == 8000, (
+            f"expected 'PORT' without the prefix to be ignored, got port {settings['port']!r}"
+        )
+
+    def bad_json_and_bad_bool_name_their_fields():
+        try:
+            load_settings({"database": "not json"}, {})
+        except ConfigError as exc:
+            assert "database" in str(exc), f"expected the message to name 'database', got {str(exc)!r}"
+        else:
+            raise AssertionError("expected ConfigError for database='not json', got no error")
+        try:
+            load_settings({}, {"APP_DEBUG": "maybe"})
+        except ConfigError as exc:
+            assert "debug" in str(exc), f"expected the message to name 'debug', got {str(exc)!r}"
+        else:
+            raise AssertionError("expected ConfigError for APP_DEBUG='maybe', got no error")
+
+    def redaction_reaches_into_lists():
+        value = {"replicas": [{"host": "db1", "db_password": "hunter2"}, {"host": "db2"}]}
+        redacted = redact_record(value)
+        expected = {"replicas": [{"host": "db1", "db_password": "[redacted]"}, {"host": "db2"}]}
+        assert redacted == expected, f"expected {expected}, got {redacted!r}"
+        assert value["replicas"][0]["db_password"] == "hunter2", (
+            "redact_record must not mutate the value it was handed"
+        )
+
+    def no_secret_survives_serialization():
+        result = build_startup_record(
+            {"database": '{"host": "db1", "password": "hunter2", "replicas": [{"api_key": "ak-99"}]}'},
+            {"APP_API_TOKEN": "tok-123"},
+        )
+        dumped = json.dumps(result)
+        for leaked in ("hunter2", "ak-99", "tok-123"):
+            assert leaked not in dumped, f"{leaked!r} reached the log record: {dumped}"
+        assert "db1" in dumped, f"expected the non-secret host to survive, got {dumped}"
+
+    record("a blank env value is not set", blank_env_value_is_not_set)
+    record("unknown keys are ignored", unknown_keys_are_ignored)
+    record("bad JSON and bad bool name their fields", bad_json_and_bad_bool_name_their_fields)
+    record("redaction reaches into lists", redaction_reaches_into_lists)
+    record("no secret survives serialization", no_secret_survives_serialization)
 `
 
 export const configLoggingLesson: PythonLesson = {
@@ -288,38 +559,66 @@ print(load_config({"PORT": "9000", "DEBUG": "true", "SECRET": "x"}))`,
   practice: {
     id: "py-l4-config-logging-practice",
     executionMode: "workspace",
-    prompt: `Implement \`load_config(env)\` in \`config/settings.py\`: use the read-only \`DEFAULTS\` for \`PORT\`
-and \`DEBUG\`, coerce \`PORT\` to \`int\` and \`DEBUG\` to \`bool\` (\`"true"\` case-insensitive), and set
-\`has_secret\` from whether \`"SECRET"\` is present, never its value. Some tests are hidden.`,
+    prompt: `Repair the billing service's boot path after a postmortem: its \`app.startup\` log record
+went out with a live database password in it, and nobody could say which config layer any value came
+from.
+
+In \`service/config.py\`, implement \`coerce_value(field, value)\` and
+\`load_settings(file_values, env, overrides=None)\`. The settings come from four layers, later ones
+winning: the spec's \`DEFAULTS\`, then \`file_values\`, then \`env\` (keyed by \`ENV_PREFIX\` plus the
+upper-cased field name), then \`overrides\`. Keys the spec does not name are ignored, an env value that
+is blank or whitespace counts as not set, and a string that will not coerce to its declared type
+raises \`ConfigError\` with the field name in the message.
+
+In \`service/log_record.py\`, implement \`is_secret_key\`, \`redact_record\`, and
+\`build_startup_record\`. The record is
+\`{"event": "app.startup", "config": <redacted settings>, "secrets_present": <sorted field names>}\`.
+No secret value may appear anywhere in it, at any depth.
+
+\`README.md\` has the full contract. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      'Port: `int(env.get("PORT", DEFAULTS["PORT"]))`.',
-      'Debug: `env.get("DEBUG", DEFAULTS["DEBUG"]).lower() == "true"`.',
-      'Record presence only: `"has_secret": "SECRET" in env`.',
+      "Each layer is the same merge step with a different key shape, so the env layer is the only one that has to translate a name and skip blanks.",
+      "Coercion belongs in one function keyed off `FIELD_TYPES[field]`, and it returns a non-string value untouched so a typed override passes straight through. Every failure path raises `ConfigError` with an f-string that starts with the field name.",
+      "Redaction has to recurse: for a dict, replace the value when `is_secret_key(key)` and otherwise call `redact_record` on it; for a list, map over the items; for anything else return the value. `field = name[len(ENV_PREFIX):].lower()` is the env translation.",
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "config/settings.py",
-      editableFilePaths: ["config/settings.py"],
-      visibleTestPaths: ["tests/test_settings.py"],
-      hiddenTestPaths: ["tests/test_settings_hidden.py"],
+      primaryFilePath: "service/config.py",
+      editableFilePaths: ["service/config.py", "service/log_record.py"],
+      visibleTestPaths: ["tests/test_config.py", "tests/test_log_record.py"],
+      hiddenTestPaths: ["tests/test_startup_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
         { path: "README.md", role: "docs", language: "markdown", content: CFG_README },
-        { path: "config/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        { path: "service/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "config/defaults.py",
+          path: "service/spec.py",
           role: "readonly",
           language: "python",
-          content: CFG_DEFAULTS,
-          description: "Default config values (read-only)",
+          content: CFG_SPEC,
+          description: "Field types, defaults, and secret hints (read-only)",
         },
         {
-          path: "config/settings.py",
+          path: "service/errors.py",
+          role: "readonly",
+          language: "python",
+          content: CFG_ERRORS,
+          description: "ConfigError (read-only)",
+        },
+        {
+          path: "service/config.py",
           role: "editable",
           language: "python",
-          content: CFG_SETTINGS_STARTER,
-          description: "Implement load_config here",
+          content: CFG_CONFIG_STARTER,
+          description: "Layered config loading and type coercion",
+        },
+        {
+          path: "service/log_record.py",
+          role: "editable",
+          language: "python",
+          content: CFG_LOG_STARTER,
+          description: "Redaction and the startup log record",
         },
         {
           path: "tests/__init__.py",
@@ -329,27 +628,35 @@ and \`DEBUG\`, coerce \`PORT\` to \`int\` and \`DEBUG\` to \`bool\` (\`"true"\` 
           hidden: true,
         },
         {
-          path: "tests/test_settings.py",
+          path: "tests/test_config.py",
           role: "test",
           language: "python",
-          content: CFG_TEST,
-          description: "Visible config tests",
+          content: CFG_TEST_CONFIG,
+          description: "Visible layering and coercion tests",
         },
         {
-          path: "tests/test_settings_hidden.py",
+          path: "tests/test_log_record.py",
+          role: "test",
+          language: "python",
+          content: CFG_TEST_LOG,
+          description: "Visible redaction tests",
+        },
+        {
+          path: "tests/test_startup_hidden.py",
           role: "test",
           language: "python",
           content: CFG_TEST_HIDDEN,
           hidden: true,
-          description: "Hidden config/secret tests",
+          description: "Hidden edge-case and leak tests",
         },
         {
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
           content: buildRunner([
-            { module: "test_settings", label: "visible settings" },
-            { module: "test_settings_hidden", label: "hidden settings" },
+            { module: "test_config", label: "visible config" },
+            { module: "test_log_record", label: "visible log record" },
+            { module: "test_startup_hidden", label: "hidden startup" },
           ]),
           hidden: true,
           description: "Workspace test runner",
@@ -357,10 +664,16 @@ and \`DEBUG\`, coerce \`PORT\` to \`int\` and \`DEBUG\` to \`bool\` (\`"true"\` 
       ],
       referenceFiles: [
         {
-          path: "config/settings.py",
+          path: "service/config.py",
           role: "editable",
           language: "python",
-          content: CFG_SETTINGS_REFERENCE,
+          content: CFG_CONFIG_REFERENCE,
+        },
+        {
+          path: "service/log_record.py",
+          role: "editable",
+          language: "python",
+          content: CFG_LOG_REFERENCE,
         },
       ],
     },
