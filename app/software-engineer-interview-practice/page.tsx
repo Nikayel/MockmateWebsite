@@ -1,10 +1,11 @@
 import { Metadata } from "next"
+import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
   title: "Software Engineer Interview Practice",
   description:
-    "Comprehensive interview practice for Software Engineers. Prepare for coding, system design, and behavioral rounds with our AI interviewer simulator.",
+    "Practice the software engineering loop: a timed DSA phone screen, a debugging round, and system design, with an AI interviewer.",
   alternates: {
     canonical: "/software-engineer-interview-practice",
   },
@@ -13,88 +14,80 @@ export const metadata: Metadata = {
 export default function SWEInterviewPracticePage() {
   const contentSections = [
     {
-      heading: "The Full Software Engineering Loop",
+      heading: "The full loop, not just one round",
+      content: (
+        <p>
+          A software engineering offer rarely comes down to one interview. Most loops run four to
+          six rounds: a phone screen, one or two deeper technical rounds, sometimes system design,
+          and a practical or debugging round. Each one is scored differently, and preparing for only
+          the algorithmic part leaves the rest untested.
+        </p>
+      ),
+    },
+    {
+      heading: "Rounds you can practice here",
       content: (
         <>
           <p>
-            Landing a job as a Software Engineer isn't just about passing a single coding test. You
-            have to survive the "loop," a grueling series of 4 to 6 interviews covering algorithms,
-            system design, practical coding, and behavioral questions.
+            An AI interviewer runs each of these, by voice or text, and follows what you do instead
+            of waiting for a final answer.
           </p>
+          <div className="my-8 grid gap-3 sm:grid-cols-3">
+            {[
+              ["Phone screen", "A timed DSA round across 170+ scenarios in 18 patterns."],
+              ["Debugging", "A broken codebase and a failing test you diagnose and fix."],
+              ["System design", "An open-ended architecture discussion, trade-offs included."],
+            ].map(([label, text]) => (
+              <div key={label} className="border-border bg-muted/40 rounded-lg border p-4">
+                <p className="text-foreground text-sm font-semibold">{label}</p>
+                <p className="text-muted-foreground mt-1 text-sm leading-6">{text}</p>
+              </div>
+            ))}
+          </div>
           <p>
-            CodeSparring is the only platform that offers comprehensive, end-to-end simulation for
-            the entire software engineering interview loop.
+            See both the debugging and case lab formats on the{" "}
+            <Link href="/rounds">rounds page</Link>.
           </p>
         </>
       ),
     },
     {
-      heading: "How to Prepare for the Loop",
+      heading: "Where most candidates lose points",
       content: (
-        <>
-          <p>Our AI interviewer allows you to practice every round you'll face:</p>
-          <ul className="mt-4 list-disc space-y-2 pl-6">
-            <li>
-              <strong>The Phone Screen:</strong> 45-minute algorithmic coding rounds focused on fast
-              problem-solving and clear communication.
-            </li>
-            <li>
-              <strong>The Onsite Technical:</strong> Deep-dive coding rounds where you must optimize
-              solutions and handle edge cases.
-            </li>
-            <li>
-              <strong>System Design:</strong> High-level architecture discussions for Mid-level and
-              Senior roles.
-            </li>
-            <li>
-              <strong>Practical / Real-World:</strong> Bug-fix and add-functionality rounds that
-              test your ability to work in existing codebases.
-            </li>
-          </ul>
-        </>
-      ),
-    },
-    {
-      heading: "Feedback That Actually Helps",
-      content: (
-        <>
-          <p>
-            Most engineers fail interviews not because they can't code, but because they fail to
-            communicate. They stay silent while thinking, they jump into coding before clarifying
-            requirements, or they struggle to articulate their time/space complexity.
-          </p>
-          <p>
-            CodeSparring's AI gives you a detailed scorecard on your soft skills, communication, and
-            technical accuracy, ensuring you walk into your real interview with confidence.
-          </p>
-        </>
+        <p>
+          Most engineers do not fail interviews because they cannot code. They fail because they
+          stay quiet while thinking, start typing before they understand the problem, or cannot
+          explain the complexity of what they just wrote. A scored rubric after each session covers
+          communication, problem solving, and code quality, not just whether the tests pass, so you
+          know which of those to fix before the next one.
+        </p>
       ),
     },
   ]
 
   const faqs = [
     {
-      question: "Is this suitable for frontend, backend, or full-stack engineers?",
+      question: "Is this useful for frontend, backend, or full-stack roles?",
       answer:
-        "Yes! We have specialized question banks for frontend (React/DOM manipulation), backend (API design/SQL), and generalist software engineering roles.",
+        "Yes. The DSA patterns, debugging rounds, and system design drills are general to software engineering rather than tied to one specialization. If you want to build language fundamentals first, the free Python course runs in your browser.",
     },
     {
-      question: "How long is a typical mock interview?",
+      question: "How long is a session?",
       answer:
-        "You can customize the length, but our standard mock interviews are designed to simulate a real 45-minute round.",
+        "Long enough to work through a full problem: read it, ask clarifying questions, write and run code, and get a scored rubric at the end.",
     },
     {
-      question: "Can I practice behavioral questions?",
+      question: "Can I see my progress across sessions?",
       answer:
-        "While our core focus is technical rounds (coding and system design), our AI is equipped to handle standard behavioral intro questions commonly asked at the start of technical screens.",
+        "Yes. Session history and per-pattern progress are part of every account, so you can see which rounds and patterns need more reps before a real loop.",
     },
   ]
 
   return (
     <LandingPageTemplate
-      title="Software Engineer Interview Practice"
-      subtitle="Conquer the Interview Loop"
-      heroDescription="Prepare for the full software engineering interview loop. Practice coding, system design, and real-world rounds with an AI interviewer that grades your performance and communication."
+      title="Software engineer interview practice"
+      subtitle="Interview loop"
+      heroDescription="Practice the rounds in a real software engineering loop: a timed DSA phone screen, a debugging round in a broken codebase, and a system design discussion, all with an AI interviewer that reacts as you work."
       primaryKeyword="software engineer interview"
       contentSections={contentSections}
       faqs={faqs}
