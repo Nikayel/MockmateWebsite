@@ -484,6 +484,8 @@ def match(row, expression):
     return bool(eval(expression, {"__builtins__": {}}, dict(row)))
 \`\`\`
 
+\`__builtins__\` is the table of names Python hands you for free in every scope: \`len\`, \`open\`, \`print\`, and \`__import__\`. Passing an empty one to \`eval\` takes those names away, so the evaluated text cannot import a module by name. It does not take away the objects themselves. An expression can start from a literal, which needs no name at all, and reach the interpreter's internals through that literal's attributes.
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -590,7 +592,7 @@ Notice what is absent from that outline. Nothing in it executes the input. The i
 
 ## The same audit, a different sink
 
-When a caller controls a path fragment, joining it onto a base directory and normalizing does not keep it under that base. Normalization is not a security check, it is a tidying step, and it will happily tidy its way out of the directory you meant.
+When a caller controls a path fragment, joining it onto a base directory and normalizing does not keep it under that base. Normalization is not a security check, it is a tidying step, and it will happily tidy its way out of the directory you meant. \`posixpath\` is the standard-library module behind path handling on Unix-style paths, and its \`normpath\` resolves \`..\` segments textually, without touching the disk.
 
 \`\`\`python
 import posixpath
