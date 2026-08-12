@@ -1,0 +1,35 @@
+---
+title: "A Free Data Engineering and SQL Course You Run in the Browser"
+description: "Write real SQL against a live in-browser database, from SELECT basics through window functions and cloud data platform lessons, graded the way DE interviews test it."
+date: "2026-08-12"
+author: "Nikayel Ali Jamal"
+category: "guides"
+tags: ["data-engineering", "sql", "window-functions", "interview-prep", "free-course"]
+featured: false
+---
+
+Most SQL practice is a query box and a "correct" badge. It tells you the syntax ran. It does not tell you whether you can reason about a warehouse, a pipeline, or the tradeoffs a data engineering interview actually probes. CodeSparring's Learn Data Engineering track is built around that gap: you write real queries against a real database, in your browser, and the course keeps going well past SELECT into the material that shows up in DE interview loops.
+
+## What the course actually is
+
+The track grew out of a SQL course and still carries that name in its file structure, but it now spans eleven levels. The first five stay close to SQL itself. Level 1, SQL Foundations, covers SELECT and column aliasing, WHERE and comparison operators, NULLs and three-valued logic, and sorting with ORDER BY. Level 2, Aggregation & Joins, moves into subqueries, CTEs, and CASE. Level 3, Data Modeling & Schema Design, covers junction tables, indexes, and the difference between facts, dimensions, and grain. Level 4, Data Engineering with SQL, is where window functions start: ROW_NUMBER, RANK, and DENSE_RANK, alongside star vs snowflake schema design. Level 5, Advanced & Company-Specific SQL for DE Interviews, pushes further into advanced window frames, the QUALIFY rewrite, write-audit-publish data quality gates, and a capstone that turns raw JSON events into a sessionized, incrementally loaded medallion pipeline.
+
+From there the course leaves the query editor behind and gets into infrastructure literacy. Level 6, Cloud & Data Engineering Foundations, covers data skew, broadcast vs shuffle joins, pipeline orchestration, and data quality gates. Level 7 covers warehouses, lakehouses, and dimensional modeling. Level 8 is batch pipelines and orchestration. Level 9 is streaming and change data capture. Level 10 is distributed compute and data operations. Level 11 closes with data engineering for AI. The levels are not gated behind each other, so you can start wherever your gaps actually are.
+
+## How the mechanics work
+
+Every lesson follows the same loop: read a short teaching section, apply what it taught on a guided exercise, then practice on a second problem without the hints. There is nothing to install. Queries run against a live SQLite database inside the page, powered by sql.js, so the round trip from typing a query to seeing whether it is right happens without leaving the tab.
+
+The grading is mechanical, not a pattern match on your SQL text. Early and mid-level lessons seed a small database, run your query, and check the actual result set against the expected one, as a set of rows unless the lesson specifically requires ORDER BY, in which case row order counts too. The later pipeline-style lessons grade differently: your multi-statement script runs, then a set of assertion queries run after it, and each one has to return zero rows to pass, the same "count of violations equals zero" convention data teams use in production data quality tooling. Some of those lessons also run your script a second time and check the result stays stable, because an idempotent pipeline is graded as a real skill, not an aside.
+
+## Who it fits
+
+This is built for anyone prepping a data engineering interview loop: the SQL screen, the schema design conversation, the pipeline design round. It also fits analysts and backend engineers who already know basic SQL but have never had to reason about warehouse layout, orchestration, or streaming ingestion, and want that vocabulary before walking into a design round.
+
+## What it is not
+
+Working through eleven levels of graded SQL is not the same as sitting in a real interview loop and defending a pipeline design out loud while someone pushes back on your assumptions. It will not replace mock interview reps, and it will not replace the judgment you build by breaking a real pipeline in production and fixing it. Treat it as the reps that make the live round easier, not a stand-in for the round itself.
+
+## Start with SELECT
+
+The Data Engineering track lives at [/learn/data-engineering](/learn/data-engineering). It is free and separate from CodeSparring's interview sessions, so working through it does not use any of your monthly session count.

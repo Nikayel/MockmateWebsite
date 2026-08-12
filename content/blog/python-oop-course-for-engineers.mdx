@@ -1,0 +1,33 @@
+---
+title: "A Free Python Course Built Around Object-Oriented Design"
+description: "Five levels from print statements to SOLID, concurrency, and reading code you did not write, graded in the browser. Built for interview readiness, not syntax trivia."
+date: "2026-08-12"
+author: "Nikayel Ali Jamal"
+category: "guides"
+tags: ["python", "oop", "object-oriented-programming", "interview-prep", "free-course"]
+featured: false
+---
+
+Most "learn Python" content stops at syntax: print statements, loops, a few list comprehensions, done. Interviewers do not stop there, and neither does a real codebase. They expect you to reason about objects, composition, and the tradeoffs behind a design, not recite syntax you already half know. CodeSparring's Learn Python track is built around that gap.
+
+## What the course actually is
+
+Five levels. Level 1, Foundations, starts from the actual beginning: your first program, variables, if/elif/else, for and while loops, functions, arithmetic with ints and floats, the idiomatic way to loop with enumerate, zip, and items, recursion, and reading a traceback with breakpoint(). Level 2, Idioms, is where object-oriented Python lives. Comprehensions and generators come first, then classes, __init__, methods, and self, inheritance and composition, dunder methods and properties, class methods versus static methods versus class attributes, and the container and context-manager protocols that let an object work inside a for loop or a with block.
+
+Level 3, Patterns, moves into how engineers actually organize code: working across files, type hints and the typing module (Optional, Union, generics, Protocols), pytest fixtures and parametrize, pathlib, building a CLI with argparse, validating API data with pydantic, and a first pass at numpy and pandas. Level 4, Engineering, is the deepest design material in the course: ABCs and Protocols, SOLID principles and design patterns like factory and strategy, descriptors, a peek at metaclasses, threads and the GIL, async/await and asyncio, profiling and caching, configuration and secrets handling, and a packaging and production capstone. Level 5, Judging Code You Did Not Write, is a different skill entirely: reading code you did not author, predicting what it does, finding the input that breaks it, writing the test that catches the bug, and repairing it without rewriting it, including lessons built specifically around the failure signatures of generated code.
+
+## How the mechanics work
+
+Every lesson runs the same loop: a short teaching section, a guided apply exercise with hints and a reference solution you can reveal after a few attempts, then a practice exercise that hides the reference and grades you against hidden tests, the same approach behind CodeSparring's interview scenarios. Levels 1 and 2 grade a single file; levels 3 and 4 grade multi-file workspace exercises, closer to how a real module is organized. All of it runs in the browser through Pyodide, a real Python interpreter compiled to run client-side, so there is no environment to install and no version mismatch to debug before you can start.
+
+## Who it fits
+
+It fits two different readers honestly. If you are new to Python, Level 1 does not assume anything. If you already write Python informally, scripts, notebooks, glue code, and have never had to formalize why you would choose composition over inheritance or what a descriptor actually does, Levels 2 through 4 are where the course earns its keep. Either way the target is the same: the object-oriented design and engineering practice a DE or SWE interview loop assumes you already have.
+
+## What it is not
+
+Finishing the graded exercises is not the same as having shipped a system with the design choices you just practiced. It will not replace the judgment you get from a codebase that outlives your first draft, and it is not a substitute for mock interview reps where someone questions your design decisions live. A hidden test suite can confirm your class behaves correctly; it cannot tell you whether inheritance was the wrong call versus composition, the way a reviewer eventually will. It is the practice that makes those moments less unfamiliar, not a replacement for having them.
+
+## Start with Level 1
+
+The Python track lives at [/learn/python](/learn/python). It is free and separate from CodeSparring's interview sessions, so working through it does not use any of your monthly session count.
