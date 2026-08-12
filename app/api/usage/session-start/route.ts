@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { apiRateLimit } from "@/lib/rate-limit"
 import { recordSessionStartAdmin } from "@/lib/quota/session-start-admin"
+import { trackEventServer } from "@/lib/analytics-server"
 import { logger } from "@/lib/logger"
 
 export async function POST(request: NextRequest) {
@@ -27,6 +28,18 @@ export async function POST(request: NextRequest) {
 
     if (!result.success) {
       return NextResponse.json({ error: "Session limit exceeded", ...result }, { status: 403 })
+    }
+
+    // Funnel: every paid-session spend, server-observed, so it counts
+    // regardless of client consent state. sessions_used resets each period,
+    // so "first ever" is NOT derivable from nth_in_period alone; the userId
+    // makes distinct-firsts computable downstream instead of baking a flag
+    // that would re-fire every month. trackEventServer never throws.
+    if (result.usedPaidSession) {
+      await trackEventServer("funnel_session_start", {
+        userId: authResult.userId,
+        nth_in_period: result.sessionsUsed,
+      })
     }
 
     return NextResponse.json(result)

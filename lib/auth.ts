@@ -11,6 +11,7 @@ import {
   Auth,
 } from "firebase/auth"
 import { trackLogin, trackSignup } from "./analytics"
+import { reportFunnelEvent } from "./metrics/funnel-client"
 
 // Development mode check - logs only appear in development
 const isDev = process.env.NODE_ENV === "development"
@@ -436,12 +437,15 @@ async function signInWithProvider(
     const result = await signInWithPopup(auth, authProvider)
     if (isDev) console.log(`${provider} sign-in successful`)
 
-    // Track login/signup event
+    // Track login/signup event. The GA4 pair is consent-gated; the funnel
+    // counter is the consent-independent aggregate (name only, no identity).
     const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime
     if (isNewUser) {
       trackSignup(provider, result.user.uid)
+      reportFunnelEvent("signup")
     } else {
       trackLogin(provider, result.user.uid)
+      reportFunnelEvent("login")
     }
 
     return {
@@ -557,8 +561,10 @@ export async function handleAuthRedirect() {
       const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime
       if (isNewUser) {
         trackSignup(result.providerId === "github.com" ? "github" : "google", result.user.uid)
+        reportFunnelEvent("signup")
       } else {
         trackLogin(result.providerId === "github.com" ? "github" : "google", result.user.uid)
+        reportFunnelEvent("login")
       }
       return {
         user: result.user,

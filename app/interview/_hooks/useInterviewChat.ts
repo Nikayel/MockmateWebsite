@@ -17,6 +17,7 @@ import {
 } from "@/lib/interview/code-change-note"
 import { buildTimeContextNote } from "@/lib/interview/time-context-note"
 import { trackEvent } from "@/lib/analytics"
+import { reportFunnelEvent } from "@/lib/metrics/funnel-client"
 import { computeElapsedSeconds } from "./useInterviewTimer"
 import { getGuidedChatState } from "@/lib/stores/guided-lab-store"
 import type { Scenario } from "@/lib/scenarios"
@@ -453,6 +454,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
         // MarkdownRenderer, so the link is live inside the chat bubble.
         if (!firebaseUser) {
           trackEvent("guest_chat_walled", { scenario_id: selectedScenario?.id })
+          reportFunnelEvent("guest_chat_walled")
           setMessages((prev) => [
             ...prev,
             {

@@ -16,6 +16,7 @@ import { getUserProfile } from "@/lib/firestore-helpers"
 import { Check, CheckCircle } from "lucide-react"
 import { getProPricing, PRICING_CONFIG } from "@/lib/config"
 import { trackUpgradeFlow, trackPurchase } from "@/lib/analytics"
+import { reportFunnelEvent } from "@/lib/metrics/funnel-client"
 import { Profile } from "@/lib/types"
 import { toast } from "sonner"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -178,6 +179,11 @@ function UpgradePageContent() {
   }, [authLoading, initialized, mounted, firebaseUser])
 
   const handleUpgrade = async (planType: "monthly" | "yearly") => {
+    // click_upgrade fires before the guards: the step means "pressed the
+    // button", including the anonymous and already-Pro presses the later
+    // steps never see. It was defined in the union with zero call sites.
+    trackUpgradeFlow({ userId: user?.id ?? "anonymous", step: "click_upgrade", tier: planType })
+
     if (isProUser) {
       toast.success("You're already on Pro!")
       router.push("/account")
@@ -191,6 +197,7 @@ function UpgradePageContent() {
 
     setLoading(planType)
     trackUpgradeFlow({ userId: user.id, step: "start_checkout", tier: planType })
+    reportFunnelEvent("checkout_start")
     try {
       const idToken = await firebaseUser.getIdToken()
 

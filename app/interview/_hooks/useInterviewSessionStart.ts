@@ -9,6 +9,7 @@ import type { InterviewTargetCompany } from "@/lib/stores"
 import type { Scenario } from "@/lib/scenarios"
 import { createInterviewSession, recordSessionStart } from "@/lib/firestore-helpers"
 import { trackEvent, trackSessionStart } from "@/lib/analytics"
+import { reportFunnelEvent } from "@/lib/metrics/funnel-client"
 import { markFreeTrialUsed, saveGuestSessionData } from "@/lib/guest-session"
 import { PRICING_CONFIG } from "@/lib/config"
 import { extractProtectedElements } from "@/lib/code-protection"
@@ -284,9 +285,11 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
           scenarioId: scenario.id,
           scenarioType: scenario.type,
         })
+        reportFunnelEvent("guest_trial_start")
 
         toast.success("Free trial started.", {
-          description: "Run the tests, submit, and see your score. Sign up to unlock the AI interviewer.",
+          description:
+            "Run the tests, submit, and see your score. Sign up to unlock the AI interviewer.",
         })
       } catch (error) {
         console.error("Error creating guest session:", error)
