@@ -1,105 +1,304 @@
 import type { PythonLesson } from "../../types"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const DESC_README = `# A validating descriptor
+// ───────────────────────────────────────────────────────────────────────────
+// Practice workspace: a declarative device-settings schema.
+//
+// Apply is one descriptor holding one value on one class. Practice is what a
+// descriptor is actually FOR: several Setting objects coexist on one class, so
+// per-instance, per-name storage via __set_name__ is genuinely required and a
+// shared store visibly fails; reads before any write must fall back to a
+// default; class-level access has to hand back the descriptor itself. The
+// second editable file is the metaclass-adjacent payoff the lesson title
+// promises: __init_subclass__ collects the declared fields into a registry,
+// which is how dataclasses, ORMs and pydantic all work.
+//
+// The hidden suite exists to catch the classic shared-state bug specifically:
+// a class-level dict inside the descriptor passes every single-instance test.
+// ───────────────────────────────────────────────────────────────────────────
 
-Customize attribute access with a **descriptor**. Implement \`Positive\` in \`models/fields.py\` so it:
-- stores the value on the instance (under a private name from \`__set_name__\`)
-- returns it from \`__get__\`
-- **raises \`ValueError\`** from \`__set__\` when the value is negative
+const SETTINGS_README = `# DEV-318: device profiles need real settings
 
-\`models/account.py\` (read-only) uses it: \`balance = Positive()\`. Some tests are hidden.
+\`schema/profiles.py\` (read-only) declares device profiles by listing settings in the class body,
+for example \`brightness = Setting(minimum=0, maximum=100, default=50)\`. Nothing behind those
+declarations is implemented yet. Two files are yours.
+
+## \`schema/fields.py\`
+
+\`Setting\` is the descriptor behind every declared setting. It must:
+
+- return that setting's \`default\` when the attribute has never been written on this profile object
+- raise \`ValueError\` from a write whose value is outside \`minimum\` to \`maximum\` inclusive
+- store a valid write so that reading it back returns it, while no other profile object and no
+  other setting on the same object sees that value
+- return the \`Setting\` object itself when it is read off the class instead of an instance, so
+  tooling can inspect \`minimum\`, \`maximum\` and \`default\`
+
+## \`schema/profile.py\`
+
+\`Profile\` is the base class every profile inherits. It must give each subclass:
+
+- \`SETTINGS\`, a dict from declared setting name to its \`Setting\` object, in declaration order,
+  including settings inherited from a parent profile and excluding a child's settings from the
+  parent's own registry
+- a constructor \`Profile(**overrides)\` that applies each override through the same validation a
+  plain assignment gets, and raises \`ValueError\` for a name that is not a declared setting
+- \`settings_snapshot()\`, returning a dict from every declared setting name to its current value
+
+Some tests are hidden.
 `
 
-const DESC_FIELDS_STARTER = String.raw`class Positive:
-    """A data descriptor that only allows non-negative values (see README.md)."""
+const SETTINGS_FIELDS_STARTER = String.raw`class Setting:
+    """One declared, validated setting on a device profile (see README.md)."""
+
+    def __init__(self, minimum, maximum, default):
+        self.minimum = minimum
+        self.maximum = maximum
+        self.default = default
 
     def __set_name__(self, owner, name):
-        self.storage_name = "_" + name
+        self.name = name
+        # TODO: record a storage name this descriptor does not itself own.
 
     def __get__(self, instance, owner):
-        # TODO: return the stored value from the instance.
+        # TODO: handle class-level access, and reads that happen before any write.
         return None
 
     def __set__(self, instance, value):
-        # TODO: raise ValueError if value < 0, else store it on the instance.
+        # TODO: reject out-of-range values, and store the rest where the README says they live.
         pass
 `
 
-const DESC_FIELDS_REFERENCE = String.raw`class Positive:
+const SETTINGS_FIELDS_REFERENCE = String.raw`class Setting:
+    """One declared, validated setting on a device profile."""
+
+    def __init__(self, minimum, maximum, default):
+        self.minimum = minimum
+        self.maximum = maximum
+        self.default = default
+
     def __set_name__(self, owner, name):
-        self.storage_name = "_" + name
+        self.name = name
+        self.storage_name = "_setting_" + name
 
     def __get__(self, instance, owner):
-        return getattr(instance, self.storage_name)
+        if instance is None:
+            return self
+        return getattr(instance, self.storage_name, self.default)
 
     def __set__(self, instance, value):
-        if value < 0:
-            raise ValueError("value must be non-negative")
+        if value < self.minimum or value > self.maximum:
+            raise ValueError(
+                f"{self.name} must be between {self.minimum} and {self.maximum}, got {value!r}"
+            )
         setattr(instance, self.storage_name, value)
 `
 
-const DESC_ACCOUNT = String.raw`from models.fields import Positive
+const SETTINGS_PROFILE_STARTER = String.raw`from schema.fields import Setting
 
 
-class Account:
-    balance = Positive()
+class Profile:
+    """Base class for declarative device profiles (see README.md)."""
 
-    def __init__(self, balance):
-        self.balance = balance
+    SETTINGS = {}
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # TODO: give this subclass its own SETTINGS registry, inherited names first.
+
+    def __init__(self, **overrides):
+        # TODO: apply each override, rejecting names that were never declared.
+        pass
+
+    def settings_snapshot(self):
+        # TODO: report the current value of every declared setting.
+        return {}
 `
 
-const DESC_TEST = String.raw`from models.account import Account
+const SETTINGS_PROFILE_REFERENCE = String.raw`from schema.fields import Setting
+
+
+class Profile:
+    """Base class for declarative device profiles."""
+
+    SETTINGS = {}
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        collected = {}
+        for base in cls.__bases__:
+            collected.update(getattr(base, "SETTINGS", {}))
+        for name, value in vars(cls).items():
+            if isinstance(value, Setting):
+                collected[name] = value
+        cls.SETTINGS = collected
+
+    def __init__(self, **overrides):
+        for name, value in overrides.items():
+            if name not in type(self).SETTINGS:
+                raise ValueError(f"unknown setting {name!r}")
+            setattr(self, name, value)
+
+    def settings_snapshot(self):
+        return {name: getattr(self, name) for name in type(self).SETTINGS}
+`
+
+const SETTINGS_PROFILES = String.raw`"""The declared device profiles (read-only)."""
+
+from schema.fields import Setting
+from schema.profile import Profile
+
+
+class CameraProfile(Profile):
+    brightness = Setting(minimum=0, maximum=100, default=50)
+    contrast = Setting(minimum=0, maximum=100, default=40)
+    fps = Setting(minimum=1, maximum=60, default=30)
+
+
+class NightCameraProfile(CameraProfile):
+    gain = Setting(minimum=0, maximum=8, default=2)
+`
+
+const SETTINGS_TEST = String.raw`from schema.profiles import CameraProfile
 
 
 def run_tests(record):
-    def stores_and_reads():
-        assert Account(100).balance == 100, f"got {Account(100).balance!r}"
+    def unwritten_settings_read_as_defaults():
+        profile = CameraProfile()
+        got = (profile.brightness, profile.contrast, profile.fps)
+        assert got == (50, 40, 30), f"expected the declared defaults (50, 40, 30), got {got!r}"
 
-    def allows_zero():
-        assert Account(0).balance == 0
+    def a_valid_write_reads_back():
+        profile = CameraProfile()
+        profile.brightness = 80
+        assert profile.brightness == 80, f"expected 80 after writing 80, got {profile.brightness!r}"
 
-    def rejects_negative():
+    def an_out_of_range_write_is_rejected():
+        profile = CameraProfile()
         try:
-            Account(-5)
-            raised = False
-        except ValueError:
-            raised = True
-        assert raised, "a negative balance should raise ValueError"
+            profile.brightness = 101
+            raised = None
+        except ValueError as exc:
+            raised = exc
+        assert raised is not None, (
+            "expected ValueError when writing 101 to brightness (max 100), got no exception and "
+            f"a stored value of {profile.brightness!r}"
+        )
 
-    record("stores and reads", stores_and_reads)
-    record("allows zero", allows_zero)
-    record("rejects a negative balance", rejects_negative)
+    def the_registry_lists_declared_settings():
+        got = list(CameraProfile.SETTINGS)
+        assert got == ["brightness", "contrast", "fps"], (
+            f"expected CameraProfile.SETTINGS to list ['brightness', 'contrast', 'fps'], got {got!r}"
+        )
+
+    def overrides_are_applied_at_construction():
+        got = CameraProfile(brightness=70, fps=24).settings_snapshot()
+        expected = {"brightness": 70, "contrast": 40, "fps": 24}
+        assert got == expected, f"expected {expected!r}, got {got!r}"
+
+    record("unwritten settings read as their defaults", unwritten_settings_read_as_defaults)
+    record("a valid write reads back", a_valid_write_reads_back)
+    record("an out-of-range write is rejected", an_out_of_range_write_is_rejected)
+    record("the registry lists the declared settings", the_registry_lists_declared_settings)
+    record("constructor overrides reach the snapshot", overrides_are_applied_at_construction)
 `
 
-const DESC_TEST_HIDDEN = String.raw`from models.account import Account
+const SETTINGS_TEST_HIDDEN = String.raw`"""Hidden tests: they ask WHERE each value lives, not whether one value round-trips."""
+
+from schema.fields import Setting
+from schema.profiles import CameraProfile, NightCameraProfile
 
 
 def run_tests(record):
-    def reassignment_is_validated():
-        account = Account(100)
-        account.balance = 50
-        assert account.balance == 50
+    def two_profiles_do_not_share_a_value():
+        first = CameraProfile()
+        second = CameraProfile()
+        first.brightness = 10
+        second.brightness = 90
+        assert first.brightness == 10, (
+            f"expected the first profile to keep brightness 10, got {first.brightness!r}. A second "
+            "profile writing 90 overwrote it, so the value is living on the shared Setting object "
+            "rather than on each profile."
+        )
+        assert second.brightness == 90, f"expected 90, got {second.brightness!r}"
+
+    def one_setting_does_not_overwrite_another():
+        profile = CameraProfile()
+        profile.brightness = 80
+        profile.contrast = 12
+        got = (profile.brightness, profile.contrast, profile.fps)
+        assert got == (80, 12, 30), (
+            f"expected (80, 12, 30), got {got!r}. Each setting needs its own storage name, so a "
+            "write to one does not land in the slot another one reads."
+        )
+
+    def a_write_does_not_disturb_other_profiles_defaults():
+        written = CameraProfile(brightness=90)
+        untouched = CameraProfile()
+        assert untouched.brightness == 50, (
+            f"expected an untouched profile to still read the default 50, got "
+            f"{untouched.brightness!r}, so the default is being cached on the descriptor."
+        )
+        assert written.brightness == 90, f"expected 90, got {written.brightness!r}"
+
+    def the_lower_bound_is_inclusive_and_below_it_raises():
+        profile = CameraProfile()
+        profile.fps = 1
+        assert profile.fps == 1, f"expected fps 1 to be accepted (min 1), got {profile.fps!r}"
         try:
-            account.balance = -1
-            raised = False
-        except ValueError:
-            raised = True
-        assert raised, "assigning a negative value should raise"
+            profile.fps = 0
+            raised = None
+        except ValueError as exc:
+            raised = exc
+        assert raised is not None, (
+            f"expected ValueError when writing 0 to fps (min 1), got no exception and {profile.fps!r}"
+        )
 
-    def instances_are_independent():
-        a, b = Account(10), Account(20)
-        assert (a.balance, b.balance) == (10, 20)
+    def class_access_returns_the_descriptor():
+        got = CameraProfile.brightness
+        assert isinstance(got, Setting), (
+            f"expected CameraProfile.brightness to be the Setting object itself, got {got!r}"
+        )
+        bounds = (got.minimum, got.maximum, got.default)
+        assert bounds == (0, 100, 50), f"expected bounds (0, 100, 50), got {bounds!r}"
 
-    record("reassignment is validated", reassignment_is_validated)
-    record("instances stay independent", instances_are_independent)
+    def a_subclass_inherits_the_registry_without_leaking_back():
+        child = list(NightCameraProfile.SETTINGS)
+        assert child == ["brightness", "contrast", "fps", "gain"], (
+            f"expected the child registry to be ['brightness', 'contrast', 'fps', 'gain'], got {child!r}"
+        )
+        parent = list(CameraProfile.SETTINGS)
+        assert parent == ["brightness", "contrast", "fps"], (
+            f"expected the parent registry to stay ['brightness', 'contrast', 'fps'], got {parent!r}"
+        )
+        snapshot = NightCameraProfile(gain=5).settings_snapshot()
+        expected = {"brightness": 50, "contrast": 40, "fps": 30, "gain": 5}
+        assert snapshot == expected, f"expected {expected!r}, got {snapshot!r}"
+
+    def an_undeclared_override_is_rejected():
+        try:
+            CameraProfile(zoom=3)
+            raised = None
+        except ValueError as exc:
+            raised = exc
+        assert raised is not None, (
+            "expected ValueError for the undeclared setting 'zoom', got no exception"
+        )
+
+    record("two profiles do not share one value", two_profiles_do_not_share_a_value)
+    record("one setting does not overwrite another", one_setting_does_not_overwrite_another)
+    record("a write leaves other profiles on their defaults", a_write_does_not_disturb_other_profiles_defaults)
+    record("the lower bound is inclusive", the_lower_bound_is_inclusive_and_below_it_raises)
+    record("class access returns the descriptor", class_access_returns_the_descriptor)
+    record("a subclass inherits the registry", a_subclass_inherits_the_registry_without_leaking_back)
+    record("an undeclared override is rejected", an_undeclared_override_is_rejected)
 `
 
 export const descriptorsMetaclassesLesson: PythonLesson = {
   id: "py-l4-descriptors-metaclasses",
   title: "Descriptors & a peek at metaclasses",
   summary: "Customize attribute access with a descriptor and understand how classes are created.",
-  estimatedMinutes: 22,
+  estimatedMinutes: 28,
   difficulty: "hard",
   skills: ["descriptors", "metaclasses", "attributes", "metaprogramming"],
   teach: {
@@ -348,38 +547,49 @@ def run(balance):
   practice: {
     id: "py-l4-descriptors-metaclasses-practice",
     executionMode: "workspace",
-    prompt: `Implement the \`Positive\` descriptor in \`models/fields.py\`: \`__get__\` returns the stored value,
-\`__set__\` raises \`ValueError\` for negatives and otherwise stores the value (the storage name comes
-from \`__set_name__\`). \`Account\` uses it for \`balance\`. Some tests are hidden.`,
+    prompt: `Build the settings layer behind the device profiles in \`schema/profiles.py\`, which declare
+their settings in the class body and are read-only. Implement the \`Setting\` descriptor in
+\`schema/fields.py\` so a declared setting validates its range, falls back to its default before
+anything is written, and is inspectable from the class. Implement the \`Profile\` base class in
+\`schema/profile.py\` so every subclass gains a registry of the settings it declares, a constructor
+that applies overrides, and a snapshot of its current values. \`README.md\` states the full contract.
+Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "`__get__`: `return getattr(instance, self.storage_name)`.",
-      "`__set__`: guard `value < 0` with `raise ValueError(...)`, else `setattr(instance, self.storage_name, value)`.",
-      "Storing under `self.storage_name` (not a fixed name) keeps each instance independent.",
+      "One `Setting` object is created per declared name when the class body runs, and every profile object shares it, so decide where a written value has to live before you write `__set__`. In `schema/profile.py`, note that the registry has to be built once per subclass rather than once per profile object.",
+      "`__set_name__` is where each descriptor can learn a storage name of its own, `__get__` is called with `instance` set to `None` for class-level access, and `getattr` takes a third argument for the name that was never written. `__init_subclass__` runs as each subclass is created and can read the class body it was given.",
+      'In `__get__`: `if instance is None: return self`, then `return getattr(instance, self.storage_name, self.default)`. In `__init_subclass__`, start from `getattr(base, "SETTINGS", {})` for each entry in `cls.__bases__`, then add the entries of `vars(cls)` whose value passes `isinstance(value, Setting)`, and assign the result to `cls.SETTINGS`.',
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "models/fields.py",
-      editableFilePaths: ["models/fields.py"],
-      visibleTestPaths: ["tests/test_positive_field.py"],
-      hiddenTestPaths: ["tests/test_positive_field_hidden.py"],
+      primaryFilePath: "schema/fields.py",
+      editableFilePaths: ["schema/fields.py", "schema/profile.py"],
+      visibleTestPaths: ["tests/test_settings.py"],
+      hiddenTestPaths: ["tests/test_settings_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
-        { path: "README.md", role: "docs", language: "markdown", content: DESC_README },
-        { path: "models/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        { path: "README.md", role: "docs", language: "markdown", content: SETTINGS_README },
+        { path: "schema/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "models/fields.py",
+          path: "schema/fields.py",
           role: "editable",
           language: "python",
-          content: DESC_FIELDS_STARTER,
-          description: "Implement the Positive descriptor here",
+          content: SETTINGS_FIELDS_STARTER,
+          description: "Implement the Setting descriptor here",
         },
         {
-          path: "models/account.py",
+          path: "schema/profile.py",
+          role: "editable",
+          language: "python",
+          content: SETTINGS_PROFILE_STARTER,
+          description: "Implement the Profile base class here",
+        },
+        {
+          path: "schema/profiles.py",
           role: "readonly",
           language: "python",
-          content: DESC_ACCOUNT,
-          description: "Account uses the descriptor (read-only)",
+          content: SETTINGS_PROFILES,
+          description: "The declared device profiles (read-only)",
         },
         {
           path: "tests/__init__.py",
@@ -389,27 +599,27 @@ from \`__set_name__\`). \`Account\` uses it for \`balance\`. Some tests are hidd
           hidden: true,
         },
         {
-          path: "tests/test_positive_field.py",
+          path: "tests/test_settings.py",
           role: "test",
           language: "python",
-          content: DESC_TEST,
-          description: "Visible descriptor tests",
+          content: SETTINGS_TEST,
+          description: "Visible settings tests",
         },
         {
-          path: "tests/test_positive_field_hidden.py",
+          path: "tests/test_settings_hidden.py",
           role: "test",
           language: "python",
-          content: DESC_TEST_HIDDEN,
+          content: SETTINGS_TEST_HIDDEN,
           hidden: true,
-          description: "Hidden descriptor tests",
+          description: "Hidden settings tests",
         },
         {
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
           content: buildRunner([
-            { module: "test_positive_field", label: "visible account" },
-            { module: "test_positive_field_hidden", label: "hidden account" },
+            { module: "test_settings", label: "visible settings" },
+            { module: "test_settings_hidden", label: "hidden settings" },
           ]),
           hidden: true,
           description: "Workspace test runner",
@@ -417,10 +627,16 @@ from \`__set_name__\`). \`Account\` uses it for \`balance\`. Some tests are hidd
       ],
       referenceFiles: [
         {
-          path: "models/fields.py",
+          path: "schema/fields.py",
           role: "editable",
           language: "python",
-          content: DESC_FIELDS_REFERENCE,
+          content: SETTINGS_FIELDS_REFERENCE,
+        },
+        {
+          path: "schema/profile.py",
+          role: "editable",
+          language: "python",
+          content: SETTINGS_PROFILE_REFERENCE,
         },
       ],
     },
