@@ -23,13 +23,19 @@ You have two files to change.
 
 **\`tests/test_ledger.py\`** is the suite. It has to cover:
 
-- a fixture that hands each test its own open ledger and releases it when the test finishes
+- a fixture that hands each test its own open ledger and releases it when the test finishes.
+  Write it as a **generator**: build the ledger, \`yield\` it to the test, and release it on the
+  line after the \`yield\`. Only that shape gets a teardown half, and only a teardown half runs
+  when a test fails.
 - at least two tests that take that fixture, one of which books seats and one of which asserts
   the room it was handed is still empty
 - one parametrized test carrying at least four rows, one of which is a request the ledger must
   reject, marked with \`minipytest.param(..., raises=ValueError)\`
 
 Every assertion needs a message naming the expected value and the actual one.
+
+You may define more than one fixture. The shape checks grade the fixture that the most of your
+tests take as a parameter, so the one you build the suite around is the one being judged.
 
 **\`bookings/ledger.py\`** is the module under test. \`Ledger(seats)\` opens a ledger, lists itself
 in \`OPEN_LEDGERS\`, and:
@@ -411,13 +417,35 @@ from bookings import ledger as ledger_module
 from tests import test_ledger
 
 
-def _the_fixture():
+def _fixture_use_counts():
+    """How many of your tests take each fixture as a parameter."""
     found = minipytest.fixtures_in(test_ledger)
     assert found, (
         "tests/test_ledger.py defines no @minipytest.fixture, so every test still builds its "
         "own setup by hand"
     )
-    return sorted(found.items())[0][1]
+    counts = {}
+    for _, func in minipytest.tests_in(test_ledger):
+        for arg in inspect.signature(func).parameters:
+            if arg in found:
+                counts[arg] = counts.get(arg, 0) + 1
+    return found, counts
+
+
+def _the_fixture_name():
+    """The fixture the suite is actually built around: the one the most tests take."""
+    found, counts = _fixture_use_counts()
+    assert counts, (
+        "tests/test_ledger.py defines "
+        + ", ".join(sorted(found))
+        + " as a fixture, but no test takes it as a parameter, so nothing is injected"
+    )
+    return max(counts, key=lambda name: counts[name])
+
+
+def _the_fixture():
+    found, _ = _fixture_use_counts()
+    return found[_the_fixture_name()]
 
 
 def _tables():
@@ -474,14 +502,11 @@ def run_tests(record):
             finish_second()
 
     def more_than_one_test_takes_the_fixture():
-        names = set(minipytest.fixtures_in(test_ledger))
-        users = [
-            name
-            for name, func in minipytest.tests_in(test_ledger)
-            if names & set(inspect.signature(func).parameters)
-        ]
-        assert len(users) >= 2, (
-            "expected at least 2 tests to take the fixture, found " + str(len(users))
+        name = _the_fixture_name()
+        _, counts = _fixture_use_counts()
+        assert counts[name] >= 2, (
+            "expected at least 2 tests to take the " + name + " fixture, found "
+            + str(counts[name])
             + ", and a fixture only earns its place when several tests share it"
         )
 
@@ -641,7 +666,7 @@ export const pytestFixturesLesson: PythonLesson = {
   title: "Fixtures & parametrize",
   summary:
     "Share setup with fixtures and cover many cases with parametrize while you TDD a module.",
-  estimatedMinutes: 28,
+  estimatedMinutes: 45,
   difficulty: "medium",
   skills: ["pytest", "fixtures", "parametrize", "tdd"],
   teach: {
@@ -886,8 +911,8 @@ so a booking that must be rejected raises \`ValueError\` and a closed ledger is 
     starterCode: "",
     hints: [
       "Order dependence comes from state that outlives a test. Look at what `Ledger(seats=4)` uses for `entries` when the caller passes nothing, and ask which ledgers end up sharing that object.",
-      "A fixture that yields is two halves: build the ledger, `yield` it to the test, then release it after the yield. That is where `close()` belongs, and it is why teardown still runs when a test fails.",
-      'The four booking cases become one table: `@minipytest.parametrize("seats, expected_remaining", [...])`, and the row that must be refused is written `minipytest.param(5, None, raises=ValueError)`.',
+      "The README asks for a generator fixture, so the fixture body has two halves. Everything the ledger needs on the way in goes above the yield; the one `Ledger` method that releases it goes below.",
+      "Your four booking tests differ only in two numbers, so those two numbers are the argument names your parametrize table declares. The rejected request has no expected result to compare against, which is what `minipytest.param(..., raises=...)` is for: read its docstring in `minipytest.py` for the call shape.",
     ],
     workspace: {
       language: "python",

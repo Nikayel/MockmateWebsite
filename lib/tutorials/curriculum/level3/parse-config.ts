@@ -10,15 +10,19 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 const README = `# Ticket DEP-412: the deploy tool reads settings files nobody agrees on
 
 Every service in the fleet ships a \`deploy.settings\` file, and the files in the wild are messier
-than the parser that reads them. A release went out with the token set to the string
-\`"abc123 # rotate me"\`, another crashed because a password with spaces got trimmed, and a third
-booted with no host at all because the checker stopped at the first missing key.
+than the parser that reads them. A release went out authenticating with the literal text
+\`abc123 # rotate me\`, because the operator wrote \`token = abc123 # rotate me\` and the parser kept
+the comment. Another crashed because a password deliberately quoted as \`"  hunter2  "\` had its
+spaces trimmed off. A third booted with \`port\` set to the string \`"eighty"\` and fell over hours
+later, and a fourth booted with no host at all because the checker stopped at the first missing key.
 
 You own two modules, and they meet at one seam: **\`lines.py\` decides what the raw text of a value
-is, \`rules.py\` decides what type that text becomes.** \`rules.py\` never trims, because trimming is
-the reader's job and a quoted value must keep its spaces.
+is, \`rules.py\` decides what that text is worth given the type the key was declared with.**
+\`rules.py\` never trims, because trimming is the reader's job and a quoted value must keep its
+spaces.
 
-\`settings/spec.py\` is read-only.
+\`settings/spec.py\` is read-only. It holds the required keys, the comment and quote characters, the
+declared type of every typed key in \`VALUE_TYPES\`, and the words that count as \`True\` and \`False\`.
 
 ## \`settings/lines.py\`
 
@@ -31,29 +35,51 @@ For each line, working on the stripped line:
 - Skip it when it is blank or starts with \`#\`.
 - Skip it when it holds no \`=\`, or when the part before the first \`=\` is empty once trimmed.
 - Split on the **first** \`=\` only, and trim whitespace around the key and around the value.
-- A value wrapped in double quotes is taken literally: drop the two quotes and keep everything
-  between them exactly, spaces and \`#\` included.
+- A value that **opens** with a double quote runs to the next double quote. Keep everything between
+  the two quotes exactly, spaces and \`#\` included, and discard whatever follows the closing quote,
+  comment or not. A value that opens a quote and never closes it is not quoted at all, and falls
+  through to the rules below.
 - Otherwise the value ends where an inline comment begins. A comment starts at the first space
   followed by \`#\`, and a value that starts with \`#\` is empty.
 
 Duplicate keys are **kept**, in order. Deciding which one wins is not this module's job.
 
 \`\`\`python
-split_entries('port = 8080  # default\\nnote = " keep  me "')
-# [("port", "8080"), ("note", " keep  me ")]
+split_entries('port = 8080  # default\\nnote = " keep  me "\\ntoken = "abc" # rotate me')
+# [("port", "8080"), ("note", " keep  me "), ("token", "abc")]
 \`\`\`
 
 ## \`settings/rules.py\`
 
 \`\`\`python
-typed_value(raw)      # -> bool, int, or the text unchanged
-build_settings(text)  # -> dict
+typed_value(key, raw)   # -> the value this key was declared to hold
+build_settings(text)    # -> dict
 missing_keys(settings)  # -> sorted list of the required keys that are absent
 \`\`\`
 
-- \`typed_value\` returns \`True\`/\`False\` for \`true\`/\`false\` in any case, an \`int\` for
-  integer-looking text (digits, optionally with a leading \`-\`), and otherwise the text it was
-  handed, unchanged. It does no trimming at all.
+\`typed_value\` does not guess a type from the text. It looks the **key** up in \`VALUE_TYPES\` and
+converts to the type declared there, so a typo in a config file is caught at boot rather than three
+hours in:
+
+| \`VALUE_TYPES[key]\` | \`typed_value\` returns |
+| --- | --- |
+| absent (the key is not declared) | the text it was handed, unchanged |
+| \`"int"\` | the \`int\`, for digits optionally led by a \`-\` |
+| \`"bool"\` | \`True\` for a word in \`TRUE_WORDS\`, \`False\` for one in \`FALSE_WORDS\`, in any case |
+| \`"list"\` | the comma-separated items, each trimmed, empty items dropped |
+
+An empty value is the one exception: whatever the key was declared to hold, \`""\` stays \`""\`, which
+is how an operator writes "declared but unset". Otherwise, text that does not fit its declared type
+is a broken file, so \`typed_value\` raises \`ValueError\` naming both the key and the text it was
+handed. It never trims; only the \`"list"\` items are trimmed, one by one.
+
+\`\`\`python
+typed_value("port", "8080")        # 8080
+typed_value("port", "eighty")      # ValueError, naming port and 'eighty'
+typed_value("hosts", "a, b ,c")    # ["a", "b", "c"]
+typed_value("greeting", " hi ")    # ' hi ' unchanged, greeting is not declared
+\`\`\`
+
 - \`build_settings\` reads \`text\` through \`split_entries\` and returns one dict of typed values.
   When a key appears more than once, the **last** entry wins.
 - \`missing_keys\` reports **every** required key from \`REQUIRED_KEYS\` that is absent, sorted, so an
@@ -69,6 +95,21 @@ REQUIRED_KEYS = ("host", "port", "token")
 COMMENT_CHAR = "#"
 
 QUOTE_CHAR = '"'
+
+# What each declared key holds. A key that is not listed here keeps its text.
+VALUE_TYPES = {
+    "port": "int",
+    "retries": "int",
+    "timeout": "int",
+    "debug": "bool",
+    "verbose": "bool",
+    "hosts": "list",
+    "tags": "list",
+}
+
+TRUE_WORDS = ("true", "yes", "on")
+
+FALSE_WORDS = ("false", "no", "off")
 `
 
 const LINES_STARTER = String.raw`from settings.spec import COMMENT_CHAR, QUOTE_CHAR
@@ -86,8 +127,10 @@ const LINES_REFERENCE = String.raw`from settings.spec import COMMENT_CHAR, QUOTE
 
 def _read_value(raw):
     value = raw.strip()
-    if len(value) >= 2 and value.startswith(QUOTE_CHAR) and value.endswith(QUOTE_CHAR):
-        return value[1:-1]
+    if value.startswith(QUOTE_CHAR):
+        closing = value.find(QUOTE_CHAR, 1)
+        if closing != -1:
+            return value[1:closing]
     if value.startswith(COMMENT_CHAR):
         return ""
     marker = " " + COMMENT_CHAR
@@ -114,12 +157,12 @@ def split_entries(text):
 `
 
 const RULES_STARTER = String.raw`from settings.lines import split_entries
-from settings.spec import REQUIRED_KEYS
+from settings.spec import FALSE_WORDS, REQUIRED_KEYS, TRUE_WORDS, VALUE_TYPES
 
 
-def typed_value(raw):
-    """Turn one raw value into a bool, an int, or the text unchanged (see README.md)."""
-    # TODO: recognise booleans and integers; never trim.
+def typed_value(key, raw):
+    """Convert raw to the type this key was declared to hold (see README.md)."""
+    # TODO: look the key up in VALUE_TYPES, convert, and reject text that does not fit.
     return raw
 
 
@@ -136,28 +179,36 @@ def missing_keys(settings):
 `
 
 const RULES_REFERENCE = String.raw`from settings.lines import split_entries
-from settings.spec import REQUIRED_KEYS
-
-TRUE_WORDS = ("true",)
-FALSE_WORDS = ("false",)
+from settings.spec import FALSE_WORDS, REQUIRED_KEYS, TRUE_WORDS, VALUE_TYPES
 
 
-def typed_value(raw):
-    lowered = raw.lower()
-    if lowered in TRUE_WORDS:
-        return True
-    if lowered in FALSE_WORDS:
-        return False
-    digits = raw[1:] if raw.startswith("-") else raw
-    if digits.isdigit():
+def _reject(key, raw, wanted):
+    return ValueError(key + " expects " + wanted + ", got " + repr(raw))
+
+
+def typed_value(key, raw):
+    declared = VALUE_TYPES.get(key)
+    if declared is None or raw == "":
+        return raw
+    if declared == "int":
+        digits = raw[1:] if raw.startswith("-") else raw
+        if not digits.isdigit():
+            raise _reject(key, raw, "an int")
         return int(raw)
-    return raw
+    if declared == "bool":
+        lowered = raw.lower()
+        if lowered in TRUE_WORDS:
+            return True
+        if lowered in FALSE_WORDS:
+            return False
+        raise _reject(key, raw, "a boolean")
+    return [item.strip() for item in raw.split(",") if item.strip()]
 
 
 def build_settings(text):
     settings = {}
     for key, raw in split_entries(text):
-        settings[key] = typed_value(raw)
+        settings[key] = typed_value(key, raw)
     return settings
 
 
@@ -200,12 +251,27 @@ const TEST_RULES = String.raw`from settings.rules import build_settings, missing
 
 
 def run_tests(record):
-    def types_booleans_and_integers():
-        assert typed_value("true") is True, f"expected True for 'true', got {typed_value('true')!r}"
-        assert typed_value("8080") == 8080, f"expected int 8080, got {typed_value('8080')!r}"
-        assert typed_value("api.internal") == "api.internal", (
-            f"expected 'api.internal' unchanged, got {typed_value('api.internal')!r}"
+    def types_a_value_by_its_declared_type():
+        assert typed_value("debug", "true") is True, (
+            f"expected True for debug 'true', got {typed_value('debug', 'true')!r}"
         )
+        assert typed_value("port", "8080") == 8080, (
+            f"expected int 8080 for port, got {typed_value('port', '8080')!r}"
+        )
+        assert typed_value("host", "8080") == "8080", (
+            f"expected '8080' unchanged because host is not declared, "
+            f"got {typed_value('host', '8080')!r}"
+        )
+
+    def an_undeclarable_value_is_rejected():
+        try:
+            got = typed_value("port", "eighty")
+        except ValueError as err:
+            message = str(err)
+            assert "port" in message, f"expected the key named in {message!r}"
+            assert "eighty" in message, f"expected the offending text named in {message!r}"
+        else:
+            raise AssertionError(f"expected ValueError for port 'eighty', got {got!r}")
 
     def last_duplicate_wins():
         result = build_settings("mode = fast\nmode = safe")
@@ -217,7 +283,8 @@ def run_tests(record):
         expected = ["host", "token"]
         assert result == expected, f"expected {expected}, got {result!r}"
 
-    record("types booleans and integers", types_booleans_and_integers)
+    record("types a value by its declared type", types_a_value_by_its_declared_type)
+    record("an undeclarable value is rejected", an_undeclarable_value_is_rejected)
     record("the last duplicate wins", last_duplicate_wins)
     record("missing_keys reports every gap", missing_keys_reports_every_gap)
 `
@@ -246,14 +313,45 @@ def run_tests(record):
         expected = [("host", "api.internal")]
         assert result == expected, f"expected {expected}, got {result!r}"
 
+    def a_quoted_value_ends_at_its_closing_quote():
+        result = split_entries('token = "abc" # rotate me\npass = "abc\n')
+        expected = [("token", "abc"), ("pass", '"abc')]
+        assert result == expected, f"expected {expected}, got {result!r}"
+
     def typing_handles_signs_and_case():
-        assert typed_value("-3") == -3, f"expected int -3, got {typed_value('-3')!r}"
-        assert typed_value("FALSE") is False, f"expected False for 'FALSE', got {typed_value('FALSE')!r}"
-        assert typed_value("-") == "-", f"expected '-' unchanged, got {typed_value('-')!r}"
-        assert typed_value("") == "", f"expected '' unchanged, got {typed_value('')!r}"
-        assert typed_value(" 12 ") == " 12 ", (
-            f"expected ' 12 ' unchanged because rules never trim, got {typed_value(' 12 ')!r}"
+        assert typed_value("retries", "-3") == -3, (
+            f"expected int -3, got {typed_value('retries', '-3')!r}"
         )
+        assert typed_value("verbose", "OFF") is False, (
+            f"expected False for 'OFF', got {typed_value('verbose', 'OFF')!r}"
+        )
+        assert typed_value("port", "") == "", (
+            f"expected '' left alone even though port is an int key, "
+            f"got {typed_value('port', '')!r}"
+        )
+        assert typed_value("greeting", " 12 ") == " 12 ", (
+            f"expected ' 12 ' unchanged because rules never trim an undeclared key, "
+            f"got {typed_value('greeting', ' 12 ')!r}"
+        )
+
+    def a_list_value_is_split_and_trimmed():
+        assert typed_value("hosts", "a, b ,c") == ["a", "b", "c"], (
+            f"expected ['a', 'b', 'c'], got {typed_value('hosts', 'a, b ,c')!r}"
+        )
+        assert typed_value("tags", "one,,two,") == ["one", "two"], (
+            f"expected the empty items dropped, got {typed_value('tags', 'one,,two,')!r}"
+        )
+
+    def a_bad_boolean_is_rejected():
+        try:
+            got = typed_value("debug", "maybe")
+        except ValueError as err:
+            message = str(err)
+            assert "debug" in message and "maybe" in message, (
+                f"expected the key and the text named in {message!r}"
+            )
+        else:
+            raise AssertionError(f"expected ValueError for debug 'maybe', got {got!r}")
 
     def an_empty_value_still_counts_as_present():
         settings = build_settings("host =\nport = 8080\ntoken = x")
@@ -270,6 +368,7 @@ def run_tests(record):
             "port = 9090\n"
             'greeting = " hello  world "\n'
             "debug = TRUE\n"
+            "hosts = a.internal, b.internal   # both\n"
             "RETRIES\n"
         )
         settings = build_settings(text)
@@ -278,6 +377,7 @@ def run_tests(record):
             "port": 9090,
             "greeting": " hello  world ",
             "debug": True,
+            "hosts": ["a.internal", "b.internal"],
         }
         assert settings == expected, f"expected {expected}, got {settings!r}"
         gaps = missing_keys(settings)
@@ -286,7 +386,10 @@ def run_tests(record):
     record("quoted values keep whitespace and #", quoted_values_keep_their_whitespace_and_hash)
     record("a # inside a value is not a comment", a_hash_inside_a_value_is_not_a_comment)
     record("keyless lines are skipped", keyless_lines_are_skipped)
+    record("a quoted value ends at its closing quote", a_quoted_value_ends_at_its_closing_quote)
     record("typing handles signs and case", typing_handles_signs_and_case)
+    record("a list value is split and trimmed", a_list_value_is_split_and_trimmed)
+    record("a bad boolean is rejected", a_bad_boolean_is_rejected)
     record("an empty value still counts as present", an_empty_value_still_counts_as_present)
     record("a whole file end to end", whole_file_end_to_end)
 `
@@ -295,7 +398,7 @@ export const parseConfigLesson: PythonLesson = {
   id: "py-l3-parse-config",
   title: "Working across files",
   summary: "Build a config parser across modules, using a read-only helper and real test files.",
-  estimatedMinutes: 22,
+  estimatedMinutes: 35,
   difficulty: "medium",
   skills: ["modules", "imports", "string-parsing", "type-coercion"],
   teach: {
@@ -505,28 +608,30 @@ otherwise return the trimmed string. Examples: \`"42"\` → \`42\`, \`"-3"\` →
   practice: {
     id: "py-l3-parse-config-practice",
     executionMode: "workspace",
-    prompt: `Repair the deploy tool's settings reader after ticket DEP-412: one release shipped a token
-that still had an inline comment glued to it, one crashed on a value whose spaces were trimmed away,
-and one booted with no host because the checker stopped at the first missing key.
+    prompt: `Repair the deploy tool's settings reader after ticket DEP-412: one release authenticated with
+a token that still had its inline comment glued on, one crashed on a quoted password whose spaces
+were trimmed away, one booted with \`port\` set to the word "eighty", and one booted with no host
+because the checker stopped at the first missing key.
 
 The work spans two modules that meet at one seam. In \`settings/lines.py\`, implement
 \`split_entries(text)\`, which returns \`(key, raw_value)\` tuples in file order. It skips blanks,
 \`#\` comment lines, lines with no \`=\`, and lines whose key is empty. It splits on the first \`=\`
-only, takes a double-quoted value literally (spaces and \`#\` included), and otherwise ends the value
-where an inline comment begins. Duplicate keys are kept, in order.
+only, runs a quoted value to its closing quote and keeps the inside exactly, and otherwise ends the
+value where an inline comment begins. Duplicate keys are kept, in order.
 
-In \`settings/rules.py\`, implement \`typed_value(raw)\`, \`build_settings(text)\`, and
-\`missing_keys(settings)\`. \`typed_value\` returns a bool for \`true\`/\`false\` in any case, an \`int\`
-for integer-looking text, and otherwise the text unchanged, and it never trims. \`build_settings\`
-reads the file through \`split_entries\` and lets the last entry for a key win. \`missing_keys\`
-returns every absent key from \`REQUIRED_KEYS\`, sorted, not the first one.
+In \`settings/rules.py\`, implement \`typed_value(key, raw)\`, \`build_settings(text)\`, and
+\`missing_keys(settings)\`. \`typed_value\` does not sniff the type from the text: it converts to the
+type the key was declared with in \`VALUE_TYPES\` and raises \`ValueError\` when the text does not
+fit, so a typo is caught at boot. \`build_settings\` reads the file through \`split_entries\` and lets
+the last entry for a key win. \`missing_keys\` returns every absent key from \`REQUIRED_KEYS\`,
+sorted, not the first one.
 
-\`README.md\` has the full contract. Some tests are hidden.`,
+\`README.md\` has the full contract, including the table of declared types. Some tests are hidden.`,
     starterCode: "",
     hints: [
       "The two modules divide the work cleanly: only the reader is allowed to trim, so by the time a value reaches `typed_value` its whitespace is already whatever it is meant to be.",
-      "In the reader, decide the value in one small helper: quoted first (drop both quotes, keep the inside), then a value that begins with `#` is empty, then cut at the first occurrence of a space followed by `#`. A `#` with no space before it is part of the value.",
-      "In the rules, `raw.lower()` decides the booleans, and integer-looking means `raw[1:].isdigit()` when it starts with `-` and `raw.isdigit()` otherwise. `missing_keys` is one sorted comprehension over `REQUIRED_KEYS`, and `build_settings` gets last-wins for free by assigning into a dict as it walks the entries in order.",
+      "In the reader, decide the value in one small helper with the cases in priority order: a value that opens a quote, then a value that is nothing but a comment, then a value with a comment after it. `str.find` takes a start index, which is how you locate a closing quote without matching the opening one.",
+      "In the rules, the key decides everything, so the first thing `typed_value` does is a lookup in `VALUE_TYPES`, and every branch after that is one declared type. The warm-up already showed you how to test integer-looking text; the difference here is that failing the test is an error rather than a fallback. `build_settings` gets last-wins for free from the order `split_entries` hands you, and `missing_keys` is one sorted comprehension.",
     ],
     workspace: {
       language: "python",
@@ -543,7 +648,8 @@ returns every absent key from \`REQUIRED_KEYS\`, sorted, not the first one.
           role: "readonly",
           language: "python",
           content: SPEC,
-          description: "Required keys and the comment/quote characters (read-only)",
+          description:
+            "Required keys, the comment/quote characters, and the declared types (read-only)",
         },
         {
           path: "settings/lines.py",

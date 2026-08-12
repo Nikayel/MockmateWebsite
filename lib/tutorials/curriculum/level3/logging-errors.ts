@@ -27,7 +27,9 @@ The first two of those start life as some other exception. Keep that original ex
 the cause of the \`BadReading\`, so the traceback still shows what actually went wrong.
 
 Anything else is not a bad row, it is a broken export: a \`"kwh"\` of \`None\` means the upstream
-system wrote a null, and that must stop the run rather than be filed as one skipped meter.
+system wrote a null. That must stop the run rather than be filed as one skipped meter, so let it
+raise and travel out of \`import_batch\`. Any exception other than \`BadReading\` counts: leave
+\`int(None)\`'s \`TypeError\` alone, or detect the null and raise something clearer of your own.
 
 ## \`ingest/batch.py\` decides the policy
 
@@ -42,7 +44,80 @@ lists one entry per unreadable row in the order they were met. \`source\` is the
 \`ingest/source.py\` (read-only); it must be closed before \`import_batch\` returns, and also on the
 way out when an error leaves the function.
 
+## \`import_batch\` also has to leave a trace
+
+The reason finance could not see the missing rows is that the old job printed nothing. Take a
+module logger at the top of \`ingest/batch.py\` with \`logging.getLogger(__name__)\`, which puts your
+records on the \`ingest\` channel where the tests can read them, and emit exactly two kinds:
+
+| When | Level | What it has to name |
+| --- | --- | --- |
+| each unreadable row, as you file it | \`warning\` | that row's meter, and its reason |
+| once, after the loop, before you return | \`info\` | how many readings were imported, and how many rows were skipped |
+
+Hand those values to \`logging\` as **arguments**, not baked into the message with an f-string:
+
+\`\`\`python
+logger.warning("some message %s and %s", first_value, second_value)
+\`\`\`
+
+That is the lazy-formatting habit from the lesson, and it is checked: the tests read your records
+back through \`ingest/runlog.py\` (read-only) and look at both the formatted message and the
+arguments you passed.
+
 Some tests are hidden.
+`
+
+const LG_RUNLOG = String.raw`"""Read-only. The capture the tests read your log records back out of.
+
+Nothing in here is yours to change, and your code never has to import it. It exists so a test
+can attach a handler to the "ingest" channel, run your import, and inspect what you logged:
+
+    handler = capture()
+    try:
+        import_batch(rows, source)
+    finally:
+        handler.detach()
+    handler.records   # the logging.LogRecord objects your run emitted
+
+A logger you take with logging.getLogger(__name__) inside the ingest package is a child of the
+"ingest" logger, so its records propagate up to this handler. That is the whole trick.
+"""
+
+import logging
+
+LOGGER_NAME = "ingest"
+
+
+class CapturingHandler(logging.Handler):
+    """A handler that keeps every record instead of writing it anywhere."""
+
+    def __init__(self):
+        super().__init__(level=logging.DEBUG)
+        self.records = []
+
+    def emit(self, record):
+        self.records.append(record)
+
+    def messages(self, level):
+        """The formatted messages emitted at exactly one level."""
+        return [record.getMessage() for record in self.records if record.levelno == level]
+
+
+def capture():
+    """Attach a CapturingHandler to the ingest channel. Call handler.detach() when done."""
+    logger = logging.getLogger(LOGGER_NAME)
+    handler = CapturingHandler()
+    previous_level = logger.level
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(handler)
+
+    def detach():
+        logger.removeHandler(handler)
+        logger.setLevel(previous_level)
+
+    handler.detach = detach
+    return handler
 `
 
 const LG_ERRORS = String.raw`"""Read-only. The error vocabulary the import job reports with."""
@@ -107,18 +182,27 @@ def parse_reading(row):
     return kwh
 `
 
-const LG_BATCH_STARTER = String.raw`from ingest.errors import BadReading
+const LG_BATCH_STARTER = String.raw`import logging
+
+from ingest.errors import BadReading
 from ingest.record import parse_reading
+
+logger = logging.getLogger(__name__)
 
 
 def import_batch(rows, source):
     """Import every readable row and report the rest (see README.md)."""
-    # TODO: build the total, the imported count and the failures list, and close the source.
+    # TODO: build the total, the imported count and the failures list, close the source, and
+    # leave the trace README.md asks for.
     return {"total": 0, "imported": 0, "failures": []}
 `
 
-const LG_BATCH_REFERENCE = String.raw`from ingest.errors import BadReading
+const LG_BATCH_REFERENCE = String.raw`import logging
+
+from ingest.errors import BadReading
 from ingest.record import parse_reading
+
+logger = logging.getLogger(__name__)
 
 
 def import_batch(rows, source):
@@ -130,18 +214,24 @@ def import_batch(rows, source):
             try:
                 kwh = parse_reading(row)
             except BadReading as err:
-                failures.append({"meter": err.row.get("meter"), "reason": err.reason})
+                meter = err.row.get("meter")
+                logger.warning("skipped meter %s: %s", meter, err.reason)
+                failures.append({"meter": meter, "reason": err.reason})
                 continue
             total += kwh
             imported += 1
     finally:
         source.close()
+    logger.info("imported %d readings, skipped %d rows", imported, len(failures))
     return {"total": total, "imported": imported, "failures": failures}
 `
 
-const LG_TEST = String.raw`from ingest.batch import import_batch
+const LG_TEST = String.raw`import logging
+
+from ingest.batch import import_batch
 from ingest.errors import BadReading, MISSING_KWH, UNPARSABLE_KWH
 from ingest.record import parse_reading
+from ingest.runlog import capture
 from ingest.source import ReadingSource
 
 
@@ -186,16 +276,35 @@ def run_tests(record):
         assert source.closed is True, f"expected closed True, got {source.closed!r}"
         assert source.close_count == 1, f"expected close_count 1, got {source.close_count!r}"
 
+    def a_skipped_row_is_logged_as_a_warning():
+        source = ReadingSource()
+        rows = [{"meter": "m-01", "kwh": "120"}, {"meter": "m-02", "kwh": "twelve"}]
+        handler = capture()
+        try:
+            import_batch(rows, source)
+        finally:
+            handler.detach()
+        warnings = handler.messages(logging.WARNING)
+        assert len(warnings) == 1, (
+            f"expected one warning for the one unreadable row, got {warnings!r}"
+        )
+        assert "m-02" in warnings[0], f"expected the meter named in {warnings[0]!r}"
+        assert UNPARSABLE_KWH in warnings[0], f"expected the reason named in {warnings[0]!r}"
+
     record("parses a good row", parses_a_good_row)
     record("a bad row raises BadReading carrying the row", bad_row_raises_carrying_the_row)
     record("imports every readable row", imports_every_readable_row)
     record("one bad row is reported, not dropped", one_bad_row_is_reported_not_dropped)
     record("closes the source on the happy path", closes_the_source_on_the_happy_path)
+    record("a skipped row is logged as a warning", a_skipped_row_is_logged_as_a_warning)
 `
 
-const LG_TEST_HIDDEN = String.raw`from ingest.batch import import_batch
+const LG_TEST_HIDDEN = String.raw`import logging
+
+from ingest.batch import import_batch
 from ingest.errors import BadReading, NEGATIVE_KWH, UNPARSABLE_KWH
 from ingest.record import parse_reading
+from ingest.runlog import capture
 from ingest.source import ReadingSource
 
 
@@ -227,11 +336,54 @@ def run_tests(record):
         rows = [{"meter": "m-01", "kwh": "10"}, {"meter": "m-02", "kwh": None}]
         try:
             got = import_batch(rows, source)
-        except TypeError:
+        except BadReading as err:
+            raise AssertionError(
+                "expected a null kwh to stop the run, it was filed as one bad row instead: "
+                f"{err.reason!r}"
+            )
+        except Exception:
             pass
         else:
-            raise AssertionError(f"expected TypeError to escape, got a result of {got!r}")
+            raise AssertionError(f"expected the error to escape, got a result of {got!r}")
         assert source.closed is True, f"expected the source closed anyway, got {source.closed!r}"
+
+    def the_run_reports_its_totals_at_info():
+        source = ReadingSource()
+        rows = [
+            {"meter": "m-01", "kwh": "120"},
+            {"meter": "m-02", "kwh": "twelve"},
+            {"meter": "m-03", "kwh": "20"},
+        ]
+        handler = capture()
+        try:
+            import_batch(rows, source)
+        finally:
+            handler.detach()
+        summaries = handler.messages(logging.INFO)
+        assert len(summaries) == 1, (
+            f"expected one info line summarising the run, got {summaries!r}"
+        )
+        assert "2" in summaries[0] and "1" in summaries[0], (
+            f"expected 2 imported and 1 skipped named in {summaries[0]!r}"
+        )
+
+    def the_values_are_left_for_logging_to_format():
+        source = ReadingSource()
+        rows = [{"meter": "m-02", "kwh": "twelve"}]
+        handler = capture()
+        try:
+            import_batch(rows, source)
+        finally:
+            handler.detach()
+        assert handler.records, "expected the run to log something, it logged nothing"
+        for entry in handler.records:
+            assert entry.args, (
+                f"expected the values passed as logging arguments, {entry.msg!r} carries none, "
+                "so an f-string built the message eagerly"
+            )
+            assert "%" in str(entry.msg), (
+                f"expected % placeholders in the message, got {entry.msg!r}"
+            )
 
     def an_empty_batch_reports_nothing():
         source = ReadingSource()
@@ -244,13 +396,15 @@ def run_tests(record):
     record("a negative reading is a failure", a_negative_reading_is_a_failure)
     record("a null reading stops the run", a_null_reading_stops_the_run)
     record("an empty batch reports nothing", an_empty_batch_reports_nothing)
+    record("the run reports its totals at info", the_run_reports_its_totals_at_info)
+    record("the values are left for logging to format", the_values_are_left_for_logging_to_format)
 `
 
 export const loggingErrorsLesson: PythonLesson = {
   id: "py-l3-logging-errors",
   title: "Error boundaries & logging habits",
   summary: "Use logging instead of print and design where errors get caught.",
-  estimatedMinutes: 22,
+  estimatedMinutes: 35,
   difficulty: "medium",
   skills: ["logging", "exceptions", "error-boundaries", "robustness"],
   teach: {
@@ -485,14 +639,15 @@ without a trace.
 
 Implement \`parse_reading(row)\` in \`ingest/record.py\` and \`import_batch(rows, source)\` in
 \`ingest/batch.py\`. One unreadable row must not abort the run, and it must not vanish either:
-\`import_batch\` returns the imported total and count alongside a list of the rows it could not read.
-A \`"kwh"\` of \`None\` is a broken export rather than a bad row, and has to stop the run. The README
-has the exact reason constants and the shape of the returned report. Some tests are hidden.`,
+\`import_batch\` returns the imported total and count alongside a list of the rows it could not read,
+and logs a warning per skipped row plus one summary line. A \`"kwh"\` of \`None\` is a broken export
+rather than a bad row, and has to stop the run. The README has the exact reason constants, the shape
+of the returned report, and what the two log lines have to name. Some tests are hidden.`,
     starterCode: "",
     hints: [
       "Two different jobs. `parse_reading` decides that one row is unreadable; `import_batch` decides what the run does about it. Neither should do the other's work.",
       "In `parse_reading`, a missing key and an unparsable value arrive as two different exceptions. Catch each one narrowly and re-raise it as a `BadReading`, using `raise ... from err` so the original is kept as the cause. Leave anything you did not name alone so it travels on up.",
-      "In `import_batch`, `except BadReading as err:` gives you `err.row` and `err.reason` for the failures entry, then `continue`. Wrap the whole loop in `try: ... finally: source.close()` so the source closes on both the normal exit and the escaping error.",
+      "In `import_batch`, the failures entry is built from the two attributes `BadReading` carries, and the same two values are what the warning names. For the source, you need a clause that runs on the ordinary exit and on the escaping null alike: `finally` is the one that does that, and note that it runs before the caller ever sees the exception.",
     ],
     workspace: {
       language: "python",
@@ -522,6 +677,13 @@ has the exact reason constants and the shape of the returned report. Some tests 
           language: "python",
           content: LG_SOURCE,
           description: "The export handle that has to be closed (read-only)",
+        },
+        {
+          path: "ingest/runlog.py",
+          role: "readonly",
+          language: "python",
+          content: LG_RUNLOG,
+          description: "How the tests read your log records back (read-only)",
         },
         {
           path: "ingest/record.py",
