@@ -22,7 +22,10 @@
  *    documentation now names exactly three: `ClaudeBot` (training), `Claude-User` (fetches a page
  *    when someone asks Claude about it), and `Claude-SearchBot` (search indexing). Checked
  *    2026-08-02 against support.claude.com article 8896518. `GPTBot` and `Google-Extended` were
- *    checked the same way and are still current.
+ *    checked the same way and are still current. Re-checked 2026-08-12: the OpenAI list at
+ *    developers.openai.com/api/docs/bots names three crawlers (`GPTBot`, `OAI-SearchBot`,
+ *    `ChatGPT-User`), and the Perplexity list at docs.perplexity.ai/guides/bots names two
+ *    (`PerplexityBot`, `Perplexity-User`); the welcome list below carries all of them.
  *
  * ## Why `/learn` is fully allowed, workspaces included
  *
@@ -80,14 +83,27 @@ const PRIVATE_PATHS = [
  * engine to be able to read and cite. The rule body is identical to `*` on purpose.
  */
 const WELCOMED_AI_CRAWLERS = [
-  // OpenAI, training crawler.
+  // OpenAI: training, ChatGPT search indexing, and user-initiated fetch. OAI-SearchBot is the
+  // token that decides whether ChatGPT search can index and cite the site at all.
   "GPTBot",
+  "OAI-SearchBot",
+  "ChatGPT-User",
   // Anthropic: training, user-initiated fetch, and search indexing.
   "ClaudeBot",
   "Claude-User",
   "Claude-SearchBot",
+  // Perplexity: search indexing and user-initiated fetch. Perplexity-User largely ignores
+  // robots.txt by design, but naming it keeps the welcome explicit.
+  "PerplexityBot",
+  "Perplexity-User",
   // Google's separate opt-out token for Gemini and Vertex AI training.
   "Google-Extended",
+  // Common Crawl, whose corpus feeds many model training sets.
+  "CCBot",
+  // Apple's opt-out token for Apple Intelligence training; Applebot itself is covered by `*`.
+  "Applebot-Extended",
+  // Meta's AI training crawler.
+  "meta-externalagent",
 ]
 
 export default function robots(): MetadataRoute.Robots {
