@@ -488,7 +488,7 @@ export const theOtherCallerLesson: PythonLesson = {
 
 Yesterday's ticket was small. Sessions shorter than a minute were billing zero minutes on the usage report. An assistant was pointed at the report, followed the number back to a shared helper called \`minutes\`, and changed the helper to round up. The usage suite went green, the diff was one line, and it shipped.
 
-This morning a different team's pager fires a minute early on every job, because their alerting module calls \`minutes\` too, and it was built on the promise that a partial minute does not count. Nobody edited that module. Nobody opened it. It was not in the context window, and it had no test at the boundary where the two answers differ.
+This morning a different team's pager fires a minute early on every job, because their alerting module calls \`minutes\` too, and it was built on the promise that a partial minute does not count. Nobody edited that module. Nobody opened it. It was never among the files the assistant was shown, and it had no test at the boundary where the two answers differ.
 
 That is the most common regression shape in AI-assisted work, and this lesson starts where you actually arrive: after the change landed. Two callers want two different things from one function, and the function currently serves one of them.
 

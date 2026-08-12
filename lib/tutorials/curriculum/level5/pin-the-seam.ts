@@ -692,7 +692,7 @@ Both workspaces in this lesson enforce the order for you. An audit suite runs yo
 
 ## Why the audit swaps builds
 
-The audit keeps a frozen copy of the buggy function and installs it with a module attribute assignment, then restores the original in a \`finally\` block. That is the same mechanism \`pytest\`'s \`monkeypatch\` uses on real jobs, and it has one consequence you have to respect while writing the test:
+The audit keeps a frozen copy of the buggy function and installs it with a module attribute assignment, then restores the original in a \`finally\` block. Replacing a name on a live module like that is called **monkeypatching**, and it is the same mechanism \`pytest\`'s \`monkeypatch\` fixture uses on real jobs. It has one consequence you have to respect while writing the test:
 
 \`\`\`python
 from search import pagination
