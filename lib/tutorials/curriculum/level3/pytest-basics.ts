@@ -6,56 +6,323 @@ import { buildPytestRunner } from "./pytest-runner"
 // L3-M3: Testing with pytest
 // ───────────────────────────────────────────────────────────────────────────
 
-const PT_README = `# TDD a bank balance
+// ───────────────────────────────────────────────────────────────────────────
+// Practice workspace: shipping cost (the learner writes the tests)
+//
+// Apply has the learner implement a function against tests that already exist. Practice turns
+// that around: the learner is handed a documented module and writes the suite for it, following
+// the precedent set by `py-l5-pin-the-seam` (a `role: "test"` file listed in `editableFilePaths`,
+// graded by running it against frozen broken builds).
+//
+// Deliberately smaller than `py-l4-testing-tooling`: no mocks, no shared mutable state, no call
+// history. Three broken builds, each of which only one basic testing habit catches:
+//   _always_flat   ignores express and the free threshold -> forces a test per behaviour
+//   _never_raises  returns 0 instead of raising           -> forces the raises test
+//   _charges_at_the_threshold  the bug that shipped       -> forces the boundary case
+// The third build is the code in cart/shipping.py, so the learner also makes one small repair.
+// ───────────────────────────────────────────────────────────────────────────
 
-The pytest tests already exist. Make them pass. Implement \`balance_after(start, transactions)\` in
-\`bank/account.py\` so it applies a list of signed \`transactions\` (deposits are positive,
-withdrawals negative) to a \`start\` balance and returns the new balance.
+const SHIPPING_README = `# Write the tests for the shipping rule
 
-Example: \`balance_after(100, [10, -30, 5])\` is \`85\`. Some tests are hidden.
+\`cart/shipping.py\` charges shipping on a cart subtotal. Four behaviours are documented, and one
+of them is wrong in the code:
+
+1. A standard order under 5000 cents pays 500 cents of shipping.
+2. A standard order of 5000 cents or more ships free.
+3. An express order always pays 1500 cents, at any subtotal.
+4. A negative subtotal is rejected with \`ValueError\`.
+
+Two things to do:
+
+1. Write one test per behaviour in \`tests/test_shipping.py\`, plus the zero-subtotal edge case.
+   Call the function as \`shipping.shipping_cost(...)\` so the grader can run your suite against
+   other builds of the module.
+2. Fix the behaviour that is wrong in \`cart/shipping.py\`.
+
+This sandbox has no \`pytest\` installed, so \`tests/pytest_shim.py\` provides a \`raises\` context
+manager that behaves like \`pytest.raises\`. Everything else is ordinary pytest: functions named
+\`test_*\`, plain \`assert\`.
+
+A hidden grader runs your suite against three broken builds of \`shipping_cost\` and against the
+code in the repo. It only passes when your suite catches every broken build, so a test that
+asserts nothing specific is named and rejected. Some tests are hidden.
 `
 
-const PT_ACCOUNT_STARTER = String.raw`def balance_after(start, transactions):
-    """Apply signed transactions to start and return the new balance (see README.md)."""
-    # TODO: add every transaction to the starting balance.
-    return start
+const SHIPPING_SHIM = String.raw`"""A stand-in for pytest.raises, because this sandbox has no pytest installed.
+
+Usage is identical to the real thing:
+
+    with raises(ValueError):
+        shipping.shipping_cost(-1)
+"""
+
+
+class _Raises:
+    def __init__(self, expected):
+        self.expected = expected
+        self.value = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc_type is None:
+            raise AssertionError(
+                f"expected {self.expected.__name__} to be raised, got no exception"
+            )
+        if not issubclass(exc_type, self.expected):
+            return False
+        self.value = exc
+        return True
+
+
+def raises(expected):
+    """Assert that the block raises expected (or a subclass of it)."""
+    return _Raises(expected)
 `
 
-const PT_ACCOUNT_REFERENCE = String.raw`def balance_after(start, transactions):
-    return start + sum(transactions)
+const SHIPPING_STARTER = String.raw`"""Shipping charged on a cart subtotal, in cents (see README.md)."""
+
+FREE_SHIPPING_THRESHOLD_CENTS = 5000
+STANDARD_CENTS = 500
+EXPRESS_CENTS = 1500
+
+
+def shipping_cost(subtotal_cents, express=False):
+    """Return the shipping charge in cents for this subtotal."""
+    if subtotal_cents < 0:
+        raise ValueError("subtotal_cents must not be negative")
+    if express:
+        return EXPRESS_CENTS
+    # TODO: one of the four documented behaviours is wrong here. Your tests decide which.
+    if subtotal_cents > FREE_SHIPPING_THRESHOLD_CENTS:
+        return 0
+    return STANDARD_CENTS
 `
 
-const PT_TEST = String.raw`from bank.account import balance_after
+const SHIPPING_REFERENCE = String.raw`"""Shipping charged on a cart subtotal, in cents (see README.md)."""
+
+FREE_SHIPPING_THRESHOLD_CENTS = 5000
+STANDARD_CENTS = 500
+EXPRESS_CENTS = 1500
 
 
-def test_applies_deposits():
-    assert balance_after(0, [10, 20]) == 30
-
-
-def test_applies_withdrawals():
-    assert balance_after(100, [-30, -20]) == 50
-
-
-def test_empty_transactions_unchanged():
-    assert balance_after(50, []) == 50
+def shipping_cost(subtotal_cents, express=False):
+    """Return the shipping charge in cents for this subtotal."""
+    if subtotal_cents < 0:
+        raise ValueError("subtotal_cents must not be negative")
+    if express:
+        return EXPRESS_CENTS
+    if subtotal_cents >= FREE_SHIPPING_THRESHOLD_CENTS:
+        return 0
+    return STANDARD_CENTS
 `
 
-const PT_TEST_HIDDEN = String.raw`from bank.account import balance_after
+const SHIPPING_TEST_STARTER = String.raw`# Your test suite for cart/shipping.py.
+#
+# Call the function as shipping.shipping_cost(...). A from-imported name would point at one
+# build forever, and the grader swaps builds under your suite.
+
+from cart import shipping
+from tests.pytest_shim import raises  # stand-in for pytest.raises
 
 
-def test_mixed_transactions():
-    assert balance_after(100, [10, -30, 5]) == 85
+def test_standard_order_under_the_threshold_pays_500():
+    got = shipping.shipping_cost(4999)
+    assert got == 500, f"expected 500 cents under the threshold, got {got}"
 
 
-def test_overdraft_allowed():
-    assert balance_after(0, [-5]) == -5
+# TODO: add one test for each remaining documented behaviour, plus the zero-subtotal case.
+# Give each test a name that says what it asserts, and assert on the value the function
+# returned rather than on whether it is truthy. One behaviour per test.
+`
+
+const SHIPPING_TEST_REFERENCE = String.raw`# Your test suite for cart/shipping.py.
+#
+# Call the function as shipping.shipping_cost(...). A from-imported name would point at one
+# build forever, and the grader swaps builds under your suite.
+
+from cart import shipping
+from tests.pytest_shim import raises  # stand-in for pytest.raises
+
+
+def test_standard_order_under_the_threshold_pays_500():
+    got = shipping.shipping_cost(4999)
+    assert got == 500, f"expected 500 cents under the threshold, got {got}"
+
+
+def test_zero_subtotal_still_pays_standard_shipping():
+    got = shipping.shipping_cost(0)
+    assert got == 500, f"expected 500 cents on a zero subtotal, got {got}"
+
+
+def test_free_shipping_starts_exactly_at_the_threshold():
+    got = shipping.shipping_cost(5000)
+    assert got == 0, f"expected 0 cents at exactly 5000, got {got}"
+
+
+def test_express_costs_1500_on_a_small_order():
+    got = shipping.shipping_cost(1000, express=True)
+    assert got == 1500, f"expected 1500 cents for express, got {got}"
+
+
+def test_express_is_not_free_above_the_threshold():
+    got = shipping.shipping_cost(9000, express=True)
+    assert got == 1500, f"expected express to stay 1500 above the threshold, got {got}"
+
+
+def test_a_negative_subtotal_raises_value_error():
+    with raises(ValueError):
+        shipping.shipping_cost(-1)
+`
+
+const SHIPPING_TEST_HIDDEN = String.raw`"""Hidden grader for the suite you wrote, plus checks on the repaired module.
+
+The first four tests run YOUR tests/test_shipping.py against frozen builds of shipping_cost.
+A suite that only checks one behaviour, or that asserts nothing specific, passes on a broken
+build and is reported here by name.
+"""
+
+import inspect
+
+from cart import shipping
+from tests import test_shipping
+
+STANDARD = 500
+EXPRESS = 1500
+THRESHOLD = 5000
+
+
+def _always_flat(subtotal_cents, express=False):
+    """Broken build: charges standard shipping no matter what. Do not edit."""
+    if subtotal_cents < 0:
+        raise ValueError("subtotal_cents must not be negative")
+    return STANDARD
+
+
+def _never_raises(subtotal_cents, express=False):
+    """Broken build: swallows a negative subtotal instead of rejecting it. Do not edit."""
+    if subtotal_cents < 0:
+        return 0
+    if express:
+        return EXPRESS
+    return 0 if subtotal_cents >= THRESHOLD else STANDARD
+
+
+def _charges_at_the_threshold(subtotal_cents, express=False):
+    """Broken build: the boundary is off by one cart. Do not edit."""
+    if subtotal_cents < 0:
+        raise ValueError("subtotal_cents must not be negative")
+    if express:
+        return EXPRESS
+    return 0 if subtotal_cents > THRESHOLD else STANDARD
+
+
+def _learner_tests():
+    return [
+        (name, fn)
+        for name, fn in inspect.getmembers(test_shipping, inspect.isfunction)
+        if name.startswith("test_") and getattr(fn, "__module__", None) == test_shipping.__name__
+    ]
+
+
+def _run_against(build):
+    """Run every test in tests/test_shipping.py with shipping_cost swapped for build."""
+    outcomes = []
+    original = shipping.shipping_cost
+    setattr(shipping, "shipping_cost", build)
+    try:
+        for name, fn in _learner_tests():
+            try:
+                fn()
+                outcomes.append((name, True, ""))
+            except Exception as exc:
+                outcomes.append((name, False, str(exc) or type(exc).__name__))
+    finally:
+        setattr(shipping, "shipping_cost", original)
+    return outcomes
+
+
+def _assert_catches(build, label, missing):
+    red = [name for name, passed, _ in _run_against(build) if not passed]
+    assert red, (
+        f"expected at least one of your tests to fail on the {label} build, got none; "
+        f"{missing}"
+    )
+
+
+def test_your_suite_has_a_test_per_behaviour():
+    found = [name for name, _ in _learner_tests()]
+    assert len(found) >= 5, (
+        f"expected at least 5 tests in tests/test_shipping.py (four behaviours plus the "
+        f"zero-subtotal case), got {len(found)}: {found}"
+    )
+
+
+def test_your_suite_catches_the_flat_rate_build():
+    _assert_catches(
+        _always_flat,
+        "flat-rate",
+        "it charges 500 cents for every order, so add tests for free shipping and for express",
+    )
+
+
+def test_your_suite_catches_the_build_that_never_raises():
+    _assert_catches(
+        _never_raises,
+        "never-raises",
+        "it returns 0 for a negative subtotal instead of raising, so add a test for the "
+        "error path",
+    )
+
+
+def test_your_suite_catches_the_threshold_build():
+    _assert_catches(
+        _charges_at_the_threshold,
+        "off-by-one threshold",
+        "it charges 500 cents at exactly 5000, so add a test at the boundary itself",
+    )
+
+
+def test_your_suite_passes_on_the_repaired_module():
+    red = [
+        f"{name}: {error}" for name, passed, error in _run_against(shipping.shipping_cost)
+        if not passed
+    ]
+    assert not red, "your suite still fails on cart/shipping.py: " + "; ".join(red)
+
+
+def test_free_shipping_starts_exactly_at_the_threshold():
+    for subtotal, expected in [(4999, 500), (5000, 0), (5001, 0)]:
+        got = shipping.shipping_cost(subtotal)
+        assert got == expected, f"expected {expected} cents at {subtotal}, got {got}"
+
+
+def test_zero_subtotal_pays_standard_shipping():
+    got = shipping.shipping_cost(0)
+    assert got == 500, f"expected 500 cents on a zero subtotal, got {got}"
+
+
+def test_express_ignores_the_free_threshold():
+    for subtotal in [0, 4999, 5000, 20000]:
+        got = shipping.shipping_cost(subtotal, express=True)
+        assert got == 1500, f"expected 1500 cents for express at {subtotal}, got {got}"
+
+
+def test_a_negative_subtotal_is_rejected():
+    for subtotal in [-1, -5000]:
+        try:
+            got = shipping.shipping_cost(subtotal)
+        except ValueError:
+            continue
+        raise AssertionError(f"expected ValueError at {subtotal}, got {got}")
 `
 
 export const pytestBasicsLesson: PythonLesson = {
   id: "py-l3-pytest-basics",
   title: "pytest assertions & structure",
   summary: "Make a suite of pytest tests pass by implementing the module they cover.",
-  estimatedMinutes: 16,
+  estimatedMinutes: 24,
   difficulty: "medium",
   skills: ["pytest", "testing", "assertions", "tdd"],
   teach: {
@@ -198,31 +465,35 @@ print("all good")`,
   practice: {
     id: "py-l3-pytest-basics-practice",
     executionMode: "workspace",
-    prompt: `Make the pytest suite pass: implement \`balance_after(start, transactions)\` in
-\`bank/account.py\` so it applies the signed \`transactions\` to \`start\`. Open the visible test file
-to read the cases; some tests are hidden.`,
+    prompt: `Write the test suite for \`cart/shipping.py\` in \`tests/test_shipping.py\`, then fix the
+one documented behaviour the module gets wrong. \`README.md\` lists what shipping is supposed to
+cost: a flat charge under the free-shipping threshold, free at or above it, a fixed express charge
+at any subtotal, and a \`ValueError\` on a negative subtotal.
+
+Call the function as \`shipping.shipping_cost(...)\`. A hidden grader runs your suite against three
+broken builds of the module and names the ones it still lets through. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "Read `tests/test_account.py` to see exactly what's expected.",
-      "`sum(transactions)` handles deposits and withdrawals together.",
-      "`return start + sum(transactions)`.",
+      "Work down the list in `README.md` one line at a time. Each documented behaviour is one test, named for what it asserts, and each test compares the returned number against the number you expect.",
+      "The grader's broken builds each break exactly one behaviour, so a suite that tests only the standard charge passes three of them. Cover express and the free threshold at the boundary value itself, not a comfortable distance away from it.",
+      "For the error path, `with raises(ValueError): shipping.shipping_cost(-1)` from `tests/pytest_shim.py`. Then compare the threshold comparison in `cart/shipping.py` against behaviour 2 in the README.",
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "bank/account.py",
-      editableFilePaths: ["bank/account.py"],
-      visibleTestPaths: ["tests/test_account.py"],
-      hiddenTestPaths: ["tests/test_account_hidden.py"],
+      primaryFilePath: "tests/test_shipping.py",
+      editableFilePaths: ["tests/test_shipping.py", "cart/shipping.py"],
+      visibleTestPaths: ["tests/test_shipping.py"],
+      hiddenTestPaths: ["tests/test_shipping_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
-        { path: "README.md", role: "docs", language: "markdown", content: PT_README },
-        { path: "bank/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        { path: "README.md", role: "docs", language: "markdown", content: SHIPPING_README },
+        { path: "cart/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "bank/account.py",
+          path: "cart/shipping.py",
           role: "editable",
           language: "python",
-          content: PT_ACCOUNT_STARTER,
-          description: "Implement balance_after here",
+          content: SHIPPING_STARTER,
+          description: "The module under test. One documented behaviour is wrong here",
         },
         {
           path: "tests/__init__.py",
@@ -232,29 +503,36 @@ to read the cases; some tests are hidden.`,
           hidden: true,
         },
         {
-          path: "tests/test_account.py",
-          role: "test",
+          path: "tests/pytest_shim.py",
+          role: "readonly",
           language: "python",
-          content: PT_TEST,
-          description: "Visible pytest suite",
+          content: SHIPPING_SHIM,
+          description: "A stand-in for pytest.raises (read-only)",
         },
         {
-          path: "tests/test_account_hidden.py",
+          path: "tests/test_shipping.py",
           role: "test",
           language: "python",
-          content: PT_TEST_HIDDEN,
+          content: SHIPPING_TEST_STARTER,
+          description: "Write your pytest suite here",
+        },
+        {
+          path: "tests/test_shipping_hidden.py",
+          role: "test",
+          language: "python",
+          content: SHIPPING_TEST_HIDDEN,
           hidden: true,
-          description: "Hidden pytest suite",
+          description: "Hidden grader for your suite, plus checks on the repaired module",
         },
         {
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
           content: buildPytestRunner(
-            "test_account",
-            "test_account_hidden",
-            "visible account",
-            "hidden account"
+            "test_shipping",
+            "test_shipping_hidden",
+            "visible shipping",
+            "hidden shipping"
           ),
           hidden: true,
           description: "pytest-style test runner",
@@ -262,10 +540,16 @@ to read the cases; some tests are hidden.`,
       ],
       referenceFiles: [
         {
-          path: "bank/account.py",
+          path: "tests/test_shipping.py",
+          role: "test",
+          language: "python",
+          content: SHIPPING_TEST_REFERENCE,
+        },
+        {
+          path: "cart/shipping.py",
           role: "editable",
           language: "python",
-          content: PT_ACCOUNT_REFERENCE,
+          content: SHIPPING_REFERENCE,
         },
       ],
     },
