@@ -1,87 +1,413 @@
 import type { PythonLesson } from "../../types"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const CAP_README = `# Capstone: a todo reporter
+// ───────────────────────────────────────────────────────────────────────────
+// Practice workspace: the shiftlog project (the Level 3 capstone)
+//
+// The last exercise of the level composes the level's skills instead of drilling one: a package
+// laid out under a real pyproject.toml, files read off disk with pathlib, a validating boundary
+// that turns text into a typed record, an error boundary that keeps one bad line from ending the
+// run, and a CLI entry point. Three editable files with distinct jobs: the record parser, the
+// directory reader, and the command.
+//
+// The pyproject.toml is load-bearing rather than decoration: a hidden test reads the
+// [project.scripts] declaration out of it and imports main through that path, so the layout and
+// the declared entry point have to agree.
+//
+// Deliberately simpler than py-l4-packaging-capstone (no registry, no decorator factory, no
+// injected transport, no __init__ export surface): this one is about a small tool that reads
+// files and survives bad input.
+// ───────────────────────────────────────────────────────────────────────────
 
-Tie Level 3 together. This is a small, real project: a \`todo\` package with sample tasks, tests,
-and a \`pyproject.toml\`. Implement \`summary(tasks)\` in \`todo/report.py\` so it returns the counts a
-CLI or API would report:
+const CAP_README = `# Capstone: the \`shiftlog\` command
 
-\`\`\`python
-{"total": <count>, "done": <completed>, "pending": <not done>}
+A workshop drops one plain-text log per day into a folder, and the office manager wants a single
+total per person at the end of the week. You are writing the tool that reads that folder.
+
+Three files are yours: \`shiftlog/records.py\`, \`shiftlog/store.py\`, and \`shiftlog/cli.py\`.
+Read \`pyproject.toml\` too, because it declares which function the \`shiftlog\` command runs.
+
+## The log format
+
+Each \`.log\` file holds one line per shift:
+
+\`\`\`
+alice: 45
+# machines down after this point
+bob:30
 \`\`\`
 
-Each task is a dict like \`{"title": "...", "done": True}\`. Some tests are hidden.
+A line is a worker name, a colon, and whole minutes. Surrounding spaces do not matter. A blank
+line and a line starting with \`#\` carry no data. Anything else is a bad line: a missing colon, a
+second colon, a missing name, or minutes that are not whole digits.
+
+## \`shiftlog/records.py\`
+
+\`parse_line(line)\` returns an \`Entry(worker, minutes)\` for a data line, \`None\` for a line that
+carries no data, and raises \`BadLineError\` for a bad one. The error message must contain the line
+it rejected, because the manager gets handed these.
+
+## \`shiftlog/store.py\`
+
+\`log_files(directory)\` returns the directory's \`.log\` files sorted by name. Other file types and
+anything in a subfolder are not part of the log.
+
+\`collect_entries(directory)\` reads those files in that order and returns two things: the list of
+entries in the order they were read, and a list of the bad lines it stepped over, each written as
+\`"<filename>:<line number>"\` with line numbers starting at 1. One bad line must never stop the
+rest of the run.
+
+## \`shiftlog/cli.py\`
+
+\`main(argv)\` is the command. \`argv\` holds the arguments after the command name, so exactly one:
+the log directory. Anything else, or a path that is not a directory, is a \`ValueError\` naming
+the problem. Otherwise it returns:
+
+\`\`\`python
+{"files": 2, "entries": 4, "skipped": ["mon.log:3"], "totals": {"alice": 75, "bob": 30}}
+\`\`\`
+
+\`totals\` sums each worker's minutes across every file. Some tests are hidden.
 `
 
 const CAP_PYPROJECT = String.raw`[project]
-name = "todo"
+name = "shiftlog"
 version = "0.1.0"
-description = "A tiny todo reporter"
+description = "Total the minutes in a folder of workshop shift logs"
 requires-python = ">=3.11"
 dependencies = []
 
 [project.scripts]
-todo = "todo.cli:main"
+shiftlog = "shiftlog.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 `
 
-const CAP_TASKS = String.raw`TASKS = [
-    {"title": "write tests", "done": True},
-    {"title": "ship feature", "done": False},
-    {"title": "review PR", "done": True},
-]
+const CAP_RECORDS_STARTER = String.raw`"""One log line, checked at the boundary. See README.md for the line format."""
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Entry:
+    worker: str
+    minutes: int
+
+
+class BadLineError(ValueError):
+    """Raised for a line that is neither blank, a comment, nor a valid entry."""
+
+
+def parse_line(line: str) -> Entry | None:
+    """Turn one raw line into an Entry, or nothing, or an error (see README.md)."""
+    # TODO: let the lines that carry no data through as nothing, turn a data line into an
+    # Entry, and reject every other shape with a BadLineError that quotes the line.
+    raise NotImplementedError("parse_line")
 `
 
-const CAP_REPORT_STARTER = String.raw`def summary(tasks):
-    """Return {"total", "done", "pending"} counts for the tasks (see README.md)."""
-    # TODO: count total, done (task["done"] is True), and pending.
-    return {}
+const CAP_RECORDS_REFERENCE = String.raw`"""One log line, checked at the boundary. See README.md for the line format."""
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Entry:
+    worker: str
+    minutes: int
+
+
+class BadLineError(ValueError):
+    """Raised for a line that is neither blank, a comment, nor a valid entry."""
+
+
+def parse_line(line: str) -> Entry | None:
+    """Turn one raw line into an Entry, or nothing, or an error (see README.md)."""
+    text = line.strip()
+    if not text or text.startswith("#"):
+        return None
+    if text.count(":") != 1:
+        raise BadLineError("bad log line: " + repr(line))
+    worker, raw_minutes = (part.strip() for part in text.split(":"))
+    if not worker or not raw_minutes.isdigit():
+        raise BadLineError("bad log line: " + repr(line))
+    return Entry(worker=worker, minutes=int(raw_minutes))
 `
 
-const CAP_REPORT_REFERENCE = String.raw`def summary(tasks):
-    done = sum(1 for task in tasks if task["done"])
-    return {"total": len(tasks), "done": done, "pending": len(tasks) - done}
+const CAP_STORE_STARTER = String.raw`"""Read the log files out of a directory. See README.md."""
+
+from pathlib import Path
+
+from shiftlog.records import BadLineError, Entry, parse_line
+
+
+def log_files(directory: Path) -> list[Path]:
+    """Return the directory's log files in the order they should be read (see README.md)."""
+    # TODO: find the files this tool owns inside the directory, in a stable order.
+    raise NotImplementedError("log_files")
+
+
+def collect_entries(directory: Path) -> tuple[list[Entry], list[str]]:
+    """Return the entries read from the directory and the bad lines skipped (see README.md)."""
+    # TODO: walk the log files line by line, keep the entries, and note where each rejected
+    # line was without letting it end the run.
+    raise NotImplementedError("collect_entries")
 `
 
-const CAP_TEST = String.raw`from todo.report import summary
-from todo.tasks import TASKS
+const CAP_STORE_REFERENCE = String.raw`"""Read the log files out of a directory. See README.md."""
+
+from pathlib import Path
+
+from shiftlog.records import BadLineError, Entry, parse_line
+
+
+def log_files(directory: Path) -> list[Path]:
+    """Return the directory's log files in the order they should be read (see README.md)."""
+    return sorted(Path(directory).glob("*.log"))
+
+
+def collect_entries(directory: Path) -> tuple[list[Entry], list[str]]:
+    """Return the entries read from the directory and the bad lines skipped (see README.md)."""
+    entries: list[Entry] = []
+    skipped: list[str] = []
+    for path in log_files(directory):
+        for number, line in enumerate(path.read_text().splitlines(), start=1):
+            try:
+                entry = parse_line(line)
+            except BadLineError:
+                skipped.append(path.name + ":" + str(number))
+                continue
+            if entry is not None:
+                entries.append(entry)
+    return entries, skipped
+`
+
+const CAP_CLI_STARTER = String.raw`"""The shiftlog command. pyproject.toml points the console script at main below."""
+
+from pathlib import Path
+
+from shiftlog.store import collect_entries, log_files
+
+
+def main(argv: list[str]) -> dict:
+    """Run the command over one log directory and return its report (see README.md)."""
+    # TODO: refuse the calls this command cannot serve, then report the file count, the
+    # entry count, the skipped lines, and each worker's total minutes.
+    raise NotImplementedError("main")
+`
+
+const CAP_CLI_REFERENCE = String.raw`"""The shiftlog command. pyproject.toml points the console script at main below."""
+
+from pathlib import Path
+
+from shiftlog.store import collect_entries, log_files
+
+
+def main(argv: list[str]) -> dict:
+    """Run the command over one log directory and return its report (see README.md)."""
+    if len(argv) != 1:
+        raise ValueError("usage: shiftlog <log-directory>")
+    directory = Path(argv[0])
+    if not directory.is_dir():
+        raise ValueError("not a log directory: " + str(directory))
+    entries, skipped = collect_entries(directory)
+    totals: dict[str, int] = {}
+    for entry in entries:
+        totals[entry.worker] = totals.get(entry.worker, 0) + entry.minutes
+    return {
+        "files": len(log_files(directory)),
+        "entries": len(entries),
+        "skipped": skipped,
+        "totals": totals,
+    }
+`
+
+const CAP_TEST = String.raw`"""Visible capstone tests: the contract, one layer at a time."""
+
+import tempfile
+from pathlib import Path
+
+from shiftlog.cli import main
+from shiftlog.records import BadLineError, Entry, parse_line
+from shiftlog.store import collect_entries, log_files
+
+
+def make_dir(files):
+    root = Path(tempfile.mkdtemp())
+    for name, text in files.items():
+        (root / name).write_text(text)
+    return root
 
 
 def run_tests(record):
-    def counts_sample_tasks():
-        assert summary(TASKS) == {"total": 3, "done": 2, "pending": 1}, f"got {summary(TASKS)!r}"
+    def a_data_line_becomes_an_entry():
+        got = parse_line("alice: 45")
+        assert got == Entry("alice", 45), f"expected Entry('alice', 45), got {got!r}"
+        assert got.minutes == 45 and isinstance(got.minutes, int), (
+            f"expected minutes to be the int 45, got {got.minutes!r}"
+        )
 
-    def empty_is_all_zero():
-        assert summary([]) == {"total": 0, "done": 0, "pending": 0}
+    def lines_without_data_are_nothing():
+        for line in ["", "   ", "# machines down"]:
+            got = parse_line(line)
+            assert got is None, f"expected None for {line!r}, got {got!r}"
 
-    record("counts the sample tasks", counts_sample_tasks)
-    record("empty list is all zero", empty_is_all_zero)
+    def a_bad_line_is_rejected_and_quoted():
+        try:
+            got = parse_line("alice 45")
+        except BadLineError as error:
+            assert "alice 45" in str(error), (
+                f"expected the error to quote the line 'alice 45', got {str(error)!r}"
+            )
+            return
+        raise AssertionError(f"expected BadLineError for 'alice 45', got {got!r}")
+
+    def log_files_come_back_in_name_order():
+        root = make_dir({"tue.log": "", "mon.log": ""})
+        names = [path.name for path in log_files(root)]
+        assert names == ["mon.log", "tue.log"], f"expected ['mon.log', 'tue.log'], got {names!r}"
+
+    def entries_and_skips_are_collected_together():
+        root = make_dir({"mon.log": "alice: 45\nnonsense\nbob:30\n"})
+        entries, skipped = collect_entries(root)
+        assert entries == [Entry("alice", 45), Entry("bob", 30)], (
+            f"expected the two good entries in file order, got {entries!r}"
+        )
+        assert skipped == ["mon.log:2"], f"expected ['mon.log:2'], got {skipped!r}"
+
+    def the_command_reports_one_directory():
+        root = make_dir({"mon.log": "alice: 45\n", "tue.log": "bob:30\nalice: 15\n"})
+        report = main([str(root)])
+        expected = {
+            "files": 2,
+            "entries": 3,
+            "skipped": [],
+            "totals": {"alice": 60, "bob": 30},
+        }
+        assert report == expected, f"expected {expected!r} from main, got {report!r}"
+
+    record("a data line becomes an Entry", a_data_line_becomes_an_entry)
+    record("blank and comment lines carry no data", lines_without_data_are_nothing)
+    record("a bad line is rejected and quoted", a_bad_line_is_rejected_and_quoted)
+    record("log files come back in name order", log_files_come_back_in_name_order)
+    record("entries and skipped lines are collected together", entries_and_skips_are_collected_together)
+    record("the command reports one directory", the_command_reports_one_directory)
 `
 
-const CAP_TEST_HIDDEN = String.raw`from todo.report import summary
+const CAP_TEST_HIDDEN = String.raw`"""Hidden capstone tests: the edges, and whether the pieces really compose.
+
+The first test never imports shiftlog.cli directly. It reads the console script declared in
+pyproject.toml and reaches main through that, so the layout and the declaration have to agree.
+"""
+
+import importlib
+import re
+import tempfile
+from pathlib import Path
+
+from shiftlog.records import BadLineError, Entry, parse_line
+from shiftlog.store import collect_entries, log_files
+
+
+def make_dir(files):
+    root = Path(tempfile.mkdtemp())
+    for name, text in files.items():
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text)
+    return root
+
+
+def entry_point():
+    text = Path("pyproject.toml").read_text()
+    match = re.search(r"^\s*shiftlog\s*=\s*\"([^\"]+)\"", text, re.MULTILINE)
+    assert match, "expected pyproject.toml to declare a shiftlog console script"
+    module_name, _, attribute = match.group(1).partition(":")
+    module = importlib.import_module(module_name)
+    return getattr(module, attribute)
 
 
 def run_tests(record):
-    def all_done():
-        tasks = [{"title": "a", "done": True}, {"title": "b", "done": True}]
-        assert summary(tasks) == {"total": 2, "done": 2, "pending": 0}
+    def the_declared_console_script_runs():
+        run = entry_point()
+        root = make_dir({"mon.log": "dana: 20\n"})
+        report = run([str(root)])
+        expected = {"files": 1, "entries": 1, "skipped": [], "totals": {"dana": 20}}
+        assert report == expected, (
+            f"expected {expected!r} through the declared entry point, got {report!r}"
+        )
 
-    def none_done():
-        tasks = [{"title": "a", "done": False}]
-        assert summary(tasks) == {"total": 1, "done": 0, "pending": 1}
+    def only_the_log_files_at_the_top_level_are_read():
+        root = make_dir(
+            {
+                "mon.log": "alice: 10\n",
+                "notes.txt": "alice: 999\n",
+                "archive/old.log": "alice: 999\n",
+            }
+        )
+        names = [path.name for path in log_files(root)]
+        assert names == ["mon.log"], f"expected only ['mon.log'], got {names!r}"
+        report = main_report(root)
+        assert report["totals"] == {"alice": 10}, (
+            f"expected totals {{'alice': 10}}, got {report['totals']!r}"
+        )
 
-    record("all tasks done", all_done)
-    record("no tasks done", none_done)
+    def main_report(root):
+        run = entry_point()
+        return run([str(root)])
+
+    def minutes_must_be_whole_and_positive():
+        for line in ["alice: -5", "alice: 4.5", "alice: many", "alice:", ": 5", "a:b:5"]:
+            try:
+                got = parse_line(line)
+            except BadLineError:
+                continue
+            raise AssertionError(f"expected BadLineError for {line!r}, got {got!r}")
+
+    def skipped_lines_are_numbered_per_file():
+        root = make_dir(
+            {
+                "mon.log": "# header\n\nalice: 5\noops\n",
+                "tue.log": "bad one\nbob: 7\n",
+            }
+        )
+        entries, skipped = collect_entries(root)
+        assert entries == [Entry("alice", 5), Entry("bob", 7)], (
+            f"expected the two good entries across both files, got {entries!r}"
+        )
+        assert skipped == ["mon.log:4", "tue.log:1"], (
+            f"expected ['mon.log:4', 'tue.log:1'], got {skipped!r}"
+        )
+
+    def an_empty_directory_reports_zeroes():
+        root = make_dir({})
+        report = main_report(root)
+        expected = {"files": 0, "entries": 0, "skipped": [], "totals": {}}
+        assert report == expected, f"expected {expected!r} for an empty directory, got {report!r}"
+
+    def the_command_refuses_what_it_cannot_serve():
+        root = make_dir({"mon.log": "alice: 5\n"})
+        run = entry_point()
+        for argv in [[], [str(root), "extra"], [str(root / "mon.log")]]:
+            try:
+                got = run(argv)
+            except ValueError:
+                continue
+            raise AssertionError(f"expected ValueError for argv {argv!r}, got {got!r}")
+
+    record("the console script declared in pyproject runs", the_declared_console_script_runs)
+    record("only top-level log files are read", only_the_log_files_at_the_top_level_are_read)
+    record("minutes must be whole and positive", minutes_must_be_whole_and_positive)
+    record("skipped lines are numbered per file", skipped_lines_are_numbered_per_file)
+    record("an empty directory reports zeroes", an_empty_directory_reports_zeroes)
+    record("the command refuses what it cannot serve", the_command_refuses_what_it_cannot_serve)
 `
 
 export const uvPyprojectCapstoneLesson: PythonLesson = {
   id: "py-l3-uv-pyproject-capstone",
   title: "Dependencies, pyproject & a mini capstone",
   summary: "Understand pyproject.toml/uv and extend a small, tested multi-file project.",
-  estimatedMinutes: 22,
+  estimatedMinutes: 34,
   difficulty: "hard",
   skills: ["pyproject", "uv", "packaging", "capstone"],
   teach: {
@@ -304,39 +630,50 @@ For \`[{"title": "a", "done": True}, {"title": "b", "done": False}]\` return
   practice: {
     id: "py-l3-uv-pyproject-capstone-practice",
     executionMode: "workspace",
-    prompt: `Capstone: implement \`summary(tasks)\` in \`todo/report.py\` so it returns
-\`{"total", "done", "pending"}\` counts for the project's tasks. Read \`pyproject.toml\` and
-\`todo/tasks.py\` for context. Some tests are hidden.`,
+    prompt: `Capstone: build the \`shiftlog\` command that totals a folder of workshop shift logs.
+Three files are yours. \`shiftlog/records.py\` turns one raw line into a checked \`Entry\`,
+\`shiftlog/store.py\` reads the directory's log files and keeps going past the lines it cannot
+use, and \`shiftlog/cli.py\` holds \`main(argv)\`, the function \`pyproject.toml\` declares as the
+command. Bad lines are reported, never fatal. Start with \`README.md\`, and read
+\`pyproject.toml\` for the entry point the command has to reach. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "`len(tasks)` is the total count.",
-      'Completed tasks have `task["done"] == True`; count them with a generator + `sum`.',
-      "Pending is whatever's left: `total - done`.",
+      "Build it bottom up: one line first, then a directory of files, then the command over that directory. Each layer only calls the one below it.",
+      "`parse_line` has three outcomes, so decide them in order: nothing to report (blank or `#`), then a valid `worker: minutes`, then everything else is a `BadLineError`. `str.isdigit()` is a quick way to reject minutes that are negative, fractional, or not numbers at all.",
+      '`log_files` is `sorted(Path(directory).glob("*.log"))`, which skips other extensions and subfolders for free. In `collect_entries`, `enumerate(path.read_text().splitlines(), start=1)` gives you the line number, and wrapping the `parse_line` call in `try` / `except BadLineError` is what turns a bad line into an appended `"name:number"` instead of a crash.',
+      "`main` validates before it works: `len(argv) != 1` and `not Path(argv[0]).is_dir()` are both `ValueError`. Then total per worker with `totals[entry.worker] = totals.get(entry.worker, 0) + entry.minutes`.",
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "todo/report.py",
-      editableFilePaths: ["todo/report.py"],
-      visibleTestPaths: ["tests/test_report.py"],
-      hiddenTestPaths: ["tests/test_report_hidden.py"],
+      primaryFilePath: "shiftlog/records.py",
+      editableFilePaths: ["shiftlog/records.py", "shiftlog/store.py", "shiftlog/cli.py"],
+      visibleTestPaths: ["tests/test_shiftlog.py"],
+      hiddenTestPaths: ["tests/test_shiftlog_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
         { path: "README.md", role: "docs", language: "markdown", content: CAP_README },
         { path: "pyproject.toml", role: "docs", language: "text", content: CAP_PYPROJECT },
-        { path: "todo/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        { path: "shiftlog/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "todo/tasks.py",
-          role: "readonly",
-          language: "python",
-          content: CAP_TASKS,
-          description: "Sample task data (read-only)",
-        },
-        {
-          path: "todo/report.py",
+          path: "shiftlog/records.py",
           role: "editable",
           language: "python",
-          content: CAP_REPORT_STARTER,
-          description: "Implement summary here",
+          content: CAP_RECORDS_STARTER,
+          description: "Check one log line at the boundary",
+        },
+        {
+          path: "shiftlog/store.py",
+          role: "editable",
+          language: "python",
+          content: CAP_STORE_STARTER,
+          description: "Read the log files in a directory",
+        },
+        {
+          path: "shiftlog/cli.py",
+          role: "editable",
+          language: "python",
+          content: CAP_CLI_STARTER,
+          description: "The command pyproject.toml points at",
         },
         {
           path: "tests/__init__.py",
@@ -346,14 +683,14 @@ For \`[{"title": "a", "done": True}, {"title": "b", "done": False}]\` return
           hidden: true,
         },
         {
-          path: "tests/test_report.py",
+          path: "tests/test_shiftlog.py",
           role: "test",
           language: "python",
           content: CAP_TEST,
           description: "Visible capstone tests",
         },
         {
-          path: "tests/test_report_hidden.py",
+          path: "tests/test_shiftlog_hidden.py",
           role: "test",
           language: "python",
           content: CAP_TEST_HIDDEN,
@@ -365,8 +702,8 @@ For \`[{"title": "a", "done": True}, {"title": "b", "done": False}]\` return
           role: "test",
           language: "python",
           content: buildRunner([
-            { module: "test_report", label: "visible report" },
-            { module: "test_report_hidden", label: "hidden report" },
+            { module: "test_shiftlog", label: "visible shiftlog" },
+            { module: "test_shiftlog_hidden", label: "hidden shiftlog" },
           ]),
           hidden: true,
           description: "Workspace test runner",
@@ -374,10 +711,22 @@ For \`[{"title": "a", "done": True}, {"title": "b", "done": False}]\` return
       ],
       referenceFiles: [
         {
-          path: "todo/report.py",
+          path: "shiftlog/records.py",
           role: "editable",
           language: "python",
-          content: CAP_REPORT_REFERENCE,
+          content: CAP_RECORDS_REFERENCE,
+        },
+        {
+          path: "shiftlog/store.py",
+          role: "editable",
+          language: "python",
+          content: CAP_STORE_REFERENCE,
+        },
+        {
+          path: "shiftlog/cli.py",
+          role: "editable",
+          language: "python",
+          content: CAP_CLI_REFERENCE,
         },
       ],
     },
