@@ -1,91 +1,442 @@
 import type { PythonLesson } from "../../types"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
-const AIO_README = `# Concurrent I/O with asyncio
+const BATCH_README = `# Ticket: the thumbnail batch loader reads one blob at a time
 
-\`aio/fetch.py\` (read-only) has \`async def fetch_one(n)\`, a **coroutine** standing in for an async
-network call. Implement \`fetch_all(numbers)\` in \`aio/gather.py\` so it builds a \`fetch_one(n)\`
-coroutine for every number and runs them all, returning the results in order.
+The media service loads a batch of blobs before it renders a page. Two complaints are open on it.
 
-Normally you'd write \`asyncio.run(asyncio.gather(*coros))\`. This in-browser sandbox is **already
-inside a running event loop**, so \`asyncio.run\` can't be called here. Use the provided
-\`run_coroutines\` helper from \`aio.loop\` to run the coroutines instead.
+Latency: a batch of five keys takes as long as the five reads added together, because the loader
+awaits each key before starting the next one. The reads are I/O, so they should overlap.
 
-\`fetch_all([1, 2, 3])\` is \`[10, 20, 30]\`. Some tests are hidden.
+Reliability: one unreadable key currently ends the whole batch and the page renders empty. A bad
+key should cost the caller that key, not the other four.
+
+Storage has also asked for a cap: no more than **two** reads may be in flight at once, or the blob
+store starts shedding connections.
+
+## What to build
+
+\`fetch_batch(keys)\` in \`pipeline/fanout.py\` returns a list the same length and order as \`keys\`,
+where each entry is either the payload \`{"key": key, "bytes": n}\` from a successful read, or the
+record \`{"key": key, "error": str(exc)}\` for a key whose read raised \`LoadError\`.
+
+\`Gate\` in \`pipeline/gate.py\` is the cap. At most \`limit\` holders may be past \`acquire()\` at any
+moment; \`release()\` gives the slot back.
+
+## The sandbox loop
+
+This page already runs inside an event loop, so \`asyncio.run\` raises \`RuntimeError\` and
+\`asyncio.gather\` is not available to you. \`pipeline/kernel.py\` (read-only) is a deterministic
+stand-in with the same shape: \`sleep\`, \`spawn\` (create_task), \`wait_all\`, \`run\`, and
+\`yield_now\`. Time is counted in ticks. The tests call \`kernel.run(fetch_batch(keys))\` for you.
+
+\`pipeline/store.py\` (read-only) holds \`load(key)\`, which suspends for the key's latency, and a
+meter that records how many reads were in flight at once and what tick the batch finished on. The
+tests read that meter, so a loader that awaits its keys one at a time fails even when its results
+are correct.
+
+Some tests are hidden.
 `
 
-const AIO_FETCH = String.raw`async def fetch_one(n):
-    """A coroutine standing in for an async network call."""
-    return n * 10
+const KERNEL_MODULE = String.raw`"""A tiny deterministic stand-in for the asyncio event loop. Read-only.
+
+This sandbox is already running inside an event loop, so asyncio.run raises RuntimeError and
+asyncio.gather is unavailable to you. Everything here mirrors the asyncio API you would really
+use, on a simulated clock that counts ticks instead of seconds:
+
+    sleep(ticks)      stands in for asyncio.sleep
+    spawn(coro)       stands in for asyncio.create_task
+    wait_all(tasks)   stands in for awaiting a gather of tasks
+    run(coro)         stands in for asyncio.run
+
+A Task carries .done, .result and .error. Time only moves forward when every runnable task is
+suspended, so the ordering below is reproducible on every run.
+"""
+
+
+class _Suspend:
+    """What an await hands back to the loop: 'wake me in this many ticks'."""
+
+    __slots__ = ("ticks",)
+
+    def __init__(self, ticks):
+        self.ticks = ticks
+
+    def __await__(self):
+        yield self
+
+
+class Task:
+    """A coroutine the loop has been told about."""
+
+    def __init__(self, coro, name):
+        self.coro = coro
+        self.name = name
+        self.done = False
+        self.result = None
+        self.error = None
+        self.wake_at = 0
+
+    def __repr__(self):
+        state = "done" if self.done else "pending"
+        return "<Task {} {}>".format(self.name, state)
+
+
+class _Loop:
+    def __init__(self):
+        self.tasks = []
+        self.now = 0
+
+    def spawn(self, coro, name):
+        task = Task(coro, name)
+        task.wake_at = self.now
+        self.tasks.append(task)
+        return task
+
+    def run(self, coro):
+        root = self.spawn(coro, "root")
+        rounds = 0
+        while not root.done:
+            rounds += 1
+            if rounds > 50000:
+                raise RuntimeError(
+                    "the simulated loop ran 50000 rounds without finishing; "
+                    "a task is waiting for something that never happens"
+                )
+            ready = [t for t in self.tasks if not t.done and t.wake_at <= self.now]
+            if not ready:
+                pending = [t.wake_at for t in self.tasks if not t.done]
+                if not pending:
+                    break
+                self.now = min(pending)
+                continue
+
+            before = len(self.tasks)
+            finished = 0
+            for task in ready:
+                if task.done:
+                    continue
+                try:
+                    signal = task.coro.send(None)
+                except StopIteration as stop:
+                    task.done = True
+                    task.result = stop.value
+                    finished += 1
+                except Exception as exc:
+                    task.done = True
+                    task.error = exc
+                    finished += 1
+                else:
+                    task.wake_at = self.now + getattr(signal, "ticks", 0)
+
+            spawned = len(self.tasks) - before
+            if finished == 0 and spawned == 0:
+                later = [t.wake_at for t in self.tasks if not t.done and t.wake_at > self.now]
+                if later:
+                    self.now = min(later)
+        if root.error is not None:
+            raise root.error
+        return root.result
+
+
+_CURRENT = None
+
+
+def run(coro):
+    """Drive one coroutine to completion on a fresh loop. The tests call this for you."""
+    global _CURRENT
+    _CURRENT = _Loop()
+    try:
+        return _CURRENT.run(coro)
+    finally:
+        _CURRENT = None
+
+
+def spawn(coro, name=None):
+    """Hand a coroutine to the loop now and get a Task back, without waiting for it."""
+    if _CURRENT is None:
+        raise RuntimeError("spawn() called outside run()")
+    return _CURRENT.spawn(coro, name or getattr(coro, "__name__", "task"))
+
+
+async def sleep(ticks):
+    """Suspend the calling coroutine for a number of simulated ticks."""
+    await _Suspend(ticks)
+
+
+async def yield_now():
+    """Give the loop a chance to run other tasks, then resume on the same tick."""
+    await _Suspend(0)
+
+
+async def wait_all(tasks):
+    """Suspend until every task in the list is done. Never raises; read task.error."""
+    tasks = list(tasks)
+    while any(not task.done for task in tasks):
+        await yield_now()
+    return tasks
+
+
+def now():
+    """The current simulated tick."""
+    return 0 if _CURRENT is None else _CURRENT.now
 `
 
-const AIO_LOOP = String.raw`def run_coroutines(coros):
-    """Run already-created coroutines to completion and collect their results, in order.
+const STORE_MODULE = String.raw`"""The fake blob store the batch loader talks to, plus the meter that watches it. Read-only.
 
-    A stand-in for asyncio.run(asyncio.gather(*coros)) for this sandbox, which is already inside a
-    running event loop (so asyncio.run can't be used). The coroutines here don't await real I/O, so
-    each finishes on its first step.
-    """
-    results = []
-    for coro in coros:
-        try:
-            coro.send(None)
-        except StopIteration as done:
-            results.append(done.value)
-    return results
+load(key) is a coroutine that suspends for the key's latency, so two loads that are in flight at
+the same time overlap in simulated time. Every call is metered, which is how the tests can tell a
+concurrent loader from one that awaits its keys one at a time.
+"""
+
+from pipeline import kernel
+
+SIZES = {"alpha": 120, "bravo": 340, "charlie": 90, "delta": 500, "echo": 75, "foxtrot": 260}
+LATENCY = {"alpha": 3, "bravo": 5, "charlie": 2, "delta": 4, "echo": 1, "foxtrot": 6}
+BROKEN = {"bravo": "checksum mismatch", "delta": "disk offline"}
+
+
+class LoadError(Exception):
+    """Raised when one key cannot be read. One bad key must not sink the batch."""
+
+
+class _Meter:
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.in_flight = 0
+        self.peak_in_flight = 0
+        self.started = 0
+        self.last_tick = 0
+
+    def begin(self):
+        self.in_flight += 1
+        self.started += 1
+        self.peak_in_flight = max(self.peak_in_flight, self.in_flight)
+        self.last_tick = max(self.last_tick, kernel.now())
+
+    def end(self):
+        self.in_flight -= 1
+        self.last_tick = max(self.last_tick, kernel.now())
+
+
+METER = _Meter()
+
+
+def reset_meter():
+    METER.reset()
+
+
+async def load(key):
+    """Read one key. Suspends for LATENCY[key] ticks, then returns a payload or raises."""
+    METER.begin()
+    try:
+        await kernel.sleep(LATENCY.get(key, 2))
+        if key not in SIZES:
+            raise LoadError("{}: no such key".format(key))
+        if key in BROKEN:
+            raise LoadError("{}: {}".format(key, BROKEN[key]))
+        return {"key": key, "bytes": SIZES[key]}
+    finally:
+        METER.end()
 `
 
-const AIO_GATHER_STARTER = String.raw`from aio.fetch import fetch_one
-from aio.loop import run_coroutines
+const GATE_STARTER = String.raw`"""The concurrency bound for the batch loader."""
+
+from pipeline import kernel
+
+MAX_IN_FLIGHT = 2
 
 
-def fetch_all(numbers):
-    """Build a fetch_one(n) coroutine per number and run them all in order (see README.md)."""
-    # TODO: pass a fetch_one(n) coroutine for each number to run_coroutines.
+class Gate:
+    """Lets at most 'limit' holders through at a time (see README.md)."""
+
+    def __init__(self, limit=MAX_IN_FLIGHT):
+        self.limit = limit
+        self.in_flight = 0
+
+    async def acquire(self):
+        # TODO: do not return while the gate is full, and count the holder once it is let through.
+        self.in_flight += 1
+
+    def release(self):
+        # TODO: hand the slot back.
+        pass
+`
+
+const GATE_REFERENCE = String.raw`"""The concurrency bound for the batch loader."""
+
+from pipeline import kernel
+
+MAX_IN_FLIGHT = 2
+
+
+class Gate:
+    """Lets at most 'limit' holders through at a time."""
+
+    def __init__(self, limit=MAX_IN_FLIGHT):
+        self.limit = limit
+        self.in_flight = 0
+
+    async def acquire(self):
+        while self.in_flight >= self.limit:
+            await kernel.yield_now()
+        self.in_flight += 1
+
+    def release(self):
+        self.in_flight -= 1
+`
+
+const FANOUT_STARTER = String.raw`from pipeline import kernel
+from pipeline.gate import MAX_IN_FLIGHT, Gate
+from pipeline.store import LoadError, load
+
+
+async def _load_one(gate, key):
+    """Read one key under the gate, returning a payload or an error record (see README.md)."""
+    # TODO: take a slot, read the key, turn a LoadError into an error record, give the slot back.
+    return {"key": key, "error": "not read"}
+
+
+async def fetch_batch(keys):
+    """Read every key, overlapping the reads, and return one entry per key in order."""
+    # TODO: get all the keys moving before waiting on any of them, then collect their entries.
     return []
 `
 
-const AIO_GATHER_REFERENCE = String.raw`from aio.fetch import fetch_one
-from aio.loop import run_coroutines
+const FANOUT_REFERENCE = String.raw`from pipeline import kernel
+from pipeline.gate import MAX_IN_FLIGHT, Gate
+from pipeline.store import LoadError, load
 
 
-def fetch_all(numbers):
-    return run_coroutines(fetch_one(n) for n in numbers)
+async def _load_one(gate, key):
+    await gate.acquire()
+    try:
+        return await load(key)
+    except LoadError as exc:
+        return {"key": key, "error": str(exc)}
+    finally:
+        gate.release()
+
+
+async def fetch_batch(keys):
+    gate = Gate(MAX_IN_FLIGHT)
+    tasks = [kernel.spawn(_load_one(gate, key), key) for key in keys]
+    await kernel.wait_all(tasks)
+    return [task.result for task in tasks]
 `
 
-const AIO_TEST = String.raw`from aio.gather import fetch_all
+const BATCH_TEST = String.raw`from pipeline import store
+from pipeline.fanout import fetch_batch
+from pipeline.kernel import run
+
+
+def batch(keys):
+    store.reset_meter()
+    return run(fetch_batch(keys))
 
 
 def run_tests(record):
-    def gathers_in_order():
-        assert fetch_all([1, 2, 3]) == [10, 20, 30], f"got {fetch_all([1, 2, 3])!r}"
+    def payloads_in_key_order():
+        got = batch(["charlie", "alpha", "echo"])
+        want = [
+            {"key": "charlie", "bytes": 90},
+            {"key": "alpha", "bytes": 120},
+            {"key": "echo", "bytes": 75},
+        ]
+        assert got == want, f"expected {want}, got {got!r}"
 
-    def empty_input():
-        assert fetch_all([]) == []
+    def one_bad_key_does_not_sink_the_batch():
+        got = batch(["alpha", "bravo", "charlie"])
+        want = [
+            {"key": "alpha", "bytes": 120},
+            {"key": "bravo", "error": "bravo: checksum mismatch"},
+            {"key": "charlie", "bytes": 90},
+        ]
+        assert got == want, f"expected {want}, got {got!r}"
 
-    record("gathers results in order", gathers_in_order)
-    record("empty input returns empty", empty_input)
+    def every_entry_is_a_finished_value():
+        got = batch(["alpha", "bravo"])
+        offenders = [entry for entry in got if not isinstance(entry, dict)]
+        assert offenders == [], (
+            f"expected every entry to be a dict payload or error record, "
+            f"got these unfinished entries: {offenders!r}"
+        )
+
+    def bound_is_respected_and_used():
+        batch(["alpha", "bravo", "charlie", "delta", "echo"])
+        peak = store.METER.peak_in_flight
+        assert peak == 2, f"expected peak in flight of exactly 2, got {peak}"
+        assert store.METER.started == 5, (
+            f"expected all 5 keys to be loaded, got {store.METER.started}"
+        )
+
+    record("returns payloads in key order", payloads_in_key_order)
+    record("collects a failing key per item", one_bad_key_does_not_sink_the_batch)
+    record("no unfinished coroutine leaks into the results", every_entry_is_a_finished_value)
+    record("at most two loads in flight", bound_is_respected_and_used)
 `
 
-const AIO_TEST_HIDDEN = String.raw`from aio.gather import fetch_all
+const BATCH_TEST_HIDDEN = String.raw`from pipeline import store
+from pipeline.fanout import fetch_batch
+from pipeline.kernel import run
+
+
+def batch(keys):
+    store.reset_meter()
+    return run(fetch_batch(keys))
 
 
 def run_tests(record):
-    def single_item():
-        assert fetch_all([5]) == [50]
+    def empty_batch():
+        got = batch([])
+        assert got == [], f"expected [], got {got!r}"
 
-    def includes_zero():
-        assert fetch_all([0, 2]) == [0, 20]
+    def unknown_key_is_an_error_record():
+        got = batch(["echo", "zulu"])
+        want = [
+            {"key": "echo", "bytes": 75},
+            {"key": "zulu", "error": "zulu: no such key"},
+        ]
+        assert got == want, f"expected {want}, got {got!r}"
 
-    record("single item", single_item)
-    record("includes zero", includes_zero)
+    def every_key_fails():
+        got = batch(["bravo", "delta"])
+        want = [
+            {"key": "bravo", "error": "bravo: checksum mismatch"},
+            {"key": "delta", "error": "delta: disk offline"},
+        ]
+        assert got == want, f"expected {want}, got {got!r}"
+
+    def duplicate_keys_are_loaded_twice():
+        got = batch(["echo", "echo"])
+        want = [{"key": "echo", "bytes": 75}, {"key": "echo", "bytes": 75}]
+        assert got == want, f"expected {want}, got {got!r}"
+        assert store.METER.started == 2, (
+            f"expected 2 loads for 2 keys, got {store.METER.started}"
+        )
+
+    def loads_overlap_instead_of_queueing():
+        batch(["alpha", "charlie", "echo"])
+        elapsed = store.METER.last_tick
+        assert elapsed == 3, (
+            f"expected the batch to finish at tick 3 (loads of 3, 2 and 1 ticks overlapping "
+            f"two at a time), got tick {elapsed}; awaiting the keys one at a time costs 6"
+        )
+
+    record("empty batch returns an empty list", empty_batch)
+    record("unknown key is collected as an error", unknown_key_is_an_error_record)
+    record("a batch of only failures keeps its length", every_key_fails)
+    record("duplicate keys are each loaded", duplicate_keys_are_loaded_twice)
+    record("loads overlap under the bound", loads_overlap_instead_of_queueing)
 `
 
 export const asyncioLesson: PythonLesson = {
   id: "py-l4-asyncio",
   title: "async / await & asyncio",
   summary: "Run many I/O tasks concurrently with coroutines and asyncio.gather.",
-  estimatedMinutes: 20,
+  estimatedMinutes: 28,
   difficulty: "hard",
   skills: ["asyncio", "async-await", "coroutines", "concurrency"],
   teach: {
@@ -338,45 +689,60 @@ def fetch_all(numbers):
   practice: {
     id: "py-l4-asyncio-practice",
     executionMode: "workspace",
-    prompt: `Implement \`fetch_all(numbers)\` in \`aio/gather.py\`: build a \`fetch_one(n)\` coroutine for every
-number and run them with the read-only \`run_coroutines\` helper (imported from \`aio.loop\`),
-returning the results in order. Some tests are hidden.`,
+    prompt: `Repair the media service's batch loader. \`fetch_batch(keys)\` in \`pipeline/fanout.py\` reads its
+keys one at a time and lets a single unreadable key end the whole batch, and storage now caps the
+service at two reads in flight at once.
+
+Return one entry per key, in the order the keys were given: the payload \`{"key": key, "bytes": n}\`
+for a key that read cleanly, or \`{"key": key, "error": str(exc)}\` for a key whose read raised
+\`LoadError\`. Reads must overlap, and never more than \`MAX_IN_FLIGHT\` of them at once, which is
+what \`Gate\` in \`pipeline/gate.py\` is for.
+
+\`pipeline/kernel.py\` and \`pipeline/store.py\` are read-only. The tests read the store's meter, so
+a loader that returns the right entries the slow way still fails. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "`fetch_one` and `run_coroutines` are already imported for you.",
-      "Build one coroutine per number: `fetch_one(n) for n in numbers`.",
-      "`return run_coroutines(fetch_one(n) for n in numbers)`.",
+      "Awaiting a read finishes it before the next one starts. The loop can only overlap work it has been told about, so every key has to be handed to the loop before you wait on any of them.",
+      "`kernel.spawn(coro)` registers a coroutine and hands back a Task immediately; `kernel.wait_all(tasks)` suspends until they are all done, and each Task carries `.result`. The bound belongs inside the per-key coroutine, around the read itself, so a slot is taken before `load(key)` and released whether it succeeds or raises.",
+      "`Gate.acquire` cannot return while the gate is full: loop until a slot frees, awaiting `kernel.yield_now()` inside that loop so the holders get a chance to run and release. In `_load_one`, wrap `await load(key)` in `try`/`except LoadError as exc` and return the error record from the except branch, with the release in a `finally`.",
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "aio/gather.py",
-      editableFilePaths: ["aio/gather.py"],
-      visibleTestPaths: ["tests/test_gather.py"],
-      hiddenTestPaths: ["tests/test_gather_hidden.py"],
+      primaryFilePath: "pipeline/fanout.py",
+      editableFilePaths: ["pipeline/fanout.py", "pipeline/gate.py"],
+      visibleTestPaths: ["tests/test_fanout.py"],
+      hiddenTestPaths: ["tests/test_fanout_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
-        { path: "README.md", role: "docs", language: "markdown", content: AIO_README },
-        { path: "aio/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        { path: "README.md", role: "docs", language: "markdown", content: BATCH_README },
+        { path: "pipeline/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "aio/fetch.py",
+          path: "pipeline/kernel.py",
           role: "readonly",
           language: "python",
-          content: AIO_FETCH,
-          description: "Async fetch_one coroutine (read-only)",
+          content: KERNEL_MODULE,
+          description: "The sandbox's event loop stand-in: sleep, spawn, wait_all, run (read-only)",
         },
         {
-          path: "aio/loop.py",
+          path: "pipeline/store.py",
           role: "readonly",
           language: "python",
-          content: AIO_LOOP,
-          description: "run_coroutines helper, the sandbox's asyncio.run stand-in (read-only)",
+          content: STORE_MODULE,
+          description: "The fake blob store and its in-flight meter (read-only)",
         },
         {
-          path: "aio/gather.py",
+          path: "pipeline/fanout.py",
           role: "editable",
           language: "python",
-          content: AIO_GATHER_STARTER,
-          description: "Implement fetch_all here",
+          content: FANOUT_STARTER,
+          description: "Implement fetch_batch here",
+        },
+        {
+          path: "pipeline/gate.py",
+          role: "editable",
+          language: "python",
+          content: GATE_STARTER,
+          description: "Implement the concurrency bound here",
         },
         {
           path: "tests/__init__.py",
@@ -386,27 +752,27 @@ returning the results in order. Some tests are hidden.`,
           hidden: true,
         },
         {
-          path: "tests/test_gather.py",
+          path: "tests/test_fanout.py",
           role: "test",
           language: "python",
-          content: AIO_TEST,
-          description: "Visible asyncio tests",
+          content: BATCH_TEST,
+          description: "Visible batch loader tests",
         },
         {
-          path: "tests/test_gather_hidden.py",
+          path: "tests/test_fanout_hidden.py",
           role: "test",
           language: "python",
-          content: AIO_TEST_HIDDEN,
+          content: BATCH_TEST_HIDDEN,
           hidden: true,
-          description: "Hidden asyncio tests",
+          description: "Hidden batch loader tests",
         },
         {
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
           content: buildRunner([
-            { module: "test_gather", label: "visible gather" },
-            { module: "test_gather_hidden", label: "hidden gather" },
+            { module: "test_fanout", label: "visible batch loader" },
+            { module: "test_fanout_hidden", label: "hidden batch loader" },
           ]),
           hidden: true,
           description: "Workspace test runner",
@@ -414,10 +780,16 @@ returning the results in order. Some tests are hidden.`,
       ],
       referenceFiles: [
         {
-          path: "aio/gather.py",
+          path: "pipeline/fanout.py",
           role: "editable",
           language: "python",
-          content: AIO_GATHER_REFERENCE,
+          content: FANOUT_REFERENCE,
+        },
+        {
+          path: "pipeline/gate.py",
+          role: "editable",
+          language: "python",
+          content: GATE_REFERENCE,
         },
       ],
     },
