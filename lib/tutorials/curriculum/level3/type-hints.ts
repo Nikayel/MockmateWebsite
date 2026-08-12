@@ -5,83 +5,286 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // L3-M2: Type Hints & Static Typing
 // ───────────────────────────────────────────────────────────────────────────
 
-const TH_README = `# A typed stats module
+const TH_README = `# The carrier export loader
 
-Add precise **type hints** while you implement a small stats module. \`stats/rounding.py\`
-(read-only) rounds to 2 decimals; implement \`average(values)\` in \`stats/summary.py\`.
+Every night a carrier drops a CSV of shipments. Each column arrives as a **string**, and the
+loader turns those strings into real Python values. The team's rule is that the class declaration
+is the single source of truth: what a field is called and what type it holds is written once, in
+the annotations, and the loader follows it.
 
-\`average\` should:
-- return \`0.0\` for an empty list
-- otherwise return the mean, rounded with the read-only \`round2\` helper
+## \`catalog/models.py\`
 
-Annotate it as \`def average(values: list[float]) -> float\`. Some tests are hidden.
+Declare the \`Shipment\` dataclass with these fields, then implement \`from_row\`.
+
+| field | type | notes |
+| --- | --- | --- |
+| \`tracking_id\` | text | |
+| \`destination\` | text | |
+| \`weight_grams\` | whole number | |
+| \`fragile\` | true/false | |
+| \`notes\` | text | defaults to \`""\` |
+
+\`Shipment.from_row(row)\` takes one \`dict\` of raw string columns and returns a \`Shipment\`:
+
+- every declared field is converted with the read-only \`coerce\` helper in \`catalog.coercion\`,
+  which needs the type that field declares
+- a column the class does not declare is ignored, however many of them the carrier adds
+- a declared field missing from the row falls back to its default
+
+## \`catalog/report.py\`
+
+Implement and annotate three functions over a list of \`Shipment\`:
+
+- \`group_by_destination\` returns a mapping from destination to the shipments for it, each group
+  in arrival order
+- \`heaviest\` returns the single heaviest shipment, the earliest one on a tie, and nothing at all
+  when the list is empty
+- \`count_where\` takes a one-argument function that answers true or false about a shipment, and
+  returns how many shipments it accepts
+
+The tests read your annotations as well as your results, so an unannotated function that computes
+the right answer still fails. Some tests are hidden.
 `
 
-const TH_ROUNDING = String.raw`def round2(x: float) -> float:
-    """Round a number to two decimal places."""
-    return round(x, 2)
+const TH_COERCION = String.raw`"""Raw-column converters, keyed by the type a field declares. Read-only."""
+
+
+def coerce(declared: type, raw: str) -> object:
+    """Convert one raw export column into the declared type."""
+    if declared is bool:
+        return raw.strip().lower() in {"1", "true", "yes"}
+    if declared is int:
+        return int(raw.strip())
+    if declared is float:
+        return float(raw.strip())
+    return raw.strip()
 `
 
-const TH_SUMMARY_STARTER = String.raw`from stats.rounding import round2
+const TH_MODELS_STARTER = String.raw`from dataclasses import dataclass
+from typing import get_type_hints
+
+from catalog.coercion import coerce
 
 
-def average(values: list[float]) -> float:
-    """Return the rounded mean of values, or 0.0 when empty (see README.md)."""
-    # TODO: handle the empty list, then return round2(mean).
-    return 0.0
+@dataclass
+class Shipment:
+    """One row of the carrier export (see README.md)."""
+
+    # TODO: declare the five fields and their types, with a default for notes.
+
+    @classmethod
+    def from_row(cls, row):
+        """Build a Shipment from a row of raw string columns (see README.md)."""
+        # TODO: build each field from what the class declares, not from what the row contains.
+        raise NotImplementedError
 `
 
-const TH_SUMMARY_REFERENCE = String.raw`from stats.rounding import round2
+const TH_MODELS_REFERENCE = String.raw`from dataclasses import dataclass
+from typing import get_type_hints
+
+from catalog.coercion import coerce
 
 
-def average(values: list[float]) -> float:
-    if not values:
-        return 0.0
-    return round2(sum(values) / len(values))
+@dataclass
+class Shipment:
+    """One row of the carrier export."""
+
+    tracking_id: str
+    destination: str
+    weight_grams: int
+    fragile: bool
+    notes: str = ""
+
+    @classmethod
+    def from_row(cls, row: dict[str, str]) -> "Shipment":
+        values = {}
+        for name, declared in get_type_hints(cls).items():
+            if name in row:
+                values[name] = coerce(declared, row[name])
+        return cls(**values)
 `
 
-const TH_TEST = String.raw`from stats.summary import average
+const TH_REPORT_STARTER = String.raw`from catalog.models import Shipment
+
+
+# TODO: annotate and implement all three (see README.md). The tests read the annotations.
+def group_by_destination(shipments):
+    raise NotImplementedError
+
+
+def heaviest(shipments):
+    raise NotImplementedError
+
+
+def count_where(shipments, predicate):
+    raise NotImplementedError
+`
+
+const TH_REPORT_REFERENCE = String.raw`from collections.abc import Callable
+
+from catalog.models import Shipment
+
+
+def group_by_destination(shipments: list[Shipment]) -> dict[str, list[Shipment]]:
+    grouped: dict[str, list[Shipment]] = {}
+    for shipment in shipments:
+        grouped.setdefault(shipment.destination, []).append(shipment)
+    return grouped
+
+
+def heaviest(shipments: list[Shipment]) -> Shipment | None:
+    if not shipments:
+        return None
+    return max(shipments, key=lambda shipment: shipment.weight_grams)
+
+
+def count_where(shipments: list[Shipment], predicate: Callable[[Shipment], bool]) -> int:
+    return sum(1 for shipment in shipments if predicate(shipment))
+`
+
+const TH_TEST = String.raw`from typing import get_type_hints
+
+from catalog.models import Shipment
+from catalog.report import count_where, group_by_destination
+
+
+ROW = {
+    "tracking_id": "  TRK-1  ",
+    "destination": "Lisbon",
+    "weight_grams": "1200",
+    "fragile": "true",
+    "notes": "leave with doorman",
+}
 
 
 def run_tests(record):
-    def averages_two_numbers():
-        result = average([2, 4])
-        assert result == 3.0, f"expected 3.0, got {result!r}"
+    def declares_five_fields():
+        hints = get_type_hints(Shipment)
+        expected = {
+            "tracking_id": str,
+            "destination": str,
+            "weight_grams": int,
+            "fragile": bool,
+            "notes": str,
+        }
+        assert hints == expected, f"expected declared fields {expected}, got {hints!r}"
 
-    def empty_is_zero():
-        result = average([])
-        assert result == 0.0, f"expected 0.0, got {result!r}"
+    def from_row_converts_columns():
+        shipment = Shipment.from_row(ROW)
+        assert shipment.tracking_id == "TRK-1", f"expected 'TRK-1', got {shipment.tracking_id!r}"
+        assert shipment.weight_grams == 1200, f"expected 1200, got {shipment.weight_grams!r}"
+        assert shipment.fragile is True, f"expected True, got {shipment.fragile!r}"
 
-    def keeps_one_decimal():
-        result = average([1, 2])
-        assert result == 1.5, f"expected 1.5, got {result!r}"
+    def groups_by_destination():
+        rows = [
+            {"tracking_id": "A", "destination": "Lisbon", "weight_grams": "100", "fragile": "no"},
+            {"tracking_id": "B", "destination": "Oslo", "weight_grams": "200", "fragile": "no"},
+            {"tracking_id": "C", "destination": "Lisbon", "weight_grams": "300", "fragile": "no"},
+        ]
+        grouped = group_by_destination([Shipment.from_row(row) for row in rows])
+        ids = {key: [s.tracking_id for s in group] for key, group in grouped.items()}
+        expected = {"Lisbon": ["A", "C"], "Oslo": ["B"]}
+        assert ids == expected, f"expected {expected}, got {ids!r}"
 
-    record("averages two numbers", averages_two_numbers)
-    record("empty list is 0.0", empty_is_zero)
-    record("keeps the decimal", keeps_one_decimal)
+    def counts_with_a_predicate():
+        rows = [
+            {"tracking_id": "A", "destination": "Lisbon", "weight_grams": "100", "fragile": "no"},
+            {"tracking_id": "B", "destination": "Oslo", "weight_grams": "900", "fragile": "no"},
+        ]
+        shipments = [Shipment.from_row(row) for row in rows]
+        result = count_where(shipments, lambda s: s.weight_grams > 500)
+        assert result == 1, f"expected 1, got {result!r}"
+
+    record("Shipment declares five typed fields", declares_five_fields)
+    record("from_row converts raw columns", from_row_converts_columns)
+    record("group_by_destination keeps arrival order", groups_by_destination)
+    record("count_where applies the predicate", counts_with_a_predicate)
 `
 
-const TH_TEST_HIDDEN = String.raw`from stats.summary import average
+const TH_TEST_HIDDEN = String.raw`from typing import get_args, get_origin, get_type_hints
+
+from catalog.models import Shipment
+from catalog.report import count_where, group_by_destination, heaviest
+
+
+def make(tracking_id, destination, grams, fragile="no"):
+    return Shipment.from_row(
+        {
+            "tracking_id": tracking_id,
+            "destination": destination,
+            "weight_grams": str(grams),
+            "fragile": fragile,
+        }
+    )
 
 
 def run_tests(record):
-    def rounds_to_two_decimals():
-        result = average([10, 20, 35])
-        assert result == 21.67, f"expected 21.67, got {result!r}"
+    def ignores_undeclared_columns():
+        shipment = Shipment.from_row(
+            {
+                "tracking_id": "TRK-9",
+                "destination": "Porto",
+                "weight_grams": "50",
+                "fragile": "no",
+                "carrier_internal_code": "ZZ-77",
+            }
+        )
+        assert not hasattr(shipment, "carrier_internal_code"), (
+            "expected no carrier_internal_code attribute, got "
+            f"{getattr(shipment, 'carrier_internal_code', None)!r}"
+        )
 
-    def single_value():
-        result = average([42])
-        assert result == 42.0, f"expected 42.0, got {result!r}"
+    def missing_column_uses_the_default():
+        shipment = make("TRK-2", "Oslo", 10)
+        assert shipment.notes == "", f"expected '', got {shipment.notes!r}"
 
-    record("rounds to two decimals", rounds_to_two_decimals)
-    record("single value averages to itself", single_value)
+    def false_string_becomes_false():
+        shipment = make("TRK-3", "Oslo", 10, fragile="false")
+        assert shipment.fragile is False, f"expected False, got {shipment.fragile!r}"
+
+    def heaviest_handles_empty_and_ties():
+        empty = heaviest([])
+        assert empty is None, f"expected None, got {empty!r}"
+        tied = heaviest([make("A", "Oslo", 400), make("B", "Oslo", 400)])
+        assert tied.tracking_id == "A", f"expected 'A', got {tied.tracking_id!r}"
+
+    def heaviest_is_annotated_optional():
+        returned = get_type_hints(heaviest)["return"]
+        args = set(get_args(returned))
+        assert args == {Shipment, type(None)}, (
+            f"expected the return to be Shipment or None, got {returned!r}"
+        )
+
+    def count_where_declares_a_callable():
+        hints = get_type_hints(count_where)
+        predicate = hints["predicate"]
+        origin = get_origin(predicate)
+        assert origin is not None and origin.__name__ == "Callable", (
+            f"expected predicate to be a Callable type, got {predicate!r}"
+        )
+        args = get_args(predicate)
+        assert args == ([Shipment], bool), f"expected ([Shipment], bool), got {args!r}"
+        assert hints["return"] is int, f"expected int, got {hints['return']!r}"
+
+    def group_by_destination_declares_its_mapping():
+        returned = get_type_hints(group_by_destination)["return"]
+        expected = dict[str, list[Shipment]]
+        assert returned == expected, f"expected {expected}, got {returned!r}"
+
+    record("from_row ignores undeclared columns", ignores_undeclared_columns)
+    record("a missing column falls back to the default", missing_column_uses_the_default)
+    record("'false' becomes the boolean False", false_string_becomes_false)
+    record("heaviest handles empty input and ties", heaviest_handles_empty_and_ties)
+    record("heaviest is annotated as optional", heaviest_is_annotated_optional)
+    record("count_where declares its callable parameter", count_where_declares_a_callable)
+    record("group_by_destination declares its mapping", group_by_destination_declares_its_mapping)
 `
 
 export const typeHintsLesson: PythonLesson = {
   id: "py-l3-type-hints",
   title: "Type hints on functions & classes",
   summary: "Annotate functions with precise types while implementing a small module.",
-  estimatedMinutes: 16,
+  estimatedMinutes: 22,
   difficulty: "medium",
   skills: ["type-hints", "annotations", "modules", "mypy"],
   teach: {
@@ -305,38 +508,56 @@ For \`[10, 20, 35]\` return \`21.67\`. Add type hints: \`def average(nums: list[
   practice: {
     id: "py-l3-type-hints-practice",
     executionMode: "workspace",
-    prompt: `Implement \`average(values)\` in \`stats/summary.py\`: return \`0.0\` for an empty list, otherwise
-the mean rounded with the read-only \`round2\` helper imported from \`stats.rounding\`. Annotate it as
-\`def average(values: list[float]) -> float\`. Some tests are hidden.`,
+    prompt: `Implement the carrier export loader. A logistics feed arrives as rows of raw strings, and the
+team's rule is that the \`Shipment\` class declaration is the only place a field's name and type are
+written down. The loader has to follow those declarations rather than whatever columns the carrier
+happens to send.
+
+Two files to fill in. In \`catalog/models.py\`, declare the \`Shipment\` dataclass and implement
+\`Shipment.from_row(row)\`, which converts every declared field with the read-only \`coerce\` helper,
+ignores columns the class does not declare, and falls back to a field's default when the row is
+missing it. In \`catalog/report.py\`, implement \`group_by_destination\`, \`heaviest\`, and
+\`count_where\` over a list of shipments, and annotate them.
+
+\`README.md\` has the field table and the exact behaviour of each function. The tests read your
+annotations as well as your results, so correct code with no hints still fails. Some tests are
+hidden.`,
     starterCode: "",
     hints: [
-      "Guard the empty list: `if not values: return 0.0`.",
-      "`round2` is imported for you. Wrap the mean in it.",
-      "`return round2(sum(values) / len(values))`.",
+      "Annotations are data you can read back. `typing.get_type_hints(cls)` hands you a dict of field name to declared type for the class, in declaration order, which is exactly the pair `coerce` wants.",
+      "Build a dict of keyword arguments as you walk the declared fields, skipping any name the row does not have, then pass it to `cls(**values)` so the dataclass supplies the defaults. In `report.py`, `heaviest` returns either a `Shipment` or `None`, and `count_where`'s second parameter is a function from `Shipment` to `bool`.",
+      "The declared types you need in `report.py` are `list[Shipment]`, `dict[str, list[Shipment]]`, `Shipment | None`, and `Callable[[Shipment], bool]` from `collections.abc`. For ties, `max` already keeps the first of equal values.",
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "stats/summary.py",
-      editableFilePaths: ["stats/summary.py"],
-      visibleTestPaths: ["tests/test_summary.py"],
-      hiddenTestPaths: ["tests/test_summary_hidden.py"],
+      primaryFilePath: "catalog/models.py",
+      editableFilePaths: ["catalog/models.py", "catalog/report.py"],
+      visibleTestPaths: ["tests/test_manifest.py"],
+      hiddenTestPaths: ["tests/test_manifest_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
         { path: "README.md", role: "docs", language: "markdown", content: TH_README },
-        { path: "stats/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
+        { path: "catalog/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "stats/rounding.py",
+          path: "catalog/coercion.py",
           role: "readonly",
           language: "python",
-          content: TH_ROUNDING,
-          description: "round2 helper (read-only)",
+          content: TH_COERCION,
+          description: "coerce helper (read-only)",
         },
         {
-          path: "stats/summary.py",
+          path: "catalog/models.py",
           role: "editable",
           language: "python",
-          content: TH_SUMMARY_STARTER,
-          description: "Implement average here",
+          content: TH_MODELS_STARTER,
+          description: "Declare Shipment and implement from_row",
+        },
+        {
+          path: "catalog/report.py",
+          role: "editable",
+          language: "python",
+          content: TH_REPORT_STARTER,
+          description: "Implement and annotate the three report functions",
         },
         {
           path: "tests/__init__.py",
@@ -346,27 +567,27 @@ the mean rounded with the read-only \`round2\` helper imported from \`stats.roun
           hidden: true,
         },
         {
-          path: "tests/test_summary.py",
+          path: "tests/test_manifest.py",
           role: "test",
           language: "python",
           content: TH_TEST,
-          description: "Visible stats tests",
+          description: "Visible manifest tests",
         },
         {
-          path: "tests/test_summary_hidden.py",
+          path: "tests/test_manifest_hidden.py",
           role: "test",
           language: "python",
           content: TH_TEST_HIDDEN,
           hidden: true,
-          description: "Hidden edge-case tests",
+          description: "Hidden edge-case and annotation tests",
         },
         {
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
           content: buildRunner([
-            { module: "test_summary", label: "visible stats" },
-            { module: "test_summary_hidden", label: "hidden stats" },
+            { module: "test_manifest", label: "visible manifest" },
+            { module: "test_manifest_hidden", label: "hidden manifest" },
           ]),
           hidden: true,
           description: "Workspace test runner",
@@ -374,10 +595,16 @@ the mean rounded with the read-only \`round2\` helper imported from \`stats.roun
       ],
       referenceFiles: [
         {
-          path: "stats/summary.py",
+          path: "catalog/models.py",
           role: "editable",
           language: "python",
-          content: TH_SUMMARY_REFERENCE,
+          content: TH_MODELS_REFERENCE,
+        },
+        {
+          path: "catalog/report.py",
+          role: "editable",
+          language: "python",
+          content: TH_REPORT_REFERENCE,
         },
       ],
     },
