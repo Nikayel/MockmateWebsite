@@ -8,6 +8,12 @@ import {
   TOUR_STEPS,
   type BugfixTourStep as BugfixTourStepData,
 } from "@/app/interview/_utils/bugfix-tour-state"
+import {
+  TOUR_CARD_CLASSES,
+  TOUR_FOCUS_RING,
+  TOUR_PRIMARY_BUTTON_CLASSES,
+  TOUR_PROGRESS_DOT_ACTIVE,
+} from "./tour-accent"
 
 interface CoachMarkPosition {
   left?: number
@@ -44,7 +50,7 @@ export function BugfixTourStep({
       aria-describedby="bugfix-tour-step-description"
       aria-labelledby="bugfix-tour-step-title"
       aria-live="polite"
-      className="bg-background text-foreground pointer-events-auto fixed rounded-lg border border-cyan-300/30 p-4 shadow-2xl shadow-black/50"
+      className={`bg-background text-foreground pointer-events-auto fixed rounded-lg border p-4 ${TOUR_CARD_CLASSES}`}
       role="dialog"
       style={coachMarkPosition}
     >
@@ -61,7 +67,7 @@ export function BugfixTourStep({
           ref={closeButtonRef}
           type="button"
           onClick={onSkip}
-          className="text-muted-foreground hover:bg-foreground/10 hover:text-foreground rounded p-1 transition focus:ring-2 focus:ring-cyan-300 focus:outline-none"
+          className={`text-muted-foreground hover:bg-foreground/10 hover:text-foreground rounded p-1 transition ${TOUR_FOCUS_RING}`}
           aria-label="Skip bugfix tour"
         >
           <X className="h-4 w-4" aria-hidden="true" />
@@ -81,7 +87,7 @@ export function BugfixTourStep({
           <span
             key={tourStep.id}
             className={`h-1.5 flex-1 rounded-full ${
-              index <= stepIndex ? "bg-cyan-300" : "bg-muted"
+              index <= stepIndex ? TOUR_PROGRESS_DOT_ACTIVE : "bg-muted"
             }`}
           />
         ))}
@@ -103,7 +109,7 @@ export function BugfixTourStep({
         <Button
           type="button"
           onClick={onNext}
-          className="text-foreground justify-self-end bg-cyan-300 hover:bg-cyan-200"
+          className={`justify-self-end ${TOUR_PRIMARY_BUTTON_CLASSES}`}
         >
           {isLastStep ? "Finish" : "Next"}
           {!isLastStep && <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />}

@@ -17,6 +17,11 @@ import {
   type BugfixTourStatus,
   type TourPanel,
 } from "@/app/interview/_utils/bugfix-tour-state"
+import {
+  TOUR_CARD_CLASSES,
+  TOUR_PRIMARY_BUTTON_CLASSES,
+  TOUR_SPOTLIGHT_CLASSES,
+} from "./_sub/tour-accent"
 import { BugfixTourStep } from "@/app/interview/_components/_sub/BugfixTourStep"
 
 function getTargetRect(target: string): DOMRect | null {
@@ -409,7 +414,7 @@ export function BugfixOnboardingTour({
               aria-modal="true"
               aria-describedby="bugfix-tour-welcome-description"
               aria-labelledby="bugfix-tour-welcome-title"
-              className="bg-background w-full max-w-md rounded-lg border border-cyan-400/25 p-5 shadow-2xl shadow-cyan-950/40"
+              className={`bg-background w-full max-w-md rounded-lg border p-5 ${TOUR_CARD_CLASSES}`}
               exit={reduceMotion ? undefined : { scale: 0.98, y: 12 }}
               initial={reduceMotion ? undefined : { scale: 0.98, y: 12 }}
               animate={reduceMotion ? undefined : { scale: 1, y: 0 }}
@@ -448,7 +453,7 @@ export function BugfixOnboardingTour({
                   ref={startButtonRef}
                   type="button"
                   onClick={handleWelcomeStart}
-                  className="text-foreground focus:ring-offset-background inline-flex h-10 items-center justify-center rounded-md bg-cyan-300 px-4 py-2 text-sm font-medium transition-colors hover:bg-cyan-200 focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:outline-none"
+                  className={`inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors ${TOUR_PRIMARY_BUTTON_CLASSES}`}
                 >
                   Start tour
                 </button>
@@ -469,7 +474,7 @@ export function BugfixOnboardingTour({
             {spotlightStyle && (
               <motion.div
                 aria-hidden="true"
-                className="pointer-events-none fixed rounded-lg border-2 border-cyan-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.55),0_0_28px_rgba(103,232,249,0.45)]"
+                className={`pointer-events-none fixed rounded-lg border-2 ${TOUR_SPOTLIGHT_CLASSES}`}
                 style={spotlightStyle}
                 layout={!reduceMotion}
               />
