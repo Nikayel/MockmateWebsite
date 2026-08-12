@@ -33,17 +33,23 @@ Declare the \`Shipment\` dataclass with these fields, then implement \`from_row\
 
 ## \`catalog/report.py\`
 
-Implement and annotate three functions over a list of \`Shipment\`:
+Implement and annotate three functions over a list of \`Shipment\`. The tests read your annotations
+as well as your results, and they compare them for equality, so write each signature exactly as
+given here:
 
-- \`group_by_destination\` returns a mapping from destination to the shipments for it, each group
-  in arrival order
-- \`heaviest\` returns the single heaviest shipment, the earliest one on a tie, and nothing at all
-  when the list is empty
-- \`count_where\` takes a one-argument function that answers true or false about a shipment, and
-  returns how many shipments it accepts
+\`\`\`python
+def group_by_destination(shipments: list[Shipment]) -> dict[str, list[Shipment]]: ...
+def heaviest_first(shipments: list[Shipment]) -> list[Shipment]: ...
+def count_heavier_than(shipments: list[Shipment], grams: int) -> int: ...
+\`\`\`
 
-The tests read your annotations as well as your results, so an unannotated function that computes
-the right answer still fails. Some tests are hidden.
+- \`group_by_destination\` returns each destination mapped to the shipments going there, every group
+  in arrival order.
+- \`heaviest_first\` returns every shipment, heaviest first. Two shipments of equal weight keep the
+  order they arrived in, relative to each other. An empty list gives an empty list.
+- \`count_heavier_than\` returns how many shipments weigh strictly more than \`grams\`.
+
+An unannotated function that computes the right answer still fails. Some tests are hidden.
 `
 
 const TH_COERCION = String.raw`"""Raw-column converters, keyed by the type a field declares. Read-only."""
@@ -61,7 +67,6 @@ def coerce(declared: type, raw: str) -> object:
 `
 
 const TH_MODELS_STARTER = String.raw`from dataclasses import dataclass
-from typing import get_type_hints
 
 from catalog.coercion import coerce
 
@@ -112,17 +117,15 @@ def group_by_destination(shipments):
     raise NotImplementedError
 
 
-def heaviest(shipments):
+def heaviest_first(shipments):
     raise NotImplementedError
 
 
-def count_where(shipments, predicate):
+def count_heavier_than(shipments, grams):
     raise NotImplementedError
 `
 
-const TH_REPORT_REFERENCE = String.raw`from collections.abc import Callable
-
-from catalog.models import Shipment
+const TH_REPORT_REFERENCE = String.raw`from catalog.models import Shipment
 
 
 def group_by_destination(shipments: list[Shipment]) -> dict[str, list[Shipment]]:
@@ -132,20 +135,20 @@ def group_by_destination(shipments: list[Shipment]) -> dict[str, list[Shipment]]
     return grouped
 
 
-def heaviest(shipments: list[Shipment]) -> Shipment | None:
-    if not shipments:
-        return None
-    return max(shipments, key=lambda shipment: shipment.weight_grams)
+def heaviest_first(shipments: list[Shipment]) -> list[Shipment]:
+    # sorted is stable, and reverse=True does NOT flip equal elements, so ties keep
+    # their arrival order. Sorting ascending and reversing the list would not.
+    return sorted(shipments, key=lambda shipment: shipment.weight_grams, reverse=True)
 
 
-def count_where(shipments: list[Shipment], predicate: Callable[[Shipment], bool]) -> int:
-    return sum(1 for shipment in shipments if predicate(shipment))
+def count_heavier_than(shipments: list[Shipment], grams: int) -> int:
+    return sum(1 for shipment in shipments if shipment.weight_grams > grams)
 `
 
 const TH_TEST = String.raw`from typing import get_type_hints
 
 from catalog.models import Shipment
-from catalog.report import count_where, group_by_destination
+from catalog.report import count_heavier_than, group_by_destination
 
 
 ROW = {
@@ -186,25 +189,25 @@ def run_tests(record):
         expected = {"Lisbon": ["A", "C"], "Oslo": ["B"]}
         assert ids == expected, f"expected {expected}, got {ids!r}"
 
-    def counts_with_a_predicate():
+    def counts_the_heavier_shipments():
         rows = [
             {"tracking_id": "A", "destination": "Lisbon", "weight_grams": "100", "fragile": "no"},
             {"tracking_id": "B", "destination": "Oslo", "weight_grams": "900", "fragile": "no"},
         ]
         shipments = [Shipment.from_row(row) for row in rows]
-        result = count_where(shipments, lambda s: s.weight_grams > 500)
+        result = count_heavier_than(shipments, 500)
         assert result == 1, f"expected 1, got {result!r}"
 
     record("Shipment declares five typed fields", declares_five_fields)
     record("from_row converts raw columns", from_row_converts_columns)
     record("group_by_destination keeps arrival order", groups_by_destination)
-    record("count_where applies the predicate", counts_with_a_predicate)
+    record("count_heavier_than counts strictly heavier shipments", counts_the_heavier_shipments)
 `
 
-const TH_TEST_HIDDEN = String.raw`from typing import get_args, get_origin, get_type_hints
+const TH_TEST_HIDDEN = String.raw`from typing import get_type_hints
 
 from catalog.models import Shipment
-from catalog.report import count_where, group_by_destination, heaviest
+from catalog.report import count_heavier_than, group_by_destination, heaviest_first
 
 
 def make(tracking_id, destination, grams, fragile="no"):
@@ -242,53 +245,57 @@ def run_tests(record):
         shipment = make("TRK-3", "Oslo", 10, fragile="false")
         assert shipment.fragile is False, f"expected False, got {shipment.fragile!r}"
 
-    def heaviest_handles_empty_and_ties():
-        empty = heaviest([])
-        assert empty is None, f"expected None, got {empty!r}"
-        tied = heaviest([make("A", "Oslo", 400), make("B", "Oslo", 400)])
-        assert tied.tracking_id == "A", f"expected 'A', got {tied.tracking_id!r}"
-
-    def heaviest_is_annotated_optional():
-        returned = get_type_hints(heaviest)["return"]
-        args = set(get_args(returned))
-        assert args == {Shipment, type(None)}, (
-            f"expected the return to be Shipment or None, got {returned!r}"
+    def heaviest_first_orders_by_weight():
+        ordered = heaviest_first(
+            [make("A", "Oslo", 100), make("B", "Oslo", 900), make("C", "Oslo", 400)]
+        )
+        ids = [shipment.tracking_id for shipment in ordered]
+        assert ids == ["B", "C", "A"], f"expected ['B', 'C', 'A'], got {ids!r}"
+        assert heaviest_first([]) == [], (
+            f"expected [] for no shipments, got {heaviest_first([])!r}"
         )
 
-    def count_where_declares_a_callable():
-        hints = get_type_hints(count_where)
-        predicate = hints["predicate"]
-        origin = get_origin(predicate)
-        assert origin is not None and origin.__name__ == "Callable", (
-            f"expected predicate to be a Callable type, got {predicate!r}"
+    def equal_weights_keep_their_arrival_order():
+        ordered = heaviest_first(
+            [make("A", "Oslo", 400), make("B", "Oslo", 900), make("C", "Oslo", 400)]
         )
-        args = get_args(predicate)
-        assert args == ([Shipment], bool), f"expected ([Shipment], bool), got {args!r}"
-        assert hints["return"] is int, f"expected int, got {hints['return']!r}"
+        ids = [shipment.tracking_id for shipment in ordered]
+        assert ids == ["B", "A", "C"], (
+            f"expected ['B', 'A', 'C'], with the two 400g shipments in arrival order, got {ids!r}"
+        )
 
-    def group_by_destination_declares_its_mapping():
-        returned = get_type_hints(group_by_destination)["return"]
-        expected = dict[str, list[Shipment]]
-        assert returned == expected, f"expected {expected}, got {returned!r}"
+    def report_functions_declare_their_types():
+        expected = {
+            group_by_destination: {
+                "shipments": list[Shipment],
+                "return": dict[str, list[Shipment]],
+            },
+            heaviest_first: {"shipments": list[Shipment], "return": list[Shipment]},
+            count_heavier_than: {"shipments": list[Shipment], "grams": int, "return": int},
+        }
+        for function, wanted in expected.items():
+            hints = get_type_hints(function)
+            assert hints == wanted, (
+                f"expected {function.__name__} to declare {wanted}, got {hints!r}"
+            )
 
     record("from_row ignores undeclared columns", ignores_undeclared_columns)
     record("a missing column falls back to the default", missing_column_uses_the_default)
     record("'false' becomes the boolean False", false_string_becomes_false)
-    record("heaviest handles empty input and ties", heaviest_handles_empty_and_ties)
-    record("heaviest is annotated as optional", heaviest_is_annotated_optional)
-    record("count_where declares its callable parameter", count_where_declares_a_callable)
-    record("group_by_destination declares its mapping", group_by_destination_declares_its_mapping)
+    record("heaviest_first orders by weight", heaviest_first_orders_by_weight)
+    record("equal weights keep their arrival order", equal_weights_keep_their_arrival_order)
+    record("the report functions declare their types", report_functions_declare_their_types)
 `
 
 export const typeHintsLesson: PythonLesson = {
   id: "py-l3-type-hints",
   title: "Type hints on functions & classes",
   summary: "Annotate functions with precise types while implementing a small module.",
-  estimatedMinutes: 22,
+  estimatedMinutes: 40,
   difficulty: "medium",
   skills: ["type-hints", "annotations", "modules", "mypy"],
   teach: {
-    estimatedMinutes: 5,
+    estimatedMinutes: 7,
     markdown: `## Types you write down, but Python won't enforce
 
 A **type hint** is a note you attach to a name saying what kind of value belongs there. When you review a stranger's function, the signature \`def average(values: list[float]) -> float\` states the contract in one line: pass a list of floats, get a float back. Without hints you are reverse-engineering intent from the body. On real teams, hints plus a checker like \`mypy\` or \`pyright\` catch a whole class of bugs (passing a \`str\` where an \`int\` was meant) in CI, before the code ever runs.
@@ -392,6 +399,25 @@ class Account:
 \`\`\`
 
 \`-> None\` on \`__init__\` is the convention: it returns nothing.
+
+### Reading the annotations back
+
+Because annotations are recorded rather than acted on, your own code can read them. Every class and function keeps them in \`__annotations__\`, and \`typing.get_type_hints()\` is the version you actually want: it hands back real type objects and gathers inherited fields too.
+
+\`\`\`python
+from dataclasses import dataclass
+from typing import get_type_hints
+
+@dataclass
+class Account:
+    id: int
+    name: str
+    note: str = ""
+
+get_type_hints(Account)   # {'id': <class 'int'>, 'name': <class 'str'>, 'note': <class 'str'>}
+\`\`\`
+
+That dict is what the opted-in tools are built on: \`@dataclass\` walks it to decide which fields exist and in what order \`__init__\` takes them. It is also how you write a loader that follows a class declaration instead of repeating it. Walk \`get_type_hints(cls)\` and each step gives you a field name and the type that field declared, together, which is exactly the pair a converter needs. Add a field to the class and the loader picks it up with no second edit.
 
 ### Across modules
 
@@ -516,17 +542,17 @@ happens to send.
 Two files to fill in. In \`catalog/models.py\`, declare the \`Shipment\` dataclass and implement
 \`Shipment.from_row(row)\`, which converts every declared field with the read-only \`coerce\` helper,
 ignores columns the class does not declare, and falls back to a field's default when the row is
-missing it. In \`catalog/report.py\`, implement \`group_by_destination\`, \`heaviest\`, and
-\`count_where\` over a list of shipments, and annotate them.
+missing it. In \`catalog/report.py\`, implement \`group_by_destination\`, \`heaviest_first\`, and
+\`count_heavier_than\` over a list of shipments, and annotate them.
 
 \`README.md\` has the field table and the exact behaviour of each function. The tests read your
 annotations as well as your results, so correct code with no hints still fails. Some tests are
 hidden.`,
     starterCode: "",
     hints: [
-      "Annotations are data you can read back. `typing.get_type_hints(cls)` hands you a dict of field name to declared type for the class, in declaration order, which is exactly the pair `coerce` wants.",
-      "Build a dict of keyword arguments as you walk the declared fields, skipping any name the row does not have, then pass it to `cls(**values)` so the dataclass supplies the defaults. In `report.py`, `heaviest` returns either a `Shipment` or `None`, and `count_where`'s second parameter is a function from `Shipment` to `bool`.",
-      "The declared types you need in `report.py` are `list[Shipment]`, `dict[str, list[Shipment]]`, `Shipment | None`, and `Callable[[Shipment], bool]` from `collections.abc`. For ties, `max` already keeps the first of equal values.",
+      "`from_row` is told which fields exist by the class, not by the row. Anything that loops over the row's keys is reading the wrong source of truth.",
+      "The teach section's `get_type_hints(cls)` is the loop you want in `from_row`: each step gives you a field name and its declared type, which is the exact pair `coerce` takes. Collect what you build into a dict of keyword arguments rather than positional ones, so the fields you skip fall back to their defaults.",
+      "Skip a field when the row does not carry it, then hand the whole dict to `cls(**values)` and let the dataclass fill the gaps. In `report.py`, `heaviest_first` wants a sort that is descending by weight and stable, so reach for the `reverse=` parameter of `sorted` rather than reversing the list afterwards, because those two treat ties differently.",
     ],
     workspace: {
       language: "python",

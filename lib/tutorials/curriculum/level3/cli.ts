@@ -52,8 +52,7 @@ command name: \`argv\` is what is left after the command was taken off the front
 - Everything that is not an option is a positional, in the order it arrived.
 - After a bare \`--\`, every remaining token is a positional even if it starts with a dash.
 
-Bad input raises \`UsageError\` (read-only, in \`cli/errors.py\`) with one of these messages, where
-the option is named exactly as the user typed it:
+Bad input raises \`UsageError\` (read-only, in \`cli/errors.py\`) with one of these messages:
 
 | Situation | Message |
 | --- | --- |
@@ -61,6 +60,15 @@ the option is named exactly as the user typed it:
 | a value option at the end of \`argv\` | \`option --limit needs a value\` |
 | \`=\` on a flag option | \`option --verbose takes no value\` |
 | an \`int\` value that is not a number | \`option --limit expects a whole number, got 'abc'\` |
+
+Which spelling goes in the message depends on whether you could resolve the option at all:
+
+- An **unknown** option has no long name to report, so echo the token exactly as it was typed.
+  \`-x\` gives \`unknown option: -x\`, not \`unknown option: --x\`.
+- The other three situations are about an option you did find in the spec, so name it by its **long**
+  name whichever form the user typed. \`parse_args(["-n", "abc"], ...)\` reports
+  \`option --limit expects a whole number, got 'abc'\`, because \`-n\` and \`--limit\` are the same
+  option and the long name is the one the spec and the \`--help\` output use.
 
 ## The dispatcher
 
@@ -475,7 +483,7 @@ export const cliLesson: PythonLesson = {
   id: "py-l3-cli",
   title: "Building a CLI: parse and dispatch argv (argparse/typer preview)",
   summary: "Turn argument lists into commands with a testable dispatcher.",
-  estimatedMinutes: 28,
+  estimatedMinutes: 50,
   difficulty: "medium",
   skills: ["cli", "dispatch", "arguments", "commands"],
   teach: {

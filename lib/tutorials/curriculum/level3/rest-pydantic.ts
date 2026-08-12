@@ -40,6 +40,12 @@ is not empty. \`parse_order\` requires \`id\` (int), \`total\` (int), and \`paid
 every path with the \`path\` it was given, so a bad total in the second order reads
 \`orders[1].total: expected int, got 'abc'\`.
 
+All three order fields are required, and a **missing key** is reported differently from a wrong
+value: there is no value to name, so the message is \`"<path>.<field>: missing"\` and nothing else.
+\`parse_order({"id": 3}, "orders[2]")\` returns
+\`["orders[2].total: missing", "orders[2].paid: missing"]\`, in the field order above. This is the
+same \`"<field>: missing"\` shape the account fields use, with the order's path in front of it.
+
 \`parse_account\` fills an \`Account\` from \`models.py\` and treats its fields three different ways:
 
 | field | rule | a missing key | a \`None\` value |
@@ -414,7 +420,7 @@ export const restPydanticLesson: PythonLesson = {
   id: "py-l3-rest-pydantic",
   title: "Validating API data at the boundary (httpx/pydantic preview)",
   summary: "Fetch external JSON and validate it into a typed model at the boundary.",
-  estimatedMinutes: 28,
+  estimatedMinutes: 55,
   difficulty: "hard",
   skills: ["validation", "dataclasses", "data-boundary", "type-coercion"],
   teach: {
