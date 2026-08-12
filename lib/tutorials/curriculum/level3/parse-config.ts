@@ -1,144 +1,301 @@
 import type { PythonLesson } from "../../types"
+import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ---------------------------------------------------------------------------
-// Workspace file contents for the `parse_config` practice challenge.
+// Workspace file contents for the deploy-settings practice challenge.
+// Two editable modules with one seam: the reader decides what the raw text of a
+// value is, the rules module decides what type that text becomes.
 // ---------------------------------------------------------------------------
 
-const README = `# Config parser
+const README = `# Ticket DEP-412: the deploy tool reads settings files nobody agrees on
 
-A teammate started a tiny config loader and left you to finish it.
+Every service in the fleet ships a \`deploy.settings\` file, and the files in the wild are messier
+than the parser that reads them. A release went out with the token set to the string
+\`"abc123 # rotate me"\`, another crashed because a password with spaces got trimmed, and a third
+booted with no host at all because the checker stopped at the first missing key.
 
-\`app/coerce.py\` (read-only) already turns integer-looking text into an \`int\`. Your job is to
-implement \`parse_config(text)\` in \`app/config.py\` so it:
+You own two modules, and they meet at one seam: **\`lines.py\` decides what the raw text of a value
+is, \`rules.py\` decides what type that text becomes.** \`rules.py\` never trims, because trimming is
+the reader's job and a quoted value must keep its spaces.
 
-- splits \`text\` into lines
-- skips blank lines and lines that start with \`#\`
-- skips any remaining line that has no \`=\`
-- splits each remaining line on the **first** \`=\`
-- trims whitespace around the key and value
-- runs the value through \`coerce\` so numbers become \`int\`
+\`settings/spec.py\` is read-only.
 
-Run the tests to check your work. Some tests are hidden.
+## \`settings/lines.py\`
+
+\`\`\`python
+split_entries(text)   # -> list of (key, raw_value) tuples, in file order
+\`\`\`
+
+For each line, working on the stripped line:
+
+- Skip it when it is blank or starts with \`#\`.
+- Skip it when it holds no \`=\`, or when the part before the first \`=\` is empty once trimmed.
+- Split on the **first** \`=\` only, and trim whitespace around the key and around the value.
+- A value wrapped in double quotes is taken literally: drop the two quotes and keep everything
+  between them exactly, spaces and \`#\` included.
+- Otherwise the value ends where an inline comment begins. A comment starts at the first space
+  followed by \`#\`, and a value that starts with \`#\` is empty.
+
+Duplicate keys are **kept**, in order. Deciding which one wins is not this module's job.
+
+\`\`\`python
+split_entries('port = 8080  # default\\nnote = " keep  me "')
+# [("port", "8080"), ("note", " keep  me ")]
+\`\`\`
+
+## \`settings/rules.py\`
+
+\`\`\`python
+typed_value(raw)      # -> bool, int, or the text unchanged
+build_settings(text)  # -> dict
+missing_keys(settings)  # -> sorted list of the required keys that are absent
+\`\`\`
+
+- \`typed_value\` returns \`True\`/\`False\` for \`true\`/\`false\` in any case, an \`int\` for
+  integer-looking text (digits, optionally with a leading \`-\`), and otherwise the text it was
+  handed, unchanged. It does no trimming at all.
+- \`build_settings\` reads \`text\` through \`split_entries\` and returns one dict of typed values.
+  When a key appears more than once, the **last** entry wins.
+- \`missing_keys\` reports **every** required key from \`REQUIRED_KEYS\` that is absent, sorted, so an
+  operator fixes the file in one pass. A key set to the empty string counts as present.
+
+Some tests are hidden.
 `
 
-const APP_INIT = ""
+const SPEC = String.raw`"""Read-only settings contract shared by the reader and the rules."""
 
-const COERCE = String.raw`def coerce(raw):
-    """Return an int for integer-looking text, otherwise the trimmed string.
+REQUIRED_KEYS = ("host", "port", "token")
 
-    Examples: "42" -> 42, "-3" -> -3, "  hi " -> "hi".
-    """
+COMMENT_CHAR = "#"
+
+QUOTE_CHAR = '"'
+`
+
+const LINES_STARTER = String.raw`from settings.spec import COMMENT_CHAR, QUOTE_CHAR
+
+
+def split_entries(text):
+    """Return (key, raw_value) tuples in file order (see README.md)."""
+    # TODO: skip blanks, comments, keyless lines; split on the first "="; honour
+    # quoted values and inline comments.
+    return []
+`
+
+const LINES_REFERENCE = String.raw`from settings.spec import COMMENT_CHAR, QUOTE_CHAR
+
+
+def _read_value(raw):
     value = raw.strip()
-    if value.lstrip("-").isdigit():
-        return int(value)
+    if len(value) >= 2 and value.startswith(QUOTE_CHAR) and value.endswith(QUOTE_CHAR):
+        return value[1:-1]
+    if value.startswith(COMMENT_CHAR):
+        return ""
+    marker = " " + COMMENT_CHAR
+    cut = value.find(marker)
+    if cut != -1:
+        return value[:cut].strip()
     return value
-`
-
-const CONFIG_STARTER = String.raw`from app.coerce import coerce
 
 
-def parse_config(text):
-    """Parse "key = value" lines into a dict (see README.md)."""
-    # TODO: implement me, split lines, skip blanks/comments, split on the first
-    # "=", strip whitespace, and coerce the value.
-    return {}
-`
-
-const CONFIG_REFERENCE = String.raw`from app.coerce import coerce
-
-
-def parse_config(text):
-    result = {}
+def split_entries(text):
+    entries = []
     for line in text.splitlines():
         stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
+        if not stripped or stripped.startswith(COMMENT_CHAR):
             continue
         if "=" not in stripped:
             continue
-        key, value = stripped.split("=", 1)
-        result[key.strip()] = coerce(value)
-    return result
+        key, raw = stripped.split("=", 1)
+        key = key.strip()
+        if not key:
+            continue
+        entries.append((key, _read_value(raw)))
+    return entries
 `
 
-const TESTS_INIT = ""
+const RULES_STARTER = String.raw`from settings.lines import split_entries
+from settings.spec import REQUIRED_KEYS
 
-const TEST_CONFIG = String.raw`from app.config import parse_config
+
+def typed_value(raw):
+    """Turn one raw value into a bool, an int, or the text unchanged (see README.md)."""
+    # TODO: recognise booleans and integers; never trim.
+    return raw
+
+
+def build_settings(text):
+    """Return one dict of typed settings, last duplicate winning (see README.md)."""
+    # TODO: read the entries through split_entries and type each value.
+    return {}
+
+
+def missing_keys(settings):
+    """Return every required key that is absent, sorted (see README.md)."""
+    # TODO: report all of them, not the first one.
+    return []
+`
+
+const RULES_REFERENCE = String.raw`from settings.lines import split_entries
+from settings.spec import REQUIRED_KEYS
+
+TRUE_WORDS = ("true",)
+FALSE_WORDS = ("false",)
+
+
+def typed_value(raw):
+    lowered = raw.lower()
+    if lowered in TRUE_WORDS:
+        return True
+    if lowered in FALSE_WORDS:
+        return False
+    digits = raw[1:] if raw.startswith("-") else raw
+    if digits.isdigit():
+        return int(raw)
+    return raw
+
+
+def build_settings(text):
+    settings = {}
+    for key, raw in split_entries(text):
+        settings[key] = typed_value(raw)
+    return settings
+
+
+def missing_keys(settings):
+    return sorted(key for key in REQUIRED_KEYS if key not in settings)
+`
+
+const TEST_LINES = String.raw`from settings.lines import split_entries
 
 
 def run_tests(record):
-    def parses_basic_pairs():
-        result = parse_config("name = Ada\nrole = engineer")
-        assert result == {"name": "Ada", "role": "engineer"}, f"got {result!r}"
+    def keeps_pairs_in_file_order():
+        text = "# deploy settings\n\nhost = api.internal\nport = 8080\nDEBUG\n"
+        result = split_entries(text)
+        expected = [("host", "api.internal"), ("port", "8080")]
+        assert result == expected, f"expected {expected}, got {result!r}"
 
-    def coerces_integer_values():
-        result = parse_config("retries = 5")
-        assert result == {"retries": 5}, f"expected retries to be int 5, got {result!r}"
-
-    def ignores_blanks_and_comments():
-        result = parse_config("# a comment\n\nhost = localhost\n")
-        assert result == {"host": "localhost"}, f"got {result!r}"
-
-    record("parses basic key=value pairs", parses_basic_pairs)
-    record("coerces integer values", coerces_integer_values)
-    record("ignores blank lines and comments", ignores_blanks_and_comments)
-`
-
-const TEST_CONFIG_HIDDEN = String.raw`from app.config import parse_config
-
-
-def run_tests(record):
     def splits_on_the_first_equals_only():
-        result = parse_config("url = http://x/?a=1")
-        assert result == {"url": "http://x/?a=1"}, f"got {result!r}"
+        result = split_entries("url =  http://x/?a=b  ")
+        expected = [("url", "http://x/?a=b")]
+        assert result == expected, f"expected {expected}, got {result!r}"
 
-    def trims_surrounding_whitespace():
-        result = parse_config("   port   =   8080   ")
-        assert result == {"port": 8080}, f"expected port to be int 8080, got {result!r}"
+    def drops_an_inline_comment():
+        result = split_entries("port = 8080  # the default")
+        expected = [("port", "8080")]
+        assert result == expected, f"expected {expected}, got {result!r}"
 
-    def handles_negative_integers():
-        result = parse_config("offset = -3")
-        assert result == {"offset": -3}, f"got {result!r}"
+    def keeps_duplicate_keys():
+        result = split_entries("mode = fast\nmode = safe")
+        expected = [("mode", "fast"), ("mode", "safe")]
+        assert result == expected, f"expected both entries {expected}, got {result!r}"
 
+    record("keeps pairs in file order", keeps_pairs_in_file_order)
     record("splits on the first = only", splits_on_the_first_equals_only)
-    record("trims surrounding whitespace", trims_surrounding_whitespace)
-    record("handles negative integers", handles_negative_integers)
+    record("drops an inline comment", drops_an_inline_comment)
+    record("keeps duplicate keys for the rules layer", keeps_duplicate_keys)
 `
 
-const TEST_RUNNER = String.raw`import json
-import os
-import sys
-import traceback
-
-sys.path.insert(0, os.getcwd())
-from tests import test_config, test_config_hidden
-
-results = []
+const TEST_RULES = String.raw`from settings.rules import build_settings, missing_keys, typed_value
 
 
-def record_factory(suite):
-    def record(name, fn):
-        is_hidden = "hidden" in suite.lower()
-        try:
-            fn()
-            results.append({"suite": suite, "name": name, "passed": True, "error": None, "isHidden": is_hidden})
-        except AssertionError as exc:
-            results.append({"suite": suite, "name": name, "passed": False, "error": str(exc) or (name + " failed"), "isHidden": is_hidden})
-        except Exception as exc:
-            results.append({"suite": suite, "name": name, "passed": False, "error": str(exc) or traceback.format_exc(), "isHidden": is_hidden})
+def run_tests(record):
+    def types_booleans_and_integers():
+        assert typed_value("true") is True, f"expected True for 'true', got {typed_value('true')!r}"
+        assert typed_value("8080") == 8080, f"expected int 8080, got {typed_value('8080')!r}"
+        assert typed_value("api.internal") == "api.internal", (
+            f"expected 'api.internal' unchanged, got {typed_value('api.internal')!r}"
+        )
 
-    return record
+    def last_duplicate_wins():
+        result = build_settings("mode = fast\nmode = safe")
+        expected = {"mode": "safe"}
+        assert result == expected, f"expected {expected}, got {result!r}"
+
+    def missing_keys_reports_every_gap():
+        result = missing_keys({"port": 8080})
+        expected = ["host", "token"]
+        assert result == expected, f"expected {expected}, got {result!r}"
+
+    record("types booleans and integers", types_booleans_and_integers)
+    record("the last duplicate wins", last_duplicate_wins)
+    record("missing_keys reports every gap", missing_keys_reports_every_gap)
+`
+
+const TEST_HIDDEN = String.raw`from settings.lines import split_entries
+from settings.rules import build_settings, missing_keys, typed_value
 
 
-test_config.run_tests(record_factory("visible config"))
-test_config_hidden.run_tests(record_factory("hidden config"))
-print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
+def run_tests(record):
+    def quoted_values_keep_their_whitespace_and_hash():
+        result = split_entries('token = "  abc # 123  "')
+        expected = [("token", "  abc # 123  ")]
+        assert result == expected, f"expected {expected}, got {result!r}"
+        settings = build_settings('token = "  abc # 123  "')
+        assert settings["token"] == "  abc # 123  ", (
+            f"expected the quoted text untyped and untrimmed, got {settings['token']!r}"
+        )
+
+    def a_hash_inside_a_value_is_not_a_comment():
+        result = split_entries("url = http://x/page#frag\nnote = # nothing here")
+        expected = [("url", "http://x/page#frag"), ("note", "")]
+        assert result == expected, f"expected {expected}, got {result!r}"
+
+    def keyless_lines_are_skipped():
+        result = split_entries("  = orphan\nhost = api.internal\n")
+        expected = [("host", "api.internal")]
+        assert result == expected, f"expected {expected}, got {result!r}"
+
+    def typing_handles_signs_and_case():
+        assert typed_value("-3") == -3, f"expected int -3, got {typed_value('-3')!r}"
+        assert typed_value("FALSE") is False, f"expected False for 'FALSE', got {typed_value('FALSE')!r}"
+        assert typed_value("-") == "-", f"expected '-' unchanged, got {typed_value('-')!r}"
+        assert typed_value("") == "", f"expected '' unchanged, got {typed_value('')!r}"
+        assert typed_value(" 12 ") == " 12 ", (
+            f"expected ' 12 ' unchanged because rules never trim, got {typed_value(' 12 ')!r}"
+        )
+
+    def an_empty_value_still_counts_as_present():
+        settings = build_settings("host =\nport = 8080\ntoken = x")
+        assert settings["host"] == "", f"expected host to be the empty string, got {settings['host']!r}"
+        result = missing_keys(settings)
+        assert result == [], f"expected no missing keys, got {result!r}"
+
+    def whole_file_end_to_end():
+        text = (
+            "# deploy settings\n"
+            "\n"
+            "host = api.internal   # staging\n"
+            "port = 8080\n"
+            "port = 9090\n"
+            'greeting = " hello  world "\n'
+            "debug = TRUE\n"
+            "RETRIES\n"
+        )
+        settings = build_settings(text)
+        expected = {
+            "host": "api.internal",
+            "port": 9090,
+            "greeting": " hello  world ",
+            "debug": True,
+        }
+        assert settings == expected, f"expected {expected}, got {settings!r}"
+        gaps = missing_keys(settings)
+        assert gaps == ["token"], f"expected ['token'], got {gaps!r}"
+
+    record("quoted values keep whitespace and #", quoted_values_keep_their_whitespace_and_hash)
+    record("a # inside a value is not a comment", a_hash_inside_a_value_is_not_a_comment)
+    record("keyless lines are skipped", keyless_lines_are_skipped)
+    record("typing handles signs and case", typing_handles_signs_and_case)
+    record("an empty value still counts as present", an_empty_value_still_counts_as_present)
+    record("a whole file end to end", whole_file_end_to_end)
 `
 
 export const parseConfigLesson: PythonLesson = {
   id: "py-l3-parse-config",
   title: "Working across files",
   summary: "Build a config parser across modules, using a read-only helper and real test files.",
-  estimatedMinutes: 18,
+  estimatedMinutes: 22,
   difficulty: "medium",
   skills: ["modules", "imports", "string-parsing", "type-coercion"],
   teach: {
@@ -348,59 +505,86 @@ otherwise return the trimmed string. Examples: \`"42"\` → \`42\`, \`"-3"\` →
   practice: {
     id: "py-l3-parse-config-practice",
     executionMode: "workspace",
-    prompt: `Now build the real thing. Implement \`parse_config(text)\` in \`app/config.py\` so it parses
-\`key = value\` lines into a dict, skipping blanks and \`#\` comments, splitting on the first \`=\`,
-trimming whitespace, and running each value through the read-only \`coerce\` helper. Open the visible
-test to see the expected behaviour; some tests are hidden.`,
+    prompt: `Repair the deploy tool's settings reader after ticket DEP-412: one release shipped a token
+that still had an inline comment glued to it, one crashed on a value whose spaces were trimmed away,
+and one booted with no host because the checker stopped at the first missing key.
+
+The work spans two modules that meet at one seam. In \`settings/lines.py\`, implement
+\`split_entries(text)\`, which returns \`(key, raw_value)\` tuples in file order. It skips blanks,
+\`#\` comment lines, lines with no \`=\`, and lines whose key is empty. It splits on the first \`=\`
+only, takes a double-quoted value literally (spaces and \`#\` included), and otherwise ends the value
+where an inline comment begins. Duplicate keys are kept, in order.
+
+In \`settings/rules.py\`, implement \`typed_value(raw)\`, \`build_settings(text)\`, and
+\`missing_keys(settings)\`. \`typed_value\` returns a bool for \`true\`/\`false\` in any case, an \`int\`
+for integer-looking text, and otherwise the text unchanged, and it never trims. \`build_settings\`
+reads the file through \`split_entries\` and lets the last entry for a key win. \`missing_keys\`
+returns every absent key from \`REQUIRED_KEYS\`, sorted, not the first one.
+
+\`README.md\` has the full contract. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "Loop `for line in text.splitlines():` and `continue` past blanks and comments.",
-      '`stripped.split("=", 1)` splits on the first `=` only. That matters for values like URLs.',
-      "`coerce` is already imported for you; call it on the value before storing it.",
+      "The two modules divide the work cleanly: only the reader is allowed to trim, so by the time a value reaches `typed_value` its whitespace is already whatever it is meant to be.",
+      "In the reader, decide the value in one small helper: quoted first (drop both quotes, keep the inside), then a value that begins with `#` is empty, then cut at the first occurrence of a space followed by `#`. A `#` with no space before it is part of the value.",
+      "In the rules, `raw.lower()` decides the booleans, and integer-looking means `raw[1:].isdigit()` when it starts with `-` and `raw.isdigit()` otherwise. `missing_keys` is one sorted comprehension over `REQUIRED_KEYS`, and `build_settings` gets last-wins for free by assigning into a dict as it walks the entries in order.",
     ],
     workspace: {
       language: "python",
-      primaryFilePath: "app/config.py",
-      editableFilePaths: ["app/config.py"],
-      visibleTestPaths: ["tests/test_config.py"],
-      hiddenTestPaths: ["tests/test_config_hidden.py"],
+      primaryFilePath: "settings/lines.py",
+      editableFilePaths: ["settings/lines.py", "settings/rules.py"],
+      visibleTestPaths: ["tests/test_lines.py", "tests/test_rules.py"],
+      hiddenTestPaths: ["tests/test_settings_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
         { path: "README.md", role: "docs", language: "markdown", content: README },
-        { path: "app/__init__.py", role: "readonly", language: "python", content: APP_INIT },
+        { path: "settings/__init__.py", role: "readonly", language: "python", content: EMPTY_INIT },
         {
-          path: "app/coerce.py",
+          path: "settings/spec.py",
           role: "readonly",
           language: "python",
-          content: COERCE,
-          description: "Type coercion helper (read-only)",
+          content: SPEC,
+          description: "Required keys and the comment/quote characters (read-only)",
         },
         {
-          path: "app/config.py",
+          path: "settings/lines.py",
           role: "editable",
           language: "python",
-          content: CONFIG_STARTER,
-          description: "Implement parse_config here",
+          content: LINES_STARTER,
+          description: "Turn file text into (key, raw_value) entries",
+        },
+        {
+          path: "settings/rules.py",
+          role: "editable",
+          language: "python",
+          content: RULES_STARTER,
+          description: "Type the values, resolve duplicates, report missing keys",
         },
         {
           path: "tests/__init__.py",
           role: "test",
           language: "python",
-          content: TESTS_INIT,
+          content: EMPTY_INIT,
           hidden: true,
         },
         {
-          path: "tests/test_config.py",
+          path: "tests/test_lines.py",
           role: "test",
           language: "python",
-          content: TEST_CONFIG,
-          description: "Visible config tests",
+          content: TEST_LINES,
+          description: "Visible reader tests",
         },
         {
-          path: "tests/test_config_hidden.py",
+          path: "tests/test_rules.py",
           role: "test",
           language: "python",
-          content: TEST_CONFIG_HIDDEN,
+          content: TEST_RULES,
+          description: "Visible typing and validation tests",
+        },
+        {
+          path: "tests/test_settings_hidden.py",
+          role: "test",
+          language: "python",
+          content: TEST_HIDDEN,
           hidden: true,
           description: "Hidden edge-case tests",
         },
@@ -408,17 +592,27 @@ test to see the expected behaviour; some tests are hidden.`,
           path: "tests/run_workspace_tests.py",
           role: "test",
           language: "python",
-          content: TEST_RUNNER,
+          content: buildRunner([
+            { module: "test_lines", label: "visible lines" },
+            { module: "test_rules", label: "visible rules" },
+            { module: "test_settings_hidden", label: "hidden settings" },
+          ]),
           hidden: true,
           description: "Workspace test runner",
         },
       ],
       referenceFiles: [
         {
-          path: "app/config.py",
+          path: "settings/lines.py",
           role: "editable",
           language: "python",
-          content: CONFIG_REFERENCE,
+          content: LINES_REFERENCE,
+        },
+        {
+          path: "settings/rules.py",
+          role: "editable",
+          language: "python",
+          content: RULES_REFERENCE,
         },
       ],
     },
