@@ -5,7 +5,7 @@ import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 export const metadata: Metadata = {
   title: "Free AI Coding Interview Practice",
   description:
-    "Try a free mock coding interview with our AI. Practice data structures, algorithms, and system design without a credit card.",
+    "Run a free mock coding interview with an AI interviewer that reacts as you work. Real editor, real tests, a scored rubric at the end. No credit card.",
   alternates: {
     canonical: "/free-ai-coding-interview",
   },
@@ -14,79 +14,78 @@ export const metadata: Metadata = {
 export default function FreePracticePage() {
   const contentSections = [
     {
-      heading: "Try CodeSparring for Free",
+      heading: "Try a full round before you commit",
       content: (
         <>
           <p>
-            The best way to understand the power of an AI interviewer is to experience it yourself.
-            We offer a completely free, interactive mock interview round so you can see exactly how
-            the AI evaluates your problem-solving, communication, and coding efficiency.
+            A mock interview only teaches you something if it behaves like the real thing. Here you
+            pick a problem, talk through your approach, and write code against tests that actually
+            run. The interviewer follows what you do and asks about the choices you make.
           </p>
-          <div className="my-8 overflow-hidden rounded-xl border border-white/10 bg-zinc-950 p-5">
-            <div className="grid gap-3 sm:grid-cols-3">
-              {[
-                ["Reasoning", "Talk through assumptions before the code."],
-                ["Execution", "Run tests and inspect the result."],
-                ["Feedback", "Leave with the next best rep."],
-              ].map(([label, text]) => (
-                <div key={label} className="rounded-lg border border-cyan-300/15 bg-cyan-300/5 p-4">
-                  <p className="text-sm font-semibold text-cyan-100">{label}</p>
-                  <p className="mt-1 text-sm text-zinc-400">{text}</p>
-                </div>
-              ))}
-            </div>
+          <div className="my-8 grid gap-3 sm:grid-cols-3">
+            {[
+              ["Reasoning", "Talk through assumptions before the code."],
+              ["Execution", "Run tests and inspect the result."],
+              ["Feedback", "Leave with the next best rep."],
+            ].map(([label, text]) => (
+              <div key={label} className="border-border bg-muted/40 rounded-lg border p-4">
+                <p className="text-foreground text-sm font-semibold">{label}</p>
+                <p className="text-muted-foreground mt-1 text-sm leading-6">{text}</p>
+              </div>
+            ))}
           </div>
           <p>
-            Ready to jump in? Create a free account and start your first full AI mock interview. No
-            credit card required. Want to shore up the basics first? Our free{" "}
+            You can open the workspace and try a problem without an account. Signing in with Google
+            or GitHub unlocks the interviewer itself: the free plan includes 8 full AI sessions a
+            month. If you want to build fundamentals first, the free{" "}
             <Link href="/learn/python">Python</Link>,{" "}
             <Link href="/learn/data-engineering">SQL</Link>, and{" "}
-            <Link href="/learn/system-design">System Design</Link> courses run right in your
-            browser.
+            <Link href="/learn/system-design">System Design</Link> courses run in your browser.
           </p>
         </>
       ),
     },
     {
-      heading: "What to Expect in Your Free Round",
+      heading: "What a free session includes",
       content: (
-        <>
-          <ul className="mt-4 list-disc space-y-2 pl-6">
-            <li>
-              <strong>A Realistic Question:</strong> You'll be given a problem that tests a core
-              FAANG pattern (e.g., Two Pointers or Sliding Window).
-            </li>
-            <li>
-              <strong>Voice or Text:</strong> You can communicate via microphone or typing.
-            </li>
-            <li>
-              <strong>Instant Scorecard:</strong> After you submit your solution, you'll instantly
-              receive a detailed rubric grading your performance.
-            </li>
-          </ul>
-        </>
+        <ul className="list-disc space-y-2 pl-6">
+          <li>
+            A problem drawn from core interview patterns, like two pointers, sliding window, or
+            graphs.
+          </li>
+          <li>Voice or text. Explain your approach out loud or type it.</li>
+          <li>
+            A scored rubric after you submit, covering communication, problem solving, and code
+            quality, not just whether the tests pass.
+          </li>
+        </ul>
       ),
     },
   ]
 
   const faqs = [
     {
+      question: "Do I need an account to try it?",
+      answer:
+        "You can open a problem and run code without one. The AI interviewer needs a free account, which takes one click with Google or GitHub and includes 8 full sessions a month.",
+    },
+    {
       question: "Do I need to put in a credit card?",
       answer:
-        "No. The free plan includes 8 full interview sessions every month across 20+ problems, with complete AI feedback on every session. You only upgrade to Pro if you want 35 interview sessions a month plus spaced repetition scheduling and a personalized roadmap.",
+        "No. The free plan includes 8 full interview sessions every month with complete AI feedback on each one. Pro exists for people who want 35 sessions a month plus spaced repetition and a personalized roadmap.",
     },
     {
       question: "Can I choose the question difficulty?",
       answer:
-        "The free plan includes 20+ problems spanning core interview patterns and difficulties, so you can pick where to start. Pro users get 35 interview sessions a month and can customize their difficulty and exact topic.",
+        "Yes. The free plan spans core interview patterns and difficulties, so you pick where to start. Pro adds more sessions and finer control over topic and difficulty.",
     },
   ]
 
   return (
     <LandingPageTemplate
-      title="Free AI Coding Interview"
-      subtitle="Experience the Simulator"
-      heroDescription="Take a completely free AI mock interview. Test your skills, get instant feedback on your communication and code, and see exactly where you stand before the real thing."
+      title="Free AI coding interview practice"
+      subtitle="Free plan"
+      heroDescription="Pick a problem, talk through your approach, and code against real tests while an AI interviewer reacts as you work. The free plan includes 8 full sessions a month."
       primaryKeyword="free coding interview practice"
       contentSections={contentSections}
       faqs={faqs}
