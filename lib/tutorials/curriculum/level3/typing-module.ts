@@ -420,7 +420,7 @@ Python 3.12 and later write the same thing as \`def first[T](items: list[T]) -> 
     },
     {
       "label": "Yes at runtime, but a static checker would still reject it.",
-      "feedback": "Backwards, though it is a fair guess given how little Python verifies at runtime. Protocols are a static feature: the checker is the thing that verifies the shape, and at runtime nothing is verified at all."
+      "feedback": "Backwards, though it is a fair guess given how little Python verifies at runtime. Protocols are a static feature: the checker is the thing that verifies the shape, and at runtime nothing is verified unless you opt in with @runtime_checkable, which only ever looks for method names."
     }
   ]
 }
@@ -437,6 +437,20 @@ class Named(Protocol):
 def greet(who: Named) -> str:
     return "Hi, " + who.name   # any object with a .name: str fits
 \`\`\`
+
+That matching is a checker feature, so \`isinstance(user, Named)\` raises \`TypeError\` by default. Decorating the protocol with \`@runtime_checkable\` opts into the one runtime check Python can do cheaply:
+
+\`\`\`python
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class LineSink(Protocol):
+    def write(self, line: str) -> None: ...
+
+isinstance(sink, LineSink)   # True if sink has a write attribute
+\`\`\`
+
+Know its limits before you lean on it: it checks that the method names exist and nothing more. Signatures, argument types, and return types are never inspected, so an object whose \`write\` takes three arguments still passes. It also only works for protocols made of methods, not ones declaring plain attributes. Treat it as a friendlier \`hasattr\`, not as verification.
 
 ### Pitfall: Optional is not an optional argument
 
