@@ -462,13 +462,17 @@ function LoginPageContent() {
             aria-hidden="true"
           />
 
-          {/* brand */}
-          <div className="relative z-10 flex items-center gap-2">
+          {/* brand — links home, the way every logo is expected to */}
+          <Link
+            href="/"
+            aria-label="CodeSparring home"
+            className="relative z-10 flex items-center gap-2 transition-opacity hover:opacity-80"
+          >
             <Sparra size={22} className="sparra-blink" />
             <span className="text-foreground text-sm font-semibold tracking-tight">
               CodeSparring
             </span>
-          </div>
+          </Link>
 
           {/* quote */}
           <div className="relative z-10 max-w-md">
@@ -520,11 +524,17 @@ function LoginPageContent() {
             animate="animate"
           >
             {/* brand (mobile only — left pane hidden on small screens) */}
-            <motion.div variants={staggerItem} className="mb-8 flex items-center gap-2 lg:hidden">
-              <Sparra size={22} className="sparra-blink" />
-              <span className="text-foreground text-sm font-semibold tracking-tight">
-                CodeSparring
-              </span>
+            <motion.div variants={staggerItem} className="mb-8 lg:hidden">
+              <Link
+                href="/"
+                aria-label="CodeSparring home"
+                className="flex items-center gap-2 transition-opacity hover:opacity-80"
+              >
+                <Sparra size={22} className="sparra-blink" />
+                <span className="text-foreground text-sm font-semibold tracking-tight">
+                  CodeSparring
+                </span>
+              </Link>
             </motion.div>
 
             {/* Headline */}
