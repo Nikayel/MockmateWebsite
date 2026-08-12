@@ -14,6 +14,19 @@ export const metadata: Metadata = {
 export default function VsPrampPage() {
   const contentSections = [
     {
+      heading: "Pramp is now Exponent Practice",
+      content: (
+        <p>
+          First, a naming note: Pramp was acquired by Exponent, and since 2024 its peer-to-peer
+          sessions run on Exponent Practice. The format is the same and it is still free, so
+          everything below about Pramp applies to Exponent Practice today. Exponent also sells a
+          broader membership with courses; its own AI mock interviewer currently covers product
+          management and behavioral rounds, and their page states it does not support technical
+          interviews or live coding.
+        </p>
+      ),
+    },
+    {
       heading: "What Pramp does well",
       content: (
         <>
