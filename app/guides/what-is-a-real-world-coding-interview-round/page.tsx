@@ -1,10 +1,11 @@
 import { Metadata } from "next"
+import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
-  title: "What is a Real-World Coding Interview?",
+  title: "What Is a Real-World Coding Interview Round?",
   description:
-    "Learn what to expect in practical, real-world software engineering interview rounds and how to prepare for them.",
+    "What real-world interview rounds are: bug fixes, feature additions, and take-home reviews, and how they differ from algorithm-only interviews.",
   alternates: {
     canonical: "/guides/what-is-a-real-world-coding-interview-round",
   },
@@ -13,56 +14,58 @@ export const metadata: Metadata = {
 export default function RealWorldGuidePage() {
   const contentSections = [
     {
-      heading: "The Shift Away from LeetCode",
+      heading: "Why these rounds exist",
       content: (
         <>
           <p>
-            While Data Structures and Algorithms remain standard for junior roles, many progressive
-            tech companies (like Stripe, Square, and Palantir) are pivoting to "Real-World" or
-            "Practical" interview rounds.
+            An algorithm interview tests whether you can solve a well-defined problem in a fixed
+            amount of time. It says less about whether you can work inside code you did not write,
+            which is most of what the job actually involves.
           </p>
           <p>
-            Instead of asking you to reverse a linked list, they evaluate how you perform in the
-            actual day-to-day environment of a software engineer.
+            A real-world round hands you something closer to the job itself: an existing project, a
+            scoped task, and a limited amount of time to make a defensible change.
           </p>
         </>
       ),
     },
     {
-      heading: "Types of Real-World Rounds",
+      heading: "The three formats",
       content: (
-        <>
-          <p>There are typically three formats for a real-world interview:</p>
-          <ul className="mt-4 list-disc space-y-2 pl-6">
-            <li>
-              <strong>The Bug Fix:</strong> You are given an existing codebase with failing tests.
-              You must trace the error and deploy a fix.
-            </li>
-            <li>
-              <strong>Add Functionality:</strong> You are given a working application and asked to
-              implement a new feature (e.g., "Add pagination to this React list component").
-            </li>
-            <li>
-              <strong>The Take-Home Assignment:</strong> A multi-hour project you complete on your
-              own time, followed by a live code-review session where you must defend your
-              architectural choices.
-            </li>
-          </ul>
-        </>
+        <ul className="list-disc space-y-2 pl-6">
+          <li>
+            <strong>Bug fix:</strong> you get a codebase with a failing test and a description of
+            what is wrong. You reproduce the error, trace it, and fix it while explaining your
+            reasoning.
+          </li>
+          <li>
+            <strong>Add a feature:</strong> you get a working app and a small, scoped request, like
+            adding pagination to a list component. You read the existing patterns in the code before
+            you add your own.
+          </li>
+          <li>
+            <strong>Take-home plus review:</strong> you build something over a few hours on your own
+            time, then defend the choices you made in a live conversation. The finished code matters
+            less than your answers about why you wrote it that way.
+          </li>
+        </ul>
       ),
     },
     {
-      heading: "How to Prepare",
+      heading: "How to prepare",
       content: (
         <>
           <p>
-            Preparing for real-world rounds requires familiarity with popular frameworks (React,
-            Node.js, Express) and tools (Git, Chrome DevTools, debugging in an IDE).
+            Get comfortable reading code you did not write. Open an unfamiliar repository, pick a
+            function, and explain out loud what it does before you run it. Know your way around your
+            editor's debugger and Git well enough that neither one interrupts your train of thought.
           </p>
           <p>
-            CodeSparring offers a suite of "Real-World" mock interviews where you are dropped into
-            actual project codebases. Our AI acts as a Tech Lead, answering questions about the
-            legacy code and reviewing your PRs in real-time.
+            CodeSparring's debugging rounds put you in a real codebase with a failing test that a
+            verified pack runs against your fix, and its case labs cover forward-deployed
+            engineering work like a 911 dispatch system, an ontology build, and a Stripe billing
+            webhook. See <Link href="/rounds">what a full round looks like</Link> before you start
+            one.
           </p>
         </>
       ),
@@ -71,17 +74,27 @@ export default function RealWorldGuidePage() {
 
   const faqs = [
     {
-      question: "Are these rounds harder than algorithmic rounds?",
+      question: "Are real-world rounds harder than algorithmic rounds?",
       answer:
-        "They are generally less mathematically rigorous but require stronger architectural intuition. If you have built side projects, you will likely find real-world rounds more natural than abstract puzzles.",
+        "They call for a different kind of preparation, not a harder one. If you have built and maintained your own projects, the format will feel more natural than a pure algorithm puzzle. If you have only drilled algorithms, spend extra time practicing on code you did not write.",
+    },
+    {
+      question: "Do I still need to know algorithms?",
+      answer:
+        "Usually, yes. A real-world round tends to replace one round in the loop, not the whole process. Ask what the rest of the loop covers so you know where to put your prep time.",
+    },
+    {
+      question: "How do I practice reading code I did not write?",
+      answer:
+        "Pick an open-source repository in a language you know, open a file you have never seen, and explain what it does before you run it. Then break something on purpose and fix it. That rehearsal is closer to a real-world round than another isolated algorithm problem.",
     },
   ]
 
   return (
     <LandingPageTemplate
-      title="What is a Real-World Coding Interview?"
-      subtitle="The Practical Tech Screen"
-      heroDescription="Explore the rise of practical interview rounds. Learn how to debug legacy code, add features on the fly, and ace your real-world technical screen."
+      title="What is a real-world coding interview round?"
+      subtitle="Guide"
+      heroDescription="Some interview loops skip algorithms and hand you a real codebase instead. Here is what those rounds actually look like and how to prepare for one."
       primaryKeyword="real-world coding interview"
       contentSections={contentSections}
       faqs={faqs}
