@@ -98,9 +98,35 @@ export function HeroSection() {
               >
                 Start practicing free
               </Link>
-              {/* Microcopy lives directly under the primary button */}
+              {/* Microcopy lives directly under the primary button. The second
+                  line quietly surfaces the free courses without adding a
+                  section: they are the no-session-cost on-ramp for free users. */}
               <span className="text-muted-foreground mt-2.5 text-[12px]">
                 No credit card required.
+              </span>
+              <span className="text-muted-foreground/80 mt-1 text-[12px]">
+                Free{" "}
+                <Link
+                  href="/learn/python"
+                  className="hover:text-foreground underline-offset-2 hover:underline"
+                >
+                  Python
+                </Link>
+                ,{" "}
+                <Link
+                  href="/learn/data-engineering"
+                  className="hover:text-foreground underline-offset-2 hover:underline"
+                >
+                  Data Engineering
+                </Link>
+                , and{" "}
+                <Link
+                  href="/learn/system-design"
+                  className="hover:text-foreground underline-offset-2 hover:underline"
+                >
+                  System Design
+                </Link>{" "}
+                courses included.
               </span>
             </div>
             <Link
