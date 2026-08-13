@@ -3,6 +3,16 @@ import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ---------------------------------------------------------------------------
+// Time budget behind `estimatedMinutes` (counted, not guessed): teach 5 (about 900 prose words,
+// four checks), apply 10 (18 prompt lines to read, 13 to write), practice 30 (78 README lines plus
+// ~90 lines of spec and visible tests to read, 56 lines to write across two modules). Lesson total
+// 45 = 5 + 10 + 30, up from an unmeasured 35.
+//
+// Apply used to be `coerce(raw)`, four lines of int-or-string, which left the whole line-reading
+// half of the practice unrehearsed. It now reads ONE line end to end (the guards, the bounded
+// split, the type decision), which is the practice reader minus quotes, inline comments and
+// duplicate keys.
+// ---------------------------------------------------------------------------
 // Workspace file contents for the deploy-settings practice challenge.
 // Two editable modules with one seam: the reader decides what the raw text of a
 // value is, the rules module decides what type that text becomes.
@@ -399,7 +409,7 @@ export const parseConfigLesson: PythonLesson = {
   id: "py-l3-parse-config",
   title: "Working across files",
   summary: "Build a config parser across modules, using a read-only helper and real test files.",
-  estimatedMinutes: 35,
+  estimatedMinutes: 45,
   difficulty: "medium",
   skills: ["modules", "imports", "string-parsing", "type-coercion"],
   teach: {
@@ -475,7 +485,7 @@ In the Practice workspace the same thing happens across two modules: one imports
 }
 \`\`\`
 
-Config values arrive as strings, so \`coerce\` has to decide whether a value is really an integer:
+Config values arrive as strings, so the reader has to decide whether a value is really an integer:
 
 \`\`\`python
 >>> "  hi ".strip()
@@ -488,7 +498,25 @@ True
 -3
 \`\`\`
 
-The rule is: trim the string, strip a leading \`-\` before calling \`isdigit\`, return \`int(value)\` when it looks integer, otherwise return the trimmed string. That is your Apply warm-up.
+The rule is: trim the string, strip a leading \`-\` before calling \`isdigit\`, return \`int(value)\` when it looks integer, otherwise return the trimmed string.
+
+## Finding a delimiter by position
+
+Splitting works when the delimiter always means the same thing. When it does not, you need the **position** of a character rather than the pieces around it. \`str.find\` returns that index, or \`-1\` when the character is absent, and it takes a start index so you can look past a character you have already accounted for:
+
+\`\`\`python
+>>> value = '"keep me" # a comment'
+>>> value.find('"')          # the opening quote, at index 0
+0
+>>> value.find('"', 1)       # search again, starting past it: the CLOSING quote
+8
+>>> value[1:8]               # everything between the two
+'keep me'
+>>> value.find("!")          # absent, so -1 rather than an exception
+-1
+\`\`\`
+
+That \`-1\` is the part to guard. It is a valid index in Python, so \`value[:value.find("!")]\` quietly drops the last character instead of failing. Test the result against \`-1\` before you slice with it.
 
 ## Parsing \`key = value\` lines
 
@@ -582,33 +610,75 @@ Given \`"# db\\nhost = localhost\\nport = 8080"\`, this produces \`{"host": "loc
   apply: {
     id: "py-l3-parse-config-apply",
     executionMode: "single-file",
-    prompt: `Warm-up: implement \`coerce(raw)\`.
+    // 10 minutes: ~18 prompt lines to read, a 13-line reference to write, four guards to think
+    // through before the split and one type decision after it.
+    estimatedMinutes: 10,
+    prompt: `Implement \`read_entry(line)\`, the part of a config reader that turns **one** line of a settings
+file into an entry.
 
-Return an \`int\` when \`raw\` is integer-looking (all digits, optionally with a leading \`-\`),
-otherwise return the trimmed string. Examples: \`"42"\` → \`42\`, \`"-3"\` → \`-3\`, \`"  hi "\` → \`"hi"\`.`,
-    starterCode: `def coerce(raw):
-    # Return an int for integer-looking text, else the trimmed string.
+Return the tuple \`(key, value)\`, or \`None\` when the line carries no entry at all. A line carries no
+entry when it is blank, when it starts with \`#\`, when it holds no \`=\`, or when the part before the
+first \`=\` is empty once trimmed.
+
+Whitespace around the key and around the value is not part of either. The value is an \`int\` when it
+is integer-looking (all digits, optionally with a leading \`-\`), and the trimmed string otherwise.
+
+\`\`\`python
+read_entry("host = localhost")     # ("host", "localhost")
+read_entry("port =  8080 ")        # ("port", 8080)
+read_entry("url = http://x/?a=b")  # ("url", "http://x/?a=b")
+read_entry("# retries = 5")        # None
+read_entry("DEBUG")                # None
+\`\`\``,
+    starterCode: `def read_entry(line):
+    # Return (key, value) for a real entry, or None for a line that carries none.
     pass`,
     hints: [
-      "Trim first: `value = raw.strip()`.",
-      '`value.lstrip("-").isdigit()` is True for "42" and "-3" but not "hi".',
-      "When it's integer-looking, `return int(value)`; otherwise `return value`.",
+      "Work on the stripped line, and get every reason to give up out of the way before you split anything.",
+      "Splitting on the first `=` only is what keeps a value like `http://x/?a=b` intact. The key still needs trimming after the split, and an empty key is one of the give-up cases.",
+      '`value.lstrip("-").isdigit()` is True for "42" and "-3" but not for "hi" or "". When it is integer-looking, `int(value)` is the entry\'s value.',
     ],
-    referenceSolution: `def coerce(raw):
+    referenceSolution: `def read_entry(line):
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#"):
+        return None
+    if "=" not in stripped:
+        return None
+    key, raw = stripped.split("=", 1)
+    key = key.strip()
+    if not key:
+        return None
     value = raw.strip()
     if value.lstrip("-").isdigit():
-        return int(value)
-    return value`,
+        return (key, int(value))
+    return (key, value)`,
     testCases: [
-      { input: { raw: "42" }, expected: 42, description: "plain integer" },
-      { input: { raw: "-3" }, expected: -3, description: "negative integer" },
-      { input: { raw: "  7 " }, expected: 7, description: "integer with whitespace" },
-      { input: { raw: "hello" }, expected: "hello", description: "non-numeric stays a string" },
+      {
+        input: { line: "host = localhost" },
+        expected: ["host", "localhost"],
+        description: "an ordinary entry",
+      },
+      { input: { line: "port =  8080 " }, expected: ["port", 8080], description: "an int value" },
+      {
+        input: { line: "retries = -3" },
+        expected: ["retries", -3],
+        description: "a negative int value",
+      },
+      {
+        input: { line: "url = http://x/?a=b" },
+        expected: ["url", "http://x/?a=b"],
+        description: "splits on the first = only",
+      },
+      { input: { line: "# retries = 5" }, expected: null, description: "a comment line" },
+      { input: { line: "    " }, expected: null, description: "a blank line" },
+      { input: { line: "DEBUG" }, expected: null, description: "a line with no =" },
+      { input: { line: "  = orphan" }, expected: null, description: "a line with no key" },
     ],
   },
   practice: {
     id: "py-l3-parse-config-practice",
     executionMode: "workspace",
+    estimatedMinutes: 30,
     prompt: `Repair the deploy tool's settings reader: one release authenticated with
 a token that still had its inline comment glued on, one crashed on a quoted password whose spaces
 were trimmed away, one booted with \`port\` set to the word "eighty", and one booted with no host
