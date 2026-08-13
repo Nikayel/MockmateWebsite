@@ -592,7 +592,7 @@ export const pinTheSeamLesson: PythonLesson = {
   title: "Pin the seam with a regression test",
   summary:
     "Turn a vague bug report into a regression test that fails on the old build of the right module, then make the smallest fix that turns it green.",
-  estimatedMinutes: 40,
+  estimatedMinutes: 39,
   difficulty: "hard",
   skills: ["test design", "regression tests", "minimal reproduction", "debugging"],
   teach: {
@@ -807,6 +807,7 @@ print()
 print("A pin that passes on both builds is not a regression test, it is a coincidence.")`,
   },
   apply: {
+    estimatedMinutes: 13,
     id: "py-l5-pin-the-seam-apply",
     executionMode: "workspace",
     prompt: `Write the regression test in \`tests/test_regression.py\` that fails on the old build of
@@ -913,6 +914,7 @@ print("A pin that passes on both builds is not a regression test, it is a coinci
     },
   },
   practice: {
+    estimatedMinutes: 14,
     id: "py-l5-pin-the-seam-practice",
     executionMode: "workspace",
     prompt: `The nightly export job sometimes drops the last few rows and nobody can say when it

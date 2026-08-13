@@ -654,6 +654,7 @@ else:
     print("refused: not in the grammar")`,
   },
   apply: {
+    estimatedMinutes: 17,
     id: "py-l5-unsafe-sink-apply",
     executionMode: "workspace",
     prompt: `Repair \`reports/filters.py\` so filter expressions are parsed against the documented grammar
@@ -740,6 +741,7 @@ are hidden.`,
     },
   },
   practice: {
+    estimatedMinutes: 8,
     id: "py-l5-unsafe-sink-practice",
     executionMode: "workspace",
     prompt: `A generated change added fetch-by-path to your team's document service and its tests pass.
