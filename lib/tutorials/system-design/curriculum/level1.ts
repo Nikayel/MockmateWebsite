@@ -3982,13 +3982,15 @@ design choices, and it is entirely governed by one question: is the workload CPU
 Classic Apache prefork, Tomcat's default, most synchronous frameworks: a thread (or process) per
 in-flight request. Its great virtue is simplicity: you write straight-line blocking code
 (\`result = db.query(...)\`), the OS scheduler handles switching, and stack traces are clean. The
-cost is that each thread carries a real price. A default Linux thread reserves around 1MB of stack,
-so 10,000 threads is roughly 10GB of address space before doing any work, and the scheduler pays
-context-switch overhead that grows with thread count. The killer is **blocking IO**: when a thread
-waits on a slow database or a downstream API, it is parked doing nothing but still consuming a
-thread. If your workload is 90% waiting on IO, your threads sit idle while CPU is nearly free, and
-you exhaust the thread pool (and memory) long before the CPU saturates. That is why a
-thread-per-request box can fall over at a few thousand concurrent connections while showing 10% CPU.
+cost is that each thread carries a real price. Each thread reserves a stack up front: on Linux with
+glibc that follows the process stack limit (\`RLIMIT_STACK\`, commonly 8MB), while a JVM picks its
+own smaller default (1MB via \`-Xss\`). At 8MB, 10,000 threads reserve roughly 80GB of address space
+before doing any work, and the scheduler pays context-switch overhead that grows with thread count.
+The killer is **blocking IO**: when a thread waits on a slow database or a downstream API, it is
+parked doing nothing but still consuming a thread. If your workload is 90% waiting on IO, your
+threads sit idle while CPU is nearly free, and you exhaust the thread pool (and memory) long before
+the CPU saturates. That is why a thread-per-request box can fall over at a few thousand concurrent
+connections while showing 10% CPU.
 
 ### Event loop
 
@@ -4044,11 +4046,12 @@ plus tuned OS limits:
 - **Ephemeral ports:** a single source IP connecting to one destination IP:port is limited to roughly
   28,000 outbound connections, so a proxy fanning out to one backend runs out of ports. Fix with
   connection pooling and spreading across multiple destination IPs/ports.
-- **Memory per thread:** the ~1MB stack per thread that caps thread-per-request; event loops sidestep
-  it by not having a thread per connection.
+- **Memory per thread:** every thread reserves a stack (8MB by default on glibc, 1MB in a JVM), so
+  thousands of threads reserve tens of GB. That is a real cost, though blocking IO is what actually
+  caps thread-per-request; event loops sidestep both by not having a thread per connection.
 
 \`\`\`
-Thread-per-request:   [req]->thread->BLOCK on IO (idle, 1MB)   ... caps at ~thousands
+Thread-per-request:   [req]->thread->BLOCK on IO (idle, 8MB)   ... caps at ~thousands
 Event loop:           epoll -> 1 thread -> 100k idle sockets   ... never block it
                                      \`-> CPU task? offload to worker pool (N=cores)
 \`\`\`
@@ -4056,7 +4059,7 @@ Event loop:           epoll -> 1 thread -> 100k idle sockets   ... never block i
 Recap: CPU-bound work wants a worker pool sized to cores, IO-bound fan-out wants an event loop
 multiplexing many connections via epoll/kqueue, never block the loop with CPU or blocking IO, and
 past ~10k connections you must raise fd limits, pool connections around the ephemeral-port ceiling,
-and avoid the per-thread memory wall.
+and stop paying a thread and its stack per connection.
 
 \`\`\`cswidget
 {
@@ -4076,7 +4079,7 @@ and avoid the per-thread memory wall.
     {
       "label": "API gateway that fans out to 20 backends and mostly waits on the network",
       "bucket": "Event loop",
-      "feedback": "The work is almost entirely waiting, so multiplex thousands of in-flight requests on a few threads via 'epoll' instead of parking a 1MB-stack thread per blocking call."
+      "feedback": "The work is almost entirely waiting, so multiplex thousands of in-flight requests on a few threads via 'epoll' instead of parking a thread, stack reservation and all, per blocking call."
     },
     {
       "label": "Chat server holding 100,000 mostly idle WebSocket connections",
@@ -4297,7 +4300,7 @@ export const systemDesignLevel1: DesignLevel = {
             ],
             modelAnswerOutline: [
               "The 'no plaintext anywhere' and 'every call attributable' rules push to end-to-end mTLS with a service mesh, not edge-terminate-and-trust-the-network.",
-              "**Encryption on every wire:** do not terminate to plaintext behind the edge. The public edge terminates the client's TLS (or passes through), and every internal hop runs its own mTLS connection, so no packet is ever plaintext on any wire. A sidecar proxy (Envoy via Istio/Linkerd) sits next to each service and handles the TLS so app code stays simple; plaintext only exists inside the loopback between app and its own sidecar, which never touches a wire.",
+              "**Encryption on every wire:** do not terminate to plaintext behind the edge. The public edge terminates the client's TLS (or passes through), and every internal hop runs its own mTLS connection, so no packet is ever plaintext on any wire. A sidecar proxy sits next to each service and handles the TLS so app code stays simple, whether that is Istio (Envoy sidecars) or Linkerd (its own Rust micro-proxy); plaintext only exists inside the loopback between app and its own sidecar, which never touches a wire.",
               "**Attributable identity:** mTLS with SPIFFE/SPIRE-issued identities. Each service gets an X.509 SVID encoding its identity (e.g. `spiffe://bank/payments/settlement`). Both sides verify certs on every connection, so every call is provably from a named service, and the mesh emits audit logs keyed by that identity. Authorization policies ('only settlement may call ledger-write') are enforced on identity, not IP.",
               "**Key rotation:** short-lived certs, on the order of hours, auto-rotated by SPIRE. Short lifetimes shrink the blast radius of a leaked key and remove the manual-rotation outage risk; the mesh rotates transparently, so no midnight cert-expiry outage.",
               "**Keeping latency in budget:** (1) TLS 1.3 for 1-RTT handshakes; (2) aggressive connection reuse/pooling between sidecars so the handshake amortizes over thousands of requests (steady state is symmetric-key encryption, cheap and often hardware-accelerated AES-NI); (3) session resumption for reconnects; (4) shallow call graphs so handshake RTTs do not stack. Do not enable 0-RTT: these are payment mutations, and 0-RTT's replay risk is unacceptable for a charge.",
@@ -5166,8 +5169,8 @@ export const systemDesignLevel1: DesignLevel = {
             modelAnswerOutline: [
               "The deciding axis is CPU-bound vs IO-bound. Image transcoding is CPU-bound: each request pins a core for hundreds of milliseconds with nothing to wait on. The API gateway is IO-bound: each request fans out to 20 backends and spends almost all its wall-clock time waiting on the network, using near-zero CPU.",
               "**Image transcoder -> thread/process worker pool sized to cores.** The work is compute, so the only thing that matters is keeping every core busy without oversubscription: roughly N workers for N cores plus a bounded queue in front. An event loop would be actively wrong: a single transcode blocks the loop and serializes every other request. If an event runtime handles the HTTP layer, offload the transcode itself to worker threads or a separate service.",
-              "**API gateway -> event-loop / async runtime with connection pooling.** Thread-per-request fails here specifically: with 20 blocking downstream calls per request, each request parks threads doing nothing but waiting. At a few thousand concurrent requests the thread pool and memory (~1MB stack each) are exhausted while CPU sits near idle: blocking IO caps the server long before compute does. An event loop multiplexes thousands of waiting connections on a few threads via epoll, so idle connections cost only an fd.",
-              "**C10k / OS limits to tune:** raise the file-descriptor limit (`ulimit -n`, `fs.file-max`) from the 1024 default to hundreds of thousands, since every connection is an fd. Watch ephemeral ports: the gateway opening connections to a single backend IP:port caps near 28,000, so pool and reuse connections and spread across multiple backend endpoints. The per-thread ~1MB stack is exactly the wall that makes thread-per-request infeasible at 10k+, which the event loop avoids.",
+              "**API gateway -> event-loop / async runtime with connection pooling.** Thread-per-request fails here specifically: with 20 blocking downstream calls per request, each request parks threads doing nothing but waiting. At a few thousand concurrent requests the thread pool and memory (a reserved stack each, 8MB by default on glibc) are exhausted while CPU sits near idle: blocking IO caps the server long before compute does. An event loop multiplexes thousands of waiting connections on a few threads via epoll, so idle connections cost only an fd.",
+              "**C10k / OS limits to tune:** raise the file-descriptor limit (`ulimit -n`, `fs.file-max`) from the 1024 default to hundreds of thousands, since every connection is an fd. Watch ephemeral ports: the gateway opening connections to a single backend IP:port caps near 28,000, so pool and reuse connections and spread across multiple backend endpoints. Per-thread stacks add up too (8MB by default on glibc, 1MB in a JVM), though blocking IO rather than stack memory is what actually makes thread-per-request infeasible at 10k+; the event loop avoids both.",
               "Common wrong turn: putting a blocking DB call or a CPU-heavy transform directly on the event loop, which serializes every request behind it and destroys throughput: the mirror image of running CPU work on an async model that gives no benefit.",
             ],
           },
@@ -5182,7 +5185,7 @@ export const systemDesignLevel1: DesignLevel = {
             ],
             modelAnswerOutline: [
               "Assumptions: millions of persistent WebSocket connections that are mostly idle (heartbeats plus occasional pushed events), and a separate voice/media tier doing CPU-heavy audio transcoding and mixing.",
-              "**Gateway (millions of idle sockets) -> event-loop / async, unambiguously.** This is the C10M problem: connections are almost entirely idle, so the cost that matters is per-connection memory and the ability to wait cheaply. Thread-per-connection is dead on arrival: a million threads at ~1MB each is a terabyte of stack. An event-driven runtime built on epoll (Discord famously uses Elixir/BEAM, whose lightweight processes are effectively userspace green threads over an async core; Go, Netty, or Node is analogous) holds each connection as a few KB of userspace state, and epoll surfaces only the handful of active sockets per tick. The workload is 99.9% waiting, exactly what async multiplexing is for.",
+              "**Gateway (millions of idle sockets) -> event-loop / async, unambiguously.** This is the C10M problem: connections are almost entirely idle, so the cost that matters is per-connection memory and the ability to wait cheaply. Thread-per-connection is dead on arrival: at glibc's default 8MB stack, a million threads reserve 8TB of address space, and even a JVM's 1MB default is a terabyte. An event-driven runtime built on epoll (Discord famously uses Elixir/BEAM, whose lightweight processes are effectively userspace green threads over an async core; Go, Netty, or Node is analogous) holds each connection as a few KB of userspace state, and epoll surfaces only the handful of active sockets per tick. The workload is 99.9% waiting, exactly what async multiplexing is for.",
               "**Media/voice tier -> worker pool sized to cores (or GPUs).** Transcoding and mixing are CPU-bound, so this tier wants one busy worker per core, a bounded intake queue, and horizontal scale-out, not async. These are deliberately separate services precisely because their concurrency models are opposite.",
               "**OS limits and fixes:** raise `nofile` to millions and `fs.file-max` system-wide (every WebSocket is an fd); shard connections across many gateway nodes so no single box holds all millions; tune kernel socket buffers and `somaxconn` for accept bursts; on any node making outbound connections, pool them and spread across destination IPs to dodge the ~28k ephemeral-port ceiling per source/destination pair. Heartbeat/keepalive tuning matters too: at millions of connections even a cheap per-connection timer adds up.",
               "Common wrong turn: trying to hold millions of WebSockets with a thread-per-connection server (instant memory death), or conversely running voice transcoding on the same event loop and freezing every connected client behind one CPU-bound mixing job.",
