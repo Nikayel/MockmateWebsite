@@ -12,7 +12,7 @@ import type { DesignLevel } from "@/lib/tutorials/types"
 const monolithVsMicroservicesTeach = `
 ## Match the architecture to the org and the load
 
-This is the most-tested architecture tradeoff in system design rounds, and the industry mood has swung back toward starting monolithic. Amazon Prime Video famously moved a monitoring pipeline from microservices back to a monolith and cut cost 90%. Shopify runs a modular monolith at enormous scale. The strong senior answer is not "microservices are modern" but "match the architecture to the org and the load."
+This is the most-tested architecture tradeoff in system design rounds, and the industry mood has swung back toward starting monolithic. Amazon Prime Video famously moved a video quality-monitoring pipeline off distributed serverless steps and back into a single process, cutting cost about 90%. Shopify runs a modular monolith at enormous scale. The strong senior answer is not "microservices are modern" but "match the architecture to the org and the load."
 
 \`\`\`
  Monolith            Modular Monolith           Microservices
@@ -292,10 +292,10 @@ The classic implementation is the **sidecar** model: a proxy (Envoy) is injected
 
 The 2024 to 2025 shift is meshes that cut this tax:
 
-- **Istio Ambient** splits the mesh into a per-node L4 component (ztunnel) handling mTLS for all Pods on the node, plus an optional per-namespace L7 proxy (waypoint) only where you need retries/splitting. Most Pods pay no per-Pod proxy.
-- **Cilium** pushes mTLS and L4 policy into the kernel via **eBPF**, avoiding a userspace proxy hop for much of the work.
+- **Istio Ambient** splits the mesh into a per-node L4 component (ztunnel) handling mTLS for all Pods on the node, plus an optional per-namespace L7 proxy (waypoint) only where you need retries/splitting. The ztunnels carry traffic to each other over **HBONE**, an mTLS tunnel that keeps each workload's own identity on the connection, so per-connection mTLS survives even though most Pods pay no per-Pod proxy.
+- **Cilium** takes a different route to the same goal. It enforces identity-based L3/L4 policy in the kernel via **eBPF**, does mutual authentication in its agent using SPIFFE workload identities (off the datapath, because eBPF does not perform a TLS handshake), and gets confidentiality from transparent node-to-node encryption with **WireGuard** or **IPsec**. The result is authenticated, encrypted east-west traffic with no per-Pod proxy at all, but it is not per-connection mTLS.
 
-The win is fewer proxies, lower per-Pod memory, and lower latency for the common L4 path, while keeping mTLS everywhere. Ambient/eBPF meshes reached GA maturity around 2025 and are the direction of new adoption. **Gateway API** is the converging standard for both north-south and (via GAMMA) east-west config, which lets you swap the underlying implementation with less lock-in than the older bespoke CRDs.
+The win is fewer proxies, lower per-Pod memory, and lower latency for the common L4 path. Maturity differs by implementation, and the difference matters in an interview: Istio's ambient mode went GA in 1.24 (November 2024), while Cilium's mutual authentication is still beta. Either way this is the direction of new adoption. **Gateway API** is the converging standard for both north-south and (via GAMMA) east-west config, which lets you swap the underlying implementation with less lock-in than the older bespoke CRDs.
 
 \`\`\`csdiagram
 {
@@ -404,7 +404,7 @@ The win is fewer proxies, lower per-Pod memory, and lower latency for the common
         "ztunnel",
         "b_ambient"
       ],
-      "note": "Istio Ambient: a per-node L4 ztunnel handles mTLS for all Pods on the node, so most Pods pay no per-Pod proxy. Cilium pushes mTLS and L4 policy into the kernel via eBPF, avoiding the userspace hop for much of the work."
+      "note": "Istio Ambient: a per-node L4 ztunnel handles mTLS for all Pods on the node (over HBONE, carrying each workload's own identity), so most Pods pay no per-Pod proxy. Cilium replaces the proxy entirely: identity-based L3/L4 policy in the kernel via eBPF, mutual authentication in the agent with SPIFFE identities, and WireGuard or IPsec for encryption on the wire."
     },
     {
       "adds": [
@@ -413,7 +413,7 @@ The win is fewer proxies, lower per-Pod memory, and lower latency for the common
       "note": "An optional per-namespace waypoint proxy adds L7 features (retries, traffic splitting) only where you need them, instead of taxing every Pod in the fleet."
     }
   ],
-  "caption": "Same guarantee (mTLS everywhere), different data paths: the sidecar tax is per Pod and per hop; ambient/eBPF pays per node and adds L7 only where needed."
+  "caption": "Different data paths for the same east-west problem: the sidecar tax is per Pod and per hop, while ambient pays per node and adds L7 only where needed. Cilium is a third path not drawn here, with policy in the kernel and no proxy at all."
 }
 \`\`\`
 
@@ -423,7 +423,7 @@ For a handful of services, you can get mTLS from the platform, retries and timeo
 
 **Interview nuance:** the strong answer is not "add Istio." It is "at 40 services in mixed languages, a mesh is justified because you cannot keep mTLS and retry logic consistent across five client libraries, and I would choose ambient/eBPF to avoid the per-Pod sidecar tax." The weak answer adds a mesh reflexively for three services.
 
-**Recap:** a mesh moves mTLS, retries/timeouts, traffic shifting, and L7 telemetry out of app code; sidecars cost memory and latency per Pod, ambient/eBPF (Istio Ambient, Cilium) cut that tax and are the 2025 direction, and for a small fleet a mesh is often not worth it.
+**Recap:** a mesh moves mTLS, retries/timeouts, traffic shifting, and L7 telemetry out of app code; sidecars cost memory and latency per Pod; Istio Ambient cuts that tax while keeping per-connection mTLS (GA in 1.24), and Cilium cuts it further by putting eBPF policy in the kernel with SPIFFE mutual authentication and WireGuard or IPsec encryption instead of mTLS (still beta); and for a small fleet, a mesh is often not worth it.
 `.trim()
 
 const cloudNative12factorTeach = `
@@ -1170,18 +1170,18 @@ export const systemDesignLevel9: DesignLevel = {
           practice: {
             id: "sd-l9-monolith-vs-microservices-practice",
             prompt:
-              "Design the migration path for a company like Prime Video that already runs a 12-microservice media-monitoring pipeline costing too much, where the services are chatty and pass large frames over the network. Recommend whether to consolidate and how, leading with the deliverable.",
+              "Design the migration path for a company like Prime Video that runs its video quality-monitoring pipeline as distributed steps, orchestrated by AWS Step Functions over Lambda functions that hand video frames to each other through S3, and is now paying too much for it. Recommend whether to consolidate and how, leading with the deliverable.",
             thinkAbout: [
               "How do you confirm the cost is network/storage transfer, not compute?",
-              "Which services consolidate and which stay split?",
+              "Which steps consolidate and which stay split?",
               "Why does per-step independent scaling lose nothing here?",
             ],
             modelAnswerOutline: [
-              "Deliverable: consolidate the chatty, data-heavy services into a single orchestrated process, keeping only the genuinely independent components as services.",
-              "**Diagnosis first.** The problem signature is high inter-service data volume: each frame is passed over the network and often serialized to object storage between steps, so the bill is dominated by network transfer and S3 round trips, not compute. This is the case where microservices actively hurt, because the 'hop' cost dwarfs the 'work' cost. Twelve services that must all run for every frame is a distributed monolith wearing a microservices costume: coupled lifecycle, no independent value, full network tax.",
-              "**Recommendation:** merge the frame-processing steps (detectors, defect analysis, aggregation) into one process where data moves in memory instead of over the network. This is exactly the change Prime Video made, collapsing the pipeline into a single monolithic process and cutting cost about 90%, because in-memory handoff replaced S3 and inter-service transfer.",
+              "Deliverable: consolidate the chatty, data-heavy steps into a single process, keeping only the genuinely independent components separate.",
+              "**Diagnosis first.** The problem signature is high inter-step data volume: every frame is written to S3 by one step and read back by the next, so the bill is dominated by S3 operations and orchestration state transitions, not compute. This is the case where a distributed split actively hurts, because the 'hop' cost dwarfs the 'work' cost. A chain of steps that must all run for every frame has a coupled lifecycle and gains nothing from being split, so it pays the full transfer tax and buys no independence.",
+              "**Recommendation:** merge the frame-processing steps (frame conversion, the defect detectors, aggregation) into one process where data moves in memory instead of through object storage. This is the change Amazon's Video Quality Analysis team actually made: they collapsed the Step Functions and Lambda pipeline into a single process running on ECS and EC2 and reported about 90% lower cost, because in-memory handoff replaced the S3 round trips and the orchestration transitions. Say the limit of that evidence out loud, because interviewers listen for it: this was one data-heavy pipeline where the per-hop transfer cost dwarfed the actual work cost, so it is a verdict on that shape of workload, not a general verdict that microservices cost more.",
               "**What stays split:** control-plane and orchestration pieces with a genuinely different profile, for example the API that schedules jobs, the dashboard, and any component that scales on a different axis. Keep those as separate services because they meet a real trigger (different cadence, different scaling).",
-              "**Migration path:** (1) instrument to confirm the cost is transfer, not compute, so the decision is data-driven, (2) combine the hot data-path services behind a feature flag into one deployable, (3) run old and new in parallel on a slice of traffic and compare cost and latency, (4) cut over and decommission the redundant services and their storage buckets.",
+              "**Migration path:** (1) instrument to confirm the cost is transfer, not compute, so the decision is data-driven, (2) combine the hot data-path steps behind a feature flag into one deployable, (3) run old and new in parallel on a slice of traffic and compare cost and latency, (4) cut over and decommission the redundant functions and their intermediate storage buckets.",
               "Tradeoff acknowledged: the consolidated process scales as one unit and loses per-step independent scaling, but for a pipeline where every step runs on every frame anyway, that independence was never being used, so nothing real is lost while the network and storage bill collapses.",
             ],
           },
@@ -1392,7 +1392,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-service-mesh",
           title: "Service Mesh (Sidecar vs Sidecarless/Ambient/eBPF)",
           summary:
-            "A mesh moves mTLS, retries/timeouts, traffic shifting, and L7 telemetry out of app code; sidecars cost memory and latency per Pod, ambient/eBPF (Istio Ambient, Cilium) cut that tax and are the 2025 direction, and for a small fleet a mesh is often not worth it.",
+            "A mesh moves mTLS, retries/timeouts, traffic shifting, and L7 telemetry out of app code; sidecars cost memory and latency per Pod, Istio Ambient cuts that tax while keeping per-connection mTLS and Cilium replaces the proxy with kernel eBPF policy plus SPIFFE mutual authentication and WireGuard or IPsec encryption, and for a small fleet a mesh is often not worth it.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["service-mesh", "ebpf", "mtls"],
@@ -1413,9 +1413,9 @@ export const systemDesignLevel9: DesignLevel = {
               "Assumptions: 40 microservices in mixed languages (Go, Java, Python, Node), hundreds of Pods, a zero-trust requirement (mTLS everywhere), and a need for consistent retries/timeouts and safe canary rollouts. Latency budgets are tight on the hot call graph.",
               "**Is a mesh justified here? Yes.** At 40 services in 4 languages you cannot keep mTLS, retry policy, timeouts, and circuit breaking consistent across four client libraries; that inconsistency is exactly where outages and security gaps live. A mesh gives one uniform, language-agnostic layer. (If this were 3 services I would decline the mesh and use platform mTLS plus a shared library.)",
               "**What the mesh provides:** automatic **mTLS** for zero-trust east-west, **retries/timeouts/circuit-breaking** declared as policy, **traffic splitting** for per-service canaries (5 percent to v2, watch metrics, ramp), and uniform L7 telemetry and trace propagation across every hop, all without editing 40 codebases.",
-              "**Sidecar vs ambient:** the classic sidecar (Envoy per Pod) works but at this fleet size the tax is significant: hundreds of sidecars cost GBs of cluster memory and add 1 to several ms of proxy+mTLS latency per hop, compounding across a deep call graph and hurting p99. I choose an **ambient / eBPF** mesh: **Istio Ambient** (per-node ztunnel for mTLS/L4, waypoint proxies only in namespaces that need L7 retries/splitting) or **Cilium** (mTLS and L4 policy in the kernel via eBPF). This gives mTLS everywhere with far fewer proxies, lower per-Pod memory, and a cheaper L4 path, while still allowing full L7 features where I actually need them. I express routing through the **Gateway API** to keep the implementation swappable.",
+              "**Sidecar vs ambient:** the classic sidecar (Envoy per Pod) works but at this fleet size the tax is significant: hundreds of sidecars cost GBs of cluster memory and add 1 to several ms of proxy+mTLS latency per hop, compounding across a deep call graph and hurting p99. I choose a sidecarless mesh, and specifically **Istio Ambient**, because it is the option that actually preserves per-connection mTLS: a per-node ztunnel carries L4 traffic over HBONE with each workload's own identity, and waypoint proxies go only in namespaces that need L7 retries or splitting. The alternative is **Cilium**, which enforces identity-based L3/L4 policy in the kernel via eBPF, mutually authenticates workloads with SPIFFE identities in its agent, and encrypts node to node with WireGuard or IPsec; that is authenticated and encrypted east-west traffic with no proxy at all, but it is not per-connection mTLS and the mutual authentication is still beta, so I would not lead with it against a strict mTLS requirement. Either way I get far fewer proxies, lower per-Pod memory, and a cheaper L4 path, while still allowing full L7 features where I actually need them. I express routing through the **Gateway API** to keep the implementation swappable.",
               "**Rollout:** start L4 (mTLS everywhere, cheap), then add L7 waypoints only for the services doing canaries or complex retries, so I pay the L7 cost only where it earns its keep.",
-              "Common wrong turn: defaulting to a full per-Pod Envoy sidecar mesh for the whole fleet and eating the memory and latency tax on every hop, when ambient/eBPF delivers the same mTLS at a fraction of the cost; or the opposite error of adding a mesh reflexively when the fleet is too small to justify it.",
+              "Common wrong turn: defaulting to a full per-Pod Envoy sidecar mesh for the whole fleet and eating the memory and latency tax on every hop, when ambient delivers the same mTLS at a fraction of the cost; or the opposite error of adding a mesh reflexively when the fleet is too small to justify it.",
             ],
           },
           practice: {
@@ -1429,7 +1429,7 @@ export const systemDesignLevel9: DesignLevel = {
             ],
             modelAnswerOutline: [
               "Assumptions: 250 services, three regions, a hard compliance requirement for mTLS on every hop plus authz policy and audit, and an existing Istio sidecar mesh that is expensive and latency-heavy at this scale. Zero downtime during migration is mandatory.",
-              "**Architecture:** keep a mesh (at 250 services it is unambiguously justified) but move to **ambient/eBPF** to cut the tax. Istio Ambient gives per-node ztunnel mTLS for all Pods (satisfying 'encrypted and authenticated on every hop' cheaply at L4) with waypoint L7 proxies only where authz policy, retries, or traffic shifting are needed. mTLS gives the compliance property (mutual auth + encryption) and the mesh emits uniform authz decisions and L7 telemetry that feed the audit trail. Cross-region traffic goes over east-west gateways with mTLS preserved.",
+              "**Architecture:** keep a mesh (at 250 services it is unambiguously justified) but move to **ambient** to cut the tax. Istio Ambient gives per-node ztunnel mTLS for all Pods (satisfying 'encrypted and authenticated on every hop' cheaply at L4) with waypoint L7 proxies only where authz policy, retries, or traffic shifting are needed. mTLS gives the compliance property (mutual auth + encryption) and the mesh emits uniform authz decisions and L7 telemetry that feed the audit trail. Cross-region traffic goes over east-west gateways with mTLS preserved.",
               "**Why not stay on sidecars:** 250 services means thousands of Pods; per-Pod Envoy would cost many GBs of memory and add per-hop latency that, on a multi-hop payment path, meaningfully inflates p99. Ambient removes most per-Pod proxies while preserving mTLS everywhere, so compliance holds at lower cost and latency.",
               "**Compliance specifics:** enforce `STRICT` mTLS mode so any plaintext call is rejected (not just permitted alongside mTLS), authorization policies scoped per service, and export the mesh's access logs and policy decisions to the audit pipeline. Use SPIFFE-style workload identities so each service's certificate is its auditable identity.",
               "**Zero-window migration:** do it in **permissive mode** first (accept both mTLS and plaintext) so nothing breaks while you convert, then flip to strict per namespace once metrics confirm all traffic is already mTLS. Migrate ambient namespace by namespace: onboard a namespace to the ztunnel data path, verify golden metrics and mTLS coverage, add waypoints only where L7 policy is required, then move the next. Keep the old sidecar path as fallback per namespace until validated, so there is never a big-bang cutover.",
