@@ -4,6 +4,15 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ───────────────────────────────────────────────────────────────────────────
 // py-l3-typing-module: Optional/Union, generics, Protocols
+//
+// Time budget behind `estimatedMinutes` (counted, not guessed): teach 6 (about 1,400 prose words,
+// four checks, four fences), apply 6 (a 10-line prompt, a 6-line reference), practice 32 (38 README
+// lines plus ~60 lines of starters and visible tests to read, 48 lines to write across two files,
+// 16 recorded tests). Lesson total 44 = 6 + 6 + 32.
+//
+// The lesson used to advertise 24 minutes for the whole thing, which was never plausible against
+// two editable files and 16 tests. Nothing was made easier to reach that number: the estimate was
+// wrong, not the exercise.
 // ───────────────────────────────────────────────────────────────────────────
 
 // ── Practice workspace: the config-loader ticket ───────────────────────────────────────────────
@@ -298,7 +307,7 @@ export const typingModuleLesson: PythonLesson = {
   id: "py-l3-typing-module",
   title: "typing: Optional, Union, generics & Protocols",
   summary: "Type a small API with Optional/Union, a TypeVar generic, and a structural Protocol.",
-  estimatedMinutes: 24,
+  estimatedMinutes: 44,
   difficulty: "medium",
   skills: ["typing", "optional", "generics", "protocols"],
   teach: {
@@ -358,6 +367,36 @@ Returning \`None\` from a function you annotated \`-> dict\` is a lie a checker 
 u = find_user(7)          # u: dict | None
 if u is not None:
     print(u["name"])      # here u is dict, so u["name"] is allowed
+\`\`\`
+
+### Narrowing without collapsing
+
+A union type only pays off if the code narrows it as carefully as the annotation describes it. The reflex to distrust is \`if not value\`, which answers \`True\` for \`None\`, for \`""\`, for \`[]\`, for \`0\` and for \`False\` alike. When those mean different things to your caller, you need to ask a different question of each one.
+
+\`\`\`python
+>>> value is None            # only None answers this
+False
+>>> hasattr([], "__len__")   # lists, strings, dicts and tuples all carry it
+True
+>>> hasattr(0, "__len__")    # numbers do not, so len(0) is a TypeError
+False
+>>> len({})                  # so a container can be asked whether it is empty
+0
+\`\`\`
+
+\`hasattr(value, "__len__")\` is the honest way to ask "is this the kind of thing that can be empty", because \`len()\` itself raises on anything that is not a container. Combined with an \`is None\` test first, it separates "nothing was given" from "something empty was given" from "\`0\` was given", which \`if not value\` cannot.
+
+The other half of narrowing is deciding whether a \`str\` carries the value you wanted:
+
+\`\`\`python
+>>> "30".isdigit()      # True when every character is a digit
+True
+>>> " 30 ".isdigit()    # a space is not a digit, so strip before you ask
+False
+>>> "3.5".isdigit()
+False
+>>> "".isdigit()        # no characters, so nothing to be true of
+False
 \`\`\`
 
 ### Generics with TypeVar
@@ -492,21 +531,28 @@ print(first([]))         # None`,
   apply: {
     id: "py-l3-typing-module-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`find_by_id(rows, target)\`. Return the first dict in \`rows\` whose
-\`"id"\` equals \`target\`, or \`None\` if none match.
+    // 6 minutes: a 10-line prompt, a 6-line reference, one union input to narrow.
+    estimatedMinutes: 6,
+    prompt: `Implement \`find_by_id(rows, target)\`. Return the first dict in \`rows\` whose \`"id"\` matches
+\`target\`, or \`None\` when none of them do.
 
-Annotate the return as \`-> dict | None\`.`,
-    starterCode: `def find_by_id(rows, target) -> dict | None:
-    # Return the first row whose "id" == target, else None.
+The lookup key reaches you from two callers, so \`target\` is a union: the internal caller passes the
+\`int\` id, and the web layer passes it as \`str\` text that may carry surrounding spaces. Both must
+find the same row, so \`2\`, \`"2"\` and \`" 2 "\` all match the row whose id is \`2\`.
+
+Write the signature as \`def find_by_id(rows: list[dict], target: int | str) -> dict | None\`.`,
+    starterCode: `def find_by_id(rows: list[dict], target: int | str) -> dict | None:
+    # Return the first row whose "id" matches target, else None.
     pass`,
     hints: [
-      'Loop the rows and check `row["id"] == target`.',
-      "Return the row as soon as it matches.",
-      "If the loop finishes with no match, `return None`.",
+      "The two arms of the union have to meet somewhere before you can compare. Pick one shape and put both sides into it.",
+      "Do the union work once, before the loop, rather than inside it: whatever `target` arrived as, you only need one comparable form of it.",
+      "If the loop finishes with no match, `return None`. That is the arm the `| None` in the return type is promising the caller.",
     ],
-    referenceSolution: `def find_by_id(rows, target) -> dict | None:
+    referenceSolution: `def find_by_id(rows: list[dict], target: int | str) -> dict | None:
+    wanted = str(target).strip()
     for row in rows:
-        if row["id"] == target:
+        if str(row["id"]) == wanted:
             return row
     return None`,
     testCases: [
@@ -519,7 +565,29 @@ Annotate the return as \`-> dict | None\`.`,
           target: 2,
         },
         expected: { id: 2, name: "Sam" },
-        description: "finds a match",
+        description: "finds a match by int id",
+      },
+      {
+        input: {
+          rows: [
+            { id: 1, name: "Ada" },
+            { id: 2, name: "Sam" },
+          ],
+          target: "2",
+        },
+        expected: { id: 2, name: "Sam" },
+        description: "the same row by str id",
+      },
+      {
+        input: {
+          rows: [
+            { id: 1, name: "Ada" },
+            { id: 2, name: "Sam" },
+          ],
+          target: " 2 ",
+        },
+        expected: { id: 2, name: "Sam" },
+        description: "a padded str id still matches",
       },
       {
         input: {
@@ -538,6 +606,7 @@ Annotate the return as \`-> dict | None\`.`,
   practice: {
     id: "py-l3-typing-module-practice",
     executionMode: "workspace",
+    estimatedMinutes: 32,
     prompt: `Close the config-loader ticket. A service came up with no proxy because the config loader could not tell
 an absent key from a key set to \`None\` from a key set to an empty string, so all three got the
 same default.
