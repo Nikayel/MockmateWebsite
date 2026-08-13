@@ -2,6 +2,16 @@ import type { PythonLesson } from "../../types"
 import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
+// Time budget behind `estimatedMinutes` (counted, not guessed): teach 8 (about 1,300 prose words,
+// four checks), apply 6 (an 8-line prompt, a 7-line reference), practice 28 (45 README lines plus
+// ~95 lines of the read-only feed and visible tests to read, 45 lines to write across two modules,
+// 14 recorded tests). Lesson total 42 = 8 + 6 + 28.
+//
+// Both editable starters are deliberately blank-bodied rather than absent: each names its function,
+// its parameters and a docstring pointing at README.md, and each TODO names the decision without
+// naming the approach. That is scaffolding, not a gap, so it stays. Apply at 4.8x already drills
+// the practice's central rule, that a blank cell is a missing value and not a zero.
+
 const LEDGER_README = buildBrief({
   lesson: "py-l3-pandas-dataframes",
   kind: "bug-report",
@@ -495,6 +505,7 @@ print("group:", totals)`,
   apply: {
     id: "py-l3-pandas-dataframes-apply",
     executionMode: "single-file",
+    estimatedMinutes: 6,
     prompt: `Warm-up: implement \`infer_dtype(cells)\`, the rule \`read_csv\` uses to pick a column's dtype.
 
 \`cells\` is the list of raw text values for one column. Return \`"int64"\` when every cell is
@@ -544,6 +555,7 @@ Treat a whitespace-only cell as blank.`,
   practice: {
     id: "py-l3-pandas-dataframes-practice",
     executionMode: "workspace",
+    estimatedMinutes: 28,
     prompt: `Repair the monthly spend-by-category report. Finance says the totals are short, one
 category has vanished from the output, and an average looks too low.
 
