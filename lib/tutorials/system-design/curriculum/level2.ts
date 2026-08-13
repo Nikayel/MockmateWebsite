@@ -143,7 +143,10 @@ Repeatable Read, and Serializable. Each level forbids more anomalies and costs m
 
 Defaults matter and differ: **Postgres defaults to Read Committed**, **MySQL InnoDB defaults to
 Repeatable Read**. So the same application code can behave differently on the two databases under
-load, which is a real production trap.
+load, which is a real production trap. The two engines also disagree about what Repeatable Read does
+when two transactions update the same row: Postgres is **first-updater-wins** and aborts the second
+writer with a serialization failure the application must catch and retry, while MySQL InnoDB blocks
+the second writer until the first commits and then lets it proceed.
 
 \`\`\`cswidget
 {
@@ -3235,7 +3238,7 @@ export const systemDesignLevel2: DesignLevel = {
               "**If checkout must reserve across multiple rows,** take a pessimistic lock: `SELECT stock FROM products WHERE id = :sku FOR UPDATE`, then decrement, then commit. Concurrent checkouts on the same SKU serialize behind the row lock. Cost: on a hot SKU all buyers queue on one lock, so throughput on that key is bounded by commit speed; keep the transaction tiny.",
               "**Optimistic version-column retry** works and avoids holding locks, but under a flash sale contention is high, so the retry-abort rate is high and wastes work. Prefer the conditional update or FOR UPDATE under heavy contention; reserve optimistic for low-contention cases.",
               "**Do not reach for global Serializable:** it would fix the bug but penalizes every unrelated transaction with SSI aborts or lock waits; the surgical row-level fix costs nothing outside the hot key.",
-              "Common wrong turn: assuming snapshot isolation (Repeatable Read) prevents this. It gives each transaction a stale snapshot showing `stock = 1`, both pass the check, and the second write triggers a serialization failure only under Serializable, not Repeatable Read, for this shape. The reliable fix is the atomic conditional update or an explicit lock.",
+              "Common wrong turn: assuming Repeatable Read means the same thing on both engines. The optimistic version check survives under Read Committed, where the guarded UPDATE matches 0 rows so you retry cheaply, and it survives under MySQL InnoDB Repeatable Read even when the app writes an absolute `stock = :computed`, because the second writer blocks until the first commits and then re-checks the committed row. Postgres Repeatable Read is the one that behaves differently: it is first-updater-wins, so the second writer is aborted with a serialization failure the application must catch and retry, and under flash-sale contention that retry churn is exactly why the atomic conditional decrement still wins.",
             ],
           },
           practice: {
@@ -3494,7 +3497,7 @@ export const systemDesignLevel2: DesignLevel = {
             modelAnswerOutline: [
               "Assume Redis, a web app with a few million DAU, 30-minute sliding session timeout, and a rate limit of 100 API calls per user per minute.",
               "**Sessions.** Key `session:{sessionId}` where sessionId is a 128-bit random token. Store the session as a Redis **hash** so individual fields (userId, csrfToken, lastSeen, roles) update without rewriting the blob. TTL `EXPIRE session:{id} 1800`, refreshed on each authenticated request for a sliding window. Because the value is opaque, 'all sessions for user 123' needs a reverse index: `user:{userId}:sessions` as a set of session ids, deleted explicitly for 'log out everywhere.'",
-              "**Sessions are a source of truth for live logins:** run Redis with AOF persistence and a replica, and `noeviction` (or `volatile-lru` so only expiring keys drop) to avoid silently evicting a logged-in user.",
+              "**Sessions are a source of truth for live logins:** run Redis with AOF persistence and a replica, and set `noeviction` so a full instance fails writes loudly instead of silently evicting a logged-in user. `volatile-lru` is the trap here: every session key carries a TTL and the reverse index does not, so eviction lands entirely on live sessions and leaves orphaned pointers behind. Keep memory headroom and alert on `used_memory` so you scale before it fills, and accept a failed write over a silent logout.",
               "**Rate-limit counters.** Key `ratelimit:{userId}:{minuteBucket}` where minuteBucket is floor(epochSeconds / 60). Each request does INCR then, on first creation, EXPIRE 60; the bucketed key self-expires with no cleanup job. This is **cache-like**: losing a counter on restart means a user briefly gets extra calls, acceptable, so persistence is optional. For a smoother sliding window, use a **sorted set** per user keyed by timestamp, counting entries in the trailing 60s and trimming with ZREMRANGEBYSCORE.",
               "**Hot keys:** a global counter (`ratelimit:global`) concentrates traffic on one shard; shard it into `ratelimit:global:{0..15}`, increment a random shard, sum on read. Per-user keys naturally spread across the keyspace.",
               "Common wrong turn: putting queryable attributes (like lastActive) inside the opaque value and then discovering you cannot query them, or running the session store as a non-persistent cache and logging every user out on a restart.",
