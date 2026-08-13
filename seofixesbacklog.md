@@ -81,6 +81,51 @@ are unaffected.
 **Accept.** Top-40 pages have `seoDescription` set. A test asserts every `seoDescription` is between
 110 and 155 characters and does not start with "In this lesson" or "This lesson".
 
+**Blocked on SEO-35**, which is the reason the fallback is currently unusable.
+
+### SEO-35 — Lesson summaries are paragraphs in a field documented as one line
+
+**Evidence.** `TutorialLesson.summary` is declared in `lib/tutorials/types.ts` as
+`/** One line, for the module list. */`. Measured against the live corpus on 2026-08-13:
+
+| Course | Summaries over 160 chars |
+| --- | --- |
+| Whole corpus | 216 of 425 |
+| System design | 165 of 208 |
+
+The worst offenders are the pages with the most search demand:
+
+| Lesson | Summary length | Search impressions |
+| --- | --- | --- |
+| `sd-l9-batch-streaming` | 493 | — |
+| `sd-l9-iac-progressive-delivery` | 439 | — |
+| `sd-l10-code-sandbox` | 422 | 16 at position 6.1 |
+| `sd-l10-webhook-delivery` | 414 | 5 at position 14.0 |
+| `sd-l10-stock-exchange` | 410 | 55 at position 40.3 |
+| `sd-l10-distributed-lock` | 386 | 20 at position 13.0 |
+
+`sd-l9-batch-streaming` in full is a single 493-character sentence chain covering Lambda, Kappa,
+watermarks, exactly-once and Flink-into-Iceberg. `truncateForDescription` cuts it at 155 on a word
+boundary, so the meta description Google shows is a fragment that stops mid-argument. This also
+explains why SEO-02's fallback path cannot simply be left alone: the fallback is the defect.
+
+The damage is not only in the SERP. The module list renders `summary` as a one-line descriptor, so
+every one of these 165 lessons is pushing a paragraph through a single-line slot.
+
+`lib/tutorials/__tests__/lesson-content-hygiene.test.ts` already measures this and prints it, but
+deliberately does not fail: the test is titled "reports overlong titles and summaries without
+blocking the authoring loop". CLAUDE.md says to enforce a convention with a test rather than a
+document. This convention is currently enforced by neither.
+
+**Do.** Rewrite the 165 over-length system design summaries to one real sentence under 160
+characters, keeping the current text's first clause where it already leads with the point. Then
+convert the hygiene reporter into a failing assertion with a grandfathered allow-list of zero, so a
+new lesson cannot reintroduce the problem. Partition the rewrite by level file, one agent per file,
+since concurrent agents sharing a file clobber each other.
+
+**Accept.** No lesson summary exceeds 160 characters. `lesson-content-hygiene` fails when one does.
+The four titles over 60 characters are handled by SEO-01's budget ladder rather than rewritten.
+
 ### SEO-03 — Lesson pages publish no FAQ or article structured data
 
 **Evidence.** `components/seo/JsonLd.tsx` exists and is used on landing pages. Learn lessons emit
