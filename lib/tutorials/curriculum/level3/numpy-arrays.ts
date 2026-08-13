@@ -9,6 +9,16 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // prose and grade a pure-Python model of the same mechanic.
 // ───────────────────────────────────────────────────────────────────────────
 
+// Time budget behind `estimatedMinutes` (counted, not guessed): teach 7 (about 1,100 prose words,
+// four checks), apply 8 (a 14-line prompt, a 9-line reference), practice 30 (47 README lines plus
+// ~80 lines of starters and visible tests to read, 53 lines to write across two modules, 19
+// recorded tests). Lesson total 45 = 7 + 8 + 30.
+//
+// Apply used to be a 1D `broadcast_add`, four lines against a 53-line practice reference (13.3x),
+// and it never touched a column. It is now a column reduction over a real table with gaps in it,
+// which is the axis decision and the missing-value rule the practice is built on. It is still a
+// different function from every one of the practice's seven.
+//
 // ── Practice workspace: a 2D measurement table, modelled over lists of lists ──
 // numpy is unavailable here (see the note above), so the practice grades the mechanics
 // of array programming (shape checks, per-column broadcasting, axis=0 vs axis=1
@@ -525,46 +535,85 @@ print("int column stores 3.7 as", int(3.7))`,
   apply: {
     id: "py-l3-numpy-arrays-apply",
     executionMode: "single-file",
-    prompt: `Warm-up: implement \`broadcast_add(values, addend)\`, the pure-Python version of what \`arr + other\`
-does in numpy.
+    // 8 minutes: a 14-line prompt, a 9-line reference, one axis decision plus two edge cases
+    // (a gap in a column, a column that is nothing but gaps).
+    estimatedMinutes: 8,
+    prompt: `Implement \`column_ranges(table)\`, the pure-Python version of what
+\`arr.max(axis=0) - arr.min(axis=0)\` gives you in numpy.
 
-When \`addend\` is a list, add the two sequences elementwise. When it is a single number, broadcast it
-across every element. Return a new list either way: \`([1, 2, 3], 10)\` gives \`[11, 12, 13]\`, and
-\`([1, 2, 3], [10, 20, 30])\` gives \`[11, 22, 33]\`.`,
-    starterCode: `def broadcast_add(values, addend):
-    # A list addend adds elementwise; a number broadcasts across every element.
+A **table** is a list of rows, every row the same length. Return one number per **column**: the
+largest value in that column minus the smallest.
+
+Sensors drop readings, so a cell may be \`None\`. A \`None\` takes part in nothing: it is skipped, and
+it never becomes a zero. A column that holds nothing but gaps has a range of \`0\`, and an empty
+table has no columns, so it gives \`[]\`.
+
+\`\`\`python
+column_ranges([[10, 5], [30, 5], [20, 9]])      # [20, 4]
+column_ranges([[10, None], [30, 7], [20, None]])  # [20, 0]
+column_ranges([])                                 # []
+\`\`\``,
+    starterCode: `def column_ranges(table):
+    # One number per column: its largest value minus its smallest, skipping gaps.
     pass`,
     hints: [
-      "`isinstance(addend, list)` tells the two cases apart.",
-      "For the elementwise case, `zip(values, addend)` pairs them up position by position.",
-      "For the scalar case, one comprehension over `values` is enough: `[value + addend for value in values]`.",
+      "A row is easy to walk and a column is not, because a column is one position taken from every row. Decide which index you are holding still before you write the loop.",
+      "`range(len(table[0]))` gives you the column indexes, as long as you have already dealt with the table that has no rows at all.",
+      "Gather one column's real values into a list first, and both edge cases become questions about that list: `max(values) - min(values)` when it holds anything, `0` when it does not.",
     ],
-    referenceSolution: `def broadcast_add(values, addend):
-    if isinstance(addend, list):
-        return [value + other for value, other in zip(values, addend)]
-    return [value + addend for value in values]`,
+    referenceSolution: `def column_ranges(table):
+    if not table:
+        return []
+    ranges = []
+    for index in range(len(table[0])):
+        values = [row[index] for row in table if row[index] is not None]
+        ranges.append(max(values) - min(values) if values else 0)
+    return ranges`,
     testCases: [
       {
-        input: { values: [1, 2, 3], addend: 10 },
-        expected: [11, 12, 13],
-        description: "a scalar broadcasts",
+        input: {
+          table: [
+            [10, 5],
+            [30, 5],
+            [20, 9],
+          ],
+        },
+        expected: [20, 4],
+        description: "one range per column",
       },
       {
-        input: { values: [1, 2, 3], addend: [10, 20, 30] },
-        expected: [11, 22, 33],
-        description: "two sequences add elementwise",
+        input: {
+          table: [
+            [10, null],
+            [30, 7],
+            [20, null],
+          ],
+        },
+        expected: [20, 0],
+        description: "gaps are skipped, and an all-gap column is 0",
       },
-      { input: { values: [], addend: 5 }, expected: [], description: "an empty array stays empty" },
+      { input: { table: [] }, expected: [], description: "an empty table has no columns" },
       {
-        input: { values: [7, -7, 0], addend: 7 },
-        expected: [14, 0, 7],
-        description: "negatives and zero broadcast the same way",
+        input: { table: [[4, -6, 0]] },
+        expected: [0, 0, 0],
+        description: "a single row has no spread in any column",
+      },
+      {
+        input: {
+          table: [
+            [-4, 2],
+            [6, -8],
+          ],
+        },
+        expected: [10, 10],
+        description: "negatives spread the same way",
       },
     ],
   },
   practice: {
     id: "py-l3-numpy-arrays-practice",
     executionMode: "workspace",
+    estimatedMinutes: 30,
     prompt: `Repair the overnight calibration report. It has been wrong since one sensor started
 dropping readings: the old job deleted any row that contained a gap, so the report quietly shrank and
 every column total came out low.
