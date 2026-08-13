@@ -10,22 +10,12 @@ import { SYSTEM_DESIGN_LEVELS } from "@/lib/tutorials/system-design/curriculum"
 import { extractCsDiagramSources, extractCsWidgetSources } from "@/lib/tutorials/diagrams/extract"
 import { parseWidgetSpec } from "../schema"
 import { parseDiagramSpec } from "@/lib/tutorials/diagrams/schema"
-
-/** Every interactive/animated family that counts against the one-per-lesson cap. */
-const SIM_TYPES = new Set([
-  "calc",
-  "hash-ring",
-  "sequence",
-  "rate-limiter",
-  "quorum",
-  "cache-sim",
-  "queue-sim",
-  "partition-sim",
-  "replication-lag",
-  "watermark-sim",
-  "steps",
-])
-const ANIMATED_DIAGRAM_TYPES = new Set(["topology", "ladder"])
+// Which families count as heavy is the density rule itself, so it has exactly one definition. The
+// coverage module owns it because the audit script and any interactivity sweep need the same answer.
+import {
+  ANIMATED_DIAGRAM_TYPES,
+  SIMULATION_WIDGET_FAMILIES as SIM_TYPES,
+} from "@/lib/tutorials/system-design/coverage"
 
 interface LessonLoad {
   lessonId: string
