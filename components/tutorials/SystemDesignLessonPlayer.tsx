@@ -38,10 +38,25 @@ import type { DesignLesson, LessonSection } from "@/lib/tutorials/types"
  * It differs from the code players in two ways:
  *  - There is NO runner. The `DesignAnswerPanel` (free-text write → Save → reveal model answer)
  *    replaces the code runner; its "answer saved" gate replaces the runner's `onPass`.
- *  - System design has ONE design write per lesson (the Apply). The UI shows the Read + Design spine
- *    only; marking the Design section done completes BOTH `apply` and `practice` so the shared store —
- *    which keys `lessonStatus` off the `practice` section — flips the lesson to completed. (Deviation
- *    noted vs a separate Practice phase.)
+ *  - The GRADED spine is Read → Design (the Apply), and marking Design done completes BOTH the
+ *    `apply` and `practice` store sections, because the shared store keys `lessonStatus` off
+ *    `practice`. That is load-bearing and must not change: every existing completion depends on it.
+ *
+ * ## Practice is an optional third phase, deliberately outside the store
+ *
+ * For a long time this player rendered `lesson.apply` and nothing else, so all 208 authored
+ * `practice` exercises were unreachable to a signed-in learner and their `modelAnswerOutline`s were
+ * reachable from nowhere at all (the public reading page publishes practice PROMPTS, but
+ * `toPublicExercisePreview` seals every model answer). In a course whose entire assessment loop is
+ * "write, then reveal and self-compare", that is the comparison half of the loop missing on the
+ * harder problem.
+ *
+ * Practice now unlocks once the Apply answer is saved, with a full editor, its own persistence row,
+ * and its own reveal. It is driven by LOCAL state rather than a `LessonSection`, which is the whole
+ * trick: `sections.practice` is already flipped to "completed" by `completeDesign`, so routing this
+ * through the store would either show a phase that is complete before it is opened, or require
+ * changing the completion rule and regressing every lesson a learner has already finished. Keeping
+ * it local means the transfer problem becomes reachable and nothing about progress moves.
  */
 export interface SystemDesignLessonPlayerProps {
   lesson: DesignLesson
@@ -71,11 +86,16 @@ export function SystemDesignLessonPlayer({
   const [active, setActive] = useState<LessonSection>("teach")
   const centerRef = useRef<HTMLElement>(null)
 
-  // The single design write per lesson is the Apply exercise. Answer text is held per-exercise so it
-  // survives phase switches (mirrors the SQL player's `codeByExercise`).
-  const designExercise = lesson.apply
+  // Which exercise the Design view is showing. Apply is the graded one; Practice is the optional
+  // harder transfer problem, unlocked after Apply is saved. Local state, not a `LessonSection` —
+  // see the module comment for why routing it through the store would break completion.
+  const [designPhase, setDesignPhase] = useState<"apply" | "practice">("apply")
+  const designExercise = designPhase === "practice" ? lesson.practice : lesson.apply
+
+  // Answer text is held per-exercise so it survives phase switches (mirrors the SQL player's
+  // `codeByExercise`), which is what lets Apply and Practice each keep their own draft.
   const [answerByExercise, setAnswerByExercise] = useState<Record<string, string>>({
-    [designExercise.id]: designExercise.starterAnswer ?? "",
+    [lesson.apply.id]: lesson.apply.starterAnswer ?? "",
   })
   const [savedAnswerByExercise, setSavedAnswerByExercise] = useState<Record<string, string>>({})
   const [answerLoading, setAnswerLoading] = useState(true)
@@ -96,6 +116,9 @@ export function SystemDesignLessonPlayer({
   useEffect(() => {
     let cancelled = false
     setAnswerLoading(true)
+    // A phase switch is a new exercise, so the "learner has typed" guard has to reset or the
+    // incoming saved answer would be treated as a clobber of the OTHER exercise's draft.
+    answerTouched.current = false
     fetchDesignAnswer(designExercise.id)
       .then((saved) => {
         if (cancelled) return
@@ -104,6 +127,13 @@ export function SystemDesignLessonPlayer({
           if (!answerTouched.current) {
             setAnswerByExercise((prev) => ({ ...prev, [designExercise.id]: saved.answer }))
           }
+        } else if (!answerTouched.current) {
+          // Seed the starter for an exercise the learner has not written yet. Switching to Practice
+          // must not inherit the Apply draft that is still sitting in `answerByExercise`.
+          setAnswerByExercise((prev) => ({
+            ...prev,
+            [designExercise.id]: prev[designExercise.id] ?? designExercise.starterAnswer ?? "",
+          }))
         }
         // Only a resolved load (a saved answer or a genuine none) opens the editor.
         setAnswerLoading(false)
@@ -115,7 +145,9 @@ export function SystemDesignLessonPlayer({
     return () => {
       cancelled = true
     }
-  }, [designExercise.id])
+    // `starterAnswer` is a constant of the authored exercise, so it only ever changes together with
+    // the id; listing it keeps the lint rule satisfied without adding a real re-run.
+  }, [designExercise.id, designExercise.starterAnswer])
 
   // The player is a Client Component and the route sets no metadata, so set the tab title here.
   useEffect(() => {
@@ -186,9 +218,27 @@ export function SystemDesignLessonPlayer({
   }
 
   // Two-phase Read → Design loop: count only teach + apply so the header bar reads 50% → 100%.
+  // Practice is optional and deliberately absent from this, so opening it cannot make a finished
+  // lesson read as unfinished.
   const progress = computeLessonProgress(sections, ["teach", "apply"])
   const showDesign = active === "apply" || active === "practice"
   const lessonComplete = sections.practice === "completed"
+
+  // Practice unlocks on a saved Apply answer, or on an Apply already marked done in a past session.
+  // Gating on the write rather than on arrival keeps the harder problem from pre-empting the one the
+  // lesson actually builds to.
+  const practiceUnlocked =
+    savedAnswerByExercise[lesson.apply.id] !== undefined || sections.apply === "completed"
+  const practiceAnswered = savedAnswerByExercise[lesson.practice.id] !== undefined
+
+  const openPractice = () => {
+    setDesignPhase("practice")
+    centerRef.current?.scrollTo({ top: 0 })
+  }
+  const backToApply = () => {
+    setDesignPhase("apply")
+    centerRef.current?.scrollTo({ top: 0 })
+  }
 
   return (
     <LessonTelemetryProvider lessonId={lesson.id} levelId={level.id} skills={lesson.skills}>
@@ -298,6 +348,17 @@ export function SystemDesignLessonPlayer({
 
                 {!isLoading && showDesign && (
                   <div className="flex flex-col gap-4">
+                    {designPhase === "practice" && (
+                      <button
+                        type="button"
+                        onClick={backToApply}
+                        className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to the Design question
+                      </button>
+                    )}
+
                     <DesignAnswerPanel
                       exercise={designExercise}
                       answer={
@@ -305,17 +366,56 @@ export function SystemDesignLessonPlayer({
                       }
                       onAnswerChange={(value) => setAnswer(designExercise.id, value)}
                       onReady={() => markPassed("apply")}
-                      brief={{ eyebrow: "Design", title: "Your turn" }}
+                      brief={
+                        designPhase === "practice"
+                          ? { eyebrow: "Practice", title: "Push harder" }
+                          : { eyebrow: "Design", title: "Your turn" }
+                      }
                       savedAnswer={savedAnswerByExercise[designExercise.id]}
                       onSave={handleSaveAnswer}
                       loading={answerLoading}
                     />
-                    <SectionDoneButton
-                      passed={Boolean(passedSections.apply)}
-                      completed={sections.apply === "completed"}
-                      onMarkDone={completeDesign}
-                    />
-                    {lessonComplete && (
+
+                    {/* Practice never gates completion, so it gets no SectionDoneButton and does not
+                        touch the store. Saving it persists the answer and reveals the model outline,
+                        which is the whole loop this course runs on. */}
+                    {designPhase === "apply" && (
+                      <SectionDoneButton
+                        passed={Boolean(passedSections.apply)}
+                        completed={sections.apply === "completed"}
+                        onMarkDone={completeDesign}
+                      />
+                    )}
+
+                    {designPhase === "apply" && practiceUnlocked && (
+                      <div className="border-border bg-muted/30 flex flex-col gap-2 rounded-xl border p-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
+                            Optional
+                          </span>
+                          {practiceAnswered && (
+                            <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                              Answered
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-foreground text-sm font-semibold">Push harder</p>
+                        <p className="text-muted-foreground text-sm">
+                          A second problem on the same skill, with tighter constraints. It does not
+                          affect completing this lesson.
+                        </p>
+                        <div>
+                          <Button variant="outline" className="gap-2" onClick={openPractice}>
+                            {practiceAnswered
+                              ? "Revisit the harder problem"
+                              : "Try the harder problem"}
+                            <ArrowRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {designPhase === "apply" && lessonComplete && (
                       <div className="flex flex-col gap-3">
                         <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
                           Lesson complete. Nice work. Revisit it in a few days to lock it in.
