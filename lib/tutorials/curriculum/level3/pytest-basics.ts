@@ -333,7 +333,7 @@ export const pytestBasicsLesson: PythonLesson = {
   difficulty: "medium",
   skills: ["pytest", "testing", "assertions", "tdd"],
   teach: {
-    estimatedMinutes: 6,
+    estimatedMinutes: 7,
     markdown: `## Why tests are the code that guards your code
 
 When you change \`balance_after\` six months from now, the only thing standing between a clean refactor and a corrupted account balance is a test that still remembers what "correct" meant. On a real team, a pull request without tests is a pull request nobody can safely merge, because reviewers cannot tell whether it works, only that it compiles. \`pytest\` is the tool most Python shops reach for because it turns "I think this works" into a repeatable, machine-checkable claim.
@@ -394,9 +394,36 @@ def test_a_negative_deposit_is_rejected():
         balance_after(-1, [])
 \`\`\`
 
-If the block raises nothing, the test fails with \`DID NOT RAISE\`. If it raises something else, that exception surfaces as the failure. Name the narrowest exception type you actually expect: \`pytest.raises(Exception)\` passes for a typo in the call as readily as for the rejection you meant to pin. (The Practice workspace has no \`pytest\` installed, so it ships a \`raises\` shim you import from \`tests/pytest_shim.py\`, used exactly the same way.)
+If the block raises nothing, the test fails with \`DID NOT RAISE\`. If it raises something else, that exception surfaces as the failure. Name the narrowest exception type you actually expect: \`pytest.raises(Exception)\` passes for a typo in the call as readily as for the rejection you meant to pin.
 
-Test-driven development runs this loop backwards: write the failing test first (red), then write the smallest code that makes it pass (green). In the Apply warm-up the tests already exist, and your job is to implement \`balance_after\` so \`start + sum(transactions)\` produces the expected total and the suite turns green. The Practice turns that around: you are handed a documented module and you write the suite for it, and a hidden grader decides whether your tests would actually catch a broken build.
+This sandbox has no \`pytest\` installed, so the Practice workspace ships the same context manager as a read-only \`tests/pytest_shim.py\`. Only the import line changes:
+
+\`\`\`python
+# tests/test_account.py, in the Practice workspace
+from bank import account
+from tests.pytest_shim import raises   # stands in for pytest.raises
+
+def test_a_negative_deposit_is_rejected():
+    with raises(ValueError):
+        account.balance_after(-1, [])
+\`\`\`
+
+Note \`from bank import account\` followed by \`account.balance_after(...)\`, rather than importing the function itself. A name you imported directly is bound once and keeps pointing at the function it named, so a harness that swaps the module's function underneath your suite would never reach your tests. Calling through the module looks the name up on every call.
+
+When you need the same check outside a test, \`try\`/\`except\`/\`else\` says it by hand:
+
+\`\`\`python
+try:
+    account.balance_after(-1, [])
+except ValueError:
+    print("rejected, as documented")
+else:
+    print("it accepted a negative deposit")
+\`\`\`
+
+The \`else\` branch is the part people forget, and it is the one that catches the bug: it runs only when the call came back normally, which is exactly the failure you are looking for.
+
+Test-driven development runs this loop backwards: write the failing test first (red), then write the smallest code that makes it pass (green). The Apply warm-up asks the question a suite exists to answer: given a documented rule and a build of the code, which documented behaviours does that build get wrong? The Practice is the same job written as a real suite, and a hidden grader decides whether your tests would actually catch a broken build.
 
 ## Pitfall: a test that never runs still "passes"
 
@@ -463,29 +490,135 @@ print("all good")`,
   apply: {
     id: "py-l3-pytest-basics-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`balance_after(start, transactions)\`. Add every signed amount in
-\`transactions\` to \`start\` and return the result.
+    // Budget: 12 min. To read: ~15 lines of prompt plus the 4 builds in the starter, ~35 lines.
+    // To write: ~12 lines. This is the Practice's job with the harness removed: pick an input
+    // per documented behaviour, including a boundary and the error path, and report what fails.
+    // Writing it as a suite (names, asserts, a raises block) is the step Practice adds.
+    estimatedMinutes: 12,
+    prompt: `Warm-up (one file): a library charges a late fee. Four behaviours are documented, and the
+starter holds four builds of \`late_fee(days_late, member=False)\`, only one of which is correct.
 
-\`balance_after(100, [10, -30, 5])\` is \`85\`.`,
-    starterCode: `def balance_after(start, transactions):
-    # Return start plus the sum of all transactions.
+1. \`"none"\`: nothing is owed on a book returned 0 days late.
+2. \`"per_day"\`: a non-member owes 50 cents for each day late.
+3. \`"member_cap"\`: a member owes the same 50 cents a day but never more than 200 cents.
+4. \`"rejects"\`: a negative \`days_late\` raises \`ValueError\`.
+
+Implement \`wrong_behaviours(build)\`. Look the named build up in \`BUILDS\`, exercise it, and return
+the sorted list of the labels above that it gets wrong.
+
+\`wrong_behaviours("correct")\` is \`[]\`.`,
+    starterCode: `def _correct(days_late, member=False):
+    if days_late < 0:
+        raise ValueError("days_late must not be negative")
+    owed = 50 * days_late
+    return min(owed, 200) if member else owed
+
+
+def _no_cap(days_late, member=False):
+    if days_late < 0:
+        raise ValueError("days_late must not be negative")
+    return 50 * days_late
+
+
+def _silent(days_late, member=False):
+    if days_late < 0:
+        return 0
+    owed = 50 * days_late
+    return min(owed, 200) if member else owed
+
+
+def _greedy(days_late, member=False):
+    if days_late < 0:
+        raise ValueError("days_late must not be negative")
+    owed = 50 * days_late
+    owed = min(owed, 200) if member else owed
+    return max(owed, 50)
+
+
+BUILDS = {"correct": _correct, "no_cap": _no_cap, "silent": _silent, "greedy": _greedy}
+
+
+def wrong_behaviours(build):
+    # Exercise BUILDS[build] and return the sorted labels it gets wrong.
     pass`,
     hints: [
-      "`sum(transactions)` adds the deposits and withdrawals (signs included).",
-      "Add it to the starting balance: `start + sum(transactions)`.",
+      "One behaviour at a time. Each one needs an input you choose and a value you already know is right, and a build is wrong on that behaviour when the two disagree.",
+      "Pick the inputs that can tell the behaviours apart: a member far enough past the cap that the cap has to bite, and 0 days for the behaviour that says nothing is owed.",
+      "The fourth behaviour has no return value to compare, so run the call in a `try` and put the failure in the `else` branch: reaching `else` means it came back instead of raising. Collect the labels in a list and `return sorted(...)`.",
     ],
-    referenceSolution: `def balance_after(start, transactions):
-    return start + sum(transactions)`,
+    referenceSolution: `def _correct(days_late, member=False):
+    if days_late < 0:
+        raise ValueError("days_late must not be negative")
+    owed = 50 * days_late
+    return min(owed, 200) if member else owed
+
+
+def _no_cap(days_late, member=False):
+    if days_late < 0:
+        raise ValueError("days_late must not be negative")
+    return 50 * days_late
+
+
+def _silent(days_late, member=False):
+    if days_late < 0:
+        return 0
+    owed = 50 * days_late
+    return min(owed, 200) if member else owed
+
+
+def _greedy(days_late, member=False):
+    if days_late < 0:
+        raise ValueError("days_late must not be negative")
+    owed = 50 * days_late
+    owed = min(owed, 200) if member else owed
+    return max(owed, 50)
+
+
+BUILDS = {"correct": _correct, "no_cap": _no_cap, "silent": _silent, "greedy": _greedy}
+
+
+def wrong_behaviours(build):
+    late_fee = BUILDS[build]
+    wrong = []
+    if late_fee(0) != 0:
+        wrong.append("none")
+    if late_fee(3) != 150:
+        wrong.append("per_day")
+    if late_fee(6, member=True) != 200:
+        wrong.append("member_cap")
+    try:
+        late_fee(-1)
+    except ValueError:
+        pass
+    else:
+        wrong.append("rejects")
+    return sorted(wrong)`,
     testCases: [
-      { input: { start: 100, transactions: [10, -30, 5] }, expected: 85, description: "mixed" },
-      { input: { start: 0, transactions: [10, 20] }, expected: 30, description: "deposits" },
-      { input: { start: 50, transactions: [] }, expected: 50, description: "no transactions" },
-      { input: { start: 0, transactions: [-5] }, expected: -5, description: "overdraft" },
+      { input: { build: "correct" }, expected: [], description: "the correct build" },
+      {
+        input: { build: "no_cap" },
+        expected: ["member_cap"],
+        description: "a member is charged past the cap",
+      },
+      {
+        input: { build: "silent" },
+        expected: ["rejects"],
+        description: "a negative day count is swallowed",
+      },
+      {
+        input: { build: "greedy" },
+        expected: ["none"],
+        description: "a fee is charged on a book returned on time",
+      },
     ],
   },
   practice: {
     id: "py-l3-pytest-basics-practice",
     executionMode: "workspace",
+    // Budget: 21 min. To read: README 25 lines, the shim 30, the module 20, the test starter 18,
+    // so ~93 lines. To write: 5 tests at ~4 lines each plus a one-operator repair, ~21 lines.
+    // Lesson total is teach 7 + apply 12 + practice 21 = 40.
+    estimatedMinutes: 21,
     prompt: `Write the test suite for \`cart/shipping.py\` in \`tests/test_shipping.py\`, then fix the
 one documented behaviour the module gets wrong. \`README.md\` lists what shipping is supposed to
 cost: a flat charge under the free-shipping threshold, free at or above it, a fixed express charge
