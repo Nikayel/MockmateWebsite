@@ -7,6 +7,17 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // ───────────────────────────────────────────────────────────────────────────
 
 // ───────────────────────────────────────────────────────────────────────────
+// Time budget behind `estimatedMinutes` (counted, not guessed): teach 5 (about 850 prose words,
+// four checks), apply 6 (a 6-line prompt, a 7-line reference), practice 39 (78 README lines plus
+// ~120 lines of read-only command table and visible tests to read, 71 lines to write across two
+// modules, 18 recorded tests). Lesson total 50 = 5 + 6 + 39.
+//
+// Apply is left alone deliberately: at 71 to 8 reference lines it is inside the 12x ramp threshold
+// and it already exercises the lesson's real skill, dispatching a command name to a function with
+// its arguments converted at the boundary. The practice's option grammar is the one new idea.
+// ───────────────────────────────────────────────────────────────────────────
+
+// ───────────────────────────────────────────────────────────────────────────
 // Practice workspace: the logtail option parser
 //
 // Apply already covers "read argv[0] and convert two positionals". Practice grades what actually
@@ -594,6 +605,22 @@ print(run(["add", "2", "3"]))   # 5
 
 Because \`run\` receives its input, a test can call \`run(["mul", "4", "5"])\` and assert it returns \`20\`, with no subprocess and no shell.
 
+### Splitting a token that may not contain the delimiter
+
+A shell hands you an option two ways, \`--limit 10\` and \`--limit=10\`, so a token has to be read as "a name, and possibly a value glued on". \`str.split\` is awkward here because the number of pieces changes. \`str.partition\` always returns exactly three strings, so one unpacking covers both spellings:
+
+\`\`\`python
+>>> "--limit=10".partition("=")
+('--limit', '=', '10')
+>>> "--limit".partition("=")     # no delimiter: still three pieces
+('--limit', '', '')
+>>> name, sep, value = "--verbose".partition("=")
+>>> bool(sep)                    # the middle piece answers "was there one?"
+False
+\`\`\`
+
+The middle element is the separator itself when it was found and the empty string when it was not, which makes it the truthiness test for "did this token carry a value". Note the difference from \`split("=", 1)\`, which returns one piece or two and so needs a length check before you can unpack it.
+
 ### Pitfalls
 
 \`\`\`cswidget
@@ -664,6 +691,7 @@ print(run(["add", "2", "3"]))   # 5`,
   apply: {
     id: "py-l3-cli-apply",
     executionMode: "single-file",
+    estimatedMinutes: 6,
     prompt: `Warm-up (one file): implement \`run(argv)\`: \`argv\` is a list like \`["add", "2", "3"]\`. Read the
 command and two integer arguments and return \`add\` or \`mul\` of them.
 
@@ -694,6 +722,7 @@ command and two integer arguments and return \`add\` or \`mul\` of them.
   practice: {
     id: "py-l3-cli-practice",
     executionMode: "workspace",
+    estimatedMinutes: 39,
     prompt: `Implement option handling for \`logtail\`, the small log tool in this workspace. The ticket
 says it must accept \`--limit 10\`, \`--limit=10\`, the short forms, a \`--\` after which a
 filename starting with a dash is still a filename, and it must answer a mistyped option with a
