@@ -247,31 +247,142 @@ large working sets belong at origin) rather than on a CPU quota that vendors kee
 
 ## P1 — The visual gap
 
+### CUR-13 — Topology diagrams server-render only their first stage
+
+**Effort:** 1 agent-day. **Blocks:** CUR-07. **This is an SEO bug on the traffic surface.**
+
+**Evidence.** Verified 2026-08-13 by rendering a four-node, three-stage topology through
+`renderToStaticMarkup`:
+
+```
+IN SSR HTML : Client
+IN SSR HTML : Load balancer
+MISSING     : Service
+MISSING     : Database
+```
+
+`useStepPlayer` initialises to `useState(0)` and `TopologyDiagram` filters both nodes and edges to
+the visible set, so the server HTML contains stage 1 of N and nothing else. All 22 shipped topology
+diagrams are affected, on `/learn` pages that are the site's main organic-traffic surface.
+
+Two consequences. Googlebot indexes a fraction of each architecture diagram, so the content we are
+trying to rank on is partly invisible to the crawler. And any reader before hydration, or with JS
+disabled, sees a truncated system.
+
+**Do.** Render the complete diagram in server HTML and let the staged reveal be a client
+enhancement that hides later stages after mount, rather than a client feature that adds them. That
+inverts the current default from "nothing until JS" to "everything until JS narrows it", which is
+the correct default for indexed content and for `prefers-reduced-motion`.
+
+**Accept.** A test renders every authored topology through `renderToStaticMarkup` and asserts every
+node label appears in the server HTML. Confirm it fails against today's renderer before fixing.
+Fetch a live lesson with `curl` after deploy and grep for a last-stage node label.
+
+### CUR-14 — The topology layout explodes on a cycle and draws backwards arrows
+
+**Effort:** 1.5 agent-days. **Blocks:** CUR-07, hard.
+
+**Evidence.** Verified by calling `layoutTopology` directly with a six-node feedback loop, which is
+the exact shape of the ML blueprint lesson's own ASCII drawing (raw logs to ETL to training to
+registry to serving to feedback log, back to ETL):
+
+```
+nodes: 6   max column: 31
+  raw col=0   etl col=31   train col=27   registry col=28   serve col=29   feedback col=30
+edge etl -> train: POINTS BACKWARD (etl col 31 is after train col 27)
+approx width px: 6264
+```
+
+Six nodes produce thirty-two columns and a diagram roughly 6,264 pixels wide, with an arrow running
+backwards. It passes the Zod schema, passes the integrity test, and would ship, because the only
+render assertion is `not.toThrow()`.
+
+**Why this blocks CUR-07 rather than sitting beside it.** Feedback loops are everywhere in the
+lessons queued for conversion: ML training loops, streaming pipelines with replay, retry paths,
+CDC. The first agent to convert one of those ASCII drawings ships a broken 6,000-pixel diagram and
+nothing catches it. Per CLAUDE.md the check that catches a bad edit lands before the sweep, not
+after.
+
+**Do.** Break cycles at layout time the way a layered layout is supposed to: detect back edges,
+assign the cycle-closing edge a reversed rank, and render it as a return arrow rather than pushing
+the node into a new column. Then bound the result: a spec that cannot lay out inside a sane column
+count should fail `parseDiagramSpec` with a readable message, not render.
+
+**Accept.** The six-node loop above lays out in at most 6 columns with the return edge drawn
+backwards deliberately. A test asserts no authored topology exceeds a column count near its node
+count, and that every edge either points forward or is explicitly marked as a return edge. Confirm
+the test fails on today's layout.
+
+### CUR-15 — Topology SVG content is hidden from screen readers
+
+**Effort:** 0.5 agent-days.
+
+**Evidence.** `components/tutorials/diagrams/TopologyDiagram.tsx:80` sets `aria-hidden="true"` on
+the `<svg>`, with `focusable="false"`.
+
+Stated precisely, because the situation is better than "no alternative": the frame does supply an
+accessible name (`label={spec.title}` and a `groupLabel` describing a steppable build), and each
+stage's `note` is required by the schema and rendered as real text, so a screen-reader user gets a
+narrated walkthrough. What they never get is the structure: node labels, what connects to what, and
+which edges are sync, async or replication.
+
+**Do.** Give the SVG a real accessible name and description built from the spec rather than hiding
+it, or render a visually-hidden structured list beside it (nodes by kind, then edges as "A calls B
+synchronously"). The second is usually better for a graph, because a flat description of a
+two-dimensional structure reads poorly.
+
+**Accept.** A screen reader can enumerate every node and edge. No authored diagram has
+`aria-hidden` on content that carries information. Add the assertion to the integrity test.
+
 ### CUR-07 — Replace the 42 ASCII architecture drawings
 
-**Effort:** pending the decision in
-`docs/system-design-curriculum/DIAGRAM-LIBRARY-DECISION-2026-08-13.md`. **Do not start until that
-lands.**
+**Effort:** 12 to 16 agent-days. **Depends on:** CUR-13, CUR-14 and CUR-15, all of which must land
+first. **Decision:** `docs/system-design-curriculum/DIAGRAM-LIBRARY-DECISION-2026-08-13.md`.
+
+**The verdict is KEEP AND EXTEND: adopt no diagram or layout library, at runtime or at build time.**
+Fourteen candidates were surveyed and all fourteen rejected, but not for the reason anyone expected.
+The deciding argument is that the three live constraint failures are in our own code and no library
+touches any of them: the diagram does not server-render (CUR-13), the layout breaks on a cycle
+(CUR-14), and the content is hidden from assistive technology (CUR-15). Adopting elkjs or dagre
+would have imported a layout engine while leaving all three defects in place.
+
+**One prior fact corrected.** The 2026-07-04 rejection of Mermaid cited "~500KB+ gzip", which
+measured neither real artifact. Measured against mermaid 11.16.1: ESM entry 11,025 B gzip, entry
+plus nine static chunks 124,375 B, UMD single-file 971,552 B gzip. Cite 121 KB, never 500 KB. The
+verdict does not change, but it now rests on the constraint failures rather than on a wrong number.
+Two other clauses of that decision are stale and should stop being quoted: the React 19
+`findDOMNode` risk is resolved, and "non-deterministic layout" is correct for physics simulation but
+false for layered Sugiyama layout, which is what dagre and ELK do.
 
 **Evidence.** 42 lessons draw their architecture as ASCII inside plain code fences, exactly one
 drawing each, concentrated in L6, L7, L9, L10 and L11. 105 of 208 lessons carry no diagram or
 simulation at all. ASCII survives copy-paste into a terminal and nothing else: it does not scale on
 mobile, it is read character by character by a screen reader, and it cannot be themed.
 
-**The open question this ticket is blocked on.** Whether to keep extending the hand-rolled
-`csdiagram` system (11 types, deterministic layered layout already implemented in
-`lib/tutorials/diagrams/topology-layout.ts`, zero runtime dependencies, server-rendered, 1,459
-integrity assertions) or to adopt a library. A prior decision on 2026-07-04 rejected Mermaid on
-bundle size and rejected force-directed graphs on determinism and accessibility, and the current
-system is the product of that decision. Research is in flight and covers layout engines (dagre,
-elkjs), diagram-as-code tools rendered to static SVG at BUILD time (D2, Graphviz, Mermaid CLI),
-React component libraries, and the option of simply extending the schema.
+**On build-time rendering, which was the most promising angle.** Technically yes, and it genuinely
+neutralises the bundle and licence objections, so any argument against a build-time engine that
+leans on those is leaning on nothing. It still loses, for three reasons worth recording: there is no
+payload to eliminate (the whole diagram system is about 21 KB gzip), baking the diagram at build
+time forfeits the staged reveal where the WCAG 2.3.3 compliance and the segmenting benefit live, and
+static SVG bakes colours against a `.dark`-class theme with `enableSystem={false}`.
 
-**The constraint that will shape the answer.** The density cap. `topology` and `ladder` are animated
-and therefore capped at one per lesson, and 14 of 28 L10 lessons are already at that cap. So a large
-share of the 42 cannot take a topology no matter what is decided, and need a STATIC box-and-arrow
-form that does not count against the animation budget. Any recommendation that ignores this will not
-survive `sim-density.test.ts`.
+**One honest re-entry criterion**, recorded rather than a permanent refusal: if orthogonal edge
+routing in our own renderer still leaves more than roughly three edges crossing through unrelated
+boxes, revisit `@dagrejs/dagre` as a build-time devDependency with canonical node sorting.
+
+**The constraint that shapes the work.** The density cap. `topology` and `ladder` are animated and
+therefore capped at one per lesson, and 14 of 28 L10 lessons are already at that cap. So a large
+share of the 42 cannot take a topology and need a STATIC box-and-arrow form that does not count
+against the animation budget. The proposed schema changes are additive and optional: `reveal: "all"`
+to opt out of staging (which also makes a diagram exempt from the cap), a `feedback` edge kind, and
+`groups` for swimlanes.
+
+**Two shapes are deliberately left unconverted**, which makes restyling the `<pre>` fence mandatory
+rather than optional: decision branches, and nodes whose content is a list. Those stay as text.
+
+**The single biggest reader-facing win costs nothing and beats what a library would achieve:**
+vertical flow with wrapped labels takes diagrams over 720px from 8 of 22 down to 0 of 22, with
+honest untruncated labels.
 
 **Accept.** Zero ASCII architecture drawings in L6, L7, L9, L10 and L11.
 `lessonsWithoutDiagramOrSim` falls from 105, with the ratchet in `coverage-floors.test.ts` lowered in
@@ -408,7 +519,12 @@ These live in `seofixesbacklog.md` but are curriculum work and will be executed 
 - **Building an autograder for free-response design answers.** CUR-11 raises self-assessment quality
   without one; grading prose is a different product.
 - **Re-litigating the 2026-07-04 decision against physics graphs.** Non-deterministic layout breaks
-  spatial memory across revisits and canvas is a screen-reader black box. Both still hold.
+  spatial memory across revisits and canvas is a screen-reader black box. Both still hold. Note that
+  two OTHER clauses of that decision are stale and should stop being quoted: the React 19
+  `findDOMNode` risk is resolved, and the "~500KB gzip" Mermaid figure was wrong (121 KB measured).
+- **Adopting a layout library to fix diagram quality.** Surveyed and rejected: all three real defects
+  (CUR-13, CUR-14, CUR-15) are in our own renderer, and a library fixes none of them. Re-entry
+  criterion is recorded in CUR-07.
 
 ## Log
 

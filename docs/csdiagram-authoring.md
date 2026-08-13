@@ -39,7 +39,7 @@ sliding, a name pointing at an object. They hurt as decoration. Rules of thumb:
 | `call-stack` | triggered | recursion / wrapping push-and-pop |
 | `comprehension` | static | a comprehension next to its equivalent loop |
 | `table` | static | a highlightable example table (LAG/LEAD, SCD versions, before/after) |
-| `ladder` | **animated** | messages crossing between participants over time: a handshake, a consensus round, a replication exchange |
+| `ladder` | **animated** | magnitudes separated by orders of scale, revealed smallest first: the latency ladder (L1 to RAM to SSD to disk to cross-region), cost tiers, storage tiers |
 | `topology` | **animated** | a system drawn as boxes and edges: clients, load balancers, services, stores, caches, queues, CDNs, zones |
 
 `pipeline` is not SQL-only despite the row above. Any ordered left-to-right sequence renders
@@ -65,7 +65,10 @@ the cap is a test failure, not a warning.
 
 ### Cross-field rules the schema enforces
 
-- **`ladder`**: 3 to 12 bands, ordered smallest to largest, and `value` must ascend across them.
+- **`ladder`** is NOT a sequence or message diagram. It draws bars whose lengths compare magnitudes,
+  not actors exchanging messages over time. If you want messages between participants, that is the
+  `sequence` WIDGET family in `cswidget`, not this. 3 to 12 bands, ordered smallest to largest, and
+  `value` must ascend across them.
   `scale: "log"` gives each decade equal travel, which is what makes a latency ladder's cliffs
   visible; `linear` flattens them into one bar and eleven slivers.
 - **`topology`**: 2 to 16 nodes and 1 to 24 edges. Every node must appear in exactly one stage, and
