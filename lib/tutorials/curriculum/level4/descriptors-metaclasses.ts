@@ -1,3 +1,21 @@
+/**
+ * L4: descriptors, __set_name__ and __init_subclass__.
+ *
+ * Difficulty is deliberately untouched. The council measured this practice at 39 reference lines
+ * against a 15-line Apply, a 2.6x ratio, with two depth levers and a genuine two-file seam
+ * (the descriptor and the base class that collects them). Apply already exercises the real skill:
+ * it is a working descriptor with all three protocol methods.
+ *
+ * The one defect was closure: the reference walks `cls.__bases__` to inherit a registry, and no
+ * fence in the lesson had shown that attribute. Teach now demonstrates it beside `__mro__`, with
+ * the reason the merged registry must be assigned onto the class rather than mutated in place.
+ * Where the descriptor stores its value, and what belongs in the registry, stay the learner's.
+ *
+ * Time budget (counted, not guessed). Teach 9: ~1,200 prose words, four checks, six fences.
+ * Apply 12: 12 provided lines to read, 15 to write across a three-method protocol. Practice 45:
+ * 45 lines of README, 35 of read-only declared profiles, 39 to write across two files, and the
+ * per-instance storage bug the hidden tests hunt. 9 + 12 + 45 = 66, the lesson total.
+ */
 import type { PythonLesson } from "../../types"
 import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
@@ -487,6 +505,31 @@ class CsvReader(Reader, fmt="csv"): ...
 print(Reader.REGISTRY)   # {'csv': <class 'CsvReader'>}
 \`\`\`
 
+### Reading what a class was built from
+
+Two attributes answer that, and they are not the same question. \`cls.__bases__\` is the tuple of direct parents, exactly as written in the class statement. \`cls.__mro__\` is the full linearised lookup order Python actually searches, starting at \`cls\` and ending at \`object\`:
+
+\`\`\`python
+class Base:
+    LABELS = {"id": "identifier"}
+
+class Middle(Base):
+    LABELS = {"name": "display name"}
+
+class Leaf(Middle): ...
+
+print(Leaf.__bases__)    # (<class 'Middle'>,)   direct parents only
+print(Leaf.__mro__)      # (Leaf, Middle, Base, object)
+
+# Merge what the parents declared, weakest first, then this class on top.
+collected = {}
+for base in Leaf.__bases__:
+    collected.update(getattr(base, "LABELS", {}))
+print(collected)         # {'name': 'display name'}
+\`\`\`
+
+Note what that loop does *not* pick up: \`Base.LABELS\` never appears, because \`Leaf.__bases__\` is only \`Middle\`. It works anyway in a hierarchy where every class rebuilds its own merged copy as it is defined, because \`Middle\` already merged \`Base\` into its own. That is the standard shape for an inherited registry, and it is why the merged value has to be **assigned onto the class** rather than mutated: \`getattr(base, "LABELS")\` on a class that never assigned its own would hand you the parent's dict object itself, and updating it in place would rewrite the parent's registry for everyone.
+
 A metaclass would do the same job, but it changes the *type* of every class involved, which then has to stay compatible with the metaclass of every other base you mix in. \`__init_subclass__\` is an ordinary method on an ordinary class, so it composes without that risk and a reader who has never met \`type.__new__\` can still follow it. Reach for a metaclass only when you need to control the namespace *before* the class body is executed. Note also that a subclass's own \`__init_subclass__\` applies to *its* subclasses, so if you write a registry per subclass, assign a new dict onto \`cls\` rather than mutating an inherited one, or every class shares the base's.`,
     demoCode: `class Positive:
     def __set_name__(self, owner, name):
@@ -512,6 +555,7 @@ print(Account(100).balance)   # 100`,
   },
   apply: {
     id: "py-l4-descriptors-metaclasses-apply",
+    estimatedMinutes: 12,
     executionMode: "single-file",
     prompt: `Warm-up (one file): implement the \`Positive\` descriptor so \`Account\` stores and returns a
 balance through it (raising \`ValueError\` on negatives). The \`run\` driver builds an \`Account\` and
@@ -575,6 +619,7 @@ def run(balance):
   },
   practice: {
     id: "py-l4-descriptors-metaclasses-practice",
+    estimatedMinutes: 45,
     executionMode: "workspace",
     prompt: `Build the settings layer behind the device profiles in \`schema/profiles.py\`, which declare
 their settings in the class body and are read-only. Implement the \`Setting\` descriptor in
