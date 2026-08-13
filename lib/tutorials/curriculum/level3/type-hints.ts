@@ -4,6 +4,15 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ───────────────────────────────────────────────────────────────────────────
 // L3-M2: Type Hints & Static Typing
+//
+// Time budget behind `estimatedMinutes` (counted, not guessed): teach 7 (about 1,500 prose words,
+// four checks, six fences), apply 5 (a 4-line prompt, a 4-line reference), practice 28 (45 README
+// lines plus ~70 lines of the coerce helper, starters and visible tests to read, 28 lines to write
+// across two files, 10 recorded tests). Lesson total 40 = 7 + 5 + 28.
+//
+// Apply is left alone: 7.0x is well inside the ramp threshold, `average` is the function the teach
+// section builds its whole hints-are-not-checks argument on, and the practice's difficulty is the
+// declaration-driven loader, not the arithmetic.
 // ───────────────────────────────────────────────────────────────────────────
 
 const TH_README = buildBrief({
@@ -422,6 +431,31 @@ get_type_hints(Account)   # {'id': <class 'int'>, 'name': <class 'str'>, 'note':
 
 That dict is what the opted-in tools are built on: \`@dataclass\` walks it to decide which fields exist and in what order \`__init__\` takes them. It is also how you write a loader that follows a class declaration instead of repeating it. Walk \`get_type_hints(cls)\` and each step gives you a field name and the type that field declared, together, which is exactly the pair a converter needs. Add a field to the class and the loader picks it up with no second edit.
 
+### Two dict and list moves that go with typed records
+
+Once you have a \`list[Shipment]\`, most reporting over it is one of two shapes. Grouping needs a key that may not exist yet, and \`dict.setdefault\` handles that in one step: it returns the value at the key, inserting your default first if the key was absent, so the list you get back is always safe to append to.
+
+\`\`\`python
+grouped: dict[str, list[str]] = {}
+for city, name in (("Oslo", "A"), ("Lisbon", "B"), ("Oslo", "C")):
+    grouped.setdefault(city, []).append(name)
+
+print(grouped)   # {'Oslo': ['A', 'C'], 'Lisbon': ['B']}
+\`\`\`
+
+Ordering needs \`sorted\` with a \`key\`, and the detail worth knowing is what happens to items the key cannot separate. \`sorted\` is **stable**: equal items keep the order they arrived in. \`reverse=True\` preserves that, because it sorts descending rather than sorting and then flipping the result:
+
+\`\`\`python
+pairs = [("A", 400), ("B", 900), ("C", 400)]
+
+print([name for name, _ in sorted(pairs, key=lambda pair: pair[1], reverse=True)])
+# ['B', 'A', 'C']   the two 400s stay in arrival order
+print([name for name, _ in sorted(pairs, key=lambda pair: pair[1])][::-1])
+# ['B', 'C', 'A']   reversing the list afterwards flips them
+\`\`\`
+
+Those two lines are not interchangeable, and which one you reach for is visible in the output whenever two records tie.
+
 ### Across modules
 
 Hints behave identically when code spans files. A module can import a class from a sibling module (\`from catalog.models import Shipment\`) and then annotate its own functions with that class exactly as it would in a single file. The annotation documents the boundary so a caller in another module knows the shape without opening the source.
@@ -511,6 +545,7 @@ print(average([]))       # 0.0`,
   apply: {
     id: "py-l3-type-hints-apply",
     executionMode: "single-file",
+    estimatedMinutes: 5,
     prompt: `Warm-up (one file): implement \`average(nums)\`. Return the mean of \`nums\` **rounded to 2
 decimals**, or \`0.0\` for an empty list.
 
@@ -537,6 +572,7 @@ For \`[10, 20, 35]\` return \`21.67\`. Add type hints: \`def average(nums: list[
   practice: {
     id: "py-l3-type-hints-practice",
     executionMode: "workspace",
+    estimatedMinutes: 28,
     prompt: `Implement the carrier export loader. A logistics feed arrives as rows of raw strings, and the
 team's rule is that the \`Shipment\` class declaration is the only place a field's name and type are
 written down. The loader has to follow those declarations rather than whatever columns the carrier
