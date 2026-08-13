@@ -24,6 +24,34 @@ four       99.99%         ~4.3 minutes        ~52.6 minutes
 five       99.999%        ~26 seconds         ~5.26 minutes
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "nines-cost-per-nine",
+  "prompt": "A team runs at 99.9 percent today and wants 99.99 percent. Their recovery works like this: an alert pages the on-call engineer, who opens a laptop, finds the bad node, and restarts it. What is the main problem with that plan?",
+  "options": [
+    {
+      "label": "Nothing much, since four nines is only one step up from three",
+      "feedback": "The labels sit next to each other, but the budgets do not. Going from 99.9 to 99.99 percent cuts allowed downtime from about 43 minutes a month to about 4.3 minutes."
+    },
+    {
+      "label": "Human response time alone spends most of a 4.3 minute monthly budget, so recovery has to become automatic",
+      "correct": true,
+      "feedback": "Right. Paging, waking up, and diagnosing already exceed the budget, which is why each added nine costs roughly 10x more: it forces you to take humans and manual steps out of the recovery path."
+    },
+    {
+      "label": "Four nines is unreachable without at least five geographic regions",
+      "feedback": "This over-corrects. Multi-AZ redundancy and automated failover measured in seconds usually get you to four nines, and region count is not the lever."
+    },
+    {
+      "label": "They should measure availability more generously so the number looks better",
+      "feedback": "Redefining what counts as good and valid to flatter yourself is the opposite of the discipline. Measured, SLA, and SLO stay three separate honest numbers."
+    }
+  ]
+}
+\`\`\`
+
 Notice the leap between each row. Going from 99.9% to 99.99% shrinks your monthly downtime budget from 43.2 minutes to 4.3 minutes. That is not "a bit better," it is a 10x reduction in the failure you are allowed, and every added nine costs roughly 10x more to achieve. The reason: the cheap failures (a bad deploy, a full disk) are gone by three nines, so the next nine forces you to attack rare, expensive causes: multi-AZ redundancy, automated failover measured in seconds, eliminating every manual step from recovery, and testing failure paths constantly. Human response time alone (someone gets paged, opens a laptop, diagnoses) blows a five-nines budget, so five nines effectively means no human in the recovery loop.
 
 ## Dependencies combine
@@ -97,6 +125,35 @@ Interviewers probe whether you distinguish three different numbers. **Measured**
 Common wrong turn: chasing five nines everywhere. If your database ceiling is 99.9% and a feature earns 20 dollars a minute of downtime saved, spending a quarter's engineering to add a nine it can never reach is malpractice. Match the target to revenue impact and to the dependency ceiling.
 
 **Recap:** convert nines to downtime minutes, remember serial dependencies multiply (lowering the ceiling) while redundancy combines as 1 - (1-a)^n, each nine costs about 10x more, and keep measured, SLA, and SLO as three separate numbers.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "nines-dependency-ceiling",
+  "prompt": "Checkout depends synchronously on a database with a hard 99.9 percent ceiling. Product wants to sell a 99.99 percent SLA on checkout. What is the senior answer?",
+  "options": [
+    {
+      "label": "Promise the 99.99 percent SLA and push the team to hit it",
+      "feedback": "You cannot be more available than the product of everything you synchronously depend on. Signing this promise signs you up for service credits you can never avoid paying."
+    },
+    {
+      "label": "Add a second independent copy of the shaky dependency or take it off the synchronous path first, and keep the SLA looser than the internal SLO",
+      "correct": true,
+      "feedback": "Right on both halves. Redundancy combines as 1 minus (1 minus a) to the power n, so an independent second copy raises the ceiling, and the external SLA sits looser than the internal SLO so your own alerting fires before you owe anyone money."
+    },
+    {
+      "label": "Set the internal SLO at 99.99 percent and the SLA at 99.999 percent",
+      "feedback": "Backwards. The SLA carries the financial penalties, so it is the looser number, and the SLO is the stricter internal target that warns you first."
+    },
+    {
+      "label": "Nothing to do: measured availability last month was 99.995 percent, so quote that",
+      "feedback": "Measured is one window of luck against a ceiling that has not moved. Measured, SLA, and SLO are three different numbers, and only one of them is a promise."
+    }
+  ],
+  "reveal": "Nines are minutes: 99.9 percent buys about 43 minutes a month and 99.99 percent about 4.3. Serial dependencies multiply that ceiling down, redundancy combines it back up as 1 minus (1 minus a) to the power n, each added nine costs roughly 10x more than the last, and the number you promise externally always sits looser than the one you run to internally."
+}
+\`\`\`
 `.trim()
 
 const sliSloSlaTeach = `
@@ -114,6 +171,34 @@ An **SLA** (Service Level Agreement) is the external, contractual version with t
 
 The same request looks different at three points. At the **load balancer** you capture what most users experience but miss failures that never reached the LB (DNS, a dead region). At the **server** you get clean internal numbers but hide network loss and the LB's own errors, flattering yourself. At the **client** (real-user monitoring) you capture the true end-to-end experience including the last mile, but the data is noisy and attributes the user's flaky wifi to you. Good practice: measure availability at the load balancer (the boundary you own and control) and latency with client RUM plus server-side, and state your measurement point when you quote a number.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "latency-mean-hides-tail",
+  "prompt": "A service reports a mean latency of about 100 ms against a 300 ms latency objective, and the dashboard is green. In the same window, 1 request in 100 takes 5 seconds. What does that mean tell you about those users?",
+  "options": [
+    {
+      "label": "They are fine, since the average sits comfortably inside the 300 ms objective",
+      "feedback": "This is exactly how a green dashboard hides an angry tail. Ninety-nine requests at 50 ms and one at 5 seconds average to about 100 ms while one user in a hundred waits 5 seconds."
+    },
+    {
+      "label": "Nothing useful: the mean averages the 5 second requests away, so 1 percent of users sit far outside the objective and the number cannot show it",
+      "correct": true,
+      "feedback": "Right, and that is why latency objectives are set on p95, p99, or p99.9. A percentile reports the tail instead of dissolving it."
+    },
+    {
+      "label": "The objective is too loose and should be tightened to 100 ms",
+      "feedback": "Tightening a target you still measure with a mean surfaces nothing new, and users do not notice 200 ms versus 250 ms. The statistic is the problem here, not the threshold."
+    },
+    {
+      "label": "The 5 second requests should be excluded as invalid events",
+      "feedback": "Valid excludes noise you should not be graded on, such as health-check pings and malformed client requests. A slow but legitimate user request is precisely what the indicator must count."
+    }
+  ]
+}
+\`\`\`
+
 ## Use percentiles, not averages, for latency
 
 An average hides the tail. If 99 requests take 50 ms and one takes 5 seconds, the mean is ~100 ms, which looks fine while one user in a hundred is furious. p99 = 5 s tells the truth. SLOs are set on p95/p99/p99.9 depending on how much the tail matters. Averages are actively misleading for latency and you should say so.
@@ -121,6 +206,50 @@ An average hides the tail. If 99 requests take 50 ms and one takes 5 seconds, th
 **Interview nuance:** the strongest answers keep the SLO count small and tie each to a user journey. "99.9% of checkout submissions succeed over 28 days" is a good SLO because a human cares about that event. "CPU under 80%" is not an SLO, it is a resource metric with no user in it. Few SLOs, each anchored to a journey, targets set from what users actually expect (nobody notices 200 ms vs 250 ms, everybody notices 3 s).
 
 **Recap:** SLI is good/valid events, SLO adds a target and window (99.9% over 28 days), SLA is the external promise with penalties; the measurement point (LB vs server vs client) changes the number, and latency SLOs use percentiles because averages hide the tail.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "sli-slo-sla-sort",
+  "prompt": "Sort each statement into the layer of the reliability hierarchy it belongs to.",
+  "buckets": [
+    "SLI",
+    "SLO",
+    "SLA"
+  ],
+  "items": [
+    {
+      "label": "Successful requests divided by valid requests",
+      "bucket": "SLI",
+      "feedback": "A measured ratio of good events over valid events, with no target attached to it yet."
+    },
+    {
+      "label": "Requests served faster than 300 ms divided by valid requests",
+      "bucket": "SLI"
+    },
+    {
+      "label": "99.9 percent of checkout submissions succeed over a rolling 28 days",
+      "bucket": "SLO",
+      "feedback": "An indicator plus a target plus a window. The window is what makes it something a dashboard can compute and a policy can act on."
+    },
+    {
+      "label": "95 percent of search requests return under 300 ms over 28 days",
+      "bucket": "SLO"
+    },
+    {
+      "label": "Miss 99.9 percent this month and the customer receives service credits",
+      "bucket": "SLA",
+      "feedback": "The external promise with financial teeth, which is why the internal target is always set stricter than it."
+    },
+    {
+      "label": "The number the legal team negotiated, set looser than what the team runs to",
+      "bucket": "SLA"
+    }
+  ],
+  "reveal": "The indicator measures, the objective adds a target and a window, and the agreement adds money. Keep the objective stricter than the agreement so your own alerting fires before the credits do, say where you measured (load balancer, server, or client) whenever you quote a number, and set latency objectives on percentiles because averages hide the tail."
+}
+\`\`\`
 `.trim()
 
 const errorBudgetsTeach = `
@@ -145,6 +274,34 @@ Budget remaining   Consequence
 
 The freeze is the teeth. When the budget hits zero, feature launches stop and the team works reliability until the rolling window recovers the budget. This is what makes the SLO enforceable rather than aspirational.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "freeze-carve-outs",
+  "prompt": "Your error budget is exhausted and the policy has triggered a feature freeze. Overnight, a data-loss bug is found in production and an actively exploited CVE lands in a dependency you ship. What does a sane policy allow?",
+  "options": [
+    {
+      "label": "Nothing ships until the rolling window recovers the budget",
+      "feedback": "A freeze that blocks a patch for a data-loss bug or an exploited CVE makes the service less reliable, not more. That is the failure the carve-outs exist to prevent."
+    },
+    {
+      "label": "Security fixes and P0 bug fixes ship, while new features and risky changes stay frozen",
+      "correct": true,
+      "feedback": "Right. The freeze redirects release capacity toward reliability, and reliability work itself is also exempt. It was never meant to halt every deploy."
+    },
+    {
+      "label": "The freeze is lifted entirely, since an emergency proves the policy is too rigid",
+      "feedback": "This is how a policy becomes theater. The carve-out is written narrowly and in advance precisely so nobody can argue the whole freeze away during a crisis."
+    },
+    {
+      "label": "The team ships everything and labels it a hotfix",
+      "feedback": "Relabeling a feature launch is the political fight the policy exists to end. The point is that the number already decided, not that the wording is flexible."
+    }
+  ]
+}
+\`\`\`
+
 Two carve-outs keep the policy sane. First, **security and P0 fixes ship even during a freeze**: a freeze must never block a patch for an actively exploited CVE or a data-loss bug. Second, the freeze applies to *new features and risky changes*, not to reliability work itself. The point is to redirect effort, not to halt all deploys.
 
 **Interview nuance:** the policy only works if it **depoliticizes** the decision and has **shared accountability**. Dev and ops (or product and SRE) both sign the policy in advance, and leadership pre-commits to honoring the freeze. Without that pre-agreement, when the budget is blown the product VP will simply overrule the freeze for the quarter's big launch, and the SLO becomes theater. The budget's whole purpose is that nobody has to win that argument in the moment: the number already decided.
@@ -152,6 +309,35 @@ Two carve-outs keep the policy sane. First, **security and P0 fixes ship even du
 Track burn over a rolling window and remember that **one bad incident can consume weeks of budget**. A 90-minute outage against a 40-minute budget doesn't just fail the window, it can put you underwater for the next two. That is why the response to a blown budget is a freeze, not a shrug: you are already borrowing against the future.
 
 **Recap:** error budget = 1 - SLO and it is permission to fail that you spend, not hoard; the policy pre-agrees consequences (freeze at zero) with security carve-outs and shared accountability so the ship-versus-stabilize call is depoliticized before the incident, not fought during it.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "budget-hoarding",
+  "prompt": "A team ends every month of the quarter having spent only 5 percent of its error budget against a 99.9 percent objective. Their director calls it a model of reliability. What does an experienced SRE say?",
+  "options": [
+    {
+      "label": "Agree: unused budget is pure margin, so the lower the burn the better",
+      "feedback": "Perfect reliability means you shipped too slowly. Ninety-five percent of the budget left unspent every month is reliability the users never asked for, bought with features they did."
+    },
+    {
+      "label": "The team is over-investing in reliability and under-shipping, because the budget is permission to fail that much and it exists to be spent",
+      "correct": true,
+      "feedback": "Right. A permanently full budget is a signal to ship faster, or to re-examine whether the target matches what users actually expect."
+    },
+    {
+      "label": "Loosen the objective to 99 percent so the dashboard looks busier",
+      "feedback": "Half right. Re-examining the target is fair, but the reason is what users notice, not how the dashboard looks, and loosening the number without shipping anything changes nothing real."
+    },
+    {
+      "label": "Spend the rest of the budget deliberately by injecting failures until it drains",
+      "feedback": "Chaos experiments are guardrailed by the budget, not justified by it. Burning budget for its own sake helps nobody, because the way you spend it is by shipping."
+    }
+  ],
+  "reveal": "The budget is 1 minus the objective, and it is a spendable resource rather than a threat. The policy pre-agrees the consequences (extra review as it drains, a feature freeze at zero) with narrow carve-outs for security and P0 fixes, and both sides sign it in advance so the ship-versus-stabilize call is settled before the incident instead of fought during it."
+}
+\`\`\`
 `.trim()
 
 const burnRateAlertingTeach = `
@@ -236,11 +422,68 @@ Fast burn (14.4x over 1 hour) means something is badly wrong right now and you w
 
 Each alert requires both a long window and a short window to be over threshold simultaneously. The long window (1 hour) gives significance so you do not page on a 30-second spike. The short window (5 minutes) makes the alert *reset quickly* once the problem is fixed, so you are not stuck with a firing page for an hour after recovery. Requiring both cuts false positives (a brief blip fails the long window) and flapping (a recovered incident clears the short window fast). This is the multi-window multi-burn-rate pattern.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "symptoms-not-causes",
+  "prompt": "Your team can add exactly one new condition to the on-call pager. Which one deserves to wake a human at 3 a.m.?",
+  "options": [
+    {
+      "label": "CPU across the API fleet above 90 percent for 10 minutes",
+      "feedback": "A cause, not a symptom. High CPU is often perfectly fine, and it frequently auto-scales away before the engineer has opened a laptop. This is the number-one source of alert fatigue."
+    },
+    {
+      "label": "The checkout error budget burning at 14.4x over the last hour and the last 5 minutes",
+      "correct": true,
+      "feedback": "Right. Users are being hurt right now and a human must act, which is what a page has to mean."
+    },
+    {
+      "label": "A single 30 second spike in 5xx responses",
+      "feedback": "The long window exists so a brief blip does not page anyone. A 30 second spike fails the significance test on purpose."
+    },
+    {
+      "label": "Memory on one pod above 80 percent",
+      "feedback": "Another cause. Resource pressure belongs on a dashboard and in a capacity ticket, where nobody has to be woken up to read it."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the single most important principle is **alert on symptoms, not causes**. Page on SLO burn (users are experiencing errors or slowness) not on CPU at 90% or memory pressure. High CPU might be fine; it is a cause that may or may not hurt users. A page must mean "a user is being hurt and a human must act now." Cause-based metrics belong on dashboards and in tickets for capacity planning, not on the pager. Alerting on causes is the number-one source of alert fatigue: engineers get paged for a high-CPU condition that auto-scaled away before they opened their laptop, learn to ignore pages, and then miss the real one.
 
 The tuning tradeoff: shorter windows and lower burn-rate thresholds detect problems faster but page on smaller, sometimes self-healing events (more false positives, more budget-noise). Longer windows and higher thresholds page only on serious sustained problems but let more budget burn before you know. You trade detection time against budget spent and against page volume. Fast-burn catches acute outages quickly; slow-burn catches the chronic bleed that would otherwise silently drain you over a week.
 
 **Recap:** burn rate is multiples of sustainable spend (1x uses exactly the budget, 14.4x burns ~2% of a month in an hour); require a long window for significance and a short window for fast reset; page on fast burn and ticket on slow burn; and always alert on the SLO-burn symptom, never on causes like CPU, to kill alert fatigue.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "burn-rate-arithmetic",
+  "prompt": "A service with a 99.9 percent objective has returned 1.44 percent errors for the last 40 minutes, and the last 5 minutes look the same. What fires, and why?",
+  "options": [
+    {
+      "label": "A slow-burn ticket, since 1.44 percent is a small number",
+      "feedback": "1.44 percent against a 0.1 percent budget is a 14.4x burn: about 2 percent of the month spent every hour, and the whole budget gone in roughly 2 days. That is the fast-burn case."
+    },
+    {
+      "label": "A fast-burn page: burn rate is the observed error rate divided by 1 minus the objective, so 1.44 over 0.1 is 14.4x, and both windows are over threshold",
+      "correct": true,
+      "feedback": "Right. The long window supplies significance and the short window is also over threshold, which is exactly the multi-window trigger."
+    },
+    {
+      "label": "Nothing: an error rate under 2 percent is inside a 99 percent objective",
+      "feedback": "The objective here is 99.9 percent, so the budget is 0.1 percent rather than 1 percent. Comparing an error rate against the wrong budget is how a real outage gets waved through."
+    },
+    {
+      "label": "A fast-burn page, but only once the short window has been over threshold for a full hour",
+      "feedback": "The short window is there to make the alert clear quickly after recovery, not to delay the firing. Both windows over threshold at the same moment is the trigger."
+    }
+  ],
+  "reveal": "Burn rate is multiples of sustainable spend: 1x uses exactly the budget over the window, and 14.4x burns about 2 percent of a month in an hour. The long window supplies significance and the short window supplies fast reset, so page on fast burn and ticket on slow burn. Above all, keep the pager pointed at the symptom users feel rather than at causes like CPU, because cause-based paging is what teaches engineers to ignore the pager."
+}
+\`\`\`
 `.trim()
 
 const goldenSignalsTeach = `
@@ -249,6 +492,34 @@ const goldenSignalsTeach = `
 When you own a service at 3am and it is misbehaving, you do not have time to stare at forty dashboards. You need a small, dependable set of numbers that tells you *whether* the service is healthy and *which direction* it is failing. Google's SRE book distills this to the **four golden signals**: latency, traffic, errors, and saturation. Instrument these four for every service and you can answer "is it up, is it fast, is it failing, is it about to fall over?" without guessing.
 
 **Latency**: how long a request takes. Measure it as a distribution, not a mean. A mean of 40ms can hide a p99 of 900ms that is torching 1% of your users. Alert and dashboard on p50, p95, p99, and often p99.9. **Traffic**: demand on the system, typically requests per second (QPS) for an API, or bytes per second for a pipe. **Errors**: the rate of failing requests, split by explicit failures (HTTP 500) and implicit ones (a 200 with a wrong or empty body, or a request that blew its latency budget). **Saturation**: how full the most constrained resource is (CPU, memory, connection pool, queue depth). Saturation is your *leading* indicator: latency and errors tell you the house is on fire, saturation tells you the wiring is overheating before it ignites.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "fast-failures-flatter-latency",
+  "prompt": "You ship a build with a bug that rejects 30 percent of requests with a validation 400 in about 2 ms each. Your latency chart mixes successes and failures into one series. What does that chart do?",
+  "options": [
+    {
+      "label": "Spikes, because failed requests are always slower",
+      "feedback": "Some failures are slow, such as a request that times out at 30 seconds and then returns a 500. This one comes back in 2 ms, faster than any success."
+    },
+    {
+      "label": "Drops, so a bad deploy shows up on the dashboard as a latency improvement",
+      "correct": true,
+      "feedback": "Right. That is why you chart the latency of successful requests and the latency of failed requests as separate series."
+    },
+    {
+      "label": "Stays flat, because errors are excluded from latency by definition",
+      "feedback": "Only if you deliberately split the series. An aggregate includes them by default, which is precisely the trap."
+    },
+    {
+      "label": "Becomes unreadable, because latency is a distribution rather than a number",
+      "feedback": "Reading latency as a distribution is the right habit, but that is not what happens here. The chart stays perfectly readable and perfectly misleading."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** interviewers love to ask why you separate the latency of successful requests from the latency of failed ones. Fast failures (a validation 400 returning in 2ms) drag your aggregate latency *down* and make a struggling service look healthy; slow failures (a request that times out at 30s then 500s) can hide inside an aggregate that averages them with fast successes. Always chart success latency and error latency as separate series, or a bad deploy that fails fast will look like a latency *improvement*.
 
@@ -272,6 +543,53 @@ The trap that quietly bankrupts observability budgets is **cardinality**. A metr
 The other common wrong turn is building **dashboards nobody watches** instead of signal-based alerting. A wall of graphs does not page anyone. Alert on symptoms the golden signals expose (error rate over budget, p99 over SLO, saturation climbing), keep dashboards for diagnosis after the page fires, and delete the ones that have not been opened in a quarter.
 
 **Recap:** instrument latency, traffic, errors, saturation on every service; use RED for request-driven services and USE for resources; split success vs error latency; treat saturation as your early warning; and guard cardinality by keeping unbounded ids out of metric labels.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "metric-label-cardinality",
+  "prompt": "Metric cost scales with the number of unique label combinations. Sort each field by where it belongs.",
+  "buckets": [
+    "Safe as a metric label",
+    "Belongs in logs or traces"
+  ],
+  "items": [
+    {
+      "label": "endpoint",
+      "bucket": "Safe as a metric label"
+    },
+    {
+      "label": "http method",
+      "bucket": "Safe as a metric label"
+    },
+    {
+      "label": "status class such as 2xx, 4xx, 5xx",
+      "bucket": "Safe as a metric label",
+      "feedback": "Bounded to a handful of values, so it multiplies the series count by a small constant."
+    },
+    {
+      "label": "region",
+      "bucket": "Safe as a metric label"
+    },
+    {
+      "label": "user id",
+      "bucket": "Belongs in logs or traces",
+      "feedback": "Five million users can create up to five million time series per metric. The identifier is valuable, just not on a metric."
+    },
+    {
+      "label": "the full request URL including order ids",
+      "bucket": "Belongs in logs or traces"
+    },
+    {
+      "label": "the raw error message text",
+      "bucket": "Belongs in logs or traces",
+      "feedback": "Unbounded free text is the worst possible label. Put it on the log line and correlate by trace id instead."
+    }
+  ],
+  "reveal": "Latency, traffic, errors, and saturation answer is it up, is it fast, is it failing, and is it about to fall over. Use rate, errors, and duration for request-driven services and utilization, saturation, and errors for the resources underneath them. Treat saturation as the leading indicator, split success latency from error latency so a fast-failing deploy cannot look like an improvement, and keep unbounded identifiers off metric labels so both the memory footprint and the bill stay bounded."
+}
+\`\`\`
 `.trim()
 
 const threePillarsOtelTeach = `
@@ -579,9 +897,80 @@ The thing that makes traces work across service boundaries is **context propagat
 
 **OpenTelemetry (OTel)** is the vendor-neutral standard that ties all three pillars together. It gives you: SDKs (per language) that produce metrics, logs, and traces with a common data model and automatic context propagation; instrumentation libraries that trace popular frameworks with near-zero code; and the **OTel Collector**, a separate process that receives your telemetry, processes it (batching, sampling, redaction, adding resource attributes), and exports it to whatever backends you choose (Prometheus for metrics, Loki/Elasticsearch for logs, Jaeger/Tempo for traces, or a vendor like Datadog/Honeycomb). The payoff is decoupling: your application code emits OTel and knows nothing about the backend, so you can switch vendors or fan out to several by editing Collector config, not redeploying every service.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "head-vs-tail-sampling",
+  "prompt": "Trace volume is too expensive, so you keep 1 percent of traces and the decision is taken at the first span of each request. A customer reports a checkout that took 9 seconds. What is the chance you have that trace?",
+  "options": [
+    {
+      "label": "About 1 percent, because the sampling decision was made before anyone knew the request would be slow",
+      "correct": true,
+      "feedback": "Right. Head-based sampling is cheap and simple and may drop exactly the trace you needed. Tail-based sampling buffers whole traces at the collector and then keeps all the errors and all the slow requests plus a small share of normal traffic."
+    },
+    {
+      "label": "100 percent, since errors and slow requests are always kept",
+      "feedback": "That is tail-based sampling. A decision taken at the first span cannot know the duration or the outcome, because neither exists yet."
+    },
+    {
+      "label": "Zero, because sampling drops the slow requests first",
+      "feedback": "Sampling is not biased against slow requests, it is blind to them. The head-based decision happens before the duration exists at all."
+    },
+    {
+      "label": "It does not matter, because the logs contain the same causal path",
+      "feedback": "Logs carry per-event detail, but a wall of lines from twelve services does not show where the time went across the hops. That is the question only a trace answers."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** be ready to talk cost control, because that is where these designs are won or lost. Cardinality drives metric cost, so keep labels bounded. Trace volume is enormous at scale, so you *sample*: **head-based** sampling decides at the first span (cheap, simple, but may drop the one trace you needed), while **tail-based** sampling buffers whole traces at the Collector and keeps the interesting ones (all errors, all slow requests) plus a small percentage of normal traffic (accurate, but the Collector must hold traces in memory). Logs get tiered storage: hot in a fast index for a few days, then rolled to cheap object storage (S3) for compliance retention.
 
 **Recap:** metrics for cheap aggregates and alerting, logs for structured per-event detail, traces for the causal cross-service path; propagate W3C trace context and share the trace id across all three; standardize on OpenTelemetry SDKs plus a Collector to decouple apps from backends; and control cost with bounded cardinality, trace sampling (tail-based keeps errors/slow), and tiered log retention.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "pillar-per-question",
+  "prompt": "Each question below is answered cheaply by exactly one pillar. Sort them.",
+  "buckets": [
+    "Metrics",
+    "Logs",
+    "Traces"
+  ],
+  "items": [
+    {
+      "label": "Page the on-call when the checkout error rate crosses the budget",
+      "bucket": "Metrics"
+    },
+    {
+      "label": "Trend p99 latency cheaply across the last quarter",
+      "bucket": "Metrics",
+      "feedback": "Cheap numeric aggregates retained for a long time is exactly what metrics are for."
+    },
+    {
+      "label": "Read the exact exception and parameters for one failed order",
+      "bucket": "Logs"
+    },
+    {
+      "label": "Recover which branch the code took inside a single service for one request",
+      "bucket": "Logs"
+    },
+    {
+      "label": "Find which of twelve hops consumed 1.0 second of a 1.4 second checkout",
+      "bucket": "Traces",
+      "feedback": "A tree of spans is the only view that shows where the time went across service boundaries."
+    },
+    {
+      "label": "See the parent and child relationship of one request's work across services",
+      "bucket": "Traces"
+    }
+  ],
+  "reveal": "Metrics are cheap aggregates you alert and trend on, logs are per-event detail, and traces are the causal path across services. The trace id propagated in the W3C trace context header, stamped onto log lines and attached to metrics as exemplars, is what lets a metric spike pivot to one trace and then to the logs for that exact request. OpenTelemetry standardizes all three and the collector decouples your services from whichever backends you buy, while cost stays under control through bounded cardinality, tail-based sampling, and tiered log retention."
+}
+\`\`\`
 `.trim()
 
 const timeoutsRetriesTeach = `
@@ -592,6 +981,34 @@ Level 1's resilience-primitives lesson introduced the four call-policy parts (ti
 ## Every call needs a timeout
 
 A call with no timeout inherits the operating system default, which for a TCP connect can be minutes. When a downstream slows down, requests that would have failed fast instead pile up, each holding a thread and a connection. Your thread pool fills, and now a service that was merely slow makes your service completely unavailable. You need two timeouts: a **connect timeout** (how long to wait to establish the connection, usually tens of ms inside a datacenter) and a **request timeout** (how long to wait for the response). Set the request timeout from the downstream's real p99, not a guess. If the downstream's p99 is 80 ms, a 250 ms timeout is generous; a 30 second timeout is a liability.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "deadline-propagation",
+  "prompt": "A user-facing request carries a 1 second budget. Service A spends 400 ms, then calls B with its own fresh 1 second timeout, and B calls C with another fresh 1 second timeout. What is the worst case?",
+  "options": [
+    {
+      "label": "1 second, because the user's budget bounds the whole chain",
+      "feedback": "Nothing enforces the user's budget across hops unless the remaining time is passed down. A fresh timeout at each hop is permission to start the clock over."
+    },
+    {
+      "label": "Up to 3 seconds of work across the chain, most of it producing a result the user already gave up on",
+      "correct": true,
+      "feedback": "Right. Three hops with fresh timeouts can legally spend 3x the user's budget. The fix is a shrinking deadline: tell B it has 600 ms left, and have B tell C what remains of that."
+    },
+    {
+      "label": "400 ms, because A already consumed the budget",
+      "feedback": "A consumed 400 ms of the user's budget, but it never told B or C, so each of them starts a full second of its own."
+    },
+    {
+      "label": "It depends only on C, since C is the last hop",
+      "feedback": "Every hop contributes. C's timeout bounds C, while A and B each wait on their own fresh clocks stacked on top of it."
+    }
+  ]
+}
+\`\`\`
 
 ## Propagate a deadline, do not reset it
 
@@ -791,6 +1208,35 @@ The exponential part (\`base * 2^attempt\`) spaces retries further apart as fail
 \`\`\`
 
 **Recap:** connect plus request timeouts on every call, propagate a shrinking deadline down the chain, exponential backoff with full jitter, a retry budget capping retries to a small fraction of traffic, retry only idempotent operations, and retry at one layer to avoid multiplicative amplification.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "retry-idempotency",
+  "prompt": "A POST that charges a card times out. Your client is configured with exponential backoff, full jitter, and a retry budget. Is it safe to retry?",
+  "options": [
+    {
+      "label": "Yes: backoff and jitter make retries safe",
+      "feedback": "Backoff and jitter protect the downstream from a synchronized wave of retries. They say nothing about whether the charge already happened."
+    },
+    {
+      "label": "No, not unless the charge carries an idempotency key the server dedupes on, because a timeout does not tell you whether the card was charged",
+      "correct": true,
+      "feedback": "Right. A timeout is ambiguous: the request may have been lost, the response may have been lost, or the downstream may be slow and still processing. The key is what makes a second attempt safe."
+    },
+    {
+      "label": "Yes, because a timeout means the request never arrived",
+      "feedback": "A timeout means you stopped waiting. It carries no information at all about what the downstream did or did not do."
+    },
+    {
+      "label": "No: writes can never be retried under any circumstances",
+      "feedback": "Too absolute. Writes become retryable once they are idempotent, which is exactly why idempotency keys exist."
+    }
+  ],
+  "reveal": "Every call gets a connect timeout and a request timeout set from the downstream's real p99, and the remaining deadline travels down the chain instead of resetting at each hop. Retries need exponential backoff with full jitter so a thousand clients do not retry in the same instant, a budget capping retries to a small fraction of traffic, idempotency before any write is retried, and exactly one retrying layer so three tiers of retries cannot multiply into twenty-seven calls."
+}
+\`\`\`
 `.trim()
 
 const circuitBreakersTeach = `
@@ -1003,9 +1449,66 @@ A bulkhead isolates resources per dependency, named after ship compartments that
 
 Fallbacks answer "what do we serve when the dependency is unavailable?" Options, in order of preference: return cached or slightly stale data; return a sensible default; or gracefully omit the feature. The rule is that **only non-critical dependencies should be fallback-able**. You cannot fall back on the payment authorization, but you absolutely can fall back on the "customers also bought" recommendations by rendering the page without them. The product still sells.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "slow-but-not-failing",
+  "prompt": "Dependency C has gone slow but not failing: every call still returns 200, just after 900 ms. Your breaker on C is configured on error rate alone, so it has not tripped, and A, B, and C all draw from one shared pool of 200 threads. What happens?",
+  "options": [
+    {
+      "label": "Nothing: C is returning success, so the system is healthy",
+      "feedback": "Success is not the same as cheap. Each slow call holds a thread for 900 ms, and threads are the scarce resource here."
+    },
+    {
+      "label": "Calls to C fill the shared pool, so the healthy dependencies A and B get no threads and start failing too",
+      "correct": true,
+      "feedback": "Right, and this is exactly the gap a bulkhead closes: give each dependency its own bounded pool so a sick one can consume at most its own share."
+    },
+    {
+      "label": "The breaker trips anyway, because latency always counts as a failure",
+      "feedback": "Only if you configured it to. Hardened breakers pair the error-rate threshold with a slow-call-rate threshold for this very case, but an error-rate-only breaker sees nothing wrong."
+    },
+    {
+      "label": "The fallback for C fires and the pool drains",
+      "feedback": "A fallback fires when the call fails or the breaker is open. Here every call succeeds, slowly, so nothing triggers it."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** breakers and bulkheads solve different halves of the same problem, and strong answers use both. The breaker decides *whether* to call a dependency based on its recent health; the bulkhead bounds *how much of your resources* any one dependency can ever consume, even before the breaker trips. Without the bulkhead, a dependency that is slow but not yet failing enough to trip the breaker can still exhaust your shared pool. Envoy and service meshes provide both as config (outlier detection for breaking, circuit-breaker connection/request limits for bulkheading).
 
 **Recap:** circuit breakers move Closed to Open to Half-Open to fail fast and let a sick dependency recover; bulkheads give each dependency a bounded pool so one cannot starve the others; fallbacks serve stale, default, or omitted content, but only for non-critical dependencies.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "fallback-critical-vs-not",
+  "prompt": "Checkout calls the payment authorizer and the customers-also-bought recommender. Both are timing out. What is the right pair of responses?",
+  "options": [
+    {
+      "label": "Fall back on both: serve the last known payment approval and cached recommendations",
+      "feedback": "You cannot fall back on payment authorization. Serving a stale approval ships goods you were never paid for, which is why only non-critical dependencies are fallback-able."
+    },
+    {
+      "label": "Fail the whole checkout until both recover",
+      "feedback": "This throws away revenue for a panel nobody buys. The product still sells with the recommendations missing."
+    },
+    {
+      "label": "Render checkout without the recommendations, and fail the payment step honestly while its breaker sheds load off the sick authorizer",
+      "correct": true,
+      "feedback": "Right. The non-critical dependency degrades gracefully, the critical one fails honestly, and the open breaker gives the sick authorizer room to drain its queue instead of pinning it down."
+    },
+    {
+      "label": "Retry both aggressively until one of them answers",
+      "feedback": "Retrying a broadly failing dependency keeps it saturated and delays its recovery, which is the exact condition the open state exists to relieve."
+    }
+  ],
+  "reveal": "The breaker decides whether to call a dependency at all, based on its recent health, moving Closed to Open to Half-Open so failures return instantly and a sick dependency gets room to recover. The bulkhead bounds how much of your resources any one dependency can ever consume, which covers the slow-but-not-yet-failing case the breaker misses. Fallbacks then decide what you serve instead, and only for dependencies the product can survive without."
+}
+\`\`\`
 `.trim()
 
 const loadSheddingDegradationTeach = `
@@ -1033,15 +1536,100 @@ Levels 1 and 4 own the how, so this is only the recap. Shed at the edge with \`4
 
 A metastable failure is one that *sustains itself after the original trigger is gone*. A traffic spike pushes the system into overload; the overload causes timeouts; the timeouts cause client retries; the retries add more load than the original spike; and now even after the spike passes, the retry-driven load keeps the system saturated. Adding capacity often does not break the loop, because the retries scale up to consume it. The way out is to attack the feedback loop directly: shed load aggressively to drop goodput demand below capacity, and combine it with backoff and jitter on the clients so the retry wave dissipates. Sometimes you must shed almost everything briefly to let the queues drain, then ramp back.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "autoscale-vs-metastable",
+  "prompt": "A traffic spike pushed your service into a retry-driven collapse. The spike is long over and the system is still saturated. Your autoscaler triples the app fleet. What happens?",
+  "options": [
+    {
+      "label": "The system recovers, because capacity now exceeds demand",
+      "feedback": "The demand is no longer the original spike, it is the retry loop, and retries expand to consume whatever capacity you add."
+    },
+    {
+      "label": "It usually does not break the loop: retries scale up to fill the new capacity, and if the bottleneck is a shared database, more app servers make it worse",
+      "correct": true,
+      "feedback": "Right. You have to attack the feedback loop itself by shedding load until demand falls below capacity and by making clients back off with jitter."
+    },
+    {
+      "label": "The system recovers, but only once the autoscaler finishes a few seconds later",
+      "feedback": "Autoscaling is minutes-slow. A retry storm can double load in seconds, so the scaler arrives at a fight that was already lost."
+    },
+    {
+      "label": "Nothing changes, because autoscaling cannot add capacity during an incident",
+      "feedback": "It can add capacity. The problem is that capacity is the wrong lever against a self-sustaining retry loop, not that it is unavailable."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the wrong turn is "we will autoscale." Autoscaling is minutes-slow and cannot outrun a retry storm that doubles load in seconds, and if the bottleneck is a shared database, more app servers make it worse. Load shedding acts in milliseconds at the edge and is the only thing that reliably breaks a metastable collapse.
 
 **Recap:** maximize goodput not throughput by discarding doomed work early; shed cheaply at the edge with \`429\`/\`503\` and \`Retry-After\`; prioritize by request class; use admission control and bounded concurrency instead of unbounded queues; and break metastable failures with aggressive shedding plus client backoff, because autoscaling is too slow.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "goodput-under-overload",
+  "prompt": "Your service tops out at 10k requests per second of goodput and 20k are arriving. Which move raises the number of users who actually get a served response?",
+  "options": [
+    {
+      "label": "Increase the request queue depth so nothing is dropped",
+      "feedback": "A deeper queue buys latency and eventually an out-of-memory kill. Requests sit until the client has already given up, so the work is wasted before it finishes."
+    },
+    {
+      "label": "Reject roughly half the arriving requests at the edge with 503 and a Retry-After header, killing prefetch and batch traffic before checkout",
+      "correct": true,
+      "feedback": "Right. Discarding doomed work early is what converts throughput into goodput, and prioritizing by request class decides who survives the cut."
+    },
+    {
+      "label": "Serve everything and let the clients retry whatever fails",
+      "feedback": "This is the metastable trap. Retries pile on top of the overload and the system stops self-recovering even after the original spike has passed."
+    },
+    {
+      "label": "Raise every timeout so fewer requests are cut short",
+      "feedback": "Longer timeouts hold threads on doomed work for longer. Goodput falls further and collapse gets closer."
+    }
+  ],
+  "reveal": "Under overload, throughput and goodput move in opposite directions and only goodput is worth anything. Shed cheaply at the edge with 429 or 503 plus Retry-After, prioritize by request class, and cap in-flight work with bounded queues and adaptive concurrency rather than a deeper queue. That is also the only lever fast enough to break a metastable collapse, because autoscaling arrives minutes after the retry loop has already locked itself in."
+}
+\`\`\`
 `.trim()
 
 const redundancyFailoverTeach = `
 ## No single point of failure
 
 Availability starts with a simple rule: no component whose failure takes down the system may exist as a single instance. A single point of failure (SPOF) is any box, process, or record that has no live substitute. Redundancy is having N+1 or N+2 of everything, so losing one (or two) instances still leaves enough capacity to serve.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "hidden-spofs",
+  "prompt": "Three stateless web servers sit behind one load balancer, read their config from one config service at boot, and write to one database primary. How many single points of failure does that design carry?",
+  "options": [
+    {
+      "label": "None: the web tier is redundant",
+      "feedback": "The redundant tier is the part people notice. Every request still funnels through one load balancer and one primary, and every pod boots through one config service."
+    },
+    {
+      "label": "Three: the load balancer, the database primary, and the config service, each of which quietly undoes the redundant web tier",
+      "correct": true,
+      "feedback": "Right. A real audit walks the request path and asks, at every hop, whether traffic stops if this single thing dies."
+    },
+    {
+      "label": "One: the database primary, since everything else is stateless",
+      "feedback": "Statelessness makes a component easy to replace, not redundant. A single stateless load balancer still stops all traffic the moment it dies."
+    },
+    {
+      "label": "Two: the load balancer and the primary, since config is only read at boot",
+      "feedback": "Boot-time dependencies are still dependencies. A config-service outage during a deploy or a scale-out event means no new pod can start, which is exactly when you need them most."
+    }
+  ]
+}
+\`\`\`
 
 The trap is that SPOFs hide. Engineers dutifully run three web servers, then route all of them through one load balancer, one database primary, one DNS name backed by one provider, and one config service that every pod reads on boot. Each of those is a SPOF that quietly undoes the redundant web tier. A real audit walks the request path and asks, at every hop, "if this single thing dies, does traffic stop?" Load balancers need a redundant pair (or a managed multi-node LB like AWS ALB/NLB); the DB primary needs replicas plus automated promotion; DNS needs multiple providers or at least multiple authoritative servers; the config store needs a quorum (etcd/ZooKeeper run 3 or 5 nodes for exactly this reason).
 
@@ -1107,6 +1695,49 @@ Failover has to be *triggered* by something, and that something is health checki
 \`\`\`
 
 **Recap:** eliminate every SPOF (LB, DB primary, DNS, config) with N+1/N+2 redundancy, pick active-active for instant failover or active-passive for simpler state, gate traffic with liveness/readiness/deep checks, and use quorum election plus fencing and hysteresis to avoid split-brain and flapping.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "health-check-depth",
+  "prompt": "Sort each statement by the depth of health check it describes.",
+  "buckets": [
+    "Liveness",
+    "Readiness",
+    "Deep dependency check"
+  ],
+  "items": [
+    {
+      "label": "Answers a TCP connect or a trivial healthz endpoint",
+      "bucket": "Liveness"
+    },
+    {
+      "label": "Failing it should restart the process",
+      "bucket": "Liveness"
+    },
+    {
+      "label": "Fails while caches are still warming after a restart",
+      "bucket": "Readiness"
+    },
+    {
+      "label": "Failing it should pull the instance out of the pool but leave it running",
+      "bucket": "Readiness",
+      "feedback": "The instance is alive and will be useful shortly, so killing it would only lengthen the outage."
+    },
+    {
+      "label": "Queries the shared database on every probe",
+      "bucket": "Deep dependency check"
+    },
+    {
+      "label": "Can turn a brief database blip into a total outage by failing every instance at once",
+      "bucket": "Deep dependency check",
+      "feedback": "Every instance shares the dependency, so they all fail the probe together and the load balancer ejects the entire fleet."
+    }
+  ],
+  "reveal": "Eliminate every single point of failure with N+1 or N+2, including the load balancer, the primary, DNS, and the config store. Active-active uses the capacity you already pay for and fails over instantly but forces you to share state, while active-passive keeps one owner of the state and pays with idle hardware and failover lag. Health checks trigger the failover, hysteresis stops an instance flapping in and out of the pool, and promotion goes through quorum election plus fencing so a partitioned standby can never become a second primary."
+}
+\`\`\`
 `.trim()
 
 const drRtoRpoTeach = `
@@ -1162,6 +1793,34 @@ These numbers set your strategy, because recovery speed costs money. The industr
 
 The senior move is to **tier your systems** and apply a different rung to each. Your payment ledger might warrant warm standby; your recommendation model can live on backup & restore. Spending active/active money on a system whose users would not notice an hour of downtime is a classic waste.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "failover-replicates-corruption",
+  "prompt": "A bad migration silently corrupts a table at 09:00. You run multi-site active/active with an RPO near zero, so you fail over to the other region. What do you get?",
+  "options": [
+    {
+      "label": "A clean copy, because the second region was not the one running the migration",
+      "feedback": "Replication does not judge the data it carries, it copies it. Both regions now hold the same corrupted rows."
+    },
+    {
+      "label": "The same corrupted data, just faster, because replication shipped the corruption to the other region well inside the RPO",
+      "correct": true,
+      "feedback": "Right. A near-zero RPO is a promise about freshness, and corruption is fresh. You recover from this with point-in-time restore from immutable backups, never with failover."
+    },
+    {
+      "label": "The pre-corruption data, because failover reverts to the last good snapshot",
+      "feedback": "Failover switches which region serves traffic. It does not move time backwards, which is what point-in-time restore is for."
+    },
+    {
+      "label": "A partial copy, since replication lag would have left some of the corruption behind",
+      "feedback": "Tempting, because lag sounds protective. You cannot plan on corruption being in flight, and here replication is deliberately fast anyway."
+    }
+  ]
+}
+\`\`\`
+
 ## Interview nuance: name the disaster types
 
 Name the disaster *types*, because they need different recovery. **Region loss** (fire, flood, power) is what most people picture and multi-region solves. **Data corruption or a bad migration** is different: it replicates *instantly* to your standby, so failover just gives you the corrupted data faster. You recover corruption with point-in-time restore from immutable backups, not failover. **Ransomware** is different again: it may sit dormant and encrypt your backups too, so you need immutable, air-gapped (or object-lock) backups the attacker cannot reach. A DR plan that only handles "the region went away" fails the other two.
@@ -1169,6 +1828,35 @@ Name the disaster *types*, because they need different recovery. **Region loss**
 And the line that separates real DR from theater: **an untested backup is not a DR plan.** Backups silently rot, restore scripts break, permissions drift, and the one time you need it you discover the restore takes 14 hours or fails. Real DR means restore-drills, documented runbooks, and periodic game-days where you actually fail over and time it against your stated RTO.
 
 **Recap:** RTO is tolerable downtime, RPO is tolerable data loss, both set per tier; pick the cheapest rung on the backup -> pilot-light -> warm-standby -> active/active ladder that meets the tier's numbers; handle corruption and ransomware (not just region loss) with immutable/air-gapped backups; and prove it with restore drills and game-days or it is not a plan.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "tier-the-ladder",
+  "prompt": "A marketing analytics warehouse tolerates a day of downtime and an hour of lost data. The payment ledger tolerates minutes of downtime and near-zero loss. What does a senior answer propose?",
+  "options": [
+    {
+      "label": "Multi-site active/active for both, so nothing is a weak link",
+      "feedback": "This spends the most expensive rung's money on a system whose users would not notice an hour of downtime. RTO and RPO are set per tier for exactly this reason."
+    },
+    {
+      "label": "Backup and restore for both, accepting the risk on the ledger",
+      "feedback": "Hours of recovery time on the payment ledger is the outcome those numbers were written down to prevent."
+    },
+    {
+      "label": "Warm standby for the ledger, backup and restore for the warehouse, with a timed restore drill on both",
+      "correct": true,
+      "feedback": "Right. Each tier takes the cheapest rung that meets its own numbers, and the drill is what turns the stated numbers into evidence rather than hope."
+    },
+    {
+      "label": "Pilot light for both, as a compromise between the two",
+      "feedback": "Averaging the tiers gives the ledger a slower recovery than it needs and hands the warehouse a bill it does not. The ladder exists so each tier can choose independently."
+    }
+  ],
+  "reveal": "RTO is tolerable downtime and RPO is tolerable data loss, both set per tier, and the ladder from backup and restore through pilot light and warm standby to multi-site active/active trades money for both numbers. Plan for three disaster types rather than one: region loss is what failover solves, while corruption and ransomware are not, and they need point-in-time restore from immutable, air-gapped backups. An untested backup is not a plan, so drills and game-days are what make the promise real."
+}
+\`\`\`
 `.trim()
 
 const multiRegionTeach = `
@@ -1177,6 +1865,34 @@ const multiRegionTeach = `
 Multi-AZ and multi-region are not the same tool, and conflating them is a common tell. Know exactly what each buys and what it costs.
 
 **Multi-AZ** spreads a system across Availability Zones: physically separate data centers within one region, tens of km apart, connected by fast, low-latency (single-digit ms) links. Because latency between AZs is tiny, you can replicate **synchronously** across them cheaply, so multi-AZ is the default for HA. It protects against a data-center failure (power, cooling, a fire in one building) but *not* against a whole-region outage, and not against region-wide control-plane failures.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "multi-az-is-not-multi-region",
+  "prompt": "Your database is multi-AZ with synchronous replication across three availability zones in one region. A region-wide provider outage takes that region out. What happens to your service?",
+  "options": [
+    {
+      "label": "It stays up: three zones are three physically separate data centers",
+      "feedback": "Three data centers, one region. Multi-AZ protects against losing a building, not against losing the region all three of them sit in."
+    },
+    {
+      "label": "It goes down, because every zone is inside the failed region: multi-AZ is high availability within a region, not disaster recovery across regions",
+      "correct": true,
+      "feedback": "Right. Multi-AZ is cheap precisely because the zones are close enough for synchronous replication, and that closeness is exactly why they share a regional fate."
+    },
+    {
+      "label": "It stays up with higher latency, since traffic reroutes to another region",
+      "feedback": "Nothing reroutes unless you built and paid for a copy somewhere else. A multi-AZ deployment has no other region to fall to."
+    },
+    {
+      "label": "It stays up, because synchronous replication guarantees a reachable live copy",
+      "feedback": "Synchronous replication guarantees the copy is current, not that it sits outside the blast radius. All three copies are in the region that just failed."
+    }
+  ]
+}
+\`\`\`
 
 **Multi-region** spreads across regions hundreds or thousands of km apart, with 50-150+ ms of round-trip latency between them. It protects against losing an entire region (natural disaster, region-wide provider outage, regulatory blackout). But that latency changes everything about data: synchronous replication across regions would add 100+ ms to every write, so you almost always replicate **asynchronously**, which means the remote copy lags and a region loss can lose the un-replicated tail. Multi-region is expensive (full or partial stacks in each region, cross-region data transfer, more operational surface) and it makes consistency genuinely hard.
 
@@ -1235,6 +1951,35 @@ Traffic steering sits on top: **GeoDNS** (route by client location, but DNS TTL 
 **Interview nuance:** two things separate strong answers. First, **cell-based and shuffle-sharding** thinking applies here: an active-active pair still shares a blast radius if a bad config or poison request replicates to both, so regions should fail independently and you must **test region evacuation** (actually drain a region) rather than assume it works. Second, do not claim multi-region gives strong consistency for free. It does not. You either pay cross-region latency (sync/Spanner) or accept eventual consistency and design conflict resolution. Saying "we go multi-region active-active and everything is consistent and fast" is the wrong turn interviewers wait for.
 
 **Recap:** multi-AZ is cheap synchronous HA within a region; multi-region is expensive async protection against region loss; sync gives RPO~0 but latency and stall risk while async gives speed but lag/loss; active-active forces a consistency choice (single-writer-region, CRDTs, or a Spanner-class store); steer with GeoDNS/global-LB health-based failover and actually test region evacuation.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "active-active-consistency-claim",
+  "prompt": "A candidate says: we will run active-active in two regions, both accepting writes to the same records, with strong consistency and no added write latency. What is the interviewer waiting to hear?",
+  "options": [
+    {
+      "label": "That is fine as long as replication is asynchronous",
+      "feedback": "Async is what makes those writes fast and available, and it is also what makes the remote copy lag and the two copies conflict. It buys the speed by giving up the consistency claim."
+    },
+    {
+      "label": "You cannot have all three across a WAN: either pay the cross-region round trip with synchronous replication or a globally consistent store, or accept eventual consistency and own a conflict story such as single-writer-region per record",
+      "correct": true,
+      "feedback": "Right. Single-writer-region avoids conflicts entirely at the cost of cross-region write latency for non-local records, which is why it is the most common sane choice."
+    },
+    {
+      "label": "Multi-region is always the wrong call, and multi-AZ is enough",
+      "feedback": "This over-corrects. Multi-region is the only thing that survives losing a region, so the job is to price it honestly rather than to avoid it."
+    },
+    {
+      "label": "GeoDNS solves it by routing each user to their nearest region",
+      "feedback": "Steering decides where a request lands, not how two regions agree about one record. DNS TTL caching also makes it slow to fail over."
+    }
+  ],
+  "reveal": "Multi-AZ is cheap synchronous high availability inside one region, and multi-region is expensive asynchronous protection against losing that region. Synchronous gives an RPO near zero and pays in latency and stall risk, asynchronous gives speed and pays in lag and a lost tail. Active-active forces a real consistency choice, traffic steering rides on top through GeoDNS or a health-checking global load balancer, and none of it is trustworthy until you have actually drained a region on purpose."
+}
+\`\`\`
 `.trim()
 
 const blastRadiusCellsTeach = `
@@ -1322,11 +2067,68 @@ Blast radius is a lens you apply everywhere, not just to compute: **deploys** (c
 
 **Separate control plane from data plane.** The data plane serves user requests (the hot path). The control plane manages the system: config changes, scaling decisions, deployments, service discovery, health orchestration. Control planes are complex and change often, so they fail more. If your data plane *depends on the control plane being up to serve requests*, then a control-plane outage becomes a user-facing outage. The rule: the data plane must keep serving even while the control plane is down.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "static-stability-no-data",
+  "prompt": "The control plane that reports which backends are healthy goes dark, so your load balancer stops receiving health data. What should it do with traffic?",
+  "options": [
+    {
+      "label": "Eject every backend, since none can be confirmed healthy any more",
+      "feedback": "This is the classic cascade: no data gets treated as all dead, and a control-plane hiccup becomes a total user-facing outage."
+    },
+    {
+      "label": "Keep routing to the last-known-healthy set and take no new action that needs the control plane",
+      "correct": true,
+      "feedback": "Right, and that is static stability in one sentence: keep working on last-known-good state and defer anything that requires the missing dependency."
+    },
+    {
+      "label": "Fail every request with a 503 until health data returns",
+      "feedback": "The same outage with a different status code. The backends are almost certainly still serving, and only the reporting path broke."
+    },
+    {
+      "label": "Restart the backends so they report fresh health",
+      "feedback": "Taking a new action that depends on the missing control plane is exactly what static stability forbids, and restarting healthy servers turns a reporting outage into a real one."
+    }
+  ]
+}
+\`\`\`
+
 Which brings in **static stability**, the AWS-coined principle that ties this together: a system is statically stable if it keeps working on its **last-known-good state** when its dependencies (especially the control plane) are unavailable, taking **no new action** that requires them. The canonical example: an EC2 instance keeps running even if the EC2 control-plane API is down, because running instances do not need the control plane; you just cannot *launch new ones* until it recovers. Applied to your design: cache config locally and keep serving the last-known-good config if the config service is unreachable, rather than failing or blocking. Load balancers should keep routing to the last-known-healthy set if the health-check control plane blips, rather than assuming "no data means all dead" and ejecting everyone. The failure mode static stability prevents is a control-plane hiccup cascading into a total data-plane outage.
 
 **Interview nuance:** the wrong turn interviewers listen for is a design where "one bad tenant or one bad deploy takes down everyone," or where the data plane cannot serve a single request because a control-plane component (config store, service discovery, a central auth service) is briefly down. Strong answers bound impact with cells/shuffle-sharding *and* make the data plane statically stable so it coasts on cached state through control-plane failures.
 
 **Recap:** cells give independent isolated stacks so one failure hits ~1/N of users, shuffle sharding gives each customer a unique worker combination to isolate noisy tenants, apply blast-radius thinking to deploys/data/dependencies, separate control plane from data plane, and use static stability so the data plane keeps serving last-known-good state when the control plane is down.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "redundancy-vs-blast-radius",
+  "prompt": "A globally redundant fleet of 3,000 identical servers pushes one bad config that every node loads. How many users are hurt, and what would have bounded it?",
+  "options": [
+    {
+      "label": "All of them, and the fix is more replicas",
+      "feedback": "More replicas of the same shared fate change nothing, because every additional node loads the same poison."
+    },
+    {
+      "label": "All of them, and independent cells would have held it to roughly one Nth of users, because a change rolls cell by cell and stops after the first one regresses",
+      "correct": true,
+      "feedback": "Right. Redundancy keeps you up when a component dies, while blast-radius reduction limits how many users any one change or poison input can reach. They are different properties and a serious design needs both."
+    },
+    {
+      "label": "About a third, since a config rollout moves one availability zone at a time",
+      "feedback": "Nothing in this design stops the change at a zone boundary. Zones bound hardware and facility failures, not a config that every node reads."
+    },
+    {
+      "label": "None: the redundant fleet routes around the bad nodes",
+      "feedback": "There is nothing healthy left to route to. Every node loaded the same config, which is precisely the difference between redundancy and blast-radius reduction."
+    }
+  ],
+  "reveal": "Cells give each slice of users a complete independent stack, so a failure, a bad deploy, or a poison request stays inside one cell and hits roughly one Nth of users. Shuffle sharding gives each customer a unique combination of workers so a noisy tenant degrades only the few who overlap with them. The same lens applies to deploys, data, and dependencies. Then separate the control plane from the data plane and make the data plane statically stable, so it keeps serving last-known-good state while the control plane is down instead of failing along with it."
+}
+\`\`\`
 `.trim()
 
 const deploymentStrategiesTeach = `
@@ -1346,6 +2148,34 @@ Blue-Green: blue=100% live | green warmed --smoke ok--> router flip --> green=10
 Canary:    v2 gets 1% -> analyze -> 5% -> analyze -> 25% -> ... auto-abort if SLIs diverge
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "rollback-is-not-a-redeploy",
+  "prompt": "Your rollback plan is: revert the commit, rebuild, and run the rolling deploy again. During a SEV1 caused by the last release, how good is that plan?",
+  "options": [
+    {
+      "label": "Excellent: rollback is just a deploy in reverse, so it takes seconds",
+      "feedback": "A rolling deploy in reverse is still a rolling deploy: build, drain, replace, batch by batch, with both versions live throughout."
+    },
+    {
+      "label": "Minutes at best, on a path you have never rehearsed under pressure, whereas blue-green or a flag turns rollback into a routing change",
+      "correct": true,
+      "feedback": "Right. If the old version is still running or the new behavior sits behind a flag, reversing it is a routing decision measured in seconds rather than a rebuild."
+    },
+    {
+      "label": "Instant, because the old container image is still cached on the nodes",
+      "feedback": "A cached image saves the pull. It does not save the rebuild, the rollout, or the drain, and it does nothing to make the path rehearsed."
+    },
+    {
+      "label": "It does not matter, because you can roll forward with a fix instead",
+      "feedback": "Rolling forward means authoring and testing new code while users are down. During an incident you want the change reversed first and understood afterwards."
+    }
+  ]
+}
+\`\`\`
+
 ## Separate deploy from release
 
 **Interview nuance:** separate *deploy* from *release*. Deploy means the new code is present on machines; release means live traffic is running on it. Blue-green and flags let you deploy without releasing, which is what makes rollback a routing change (seconds) instead of a rebuild (minutes). If your rollback path is "redeploy the old version," you do not have a fast rollback, you have a slow one you have not tested.
@@ -1353,6 +2183,35 @@ Canary:    v2 gets 1% -> analyze -> 5% -> analyze -> 25% -> ... auto-abort if SL
 The trap that ties this module together is the **destructive schema change**. During any of these strategies old and new code run at the same time (mid-roll, at the blue-green flip, during a canary). If the new deploy drops or renames a column the old code still reads, the old version breaks the instant the migration runs, and you cannot roll back the code because the schema is already gone. Schema changes must be backward compatible with the currently deployed version, which is the next lesson.
 
 **Recap:** rolling is cheap but slow to reverse, blue-green buys instant rollback for double the fleet, canary gives the smallest blast radius but needs automated analysis and bake time, and every strategy runs two versions at once so never ship a destructive schema change inside a code deploy.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "destructive-change-mid-roll",
+  "prompt": "Mid-roll, half your pods run v1 and half run v2. The v2 release also runs a migration that drops the email column, which v1 still selects. What happens?",
+  "options": [
+    {
+      "label": "Nothing, because the rollout finishes quickly",
+      "feedback": "Rolling deploys replace pods in batches and both versions serve live traffic for the whole window. Every v1 pod breaks the instant the migration commits."
+    },
+    {
+      "label": "The v1 pods start failing, and you cannot roll the code back because the column no longer exists",
+      "correct": true,
+      "feedback": "Right, and that is the trap that ties this module together: the code is reversible, the schema change is not, so the two must never ship together."
+    },
+    {
+      "label": "The orchestrator rolls back automatically once the v1 pods fail their readiness checks",
+      "feedback": "It can halt or reverse the rollout, but reverting to v1 puts you back on code that reads a column the database no longer has. A routing move cannot undo a dropped column."
+    },
+    {
+      "label": "Only the canary slice is affected, because a canary bounds the blast radius",
+      "feedback": "A canary bounds who sees the new code. The migration runs against the shared database, so it reaches every version at once."
+    }
+  ],
+  "reveal": "Rolling is cheap and slow to reverse, blue-green buys instant rollback for double the fleet, and canary gives the smallest blast radius but is only as good as the automated analysis and bake time behind it. All three run two versions at once, so separate deploy from release to make rollback a routing change, and never let a destructive schema change ride along inside a code deploy."
+}
+\`\`\`
 `.trim()
 
 const progressiveDeliverySchemaTeach = `
@@ -1380,9 +2239,84 @@ Each arrow is a separately deployable, separately reversible step. You never com
 
 For the physical DDL on a large hot table, a naive \`ALTER TABLE\` can lock the table and stall writes. **Online schema-change tools** (gh-ost, pt-online-schema-change for MySQL) build a shadow table, backfill it while capturing live changes via triggers or the binlog, and swap it in with a brief atomic rename, so the table stays writable throughout. On Postgres the same step looks different: \`ADD COLUMN ... NULL\` is metadata-only and never rewrites the table, so the risk moves to the backfill, which you run as batched \`UPDATE\`s over key ranges with a short \`lock_timeout\` (the setting that makes a statement give up quickly instead of queueing on a lock and blocking every writer behind it). Backfills must be **throttled** (chunked, watching replica lag), **idempotent** (safe to re-run), and **restartable** (checkpoint progress) because a multi-hour backfill will get interrupted.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "rename-is-never-one-step",
+  "prompt": "A ticket asks you to rename the email column to email_address. It is one line of DDL, and you run it during a rolling deploy. What happens?",
+  "options": [
+    {
+      "label": "Nothing, as long as the new code ships in the same release",
+      "feedback": "During any rollout both versions run at once. The still-deployed old instances select the old name, and it stops existing the instant the statement commits."
+    },
+    {
+      "label": "The old instances break immediately, and you cannot roll the code back because the old column name is gone",
+      "correct": true,
+      "feedback": "Right. The code is reversible and the schema change is not, which is why a rename in a live system is always expand, dual-write, backfill, migrate reads, then contract."
+    },
+    {
+      "label": "The database keeps the old name as an alias, so old queries keep working",
+      "feedback": "A rename is not an alias. The old name stops resolving and every query that uses it errors."
+    },
+    {
+      "label": "It locks the table for a while, but every query still succeeds once it completes",
+      "feedback": "Locking is a real and separate hazard on a large hot table. Even with zero lock time, the rename by itself is what breaks the deployed code."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the classic disaster is renaming a column. \`ALTER TABLE users RENAME COLUMN email TO email_address\` looks trivial and is a trap: the instant it runs, every still-deployed old instance that selects \`email\` breaks, and you cannot roll the code back because the column named \`email\` no longer exists. The correct answer is expand/contract: add \`email_address\`, dual-write, backfill, migrate reads, then drop \`email\` in a later deploy. A rename is never one step in a live system.
 
 **Recap:** flags decouple release from deploy and give you a per-feature kill switch and targeting, expand/contract migrates schema in individually-safe reversible steps, everything in flight must be backward and forward compatible, and never pair "add new" with "drop old" in a single deploy.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "safe-step-vs-breaks-rollback",
+  "prompt": "Sort each schema move by whether it is safe on its own or destroys your ability to roll back.",
+  "buckets": [
+    "Individually safe step",
+    "Breaks rollback"
+  ],
+  "items": [
+    {
+      "label": "Add a nullable column that nothing reads yet",
+      "bucket": "Individually safe step"
+    },
+    {
+      "label": "Deploy code that writes both the old and the new column",
+      "bucket": "Individually safe step"
+    },
+    {
+      "label": "Backfill historical rows in throttled, idempotent, restartable batches",
+      "bucket": "Individually safe step",
+      "feedback": "Additive and re-runnable, which is what lets a multi-hour backfill be interrupted and resumed without drama."
+    },
+    {
+      "label": "Switch reads to the new column behind a flag",
+      "bucket": "Individually safe step",
+      "feedback": "Reversible in seconds by flipping the flag back, which is the whole reason reads move behind one."
+    },
+    {
+      "label": "Add the new column and drop the old one in the same deploy",
+      "bucket": "Breaks rollback",
+      "feedback": "Pairing add-new with drop-old is the single combination expand and contract exists to forbid."
+    },
+    {
+      "label": "Rename a column the currently deployed code still selects",
+      "bucket": "Breaks rollback"
+    },
+    {
+      "label": "Drop the old column while one service still reads it",
+      "bucket": "Breaks rollback"
+    }
+  ],
+  "reveal": "Flags decouple release from deploy and give you a per-feature kill switch and targeting, at the price of flag debt you have to pay down. Expand and contract migrates schema in steps that are each separately deployable and separately reversible, and everything in flight must tolerate both the old and the new shape because both versions of the code are running. Never pair adding the new with dropping the old in one deploy."
+}
+\`\`\`
 `.trim()
 
 const chaosEngineeringTeach = `
@@ -1404,11 +2338,68 @@ Chaos engineering is not "randomly break things." It is the disciplined practice
 
 Blast radius is the safety discipline that separates engineering from sabotage. You start with the smallest possible scope (one instance, one non-critical service, a tiny percentage of traffic, off-peak) and expand only as confidence grows. You always run with **guardrails**: an automatic **abort condition** that halts and reverts the experiment the moment a key metric crosses a threshold. That abort should be tied to the **error budget**, if the experiment is about to burn more budget than you can afford, it stops itself, so a chaos experiment can never cause an outage worse than your reliability target already tolerates.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "why-production-not-staging",
+  "prompt": "Your failover drill passes reliably in staging. Leadership asks why you want to run the same experiment in production. What is the strongest answer?",
+  "options": [
+    {
+      "label": "Production is the only place with a blast radius big enough to be a real test",
+      "feedback": "Blast radius is the thing you deliberately keep small. You run in production narrowly and with guardrails, not to make the damage larger."
+    },
+    {
+      "label": "Staging never reproduces real traffic patterns, data volumes, cache-hit ratios, dependency graphs, or autoscaler behavior, and a failover that passes in an empty environment routinely fails under production load",
+      "correct": true,
+      "feedback": "Right, and that class of bug only exists where the risk lives, which is why you eventually have to test there, carefully and with an auto-abort."
+    },
+    {
+      "label": "Staging environments are usually broken anyway",
+      "feedback": "An unreliable staging environment is its own problem to fix. It is not an argument about where the experiment belongs."
+    },
+    {
+      "label": "Because the error budget has to be spent somewhere",
+      "feedback": "The budget guardrails the experiment rather than justifying it. The abort condition is tied to the budget so an experiment can never cost more than your reliability target already tolerates."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the strongest justification for running in production (with guardrails) rather than only staging is that staging never matches real conditions: real traffic patterns, real data volumes, real cache-hit ratios, real cross-service dependency graphs, and real autoscaler behavior only exist in prod. A failover that works in an empty staging environment routinely fails under production load. That is precisely the class of bug chaos exists to find, so you must eventually test where the risk lives, carefully.
 
 Maturity progresses from **GameDays** (scheduled, human-run exercises where a team injects a fault together and watches) toward **continuous automated experiments** run by tooling: AWS Fault Injection Simulator (FIS), Gremlin, Chaos Mesh (Kubernetes), and Netflix's Chaos Monkey / Simian Army lineage. Automation lets you re-verify resilience on every change, so it does not silently regress.
 
 **Recap:** state a steady-state hypothesis, inject a realistic fault into the smallest blast radius, measure against the hypothesis, always run with an error-budget-tied auto-abort, and test in production with guardrails because staging never reproduces real conditions.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "steady-state-metric",
+  "prompt": "You are designing a chaos experiment on the checkout path. Which metric should the steady-state hypothesis and the auto-abort watch?",
+  "options": [
+    {
+      "label": "CPU utilization across the checkout fleet",
+      "feedback": "An internal resource metric can move a long way without any user noticing, and it can sit perfectly flat while checkouts fail. Steady state is defined on the output that means healthy to a user."
+    },
+    {
+      "label": "Successful checkouts per second",
+      "correct": true,
+      "feedback": "Right. A business or indicator metric is what the hypothesis is written against, and it is what the auto-abort watches so the experiment stops before it burns budget you cannot afford."
+    },
+    {
+      "label": "The number of instances the experiment terminated",
+      "feedback": "That measures the fault you injected, not the system's response to it. The hypothesis is about the output staying within tolerance despite the fault."
+    },
+    {
+      "label": "Mean request latency across all checkout requests",
+      "feedback": "Closer, but a mean hides the tail and mixes fast failures in with successes. If the steady state has to be latency, use a percentile over successful requests."
+    }
+  ],
+  "reveal": "Define the steady state as a user-facing output, write a hypothesis that names the mechanism you expect to absorb the fault, inject a realistic fault into the smallest possible slice, then measure against the hypothesis. Guardrails are not optional: an auto-abort tied to the error budget means a chaos experiment can never cause an outage worse than your reliability target already tolerates. Maturity moves from scheduled game-days toward continuous automated experiments, so resilience is re-verified on every change instead of silently regressing."
+}
+\`\`\`
 `.trim()
 
 const incidentPostmortemTeach = `
@@ -1423,6 +2414,34 @@ Severity levels give everyone a shared vocabulary for "how bad" and the expected
 ## Roles separate coordination from fixing
 
 Roles exist to separate coordination from fixing, because the person elbow-deep in the database should not also be fielding "is it fixed yet?" from executives. The **Incident Commander (IC)** owns the response, makes decisions, and delegates; they do not fix, they coordinate. The **Communications Lead** posts regular updates to stakeholders and the status page on a fixed cadence. The **Operations/Scribe** does the hands-on remediation and keeps a timestamped log of actions. This is adapted from emergency-services incident command. In a small SEV3 one person may hold several hats; in a SEV1 they are distinct people.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "mitigate-before-diagnose",
+  "prompt": "Checkout error rate crosses 5 percent, a SEV1 is declared, and the deploy from 20 minutes ago is the prime suspect but nobody has proven it. What does the team do first?",
+  "options": [
+    {
+      "label": "Reproduce the bug in staging so the rollback is justified",
+      "feedback": "Users are down while you build a case. Diagnosis is what the postmortem is for, and the incident is for stopping the bleeding."
+    },
+    {
+      "label": "Roll the deploy back now, and investigate once service is restored",
+      "correct": true,
+      "feedback": "Right. Restoring service beats understanding it: if a bad deploy is suspected you roll it back first, and if a region is unhealthy you fail traffic away first."
+    },
+    {
+      "label": "Have the Incident Commander open a debugger, since they own the response",
+      "feedback": "The Commander coordinates and decides, they do not fix. Putting the coordinator elbow-deep in the code is how status updates stop and decisions stall."
+    },
+    {
+      "label": "Wait for another data point to confirm the error rate is real",
+      "feedback": "Severity levels carry explicit entry criteria so that declaring is objective and immediate. The threshold was already crossed."
+    }
+  ]
+}
+\`\`\`
 
 ## Mitigate before you diagnose
 
@@ -1440,6 +2459,35 @@ The blameless postmortem is the compounding step. Blameless means it assumes eve
 **Interview nuance:** never accept "human error" as a root cause, and be ready to say why. "Engineer ran the wrong command" is a stopping point that hides the real questions: why did the system let a single command take prod down, why was there no confirmation or dry-run, why did no guardrail catch it? Ask "why did the system allow this?" (this is the spirit of the Five Whys). Blameful postmortems make people hide mistakes, which hides the next incident, so blamelessness is a reliability strategy, not just a kindness.
 
 **Recap:** objective severity levels drive the response, separate the Commander from the fixers, mitigate before you diagnose, and run a blameless postmortem that targets the system (never "human error") with owned action items tracked to completion.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "human-error-is-not-a-cause",
+  "prompt": "A postmortem concludes that the root cause was an engineer running a delete against production instead of staging. Why is that not a root cause?",
+  "options": [
+    {
+      "label": "Because the engineer was not on call, so responsibility sits with their manager",
+      "feedback": "Reassigning blame is still blame, and it still ends the investigation. Blamelessness assumes everyone acted reasonably with the information and tools they had."
+    },
+    {
+      "label": "Because it stops exactly where the useful questions start: why could one command take production down, why was there no confirmation or dry run, why did no guardrail catch it",
+      "correct": true,
+      "feedback": "Right. Asking why the system allowed this is the point, and it usually surfaces several contributing causes rather than one."
+    },
+    {
+      "label": "Because human error is rare enough to ignore",
+      "feedback": "Humans make mistakes constantly. A reliable system is one built to absorb that, which is why the analysis targets the system rather than the person."
+    },
+    {
+      "label": "Because the correct action item is retraining the engineer",
+      "feedback": "Retraining is the action item a blameful postmortem produces, and it is the one that does nothing to stop the next engineer from doing the same thing."
+    }
+  ],
+  "reveal": "Objective severity criteria decide how hard the response is, and separate roles keep the Commander coordinating while operations fixes and communications posts on a fixed cadence. Mitigate first and diagnose afterwards. Then the blameless postmortem turns the incident into compounding reliability: a timeline, the impact, several contributing causes, and action items with named owners tracked to completion, because untracked action items are why the same incident happens twice."
+}
+\`\`\`
 `.trim()
 
 export const systemDesignLevel7: DesignLevel = {
