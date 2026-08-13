@@ -39,9 +39,39 @@ sliding, a name pointing at an object. They hurt as decoration. Rules of thumb:
 | `call-stack` | triggered | recursion / wrapping push-and-pop |
 | `comprehension` | static | a comprehension next to its equivalent loop |
 | `table` | static | a highlightable example table (LAG/LEAD, SCD versions, before/after) |
+| `ladder` | **animated** | messages crossing between participants over time: a handshake, a consensus round, a replication exchange |
+| `topology` | **animated** | a system drawn as boxes and edges: clients, load balancers, services, stores, caches, queues, CDNs, zones |
+
+`pipeline` is not SQL-only despite the row above. Any ordered left-to-right sequence renders
+through it, and several System Design lessons use it. Pass `title` when the pipeline is not about
+SQL: without it the frame heading reads "Order of evaluation" and screen readers announce "SQL
+logical execution order", which is what three System Design lessons shipped before it was fixed.
 
 See `lib/tutorials/diagrams/schema.ts` for the exact fields of each — it is the source of
 truth and the error messages point at the offending field.
+
+### The density cap applies to two of these
+
+`ladder` and `topology` animate, so they cost the same attention as an interactive widget and share
+its budget: **at most one simulation or animated diagram per lesson**, enforced by
+`lib/tutorials/widgets/__tests__/sim-density.test.ts`. The set is exported as
+`ANIMATED_DIAGRAM_TYPES` from `lib/tutorials/system-design/coverage.ts`, which is the single
+definition; do not re-declare it.
+
+Every other type on this list is static and uncapped. So a lesson that already carries a `calc`
+widget cannot also take a `topology`, but it can take as many `table` diagrams as the material
+justifies. Check what a lesson already has with `pnpm audit:sd --lessons` before authoring, because
+the cap is a test failure, not a warning.
+
+### Cross-field rules the schema enforces
+
+- **`ladder`**: 3 to 12 bands, ordered smallest to largest, and `value` must ascend across them.
+  `scale: "log"` gives each decade equal travel, which is what makes a latency ladder's cliffs
+  visible; `linear` flattens them into one bar and eleven slivers.
+- **`topology`**: 2 to 16 nodes and 1 to 24 edges. Every node must appear in exactly one stage, and
+  every stage requires a non-empty `note` tying what it adds back to a requirement. The 16-node
+  ceiling is deliberate: it is the guard that keeps a free-form graph from re-entering. Past it the
+  material wants splitting, not shrinking.
 
 ## Authoring rules that avoid real bugs
 

@@ -120,10 +120,36 @@ Schema-level rejections live in `lib/tutorials/widgets/__tests__/schema.test.ts`
 pipeline and SSR-safety guards in `components/tutorials/widgets/__tests__/`. Run
 `pnpm test` after authoring.
 
-## The sim families (`calc`, `hash-ring`, `sequence`)
+## The sim families (eleven of them)
 
-All three are hands-on interactives dispatched through the same fence. Field-level
-truth is `lib/tutorials/widgets/families/*.ts`; the binding pedagogy ramp:
+`lib/tutorials/widgets/schema.ts` composes eleven simulation families plus `check`. They are all
+hands-on interactives dispatched through the same fence, and they all share one shape: a mandatory
+`title`, a mandatory `predictPrompt` (2-4 options, no marked answer) that makes the learner commit
+before the widget reveals anything, a `workedExample` that narrates arithmetically correct initial
+values, and a `caption`. Field-level truth is `lib/tutorials/widgets/families/*.ts`.
+
+Reach for an existing family before proposing a new one. The three documented below at length are
+the general-purpose ones; the other eight are each purpose-built for a concept that is genuinely
+dynamic, and using the right one is most of the work:
+
+| family | models | reach for it when the lesson is about |
+|---|---|---|
+| `cache-sim` | seeded skewed stream against a small LRU | hit ratio vs capacity and TTL, stampedes, request coalescing |
+| `queue-sim` | producer/consumer rate mismatch | unbounded depth running away, bounded queues shedding or backpressuring, scale-on-backlog |
+| `rate-limiter` | token bucket vs fixed vs sliding window on one stream | why a burst at a fixed window boundary admits about 2x the limit |
+| `quorum` | N/R/W sliders plus kill-a-replica | the R+W>N misconception; presets for Dynamo, Kafka (RF / min.insync.replicas), and 3f+1 BFT |
+| `partition-sim` | two replicas, a network partition, scripted writes | CP vs AP as a choice the learner makes, then LWW dropping a write vs version vectors vs CRDTs |
+| `replication-lag` | leader/follower lag with a write burst | read-your-writes, the vanishing comment, and its two cures |
+| `watermark-sim` | event time vs processing time | watermarks, allowed lateness, the latency-versus-completeness trade |
+| `steps` | authored frame-by-frame snapshots | anything sequential with no math behind it: log compaction, a cursor page walk, a blue/green pool flip |
+
+`steps` is the long-tail escape hatch and the one to understand before proposing new machinery.
+Where `sequence` renders actors exchanging messages over time, `steps` renders SNAPSHOTS: each frame
+is labeled rows of cells plus a note, and the learner walks Prev/Next. Frames are fully authored
+data with no math module behind them, which is exactly what lets one component serve a dozen
+unrelated topics. If a proposed new family would be "a stepper for X", it is `steps`.
+
+The binding pedagogy ramp for the three general-purpose families:
 
 - **`calc`** (formula sliders): mandatory `predictPrompt` (2-4 one-tap options, no
   marked answer) and `workedExample` narrating arithmetically correct initial
@@ -140,4 +166,23 @@ truth is `lib/tutorials/widgets/families/*.ts`; the binding pedagogy ramp:
   chars; use `state` maps when a counter or race is the story; 1-2 `predict` steps
   at the pivotal moment.
 
-Density cap reminder: at most ONE sim or animated widget per lesson, plus checks.
+## The density cap
+
+**At most ONE simulation or animated diagram per lesson.** Checks are exempt and uncapped; so are
+static diagrams (`table`, `er`, `pipeline` and the rest). The capped set is every family in the
+table above plus `csdiagram`'s `ladder` and `topology`, which animate and so cost the same
+attention.
+
+This is enforced by `lib/tutorials/widgets/__tests__/sim-density.test.ts`, and it is a test failure
+rather than a warning. The set has one definition, exported from
+`lib/tutorials/system-design/coverage.ts` as `SIMULATION_WIDGET_FAMILIES` and
+`ANIMATED_DIAGRAM_TYPES`. Do not re-declare it.
+
+Before authoring, check what the lesson already carries:
+
+```
+pnpm audit:sd --lessons
+```
+
+The `sims` column is the budget. A lesson showing 1 is full, and the next interactive has to be a
+check or a static diagram no matter how good the idea is.
