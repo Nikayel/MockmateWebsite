@@ -22,6 +22,33 @@ At 100M new links per day, writes are 100M / 86,400s which is roughly 1,160 writ
 
 Base62 (0-9, a-z, A-Z) gives 62^7 which is about 3.5 trillion combinations for a 7-char key, plenty of headroom. There are three real strategies. First, encode a globally unique counter (or a Snowflake ID) into base62. This is collision-free by construction and needs no read-before-write, but a naive single counter is a coordination bottleneck, so use ranged counter allocation (each app server leases a block of 10,000 ids) or a Snowflake generator. Second, hash the long URL (MD5/SHA) and take the first 7 chars. This gives idempotency for free (same URL maps to same key) but you must detect collisions with a read and retry with a salt. Third, pre-generate a large pool of unused keys offline and hand them out; this moves collision work out of the request path entirely.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A candidate proposes a relational table with an AUTO_INCREMENT primary key, base62 encoded into the short key. What is the objection the interviewer is waiting for?",
+  "options": [
+    {
+      "label": "Every insert lands on the highest index page, so writes hotspot on one page, and a single sequence does not shard cleanly",
+      "correct": true,
+      "feedback": "Right. A monotonic sequence concentrates inserts at one end of the index and cannot be split across shards without reintroducing a coordinator, which is why you reach for leased counter ranges or Snowflake."
+    },
+    {
+      "label": "Auto-increment ids can collide when two inserts race",
+      "feedback": "The database guarantees uniqueness, so collisions are not the risk. The cost is the write hotspot and the fact that the sequence resists sharding."
+    },
+    {
+      "label": "Base62 of an integer id will not fit in seven characters",
+      "feedback": "62 to the 7th is about 3.5 trillion, so a seven character key has enormous headroom. Length is not what fails here."
+    },
+    {
+      "label": "Sequential ids let anyone enumerate every link, which is the main problem",
+      "feedback": "Guessable keys are worth raising, and this lesson returns to it. But the structural objection, the one that decides the architecture, is the hotspot and the sharding failure."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the single strongest sign of seniority here is refusing a relational table with an AUTO_INCREMENT primary key. It creates a write hotspot on the highest index page and does not shard cleanly. Say that out loud.
 
 ## The read path is a cache in front of a KV store
@@ -48,6 +75,34 @@ A 301 (permanent) is cacheable by browsers and proxies, so the follow-up request
 \`\`\`
 
 **Recap:** estimate first (~1.2K writes/sec, ~116K reads/sec, ~20 TB/yr), generate keys with base62 of a counter/Snowflake to avoid collisions and hotspots, serve reads from Redis in front of a sharded KV store, and choose 301 vs 302 by whether you need click analytics.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Product says per-click analytics is the whole feature, and you sized reads at roughly 116K per second. Which pair of choices does that force?",
+  "options": [
+    {
+      "label": "302 redirects so every click comes back to you, with Redis in front of a sharded KV store to absorb the read volume",
+      "correct": true,
+      "feedback": "Right. 302 keeps clicks measurable by giving up browser and proxy caching, and the cache in front of a sharded KV store is what makes 116K reads per second affordable."
+    },
+    {
+      "label": "301 redirects so browsers cache the hop, with Redis in front of a sharded KV store",
+      "feedback": "301 is the cheaper redirect and the better answer when raw throughput is the goal. But a cached permanent redirect never comes back, so the clicks you were asked to count disappear."
+    },
+    {
+      "label": "302 redirects with a direct KV read on every click, since a cache would hide clicks from analytics",
+      "feedback": "Analytics come from logging the redirect you serve, not from skipping the cache. Without the cache, the full 116K reads per second land on the store."
+    },
+    {
+      "label": "301 redirects with no cache, since the browser cache already removes most of the load",
+      "feedback": "It removes load only after the first click per browser, and it removes exactly the signal the product asked for. This trades the feature away to save infrastructure you can afford."
+    }
+  ],
+  "reveal": "The shape of this answer is estimate, key generation, read path, redirect semantics. About 1.2K writes and 116K reads per second says the interesting problem is latency and throughput, not capacity. Base62 over a leased counter or a Snowflake id keeps generation collision free and hotspot free. Redis in front of a sharded KV store carries the reads because the mapping is immutable. And 301 versus 302 is a deliberate trade of free browser caching against clicks you can measure."
+}
+\`\`\`
 `.trim()
 
 const rateLimiterTeach = `
@@ -95,7 +150,53 @@ Fixed window counts requests per calendar minute: it is trivial (one counter, on
 
 You can limit at the client (cheap, but untrusted), at the API gateway or a sidecar (Envoy) close to the app (low latency, shared policy), or in a dedicated rate-limit service (clean but adds a network hop per request). For a fleet of stateless servers the shared state must live somewhere both nodes can see, which is where Redis comes in.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Ten stateless app nodes sit behind a load balancer, and each enforces 100 requests per minute using its own in-process counter. What limit does one client actually get?",
+  "options": [
+    {
+      "label": "Up to 1,000 per minute, because the load balancer spreads the client across all ten counters",
+      "correct": true,
+      "feedback": "Right. Local counters mean a client hitting N nodes gets up to N times the intended limit, which is why the counter has to live somewhere every node can see."
+    },
+    {
+      "label": "100 per minute, because each node independently enforces the policy",
+      "feedback": "Each node enforces it against the slice of traffic it sees. The client is not confined to one node, so it collects a fresh 100 request budget on each of them."
+    },
+    {
+      "label": "10 per minute, because the limit is divided across the fleet",
+      "feedback": "Nothing divides it: each node was configured with the full 100 and has no idea the other nine exist."
+    }
+  ]
+}
+\`\`\`
+
 If each node keeps a local counter, a client hitting N nodes behind a load balancer gets up to N times the intended limit. So the counter is shared, usually in Redis. The naive \`GET\` then \`INCR\` is a race: two nodes read 99, both increment, both allow, and you overshoot. Fix it by making the check-and-increment atomic: either \`INCR\` first and compare the returned value (INCR is atomic and returns the new count), setting a TTL on first creation, or run a small Lua script that reads, decides, and writes in one round trip so no interleaving is possible. Sliding-window and token-bucket variants are almost always implemented as a single Lua script for exactly this reason.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your Redis is unreachable and the limiter cannot read the counter. The endpoint it protects is the login form. Fail open or fail closed?",
+  "options": [
+    {
+      "label": "Fail closed and reject: unlimited login attempts is a worse outcome than a login outage",
+      "correct": true,
+      "feedback": "Right. The limiter on login exists to stop credential stuffing, so losing it turns a dependency outage into an abuse window. State the choice out loud and tie it to what the limiter protects."
+    },
+    {
+      "label": "Fail open and allow: user experience always wins during a dependency outage",
+      "feedback": "Fail open is the right default for a public read API where the limiter only protects capacity. On login it hands an attacker unmetered attempts, which is why the choice is per endpoint, not global."
+    },
+    {
+      "label": "Neither: hold requests until Redis returns, so no traffic is wrongly admitted or rejected",
+      "feedback": "Holding is just a slow failure, and the queue becomes its own outage. Every request still has to be admitted or rejected, so you are choosing fail open or fail closed whether you name it or not."
+    }
+  ]
+}
+\`\`\`
 
 ## Clock skew and the availability call
 
@@ -110,6 +211,34 @@ Node A, Node B  ->  Redis (atomic Lua): count = INCR key; if first, EXPIRE 60
 \`\`\`
 
 **Recap:** pick the algorithm by burst tolerance (token bucket) vs accurate hard cap (sliding window counter), keep the shared counter in Redis with an atomic INCR+TTL or Lua script to avoid the read-modify-write race, compute time on the Redis side to dodge clock skew, and consciously choose fail-open vs fail-closed on a Redis outage.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The requirement is an accurate hard cap of 100 requests per minute per API key, enforced across 20 stateless nodes. What do you name?",
+  "options": [
+    {
+      "label": "Sliding window counter, evaluated in one Lua script against a shared Redis so the check and the increment cannot interleave",
+      "correct": true,
+      "feedback": "Right. Sliding window counter kills the boundary burst at O(1) memory, the shared store removes the per node divergence, and the single script removes the read modify write race."
+    },
+    {
+      "label": "Fixed window counters in Redis, since the shared store already removes the race",
+      "feedback": "The shared store fixes divergence across nodes but not the boundary leak: a fixed window still admits close to twice the limit across a window edge, so the cap is not accurate."
+    },
+    {
+      "label": "Token bucket in Redis, since it is what AWS and Stripe use",
+      "feedback": "Token bucket is the right pick when controlled bursts are acceptable, which is why those APIs chose it. It deliberately admits a burst up to the bucket size, which an accurate hard cap forbids."
+    },
+    {
+      "label": "Sliding window log kept on each node, since the log is exact",
+      "feedback": "The log is exact per node, and per node state means every node grants its own 100. It also costs O(N) memory per key, which hurts most on exactly the hot keys you care about."
+    }
+  ],
+  "reveal": "Two halves, always. The algorithm answers burst tolerance versus accuracy: token bucket for controlled bursts, sliding window counter for a cheap accurate cap, fixed window only when the roughly 2x boundary leak is acceptable. Distributed correctness answers where the counter lives: shared in Redis, mutated atomically by INCR with a TTL on first creation or by a Lua script, with refill time computed on the Redis side so no app node's clock matters. Then decide fail open versus fail closed per endpoint and return 429 with Retry-After."
+}
+\`\`\`
 `.trim()
 
 const uniqueIdGeneratorTeach = `
@@ -121,7 +250,53 @@ The job is to hand out 64-bit, globally unique, roughly time-sortable IDs at mil
 
 Snowflake's trick is to partition the ID space by bit budget so each node can mint IDs alone. A common 64-bit layout: 1 sign bit (unused, kept 0 so the number is positive), 41 bits of millisecond timestamp (since a custom epoch), 10 bits of machine/worker id, and 12 bits of a per-millisecond sequence counter. Do the arithmetic, because interviewers ask. 41 bits of ms is 2^41 milliseconds which is about 69 years of range from your epoch. 10 bits of worker id is 1,024 nodes. 12 bits of sequence is 4,096 ids per node per millisecond, which is about 4.096M ids per node per second, times 1,024 nodes is over 4 billion/sec of theoretical ceiling. You can rebudget the bits (fewer worker bits, more sequence) to match your fleet.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Why does the timestamp occupy the highest bits of the 64 rather than the lowest?",
+  "options": [
+    {
+      "label": "Because integer comparison then compares time first, so sorting the raw ids sorts roughly by creation order",
+      "correct": true,
+      "feedback": "Right. Field order is the design decision here: put time in the high bits and a plain numeric sort is a time sort, which is what makes these good clustered primary keys."
+    },
+    {
+      "label": "Because only the high bits have room for a 41 bit field",
+      "feedback": "Bit width is a budget you allocate, and the field would fit anywhere in the 64. Position decides sort order, not capacity."
+    },
+    {
+      "label": "Because the timestamp must be readable without decoding the rest of the id",
+      "feedback": "You recover any field with a shift and a mask regardless of where it sits. The reason for the high bits is what integer ordering then means."
+    }
+  ]
+}
+\`\`\`
+
 The ID is time-sortable because the timestamp occupies the high bits: sort the 64-bit integers and you get roughly chronological order, which is why these make excellent clustered primary keys. Within a single millisecond the sequence counter breaks ties and guarantees uniqueness; if the sequence overflows (more than 4,096 ids in one ms on one node), the generator waits (busy-spins) until the next millisecond.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A teammate says UUIDv4 is simpler: no worker ids, no clock handling, coordination free. You plan to use the id as the clustered primary key. What breaks?",
+  "options": [
+    {
+      "label": "Random ids scatter inserts across the whole B-tree, fragmenting the index instead of appending to one end",
+      "correct": true,
+      "feedback": "Right, and this is the classic wrong turn. UUIDv4 is coordination free and unpredictable, but as a clustered key its randomness destroys insert locality. UUIDv7 and ULID exist to put a timestamp back in the high bits."
+    },
+    {
+      "label": "Random 128 bit ids collide often enough to need a uniqueness check on insert",
+      "feedback": "122 random bits make collisions negligible in practice, which is why UUIDv4 is safe to mint anywhere. The cost is what randomness does to the index, not to uniqueness."
+    },
+    {
+      "label": "UUIDv4 cannot be generated without contacting a central service",
+      "feedback": "It can be generated entirely locally, which is exactly its appeal. That is not where it fails."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** compare the alternatives out loud. UUIDv4 is random 128-bit: trivially coordination-free and unpredictable, but not sortable, and as a clustered index key its randomness scatters writes across the B-tree and fragments the index (the classic wrong turn). UUIDv7 and ULID fix that by putting a timestamp in the high bits (like Snowflake, but 128-bit and needing no worker-id assignment). DB auto-increment is perfectly sortable and compact but needs central coordination and does not shard. A ticket server (a dedicated ID service) centralizes allocation and reintroduces the bottleneck Snowflake exists to avoid. Snowflake wins when you want compact, sortable, coordination-free 64-bit keys and can manage worker ids.
 
@@ -149,6 +324,46 @@ Worker-id assignment is the other operational detail. Each node needs a unique 1
 There is a real tension: sortability leaks information. A time-sortable ID reveals creation time and, worse, sequential-ish IDs let an attacker enumerate or estimate volume ("how many orders did they get today"). If unpredictability matters (public-facing resource ids), do not expose the raw sortable id; use a random UUID externally and keep the Snowflake id internal, or add a non-sequential public slug.
 
 **Recap:** budget the 64 bits (timestamp high for sortability, worker id, sequence), which lets every node mint millions of unique IDs per second with zero coordination; defend the clock by refusing to issue on a backward jump; and remember that sortability trades away unpredictability, so hide raw ids when enumeration is a threat.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each id scheme by what it needs at the moment an id is minted.",
+  "buckets": [
+    "No coordination when the id is minted",
+    "A central allocator in the request path"
+  ],
+  "items": [
+    {
+      "label": "Snowflake with a leased worker id",
+      "bucket": "No coordination when the id is minted",
+      "feedback": "The worker id is leased once at startup from etcd or ZooKeeper. After that the node mints ids alone from its own clock and sequence."
+    },
+    {
+      "label": "UUIDv4",
+      "bucket": "No coordination when the id is minted",
+      "feedback": "Pure randomness, generated locally. It pays for that with no sortability and a fragmented clustered index."
+    },
+    {
+      "label": "ULID or UUIDv7",
+      "bucket": "No coordination when the id is minted",
+      "feedback": "Timestamp in the high bits like Snowflake, but 128 bits wide, so it needs no worker id assignment at all."
+    },
+    {
+      "label": "Database AUTO_INCREMENT",
+      "bucket": "A central allocator in the request path",
+      "feedback": "Perfectly sortable and compact, and every insert has to go through the one sequence, which is what stops it sharding."
+    },
+    {
+      "label": "A dedicated ticket server",
+      "bucket": "A central allocator in the request path",
+      "feedback": "It centralizes allocation, which reintroduces the bottleneck and the single point of failure that Snowflake exists to remove."
+    }
+  ],
+  "reveal": "The whole scheme is a bit budget traded against three properties. Timestamp high buys rough sortability, worker id buys coordination free minting, sequence buys uniqueness within a millisecond. The clock is the weak point, so track the last issued timestamp and refuse to issue on a backward jump rather than risk a duplicate. And sortability leaks: a time ordered id reveals creation time and invites enumeration, so keep the Snowflake id internal and expose a random public slug when that matters."
+}
+\`\`\`
 `.trim()
 
 const typeaheadTeach = `
@@ -334,6 +549,29 @@ The core structure is a trie (prefix tree): each node is a character, and a path
 }
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A candidate proposes a SQL table of terms with an index on the term column, queried with a prefix pattern on every keystroke. Why is that rejected?",
+  "options": [
+    {
+      "label": "Ranking the matches and serving one query per keystroke at real QPS blows the 100ms budget, even with the index doing its job",
+      "correct": true,
+      "feedback": "Right. The index makes the prefix match itself cheap; what it cannot make cheap is scoring thousands of matches and doing it again for every character every user types."
+    },
+    {
+      "label": "A B-tree index cannot answer a prefix match at all",
+      "feedback": "It can. A pattern anchored at the start of the string is exactly a B-tree range scan, which is why the idea is tempting. Feasibility is not the objection, cost under load is."
+    },
+    {
+      "label": "SQL cannot store the frequency and recency scores that ranking needs",
+      "feedback": "A score column is trivial. The problem is that ranking has to happen inside the request, on every keystroke, instead of once offline."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the single most common wrong turn is \`SELECT ... WHERE term LIKE 'prefix%'\` against a SQL table on every keystroke. Even with an index, ranking and the per-keystroke QPS blow the 100ms budget under load. Say why a prefix tree with cached top-k beats it, and mention that a search engine (Elasticsearch completion suggester, which is FST/trie-backed) is the buy-not-build version.
 
 ## Ranking and freshness
@@ -341,6 +579,29 @@ The core structure is a trie (prefix tree): each node is a character, and a path
 Completions are scored by some blend of frequency (how often this query is issued), recency (trending terms weighted up via time decay), and personalization (this user's or this cohort's history). The scores are baked into the cached top-k per node, so ranking cost is paid offline. Weighted tries store the aggregate score alongside each terminal so the top-k selection is a simple heap over the subtree during the offline build.
 
 Keeping suggestions fresh means updating from a stream. Query logs flow through Kafka; you either rebuild the trie in batch (hourly/daily) from aggregated counts, which is simple and consistent but stale by up to the batch interval, or apply incremental updates so a newly trending term (a breaking-news query) appears within minutes, at the cost of a more complex mutable structure. Most systems do a nightly full rebuild plus a fast incremental layer for trending terms.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your trie serves a prefix in about 5ms. Does the design still need client debouncing and an edge cache?",
+  "options": [
+    {
+      "label": "Yes: the load is request count, not per request cost, and a small set of short prefixes carries most of it",
+      "correct": true,
+      "feedback": "Right. Typing one seven letter word can fire seven requests per user, and hot prefixes repeat across everyone, so debouncing and edge caching remove most origin load before the trie is ever consulted."
+    },
+    {
+      "label": "No: at 5ms a lookup the origin can absorb the traffic, and debouncing only adds perceived latency",
+      "feedback": "Per request latency is not the constraint. The fleet has to be sized for every keystroke of every user, and the debounce collapses seven requests into one or two without the user noticing."
+    },
+    {
+      "label": "No: caching prefixes would serve stale suggestions, which the product cannot accept",
+      "feedback": "Suggestions tolerate short staleness, which is why a short TTL at the edge is safe. That is a trade you make deliberately, and it is what makes the hot prefixes free."
+    }
+  ]
+}
+\`\`\`
 
 ## The load-shedding layer
 
@@ -355,6 +616,30 @@ key "ne" -> trie walk n->e (O(2)) -> node holds cached top-10:
 \`\`\`
 
 **Recap:** serve completions from a trie with top-k cached per node so lookup is O(prefix length) with no subtree walk, rank offline by frequency/recency/personalization, refresh from a Kafka stream (batch rebuild plus incremental for trending), and cut origin load with client debouncing and edge caching, never a per-keystroke SQL LIKE query.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A breaking news query starts trending at 9am. Your trie is rebuilt nightly from aggregated query logs. What do you add so the term surfaces within minutes?",
+  "options": [
+    {
+      "label": "An incremental update layer over the nightly rebuild, applying trending terms into the cached top-k of the affected nodes",
+      "correct": true,
+      "feedback": "Right. Most systems run both: a nightly full rebuild for a simple, consistent base, plus a fast incremental path so a spiking term does not wait for tomorrow."
+    },
+    {
+      "label": "Rebuild the whole trie hourly instead of nightly",
+      "feedback": "It narrows the staleness window at a large and constant cost, and a term that spikes at 9:05 still waits most of an hour. The mutable incremental layer is what buys minutes."
+    },
+    {
+      "label": "Rank at request time instead, so the newest scores are always used",
+      "feedback": "That is the subtree walk the cached top-k exists to avoid, and it puts ranking cost back inside the 100ms budget on every keystroke."
+    }
+  ],
+  "reveal": "Typeahead is a latency budget defended in three places. The structure is a trie whose every node already holds its top-k, so a lookup is O(prefix length) with no subtree walk. The ranking (frequency, recency, personalization) is paid offline, refreshed by a nightly rebuild plus an incremental layer for trending terms. And most of the traffic never reaches any of it, because client debouncing and edge caching on hot prefixes shed it first. The answer that fails is a per keystroke SQL prefix query."
+}
+\`\`\`
 `.trim()
 
 const newsFeedTeach = `
@@ -369,6 +654,33 @@ When Alice posts, you immediately write that post id into the timeline cache of 
 ## Fan-out-on-read (pull)
 
 Store each post once keyed by author. When Bob loads his timeline, fetch the recent posts of everyone Bob follows and merge them at read time. Writes are cheap (one insert). Reads are expensive: if Bob follows 2,000 accounts you issue a scatter-gather across 2,000 authors and merge-sort on every timeline load. That blows the 200ms budget for active users.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Push dies on celebrities, and pull dies on users who follow thousands of accounts. What does the senior answer do?",
+  "options": [
+    {
+      "label": "Push to normal followers, and pull only the handful of celebrity accounts a reader follows, merging them in at read time",
+      "correct": true,
+      "feedback": "Right. Both costs are bounded: write amplification is capped by the celebrity threshold, and the read time merge stays small because most users follow only a few celebrities."
+    },
+    {
+      "label": "Pull for everyone, and cache the merged timeline so the scatter-gather only happens once",
+      "feedback": "The cache helps repeat loads, but every new post invalidates it, so an active user following 2,000 accounts still pays the 2,000 way merge constantly."
+    },
+    {
+      "label": "Push for everyone, but rate limit how often high follower accounts can post",
+      "feedback": "That reshapes the product to fit the architecture, and one celebrity post is still 50M writes whenever it is allowed."
+    },
+    {
+      "label": "Push for everyone, but shard the timeline cache further so the writes spread out",
+      "feedback": "Sharding spreads where the writes land, it does not reduce how many there are. 50M timeline writes for one post is the same 50M writes on more machines."
+    }
+  ]
+}
+\`\`\`
 
 ## The hybrid (the senior answer)
 
@@ -468,11 +780,58 @@ Posts live once in a partitioned store (Cassandra or a sharded SQL, partitioned 
 
 Chronological is a sorted set scored by timestamp. ML-ranked timelines change the shape: fan-out now delivers candidates, and a ranking service scores them per request using features (author affinity, recency, engagement). You keep fan-out as candidate generation and add a scoring layer.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Alice deletes a post that already fanned out into 50M follower timelines. What has to happen?",
+  "options": [
+    {
+      "label": "Nothing in the timelines: they hold post ids, so a tombstone on the single post makes hydration skip it",
+      "correct": true,
+      "feedback": "Right, and this is exactly why timelines store ids and not bodies. The source of truth stays single, so deletes and edits are O(1) instead of a 50M row chase."
+    },
+    {
+      "label": "A background job removes the id from all 50M cached timelines before the post can disappear",
+      "feedback": "That is the work the indirection exists to avoid. You may lazily trim dead ids when a timeline is next written, but the delete itself must not depend on it."
+    },
+    {
+      "label": "The post body in every timeline entry is overwritten with a deleted placeholder",
+      "feedback": "Timelines never held the body. They hold ids, and bodies are hydrated in a second batched lookup, which is what makes this cheap."
+    }
+  ]
+}
+\`\`\`
+
 Because post bodies are stored once and timelines hold only ids, a delete is a tombstone on the post; readers filter tombstoned ids at hydration. You do not chase 50M cached copies. This is exactly why timelines store ids, not bodies: it keeps the source of truth single and makes deletes and edits O(1).
 
 **Interview nuance:** the consistency-vs-freshness tradeoff. Fan-out-on-write means a follower may see a post seconds after it is created (async fan-out lag). That is acceptable for a feed. Do not promise read-after-write on someone else's timeline.
 
 **Recap:** use a hybrid, push posts to normal followers' timelines and pull celebrities at read time, store post ids not bodies so deletes stay cheap, and paginate by cursor.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A user posts, then immediately asks why a friend has not seen it. What is the honest guarantee?",
+  "options": [
+    {
+      "label": "Timelines are eventually consistent: fan-out is async, so a follower may see the post seconds later",
+      "correct": true,
+      "feedback": "Right. Async fan-out is what makes the write path survivable, and a few seconds of lag on someone else's timeline is an acceptable trade for a feed."
+    },
+    {
+      "label": "Read-after-write applies, because the post is written to follower timelines before the response returns",
+      "feedback": "Doing the fan-out inline would put hundreds of timeline writes inside the request, and 50M of them for a celebrity. Never promise read-after-write on someone else's timeline."
+    },
+    {
+      "label": "The friend will see it on their next load, because timelines are computed at read time",
+      "feedback": "That describes pure pull. In the hybrid, a normal author's post is pushed asynchronously, so the arrival time depends on the fan-out worker, not on when the friend refreshes."
+    }
+  ],
+  "reveal": "Fan-out is the whole interview. Push makes reads a cursor slice and moves the cost to write time; pull makes writes one insert and moves the cost to a scatter-gather at read time; the hybrid picks per author using a follower threshold. Underneath, posts live once in a partitioned store and timelines hold only ids, capped to a few hundred, hydrated in a batch, paginated by an opaque cursor rather than OFFSET. That indirection is what makes deletes a tombstone and lets a ranking layer sit on top of fan-out as candidate generation."
+}
+\`\`\`
 `.trim()
 
 const instagramTeach = `
@@ -483,6 +842,29 @@ Instagram is a fan-out timeline (you already know that half from the news-feed l
 ## Split blob from metadata
 
 The single most important decision: photos go in object storage (S3, GCS), and the database stores only metadata plus a pointer (the object key or URL). A post row is \`(post_id, user_id, caption, media_key, created_at, like_count)\`, a few hundred bytes. The 3MB photo never enters the database. Storing image bytes in Postgres or MySQL bloats the row store, wrecks buffer-cache hit rates, makes backups enormous, and cannot be served from a CDN. The metadata DB (users, posts, follows) can be a partitioned relational store or a KV store; the media store is separate and optimized for large immutable blobs.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The client has a 3MB photo. The obvious flow is client uploads to your app server, and the app server writes it to S3. What breaks at scale?",
+  "options": [
+    {
+      "label": "Every byte crosses your app tier, so the fleet has to be sized for media bandwidth rather than for request volume",
+      "correct": true,
+      "feedback": "Right. The bytes move twice and your app servers become a throughput bottleneck. The fix is a presigned URL: the app tier does auth and hands out a short lived signed URL, and S3 absorbs the bytes."
+    },
+    {
+      "label": "S3 rejects object writes that do not originate from the end user's browser",
+      "feedback": "S3 accepts a server side write without complaint, which is why this design gets built. The objection is cost and throughput through your own tier."
+    },
+    {
+      "label": "The photo would have to pass through the metadata database on its way to S3",
+      "feedback": "Nothing forces that, and you would never do it. The problem is bandwidth through the app tier, not where metadata lives."
+    }
+  ]
+}
+\`\`\`
 
 ## Presigned uploads
 
@@ -508,6 +890,46 @@ Likes and comment counts on a viral post get millions of increments. A single \`
 **Interview nuance:** estimate to show you can size it. 100M photos/day at 2MB average is 200TB/day of new media before replication, so ~600TB/day at 3x replication, or roughly 250 to 300TB/day erasure coded (parity shards instead of whole copies), which is the choice you make for cold media. Read bandwidth dwarfs write bandwidth, which is the whole reason a CDN is non-negotiable.
 
 **Recap:** metadata DB plus object storage plus CDN, upload direct to S3 with presigned URLs, generate resolution variants async, reuse hybrid fan-out for the feed, and never store image bytes in the database.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each piece of a post into where it is stored.",
+  "buckets": [
+    "Metadata database",
+    "Object store behind a CDN"
+  ],
+  "items": [
+    {
+      "label": "The caption text",
+      "bucket": "Metadata database",
+      "feedback": "A few hundred bytes that queries filter and sort on, which is exactly what the row store is for."
+    },
+    {
+      "label": "The 3MB original photo",
+      "bucket": "Object store behind a CDN",
+      "feedback": "Large, immutable, and read far more than written. In the database it bloats the row store, wrecks buffer cache hit rates, and can never be served from an edge."
+    },
+    {
+      "label": "The 320 pixel thumbnail generated after upload",
+      "bucket": "Object store behind a CDN",
+      "feedback": "Every resolution variant is another immutable blob, produced asynchronously by a worker off an S3 event and served from the edge."
+    },
+    {
+      "label": "The media key that points at the photo",
+      "bucket": "Metadata database",
+      "feedback": "The pointer is metadata: small, fetched with the post, and the reason the post row stays a few hundred bytes."
+    },
+    {
+      "label": "post id, user id, created at",
+      "bucket": "Metadata database",
+      "feedback": "The identifiers the feed queries and joins on."
+    }
+  ],
+  "reveal": "Instagram is the news feed you already know bolted onto a media pipeline, and the media half is one rule applied everywhere: bytes go in object storage, the database gets a pointer. That rule is what lets uploads bypass your app tier through a presigned URL, lets variants be generated asynchronously by a worker, lets a CDN serve better than 90 percent of reads from an edge with long TTLs because media is immutable, and lets the feed reuse hybrid fan-out over ids. The one place it does not help is the like counter, where a single hot row needs sharded sub counters or an approximate count in Redis."
+}
+\`\`\`
 `.trim()
 
 const chatMessagingTeach = `
@@ -536,6 +958,29 @@ Global ordering across all messages is neither needed nor affordable. What users
 
 Delivery is a state machine per message: sent (server accepted), delivered (recipient's device ACKed receipt), read (recipient opened the chat). Each transition is an ACK flowing back that updates message state and notifies the sender.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Bob's phone is offline when Alice sends. There is no socket to push to. What does the system do?",
+  "options": [
+    {
+      "label": "Persist the message in Bob's durable inbox, and let his device pull everything after its last acknowledged sequence number when it reconnects",
+      "correct": true,
+      "feedback": "Right. Store and forward is what makes the send succeed even though delivery cannot, and the sequence number is what tells the reconnecting device exactly where to resume."
+    },
+    {
+      "label": "Retry the push every few seconds until Bob's device reappears",
+      "feedback": "There is nothing to push to, so each retry is wasted work, and a device offline for hours would lose the message entirely when the retries give up."
+    },
+    {
+      "label": "Return an error to Alice so she can resend once Bob is back",
+      "feedback": "That pushes the system's job onto the sender, and Alice has no way to know when Bob returns. The send is accepted; delivery is a later state transition."
+    }
+  ]
+}
+\`\`\`
+
 If Bob is offline, you cannot push. Persist the message in Bob's per-user inbox / mailbox (a durable store), and when Bob reconnects, his device pulls everything since its last acknowledged sequence number. The message store is a wide-column database (Cassandra / HBase) partitioned by conversation or by recipient, which suits the append-heavy, time-ordered access pattern. Messages are typically deleted or aged out after delivery to all devices.
 
 A group message is written once and delivered to each member: look up each member's connection server (or inbox if offline) and forward. For small groups this is a simple loop. For very large channels (Telegram-style broadcast channels with millions of members) you need hierarchical distribution: shard the member list, fan out through layers of workers rather than one server pushing millions of copies, similar to the celebrity timeline problem.
@@ -545,6 +990,30 @@ Multi-device sync means a message must reach all of a user's devices and read st
 **Interview nuance:** when asked about ordering, say "per-conversation ordering via sequence numbers," never "global ordering." Claiming a global total order across a billion users is the classic red flag.
 
 **Recap:** hold WebSocket connections on a connection tier with a session registry, order per-conversation with sequence numbers, dedup by client message id, store-and-forward for offline users, and fan out groups (hierarchically for huge channels).
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The interviewer asks what ordering guarantee you provide for messages. What do you claim?",
+  "options": [
+    {
+      "label": "Per conversation ordering, from a monotonic sequence number scoped to the conversation, which clients sort on",
+      "correct": true,
+      "feedback": "Right. That is the only ordering a user can observe, and it is affordable because the sequence is scoped to one chat rather than to the whole system."
+    },
+    {
+      "label": "A global total order across all messages, assigned by a single sequencer service",
+      "feedback": "This is the classic red flag. A global sequencer across a billion users is a bottleneck you do not need, because no user can observe order across conversations they are not in."
+    },
+    {
+      "label": "Ordering by the server receive timestamp, which is close enough across the fleet",
+      "feedback": "Connection servers have skewed clocks, so two messages in one chat can be ordered differently by different readers. The sequence number exists precisely to remove that ambiguity."
+    }
+  ],
+  "reveal": "Four areas, and the answer names all four. A connection tier holds the persistent sockets, with a session registry mapping each user to their connection server and a pub/sub backplane routing between them. Ordering is per conversation via sequence numbers, and a client generated message id makes retried sends idempotent. Offline users are handled by store and forward into a durable per user inbox in a wide column store, pulled from the last acknowledged sequence on reconnect. Group sends fan out per member, and huge broadcast channels need hierarchical distribution for the same reason a celebrity timeline does."
+}
+\`\`\`
 `.trim()
 
 const notificationSystemTeach = `
@@ -568,6 +1037,29 @@ event -> ingestion API -> queue
 
 Ingestion just validates and enqueues, returning fast. Workers consume from the queue (Kafka or SQS) and do the heavy work: fan-out, rendering, and dispatch. Use priority lanes: a 2FA code or fraud alert goes on a high-priority queue and must not sit behind a million marketing pushes. Per-user rate limiting prevents bombarding one user, and per-provider throttling respects APNs/Twilio rate limits.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A worker sends a push through APNs, then crashes before it records success. The queue redelivers the message. What stops the user getting two pushes?",
+  "options": [
+    {
+      "label": "An idempotency key built from the event, user and channel, checked against a dedup store before dispatch",
+      "correct": true,
+      "feedback": "Right. The crash between the send and the record is the window no broker can close, so the dedup check has to happen in your pipeline, before the provider call."
+    },
+    {
+      "label": "The queue's exactly-once delivery guarantee",
+      "feedback": "The pipeline is at-least-once by construction. A worker that dies after acting but before acknowledging is exactly the case a broker cannot distinguish from one that died before acting."
+    },
+    {
+      "label": "APNs itself, which collapses repeated notifications to the same device",
+      "feedback": "Providers deliver what you hand them. Deduplication has to happen before dispatch, on a key you control and can check cheaply."
+    }
+  ]
+}
+\`\`\`
+
 Every request carries an idempotency key (event id + user + channel). Before sending, check whether that key was already delivered (a dedup store in Redis with a TTL, or a unique constraint). Delivery pipelines retry constantly (a worker crashes after sending but before recording success, a queue redelivers), and without idempotency a retry sends the same push twice. The dedup check is what makes at-least-once delivery machinery feel exactly-once to the user.
 
 ## Templates, preferences, tracking
@@ -581,12 +1073,63 @@ Providers send delivery/open callbacks; record them. A dead-letter queue (DLQ) c
 **Interview nuance:** the most common follow-up is "a worker retries and the user gets two pushes, why?" The answer names the idempotency key plus a dedup store checked before dispatch, and explains that the pipeline is at-least-once so dedup is mandatory, not optional.
 
 **Recap:** an event flows through a queue to a preference filter, a renderer, priority per-channel lanes, and provider adapters with retries/failover, and an idempotency key checked against a dedup store is what prevents retries from double-sending.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A 2FA code and a million message marketing blast are enqueued in the same second. What keeps the 2FA code fast?",
+  "options": [
+    {
+      "label": "Priority lanes: high priority notifications ride their own queue, so they never sit behind a bulk send",
+      "correct": true,
+      "feedback": "Right. Lanes are the only mechanism here that reorders work. Everything else in the pipeline shapes what gets sent, not what gets sent first."
+    },
+    {
+      "label": "The dedup store, which drops the marketing duplicates and frees capacity",
+      "feedback": "Dedup removes repeats of the same notification, not a legitimate campaign to a million distinct users. That is real work that still has to drain."
+    },
+    {
+      "label": "Per user rate limiting, which caps how many messages any one user receives",
+      "feedback": "Per user limits protect a user from being bombarded. They do nothing about a million other users' messages queued ahead of the 2FA code."
+    },
+    {
+      "label": "The preference filter, which drops marketing for users who opted out",
+      "feedback": "Opt-outs shrink the blast, and it is still enormous. Shrinking a queue is not the same as being able to jump it."
+    }
+  ],
+  "reveal": "It is a pipeline, and each stage answers one probe. Ingestion validates and enqueues so the caller returns fast. A preference and eligibility filter applies opt-outs, quiet hours and digesting. A template service renders per channel and localized. Priority lanes keep a 2FA code ahead of a marketing blast. Provider adapters hide APNs, FCM, Twilio and SES behind one interface with retry and failover, so a new channel is a new adapter. And an idempotency key checked against a dedup store before dispatch is what makes an at-least-once pipeline feel exactly-once to the user, with delivery callbacks and a DLQ closing the loop."
+}
+\`\`\`
 `.trim()
 
 const rideSharingTeach = `
 ## The canonical "moving objects" system
 
 Ride-sharing is the canonical "moving objects" system. The defining property is that hundreds of thousands of drivers each emit a location update every 4 to 5 seconds, and riders ask "who is near me right now" against that constantly-changing set. Both the write rate and the spatial query are the hard parts, and a naive \`SELECT ... WHERE lat BETWEEN ? AND ? AND lng BETWEEN ?\` full scan collapses immediately: a bounding-box scan over millions of rows with no spatial index is O(n) per query, and you have thousands of queries per second.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Geohash, S2 and H3 all attack the same problem. What do they do to the coordinates?",
+  "options": [
+    {
+      "label": "Map two dimensions onto one sortable key, so nearby points share a prefix or land in adjacent cells and proximity becomes a key or range lookup",
+      "correct": true,
+      "feedback": "Right. Once nearby means adjacent in one dimension, the query touches a cell and its neighbor ring instead of scanning rows."
+    },
+    {
+      "label": "Compress the coordinates so more rows fit in memory for the scan",
+      "feedback": "The scan itself is the problem, not the row width. The point is to stop scanning."
+    },
+    {
+      "label": "Precompute the distance from every driver to every rider",
+      "feedback": "That is quadratic and hopeless against points that move every four seconds. Distance work happens only after the index has narrowed the candidates."
+    }
+  ]
+}
+\`\`\`
 
 ## The spatial index
 
@@ -595,6 +1138,29 @@ The fix maps 2D coordinates to a 1D sortable key so "nearby" becomes a range or 
 - **Geohash**: interleaves lat/lng bits into a base-32 string; a shared prefix means spatial proximity. Simple and stringy, but has edge effects (two close points can straddle a cell boundary and share no prefix), so you always query the cell plus its 8 neighbors.
 - **Quadtree**: recursively splits space into 4 quadrants, adapting depth to density. Great for skewed distributions (dense downtown, empty suburbs) but is a tree you must maintain in memory.
 - **S2 (Google)** and **H3 (Uber)**: project onto a space-filling curve (S2 uses a Hilbert curve on a sphere; H3 uses hexagons). Hexagons matter because every neighbor is equidistant, which makes "expand the search ring" uniform. Uber built and open-sourced H3 for exactly this.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Hundreds of thousands of drivers each emit a location every four to five seconds. How do you store those updates?",
+  "options": [
+    {
+      "label": "As an overwrite of the driver's single current position in an in-memory index sharded by geography",
+      "correct": true,
+      "feedback": "Right. Only the newest location matters to matching, so the write is an overwrite, not an append, and it never has to be durable to be useful."
+    },
+    {
+      "label": "As an append to a durable table, so the trip trail stays complete and auditable",
+      "feedback": "A location trail can be logged separately for analytics and disputes. The matching index only ever reads the newest point, so appending durable rows at that rate buys matching nothing and costs enormously."
+    },
+    {
+      "label": "As a transactional update to the driver's row in the relational database",
+      "feedback": "That is precisely the write load the in-memory index exists to absorb. Transactions per location ping is throughput you are paying for and cannot use."
+    }
+  ]
+}
+\`\`\`
 
 ## Writes as overwrites, sharded by geography
 
@@ -685,12 +1251,63 @@ The **dispatch/matching engine** does candidate generation (query the rider's H3
 **Interview nuance:** the assignment must be exclusive. If you offer the same driver to two riders you double-book. Use a short lock or conditional write on the driver's state so only one match wins, and expire the offer if the driver does not accept in a few seconds so the driver returns to the pool. And hot cities (New Year's Eve downtown) concentrate load on one shard: degrade gracefully by lowering location-update frequency (QoS) and widening the matching radius under load rather than dropping updates blindly.
 
 **Recap:** index moving drivers with a space-filling spatial index (H3/S2/geohash) sharded by geography, keep locations in memory as overwrites, and rank matches by ETA under an exclusive-assignment lock, with the trip state machine as the one strongly consistent part.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Two riders request at the same instant, and the matcher ranks the same driver first for both. What prevents a double booking?",
+  "options": [
+    {
+      "label": "An exclusive assignment: a short lock or conditional write on the driver's state so only one match wins, with the offer expiring if the driver does not accept",
+      "correct": true,
+      "feedback": "Right. Ranking suggests, assignment decides, and the decision has to be a single winner. The expiry is what returns an unresponsive driver to the pool instead of stranding the rider."
+    },
+    {
+      "label": "Ranking by ETA, which will differ for the two riders and separate them",
+      "feedback": "Ranking is a preference, not an exclusion. Both matchers can still put the same driver first, and nothing in the ranking stops the second write from landing."
+    },
+    {
+      "label": "Geographic sharding, which keeps concurrent requests on separate shards",
+      "feedback": "Both riders are in the same city, so they are on the same shard. Sharding bounds load; it does not serialize a contended driver."
+    },
+    {
+      "label": "The trip state machine, which rejects a second trip for a driver already on one",
+      "feedback": "The FSM is the right place for durable trip state, and it is downstream: by the time two trips are being created, you have already offered the driver twice and told two riders they matched."
+    }
+  ],
+  "reveal": "The defining property is moving points at high write rate. That gives you a spatial index (geohash, quadtree, S2 or H3) that turns proximity into a cell plus neighbor ring lookup, sharded by geography because a Chicago rider never needs a Miami driver, and held in memory as overwrites because only the latest position matters. Matching is candidate generation from the cell rings, then ranking by ETA rather than raw distance, then an exclusive assignment so one driver goes to one rider. The trip state machine is the one piece that needs durable, strongly consistent storage, because it maps to money."
+}
+\`\`\`
 `.trim()
 
 const fileSyncTeach = `
 ## The whole difficulty is in NOT uploading files
 
 File sync looks like "upload files to the cloud," but the entire difficulty is in **not** uploading files. A 2GB video where a user changes one tag should cost a few kilobytes of network, not 2GB. Two people uploading the same popular PDF should cost one copy of storage. Editing offline on a laptop and a phone must reconcile without silently losing an edit. The core techniques are chunking, dedup, delta sync, and conflict resolution.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Suppose you split every file into fixed 4MB blocks and hash each block. A user inserts one byte near the front of a 2GB file. How many block hashes change?",
+  "options": [
+    {
+      "label": "Effectively all of them, because every following byte shifts and each fixed boundary now cuts different content",
+      "correct": true,
+      "feedback": "Right, and that is the whole reason content-defined chunking exists. Fixed offsets have no relationship to the content, so an insert near the front re-uploads the file."
+    },
+    {
+      "label": "One, the block containing the inserted byte",
+      "feedback": "That holds only when boundaries are anchored to content. With fixed offsets, every byte after the insert moves into a different block."
+    },
+    {
+      "label": "Two, the block with the insert and the one after it",
+      "feedback": "The shift does not settle after one block. Every byte in the file moves by one position, so every subsequent boundary cuts new content."
+    }
+  ]
+}
+\`\`\`
 
 ## Content-defined chunking
 
@@ -984,6 +1601,29 @@ edit near start -> only c1 changes -> new manifest [h1', h2, h3, h4] -> upload 1
 
 Separate from blob storage, a metadata DB tracks: the file tree (paths, folders), each file's current manifest (chunk list) and version, per-device sync cursors, and sharing/ACLs. This is the coordination brain and needs strong consistency (a client must never see a manifest pointing at chunks that are not yet uploaded). The usual ordering: upload chunks to the object store first, then commit the metadata that references them.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Two people edit the same file, and the second client uploads based on version N when the server is already at N+1. What does the pragmatic product do?",
+  "options": [
+    {
+      "label": "Keep both: commit one as the new version and save the other as a conflicted copy, with full version history so nothing is destroyed",
+      "correct": true,
+      "feedback": "Right. Dropbox's answer is deliberately unambitious, because the one unacceptable outcome is a silently lost edit."
+    },
+    {
+      "label": "Merge the two versions automatically with a three way diff",
+      "feedback": "Some text merges cleanly, and binary files do not. A wrong automatic merge corrupts data silently, which is worse than handing the user two files."
+    },
+    {
+      "label": "Last write wins on the file timestamp",
+      "feedback": "That destroys one person's work with no trace, and clock skew between clients decides whose. It is the failure mode the version vector exists to detect."
+    }
+  ]
+}
+\`\`\`
+
 Each file has a version vector or a monotonically increasing version. When a client uploads based on version N but the server is already at N+1 (someone else edited), that is a conflict. Dropbox's pragmatic answer is not to merge binary files: it keeps both, creating a "conflicted copy," so no edit is lost. The safe default is keep-both plus full version history so nothing is destroyed.
 
 ## The client sync protocol
@@ -993,6 +1633,30 @@ A local filesystem watcher detects changes, an upload queue chunks and pushes, a
 **Interview nuance:** the tempting-but-wrong move is to compute deltas on the server. You cannot, because the server does not have the client's new bytes until they are uploaded. The client computes the manifest and asks the server which chunks are missing (a "have/need" negotiation), so the expensive comparison happens before any bulk transfer.
 
 **Recap:** content-defined chunking plus per-chunk hashing gives dedup and delta sync (upload only changed chunks), a strongly consistent metadata service maps files to chunk manifests and versions, and conflicts are resolved by keeping both copies plus history rather than merging blindly.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A user renames a 2GB video and changes nothing inside it. What crosses the network?",
+  "options": [
+    {
+      "label": "A metadata update only: the chunk hashes are unchanged, so the manifest is identical and no bytes move",
+      "correct": true,
+      "feedback": "Right. Chunks are addressed by content, and the name lives in the metadata service's file tree, so a rename never touches the object store at all."
+    },
+    {
+      "label": "The whole file, because the file's identity changed",
+      "feedback": "Identity in this design is the manifest of chunk hashes, not the path. The path is a metadata row."
+    },
+    {
+      "label": "One chunk, because the file's header carries the name",
+      "feedback": "The name is not in the bytes; it is in the metadata service. Not even one chunk rehashes."
+    }
+  ],
+  "reveal": "Everything follows from addressing content instead of files. Content-defined chunking with a rolling hash puts boundaries where the content says, so an insert changes one chunk instead of all of them. Hashing each chunk makes the hash both a content address and a dedup key, so identical chunks are stored once globally and a sync becomes a have/need negotiation over hashes with only the missing chunks uploaded. A strongly consistent metadata service owns the file tree, the manifest per version, and the per device cursors, and it commits only after the chunks it names are stored. Conflicts keep both copies plus history rather than merging blindly."
+}
+\`\`\`
 `.trim()
 
 const videoStreamingTeach = `
@@ -1013,6 +1677,29 @@ upload --> S3 (raw) --> transcode queue --> worker pool (segment-parallel)
 
 The player, not the server, drives quality. It downloads the manifest, measures throughput and buffer level, and requests the next 4-second segment at whatever bitrate it can sustain. Bandwidth drops on a train, the player steps down to 480p mid-stream and steps back up later, all by choosing different segment URLs from the same manifest. This is why segmentation and per-bitrate manifests exist: they make quality a client-side, per-segment choice with no server session state.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A title goes viral: a million people start watching it within a minute. What has to scale?",
+  "options": [
+    {
+      "label": "Nothing on the transcode path. It ran once at upload, so the spike is cached segment reads absorbed by edge caches and request coalescing",
+      "correct": true,
+      "feedback": "Right. Every viewer is reading the same immutable segments, so a viral spike is a pure read event on the delivery path, not a compute event."
+    },
+    {
+      "label": "The transcoding fleet, since a million concurrent viewers need a million streams encoded",
+      "feedback": "This is the exact conflation the lesson warns about. Transcoding is a write path job that finished at upload; nothing is encoded per viewer."
+    },
+    {
+      "label": "The origin object store, which must serve a million concurrent segment reads",
+      "feedback": "If the origin is serving those reads you have already lost. Edge caching plus request coalescing turn a million requests for one segment into roughly one origin fetch."
+    }
+  ]
+}
+\`\`\`
+
 ## CDN, origin offload, and tiering
 
 You must not serve segments from origin; a viral video would saturate origin egress and bankrupt you. Segments are cached at CDN edge PoPs close to viewers. Netflix built **Open Connect**, placing its own caches inside ISPs; YouTube uses Google's edge. The cache key is the segment URL, and because segments are immutable you cache them with long TTLs. For a live spike (a premiere), you pre-warm edges and rely on the CDN's request coalescing so a million viewers of the same segment produce one origin fetch.
@@ -1022,6 +1709,30 @@ The vast majority of the catalog is watched rarely. Keep hot content on fast sto
 **Interview nuance:** interviewers love "what happens the instant a video goes viral." The right answer names CDN request coalescing and edge caching absorbing the read fan-out, plus the fact that transcoding already happened once at upload so the spike is pure cached reads, not compute. If you find yourself scaling transcoding for a viral watch spike, you have conflated the write and read paths.
 
 **Recap:** transcode once, asynchronously, into an ABR ladder of segmented renditions with manifests; let the client adapt bitrate per segment; and serve segments from a CDN (Open Connect-style edge caches) with long TTLs so origin egress stays flat even under viral read spikes.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Bandwidth collapses mid stream on a train. Who decides to drop to 480p, and how?",
+  "options": [
+    {
+      "label": "The player: it measures throughput and buffer level and fetches the next segment from a lower bitrate rendition listed in the same manifest",
+      "correct": true,
+      "feedback": "Right. Quality is a client side choice of which segment URL to request, which is exactly why it works over plain cached objects with no server session state."
+    },
+    {
+      "label": "The server, which detects the slow client and re-encodes the stream at a lower bitrate on the fly",
+      "feedback": "Per viewer encoding is the cost the ABR ladder removes. The renditions already exist, and the server holds no state about this viewer's connection."
+    },
+    {
+      "label": "The CDN edge, which downgrades segments it serves to slow clients",
+      "feedback": "The edge serves whatever URL it is asked for, byte for byte. It has no notion of a stream to downgrade."
+    }
+  ],
+  "reveal": "Two systems, deliberately kept apart. The write path is asynchronous and compute heavy: an upload lands in object storage, a queue feeds a worker pool, and segment parallel transcoding produces an ABR ladder of renditions cut into short segments with an HLS or DASH manifest. The read path is millisecond scale and bandwidth dominated: the player picks a bitrate per segment from the manifest, and segments are immutable so they cache at the edge with long TTLs. Origin egress stays flat under a viral spike because coalescing collapses identical requests, and cold catalog tiers to cheaper storage and fewer edges."
+}
+\`\`\`
 `.trim()
 
 const collaborativeEditorTeach = `
@@ -1282,6 +1993,29 @@ The whole problem of a collaborative editor is **convergence**: many people edit
 
 Edits are operations like \`insert(pos=5, "x")\` and \`delete(pos=8)\`. When two operations are made concurrently against the same base, applying them in different orders gives different results, so OT **transforms** an incoming operation against operations that were applied before it locally, adjusting indices so intent is preserved. If Alice inserts at position 5 and Bob concurrently inserts at position 3, Bob's op shifts Alice's effective position to 6. OT is what Google Docs uses. It is proven and compact, but the transformation functions are notoriously subtle, and classic OT relies on a **central server** to impose a single canonical order of operations.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Classic OT depends on a central server to impose one canonical order on operations. What does that dependency cost?",
+  "options": [
+    {
+      "label": "Offline and peer to peer editing get hard, because there is no sequencer to order operations while a replica is disconnected",
+      "correct": true,
+      "feedback": "Right, and that is the gap CRDTs fill: give every character a unique, totally ordered id and concurrent inserts commute, so replicas merge in any order with no sequencer."
+    },
+    {
+      "label": "Nothing real: the server is an optimization, and OT converges without it",
+      "feedback": "The canonical order is what each op is transformed against. Remove the single ordering authority and two replicas can transform in different orders and end up different, which is the one thing convergence forbids."
+    },
+    {
+      "label": "Latency, because every keystroke must round trip before the typist sees it",
+      "feedback": "Operations apply locally first and are transformed as remote ops arrive. The server orders them; it does not gate the local echo."
+    }
+  ]
+}
+\`\`\`
+
 ## CRDTs
 
 Instead of transforming operations, CRDTs give every character a globally unique, totally-ordered identifier (often a fractional index or a dense position between two neighbors) so that concurrent inserts have a deterministic, commutative merge order with no transformation needed. Sequence CRDTs (RGA, Logoot, YATA as used by Yjs, Automerge) let replicas merge in any order and converge. The advantage is they work **peer-to-peer and offline** without a central sequencer; the cost is metadata overhead (every character carries an id, and deleted characters may linger as tombstones).
@@ -1297,6 +2031,33 @@ The tradeoff: **OT** is server-centric, memory-lean, battle-tested, but the tran
 
 Edits flow over a persistent **WebSocket** to a per-document collaboration server. Beyond the edits themselves, you broadcast **presence**: each user's cursor position and selection, and who is online. Presence is high-frequency but ephemeral and lossy-tolerant, so you send it on a lighter channel and never persist it.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "How do you persist the document as people type?",
+  "options": [
+    {
+      "label": "Append each operation to an op log and write periodic snapshots, so a joiner loads the latest snapshot plus the tail of ops",
+      "correct": true,
+      "feedback": "Right. The op log is also where undo, redo, history and reconnect catch-up all come from, and snapshots are what stop a new joiner replaying from creation."
+    },
+    {
+      "label": "Save the whole document blob on every keystroke, which is simplest and always current",
+      "feedback": "It rewrites the entire document per character, and it throws away the operation history that reconnect and undo depend on."
+    },
+    {
+      "label": "Save the whole document blob, debounced to once per second, which bounds the write rate",
+      "feedback": "Debouncing bounds the cost but keeps both problems: the write is still whole document, and there is still no op history for a returning client to catch up against."
+    },
+    {
+      "label": "Keep it in the collaboration server's memory and write it when the last editor leaves",
+      "feedback": "A crash then loses the session, and a client that reconnects mid session has nothing to replay from."
+    }
+  ]
+}
+\`\`\`
+
 You do not save the document as a blob on every keystroke. You append operations to an **op log** and periodically write a **snapshot** so a new joiner can load the latest snapshot plus the tail of ops rather than replaying from creation. Undo/redo and history come from the op log. On reconnect after being offline, the client sends its queued local ops and receives the ops it missed (identified by a version/sequence number), then transforms or merges to catch up.
 
 All editors of one document must reach the same collaboration server (or a consistent group) so ordering is coherent, so you **route by document id** to a specific server/shard (sticky, consistent-hashed). Different documents scale out horizontally.
@@ -1304,6 +2065,30 @@ All editors of one document must reach the same collaboration server (or a consi
 **Interview nuance:** the killer follow-up is offline editing. If a laptop edits offline for an hour and reconnects, you cannot LWW. You must replay/merge the queued ops against everything that happened meanwhile. CRDTs make this natural (merge is commutative); OT requires transforming the whole queued batch against the missed history.
 
 **Recap:** converge concurrent edits with OT (server-ordered, transform indices, memory-lean, Docs-style) or CRDTs (per-character ids, commutative merge, offline/P2P-friendly), broadcast ephemeral presence over WebSocket, persist an op log plus snapshots for replay and reconnect, and route all editors of a document to one server for coherent ordering.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A laptop edits offline for an hour and then reconnects. What has to happen?",
+  "options": [
+    {
+      "label": "Its queued operations are merged or transformed against everything that happened meanwhile, which a CRDT gets from commutative merge and OT gets by transforming the whole batch against the missed history",
+      "correct": true,
+      "feedback": "Right. This is the killer follow-up, and both families answer it, just at different cost: CRDT merge is natural, OT has to transform the queued batch against an hour of history."
+    },
+    {
+      "label": "The server's version wins, since the server is the ordering authority",
+      "feedback": "That is last write wins on the document, the disqualifying answer. It throws away an hour of real work."
+    },
+    {
+      "label": "The laptop's version wins, since its operations carry the newest timestamps",
+      "feedback": "The same failure pointing the other way. Both sides made real edits, and convergence means preserving both intents, not picking a winner."
+    }
+  ],
+  "reveal": "Convergence is the whole problem: every replica must end byte-for-byte identical while preserving what each person meant, which rules out last write wins on the document. OT transforms an incoming operation against the ops already applied locally, adjusting indices, and leans on a server for a canonical order. CRDTs give every character a unique id so operations commute and any merge order converges, at the cost of per character metadata and tombstone collection. Around either one: WebSocket transport with presence on a lighter, unpersisted channel, an op log plus snapshots for replay and reconnect, and routing by document id so all editors of a document share one ordering."
+}
+\`\`\`
 `.trim()
 
 const yelpNearbyTeach = `
@@ -1331,11 +2116,58 @@ Source of truth for places, reviews, and edits lives in a relational or document
 
 Because the underlying data is stable, you cache hard: popular \`(cell, filter)\` result pages and place-detail pages get **generous TTLs** (minutes to hours). A search for "coffee near downtown SF, open now" is asked constantly and its answer barely changes, so it should be served from cache the overwhelming majority of the time. Invalidate on the rare place update rather than expiring everything constantly. Reads scale with replicas (ES read replicas) and CDN edge caching.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A candidate reuses their Uber design here: a high throughput location ingest tier feeding a volatile in-memory geo index. What is wrong with it?",
+  "options": [
+    {
+      "label": "Places barely move, so it builds write throughput the workload never generates and gives up the rebuildable search index that makes the reads cheap",
+      "correct": true,
+      "feedback": "Right. The senior move is to say out loud that this is read heavy over near static data, so you precompute, denormalize and cache instead of optimizing writes."
+    },
+    {
+      "label": "Nothing is wrong, since the read side is the same nearest neighbor query in both systems",
+      "feedback": "The read side is not the same. Yelp filters on category, open now, price and rating and then ranks, which is a search engine query, not a nearest driver lookup."
+    },
+    {
+      "label": "An in-memory index cannot answer a radius query",
+      "feedback": "It can, and Uber's does. The mismatch is the workload: near static data read constantly, versus moving points written constantly."
+    }
+  ]
+}
+\`\`\`
+
 New reviews, edits, and new places are comparatively low-rate. They update the source of truth, then flow through an indexing pipeline that updates the ES read model and invalidates affected cache entries. You never optimize this path for high throughput because the workload does not have it.
 
 **Interview nuance:** the trap is to over-engineer the write path. If you find yourself building a high-frequency location-write ingestion system or geofencing with constant updates, you have modeled Yelp like Uber and wasted your design budget on throughput the workload never generates. The senior move is to explicitly state "this is read-heavy and mostly static, so I precompute and cache instead of optimizing writes."
 
 **Recap:** nearby-places is read-heavy over a near-static POI set, so serve it from a search engine (geo_distance plus attribute filters plus ranking) fed by a denormalized read model, cache popular result pages and detail pages with generous TTLs invalidated on rare edits, and do not over-build the low-rate write path.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Which component answers coffee within 2km, open now, at least four stars, ranked by rating and distance, in one hop?",
+  "options": [
+    {
+      "label": "A search engine index holding a denormalized read model, doing the geo distance filter, the attribute filters and the ranking in one query",
+      "correct": true,
+      "feedback": "Right. The spatial part is only half the query, and it is the combination of geo, attributes, text and ranking in one place that makes a search engine the natural home."
+    },
+    {
+      "label": "The relational source of truth, with a spatial index added to the places table",
+      "feedback": "It can do the geo part, but multi attribute filtering, text and ranking in a single query is what the search engine is for, and you do not want that load on the system of record."
+    },
+    {
+      "label": "A Redis geo index holding every place, refreshed on each read",
+      "feedback": "Redis geo commands do proximity, not category, open now, price band and ranked results. Refreshing on read also throws away the caching this workload lives on."
+    }
+  ],
+  "reveal": "This is Uber inverted, and naming the inversion is the answer. The points barely move, so the index is a search index you can rebuild from the source of truth rather than a volatile live one, fed by a low rate indexing pipeline. Queries are candidate generation by cell or radius, then attribute filtering, then ranking on distance, rating, popularity and sponsorship. Because the data is stable you cache hard, with generous TTLs on popular result pages and detail pages, invalidated on the rare edit. The trap is spending your design budget on a write path this workload does not have."
+}
+\`\`\`
 `.trim()
 
 const distributedCacheTeach = `
@@ -1376,6 +2208,33 @@ You cannot hold everything, so pick a policy. LRU (least recently used) is the d
 
 Cache-aside (the app reads cache, on miss reads the DB and populates the cache) is the common default and keeps the cache out of the write path. Write-through writes cache and DB together for freshness at the cost of write latency. Write-back writes cache first and flushes to the DB asynchronously for speed, at the risk of data loss on crash.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A very popular key's TTL lapses, and ten thousand concurrent requests miss on it in the same instant. What fixes this specific failure?",
+  "options": [
+    {
+      "label": "Request coalescing so one in flight fetch serves all the waiters, plus jittered TTLs so keys do not expire together",
+      "correct": true,
+      "feedback": "Right. This is a stampede, and the fix is to collapse the concurrent misses into one database read and to stop keys from expiring in lockstep. Serving stale while revalidating does the same job."
+    },
+    {
+      "label": "Raise the TTL so the key expires far less often",
+      "feedback": "That makes the event rarer without making it survivable, and the stampede is just as large when it finally happens."
+    },
+    {
+      "label": "Add more cache nodes so the missing requests spread across the fleet",
+      "feedback": "The key lives on one node either way, and the misses all fall through to the same database. More cache capacity does not help a key that is not there."
+    },
+    {
+      "label": "Switch eviction from LRU to LFU so a popular key is never evicted",
+      "feedback": "LFU does protect a popular key against eviction pressure, which is a different failure. This key was not evicted, its TTL expired, and every policy allows that."
+    }
+  ]
+}
+\`\`\`
+
 ## Stampedes and hot keys
 
 A cache stampede happens when a hot key expires and thousands of concurrent requests all miss and hit the DB at once. Fix it with request coalescing (a single in-flight fetch per key, others wait for its result), a short randomized TTL jitter so keys do not all expire together, or serving stale-while-revalidate. A hot key is a single key so popular it saturates one node's CPU or network. Consistent hashing alone does not help because it is one key on one node, so replicate the hot entry across several nodes and randomize which replica a client reads, or add a small local in-process cache in front of the distributed tier.
@@ -1389,6 +2248,41 @@ hot key: replicate k to N3,N5,N7 -> client picks a random replica
 \`\`\`
 
 **Recap:** place keys with consistent hashing plus virtual nodes (never hash mod N), evict with LRU or LFU plus TTL, choose cache-aside by default, and defend hot keys with replication and stampedes with coalescing plus TTL jitter.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each failure by whether consistent hashing with virtual nodes is the fix.",
+  "buckets": [
+    "Consistent hashing plus virtual nodes fixes it",
+    "Needs a different mechanism"
+  ],
+  "items": [
+    {
+      "label": "Adding a fifth node without collapsing the hit rate",
+      "bucket": "Consistent hashing plus virtual nodes fixes it",
+      "feedback": "On the ring a new node steals keys only from its neighbor, so about 1/N of keys move instead of nearly all of them."
+    },
+    {
+      "label": "Load piling on one node because ring positions came out lumpy",
+      "bucket": "Consistent hashing plus virtual nodes fixes it",
+      "feedback": "Virtual nodes are exactly this fix: 100 to 200 points per physical node even out both steady load and the redistribution when a node dies."
+    },
+    {
+      "label": "One key so popular it saturates a single node's CPU and network",
+      "bucket": "Needs a different mechanism",
+      "feedback": "One key hashes to one point on the ring no matter how good the placement is. Replicate that entry across several nodes and read a random one, or add a small in process cache in front."
+    },
+    {
+      "label": "Ten thousand requests missing at once when a hot key's TTL lapses",
+      "bucket": "Needs a different mechanism",
+      "feedback": "Placement is irrelevant to a stampede. Coalesce the in flight fetch, jitter the TTLs, or serve stale while revalidating."
+    }
+  ],
+  "reveal": "Three questions, three answers. Placement is consistent hashing with virtual nodes, never hash mod N, because mod N reshuffles the world on any membership change and stampedes the database. Eviction is LRU by default, LFU when a small popular set must survive a scan, with TTL almost always on as well, and Redis samples rather than maintaining exact recency so writes stay O(1). Survival is per failure: replicate a hot key and read a random replica, coalesce plus jitter against a stampede, and keep primary and replicas per shard so a failover is a promotion rather than an outage."
+}
+\`\`\`
 `.trim()
 
 const keyValueStoreTeach = `
@@ -1401,6 +2295,33 @@ A distributed key-value store is the Dynamo-lineage system (DynamoDB, Cassandra,
 Partitioning uses consistent hashing again. Keys map onto a ring, each node owns a range, and a replication factor N means each key is stored on the N nodes clockwise from its position (the preference list). Virtual nodes even out the load.
 
 Replication and quorums are the heart. With N replicas, a write is acknowledged after W replicas confirm and a read waits for R replicas to respond. The tunable rule is: if R + W > N, a read quorum and a write quorum must overlap in at least one node, so a read is guaranteed to see the latest acknowledged write. Common settings: N=3, W=2, R=2 gives strong-ish reads with tolerance for one node down. W=1 is fast writes but risky; R=1 is fast reads that may be stale.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You set N=3, W=2, R=2, so any read quorum overlaps any write quorum. Have you made the store linearizable?",
+  "options": [
+    {
+      "label": "No: overlap gives a value at least as new as the last acknowledged write, but concurrent writes, read-repair timing and sloppy quorums still allow anomalies",
+      "correct": true,
+      "feedback": "Right, and saying it this precisely is the seniority signal. Quorum overlap is a freshness property, not a single global order over all operations."
+    },
+    {
+      "label": "Yes: an overlapping node is guaranteed to hold the latest write, which is what linearizability means",
+      "feedback": "Linearizability is a total order over every operation, not a guarantee about one node's copy. Two concurrent writes have no acknowledged winner for the overlap to reveal."
+    },
+    {
+      "label": "Yes, provided the replicas keep their clocks synchronized with NTP",
+      "feedback": "Timestamps are how last write wins picks a winner, and clock skew is one of its failure modes. No amount of clock discipline turns quorum overlap into consensus."
+    },
+    {
+      "label": "No, but raising R and W to 3 would, since then every replica participates in both",
+      "feedback": "Reading and writing all replicas maximizes freshness and destroys availability, and it still does not order two concurrent writes. For a true global order you need Paxos or Raft."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** the classic trap is claiming R + W > N gives linearizability. It does not. It guarantees you read a value at least as new as the last acknowledged write on the overlapping node, but concurrent writes, read-repair timing, and sloppy quorums (hinted handoff writing to fallback nodes) mean you can still see anomalies. Say "quorum overlap gives read-your-writes-ish freshness, not linearizability; for true linearizability you need consensus like Paxos or Raft."
 
@@ -1447,6 +2368,29 @@ Conflicts happen because two clients can write the same key on different replica
 
 A write appends to a commit log for durability, then updates an in-memory sorted structure (memtable). When the memtable fills, it flushes to an immutable sorted file on disk (SSTable). Reads may check several SSTables, so a bloom filter per SSTable skips ones that cannot contain the key. Background compaction merges SSTables, drops tombstones (deletes), and keeps read amplification bounded. This design makes writes sequential and fast.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An LSM write only appends to a commit log and updates an in-memory memtable. Where does the cost reappear?",
+  "options": [
+    {
+      "label": "On reads: a key may sit in the memtable or in any of several SSTables, which is why each SSTable carries a bloom filter and compaction runs in the background",
+      "correct": true,
+      "feedback": "Right. The design buys sequential writes by scattering a key's history across immutable files, and bloom filters plus compaction are what keep read amplification bounded."
+    },
+    {
+      "label": "Nowhere: the memtable answers reads, because it holds the working set",
+      "feedback": "The memtable is bounded and flushes when it fills, so most data lives in immutable SSTables that a read has to consider."
+    },
+    {
+      "label": "On writes: the commit log has to be read back before each append",
+      "feedback": "The commit log is append only and is read only during crash recovery. Keeping writes sequential is the entire point of the structure."
+    }
+  ]
+}
+\`\`\`
+
 Membership uses gossip: nodes periodically exchange state so the cluster learns of joins and failures without a central coordinator. Hinted handoff keeps writes available during a brief node outage: a neighbor accepts the write with a hint and replays it when the owner returns.
 
 \`\`\`
@@ -1456,6 +2400,30 @@ write k=v -> coordinator -> replicas [N1,N2,N3]
 \`\`\`
 
 **Recap:** partition with consistent hashing and replication factor N, tune consistency with R + W > N (which is freshness, not linearizability), resolve conflicts with vector clocks or LWW plus read-repair and Merkle anti-entropy, and store writes in an LSM (commit log, memtable, SSTable, compaction).
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Pick the sentence you would actually say about tuning N, R and W.",
+  "options": [
+    {
+      "label": "Quorum overlap buys freshness relative to the last acknowledged write; for a true global order you need consensus such as Paxos or Raft",
+      "correct": true,
+      "feedback": "Right. It concedes exactly what quorums cannot do and names what would, which is what the interviewer is listening for."
+    },
+    {
+      "label": "R plus W greater than N gives linearizability without paying for consensus",
+      "feedback": "This is the classic trap. Overlap is not a total order, and stating it as one invites the follow-up that ends the round."
+    },
+    {
+      "label": "W equal to 1 with R equal to N is safest, since every read consults every replica",
+      "feedback": "Reading all replicas surfaces the newest value they hold, but W equal to 1 means one acknowledged replica can die before replicating, so the write you were relying on may exist nowhere."
+    }
+  ],
+  "reveal": "Four internals, and the answer touches all four. Partitioning is consistent hashing with virtual nodes, with a replication factor N defining each key's preference list. Consistency is tunable through R and W, which buy freshness, not linearizability. Conflicts are inevitable because both sides of a partition accept writes, so you either take last write wins and silently drop one, or track causality with vector clocks and hand back siblings, then reconcile drift with read-repair and Merkle tree anti-entropy. Writes go through an LSM: commit log, memtable, SSTable flush, bloom filters and compaction, with gossip membership and hinted handoff keeping the cluster available."
+}
+\`\`\`
 `.trim()
 
 const objectStoreS3Teach = `
@@ -1534,11 +2502,57 @@ Durability drives cost. Full replication (store 3 copies) gives durability and s
 
 The blob data is easy (write shards to storage nodes), but you need a massive index mapping bucket + key to the shard locations and object metadata (size, etag, version, ACL). At trillions of objects this index cannot be one database. Partition it: shard the key space (often by a hash of bucket + key, or by key-range for prefix listing), store it in a horizontally scalable KV store or a sharded and replicated database, and cache hot metadata. Listing a bucket with billions of keys efficiently requires a sorted, range-partitioned index so prefix scans do not touch every shard.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "S3 promises strong read-after-write consistency, yet an object's bytes are spread over k plus m shards on many disks. Where does the guarantee come from?",
+  "options": [
+    {
+      "label": "From the metadata index: the write is not acknowledged until the index entry naming the new shards is durable and visible, so the index is the point of truth",
+      "correct": true,
+      "feedback": "Right. Readers find an object through the index, so making the index commit the acknowledgement point is what makes the new version appear atomically."
+    },
+    {
+      "label": "From writing all k plus m shards synchronously before acknowledging",
+      "feedback": "The shards are durable before the ack, but durability is not visibility. Until the index points at them, no reader can find them."
+    },
+    {
+      "label": "From a read quorum across the shard holders on every GET",
+      "feedback": "A GET reads only the shards it needs for the requested bytes. What orders the new version ahead of the old one is the metadata commit, not a vote."
+    }
+  ]
+}
+\`\`\`
+
 ## Consistency and large objects
 
 S3 now offers strong read-after-write consistency for new objects and overwrites, achieved by making the metadata commit the point of truth (the write is not acknowledged until the index update is durable and visible). Versioning keeps old versions instead of overwriting, so a PUT to an existing key writes a new version and the index points at the latest.
 
 Multipart upload lets a client split a large object into parts, upload them in parallel (and retry individual failed parts), and then issue a complete call that assembles them, which is how you upload terabytes reliably. Range GET lets a reader fetch bytes [start, end], essential for video seeking and resumable downloads; the store reads only the shards covering that range.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Every object is checksummed and stored as k data plus m parity shards across racks. Is durability now settled?",
+  "options": [
+    {
+      "label": "No: disks fail and bits rot over years, so a scrubber must keep detecting bad or missing shards and reconstructing them from the survivors",
+      "correct": true,
+      "feedback": "Right. Durability is a maintenance process, not a property of the write. Losses accumulate, and once you drift past m without repairing, the object is gone."
+    },
+    {
+      "label": "Yes: the code tolerates m simultaneous losses, so the object survives",
+      "feedback": "It tolerates m losses at any one moment. Nothing stops a fourth and fifth disk from failing over the following months if the first three were never rebuilt."
+    },
+    {
+      "label": "Yes, because spreading shards across racks and availability zones decorrelates the failures",
+      "feedback": "Spreading makes simultaneous loss unlikely, which is necessary and not sufficient. Without reconstruction the surviving shard count only ever falls."
+    }
+  ]
+}
+\`\`\`
 
 Background health: every shard is checksummed on write and periodically scrubbed. A scrubber detects bit rot or a failed disk, reconstructs the lost shards from the survivors, and rebalances data when nodes are added or removed, which is how durability is maintained over years, not just at write time. Lifecycle policies tier cold objects to cheaper storage (S3 to Glacier).
 
@@ -1549,6 +2563,30 @@ GET range -> metadata lookup -> read shards covering range -> (reconstruct if sh
 \`\`\`
 
 **Recap:** hit 11 nines with erasure coding (k + m Reed-Solomon, roughly 1.4x overhead) instead of 3x replication, scale the metadata index by partitioning bucket+key across a KV store, give strong read-after-write via a durable metadata commit, support multipart upload and range GET, and maintain durability with checksums, scrubbing, and reconstruction.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Why is keeping three full copies of every object the wrong default at exabyte scale?",
+  "options": [
+    {
+      "label": "It costs 3x storage and tolerates fewer simultaneous losses than a k plus m code that costs roughly 1.4x",
+      "correct": true,
+      "feedback": "Right, and quantifying it is the tell. Erasure coding buys more failure tolerance for less space, which is why it is the default for large and cold objects."
+    },
+    {
+      "label": "Three copies cannot reach eleven nines of durability under any placement",
+      "feedback": "With good placement and repair, replication can be made extremely durable. The objection is economic, not that it fails the durability bar."
+    },
+    {
+      "label": "Replication reads are slower, because you must compare copies before returning",
+      "feedback": "Replication is the faster read: you take any one copy, with no reconstruction math. That is exactly why hot small objects sometimes keep it."
+    }
+  ],
+  "reveal": "This is a durability engineering problem, and cost is the axis. Erasure coding stores k data plus m parity shards so any k reconstruct the object, giving more tolerance than 3x replication at roughly 1.4x overhead, paid for in encode CPU and degraded read amplification. The metadata index is the other half of the system: bucket plus key partitioned across a scalable store, sorted and range partitioned so prefix listing does not touch every shard, and committed durably before the ack, which is where strong read-after-write comes from. Multipart upload and range GET make huge objects practical, and checksums plus scrubbing plus reconstruction keep the eleven nines true over years."
+}
+\`\`\`
 `.trim()
 
 const messageQueueTeach = `
@@ -1566,6 +2604,29 @@ Durability comes from replication. Each partition has a leader and followers; th
 
 At-most-once means a message may be lost but never redelivered (fire and forget, no retries). At-least-once means every message is delivered but may be duplicated (retry on failure, ack after processing), which is the pragmatic default. Exactly-once is the hard one, and the crucial nuance is that exactly-once delivery over a network is impossible; what systems provide is exactly-once processing.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A candidate says: we will use exactly-once delivery, so a consumer never sees a duplicate. What is the correct framing?",
+  "options": [
+    {
+      "label": "At-least-once delivery from the broker plus idempotent consumers that dedupe on a message id, which together give exactly-once processing",
+      "correct": true,
+      "feedback": "Right. Delivery over a network cannot be exactly once, so the guarantee is moved into processing: reprocessing a duplicate has no effect."
+    },
+    {
+      "label": "At-most-once delivery, which is the only setting that truly prevents duplicates",
+      "feedback": "It does prevent duplicates, by losing messages instead. That is a different guarantee and almost never the one a business wants."
+    },
+    {
+      "label": "Kafka does offer exactly-once delivery, so the claim stands",
+      "feedback": "Kafka's exactly-once is idempotent producers, which drop duplicate appends by producer id and sequence number, plus transactions tying the consume-process-produce cycle to an atomic offset commit. The delivery underneath is still at-least-once."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** if you claim "exactly-once delivery," expect a challenge. The correct framing: we get at-least-once delivery from the broker plus idempotent consumers (dedupe on a message id or use an idempotency key) so that reprocessing a duplicate has no effect. Kafka's "exactly-once" is at-least-once delivery combined with idempotent producers (a producer id plus sequence number so the broker drops duplicate appends) and transactional writes that tie the consume-process-produce cycle to an atomic offset commit.
 
 ## Consumer scaling
@@ -1580,6 +2641,34 @@ consumer group G: P0 -> C1, P1 -> C2   (one partition per consumer)
 \`\`\`
 
 **Recap:** model it as a partitioned append-only log with per-partition ordering, get durability from ISR replication and acks=all, offer at-least-once delivery plus idempotent consumers for exactly-once processing (never claim exactly-once delivery), and scale reads with consumer groups where parallelism equals partition count.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You need every event for a given user processed in order, and you need to double consumer throughput. What is the constraint?",
+  "options": [
+    {
+      "label": "Route that user's events to one partition, since ordering is per partition, and add partitions to add parallelism, since each partition goes to exactly one consumer in the group",
+      "correct": true,
+      "feedback": "Right. Partition count is simultaneously the ordering unit and the parallelism ceiling, which is the tension this question is really about."
+    },
+    {
+      "label": "Add consumers to the group, since parallelism grows with consumer count",
+      "feedback": "Consumers beyond the partition count sit idle. Each partition is assigned to exactly one consumer in a group, so partitions are the ceiling."
+    },
+    {
+      "label": "Enable topic wide ordering, then scale consumers freely",
+      "feedback": "There is no ordering across partitions, and a single partition topic would give you total order at the cost of all parallelism."
+    },
+    {
+      "label": "Commit offsets before processing so slow consumers cannot hold up the partition",
+      "feedback": "That converts the guarantee to at-most-once and loses messages on a crash. A slow consumer is meant to lag, which is how backpressure works here."
+    }
+  ],
+  "reveal": "The abstraction is a partitioned append-only log: ordered offsets within a partition, no ordering across them, which is why the partition key is a design decision. Durability comes from leader and follower replication with an in-sync replica set, tuned by the producer's acks setting. Delivery semantics are at-most-once, at-least-once or exactly-once processing, and the honest answer is at-least-once plus idempotent consumers. Consumers scale in groups, with parallelism capped by partition count, offsets committed after processing, natural backpressure through lag, and a dead-letter topic so a poison message does not block its partition forever."
+}
+\`\`\`
 `.trim()
 
 const jobSchedulerTeach = `
@@ -1594,6 +2683,29 @@ Jobs have a next-run timestamp, and the scheduler must efficiently find all jobs
 ## Leasing with a visibility timeout
 
 When a worker picks up a job it does not just mark it running; it acquires a lease: it atomically sets \`status = running, locked_by = worker, lease_expires_at = now + T\` in a single conditional update (compare-and-set on status). Only one worker wins the CAS, so only one runs the job. If that worker crashes, its lease expires and the job becomes eligible again, so another worker retries it. Crucially the job is retried, not duplicated, because a live worker holds the lease and a dead one's lease simply expires. This is the same visibility-timeout pattern SQS uses.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A worker wins the lease with a 60 second visibility timeout, then hits a 90 second GC pause. Its lease expires, a second worker takes the job and runs it. What happens when the first worker wakes up?",
+  "options": [
+    {
+      "label": "It carries on believing it holds the lease and runs too, a double run the lease alone cannot prevent",
+      "correct": true,
+      "feedback": "Right. This is the paused worker problem, and the fix is a fencing token: every lease grant carries a monotonically increasing token, and downstream writes carrying a lower token are rejected."
+    },
+    {
+      "label": "It notices the expired lease and aborts, because it re-checks the lease as it runs",
+      "feedback": "A paused process runs no code, so it makes no checks. It resumes exactly where it stopped, holding a lease it no longer owns."
+    },
+    {
+      "label": "Nothing: the compare-and-set already guaranteed a single holder",
+      "feedback": "The compare-and-set guaranteed a single winner at acquisition time. Expiry later gives the job to someone else, and the original worker was never told it lost."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** the subtle failure is a paused worker. Suppose a worker acquires the lease, then suffers a long GC pause or network partition past its lease expiry. Its lease expires, a second worker picks up the job and runs it, and then the first worker wakes up and also runs it: a double-run. A lease alone does not prevent this. The fix is a fencing token: each lease grant carries a monotonically increasing token, and any external system the job writes to (or the completion update) rejects a token lower than the highest it has seen. So the resumed old worker's write is fenced off. Bring up fencing unprompted here; it is the senior signal.
 
@@ -1612,12 +2724,63 @@ worker: CAS status pending->running, lease_expires=now+T, token=n++   (only one 
 \`\`\`
 
 **Recap:** index jobs by run time and poll the due window, make a single worker win via a compare-and-set lease with a visibility timeout so crashes retry rather than duplicate, add fencing tokens to defeat the paused-worker double-run, achieve effectively-once with idempotency keys, and handle clock skew and missed windows with an explicit misfire policy.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your scheduler fires a job whose action charges a customer. What gets you to effectively-once?",
+  "options": [
+    {
+      "label": "At-least-once execution from lease expiry retries, plus an idempotency key on the job run so the downstream charge applies only once",
+      "correct": true,
+      "feedback": "Right. You cannot make a side effect run exactly once across crashes, so you make the retry safe instead. That is the honest target."
+    },
+    {
+      "label": "A lease short enough that a crashed worker's job is retried before its action can complete",
+      "feedback": "No TTL bounds a pause or a partition, so tuning the lease narrows the window without closing it. The downstream dedup is what actually closes it."
+    },
+    {
+      "label": "Mark the job completed before running the action, so a retry can never re-run it",
+      "feedback": "Then a crash between the mark and the action loses the job silently, which trades a visible duplicate for an invisible miss."
+    }
+  ],
+  "reveal": "Firing each job once despite crashes is the defining challenge, and the answer is layered. Index jobs by next run time or time bucket so the due window is a cheap query, not a scan. Make a single worker win with a compare-and-set lease carrying a visibility timeout, so a crash means retry rather than duplicate. Add fencing tokens so a paused worker that wakes up cannot write behind the worker that replaced it. Reach effectively-once with idempotency keys on the job run. And handle time explicitly: derive it from the database rather than a worker's clock, and choose a misfire policy for windows the scheduler slept through."
+}
+\`\`\`
 `.trim()
 
 const distributedLockTeach = `
 ## Why a naive lock is unsafe
 
 A coordination service (ZooKeeper, etcd, Consul) gives a cluster the primitives it cannot build safely on its own: mutual exclusion (a distributed lock), leader election, and shared configuration that stays correct across process pauses and network partitions. The interview tests whether you understand why a naive lock is unsafe and how leases, fencing tokens, watches, and consensus combine into a correct one.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The lock is SET key if not exists with a 30 second expiry on one Redis node. Name the flaw that no amount of TTL tuning removes.",
+  "options": [
+    {
+      "label": "The holder can pause past the TTL, the lock expires, a second client acquires it, and now two clients are inside the critical section",
+      "correct": true,
+      "feedback": "Right. You cannot bound a garbage collection pause, a scheduler preemption or a partition, so any TTL is a guess about something unbounded."
+    },
+    {
+      "label": "A different client can delete the key, since SET if not exists does not restrict who may release",
+      "feedback": "Real, and fixed by comparing a random token on release. It is hygiene rather than the fundamental hole, because expiry under a pause breaks mutual exclusion even when releases are perfect."
+    },
+    {
+      "label": "A 30 second TTL deadlocks everyone else for half a minute after a holder crashes",
+      "feedback": "That is a liveness annoyance you tune. The correctness hole runs the other way: a TTL that expires while the holder is merely paused rather than dead."
+    },
+    {
+      "label": "A single Redis node cannot serve enough lock acquisitions per second",
+      "feedback": "Throughput is not the concern here, and it is why the naive lock looks attractive. Its problems are failover losing the key and expiry under a pause."
+    }
+  ]
+}
+\`\`\`
 
 ## Why a single Redis SETNX with TTL is unsafe
 
@@ -1644,12 +2807,59 @@ partition: only majority quorum can grant -> minority is unavailable, not wrong
 \`\`\`
 
 **Recap:** a Redis SETNX-with-TTL lock is unsafe because a single node can fail over and a paused holder can outlive its TTL; build on a consensus-backed store (etcd, ZooKeeper) for linearizable lock state, auto-release via session leases and heartbeats, defeat the stale-holder double-run with monotonic fencing tokens, notify clients with watches instead of polling, and elect leaders with ordered ephemeral keys where each watches its predecessor.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You move lock state into etcd, and a session lease auto releases it. Is the critical section safe now?",
+  "options": [
+    {
+      "label": "Not yet: a paused holder can still wake and write, so the protected resource must reject any write whose token is lower than the highest it has accepted",
+      "correct": true,
+      "feedback": "Right. Consensus fixes the lock, fencing fixes the resource, and the two-part answer is what separates a correct design from a plausible one."
+    },
+    {
+      "label": "Yes: consensus makes the lock state linearizable, so only one client holds it at a time",
+      "feedback": "Only one client holds it, which is true and necessary. A stale holder that has not learned it lost the lock still issues writes, and nothing in the lock service sees them."
+    },
+    {
+      "label": "Yes: the heartbeat means a paused client's lease expires, so it can no longer write",
+      "feedback": "Expiry releases the lock; it does not reach into the paused process and stop it. Its next write is still on its way unless the resource fences it."
+    }
+  ],
+  "reveal": "A coordination service exists because a cluster cannot build these primitives safely on its own. Put lock state behind a consensus protocol (Raft in etcd and Consul, Zab in ZooKeeper) so it is linearizable and a minority partition becomes unavailable rather than wrong. Auto release through session leases and heartbeats so a dead client does not deadlock the cluster. Hand out a monotonic fencing token with every grant and have the protected resource reject stale ones, because that is the only defence against a paused holder. Use watches instead of polling, and elect leaders with ordered ephemeral keys where each candidate watches only its predecessor, so a failover wakes one node rather than a herd."
+}
+\`\`\`
 `.trim()
 
 const codeSandboxTeach = `
 ## The isolation boundary is the core decision
 
 A code execution sandbox (an online judge like LeetCode, a CI runner, or this platform's own code runner) runs untrusted user code safely at scale. The defining decision is the isolation boundary: how strong a wall you put between hostile code and your host and other users. Assume the code is actively hostile (fork bombs, network exfiltration, kernel-escape attempts), because at contest scale someone will try.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A candidate says: run each submission in a Docker container, that is isolated. Why does that fail the security bar for hostile code?",
+  "options": [
+    {
+      "label": "The container shares the host kernel, so one kernel vulnerability is a full escape onto the host and everyone else's work",
+      "correct": true,
+      "feedback": "Right. Containers are a packaging and resource boundary, not a security boundary against code that is actively trying to escape."
+    },
+    {
+      "label": "Containers cannot bound CPU and memory, so a runaway submission takes the host down",
+      "feedback": "cgroups do bound CPU, memory and process count, and you should use them. The security objection is the shared kernel, which no resource limit touches."
+    },
+    {
+      "label": "Container startup is too slow for an online judge",
+      "feedback": "Containers start fast, which is exactly what makes them tempting. The problem is the strength of the wall, not the time to build it."
+    }
+  ]
+}
+\`\`\`
 
 ## The isolation spectrum
 
@@ -1698,6 +2908,29 @@ From weakest and cheapest to strongest and heaviest: a plain OS process with rli
 
 **Interview nuance:** the senior move is to name the spectrum and commit: "I would use Firecracker microVMs for true kernel isolation with fast startup, falling back to a hardened seccomp container if microVMs are not available." Saying "run it in a Docker container" and stopping there fails the security bar, because a container shares the host kernel.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You run each submission in a Firecracker microVM with a CPU cap, a memory cap and a wall clock timeout. A submission forks in an infinite loop. What happens?",
+  "options": [
+    {
+      "label": "It exhausts the process table inside the sandbox unless a pids limit caps process count, so that limit belongs alongside the CPU and memory caps",
+      "correct": true,
+      "feedback": "Right. A fork bomb is cheap in memory and expensive in process slots, which is why the pids limit is called out as its own control."
+    },
+    {
+      "label": "The memory cap stops it, since every process consumes memory",
+      "feedback": "Processes are cheap enough that the process table goes first. The memory cap fires too late to be the defence you rely on."
+    },
+    {
+      "label": "The wall clock timeout stops it, since the sandbox is destroyed when time runs out",
+      "feedback": "The timeout does end the run, but it lets the bomb saturate the sandbox and burn a worker slot for the whole window. The pids cap makes the failure immediate and cheap."
+    }
+  ]
+}
+\`\`\`
+
 ## Resource limits and architecture
 
 Use cgroups to cap CPU shares and memory (with a hard OOM kill), a wall-clock and CPU-time timeout to kill infinite loops, a pids limit to defeat fork bombs (a fork bomb without a pids cap exhausts the process table), disk quotas to stop a submission from filling the disk, and no network by default (or a strict egress allowlist) to prevent data exfiltration and abuse. Every submission runs in a fresh, throwaway sandbox that is destroyed after the run, so no state leaks between users.
@@ -1714,6 +2947,34 @@ warm pool of microVMs -> worker pulls job -> fresh Firecracker VM
 \`\`\`
 
 **Recap:** pick the isolation boundary deliberately (microVM/Firecracker as the strong default, hardened seccomp container as the middle ground, never a bare container for hostile code), bound every resource with cgroups plus timeouts plus a pids limit plus no network, run each submission in a fresh throwaway sandbox behind a queue and autoscaling worker pool with a warm pool for latency, and stream results while enforcing per-user fairness.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A contest starts and submissions arrive at twenty times the normal rate. What absorbs it?",
+  "options": [
+    {
+      "label": "A durable queue in front of a sandbox worker pool that autoscales on queue depth, with a warm pool of pre-booted sandboxes hiding cold start",
+      "correct": true,
+      "feedback": "Right. The queue decouples submission rate from execution capacity so the spike becomes a backlog, and the warm pool keeps the latency acceptable while it drains."
+    },
+    {
+      "label": "Reusing each sandbox for several submissions so the boot cost is amortized",
+      "feedback": "Sharing a sandbox leaks state between users and destroys the isolation the whole design exists for. Every submission gets a fresh throwaway sandbox."
+    },
+    {
+      "label": "Rejecting submissions above current fleet capacity so nothing queues",
+      "feedback": "Per user rate limits and concurrency quotas are fair and necessary, but dropping legitimate contest traffic is a product failure when a queue can buffer it."
+    },
+    {
+      "label": "Raising the per submission CPU and memory caps so each run finishes sooner",
+      "feedback": "Bigger limits do not make a queued job start earlier, and loosening the bounds on hostile code is exactly the wrong direction under load."
+    }
+  ],
+  "reveal": "The core decision is the isolation boundary, and you name the spectrum and commit: plain process, container, hardened container with seccomp and dropped capabilities, gVisor, microVM. Firecracker is the strong default because it gives a guest kernel and hardware virtualization while still booting in about 100ms. Then bound everything: cgroups for CPU and memory, wall clock and CPU timeouts, a pids limit against fork bombs, disk quotas, and no network by default. Architecturally it is a stateless API in front of a durable queue and an autoscaling pool of workers that each build a fresh sandbox, with a warm pool for latency, streamed output with a size cap, and per user quotas for fairness."
+}
+\`\`\`
 `.trim()
 
 const webhookDeliveryTeach = `
@@ -1724,6 +2985,29 @@ A webhook delivery system notifies customer-controlled endpoints when events hap
 ## At-least-once plus consumer idempotency
 
 Offer at-least-once. Persist every event first, enqueue a delivery task, and mark it delivered only when the endpoint returns a 2xx. If you crash after sending but before recording success, you redeliver, so duplicates are possible. This is the honest, standard guarantee; exactly-once delivery to an arbitrary external endpoint is not achievable, so you push idempotency to the consumer. Include a stable, unique event id in every payload (and an idempotency header) and document that delivery is at-least-once, so consumers dedupe on the id. Stripe, GitHub, and Shopify all do exactly this.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your checkout service calls the customer's webhook URL directly at the end of the request. One customer's endpoint starts hanging for 30 seconds. What happens?",
+  "options": [
+    {
+      "label": "Your checkout requests pile up behind the hung endpoint, so their outage becomes your outage",
+      "correct": true,
+      "feedback": "Right. Every in-path call holds one of your handlers for its full timeout, so a receiver you do not control gets to consume your capacity."
+    },
+    {
+      "label": "Only that customer's webhooks are delayed, since the calls are independent of each other",
+      "feedback": "They are independent of each other and not of your fleet: they share the same worker and connection pool as the checkout traffic they are attached to."
+    },
+    {
+      "label": "Nothing serious, as long as you set a short per attempt timeout on the call",
+      "feedback": "A timeout bounds the damage per call and keeps the work in your request path. At volume, even two seconds multiplied by a flood of events stalls the producer."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** the single most important architectural point: never deliver inline and synchronously from the event producer. If your checkout service calls the customer's webhook URL directly in the request path, a slow or hung customer endpoint backs up your producer and can stall the whole pipeline. Always persist the event and hand delivery to a separate, queue-driven delivery service.
 
@@ -1748,6 +3032,30 @@ circuit breaker + per-tenant concurrency -> one bad tenant cannot starve others
 \`\`\`
 
 **Recap:** guarantee at-least-once (persist, enqueue, ack on 2xx) with a stable event id so consumers dedupe, deliver from a separate queue-driven service (never inline), retry with exponential backoff plus jitter over a long window, sign payloads with HMAC-SHA256 plus timestamp and rotate secrets, make ordering opt-in per resource key, and protect everyone with dead-letters plus per-tenant isolation and circuit breakers.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A customer reports they processed the same payment.succeeded event twice. What is the correct response?",
+  "options": [
+    {
+      "label": "Delivery is at-least-once by design, every payload carries a stable event id, and consumers are documented to dedupe on it",
+      "correct": true,
+      "feedback": "Right. Exactly-once delivery to an arbitrary external endpoint is not achievable, so the guarantee is stated honestly and idempotency is pushed to the consumer."
+    },
+    {
+      "label": "It is a bug in the delivery service, which should mark delivered before sending so redelivery cannot happen",
+      "feedback": "Marking before the endpoint acknowledges turns duplicates into lost events, which is far worse, and it still cannot be atomic with an external HTTP call."
+    },
+    {
+      "label": "Enable strict ordering for that tenant, which also removes the duplicates",
+      "feedback": "Ordering is about sequence, not count. Holding events per resource key still redelivers an event whose acknowledgement was lost."
+    }
+  ],
+  "reveal": "Everything here follows from the receivers being outside your control. The guarantee is at-least-once: persist the event, enqueue a delivery task, and mark delivered only on a 2xx, with a stable event id so consumers dedupe. Delivery lives in a separate queue-driven service, never inline in the producer. Failures retry with exponential backoff plus jitter over hours, with a per attempt timeout. Payloads are signed with HMAC-SHA256 over the raw body plus a timestamp, with replay rejection and rotatable secrets. Ordering is opt-in per resource key because it costs throughput. And dead-letters, per-tenant queues and concurrency limits, and circuit breakers keep one bad endpoint from starving everyone else."
+}
+\`\`\`
 `.trim()
 
 const paymentLedgerTeach = `
@@ -1758,6 +3066,29 @@ Payments is the interview where "roughly correct" is a failing answer. The whole
 ## Idempotency, because retries are guaranteed
 
 Networks time out, clients resubmit, and your own workers retry after crashes. Every mutating request carries a client-generated idempotency key (a UUID the client mints per logical intent). The payment service stores that key with the request result in a dedup table before doing work, keyed uniquely so a second request with the same key returns the first result instead of charging again. This turns at-least-once delivery into effectively-once behavior. Without it, one dropped ACK becomes a double charge.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Where does an account balance live?",
+  "options": [
+    {
+      "label": "Nowhere as an authoritative field: it is derived by summing that account's immutable journal entries",
+      "correct": true,
+      "feedback": "Right. A cached or materialized balance is a fine optimization on top, but the entries have to stay the source of truth or reconciliation and audit have nothing to stand on."
+    },
+    {
+      "label": "In a balance column updated in the same transaction as the entry, so reads stay cheap",
+      "feedback": "Doing it inside the transaction keeps them agreeing today. Treating the column as truth is what removes the audit trail, because a bug that skews it leaves nothing to recompute against."
+    },
+    {
+      "label": "In the payment provider, which is authoritative for the customer's money",
+      "feedback": "The provider knows what it settled, not your internal wallet positions, and you still have to reconcile your ledger against its settlement report."
+    }
+  ]
+}
+\`\`\`
 
 ## Double-entry, immutable ledger
 
@@ -1816,6 +3147,30 @@ saga orchestrator --> ledger (pending) --> provider (charge, idem) --> ledger (s
 Providers confirm asynchronously via webhooks, which are themselves at-least-once, so webhook handlers must be idempotent too (dedup on the provider's event id). Reconcile daily by summing ledger entries and comparing to the provider's settlement report; any drift is an incident. Layer PCI scope reduction (never store raw PANs, tokenize via the provider) and fraud hooks on top.
 
 **Recap:** idempotency keys on every mutating call turn retries safe, an append-only double-entry ledger with derived balances gives auditability and reconciliation, and a saga with compensations plus idempotent webhook handling coordinates the provider, wallet, and orders without a distributed transaction.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A charge touches your ledger, an external provider, and the orders service. How do you keep them consistent?",
+  "options": [
+    {
+      "label": "A saga: local transactions in sequence, pending entry, provider call with an idempotency key, settle entries and mark the order paid, with compensating reversals on failure, all held in a durable workflow",
+      "correct": true,
+      "feedback": "Right. The durable workflow is the part people skip: a crash mid saga has to resume rather than orphan money."
+    },
+    {
+      "label": "A distributed two phase commit across the ledger, the provider and the orders service",
+      "feedback": "You cannot enlist an external payment provider in your transaction manager, and holding a prepare open across a third party call is exactly the coupling a saga avoids."
+    },
+    {
+      "label": "Fire the three writes asynchronously and let the nightly reconciliation fix any drift",
+      "feedback": "Reconciliation detects drift, it does not create consistency. Money in an unknown state overnight is an incident, not a design."
+    }
+  ],
+  "reveal": "Correctness, not throughput, is the whole problem. Idempotency keys on every mutating call turn guaranteed retries into safe retries, because a dropped acknowledgement otherwise becomes a double charge. The ledger is append-only and double-entry: each movement is two entries summing to zero, balances are derived sums, and entries that fail to sum to zero are corruption you can alarm on. Coordination across the provider, the wallet and orders is a saga with compensating reversals in a durable workflow, provider webhooks are at-least-once so their handlers dedupe on the provider's event id, and daily reconciliation against the settlement report is what proves the whole thing."
+}
+\`\`\`
 `.trim()
 
 const ecommerceFlashSaleTeach = `
@@ -2013,9 +3368,55 @@ If two requests both read \`available = 1\`, both decide "yes, buy," and both wr
 }
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You decrement inventory when a buyer adds the last seat to their cart. The buyer then wanders off and never checks out. What has to exist?",
+  "options": [
+    {
+      "label": "A hold with a TTL, plus a sweeper or a lazy check that atomically increments the seat back when it expires",
+      "correct": true,
+      "feedback": "Right. The hold makes the seat unavailable during the cart window without permanently destroying it, and the automatic release is what stops abandoned carts from leaking inventory."
+    },
+    {
+      "label": "Nothing: the seat is committed, and an abandoned cart is the buyer's problem",
+      "feedback": "Then every abandoned cart burns real inventory, and a sold out event ends with empty seats. The decrement has to be reversible on a timer."
+    },
+    {
+      "label": "Move the decrement to the payment step instead, so nothing is ever held",
+      "feedback": "Then two buyers can both reach payment for the last seat, and one of them gets a charge and no seat. The hold exists precisely to prevent that."
+    }
+  ]
+}
+\`\`\`
+
 ## Reservation holds
 
 Real commerce does not charge instantly, so you need reservation holds. When a buyer adds a seat to their cart, you decrement inventory and create a hold with a TTL (say 10 minutes). The seat is unavailable to others during the hold. If the buyer completes checkout, the hold converts to a sale; if the TTL expires, a background sweeper (or a lazy check on next read) releases the seat back to inventory via an atomic increment. This prevents both oversell and permanent leakage from abandoned carts. Optimistic locking (version numbers, retry on conflict) works when contention is low; pessimistic locking or serialized queues are better for genuinely hot items where most optimistic attempts would fail and retry-storm.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Five million people arrive in the same second. Your decrement is a single atomic operation, so oversell is impossible. Is the design done?",
+  "options": [
+    {
+      "label": "No: every request still has to reach that counter, so a waiting room admits users in controlled batches at a rate the backend can absorb",
+      "correct": true,
+      "feedback": "Right. Correctness and capacity are separate problems, and the waiting room is what makes the inventory store see bounded QPS no matter how many people showed up."
+    },
+    {
+      "label": "Yes: correctness holds, and the excess requests simply fail fast on a sold out check",
+      "feedback": "Failing fast still costs a full round trip through your stack per request, and five million of them in one second melt the tier long before the correctness argument matters."
+    },
+    {
+      "label": "No: shard the hot item's counter across nodes so the writes fan out",
+      "feedback": "You cannot shard a single seat. The genuinely contended item is serialized by definition, which is exactly why the answer is to shed and pace arrivals instead."
+    }
+  ]
+}
+\`\`\`
 
 ## The waiting room
 
@@ -2030,6 +3431,30 @@ You cannot let 5 million people hit checkout simultaneously; you would melt the 
 Hot-item sharding has a limit: you cannot shard a single seat, so the truly contended item is serialized. Accept that a sold-out item's throughput is bounded by one atomic counter, and design the waiting room so most users never reach it.
 
 **Recap:** prevent oversell with a single atomic conditional decrement (never read-then-write), use reservation holds with TTL and automatic release for the cart window, and put a fair, rate-limiting waiting room in front to shed and pace the spike so the inventory store sees bounded load.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Why can you not scale the hot item the way you scale everything else, by sharding its counter?",
+  "options": [
+    {
+      "label": "A single seat cannot be split, so the contended item is serialized by nature and the design's answer is to bound how many requests ever reach it",
+      "correct": true,
+      "feedback": "Right. Accepting that a sold out item's throughput is capped by one atomic counter is what makes the waiting room a requirement rather than a nicety."
+    },
+    {
+      "label": "You can: split 10,000 seats into ten counters of 1,000 and decrement a random one",
+      "feedback": "That works while stock is plentiful and fails at the end. A request landing on an empty shard sees sold out while seats remain elsewhere, so you either mislead buyers or rebalance under exactly the contention you were avoiding."
+    },
+    {
+      "label": "Because a decrement spread across shards is no longer atomic",
+      "feedback": "Each shard's decrement is still atomic on its own. What you lose is a single truthful view of remaining stock."
+    }
+  ],
+  "reveal": "One absolute rule, never oversell, and three mechanisms serving it. The decrement is a single atomic conditional operation, a conditional UPDATE whose affected row count you check, a Lua guarded Redis DECR, or a per item serialized queue, and never a read followed by a write in application code. Reservation holds with a TTL cover the cart window and release automatically so abandoned carts do not leak inventory. And a waiting room in front sheds and paces the spike, admitting users FIFO or by lottery at a rate the backend can absorb, because the truly contended item is serialized and the only lever left is how many requests reach it."
+}
+\`\`\`
 `.trim()
 
 const webCrawlerTeach = `
@@ -2040,6 +3465,29 @@ A web crawler is the canonical large-scale batch pipeline: discover, fetch, dedu
 ## The frontier
 
 The heart is the frontier: the queue of URLs to fetch. It is not a single FIFO. It must do two jobs at once: prioritize (crawl important, fresh, high-PageRank pages first) and enforce politeness (never hammer one host). The classic design (Mercator style) uses two layers of queues: front queues for priority (a URL is assigned to a priority band) and back queues for politeness (each back queue holds URLs for exactly one host, and a per-host timer enforces a minimum delay, respecting \`Crawl-delay\` and robots.txt). A heap of "next-fetch-time per host" tells the fetchers which host is due. This is what keeps you from sending 10,000 requests/sec to one small site and getting your IP blocked.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Suppose the frontier were a single priority queue and fetchers always pulled the highest priority URL available. What goes wrong first?",
+  "options": [
+    {
+      "label": "A high value host's URLs cluster at the top, so you hammer one site at thousands of requests per second and get blocked",
+      "correct": true,
+      "feedback": "Right, and politeness is the first thing interviewers probe. It is why the frontier is two layers: front queues for priority, back queues holding one host each with a per-host delay."
+    },
+    {
+      "label": "Low priority URLs are never fetched, so the crawl misses most of the web",
+      "feedback": "Starvation is a real scheduling concern, handled with priority bands and aging. The failure that ends the crawl is getting banned by the hosts you care about most."
+    },
+    {
+      "label": "The queue grows without bound, because link extraction adds URLs faster than fetchers remove them",
+      "feedback": "The frontier does grow enormous and needs durable storage. Size is a capacity problem you plan for; politeness is a correctness problem that stops the crawler working at all."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** politeness is the single most common thing juniors omit and the first thing interviewers probe. Say explicitly: fetch robots.txt per host (and cache it), enforce a per-host rate limit / min delay, identify with a real User-Agent, and back off on 429/503. A crawler without politeness gets banned and is useless.
 
@@ -2168,15 +3616,85 @@ Fetching is distributed and I/O-bound. Run many fetcher workers pulling due URLs
 }
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You have crawled a billion pages once. How do you keep the corpus fresh?",
+  "options": [
+    {
+      "label": "Estimate each page's change rate and recrawl adaptively, using conditional GETs so an unchanged page costs a cheap 304 instead of a full fetch",
+      "correct": true,
+      "feedback": "Right. News changes hourly and an archive page never does, so the recrawl budget follows the change rate, and If-Modified-Since or ETag makes checking almost free."
+    },
+    {
+      "label": "Recrawl everything on a fixed cycle, so no page is ever staler than the cycle length",
+      "feedback": "A uniform cycle spends the same budget on a news homepage as on a decade old archive, so either the news is stale or most of the crawl is wasted."
+    },
+    {
+      "label": "Rely on link extraction to rediscover changed pages, since a changed page usually gets relinked",
+      "feedback": "Discovery finds new URLs, not new content at a URL you already have. A page can change without anyone linking to it again."
+    }
+  ]
+}
+\`\`\`
+
 Freshness needs incremental recrawl, not one-shot. Estimate change rates per page (news changes hourly, an archive never does) and schedule recrawls adaptively, using HTTP conditional GETs (If-Modified-Since / ETag) so unchanged pages cost a cheap 304 instead of a full refetch.
 
 **Recap:** a two-layer frontier balances priority and per-host politeness, bloom-filter URL dedup plus simhash content dedup avoid redundant work and traps, distributed async fetchers with DNS caching do the I/O, and adaptive incremental recrawl with conditional GETs keeps the corpus fresh.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Which dedup does the bloom filter do, and what does its error rate cost you?",
+  "options": [
+    {
+      "label": "URL dedup before the frontier: a false positive drops a genuinely new URL, an acceptable loss at billions of URLs",
+      "correct": true,
+      "feedback": "Right. The filter answers definitely new or probably seen, backed by a durable seen-set, and its one sided error costs you the occasional missed page rather than duplicated work."
+    },
+    {
+      "label": "Content dedup after fetch: a false positive drops a genuinely new page, an acceptable loss",
+      "feedback": "Near duplicate content is caught with simhash or MinHash shingling over the fetched bytes. The bloom filter sits earlier, on normalized URLs, to keep the seen set affordable."
+    },
+    {
+      "label": "URL dedup, and a false positive causes the same URL to be crawled twice",
+      "feedback": "The error runs the other way. A bloom filter never reports new for something it has seen, so it can only claim seen for something new, which means a missed URL, not a duplicate fetch."
+    }
+  ],
+  "reveal": "A crawler is a producer-consumer loop with four disciplines. The frontier does priority and politeness at once, front queues banding by importance and back queues holding one host each behind a next-fetch-time heap, with robots.txt cached per host and backoff on 429 and 503. Dedup happens twice: bloom filtered normalized URLs before the frontier, and content hashing or simhash after the fetch, which also blunts mirrors and crawler traps alongside depth and per-host caps. Fetching is distributed and I/O bound, so async workers with aggressive DNS caching and connection reuse. And freshness is adaptive recrawl with conditional GETs, not a single pass."
+}
+\`\`\`
 `.trim()
 
 const metricsMonitoringTeach = `
 ## Write throughput and cardinality control
 
 A metrics platform ingests a firehose of numbers over time (millions of data points per second from thousands of hosts), stores them cheaply, serves fast dashboard queries, and fires alerts. The interview is really about two things: write throughput into a time-series database, and controlling cardinality so cost does not explode.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A team adds a user_id label to http_requests_total so they can slice by customer. You have ten million users. What does that cost?",
+  "options": [
+    {
+      "label": "Ten million time series from one metric, because a series is a unique combination of label values, and each carries its own index entry and sample stream",
+      "correct": true,
+      "feedback": "Right. Cardinality is the product of label value counts, and unbounded fields like user id, request id or email are what actually take these systems down."
+    },
+    {
+      "label": "Nothing at storage time: labels are just strings attached to the same series, so only queries get more complex",
+      "feedback": "The label values are what define the series. A new value is a new series to index and store, not extra text hanging off an existing one."
+    },
+    {
+      "label": "Slower writes but similar storage, since time series data compresses extremely well",
+      "feedback": "Compression works within a series, where timestamps are regular and adjacent values are similar. Cardinality multiplies the number of series, and compression has nothing to work with across them."
+    }
+  ]
+}
+\`\`\`
 
 ## The cardinality trap
 
@@ -2206,6 +3724,30 @@ hosts -> agents (batch, compress) -> Kafka -> ingester (TSDB write)
 Alerting is periodic rule evaluation. A rule engine runs queries on a schedule (e.g., every 15s), \`avg(rate(errors[5m])) > 0.05\`, and on a firing condition creates an alert. Crucially, an alert manager deduplicates and groups (one incident, not 500 pages from 500 hosts), applies silences/inhibitions, and routes to PagerDuty/Slack/email.
 
 **Recap:** buffer the ingestion firehose through Kafka into a compressed TSDB partitioned by time, control cost with cardinality limits plus retention tiers and downsampled rollups, serve dashboards from a label-indexed query engine, and evaluate alert rules on a schedule with a dedup/group/route alert manager.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A dashboard charts error rate across the last quarter. Which data does it read?",
+  "options": [
+    {
+      "label": "Downsampled rollups, because raw resolution is retained only for a short window and a quarter long chart cannot render per second detail anyway",
+      "correct": true,
+      "feedback": "Right. Retention tiers plus rollups are the cost lever that sits alongside cardinality control, and rollups keep min, max, avg and count so spikes still show."
+    },
+    {
+      "label": "Raw samples, because rollups would smooth away the spikes that matter",
+      "feedback": "The rollup keeps the max per bucket, so a spike survives as the max. Reading billions of raw points for a quarter long chart is the cost you avoid."
+    },
+    {
+      "label": "Raw samples from object storage, since older blocks are flushed there and stay queryable",
+      "feedback": "Older blocks do move to object storage, but retention ages the raw data out. What remains for long windows is the rollup."
+    }
+  ],
+  "reveal": "Two forces shape this system: write throughput and cost control. Agents batch and push, or the platform scrapes, into a stateless ingestion tier that buffers through Kafka so spiky producers cannot stall storage. The TSDB is partitioned by time, hot blocks in memory or SSD and older ones in object storage, compressed hard with delta-of-delta timestamps and XOR encoded floats, and indexed by label. Cost is controlled at two levers: cardinality limits, because unbounded label values are what break the system, and retention tiers with downsampled rollups. Alerting is scheduled rule evaluation feeding an alert manager that deduplicates, groups, silences and routes, so one incident is one page."
+}
+\`\`\`
 `.trim()
 
 const adClickAggregatorTeach = `
@@ -2213,11 +3755,57 @@ const adClickAggregatorTeach = `
 
 An ad click aggregator ingests a high-volume stream of click events and produces per-campaign counts that advertisers see in near real time and that also feed billing, so the numbers must be both fast and eventually exact. This is the canonical streaming-aggregation interview, and it lives or dies on two ideas: idempotent counting and reconciling real-time with batch truth.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A click consumer restarts and Kafka redelivers the last batch. Your aggregator does a plain increment per event. What did the advertiser get billed for?",
+  "options": [
+    {
+      "label": "Clicks that happened once but were counted twice, because at-least-once delivery plus a blind increment double counts on every replay",
+      "correct": true,
+      "feedback": "Right, and because clicks are money, that is fraud by bug. The fix is dedup on a click id, or a processor whose state update and offset commit are atomic."
+    },
+    {
+      "label": "Nothing extra: the offsets were committed, so redelivered events are skipped",
+      "feedback": "Offsets are committed after processing, so a crash between the increment and the commit is exactly the window that replays. That window is where the double count lives."
+    },
+    {
+      "label": "Fewer clicks than happened, since events in flight during the restart are dropped",
+      "feedback": "The log is retained and redelivered from the last committed offset, so the failure mode here is duplication, not loss."
+    }
+  ]
+}
+\`\`\`
+
 ## Idempotent counting
 
 The naive design fails immediately. If you just do \`counter++\` per event on an at-least-once stream (Kafka redelivers on consumer restart), you double-count, and since clicks are money, that is fraud-by-bug. You need exactly-once or idempotent counting. Each click carries a unique id; dedup on it. At high volume you cannot keep every id forever, so use a bloom filter or a windowed dedup store (recent ids in Redis with TTL) to reject replays cheaply, accepting a tiny false-positive rate. Alternatively, lean on the stream processor's exactly-once semantics (Flink checkpointing, Kafka transactions) so an aggregate update and the source offset commit are atomic, meaning a replay after crash does not double-apply.
 
 **Interview nuance:** state the delivery-semantics problem out loud: Kafka gives at-least-once by default, so naive increments double-count. Name your fix (Flink exactly-once via checkpointed state + transactional sink, or explicit dedup on click id), because "just increment a counter" is the failing answer.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Ingestion lags by ten minutes during a spike. If you window clicks by the time your consumer saw them, what happens to the per minute campaign counts?",
+  "options": [
+    {
+      "label": "Clicks are attributed to the wrong minute, so the shape of the campaign's traffic is wrong even when the daily total is right",
+      "correct": true,
+      "feedback": "Right, which is why you window on event time, when the click happened, rather than processing time, when you saw it."
+    },
+    {
+      "label": "Nothing: the counts are identical, just delivered ten minutes later",
+      "feedback": "A uniform delay would only shift the chart. Ingestion lag is not uniform, so a backlog draining fast piles many minutes of clicks into one window."
+    },
+    {
+      "label": "The clicks are dropped, because their window has already closed",
+      "feedback": "Windowing on processing time never closes a window early, since every event looks current on arrival. The damage is misattribution, not loss."
+    }
+  ]
+}
+\`\`\`
 
 ## Event time and watermarks
 
@@ -2263,12 +3851,59 @@ clicks -> Kafka (raw log, retained) --> Flink (windows + watermarks + dedup) -->
 Hot campaigns create counter hotspots; a viral ad might take millions of increments/sec on one key. Shard the counter into N sub-counters updated independently and summed on read, and pre-aggregate within the stream processor before writing. Fraud/bot filtering (dedup, rate anomalies, click-farm patterns) runs in-stream for fast defense and again in batch for the authoritative purge.
 
 **Recap:** dedup clicks idempotently (bloom/windowed store or Flink exactly-once) so at-least-once delivery does not double-count, window on event time with watermarks and allowed lateness for out-of-order clicks, use Lambda/Kappa so a fast approximate stream is reconciled by an exact batch (or replayable) source of truth, and shard hot-campaign counters.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The advertiser dashboard shows 41,102 clicks for a campaign and the billing run shows 40,987. Which is right, and why do both exist?",
+  "options": [
+    {
+      "label": "Billing: the batch or replayed path recomputes exact, deduplicated, fraud filtered numbers over the raw log, while the streaming path trades a little accuracy for immediacy",
+      "correct": true,
+      "feedback": "Right. The fast path is allowed to be approximate precisely because a slower authoritative path reconciles it, which is the whole point of Lambda and Kappa."
+    },
+    {
+      "label": "The dashboard: it is closest to the live stream, and the batch job is a stale snapshot",
+      "feedback": "The batch path reads the retained raw log, so it is not stale, it is late and complete. The streaming path is the approximate one."
+    },
+    {
+      "label": "Neither: the two should agree exactly, so a gap means the pipeline has a bug",
+      "feedback": "A small gap is the expected outcome of the architecture, not a defect. The batch layer exists to correct streaming drift."
+    }
+  ],
+  "reveal": "Fast and eventually exact, and the design earns both words separately. Exactness comes from idempotent counting, dedup on a click id through a bloom filter or a windowed store, or a processor with checkpointed state and a transactional sink so a replay cannot double apply. Correct attribution comes from windowing on event time with watermarks deciding when a window closes and allowed lateness admitting stragglers as corrections. Trust comes from Lambda or Kappa, a fast approximate stream for the dashboard reconciled by an exact, fraud filtered batch or replay that billing uses. And a viral campaign's counter is sharded into sub counters summed on read, with pre-aggregation inside the stream processor."
+}
+\`\`\`
 `.trim()
 
 const leaderboardTopkTeach = `
 ## A trap wearing a trivial costume
 
 A leaderboard looks trivial ("sort players by score") and is a trap, because the naive SQL answer collapses under load. The interview tests whether you know the right data structure (a sorted set), how to scale it, how to handle hot counters, and where approximation is a legitimate win.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Ten million players, constant score updates, and every client wants the top ten plus their own rank. What is wrong with an ORDER BY score DESC LIMIT 10 plus a COUNT of higher scores?",
+  "options": [
+    {
+      "label": "Both do a full sort or scan per request over a table being written constantly, so the cost of every read grows with the player count",
+      "correct": true,
+      "feedback": "Right. The rank query is the worse half: counting everyone above you means touching a slice of the table that grows without bound."
+    },
+    {
+      "label": "The results would be stale, because the index cannot keep up with the write rate",
+      "feedback": "The index stays current. The problem is what each read costs, not whether it is fresh."
+    },
+    {
+      "label": "SQL cannot express a player's rank without a window function, which does not scale here",
+      "feedback": "SQL can express rank several ways, and expressiveness is not the issue. Per request cost is."
+    }
+  ]
+}
+\`\`\`
 
 ## The sorted set
 
@@ -2298,6 +3933,30 @@ unique count: HyperLogLog ; trending top-K: Count-Min Sketch
 Durability matters: Redis is the fast serving/index layer, not the system of record. Persist authoritative scores in a database and treat the ZSET as a rebuildable index (write-behind, or rebuild from an event stream), so a Redis loss is a rebuild, not data loss.
 
 **Recap:** use a Redis sorted set for O(log n) updates and top-K/rank reads instead of SQL sort-per-request, shard the ZSET by segment with a merged global top-N, break hot counters into summed sub-counters for write parallelism, reach for HyperLogLog and Count-Min Sketch when approximate is good enough, and keep authoritative scores in a database with Redis as a rebuildable index.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your Redis instance holding the leaderboard is lost. How bad is that?",
+  "options": [
+    {
+      "label": "A rebuild rather than a data loss, because authoritative scores live in a database and the sorted set is a derived index",
+      "correct": true,
+      "feedback": "Right. Redis is the fast serving and index layer, not the system of record, so the recovery path is a rebuild from the database or an event stream."
+    },
+    {
+      "label": "A data loss: ranks exist only in the sorted set, so scores have to be re-entered",
+      "feedback": "Ranks are derived from scores, and scores belong in the system of record. Treating Redis as the only copy is what turns a cache incident into a data incident."
+    },
+    {
+      "label": "Neither: Redis persistence guarantees the sorted set survives a lost instance",
+      "feedback": "Persistence helps a restart, not a lost instance or a corrupted dataset, which is why the rebuildable index framing matters."
+    }
+  ],
+  "reveal": "The trivial looking problem hides four decisions. The primitive is a sorted set, giving O(log n) score updates, O(log n + k) top-K reads and O(log n) rank lookups, instead of a sort or scan per request. Scale comes from sharding the set by region, league or time window with a smaller merged global top-N, accepting that exact global rank is expensive and often bucketed. A single hot counter is split into sub counters incremented at random and summed on read. Approximation is a legitimate win where exactness is not needed, HyperLogLog for unique counts and Count-Min Sketch for heavy hitters. And the database stays the source of truth with Redis as a rebuildable index."
+}
+\`\`\`
 `.trim()
 
 const stockExchangeTeach = `
@@ -2532,6 +4191,29 @@ The matching rule is price-time priority over a limit order book: for buys, high
 }
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The matching engine is single threaded per instrument. Why is that better here than a thread pool taking a lock per order?",
+  "options": [
+    {
+      "label": "The bottleneck is determinism and tail latency, not CPU throughput: locks cost microseconds and thread scheduling would decide tie breaks",
+      "correct": true,
+      "feedback": "Right. A lock free single writer over a sequenced input stream gives reproducible output and a tight tail, which a sharded transactional database cannot."
+    },
+    {
+      "label": "Because one thread gets more CPU cache to itself than several threads combined",
+      "feedback": "Cache friendly sequential access is a real part of why the ring buffer is fast, and it is a consequence rather than the reason. The reason is that concurrency makes the result nondeterministic, which the audit forbids."
+    },
+    {
+      "label": "Because matching is I/O bound, so additional threads would only wait",
+      "feedback": "There is no I/O on the hot path at all: the book lives entirely in memory, which is itself another reason a disk backed database is the wrong tool."
+    }
+  ]
+}
+\`\`\`
+
 ## Single-writer, single-threaded
 
 The counterintuitive core: use a single-writer, single-threaded matching engine, not a database with locks. Why is single-threaded faster and more correct here? Because a lock per order in a general database adds milliseconds and nondeterminism (thread scheduling decides tie-breaks), and this domain needs microseconds and reproducibility. A sequencer assigns a total order to all inbound events (every order, cancel, and modify gets a monotonic sequence number), and a single thread processes them one at a time from an in-memory ring buffer (the LMAX Disruptor pattern), with no locks, cache-friendly memory access, and no cross-thread nondeterminism. Horizontal scale comes from sharding by instrument: each symbol (AAPL, TSLA) gets its own single-writer engine, and there is no cross-symbol coordination on the hot path.
@@ -2539,6 +4221,29 @@ The counterintuitive core: use a single-writer, single-threaded matching engine,
 **Interview nuance:** the signal here is explaining that single-threaded beats multi-threaded for this workload. Say: the bottleneck is not CPU throughput, it is determinism and tail latency, and a lock-free single writer over sequenced input gives both, which a sharded transactional database cannot.
 
 The order book lives entirely in memory (arrays or intrusive structures per price level for O(1) best-price access), with no per-order database round-trip on the hot path, because a disk read would blow the microsecond budget.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Each fill needs a timestamp, and two orders arriving together need a tie break. Where do both come from?",
+  "options": [
+    {
+      "label": "From the sequence number the sequencer assigned, because reading a wall clock or randomizing a tie makes a replay produce different fills",
+      "correct": true,
+      "feedback": "Right. Determinism means the same ordered input always yields identical output, so every decision has to be a function of the sequenced stream."
+    },
+    {
+      "label": "From the machine clock, kept tightly synchronized so all engines agree",
+      "feedback": "Even perfectly synchronized clocks read differently during a replay than during the original run, and a replay that produces different fills fails the audit requirement."
+    },
+    {
+      "label": "From arrival order at the network card, which is the fairest measure available",
+      "feedback": "Arrival order is what the sequencer captures and makes durable. Using it without the assigned, journaled number leaves you nothing to replay against."
+    }
+  ]
+}
+\`\`\`
 
 ## Determinism and recovery
 
@@ -2556,6 +4261,30 @@ Journal (replicated) --replay--> hot-standby replica (deterministic takeover)
 Market-data fan-out must not slow matching: publish trades and book deltas onto a separate high-throughput multicast or streaming bus so slow subscribers cannot backpressure the matcher. Availability comes from hot-standby replicas that consume the same sequenced log and can take over deterministically, plus pre-trade risk checks in front of the matcher (credit/position limits) so bad orders never reach the book.
 
 **Recap:** match by price-time priority in an in-memory order book, process a single-writer sequenced event stream single-threaded (Disruptor style) for lock-free determinism and microsecond latency, shard by instrument for scale, keep matching fully deterministic (no wall-clock, no randomness), recover by replaying a replicated event journal from snapshots, and fan out market data on a separate bus with hot standbys for availability.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The primary matching engine dies mid session. How does the exchange come back with the identical book?",
+  "options": [
+    {
+      "label": "Replay the replicated sequenced journal from the last snapshot into a fresh engine, which reproduces every fill because matching is deterministic",
+      "correct": true,
+      "feedback": "Right. Event sourcing plus determinism is what makes recovery exact rather than approximate, and snapshots exist only to bound how much of the day you replay."
+    },
+    {
+      "label": "Restore the most recent snapshot and accept that fills after it are lost",
+      "feedback": "Those fills are trades that really happened. The journal tail after the snapshot is exactly what makes recovery exact."
+    },
+    {
+      "label": "Fail over to a hot standby that has been mirroring the primary's memory pages",
+      "feedback": "A hot standby is the right answer for availability, and it stays in step by consuming the same sequenced log and matching deterministically, not by copying memory."
+    }
+  ],
+  "reveal": "Every usual web instinct is wrong here, and the reasons are specific. Matching is price-time priority over an in-memory limit order book, two sorted sides of FIFO price levels. Events are totally ordered by a sequencer and processed by a single writer thread over a ring buffer, because the requirement is microsecond tail latency and reproducibility rather than raw throughput, and scale comes from sharding by instrument instead of by threads. Matching must be deterministic, so no wall clock and no random tie breaks. Recovery is event sourcing: journal before acting, replay from a snapshot to rebuild the exact book. And market data leaves on a separate bus so slow subscribers cannot backpressure the matcher."
+}
+\`\`\`
 `.trim()
 
 export const systemDesignLevel10: DesignLevel = {
