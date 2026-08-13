@@ -148,19 +148,20 @@ export interface PythonExercise {
   /** single-file model answer (gated reveal). */
   referenceSolution?: string
 
+  /**
+   * Budgeted minutes for this phase, derived by counting lines to read and lines to write.
+   * A lesson that sets it on both exercises must have `lesson.estimatedMinutes` equal to
+   * `teach + apply + practice`, and the derivation belongs in a comment at the top of the
+   * lesson module (`level5/unsafe-sink.ts` is the model). Optional because most of the corpus
+   * has not been measured yet; a guessed number is worse than none.
+   */
+  estimatedMinutes?: number
+
   /** single-file grading — required when `executionMode === "single-file"`. */
   testCases?: PythonTestCase[]
 
   /** workspace grading — required when `executionMode === "workspace"`. */
   workspace?: WorkspaceScenarioConfig
-
-  /**
-   * Budgeted minutes for THIS phase, derived by counting lines to read and lines to write (see
-   * `docs/PYTHON-PRACTICE-DEPTH-SPEC.md` §3). Where present on both phases, the lesson's own
-   * `estimatedMinutes` must equal teach + apply + practice. Optional because most lessons predate
-   * the rule and still carry only a lesson-level figure.
-   */
-  estimatedMinutes?: number
 }
 
 export type PythonLevelSlug = "fundamentals" | "intermediate" | "applied" | "engineering"

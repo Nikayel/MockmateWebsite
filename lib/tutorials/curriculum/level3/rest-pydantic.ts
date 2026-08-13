@@ -2,6 +2,20 @@ import type { PythonLesson } from "../../types"
 import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
+/**
+ * Time budget behind `estimatedMinutes` (counted, not guessed): teach 6 (about 1,100 prose words
+ * and five checks), apply 12 (25 prompt lines to read, a 12-line reference to write), practice 37
+ * (67 README lines plus 75 lines of read-only modules and visible tests to read, 94 lines to write
+ * across two files). Lesson total 55 = 6 + 12 + 37.
+ *
+ * Apply used to be a two-line `parse_user` that called `int()`, `str()` and `bool()` on three keys,
+ * a 47x jump into the practice reference and the worst ramp in the course. It now runs the same
+ * schema the practice runs (report every problem, name the field, never raise) on a strictly
+ * smaller surface: three fixed types, no coercion, one flat payload. Practice keeps its coercers,
+ * its nesting, its optional/nullable rules and its dataclasses, so pasting the apply answer in
+ * still gets you nothing.
+ */
+
 const API_README = buildBrief({
   lesson: "py-l3-rest-pydantic",
   kind: "ticket",
@@ -584,6 +598,42 @@ User(id=int(raw["id"]), name=str(raw["name"]), active=bool(raw["active"]))
 }
 \`\`\`
 
+### Reporting every problem instead of the first one
+
+A boundary that raises on the first bad field tells support about one problem per run. A boundary that collects tells them about all of them at once. The move is to have each converter hand back a **pair**, \`(value, error)\`, and never raise: the caller decides what to do with the error half.
+
+\`\`\`python
+def as_hex(value, path):
+    """Return (number, None) on success, or (None, message) on failure. Never raises."""
+    if isinstance(value, str) and value.startswith("0x"):
+        return int(value, 16), None
+    return None, f"{path}: expected a hex string, got {value!r}"
+
+
+print(as_hex("0x1f", "color"))   # (31, None)
+print(as_hex(31, "color"))       # (None, "color: expected a hex string, got 31")
+
+errors = []
+for path, raw in (("color", 31), ("accent", "0x0a"), ("edge", None)):
+    value, error = as_hex(raw, path)
+    if error is not None:
+        errors.append(error)
+print(errors)
+# ['color: expected a hex string, got 31', 'edge: expected a hex string, got None']
+\`\`\`
+
+Two details in that message do real work. \`{value!r}\` asks for the \`repr\`, so a string arrives quoted and \`None\` reads as \`None\` rather than as an empty gap, which is the difference between a report you can act on and one you cannot. And the \`path\` is passed in rather than known by the converter, so the same converter can name a top-level field or a deeply nested one.
+
+### \`bool\` is an \`int\`, so order your checks
+
+\`\`\`python
+print(isinstance(True, int))    # True: bool is a subclass of int
+print(isinstance(True, bool))   # True
+print(f"{None!r} {'7'!r} {7!r}")   # None '7' 7
+\`\`\`
+
+An \`id\` field that accepts any \`int\` therefore accepts \`True\` as the id \`1\`. When a flag arriving where a number belongs should be an error, test \`isinstance(value, bool)\` **before** \`isinstance(value, int)\` and reject it there.
+
 Reach for \`raw["id"]\` (indexing), not \`raw.get("id")\`. Indexing raises \`KeyError\` on a missing field, so the absence is reported where it happened. \`.get\` would silently hand you \`None\` and push the failure downstream. When a boundary has to keep going instead of stopping at the first problem, ask \`"id" in raw\` first: that way a missing key is still a distinct, named outcome rather than a \`None\` you cannot tell apart from a real null.
 
 ### Pitfall: \`bool()\` of a string is almost always \`True\`
@@ -632,40 +682,108 @@ print(User(id=int(raw["id"]), name=str(raw["name"]), active=bool(raw["active"]))
   apply: {
     id: "py-l3-rest-pydantic-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`parse_user(raw)\`. Coerce a raw user dict into a clean dict with
-\`id\` as an \`int\`, \`name\` as a \`str\`, and \`active\` as a \`bool\`.
+    // 12 minutes: ~25 lines of prompt to read, a 12-line reference to write, one nuance
+    // (a bool is not an id) that costs a re-read of the teach section's isinstance fence.
+    estimatedMinutes: 12,
+    prompt: `Implement \`validate_user(raw)\`, the boundary check the user feed runs before anything
+downstream sees a row. It reports **every** problem in the payload rather than stopping at the
+first, and it never raises.
 
-For \`{"id": "1", "name": "Ada", "active": 1}\` return \`{"id": 1, "name": "Ada", "active": True}\`.`,
-    starterCode: `def parse_user(raw):
-    # Coerce raw["id"] -> int, raw["name"] -> str, raw["active"] -> bool. Return a dict.
+Return a dict with two keys:
+
+\`\`\`python
+{"user": {"id": 1, "name": "Ada", "active": True}, "errors": []}
+\`\`\`
+
+- \`user\` holds the three declared fields when the payload is clean, and \`None\` when it is not.
+- \`errors\` is a list of messages, in the field order \`id\`, \`name\`, \`active\`.
+
+\`id\` must be an \`int\`, \`name\` a \`str\`, and \`active\` a \`bool\`. Nothing is converted here: a value
+of the wrong type is a problem to report, not a value to fix. A \`bool\` is **not** an \`id\`, even
+though \`True\` is an \`int\` in Python, because a flag is not an identifier.
+
+- a field the payload does not carry gives \`"<field>: missing"\`
+- a field of the wrong type gives \`"<field>: expected <type>, got <value>"\`, where the type is the
+  wanted type's name and the value is its \`repr\`
+
+\`\`\`python
+validate_user({"id": "1", "name": 12, "active": 1})
+# {"user": None, "errors": [
+#     "id: expected int, got '1'",
+#     "name: expected str, got 12",
+#     "active: expected bool, got 1",
+# ]}
+validate_user({"id": 3})
+# {"user": None, "errors": ["name: missing", "active: missing"]}
+\`\`\`
+
+Keys the payload carries that are not one of the three are ignored, because the API adds fields
+without warning and a new one must not fail the row.`,
+    starterCode: `def validate_user(raw):
+    # Return {"user": ..., "errors": [...]}. Report every bad or missing field, in field order.
     pass`,
     hints: [
-      'Coerce each field: `int(raw["id"])`, `str(raw["name"])`, `bool(raw["active"])`.',
-      "Return them in a new dict with the same keys.",
+      "Nothing raises. Keep one `errors` list, append to it as you check each field, and decide what to return only once every field has been looked at.",
+      'Three fields with three wanted types is a table you can walk: a tuple of `("id", int)` pairs keeps the field order and the check in one place. `"id" in raw` answers the missing question before you touch `raw["id"]`.',
+      '`f"{value!r}"` gives you the repr, so a string comes out quoted. For the wanted type\'s name, `int.__name__` is `"int"`. Remember that `isinstance(True, int)` is `True`, so a check written with `isinstance` alone lets a bool through as an id.',
     ],
-    referenceSolution: `def parse_user(raw):
-    return {"id": int(raw["id"]), "name": str(raw["name"]), "active": bool(raw["active"])}`,
+    referenceSolution: `FIELDS = (("id", int), ("name", str), ("active", bool))
+
+
+def validate_user(raw):
+    values = {}
+    errors = []
+    for name, wanted in FIELDS:
+        if name not in raw:
+            errors.append(f"{name}: missing")
+            continue
+        value = raw[name]
+        if type(value) is not wanted:
+            errors.append(f"{name}: expected {wanted.__name__}, got {value!r}")
+        else:
+            values[name] = value
+    if errors:
+        return {"user": None, "errors": errors}
+    return {"user": values, "errors": []}`,
     testCases: [
       {
-        input: { raw: { id: "1", name: "Ada", active: 1 } },
-        expected: { id: 1, name: "Ada", active: true },
-        description: "coerces string id and int active",
+        input: { raw: { id: 1, name: "Ada", active: true } },
+        expected: { user: { id: 1, name: "Ada", active: true }, errors: [] },
+        description: "a clean payload reports no errors",
       },
       {
-        input: { raw: { id: 2, name: "Sam", active: 0 } },
-        expected: { id: 2, name: "Sam", active: false },
-        description: "inactive user",
+        input: { raw: { id: "1", name: 12, active: 1 } },
+        expected: {
+          user: null,
+          errors: [
+            "id: expected int, got '1'",
+            "name: expected str, got 12",
+            "active: expected bool, got 1",
+          ],
+        },
+        description: "collects every wrong type, not only the first",
       },
       {
-        input: { raw: { id: "99", name: "Mo", active: true } },
-        expected: { id: 99, name: "Mo", active: true },
-        description: "already-bool active",
+        input: { raw: { id: 3 } },
+        expected: { user: null, errors: ["name: missing", "active: missing"] },
+        description: "a missing field is named without a value",
+      },
+      {
+        input: { raw: { id: true, name: "Ada", active: false } },
+        expected: { user: null, errors: ["id: expected int, got True"] },
+        description: "a bool is not an id",
+      },
+      {
+        input: { raw: { id: 2, name: "Sam", active: false, plan_tier: "gold" } },
+        expected: { user: { id: 2, name: "Sam", active: false }, errors: [] },
+        description: "an undeclared field is ignored",
       },
     ],
   },
   practice: {
     id: "py-l3-rest-pydantic-practice",
     executionMode: "workspace",
+    estimatedMinutes: 37,
     prompt: `Rebuild the storefront sync boundary so a bad payload reports every problem and names the field
 path of each one, instead of dying on the first bad value.
 
