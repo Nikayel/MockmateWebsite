@@ -37,6 +37,11 @@ You have two files to change.
 
 Every assertion needs a message naming the expected value and the actual one.
 
+Two rules the shape checks hold you to. Once the parametrized rows are expanded, the suite has to
+collect **at least six cases**, which the coverage above already gives you. And every case has to
+pass no matter what order the suite runs in, so nothing a test does may reach the next one: the
+checks run your cases forwards and then backwards.
+
 You may define more than one fixture. The shape checks grade the fixture that the most of your
 tests take as a parameter, so the one you build the suite around is the one being judged.
 
@@ -673,7 +678,8 @@ export const pytestFixturesLesson: PythonLesson = {
   difficulty: "medium",
   skills: ["pytest", "fixtures", "parametrize", "tdd"],
   teach: {
-    estimatedMinutes: 6,
+    // 8 min: the yield-fixture and minipytest.param fences add two worked examples.
+    estimatedMinutes: 8,
     markdown: `## Fixtures and parametrize
 
 ### Why this matters
@@ -720,7 +726,19 @@ def test_restock_adds_item(base_stock):        # pytest passes base_stock in
 }
 \`\`\`
 
-By default a fixture has function scope: \`pytest\` calls it fresh for every test, so \`base_stock\` is a brand-new dict each time and tests cannot leak state into one another. A fixture that uses \`yield\` instead of \`return\` runs the code after \`yield\` as teardown once the test finishes.
+By default a fixture has function scope: \`pytest\` calls it fresh for every test, so \`base_stock\` is a brand-new dict each time and tests cannot leak state into one another.
+
+A fixture that uses \`yield\` instead of \`return\` gets a second half. Everything above the \`yield\` is setup, the value is handed to the test, and everything below it runs as teardown once the test finishes:
+
+\`\`\`python
+@pytest.fixture
+def warehouse():
+    store = Warehouse(capacity=4)   # setup
+    yield store                     # the test runs here, with store as its argument
+    store.close()                   # teardown, even if the test failed
+\`\`\`
+
+That is the shape to reach for whenever the thing you built has to be released: a temp file, a connection, an entry in a registry. A fixture that \`return\`s has no teardown half at all, so nothing releases what it created.
 
 \`\`\`cswidget
 {
@@ -792,7 +810,35 @@ def test_restock(stock, additions, expected):
 
 Two rows means two independent results, so a failure names the row instead of just "\`test_restock\` failed".
 
-The demo below shows the \`restock\` you will build. It copies \`stock\` with \`dict(stock)\`, then adds each quantity onto \`result.get(item, 0)\`, returning a new dict. This sandbox has no \`pytest\` installed, so the Practice ships \`minipytest\`, a small read-only stand-in offering the same three pieces under the same names: \`@fixture\` with \`yield\` teardown, \`@parametrize\`, and \`param(..., raises=...)\`. Only the machinery is smaller, so what you write there transfers.
+### A row that is supposed to fail
+
+Some rows in a table are not "these inputs give that answer", they are "these inputs are rejected". \`pytest.param(..., marks=...)\` is how pytest attaches an expectation to a single row rather than to the whole table.
+
+This sandbox has no \`pytest\` installed, so the Practice ships \`minipytest\`, a small read-only stand-in offering the three pieces under the same names: \`@fixture\` with \`yield\` teardown, \`@parametrize\`, and \`param(..., raises=...)\`, which is the spelling that marks the rejected row. Written against it, the whole shape looks like this:
+
+\`\`\`python
+import minipytest
+from warehouse.units import crates_for
+
+
+@minipytest.parametrize(
+    "items, expected_crates",
+    [
+        (0, 0),
+        (12, 1),
+        minipytest.param(-1, None, raises=ValueError),
+    ],
+)
+def test_crates_for(items, expected_crates):
+    got = crates_for(items)
+    assert got == expected_crates, (
+        "expected " + str(expected_crates) + " crates for " + str(items) + ", got " + str(got)
+    )
+\`\`\`
+
+Read the last row carefully. It carries \`None\` where a real expectation would go, because the body never gets far enough to compare anything: that case passes when \`crates_for(-1)\` raises \`ValueError\`, and fails if the call comes back normally. A test can also take a fixture and parametrize arguments at the same time, matched by name in both cases.
+
+The demo below shows the \`restock\` you will build. It copies \`stock\` with \`dict(stock)\`, then adds each quantity onto \`result.get(item, 0)\`, returning a new dict.
 
 ### Pitfall: shared mutable fixtures
 
@@ -868,44 +914,81 @@ print(restock({"apple": 5}, {"apple": 5, "plum": 3}))  # {'apple': 10, 'plum': 3
   apply: {
     id: "py-l3-pytest-fixtures-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`restock(stock, additions)\`. Return a **new** dict merging
-\`additions\` into \`stock\`, summing quantities for shared items.
+    // Budget: 11 min. ~14 lines of prompt to read, ~9 lines to write. The rung under the
+    // Practice: the aliasing hazard the ledger carries (one object reached by several owners)
+    // shows up here as a list of snapshots that all turn out to be the same dict.
+    estimatedMinutes: 11,
+    prompt: `Warm-up (one file): the warehouse log records what stock looked like after each delivery.
 
-\`restock({"apple": 5}, {"apple": 5, "plum": 3})\` is \`{"apple": 10, "plum": 3}\`.`,
+Implement \`restock(stock, additions)\`, which returns a **new** dict merging \`additions\` into
+\`stock\` and summing the quantities of shared items, then \`restock_history(stock, deliveries)\`,
+which applies each delivery in turn and returns the list of what stock looked like after each one.
+The starting \`stock\` must come back unchanged, and each snapshot has to keep the numbers it was
+taken with.
+
+\`restock_history({"apple": 1}, [{"apple": 1}, {"plum": 2}])\` is
+\`[{"apple": 2}, {"apple": 2, "plum": 2}]\`.`,
     starterCode: `def restock(stock, additions):
     # Copy stock into a new dict, then add each item/qty from additions.
+    pass
+
+
+def restock_history(stock, deliveries):
+    # Apply each delivery to the result of the one before, keeping a snapshot of each step.
     pass`,
     hints: [
       "Start from a copy so you don't mutate the input: `result = dict(stock)`.",
       "For each item, add to what's already there: `result.get(item, 0) + qty`.",
-      "Loop `for item, qty in additions.items():`, then return `result`.",
+      "In `restock_history`, each delivery starts from the dict the previous one produced. If every snapshot ends up identical, the list is holding the same dict several times over rather than one dict per step, which `restock` already avoids by copying.",
     ],
     referenceSolution: `def restock(stock, additions):
     result = dict(stock)
     for item, qty in additions.items():
         result[item] = result.get(item, 0) + qty
-    return result`,
+    return result
+
+
+def restock_history(stock, deliveries):
+    current = dict(stock)
+    history = []
+    for delivery in deliveries:
+        current = restock(current, delivery)
+        history.append(current)
+    return history`,
     testCases: [
       {
-        input: { stock: { apple: 5 }, additions: { apple: 5, plum: 3 } },
-        expected: { apple: 10, plum: 3 },
-        description: "sum shared, add new",
+        input: { stock: { apple: 1 }, deliveries: [{ apple: 1 }, { plum: 2 }] },
+        expected: [{ apple: 2 }, { apple: 2, plum: 2 }],
+        description: "one snapshot per delivery",
       },
       {
-        input: { stock: {}, additions: { x: 4 } },
-        expected: { x: 4 },
+        input: { stock: {}, deliveries: [{ x: 4 }] },
+        expected: [{ x: 4 }],
         description: "into empty stock",
       },
       {
-        input: { stock: { n: 2 }, additions: { m: 3 } },
-        expected: { n: 2, m: 3 },
-        description: "no overlap",
+        input: { stock: { n: 2 }, deliveries: [] },
+        expected: [],
+        description: "no deliveries at all",
+      },
+      {
+        input: { stock: { apple: 5 }, deliveries: [{ apple: 5, plum: 3 }, { apple: 1 }] },
+        expected: [
+          { apple: 10, plum: 3 },
+          { apple: 11, plum: 3 },
+        ],
+        description: "shared items keep summing",
       },
     ],
   },
   practice: {
     id: "py-l3-pytest-fixtures-practice",
     executionMode: "workspace",
+    // Budget: 26 min. To read: README 40 lines, the ledger 30, the test starter 25, and the parts
+    // of minipytest.py worth reading (its docstring plus fixture/parametrize/param, ~40), so
+    // ~135 lines. To write: ~35 lines (a fixture, three tests, a 5-row table) plus 8 lines of
+    // repair in the ledger. Lesson total is teach 8 + apply 11 + practice 26 = 45.
+    estimatedMinutes: 26,
     prompt: `The room booking suite passes or fails depending on which test runs first, and four of
 its cases are the same body with a different number pasted in. Write the suite in
 \`tests/test_ledger.py\` using a fixture and a parametrized table, and finish \`bookings/ledger.py\`
