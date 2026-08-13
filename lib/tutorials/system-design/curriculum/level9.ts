@@ -28,6 +28,29 @@ A modular monolith keeps the single deploy and single database but enforces inte
 
 Microservices split each capability into its own deployable service with its own datastore. The benefits are real but specific: independent deploy cadence, independent scaling (the search service can run 50 pods while checkout runs 5), fault isolation, and polyglot freedom. The costs are also real: network latency on every hop, no cross-service transactions (you need sagas), eventual consistency, distributed tracing to debug anything, and a large ops and cloud bill.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A team splits checkout into an Orders service and an Inventory service. Each gets its own repo, its own pipeline, and its own pods, but both read and write the same orders database. What have they built?",
+  "options": [
+    {
+      "label": "Microservices, since each service now deploys on its own schedule",
+      "feedback": "They cannot deploy on their own schedule: a change to the shared table forces both to ship together, so the independence exists only on paper."
+    },
+    {
+      "label": "A distributed monolith: every cost of services and none of the benefits",
+      "correct": true,
+      "feedback": "Right. The shared database recouples them at the schema level, so they pay network latency, tracing, and ops overhead while still deploying and failing together."
+    },
+    {
+      "label": "A modular monolith, because there is still only one database",
+      "feedback": "A modular monolith is one deploy with enforced internal boundaries. These are two deploys across a network with no boundary at all, which is strictly worse."
+    }
+  ]
+}
+\`\`\`
+
 ## The extraction triggers
 
 The decision rule: default to a modular monolith, then extract a service only when a concrete trigger appears. Real extraction triggers are (1) org scaling, when too many teams contend on one deploy pipeline (Conway's Law), (2) divergent deploy cadence, when one part ships hourly and the rest ships weekly, (3) divergent scaling profile, when one component needs 10x the hardware, (4) fault isolation for a critical path, and (5) a genuine polyglot need.
@@ -37,6 +60,34 @@ The decision rule: default to a modular monolith, then extract a service only wh
 Argue both directions from the requirements. If asked to justify microservices, ground it in a named trigger. If asked why not, cite the distributed-monolith risk and the ops overhead a small team cannot absorb.
 
 **Recap:** default to a modular monolith with clean seams, extract services only on a concrete org, cadence, or scaling trigger, and never build a distributed monolith.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your 12-engineer team runs a modular monolith. Which of these is a real trigger to extract the first service?",
+  "options": [
+    {
+      "label": "Search needs roughly 10 times the hardware of everything else and is starving checkout of capacity",
+      "correct": true,
+      "feedback": "Right. A divergent scaling profile is one of the named triggers, alongside org scaling, divergent deploy cadence, fault isolation for a critical path, and a genuine polyglot need."
+    },
+    {
+      "label": "Microservices are the modern default and the codebase is over a year old",
+      "feedback": "Age and fashion are not triggers. An extraction has to buy something concrete, or you take on sagas, tracing, and a bigger bill for nothing."
+    },
+    {
+      "label": "Two features both need customer data, so each should own a service that reads the customers table",
+      "feedback": "Two services on one table is the distributed monolith. Shared data is a reason to keep one boundary, not a reason to split it."
+    },
+    {
+      "label": "A new hire finds the codebase large and would prefer smaller repositories",
+      "feedback": "Smaller units can come from enforced module boundaries inside the monolith, which costs no network hops and keeps the single deploy."
+    }
+  ],
+  "reveal": "The sequence is: default to a modular monolith with clean seams, extract only when a named trigger appears (org scaling, deploy cadence, scaling profile, fault isolation, polyglot need), and give every extracted service exclusive ownership of its data so you never land in a distributed monolith."
+}
+\`\`\`
 `.trim()
 
 const decompositionDddTeach = `
@@ -47,6 +98,29 @@ Once you decide to split, the hard part is where to cut. Bad boundaries are what
 ## Align boundaries to business capabilities
 
 The core rule: align service boundaries to business capabilities, not technical layers. A common novice split is by layer (a UI service, a business-logic service, a data service), which is disastrous, because almost every feature touches all three, so every change requires coordinated deploys across all of them. Instead you split by capability: Orders, Payments, Inventory, Shipping, Catalog, Identity. Each maps to a bounded context, a part of the domain with its own model and its own language. The word "product" means an SKU with price and description in Catalog, but a line item with quantity and fulfillment status in Orders. Those are different models and belong in different services.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The Shipping service needs the customer's mailing address, which lives in the Identity service's database. What is the right way for Shipping to get it?",
+  "options": [
+    {
+      "label": "Give Shipping read-only credentials and let it join across to the Identity tables",
+      "feedback": "Read-only access is still schema coupling: Identity cannot rename a column without breaking Shipping, so the two are back to coordinated deploys."
+    },
+    {
+      "label": "Call Identity's API, or subscribe to its customer-updated event and keep a local copy",
+      "correct": true,
+      "feedback": "Right. Each service owns its data and exposes it only through an API or events, which is exactly what keeps the schema free to change behind the boundary."
+    },
+    {
+      "label": "Move the address table into a shared database that both services own",
+      "feedback": "Shared ownership is no ownership: any change needs both teams to agree and deploy together, which is the coupling good boundaries were supposed to remove."
+    }
+  ]
+}
+\`\`\`
 
 **Interview nuance:** the single most important consequence of a bounded context is data ownership. Each service owns its data and no other service touches its database. Access is only through the owning service's API or through events it publishes. If two services share a database table, they are coupled at the schema level: you cannot change the table without coordinating both deploys, and you are back to a distributed monolith. Interviewers will test this directly: "the Shipping service needs the customer's address, where does it get it?" The right answer is it calls Identity's API or subscribes to a customer-updated event and keeps its own copy, never a join across databases.
 
@@ -148,6 +222,34 @@ You rarely rewrite. The standard extraction pattern is the Strangler Fig. You pu
 \`\`\`
 
 **Recap:** cut along business capabilities and bounded contexts, give every service exclusive ownership of its data, size services to one team each, and extract incrementally with the Strangler Fig and an anti-corruption layer.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You are extracting Payments out of a nine-year-old monolith whose data model is messy and whose vocabulary is nothing like the one the new service wants. What do you build at the seam?",
+  "options": [
+    {
+      "label": "An anti-corruption layer that translates the legacy model into the new service's clean model",
+      "correct": true,
+      "feedback": "Right. Without a translation shim the legacy shapes leak straight into the new service, and you have rebuilt the old design under a new name."
+    },
+    {
+      "label": "Nothing: adopt the monolith's existing model so the two stay compatible",
+      "feedback": "That is the leak the pattern exists to stop. Compatibility today buys you a corrupted model you will carry for years."
+    },
+    {
+      "label": "A full rewrite of both sides at once, so only one model ever exists",
+      "feedback": "Big-bang rewrites are what the Strangler Fig replaces. You peel off one capability at a time behind a router precisely so you never take that risk."
+    },
+    {
+      "label": "A shared library of the monolith's domain objects, imported by both sides",
+      "feedback": "A shared domain library recouples them at compile time, so the monolith's model still dictates the new service's design and its release schedule."
+    }
+  ],
+  "reveal": "Cut along business capabilities and bounded contexts rather than technical layers, give each service exclusive ownership of its data and let others in only through APIs or events, size a service to one team, and extract incrementally with a router in front and an anti-corruption layer at every seam."
+}
+\`\`\`
 `.trim()
 
 const interServiceCommTeach = `
@@ -181,9 +283,72 @@ Orchestration puts a central coordinator (a saga orchestrator like Temporal or a
 
 You cannot run an ACID transaction across services, and two-phase commit does not scale and blocks on failure. The pattern is the saga: a sequence of local transactions where each step has a compensating action. If Shipping fails after Payment succeeded, you run the compensation for Payment (refund) rather than rolling back a distributed transaction. Sagas give you eventual consistency, not atomicity, and you must design the compensations explicitly.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A downstream service starts failing. Every caller retries three times, immediately, on every request. What does that downstream now experience?",
+  "options": [
+    {
+      "label": "Roughly the same load, since the failed requests were cheap to serve",
+      "feedback": "Failed requests are rarely free, and the retries triple the arrival rate at the exact moment the service has the least capacity to absorb it."
+    },
+    {
+      "label": "Three times the traffic, arriving as a synchronized wave that prevents it from recovering",
+      "correct": true,
+      "feedback": "Right, that is a retry storm. Immediate lockstep retries multiply the load and keep it synchronized, so the dependency never gets a quiet window to come back."
+    },
+    {
+      "label": "Less traffic, because callers back off once they see failures",
+      "feedback": "Nothing backs off unless you write it. Exponential backoff is the deliberate fix, and the jitter is what breaks the wave apart in time."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** resilience primitives are almost always probed. Every sync call needs a timeout (never infinite), retries with exponential backoff and jitter (to avoid retry storms), a circuit breaker (stop calling a dead dependency so it can recover and you fail fast), and idempotency keys (so a retry does not double-charge). Backpressure and bounded queues stop a fast producer from drowning a slow consumer. These four, timeout plus retry-with-jitter plus circuit breaker plus idempotency, are what prevent one failure from cascading.
 
 **Recap:** sync for must-know-now reads (gRPC inside, REST at the edge), async events to decouple and absorb slowness, orchestration for complex flows and choreography for simple ones, sagas with compensations for cross-service consistency, and timeouts plus jittered retries plus circuit breakers plus idempotency to stop cascades.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Checkout must authorize the card, reserve stock, email a receipt, and update loyalty points. Sort each step by how it should be called.",
+  "buckets": [
+    "Synchronous",
+    "Async event"
+  ],
+  "items": [
+    {
+      "label": "Authorize the payment",
+      "bucket": "Synchronous",
+      "feedback": "You cannot tell the user the order succeeded until you know the card authorized, so this one has to block."
+    },
+    {
+      "label": "Reserve the stock the confirmation depends on",
+      "bucket": "Synchronous",
+      "feedback": "Anything the confirmation depends on stays in the request path. You cannot confirm an order you may not be able to fill."
+    },
+    {
+      "label": "Send the receipt email",
+      "bucket": "Async event",
+      "feedback": "Nobody waits on the email to see the confirmation page, and an email outage must never fail an order that was already paid for."
+    },
+    {
+      "label": "Update the loyalty points balance",
+      "bucket": "Async event",
+      "feedback": "Loyalty can lag by seconds with no harm, and decoupling it means a loyalty outage cannot take checkout down with it."
+    },
+    {
+      "label": "Increment the analytics dashboard counters",
+      "bucket": "Async event",
+      "feedback": "Analytics is the clearest case: it consumes the fact that an order happened, and it should never sit in the user's latency path."
+    }
+  ],
+  "reveal": "Draw the line at the moment of commitment: synchronous up to order confirmed, async for everything after. Then protect the synchronous half with a timeout on every call, retries with exponential backoff and jitter, a circuit breaker so a dead dependency gets room to recover, and idempotency keys so a retry cannot double-charge."
+}
+\`\`\`
 `.trim()
 
 const containersK8sTeach = `
@@ -213,11 +378,75 @@ Every container should set resource **requests** (what the scheduler reserves) a
 - **readinessProbe:** decides whether the Pod receives traffic. A failing readiness probe pulls the Pod out of the Service endpoints without killing it.
 - **livenessProbe:** decides whether to restart the Pod. A failing liveness probe triggers a kill and restart.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A service takes 40 seconds to warm its caches before it can answer correctly. Its Deployment defines only a livenessProbe, with a threshold generous enough that no Pod is ever restarted during warm-up. You roll out a new version. What do users see?",
+  "options": [
+    {
+      "label": "Nothing: the liveness probe holds traffic back until the Pod is warm",
+      "feedback": "Liveness answers one question only, whether to restart the Pod. It has no say over which Pods the Service sends traffic to."
+    },
+    {
+      "label": "Errors from the new Pods, because nothing gates their membership in the Service",
+      "correct": true,
+      "feedback": "Right. With no readinessProbe a Pod joins the Service endpoints as soon as it starts, so it receives traffic for 40 seconds before it can serve it."
+    },
+    {
+      "label": "A crash loop, because the probe kills each Pod before it finishes warming",
+      "feedback": "That failure is real when liveness is tuned tightly, and a startupProbe is what prevents it. Here the threshold is generous, so the Pods survive and serve errors instead."
+    }
+  ]
+}
+\`\`\`
+
 A rolling update stays zero-downtime because new Pods must pass readiness before old Pods are terminated. Set \`maxUnavailable: 0\` and \`maxSurge: 1\` and Kubernetes brings up a new ready Pod before removing an old one, so capacity never dips.
 
 **Interview nuance:** the tell of a weak answer is treating K8s as "a magic scaling button." The strong answer says the app must be stateless (no local session, no local disk) for a Deployment to work, and that readiness probes, not liveness probes, are what make a rollout safe.
 
 **Recap:** build small immutable images, use Deployments for stateless and StatefulSets for stateful, set requests/limits and a PodDisruptionBudget, and let readiness probes gate a \`maxUnavailable: 0\` rolling update to stay zero-downtime.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each workload into the controller that fits it.",
+  "buckets": [
+    "Deployment",
+    "StatefulSet",
+    "DaemonSet"
+  ],
+  "items": [
+    {
+      "label": "A stateless HTTP API behind a Service",
+      "bucket": "Deployment",
+      "feedback": "Interchangeable replicas with no identity and no local disk are exactly what a Deployment's ReplicaSet manages."
+    },
+    {
+      "label": "A Postgres primary with its own PersistentVolume",
+      "bucket": "StatefulSet",
+      "feedback": "It needs a stable name and its own volume across restarts, and a Deployment promises neither, which is how a reschedule loses or corrupts the data."
+    },
+    {
+      "label": "A log-shipping agent that must run on every node",
+      "bucket": "DaemonSet",
+      "feedback": "One Pod per node is the DaemonSet contract, used for log shippers, node exporters, and CNI agents."
+    },
+    {
+      "label": "A Kafka broker that keeps its own partition data",
+      "bucket": "StatefulSet",
+      "feedback": "Broker identity and its data directory both have to survive a reschedule, so it needs stable identity and stable storage."
+    },
+    {
+      "label": "A stateless thumbnail worker scaled by an HPA",
+      "bucket": "Deployment",
+      "feedback": "Nothing survives between jobs, so any replica can do any job and the Pods stay interchangeable."
+    }
+  ],
+  "reveal": "Build small immutable images and never patch a running container. Stateless work goes in Deployments, identity-bearing work in StatefulSets, per-node agents in DaemonSets. Set requests and limits so the scheduler and the QoS class work for you, add a PodDisruptionBudget so a drain cannot take too many Pods at once, and let readiness probes rather than liveness gate the rolling update."
+}
+\`\`\`
 `.trim()
 
 const k8sAutoscalingTeach = `
@@ -268,11 +497,70 @@ The most important senior point is that CPU is the default HPA metric and it is 
 
 Scaling to zero saves money on spiky, event-driven work, but the first request after zero pays a cold start: pull image, boot process, warm caches, which can be hundreds of ms to seconds. Mitigations: keep a small **warm pool** (a floor of 1 to 2 replicas so you never fully cold-start on the user path), use **provisioned/pre-warmed concurrency**, and shrink the image and boot path. The decision is explicit: pure scale-to-zero for a nightly batch or a rare webhook, a warm floor for anything a user waits on synchronously.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your storefront takes a 10x jump in traffic every weekday at 09:00 sharp. The HPA is well tuned and scales on p99 latency rather than CPU. What still goes wrong at 09:00?",
+  "options": [
+    {
+      "label": "Nothing: p99 latency is the correct signal, so a well-tuned HPA handles it",
+      "feedback": "The signal is right and the timing is wrong. A reactive scaler can only move after latency has already degraded, so the first users pay for the evidence it needs."
+    },
+    {
+      "label": "Scaling starts only once latency degrades, so the opening minutes of the spike breach the SLA",
+      "correct": true,
+      "feedback": "Right. Reaction always trails the wave: the metric has to move, then Pods are scheduled, and if the nodes are full the cluster autoscaler has to add nodes first."
+    },
+    {
+      "label": "The HPA scales down instead, because latency looks unusually good just before the spike",
+      "feedback": "A quiet moment can cause flapping, which is what stabilization windows exist to damp. But the 09:00 problem is that the response arrives after the pain, not before it."
+    }
+  ]
+}
+\`\`\`
+
 **Diurnal and spiky patterns:** for predictable daily cycles use **scheduled or predictive scaling** to pre-provision before the morning ramp so autoscaling is not racing the traffic wave. To avoid **flapping** (rapidly scaling up and down around the threshold), set **stabilization windows** and sensible scale-down delays so a brief dip does not tear down capacity you will need again in 30 seconds.
 
 **Interview nuance:** if you say "scale on CPU" for an event-driven or latency-bound service, a strong interviewer will push: "what if CPU is at 40 percent but the queue has a million messages?" The correct answer scales on backlog or p99, and uses KEDA for the queue-depth and scale-to-zero case.
 
 **Recap:** pick the scaler to the problem (HPA Pods, cluster autoscaler nodes, KEDA events with scale-to-zero), scale on the signal that reflects user pain (RPS, p99, queue depth) not reflexive CPU, and blunt cold starts with a warm floor and stabilization windows.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each situation by the scaler that actually solves it.",
+  "buckets": [
+    "HPA",
+    "Cluster autoscaler",
+    "KEDA"
+  ],
+  "items": [
+    {
+      "label": "A stateless API whose p99 climbs as request rate rises",
+      "bucket": "HPA",
+      "feedback": "More replicas of the same stateless service is the HPA's job, driven by a metric that reflects user pain."
+    },
+    {
+      "label": "Thirty new Pods stuck Pending because every node is full",
+      "bucket": "Cluster autoscaler",
+      "feedback": "Pending means there is nowhere to put them. The HPA already did its part by asking for the replicas; something has to add nodes."
+    },
+    {
+      "label": "A nightly webhook consumer that should cost nothing between runs",
+      "bucket": "KEDA",
+      "feedback": "Scale to zero on an empty event source is the KEDA case, and a nightly job can absorb the cold start with nobody waiting."
+    },
+    {
+      "label": "A Kafka consumer group whose lag is climbing",
+      "bucket": "KEDA",
+      "feedback": "Consumer lag is an external event-source metric, which is what KEDA reads directly to size the consumer fleet."
+    }
+  ],
+  "reveal": "Match the scaler to the problem: HPA for replicas, cluster autoscaler or Karpenter for nodes, KEDA for event sources and scale to zero. Then pick the signal that reflects user pain, keep a warm floor anywhere a user waits synchronously, pre-provision for calendar-driven spikes instead of racing them, and use stabilization windows so a brief dip does not tear down capacity you need again in 30 seconds."
+}
+\`\`\`
 `.trim()
 
 const serviceMeshTeach = `
@@ -287,6 +575,33 @@ A service mesh manages **east-west** traffic: service-to-service calls inside th
 ## The sidecar model and its tax
 
 The classic implementation is the **sidecar** model: a proxy (Envoy) is injected into every Pod, and all traffic goes app -> local sidecar -> remote sidecar -> app. This is powerful but not free. Every Pod now runs an extra container, so a 40-service fleet with hundreds of Pods pays real memory and CPU per Pod (tens of MB each, adding up to GBs cluster-wide), and every hop adds mTLS and proxy latency (often 1 to several ms per call, which compounds across a deep call graph). Operationally you now run and upgrade a fleet of proxies, which is real "proxy sprawl."
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A request walks a chain of four services, so three service-to-service hops. Suppose each proxy traversal costs about 1 ms. Under the sidecar model, how much proxy latency does that one request pick up?",
+  "options": [
+    {
+      "label": "About 1 ms, since the proxy is local to the Pod",
+      "feedback": "Locality makes a traversal cheap, not free, and there is more than one of them: the request meets a proxy on the way out and another on the way in."
+    },
+    {
+      "label": "About 3 ms, one proxy per hop",
+      "feedback": "Close, but every hop passes through two proxies, the caller's sidecar and the callee's sidecar, so this counts half of them."
+    },
+    {
+      "label": "About 6 ms, because each of the three hops crosses two sidecars",
+      "correct": true,
+      "feedback": "Right. The tax is charged per proxy traversal, not per call, so it compounds with the depth of the call graph. A deep chain feels the mesh far more than a single hop does."
+    },
+    {
+      "label": "Nothing measurable, because Envoy shares the Pod's network namespace",
+      "feedback": "Sharing a namespace removes the network trip but not the work: the proxy still parses the request, applies policy, and terminates and originates a connection."
+    }
+  ]
+}
+\`\`\`
 
 ## The sidecarless / ambient shift
 
@@ -417,6 +732,29 @@ The win is fewer proxies, lower per-Pod memory, and lower latency for the common
 }
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Cilium removes the per-Pod proxy entirely. So how does it end up with authenticated, encrypted traffic between workloads?",
+  "options": [
+    {
+      "label": "eBPF performs the TLS handshake in the kernel for every connection",
+      "feedback": "This is the common mental model and it is wrong. eBPF does not perform a TLS handshake; it enforces identity-based L3 and L4 policy in the kernel, and the handshake work happens somewhere else."
+    },
+    {
+      "label": "The agent mutually authenticates workloads using SPIFFE identities, and WireGuard or IPsec encrypts node to node",
+      "correct": true,
+      "feedback": "Right. Authentication happens in the agent, off the datapath, and confidentiality comes from transparent node-to-node encryption. The traffic is authenticated and encrypted, but it is not per-connection mTLS."
+    },
+    {
+      "label": "It does not encrypt at all: you get policy only, and encryption needs a sidecar mesh layered on top",
+      "feedback": "Encryption is available with no per-Pod proxy through WireGuard or IPsec. What you give up is per-connection mTLS, not confidentiality."
+    }
+  ]
+}
+\`\`\`
+
 ## A mesh is not always warranted
 
 For a handful of services, you can get mTLS from the platform, retries and timeouts from a shared client library, and metrics from your framework, without operating a mesh. Mesh adoption has actually declined for small fleets precisely because the operational cost outweighs the benefit until you have dozens of services in multiple languages where per-language libraries stop being viable.
@@ -424,6 +762,34 @@ For a handful of services, you can get mTLS from the platform, retries and timeo
 **Interview nuance:** the strong answer is not "add Istio." It is "at 40 services in mixed languages, a mesh is justified because you cannot keep mTLS and retry logic consistent across five client libraries, and I would choose ambient/eBPF to avoid the per-Pod sidecar tax." The weak answer adds a mesh reflexively for three services.
 
 **Recap:** a mesh moves mTLS, retries/timeouts, traffic shifting, and L7 telemetry out of app code; sidecars cost memory and latency per Pod; Istio Ambient cuts that tax while keeping per-connection mTLS (GA in 1.24), and Cilium cuts it further by putting eBPF policy in the kernel with SPIFFE mutual authentication and WireGuard or IPsec encryption instead of mTLS (still beta); and for a small fleet, a mesh is often not worth it.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You run 6 services, all written in Go, owned by one team. A staff engineer proposes installing Istio in sidecar mode. What is the strongest response?",
+  "options": [
+    {
+      "label": "Agree, because a mesh is how you get mTLS and mTLS is not optional",
+      "feedback": "mTLS is not optional, but a mesh is not its only source. The platform can provide it, and at this size the proxies cost more to operate than they return."
+    },
+    {
+      "label": "Decline for now: at 6 same-language services, platform mTLS plus a shared client library covers it and the mesh does not repay its operating cost yet",
+      "correct": true,
+      "feedback": "Right. A mesh earns its keep when per-language client libraries stop being viable, which is dozens of services in mixed languages, not six in one."
+    },
+    {
+      "label": "Decline permanently, since meshes are legacy technology now that eBPF exists",
+      "feedback": "The sidecarless shift changes how a mesh is implemented, not whether the problem exists. At 40 mixed-language services you will still want one, just not a per-Pod proxy for each."
+    },
+    {
+      "label": "Agree, but skip mTLS and use the mesh only for traffic splitting",
+      "feedback": "Traffic splitting alone rarely justifies running a fleet of proxies, and you can canary with a rollout controller without a mesh at all."
+    }
+  ],
+  "reveal": "A mesh moves mTLS, retries and timeouts, traffic shifting, and L7 telemetry out of application code. The sidecar model charges for that per Pod in memory and per proxy traversal in latency. Istio Ambient cuts the tax with a per-node ztunnel and keeps per-connection mTLS over HBONE; Cilium cuts it further with eBPF policy in the kernel, SPIFFE mutual authentication in the agent, and WireGuard or IPsec on the wire, which is authenticated and encrypted but not per-connection mTLS. Below a couple of dozen services, no mesh at all is frequently the right call."
+}
+\`\`\`
 `.trim()
 
 const cloudNative12factorTeach = `
@@ -434,6 +800,29 @@ The 12-factor methodology and cloud-native principles are a checklist for buildi
 ## Config in the environment
 
 Config and secrets live outside the image, in env vars, a ConfigMap, or a secrets manager. The payoff is **one immutable artifact** promoted unchanged from dev to staging to prod (dev/prod parity). The moment you bake an environment-specific config file into the image, you need a different build per environment, and parity is gone. A baked-in database URL or API key is the classic anti-pattern.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A service keeps login sessions in process memory and writes user uploads to the container's local disk. The team containerizes it as-is and puts it behind an autoscaler. What breaks first?",
+  "options": [
+    {
+      "label": "Nothing: the container runtime keeps both across restarts",
+      "feedback": "A container's filesystem and its heap die with the container, and the platform will kill and reschedule instances routinely for drains, spot reclaims, and scale-in."
+    },
+    {
+      "label": "Users get logged out at random and uploads go missing, depending on which replica serves each request",
+      "correct": true,
+      "feedback": "Right. Once there is more than one instance, state that lives on one box makes every request a coin flip, and a scale-in deletes whatever was on the instance it removed."
+    },
+    {
+      "label": "Only scale-in is a problem, since scaling out just adds empty instances",
+      "feedback": "Scaling out is where it breaks first: the load balancer sends the next request to a replica that has never seen that session or that file."
+    }
+  ]
+}
+\`\`\`
 
 ## Stateless, disposable processes
 
@@ -454,6 +843,34 @@ In a cloud-native world instances vanish routinely: spot reclamation, autoscale 
 **Interview nuance:** the highest-signal move is to walk a specific legacy service through the checklist and name the concrete change per factor: "session is in local memory -> move to Redis; uploads go to local disk -> move to S3; config is a baked-in \`app.conf\` -> move to env vars." That specificity is what separates a strong answer from reciting the factor names.
 
 **Recap:** config in the environment (one image everywhere), stateless disposable processes (Redis session, S3 files, graceful SIGTERM), backing services attached by URL, and immutable build/release/run separation, all so a process is safe to kill and restart anywhere at any time.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A legacy service is being made platform-ready. Which change actually buys dev and prod parity?",
+  "options": [
+    {
+      "label": "Build one image per environment, each with the right config file baked in",
+      "feedback": "That is the anti-pattern the config factor names. Three builds means the artifact you tested is not the artifact you shipped."
+    },
+    {
+      "label": "Build one image and inject config as environment variables or mounted secrets at run time",
+      "correct": true,
+      "feedback": "Right. One immutable artifact promoted unchanged through the environments is the whole point, and it is what makes a rollback just re-running the previous release."
+    },
+    {
+      "label": "Keep the config file in the image and have a startup script rewrite it in place",
+      "feedback": "Mutating the container at boot reintroduces drift and makes the running state something nobody can reproduce from the repository."
+    },
+    {
+      "label": "Store all config in the database so every instance reads identical values",
+      "feedback": "Tempting, but the database connection string has to come from somewhere, and you have now made process startup depend on a service that may be down."
+    }
+  ],
+  "reveal": "Config in the environment so one image runs everywhere, stateless disposable processes with session in Redis and files in object storage, backing services attached by URL and credentials, strict build, release, and run separation, and logs streamed to stdout rather than a local file that dies with the instance. Together those are what make a process safe for the platform to kill, move, and restart."
+}
+\`\`\`
 `.trim()
 
 const serverlessFaasTeach = `
@@ -476,6 +893,29 @@ Mitigations, in order of leverage: **provisioned concurrency** (pay to keep N in
 
 Multi-step logic does not belong inside one giant function. Orchestrate it with **Step Functions** or a durable-workflow engine: each step is its own function, retries and timeouts are declarative, and you get a visual execution history instead of a 900-second monolith.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A function runs flat out, 24 hours a day, at high steady load. Next to a well-utilized container of the same size, what does the bill look like?",
+  "options": [
+    {
+      "label": "Cheaper, because you pay only for what you use and here you use all of it",
+      "feedback": "Per-invocation pricing carries a premium for elasticity you are not using. At full steady utilization you pay that premium on every single request."
+    },
+    {
+      "label": "Several times more expensive, because per-invocation pricing is built for bursty utilization",
+      "correct": true,
+      "feedback": "Right. The crossover sits roughly where sustained utilization passes 40 to 60 percent; past that a reserved or well-packed container wins clearly."
+    },
+    {
+      "label": "About the same, since both bill by memory and time",
+      "feedback": "Both bill by memory-time, but not at the same rate, and FaaS adds a per-request fee on top of the GB-seconds."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** the cost model inverts at high steady load. FaaS is priced for bursty utilization; if a function runs flat-out 24/7, per-invocation billing costs several times what an equivalently sized, well-utilized container or reserved instance would. The crossover is roughly when sustained utilization passes ~40 to 60 percent. Saying "serverless is cheaper" without "for spiky load" is the tell of someone who has not seen the bill.
 
 \`\`\`
@@ -487,6 +927,34 @@ UPLOAD --> S3 event --> Lambda (per-file, stateless, auto-scale)
 \`\`\`
 
 **Recap:** FaaS trades capacity management for per-invocation billing and instant scale, which wins for spiky event-driven glue but loses on cold-start latency, hard execution limits, statelessness, and a cost model that inverts against containers under high steady load.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A Lambda that queries Postgres scales to 800 concurrent instances during a spike. The database pool holds 200 connections. What happens, and what is the fix?",
+  "options": [
+    {
+      "label": "Nothing: Lambda multiplexes many invocations onto one shared connection",
+      "feedback": "Each instance handles exactly one request at a time and opens its own connection. There is no sharing between instances for the platform to multiplex over."
+    },
+    {
+      "label": "The database runs out of connections; bound the function with reserved concurrency and pool through a connection proxy",
+      "correct": true,
+      "feedback": "Right. The function scales far past what the store can absorb, so you cap it deliberately and put something like RDS Proxy in front to hold the pool."
+    },
+    {
+      "label": "Lambda throttles itself automatically to protect the database",
+      "feedback": "The regional concurrency limit protects the account, not your database. Nothing in the platform knows how many connections Postgres can take."
+    },
+    {
+      "label": "The 15-minute execution limit stops it, so the spike drains safely",
+      "feedback": "That limit bounds how long one invocation may run, not how many run at once, so it does nothing about connection pressure."
+    }
+  ],
+  "reveal": "FaaS trades capacity management for instant scale and per-invocation billing, which is a genuine win for spiky event-driven glue. The bill comes back as cold starts on the p99 tail, a hard execution limit, no durable local state, and a cost model that inverts under high steady load. The failure interviewers probe for is scale a downstream cannot absorb: bound it with reserved concurrency and a connection proxy, and orchestrate multi-step work with Step Functions instead of one long function."
+}
+\`\`\`
 `.trim()
 
 const edgeWasmTeach = `
@@ -501,6 +969,29 @@ Container-based FaaS boots an OS-level sandbox per function, which is why cold s
 ## What belongs where
 
 Put at the **edge** the lightweight, latency-sensitive work on the request path: geo/device **routing**, **auth and JWT verification** (reject a bad token in the PoP instead of after a trans-oceanic hop), **A/B assignment**, header rewrites, **personalization** of otherwise-cached pages, bot filtering, and cache logic. Keep at the **origin** the heavy or stateful work: large database transactions, big compute, anything needing the full Node ecosystem, and any operation requiring **strong consistency**.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "To cut latency you move the entitlement check to the edge and cache each user's plan tier in Workers KV. A user downgrades from premium to free. What can happen?",
+  "options": [
+    {
+      "label": "Nothing: the write invalidates every point of presence before the next request arrives",
+      "feedback": "Global invalidation faster than the next request is exactly what edge KV does not promise. Propagation is eventual and can take seconds."
+    },
+    {
+      "label": "They keep receiving premium content for seconds, because KV propagation is eventual",
+      "correct": true,
+      "feedback": "Right. Edge KV is built to be read everywhere, not written strongly, so entitlements, balances, and idempotency keys are the wrong data to keep there."
+    },
+    {
+      "label": "The read fails until propagation finishes, so the user sees an error",
+      "feedback": "Eventual consistency serves the old value rather than failing. A stale success is the more dangerous outcome, because nothing signals that anything is wrong."
+    }
+  ]
+}
+\`\`\`
 
 ## The edge data constraint
 
@@ -518,6 +1009,46 @@ USER --> nearest PoP (V8 isolate, <5ms start / WASM <1ms)
 \`\`\`
 
 **Recap:** V8 isolates start in under 5ms and WASM sub-ms, so edge compute delivers global sub-50ms TTFB for lightweight request-path work like routing, auth, and personalization, while heavy compute and strong-consistency data stay at the origin because edge runtimes are CPU/memory/API constrained and edge data is eventually consistent by default.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each piece of work by where it should run.",
+  "buckets": [
+    "Edge PoP",
+    "Origin region"
+  ],
+  "items": [
+    {
+      "label": "Rejecting a request that carries an invalid JWT",
+      "bucket": "Edge PoP",
+      "feedback": "Cheap, on the request path, and it saves a trans-oceanic round trip for traffic you were going to refuse anyway."
+    },
+    {
+      "label": "Assigning a visitor to an A/B bucket and rewriting a header",
+      "bucket": "Edge PoP",
+      "feedback": "Tiny CPU cost, and it personalizes an otherwise cacheable page without waking the origin at all."
+    },
+    {
+      "label": "Debiting an account balance inside a transaction",
+      "bucket": "Origin region",
+      "feedback": "This needs strong consistency, which edge data does not offer unless you pin the object, and then you are paying the write latency anyway."
+    },
+    {
+      "label": "Rendering a report that runs two seconds of CPU",
+      "bucket": "Origin region",
+      "feedback": "Edge runtimes budget tens of milliseconds of CPU per request, so this breaches the limit long before it becomes a latency question."
+    },
+    {
+      "label": "Choosing which regional origin to forward a request to, based on the caller's country",
+      "bucket": "Edge PoP",
+      "feedback": "Routing is the canonical edge job: the point of presence already knows where the caller is, and the decision costs almost no CPU."
+    }
+  ],
+  "reveal": "V8 isolates start in under 5 ms and WASM in under a millisecond, so the edge can do lightweight request-path work next to the user for global sub-50 ms TTFB. What stays at the origin is set by two limits: the edge CPU, memory, and API budget, and the fact that edge data is eventually consistent unless you explicitly pin it to one location."
+}
+\`\`\`
 `.trim()
 
 const platformGitopsTeach = `
@@ -543,6 +1074,29 @@ GitOps is the delivery control plane underneath. The principle: **Git is the sin
                                    apply / self-heal --> cluster
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "At 2am an engineer resolves an incident by editing the live Deployment directly in the cluster. The config repo is untouched. Argo CD is running. What happens next?",
+  "options": [
+    {
+      "label": "The change sticks until somebody remembers to backport it into the repo",
+      "feedback": "That is how it works with no reconciler, and it is the drift that makes environments diverge. Under GitOps, actual state is not the source of truth."
+    },
+    {
+      "label": "The reconciler sees actual state diverge from Git and converges the cluster back to what Git says",
+      "correct": true,
+      "feedback": "Right. Self-healing is the same loop as deployment, so an out-of-band edit gets undone whether it was a mistake, an attack, or a well-meant hotfix."
+    },
+    {
+      "label": "Argo CD adopts the change and commits it back to the repo automatically",
+      "feedback": "Reconciliation runs one way. Nothing writes improvised cluster state back into the repository, which is exactly what keeps the repository a reviewable record."
+    }
+  ]
+}
+\`\`\`
+
 Why Git as the source of truth: you get an audit log of every prod change (who, what, when, reviewed by whom) for free, rollback is \`git revert\`, drift is detected and auto-healed (someone hotfixes the cluster by hand, the reconciler reverts it back to Git), and disaster recovery is "point Argo at the repo and re-sync." Pull-based reconciliation is also more secure than push: no external CI system needs cluster-admin credentials.
 
 ## Guardrails as code
@@ -554,6 +1108,34 @@ Instead of a review board that manually approves each deploy, you encode policy:
 **Interview nuance:** the failure mode to name is the **ticket-queue platform team**. If shipping still means filing a Jira ticket and waiting two days for the platform team to click deploy, you built a bottleneck, not a platform. Platform-as-product means self-service by default; the team's success metric is adoption and lead time, not tickets closed.
 
 **Recap:** an IDP is a product that gives teams self-service golden paths (scaffold, deploy, observe) and abstraction over raw Kubernetes; GitOps makes Git the declarative source of truth with an Argo CD/Flux reconciler for audit, rollback, and self-healing; Backstage catalogs ownership and scorecards; guardrails as code (OPA/Kyverno) and supply-chain controls (SBOM, cosign, SLSA) replace gatekeeping; the anti-pattern is a ticket-queue platform team.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A platform team ships a portal, service templates, and a GitOps pipeline. Six months later, shipping a new service still means filing a ticket and waiting two days for that team to run it. What went wrong?",
+  "options": [
+    {
+      "label": "Nothing structural: two days is a reasonable review time for a production change",
+      "feedback": "Review is not the problem, the queue is. If the paved road runs through another team's backlog, going around it is faster, so people go around it."
+    },
+    {
+      "label": "The platform became a ticket queue, so the bottleneck moved rather than disappeared",
+      "correct": true,
+      "feedback": "Right. Platform as product means self-service by default, and the honest success metrics are adoption and lead time, not tickets closed."
+    },
+    {
+      "label": "They should have skipped the platform and let each team run its own Kubernetes setup",
+      "feedback": "That is the cognitive load the platform exists to remove, and it produces 40 differently broken pipelines. The fix is self-service, not abandonment."
+    },
+    {
+      "label": "GitOps was the wrong control plane; pushing from CI would have been faster",
+      "feedback": "Push-based CI would hand an external system cluster-admin credentials and cost you the audit trail, and it would not touch the human approval queue that is the actual delay."
+    }
+  ],
+  "reveal": "An IDP is a product: golden paths that scaffold, deploy, and observe a service with no ticket, abstraction over the messy layers, and guardrails encoded as admission policy instead of a review board. GitOps underneath makes Git the declarative source of truth, which buys audit, rollback by revert, and self-healing against drift, while SBOMs, cosign signatures, and SLSA provenance let admission verify an image came from your pipeline unmodified."
+}
+\`\`\`
 `.trim()
 
 const iacProgressiveDeliveryTeach = `
@@ -903,9 +1485,64 @@ For a **critical payments service** you want **canary with automated analysis an
 
 **Feature flags decouple deploy from release.** Deploying code and releasing a feature become separate events: ship the code dark behind a flag (LaunchDarkly, Unleash, or a homegrown flag service), then turn it on for 1% of users independent of the deploy. This means you can roll back a *feature* instantly without redeploying, and you can deploy risky code safely because it is inert until flagged on.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your canary is holding at 25 percent when the v2 deploy also runs a migration that drops a column v1 still reads. What happens?",
+  "options": [
+    {
+      "label": "Only the canary pods are affected, since v2 owns the new schema",
+      "feedback": "There is one database behind both versions. A migration changes the world for every pod, not only the ones running the new image."
+    },
+    {
+      "label": "The 75 percent of traffic still served by v1 starts failing immediately",
+      "correct": true,
+      "feedback": "Right. A canary assumes old and new code run at the same time, so a destructive migration breaks the stable version you were keeping as your escape route."
+    },
+    {
+      "label": "The rollout controller notices the schema change and pauses the migration",
+      "feedback": "Rollout controllers watch traffic and metrics, not schemas. Nothing in that pipeline knows a column the old version reads has just gone."
+    },
+    {
+      "label": "Rolling the deployment back restores service, because the old image is still around",
+      "feedback": "Rolling back the image does not bring back a dropped column, which is why the auto-rollback safety net is worth nothing against a destructive migration."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** database migrations are the trap in any progressive rollout. Canary assumes old and new code run simultaneously, so a **destructive migration in one deploy** (drop a column the old version still reads) breaks the stable version mid-canary. Use **expand/contract** (a.k.a. parallel-change): first expand (add the new column, write to both, backfill), deploy code reading the new shape, then in a later deploy contract (drop the old column) once nothing reads it. Migrations must be backward-compatible across at least one version.
 
 **Recap:** IaC (Terraform/OpenTofu) with remote-state locking and shared modules gives environment parity and kills drift; never make manual console changes; promote the same artifact dev to staging to prod; use canary with automated metric analysis and auto-rollback (Argo Rollouts/Flagger) for a payments service, blue-green when versions cannot coexist; feature flags decouple deploy from release; and use expand/contract so a migration never breaks the version still running during a canary.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A release that passed staging fails in prod. Both environments are built from the same Terraform module, and the module has not changed in weeks. What do you suspect first, and what would have caught it?",
+  "options": [
+    {
+      "label": "Someone changed prod by hand in the console, so real state no longer matches the code. A scheduled plan that alerts on any non-empty diff would have caught it",
+      "correct": true,
+      "feedback": "Right. Manual console changes are invisible to the repository and are exactly what makes staging a liar. Running the plan on a schedule turns silent drift into an alert."
+    },
+    {
+      "label": "Prod simply has more traffic, so it needs bigger instances",
+      "feedback": "Sometimes true, but it does not explain a config-shaped failure, and reaching for capacity before checking for drift papers over a difference you still cannot see."
+    },
+    {
+      "label": "The state file is stale, so applying the module again will fix prod",
+      "feedback": "Applying blindly over unknown drift can destroy the thing somebody changed for a reason. Read the diff before you converge it."
+    },
+    {
+      "label": "Staging is missing a test case; add one and redeploy",
+      "feedback": "No test in staging can detect a difference that exists only in prod. Parity is an infrastructure property, not a test-coverage property."
+    }
+  ],
+  "reveal": "IaC with remote state and locking, shared modules, and no manual console changes gives you environment parity and kills drift. Progressive delivery kills the big-bang rollout: canary with automated metric analysis and auto-rollback on a money path, blue-green when two versions cannot coexist, feature flags to separate release from deploy, and expand then contract migrations so the version still serving traffic never loses a column out from under it."
+}
+\`\`\`
 `.trim()
 
 const cloudFinopsTeach = `
@@ -930,6 +1567,29 @@ You cannot optimize what you cannot see. Enforce a **tagging/labeling policy** (
 - **Commitments**: savings plans or reserved instances for your steady-state baseline (the load that is always on), on-demand/spot for the spiky top.
 - **Autoscaling and scale-to-zero**: scale with load, and scale non-prod and bursty services to zero when idle. A dev cluster running 24/7 for a 9-to-5 team is ~70% waste.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Finance asks what the recommendations service costs per month. Your cloud bill itemizes node hours, storage, and data transfer. Can the bill answer the question?",
+  "options": [
+    {
+      "label": "Yes: add up the node hours for the nodes it runs on",
+      "feedback": "Those nodes run a dozen other workloads too. Charging one tenant for the whole node overstates it, and splitting evenly is not much closer to the truth."
+    },
+    {
+      "label": "No: many workloads share every node, so you need per-workload allocation from something like OpenCost or Kubecost",
+      "correct": true,
+      "feedback": "Right. The bill sees instances while you run pods. Allocation tools split node cost by each workload's requests and usage, which only works if labels are consistent."
+    },
+    {
+      "label": "No, and nothing can answer it: Kubernetes cost is fundamentally unattributable",
+      "feedback": "It is opaque by default, not impossible. Consistent team and service labels plus an allocation tool turn it into a solved problem."
+    }
+  ]
+}
+\`\`\`
+
 ## Kubernetes cost is opaque
 
 The cloud bill shows you *nodes* (EC2 instances), but you run *many apps per node*, so the bill cannot tell you that the recommendations service costs $8k/mo while payments costs $2k/mo. You fix visibility with **OpenCost or Kubecost**, which allocate node cost down to namespace/pod/label using each workload's requests and actual usage. That only works if workloads are **consistently labeled** (team, service), which loops back to Inform. Then you find the real K8s waste: **over-requested resources** (a pod requesting 4 CPU and using 0.3 pins capacity nobody uses) and **low bin-packing** (nodes half-empty because requests are inflated). Rightsize requests to P90/P95 usage and let the cluster autoscaler consolidate.
@@ -941,6 +1601,34 @@ The cloud bill shows you *nodes* (EC2 instances), but you run *many apps per nod
 **Interview nuance:** never cut cost by cutting reliability blindly. Deleting a standby replica or a multi-AZ setup saves money until the outage costs 10x the savings. Frame every cut as "reduce waste (idle, over-provisioned, untiered) while preserving the reliability the SLO requires."
 
 **Recap:** run FinOps as Inform (tag/allocate) -> Optimize (rightsize to P90/P95, spot for fault-tolerant work, commitments for baseline, scale-to-zero) -> Operate (budgets, anomaly detection); fix opaque Kubernetes cost with OpenCost/Kubecost plus consistent labels and rightsized requests; and do not ignore egress/inter-AZ transfer, storage tiering, warehouse scans, and GPU spend.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You are asked to cut cloud spend by 30 percent this quarter. Which move is the wrong one to lead with?",
+  "options": [
+    {
+      "label": "Rightsize instances and pod requests to P90 or P95 observed usage",
+      "feedback": "This is the safest large lever: you are reclaiming capacity nobody used, and the percentile protects you from sizing to one freak spike."
+    },
+    {
+      "label": "Drop the multi-AZ standby for the primary database",
+      "correct": true,
+      "feedback": "Right, this is the wrong lead. It trades a reliability guarantee you promised for a modest saving, and a single outage costs many times what it saved."
+    },
+    {
+      "label": "Move fault-tolerant batch jobs and CI onto spot capacity",
+      "feedback": "Work that can checkpoint and retry is exactly what spot is for, at 60 to 90 percent off, and no reliability promise is broken."
+    },
+    {
+      "label": "Scale non-production environments to zero outside working hours",
+      "feedback": "A dev cluster running around the clock for a team that works eight hours is mostly waste, and nothing user-facing depends on it."
+    }
+  ],
+  "reveal": "FinOps runs as a loop: Inform by tagging so the bill maps to owners, Optimize by rightsizing to P90 or P95, spot for fault-tolerant work, commitments for the steady baseline and scale to zero for idle, then Operate with budgets, anomaly detection, and accountability. Kubernetes cost needs OpenCost or Kubecost plus consistent labels, and the levers people forget are inter-AZ and internet egress, storage tiering, unpartitioned warehouse scans, and idle GPUs. Cut waste, never the reliability the SLO requires."
+}
+\`\`\`
 `.trim()
 
 const oltpVsOlapTeach = `
@@ -970,9 +1658,77 @@ A single \`GROUP BY\` scan over the orders table evicts your hot rows from the b
 
 Three patterns. **ETL** (extract, transform, then load) transforms before loading, classic for warehouses. **ELT** (load raw, transform in the warehouse) is now dominant because warehouse compute is cheap and elastic. **CDC/streaming** tails the OLTP write-ahead log and streams changes continuously. The axis is freshness vs simplicity: a nightly batch load is simple and fine for finance reporting; a real-time dashboard needs CDC or streaming and more moving parts.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Dashboards were hammering the OLTP primary, so the team pointed them at a Postgres read replica instead. What is now true?",
+  "options": [
+    {
+      "label": "Solved: the replica is a separate machine, so analytics and transactions no longer interfere",
+      "feedback": "The primary really is protected from the contention, which is genuine progress. But the query itself did not improve, and the replica is not free capacity either."
+    },
+    {
+      "label": "The primary is protected, but the replica is still a row store, so column aggregations remain slow and expensive",
+      "correct": true,
+      "feedback": "Right. A replica changes which machine runs the scan, not the physical layout being scanned. A read replica is not an analytics store."
+    },
+    {
+      "label": "It is strictly worse, because replication lag makes every dashboard number wrong",
+      "feedback": "Seconds of lag is usually fine for a dashboard. The real cost is the layout: reading 40 columns off disk in order to aggregate one of them."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** a read replica is not an analytics store. A Postgres replica is still a row store with OLTP layout; pointing dashboards at it isolates the primary from lock contention but still runs column-scan queries on a row engine, which is slow and steals replica resources. Use a replica for read scaling of OLTP-shaped queries, and a real column store for analytics.
 
 **Recap:** OLTP is row-store, normalized, small high-concurrency transactions (Postgres/DynamoDB); OLAP is column-store, denormalized star schema, huge scans with compression and vectorized execution (Snowflake/BigQuery/ClickHouse); never analyze on the OLTP primary because scans destroy transactional latency; move data via ETL, ELT, or CDC trading freshness for simplicity.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Sort each property by the engine it describes.",
+  "buckets": [
+    "OLTP row store",
+    "OLAP column store"
+  ],
+  "items": [
+    {
+      "label": "Normalized schema to avoid update anomalies",
+      "bucket": "OLTP row store",
+      "feedback": "Writes are the hot path, so you normalize to keep each fact in exactly one place."
+    },
+    {
+      "label": "Denormalized star schema of facts and dimensions",
+      "bucket": "OLAP column store",
+      "feedback": "Joins are the expensive part of a huge scan, so the model is flattened deliberately to do fewer of them."
+    },
+    {
+      "label": "Thousands of concurrent small transactions by primary key",
+      "bucket": "OLTP row store",
+      "feedback": "Many small point operations under strong isolation is the transactional access pattern."
+    },
+    {
+      "label": "Data compresses 5x to 20x because each stored run holds one type",
+      "bucket": "OLAP column store",
+      "feedback": "Storing a column contiguously is what makes run-length and dictionary encoding effective, and that compression is what cuts the I/O for a scan."
+    },
+    {
+      "label": "Vectorized execution over batches of values",
+      "bucket": "OLAP column store",
+      "feedback": "Processing a batch of values per instruction only pays off when the values you need are already adjacent in memory."
+    },
+    {
+      "label": "Fetching one whole record is a single page read",
+      "bucket": "OLTP row store",
+      "feedback": "Contiguous rows are the entire point of the layout: one read gets the whole record."
+    }
+  ],
+  "reveal": "Two workloads that want opposite physical layouts. Keep them on separate engines, never run analytics on the transactional primary, and remember that a read replica moves the scan without changing the layout it scans. Move data across with ETL, ELT, or CDC, trading freshness against operational complexity."
+}
+\`\`\`
 `.trim()
 
 const warehouseLakeLakehouseTeach = `
@@ -1006,9 +1762,60 @@ Each layer has an owner and a contract; downstream consumers read gold, data eng
 
 The enabler underneath all of this. In old Redshift/on-prem warehouses, storage and compute were coupled on the same nodes, so to store more you paid for more compute and vice versa, and one workload starved another. In the lake/lakehouse (and modern Snowflake/BigQuery) storage is object storage and compute is separate, elastic clusters. That means you scale them independently (cheap to store 50TB, spin up compute only when querying), run **multiple engines on one copy** (Spark for ML, Trino for interactive SQL, Flink for streaming, all reading the same Iceberg tables), and give each team its own compute so they do not contend.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A team writes Parquet files into S3 and calls the result a lakehouse. What do they not actually have yet?",
+  "options": [
+    {
+      "label": "Cheap storage that accepts any format",
+      "feedback": "That half they do have. Object storage plus an open columnar format is the lake economics, and it really is 10x to 50x cheaper per TB than warehouse storage."
+    },
+    {
+      "label": "ACID commits, schema evolution, and time travel, which come from the table format and catalog",
+      "correct": true,
+      "feedback": "Right. Those guarantees live in the metadata layer, not in the files. Without Iceberg, Delta, or Hudi plus a catalog, it is a lake with good intentions."
+    },
+    {
+      "label": "Columnar compression and predicate pushdown",
+      "feedback": "Parquet already gives them both, which is why the missing half is so easy to overlook: queries feel fast right up until two writers collide or a column is renamed."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** "lakehouse" without a catalog and table format is just a lake with good intentions. The ACID, schema evolution, and time travel come specifically from the table format plus a catalog, not from putting Parquet on S3. If someone says "lakehouse" ask what table format and catalog, that is where the substance is.
 
 **Recap:** warehouse is schema-on-write, curated, strong BI/governance, pricey for raw data; lake is schema-on-read, cheap object storage, risks becoming a swamp; lakehouse gets lake economics plus warehouse features via open table formats and a catalog; use the medallion (bronze/silver/gold) pattern for governed refinement; separating storage and compute lets you scale independently and run many engines on one copy.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You hold 50 TB of raw clickstream and application logs. The BI team wants governed dashboards and the ML team wants the raw data. Which stack fits, and why?",
+  "options": [
+    {
+      "label": "Load everything into a warehouse, since governance and BI performance are the stated requirements",
+      "feedback": "The BI half fits, but warehouse storage prices raw logs and semi-structured data badly, and the ML team loses access to the unmodeled data it needs."
+    },
+    {
+      "label": "A lakehouse: object storage with an open table format and a catalog, refined bronze to silver to gold",
+      "correct": true,
+      "feedback": "Right. One cheap copy of the raw data, ACID and schema enforcement from the table format, and the medallion layers carrying the governance BI needs."
+    },
+    {
+      "label": "A plain data lake, since object storage is cheapest and both teams can read files",
+      "feedback": "Cheapest today, a swamp within a year. With no catalog, no schema enforcement, and no ownership, nobody can find or trust the data and BI has nothing governed to build on."
+    },
+    {
+      "label": "Both a lake and a warehouse, with a nightly copy from one into the other",
+      "feedback": "This is a common real-world answer and it is defensible, but you now pay for two copies and maintain the sync between them, which is precisely the cost the lakehouse pattern removes."
+    }
+  ],
+  "reveal": "Warehouse is schema on write: curated, strong BI and governance, expensive for raw data. Lake is schema on read: cheap and format-agnostic, and a swamp without governance. Lakehouse buys lake economics plus warehouse guarantees through an open table format and a catalog, refined through bronze, silver, and gold layers, and separating storage from compute is what lets Spark, Trino, and Flink all read one copy without contending."
+}
+\`\`\`
 `.trim()
 
 const tableFormatsCdcTeach = `
@@ -1029,6 +1836,29 @@ Parquet is a great columnar file format, but a directory of Parquet files on S3 
 
 **Iceberg** is the open standard with the broadest engine support (Spark, Trino, Flink, Snowflake, BigQuery), the right default for a multi-engine lakehouse. **Delta Lake** is Spark/Databricks-native and excellent inside that ecosystem. **Hudi** was built for CDC and record-level upserts/deletes with primary keys, strong when your workload is heavy mutation. **Paimon** targets unified streaming plus batch with a Flink lineage. A **catalog** (Iceberg REST catalog, Polaris, AWS Glue, Databricks Unity) holds the table metadata and enables governance and cross-engine access; the catalog is what lets Spark and Trino agree on what a table is.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A job keeps a search index in sync with Postgres by running a query every minute for rows whose 'updated_at' is newer than the last run. A row is deleted from Postgres. What does the search index show tomorrow?",
+  "options": [
+    {
+      "label": "The row is gone, because the next poll will not return it",
+      "feedback": "The poll returns only rows that exist. A row that is gone produces no result at all, so the job has no way to learn that it should remove anything."
+    },
+    {
+      "label": "The row is still there, because a deleted row cannot appear in a query for changed rows",
+      "correct": true,
+      "feedback": "Right. Query-based polling structurally cannot see deletes, which is one of the two reasons it loses to reading the replication log."
+    },
+    {
+      "label": "The row is still there until the next full reindex, which is the standard fix",
+      "feedback": "A periodic full reindex does paper over it, at the cost of hammering the database on a schedule. That is a workaround for a mechanism that was the wrong choice."
+    }
+  ]
+}
+\`\`\`
+
 ## Log-based CDC
 
 You want every insert/update/delete in Postgres to flow to analytics and a search index in near-real-time. The right mechanism is **log-based CDC**: **Debezium** reads the database's replication log (Postgres WAL, MySQL binlog) and emits a change event per row mutation. Log-based beats the alternatives: query-based polling (\`WHERE updated_at > x\`) misses deletes and hard-hits the DB, and trigger-based CDC adds write-path latency. Reading the log is low impact and captures every change including deletes, in commit order.
@@ -1036,6 +1866,29 @@ You want every insert/update/delete in Postgres to flow to analytics and a searc
 ## The dual-write problem and the outbox
 
 The trap: your service writes to Postgres and then also writes to Kafka (or directly to the search index). These are two systems with no shared transaction, so a crash between them leaves you inconsistent forever: the order is in the DB but the event never published, or published but the DB rolled back. You cannot fix this with retries because you do not know which write succeeded.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Your service commits the order to Postgres and then publishes an OrderPlaced event to Kafka. It crashes between the two. Can a retry on restart repair the inconsistency?",
+  "options": [
+    {
+      "label": "Yes: republish the event on startup, since the order is sitting in the database",
+      "feedback": "You would have to know that this particular order never got its event. The crash took that knowledge with it, and republishing everything duplicates instead."
+    },
+    {
+      "label": "No: there is no shared transaction, so you cannot tell which of the two writes landed",
+      "correct": true,
+      "feedback": "Right, that is the dual-write problem. Two systems, no atomicity, and no reliable record of how far you got, so the fix has to make the two writes one commit."
+    },
+    {
+      "label": "No, but a two-phase commit across Postgres and Kafka would solve it cleanly",
+      "feedback": "Distributed 2PC across heterogeneous systems is what this pattern exists to avoid: it blocks when the coordinator fails, and neither system is happy hosting it."
+    }
+  ]
+}
+\`\`\`
 
 The fix is the **transactional outbox**: within the same DB transaction that writes the order, insert a row into an \`outbox\` table. The business write and the event are now atomic (one transaction). CDC then tails the WAL, sees the outbox insert, and publishes it to Kafka. There is exactly one source of truth (the DB log) and no distributed transaction.
 
@@ -1053,6 +1906,34 @@ Because delivery is **at-least-once** (a connector can replay after a crash), do
 **Interview nuance:** the outbox does not give you exactly-once end-to-end, it gives you at-least-once with an atomic source write, and you achieve effective exactly-once by making consumers idempotent. Claiming true exactly-once across DB, Kafka, and a search index without idempotency is the tell of someone who has not run this in production.
 
 **Recap:** table formats (Iceberg/Delta/Hudi/Paimon) add ACID, schema/partition evolution, time travel, and hidden partitioning over Parquet, coordinated by a catalog; pick Iceberg for multi-engine, Hudi for upsert-heavy CDC; use log-based CDC (Debezium on the WAL/binlog) plus a transactional outbox to avoid the dual-write problem; delivery is at-least-once so make consumers idempotent for effective exactly-once.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "With a transactional outbox plus Debezium in front of Kafka, how would you describe the delivery guarantee end to end?",
+  "options": [
+    {
+      "label": "Exactly-once, because the outbox row and the business row commit together",
+      "feedback": "The atomic source write is only half of the story. The connector can replay after a crash, so the same event can reach a consumer more than once."
+    },
+    {
+      "label": "At-least-once with an atomic source write, made effectively exactly-once by idempotent consumers",
+      "correct": true,
+      "feedback": "Right. The outbox removes the dual write and idempotency removes the duplicate. Upsert by primary key into the search index and the table format, and a replay changes nothing."
+    },
+    {
+      "label": "At-most-once, since a crashed connector may skip events",
+      "feedback": "The log is durable and the connector tracks its position, so it resumes rather than skipping. The risk here is repetition, not loss."
+    },
+    {
+      "label": "Exactly-once, as long as Kafka transactions are enabled on the producer",
+      "feedback": "Kafka transactions help within Kafka, but the search index and the lake table sit outside that boundary, so the last hop still has to be idempotent."
+    }
+  ],
+  "reveal": "Table formats turn a directory of Parquet into a table: ACID through an atomic metadata swap, schema and partition evolution, time travel, and hidden partitioning, coordinated by a catalog so several engines agree on what a table is. Log-based CDC on the WAL or binlog captures every change including deletes, in commit order, at low cost. The outbox makes the business write and the event one transaction, and idempotent consumers turn at-least-once delivery into an effectively exactly-once result."
+}
+\`\`\`
 `.trim()
 
 const batchStreamingTeach = `
@@ -1067,6 +1948,33 @@ A throughput-versus-latency tradeoff. **Batch** processes a bounded chunk (yeste
 ## Lambda architecture
 
 The first mainstream answer to "I need both fast and correct." It runs **two parallel layers**: a **batch layer** that reprocesses all history nightly to produce accurate, complete results, and a **speed layer** that processes the live stream for low-latency approximate results, with a serving layer merging the two so recent data comes from the speed layer and older data from the batch layer. It works and is self-correcting (the batch layer eventually overwrites any speed-layer approximation). The cost is brutal: you implement the **same business logic twice**, once in a batch engine and once in a streaming engine, in different code, and they drift. Every metric change is two implementations to keep in sync.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Lambda architecture genuinely delivers both fast and accurate results. Which cost accumulates on you over the years?",
+  "options": [
+    {
+      "label": "The same business logic is implemented twice, in two engines, and the two copies drift apart",
+      "correct": true,
+      "feedback": "Right. Every change to a metric definition is two changes in two codebases, and on the day the two numbers disagree nobody can say which one is correct."
+    },
+    {
+      "label": "The speed layer's approximate results stay permanently wrong",
+      "feedback": "The design is self-correcting on exactly that point: the batch layer reprocesses history and overwrites whatever the speed layer approximated."
+    },
+    {
+      "label": "The batch layer cannot handle late-arriving data",
+      "feedback": "Batch handles late data best of all, because it recomputes over a bounded chunk once everything has landed. That is why it is the accurate half."
+    },
+    {
+      "label": "You must retain the full event log forever, and that storage dominates the bill",
+      "feedback": "Long log retention is the price of the alternative, Kappa, which replays that log to recompute. It is not what makes Lambda expensive."
+    }
+  ]
+}
+\`\`\`
 
 ## Kappa architecture
 
@@ -1118,9 +2026,60 @@ The reaction: delete the batch layer. There is **one streaming path**, and the d
 
 The modern move that makes Kappa practical for reporting too: **Flink writes the stream directly into Iceberg** tables (exactly-once). Now the live stream powers the real-time signal, and the same Iceberg tables it lands in are queried by batch SQL (Trino, Spark) for nightly reports. One pipeline feeds both the real-time consumer and the reporting consumer, so you no longer maintain a separate batch path at all.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "The product needs a live fraud signal within seconds and a nightly finance report over the same events. Does that force two pipelines?",
+  "options": [
+    {
+      "label": "Yes: real-time and reporting are different workloads, so they need a stream job and a batch job",
+      "feedback": "They are different consumers, which is not the same as different pipelines. Assuming they must be separate is how teams end up in Lambda by default."
+    },
+    {
+      "label": "No: one streaming job can write into lake tables that batch SQL then queries for the report",
+      "correct": true,
+      "feedback": "Right. Flink writing exactly-once into Iceberg gives the live consumer its signal and leaves the reporting consumer an ordinary table to query, from one codebase."
+    },
+    {
+      "label": "No: run the nightly report by replaying the entire log through the stream job each night",
+      "feedback": "Replay is the recompute tool for a bug fix or a new metric, not a nightly routine. Reprocessing all history every night is far more work than querying a table."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** do not reflexively say "Lambda" because you need both real-time and batch outputs. State the condition: Lambda is justified only when the batch engine can express something the stream cannot, or when you need a periodic full-reprocessing guarantee the stream cannot give cheaply. Otherwise Kappa plus log replay plus streaming-into-lakehouse gives you both outputs from one codebase, and that is the stronger default answer.
 
 **Recap:** batch is high-throughput/high-latency and simple, streaming is low-latency/continuous and correctness-hard; Lambda runs parallel batch and speed layers (accurate but two codebases that drift), Kappa runs one streaming path and replays the retained log to recompute; window by event-time with watermarks to handle late/out-of-order data trading latency for completeness; choose exactly-once where counts must be exact; and Flink-into-Iceberg collapses real-time and reporting into one pipeline.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You are designing a fraud-scoring pipeline whose counts feed a chargeback dispute process. Which delivery guarantee do you commit to, and why?",
+  "options": [
+    {
+      "label": "At-least-once, because it is simpler and duplicates are rare",
+      "feedback": "Rare duplicates still inflate a number somebody has to defend in a dispute. At-least-once is right for a rough traffic dashboard, not for a figure with money attached."
+    },
+    {
+      "label": "Exactly-once, through engine checkpointing coordinated with transactional or idempotent sinks",
+      "correct": true,
+      "feedback": "Right. Flink gets there with distributed checkpoints plus two-phase-commit sinks, and you accept the checkpoint overhead because the count has to be auditable."
+    },
+    {
+      "label": "At-most-once, since undercounting is safer than overcounting in fraud",
+      "feedback": "Silently dropping events loses the fraud you were paid to catch, and it is not a guarantee anyone can audit back against the source."
+    },
+    {
+      "label": "It does not matter, because windowing by event time already makes the counts exact",
+      "feedback": "Event-time windows put each event in the right bucket. They do nothing to stop the same event being counted in that bucket twice."
+    }
+  ],
+  "reveal": "Batch is high throughput and simple because the data is already complete; streaming is low latency and correctness-hard because data arrives late and out of order. Lambda buys both with two codebases that drift, so Kappa is the default: one streaming path over a retained log you replay to recompute. Window by event time with watermarks and an explicit lateness bound, choose exactly-once wherever the number must be exact, and land the stream in lake tables so reporting and real time come out of one pipeline."
+}
+\`\`\`
 `.trim()
 
 export const systemDesignLevel9: DesignLevel = {
