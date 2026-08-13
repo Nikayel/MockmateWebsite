@@ -2434,6 +2434,33 @@ An event stream outlives every version of every service that touches it. A Kafka
 
 The tool that makes this safe is a **schema registry** (Confluent Schema Registry, Karapace, AWS Glue). Producers register the schema; the registry assigns a numeric schema ID and, critically, rejects any new version that violates the topic's configured compatibility rule before the producer is allowed to publish. On the wire the message carries the compact binary payload plus the schema ID (a few bytes), not the full schema, so you get self-describing evolution without paying to embed the schema on every record. Consumers fetch the writer schema by ID and reconcile it against their own reader schema. Avro, Protobuf, and JSON Schema all support this; Avro's explicit writer-plus-reader resolution is the classic model, Protobuf leans on field numbers and reserved tags.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A topic is configured for backward compatibility, which means a new schema can read data written by the old one. You want to drop a field your consumers no longer read. Which side deploys first?",
+  "options": [
+    {
+      "label": "Consumers first, then producers",
+      "correct": true,
+      "feedback": "Right. Backward compatibility guarantees the new reader can read old bytes, so a consumer already on the new schema handles both the records that still carry the field and the ones that soon will not. Producers move second."
+    },
+    {
+      "label": "Producers first, then consumers",
+      "feedback": "That is the order forward compatibility buys you. Ship the producer first here and old consumers start receiving records missing a field their schema still expects, which is the break this mode never promised to prevent."
+    },
+    {
+      "label": "Either order, because the registry would have rejected the schema if it were unsafe",
+      "feedback": "The registry checks the new version against the rule when the schema is registered, which is on first produce; it cannot upgrade a running consumer. The mode tells you the safe order, it does not remove the need for one."
+    },
+    {
+      "label": "Neither, because deleting a field is never legal under any mode",
+      "feedback": "Deleting a field is exactly what backward compatibility allows: a new reader that no longer declares it simply ignores it in old bytes. That is why the deploy order matters here. The change that breaks both directions at once is a rename with no default on the new field, since that is a delete and an add shipped together."
+    }
+  ]
+}
+\`\`\`
+
 ## Compatibility modes are the heart of the interview
 
 - **Backward** (the common default): new schema can read old data. You may add a field with a default and delete an optional field. Consumers upgrade first, then producers.
@@ -2451,12 +2478,67 @@ You do not mutate in place. Three options: **upcasting** (a transform step that 
 **Interview nuance:** the wrong turn is treating event schemas like internal database columns you can \`ALTER\` freely. Downstream teams you have never met are parsing your bytes. The senior move is to name the compatibility mode, show that it fixes deploy order, and reach for a new topic (not a mutation) when a break is unavoidable.
 
 **Recap:** an event schema is a versioned public contract enforced at produce time by a registry; evolve additively with defaults under a stated compatibility mode, and make true breaks with upcasting, tolerant readers, or a new topic, never an in-place mutation.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "An event type must change 'amount' from a string to an integer, a change no default can smooth over. The topic is on full compatibility and four teams you have never met consume it. What is the senior move?",
+  "options": [
+    {
+      "label": "Publish a new topic such as 'orders.v2', run v1 and v2 together until every consumer has migrated, then retire v1",
+      "correct": true,
+      "feedback": "Right. A true break cannot be made additive, so you version the contract itself and let each consumer migrate on its own schedule instead of forcing four teams into one synchronized cutover."
+    },
+    {
+      "label": "Register the new schema and coordinate a simultaneous deploy of every producer and consumer",
+      "feedback": "Under full compatibility the registry rejects the version when it is registered on first produce, and even with the rule loosened, a synchronized cutover across teams you do not control is exactly the failure mode versioning exists to avoid."
+    },
+    {
+      "label": "Add 'amount_int' alongside the old field and delete 'amount' in the same release",
+      "feedback": "The add is fine and is how a real migration starts. The delete is the trap: under full compatibility the registry blocks it outright, and even with the rule loosened it is the half that strands old readers still asking for the original field. Ship the add, migrate every reader, then delete in a later release."
+    },
+    {
+      "label": "Treat the topic like a table and alter the field type in place",
+      "feedback": "There is no in-place mutation of bytes already written to the log, and last month's records keep their old shape for the whole retention window. That instinct comes from owning a private database column, not a public contract."
+    }
+  ],
+  "reveal": "Three ideas meet here. The registry enforces the compatibility mode at produce time, additive change with defaults is the only evolution that needs no cross-team coordination, and when a change cannot be made additive the contract itself gets a version. Bytes already on the log never change shape, so every plan has to keep working for readers of last month's records."
+}
+\`\`\`
 `.trim()
 
 const streamingObservabilityTeach = `
 ## Two promises: no acknowledged loss, and no silent failure
 
 Operating a messaging tier comes down to two promises: an acknowledged message is never lost, and when something silently breaks you find out from a signal rather than from an angry downstream. Both have concrete, defensible settings.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A payments team ships an async pipeline. Producers get their acknowledgements, no service is throwing errors, dashboards are green, and every service's own latency panel looks normal. Eleven hours later a customer reports that yesterday's settlements never posted. What was almost certainly missing?",
+  "options": [
+    {
+      "label": "Consumer lag as a monitored signal, with an SLO on it",
+      "correct": true,
+      "feedback": "Right. Lag is the gap between the latest offset and the committed offset, and it is the one number that catches a consumer that has stopped keeping up. Nothing else in that list would have gone red: the producer really was acknowledged, and each service really was fast, because a stalled consumer is not slow, it is absent."
+    },
+    {
+      "label": "More replicas, since the records were clearly lost",
+      "feedback": "Nothing was lost here. The records are sitting in the log exactly as written. Replication protects an acknowledged write from a broker dying, and it has no opinion about whether anyone read it."
+    },
+    {
+      "label": "A higher acknowledgement level on the producer",
+      "feedback": "That is the durability promise, and the symptom says durability held: the producer got its ack and the data survived. The failure is on the consuming side of the hop, which acks cannot see."
+    },
+    {
+      "label": "Per-service latency alerting, tightened",
+      "feedback": "Per-service panels are exactly what made this invisible. Each service was fast at what it did; the time was spent waiting in a queue between them, which no single service's latency panel measures. That is why the end-to-end signal has to span the async hop."
+    }
+  ]
+}
+\`\`\`
 
 ## No acknowledged-write loss
 
@@ -2481,6 +2563,34 @@ Two formulas earn the offer. Partitions come from throughput: \`partitions ~= ta
 **Interview nuance:** the wrong turn is claiming durability from replication alone while leaving \`acks=1\` or unclean election on, or having no lag metric and no trace across the async boundary so failures are invisible. Name the three durability knobs together, name lag as the SLO, and show the two capacity formulas.
 
 **Recap:** prevent acknowledged loss with rack-aware RF3 plus \`acks=all\` plus \`min.insync.replicas=2\` and clean leader election; make consumer lag the primary SLO alongside under-replicated partitions, DLQ depth, and end-to-end tracing; size partitions from throughput and storage from rate times size times retention times replication.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You inherit a Kafka tier: replication factor 3 across three zones, 'acks=all', 'min.insync.replicas=2', unclean leader election disabled, 7 day retention. Broker CPU and disk alarms are the only monitors. Which gap do you close first?",
+  "options": [
+    {
+      "label": "Consumer lag per partition, because nothing on this list would notice a consumer group that stopped advancing",
+      "correct": true,
+      "feedback": "Right. The durability side is already configured correctly, so the live risk is the second promise: producers keep collecting acks while a consumer group stalls, and lag is the one number that catches it and turns into an SLO."
+    },
+    {
+      "label": "Raise replication factor to 5, since three copies is thin for a 7 day window",
+      "feedback": "Replication factor 3 with 'min.insync.replicas=2' already survives losing a full zone, and raising it multiplies the term that already dominates the disk bill, since storage is rate times size times retention times replication."
+    },
+    {
+      "label": "Enable unclean leader election so a partition never goes unavailable",
+      "feedback": "That trades away the durability the other three settings just bought. An out-of-sync replica promoted to leader discards acknowledged records, which is the wrong trade whenever the data is money or orders."
+    },
+    {
+      "label": "Nothing: 'acks=all' with replication factor 3 already makes the pipeline observable",
+      "feedback": "Those settings make writes durable, not visible. Durability and observability are separate promises, and nothing in this configuration reports whether any consumer ever read the record."
+    }
+  ],
+  "reveal": "The two promises are independent and each has its own knobs. No acknowledged loss comes from rack-aware replication factor 3 plus 'acks=all' plus 'min.insync.replicas=2' plus clean leader election. No silent failure comes from consumer lag as the primary SLO, alongside under-replicated partitions, dead letter queue depth, and a trace that spans the async hop. Capacity sits under both: partitions from throughput, storage from rate times size times retention times replication."
+}
+\`\`\`
 `.trim()
 
 export const systemDesignLevel6: DesignLevel = {
