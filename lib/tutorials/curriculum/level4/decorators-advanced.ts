@@ -2,6 +2,21 @@
 // L4-M2: Decorators & Metaprogramming
 // ───────────────────────────────────────────────────────────────────────────
 
+/**
+ * L4: decorator factories, closures and functools.wraps.
+ *
+ * Difficulty is deliberately untouched. The council measured this practice at 28 reference lines
+ * against a 13-line Apply, a 2.2x ratio and the healthiest in the level, with two depth levers.
+ * The one defect was closure: the practice requires the decorated function to publish a `.stats`
+ * dict and no fence had ever shown a decorator hanging state off its wrapper. Teach now
+ * demonstrates that, including why the container is mutable and why it is built in the decorator
+ * rather than in the wrapper. What the counter counts, and when a retry increments it, stays the
+ * learner's problem.
+ *
+ * Time budget (counted, not guessed). Teach 6: ~850 prose words, three checks, six fences.
+ * Apply 10: 16 provided lines to read, 13 to write. Practice 39: 55 lines of README, 28 to write,
+ * and the three-layer lifetime question that carries it. 6 + 10 + 39 = 55, the lesson total.
+ */
 import type { PythonLesson } from "../../types"
 import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
@@ -538,6 +553,36 @@ print(add.__name__)   # 'wrapper'  (wrong: this corrupts logs, help(), and trace
 
 \`@functools.wraps(fn)\` copies \`fn\`'s \`__name__\`, \`__qualname__\`, \`__doc__\`, and \`__module__\` onto \`wrapper\`, updates \`wrapper.__dict__\`, and sets \`wrapper.__wrapped__ = fn\` so introspection tools can still find the original. With it in place, the demo below prints \`add\`, which is exactly what the second \`print\` verifies. Add \`functools.wraps\` to every real decorator you write.
 
+### Hanging state off the wrapper
+
+The wrapper is a function object, and functions take attributes like anything else. That is how a decorator publishes what it observed: the caller keeps calling the decorated name as usual, and reads the bookkeeping off the same object.
+
+\`\`\`python
+import functools
+
+def counted(fn):
+    counter = {"calls": 0}          # created once, when the decorator runs
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        counter["calls"] += 1       # the closure reads the same dict every call
+        return fn(*args, **kwargs)
+
+    wrapper.counter = counter       # hand the same object out under a name
+    return wrapper
+
+@counted
+def greet(name):
+    return "hi " + name
+
+greet("ada")
+greet("bob")
+print(greet.counter)     # {'calls': 2}
+print(greet.__name__)    # greet, because of wraps
+\`\`\`
+
+Two details decide whether this works. The state is created in the decorator, not in the wrapper, so it survives between calls and each decorated function gets its own. And it is a mutable container rather than a bare \`count = 0\`: the wrapper only *reads* names from the enclosing scope, so \`count += 1\` inside it would raise \`UnboundLocalError\` unless you reach for \`nonlocal\`. Mutating a dict sidesteps that, and it means the object you exposed as \`wrapper.counter\` and the object the wrapper updates are the same object rather than two that drift apart.
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -630,6 +675,7 @@ print(add.__name__)   # add`,
   },
   apply: {
     id: "py-l4-decorators-advanced-apply",
+    estimatedMinutes: 10,
     executionMode: "single-file",
     prompt: `Warm-up (one file): implement \`multiply_by(factor)\`, a decorator factory that multiplies a
 function's result by \`factor\`. It's applied to \`add\` below, and the \`run\` driver calls it.
@@ -687,6 +733,7 @@ def run(a, b):
   },
   practice: {
     id: "py-l4-decorators-advanced-practice",
+    estimatedMinutes: 39,
     executionMode: "workspace",
     prompt: `Repair the nightly ingest, which currently fails a whole run on one feed blip and, when
 retries were bolted on last week, kept retrying records that can never succeed.
