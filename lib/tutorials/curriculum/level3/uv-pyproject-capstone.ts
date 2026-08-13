@@ -84,7 +84,8 @@ the problem. Otherwise it returns:
 {"files": 2, "entries": 4, "skipped": ["mon.log:3"], "totals": {"alice": 75, "bob": 30}}
 \`\`\`
 
-\`totals\` sums each worker's minutes across every file.`,
+\`totals\` sums each worker's minutes across every file. A directory with no log files in it is a
+perfectly good directory: it reports zero files, zero entries, nothing skipped, and no totals.`,
 })
 
 const CAP_PYPROJECT_STARTER = String.raw`[project]
@@ -462,7 +463,8 @@ export const uvPyprojectCapstoneLesson: PythonLesson = {
   difficulty: "hard",
   skills: ["pyproject", "uv", "packaging", "capstone"],
   teach: {
-    estimatedMinutes: 6,
+    // 8 min: the folder-reading section adds three worked fences to the original six.
+    estimatedMinutes: 8,
     markdown: `## Why one file and one lockfile
 
 A project that only runs on your laptop is a liability. The moment a teammate clones it, CI builds it, or you deploy it, "works on my machine" has to become "installs the same way everywhere." \`pyproject.toml\` plus a lockfile is how modern Python gets there. One file declares what the project is and what it needs, and the lockfile pins the exact versions that got resolved, so every install is byte-for-byte identical.
@@ -564,6 +566,48 @@ The mental model is two tiers. \`pyproject.toml\` declares intent as version ran
 }
 \`\`\`
 
+### Reading a folder of text files
+
+The capstone's tool reads plain text off disk, so here is the whole of that machinery in one place. \`glob\` lists the entries of one directory that match a filename pattern, and it stops there: nothing in a subfolder comes back. \`is_dir()\` answers whether a path is a directory at all, which is how a command refuses a caller who handed it a file.
+
+\`\`\`python
+from pathlib import Path
+
+folder = Path("receipts")
+print(folder.is_dir())                  # True
+
+for path in sorted(folder.glob("*.txt")):
+    print(path.name)
+# march.txt
+# may.txt
+\`\`\`
+
+\`glob\` yields paths in filesystem order, so \`sorted\` is what makes the run repeatable. \`read_text()\` then hands you one file as a single string, and \`splitlines()\` cuts it into lines with the newlines dropped:
+
+\`\`\`python
+text = Path("receipts/march.txt").read_text()
+
+for number, line in enumerate(text.splitlines(), start=1):
+    print(number, repr(line))
+# 1 'alice: 45'
+# 2 '# machines down'
+# 3 'bob:30'
+\`\`\`
+
+\`enumerate(..., start=1)\` is worth the habit: humans and editors number the first line 1, so a report that says "line 0" sends someone hunting.
+
+Finally, checking that a piece of text is a whole number is \`str.isdigit()\`, and its strictness is the point:
+
+\`\`\`python
+print("45".isdigit())    # True
+print("4.5".isdigit())   # False
+print("-5".isdigit())    # False
+print(" 45".isdigit())   # False, so strip the text first
+print("".isdigit())      # False
+\`\`\`
+
+One call rejects fractions, negatives and empty text, which is why it beats a \`try: int(x)\` when "whole minutes" is the actual rule. Note the fourth line: surrounding spaces make it \`False\`, so strip before you ask.
+
 ### The reporting function
 
 \`summary(tasks)\` is the kind of function a CLI or API endpoint calls to report state. Given task dicts with a \`"done"\` flag, it returns totals in one pass:
@@ -643,44 +687,88 @@ print(summary([{"title": "a", "done": True}, {"title": "b", "done": False}]))`,
   apply: {
     id: "py-l3-uv-pyproject-capstone-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`summary(tasks)\`. Given a list of task dicts (each with a
-\`"done"\` flag), return \`{"total": n, "done": d, "pending": p}\`.
+    // Budget: 13 min. ~16 lines of prompt to read, ~12 lines to write. This is one file of the
+    // capstone's job with the project removed: the same three line outcomes and the same
+    // keep-going-past-a-bad-line rule, over a string instead of a directory. The capstone then
+    // adds the package layout, the typed record, the error class and the console script.
+    estimatedMinutes: 13,
+    prompt: `Warm-up (one file): a workshop log holds one shift per line, written as a worker name, a
+colon, and whole minutes. Surrounding spaces do not matter. A blank line and a line starting with
+\`#\` carry no data. Anything else is a bad line: no colon, a second colon, a missing name, or
+minutes that are not whole digits.
 
-For \`[{"title": "a", "done": True}, {"title": "b", "done": False}]\` return
-\`{"total": 2, "done": 1, "pending": 1}\`.`,
-    starterCode: `def summary(tasks):
-    # Count total, done, and pending tasks. Return the three counts in a dict.
+Implement \`summarize_log(text)\`, which returns each worker's total minutes and the line numbers it
+had to step over, numbering the first line 1. A bad line must never stop the rest of the log.
+
+For \`"alice: 45\\nnonsense\\nalice: 15\\n"\` return
+\`{"totals": {"alice": 60}, "skipped": [2]}\`.`,
+    starterCode: `def summarize_log(text):
+    # Total each worker's minutes and collect the line numbers you had to step over.
     pass`,
     hints: [
-      "`len(tasks)` is the total.",
-      'Count completed with `sum(1 for task in tasks if task["done"])`.',
-      "Pending is `total - done`.",
+      "`text.splitlines()` gives the lines, and `enumerate(..., start=1)` numbers them the way a person would.",
+      "Sort each line into one of three outcomes before you total anything: carries no data, is a shift, or is bad. `line.strip()` first, so a line of spaces reads as blank.",
+      '`entry.partition(":")` hands back the piece before the colon, the colon itself (empty when there was none), and everything after it, and `.isdigit()` rejects minutes that are negative, fractional or missing. Total with `totals[worker] = totals.get(worker, 0) + minutes`.',
     ],
-    referenceSolution: `def summary(tasks):
-    done = sum(1 for task in tasks if task["done"])
-    return {"total": len(tasks), "done": done, "pending": len(tasks) - done}`,
+    referenceSolution: `def summarize_log(text):
+    totals = {}
+    skipped = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        entry = line.strip()
+        if not entry or entry.startswith("#"):
+            continue
+        worker, colon, raw_minutes = entry.partition(":")
+        worker, raw_minutes = worker.strip(), raw_minutes.strip()
+        if not colon or not worker or not raw_minutes.isdigit():
+            skipped.append(number)
+            continue
+        totals[worker] = totals.get(worker, 0) + int(raw_minutes)
+    return {"totals": totals, "skipped": skipped}`,
     testCases: [
       {
-        input: {
-          tasks: [
-            { title: "a", done: true },
-            { title: "b", done: false },
-          ],
-        },
-        expected: { total: 2, done: 1, pending: 1 },
-        description: "one done, one pending",
+        input: { text: "alice: 45\nnonsense\nalice: 15\n" },
+        expected: { totals: { alice: 60 }, skipped: [2] },
+        description: "a bad line does not stop the log",
       },
-      { input: { tasks: [] }, expected: { total: 0, done: 0, pending: 0 }, description: "empty" },
       {
-        input: { tasks: [{ title: "x", done: true }] },
-        expected: { total: 1, done: 1, pending: 0 },
-        description: "all done",
+        input: { text: "alice: 45\n# machines down\nbob:30\n" },
+        expected: { totals: { alice: 45, bob: 30 }, skipped: [] },
+        description: "comments and tight spacing",
+      },
+      {
+        input: { text: "" },
+        expected: { totals: {}, skipped: [] },
+        description: "an empty log",
+      },
+      {
+        input: { text: "\n   \n# nothing here\n" },
+        expected: { totals: {}, skipped: [] },
+        description: "no data lines at all",
+      },
+      {
+        input: { text: "alice: -5\nbob: 4.5\na:b:5\n: 9\n" },
+        expected: { totals: {}, skipped: [1, 2, 3, 4] },
+        description: "every shape of bad line",
       },
     ],
   },
   practice: {
     id: "py-l3-uv-pyproject-capstone-practice",
     executionMode: "workspace",
+    // Budget: 34 min. To read: README 60 lines, four starters 60, so ~120 lines. To write: ~55
+    // lines (records 10, store 16, cli 15, pyproject 1) across four files. Lesson total is
+    // teach 8 + apply 13 + practice 34 = 55.
+    //
+    // Kept at four editable files after the depth review, against the usual two-lever ceiling.
+    // The levers here are composition across a real layout and the error boundary that keeps one
+    // bad line from ending the run; everything else the four files ask for (the line grammar,
+    // the report shape, the empty directory) is stated in the README rather than discovered.
+    // Dropping pyproject.toml would leave the packaging lesson grading no packaging, and
+    // dropping cli.py would leave nothing that composes the other two, so the file count is the
+    // capstone's licence being used rather than volume for its own sake. What the review DID
+    // change is the run-up: the Apply now does one file of this job on a string, so none of the
+    // parsing arrives new here.
+    estimatedMinutes: 34,
     prompt: `Capstone: build the \`shiftlog\` command that totals a folder of workshop shift logs.
 Four files are yours. \`shiftlog/records.py\` turns one raw line into a checked \`Entry\`,
 \`shiftlog/store.py\` reads the directory's log files and keeps going past the lines it cannot

@@ -1,3 +1,19 @@
+/**
+ * L4: configuration, secrets and structured logging.
+ *
+ * Time budget (counted, not guessed). Teach 7: ~900 prose words, four checks, four fences
+ * including the `json.loads` one added because the practice reference parses a "json" field and
+ * no fence in the lesson had ever shown that call. Apply 13: 17 provided lines of spec tables to
+ * read, 22 to write across the three jobs a boot path does. Practice 35: 85 lines of README, 30 of
+ * read-only spec, 82 to write across two files. 7 + 13 + 35 = 55, the lesson total.
+ *
+ * Apply used to be a four-line `load_config` over two hard-coded env keys, against an 82-line
+ * Practice: 20.5x, the worst ratio in the level. It now does a small version of each of the three
+ * things Practice asks for (coerce by declared type, lay one layer over the defaults under skip
+ * rules, redact by key), so Practice adds depth to each rather than introducing all three at once:
+ * four layers instead of two, ConfigError attribution, per-field source reporting, and a redactor
+ * that has to recurse through nested dicts and lists. Ratio is now 3.7x.
+ */
 import type { PythonLesson } from "../../types"
 import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
@@ -506,6 +522,23 @@ debug = env.get("DEBUG", "false").lower() == "true"
 
 \`env.get("PORT", "8000")\` returns the default only when \`"PORT"\` is absent. If the key exists, you get its string value and must convert it yourself.
 
+### Structured values arrive as strings too
+
+An environment variable cannot hold a dict, so a settings block that has real structure travels as JSON text and gets parsed at the boundary like everything else. \`json.loads(text)\` is the parse; \`json.dumps(value)\` is the reverse:
+
+\`\`\`python
+import json
+
+raw = env.get("DATABASE", '{"host": "localhost", "port": 5432}')
+database = json.loads(raw)          # a real dict now
+print(database["host"], type(database))   # localhost <class 'dict'>
+
+json.loads(" 42 ")                  # 42, an int: leading and trailing space is fine
+json.loads("not json")              # raises json.JSONDecodeError
+\`\`\`
+
+Two things worth pinning down. \`json.loads\` tolerates surrounding whitespace, so a value pasted with a stray space still parses. And \`json.JSONDecodeError\` is a subclass of \`ValueError\`, so \`except ValueError\` catches a bad JSON value and a bad \`int()\` with one handler, which is what lets a config loader turn every coercion failure into one error type of its own.
+
 ### Secrets: record presence, never the value
 
 API keys, tokens, and passwords come from the environment too, but they must never appear in source control or in logs. The safe pattern is to log whether a secret is configured, not what it is:
@@ -630,45 +663,176 @@ print(load_config({"PORT": "9000", "DEBUG": "true", "SECRET": "x"}))`,
   },
   apply: {
     id: "py-l4-config-logging-apply",
+    estimatedMinutes: 13,
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`load_config(env)\` to turn an env dict into
-\`{"port": int, "debug": bool, "has_secret": bool}\`. Default \`PORT\` to \`8000\` and \`DEBUG\` to off.
-\`debug\` is \`True\` only when \`DEBUG\` is \`"true"\` (any case). \`has_secret\` records whether
-\`"SECRET"\` is present (never its value).
+    prompt: `Implement \`coerce(field, raw)\`, \`load_config(env)\` and \`redact(settings)\`, the three jobs a
+boot path does before it logs anything.
 
-\`load_config({})\` is \`{"port": 8000, "debug": False, "has_secret": False}\`.`,
-    starterCode: `def load_config(env):
-    # Coerce PORT->int (default 8000), DEBUG->bool, and record whether SECRET is present.
-    pass`,
+\`coerce\` turns one raw string into the type \`FIELD_TYPES\` names for that field: \`"int"\`,
+\`"bool"\` (\`true\`, \`1\` or \`yes\` in any case is true, anything else is false), \`"json"\`, or
+\`"str"\`, which is left exactly as written.
+
+\`load_config\` starts from \`DEFAULTS\` and lays the environment over it. An env name only counts
+when it starts with \`ENV_PREFIX\` and the rest of it, lower-cased, is a field \`FIELD_TYPES\` names;
+anything else is ignored. Values that do count are coerced.
+
+\`redact(settings)\` returns a copy in which every value whose key contains one of \`SECRET_HINTS\`,
+ignoring case, is replaced by \`REDACTED\`. The settings here are flat, so top level is enough.
+
+\`startup({"APP_PORT": "9000"})["config"]["port"]\` is \`9000\`.`,
+    starterCode: `import json
+
+FIELD_TYPES = {
+    "port": "int",
+    "debug": "bool",
+    "region": "str",
+    "database": "json",
+    "api_token": "str",
+}
+
+DEFAULTS = {"port": 8000, "debug": False, "region": "us-east-1"}
+
+ENV_PREFIX = "APP_"
+
+SECRET_HINTS = ("token", "secret", "password")
+
+REDACTED = "[redacted]"
+
+
+def coerce(field, raw):
+    # TODO: turn the raw string into the type FIELD_TYPES names for this field.
+    return raw
+
+
+def load_config(env):
+    # TODO: start from the defaults, then lay the env values that belong to this app on top.
+    return {}
+
+
+def redact(settings):
+    # TODO: return a copy whose secret-named values are replaced.
+    return settings
+
+
+def startup(env):
+    """Graded entry point: the record this service logs on boot."""
+    return {"event": "app.startup", "config": redact(load_config(env))}`,
     hints: [
-      'Port: `int(env.get("PORT", "8000"))` (env values are strings).',
-      'Debug: `env.get("DEBUG", "false").lower() == "true"`.',
-      'Secret presence (not value): `"SECRET" in env`.',
+      "Three separate jobs, and only one of them knows about types. `load_config` decides which env names it cares about; `coerce` decides what a value becomes; `redact` never looks at a value at all, only at the key it is under.",
+      "An env name like `APP_MAX_RETRIES` becomes the field name by removing the prefix and lower-casing what is left. `name[len(ENV_PREFIX):]` is that slice. A name that survives the prefix test can still be a field this app does not have.",
+      '`json.loads(raw)` is the "json" branch and `raw.strip().lower() in ("true", "1", "yes")` is the "bool" branch. In `redact`, `any(hint in key.lower() for hint in SECRET_HINTS)` is the test.',
     ],
-    referenceSolution: `def load_config(env):
-    port = int(env.get("PORT", "8000"))
-    debug = env.get("DEBUG", "false").lower() == "true"
-    return {"port": port, "debug": debug, "has_secret": "SECRET" in env}`,
+    referenceSolution: `import json
+
+FIELD_TYPES = {
+    "port": "int",
+    "debug": "bool",
+    "region": "str",
+    "database": "json",
+    "api_token": "str",
+}
+
+DEFAULTS = {"port": 8000, "debug": False, "region": "us-east-1"}
+
+ENV_PREFIX = "APP_"
+
+SECRET_HINTS = ("token", "secret", "password")
+
+REDACTED = "[redacted]"
+
+
+def coerce(field, raw):
+    kind = FIELD_TYPES[field]
+    if kind == "int":
+        return int(raw)
+    if kind == "bool":
+        return raw.strip().lower() in ("true", "1", "yes")
+    if kind == "json":
+        return json.loads(raw)
+    return raw
+
+
+def load_config(env):
+    settings = dict(DEFAULTS)
+    for name, raw in env.items():
+        if not name.startswith(ENV_PREFIX):
+            continue
+        field = name[len(ENV_PREFIX) :].lower()
+        if field not in FIELD_TYPES:
+            continue
+        settings[field] = coerce(field, raw)
+    return settings
+
+
+def redact(settings):
+    return {
+        key: REDACTED if any(hint in key.lower() for hint in SECRET_HINTS) else value
+        for key, value in settings.items()
+    }
+
+
+def startup(env):
+    """Graded entry point: the record this service logs on boot."""
+    return {"event": "app.startup", "config": redact(load_config(env))}`,
     testCases: [
       {
-        input: { env: { PORT: "9000", DEBUG: "true", SECRET: "abc" } },
-        expected: { port: 9000, debug: true, has_secret: true },
-        description: "reads and coerces",
-      },
-      {
         input: { env: {} },
-        expected: { port: 8000, debug: false, has_secret: false },
-        description: "applies defaults",
+        expected: {
+          event: "app.startup",
+          config: { port: 8000, debug: false, region: "us-east-1" },
+        },
+        description: "an empty environment is just the defaults",
       },
       {
-        input: { env: { DEBUG: "TRUE" } },
-        expected: { port: 8000, debug: true, has_secret: false },
-        description: "case-insensitive debug",
+        input: { env: { APP_PORT: "9000", APP_DEBUG: "YES" } },
+        expected: {
+          event: "app.startup",
+          config: { port: 9000, debug: true, region: "us-east-1" },
+        },
+        description: "env values are read and given their type",
+      },
+      {
+        input: { env: { APP_API_TOKEN: "tok-123" } },
+        expected: {
+          event: "app.startup",
+          config: { port: 8000, debug: false, region: "us-east-1", api_token: "[redacted]" },
+        },
+        description: "a secret is configured but never logged",
+      },
+      {
+        input: { env: { APP_DATABASE: '{"host": "db1", "port": 5432}' } },
+        expected: {
+          event: "app.startup",
+          config: {
+            port: 8000,
+            debug: false,
+            region: "us-east-1",
+            database: { host: "db1", port: 5432 },
+          },
+        },
+        description: "a json field becomes a real dict",
+      },
+      {
+        input: { env: { PORT: "1", APP_TIMEOUT: "9", APP_DEBUG: "off" } },
+        expected: {
+          event: "app.startup",
+          config: { port: 8000, debug: false, region: "us-east-1" },
+        },
+        description: "the wrong prefix and an unknown field are both ignored",
+      },
+      {
+        input: { env: { APP_REGION: " eu " } },
+        expected: {
+          event: "app.startup",
+          config: { port: 8000, debug: false, region: " eu " },
+        },
+        description: "a str field keeps the value exactly as written",
       },
     ],
   },
   practice: {
     id: "py-l4-config-logging-practice",
+    estimatedMinutes: 35,
     executionMode: "workspace",
     prompt: `Repair the billing service's boot path after a postmortem: its \`app.startup\` log record
 went out with a live database password in it, and nobody could say which config layer any value came
