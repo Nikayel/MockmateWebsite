@@ -121,7 +121,7 @@ export const sqliteParameterizedLesson: PythonLesson = {
   title: "Talking to a database from Python: sqlite3 and parameterized queries",
   summary:
     "Connect, execute, fetch and commit with sqlite3, and keep every value out of the SQL text.",
-  estimatedMinutes: 20,
+  estimatedMinutes: 18,
   difficulty: "medium",
   skills: ["standard-library", "data-boundary", "validation", "string-formatting"],
   teach: {
@@ -355,6 +355,7 @@ for candidate in ["Ada", "O'Brien", "'; DROP TABLE users; --"]:
     print(sql, "|", params)`,
   },
   apply: {
+    estimatedMinutes: 3,
     id: "py-l3-sqlite-parameterized-apply",
     executionMode: "single-file",
     prompt: `Warm-up: implement \`build_lookup(email, min_age)\`.
@@ -409,6 +410,7 @@ values in that order. The SQL text is a constant: it must not change when the ar
     ],
   },
   practice: {
+    estimatedMinutes: 8,
     id: "py-l3-sqlite-parameterized-practice",
     executionMode: "workspace",
     prompt: `Your team's data-access module ships with the next release, and the security review sent it
