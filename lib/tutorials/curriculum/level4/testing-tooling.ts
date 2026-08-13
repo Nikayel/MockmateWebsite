@@ -2,6 +2,24 @@
 // L4-M5: Quality, Packaging & Capstone
 // ───────────────────────────────────────────────────────────────────────────
 
+/**
+ * L4: testing, mocks and the tool stack.
+ *
+ * Difficulty is deliberately untouched. The council measured this practice at 53 reference lines
+ * against a 9-line Apply (5.9x) with two depth levers, and it puts the learner on the authoring
+ * side of the tests, which is the point of the lesson. The defects were closure: the reference
+ * suite calls `ledger.reset()` between cases and compares `call_args_list` against `call(...)`
+ * objects, and neither had a runnable fence behind it. `unittest.mock` had been named in prose and
+ * used in the demo, but the assertion loop was never shown end to end. Teach now shows both, plus
+ * why a reset clears in place instead of rebinding.
+ *
+ * What the suite must assert, and which broken build each assertion catches, stay the learner's.
+ *
+ * Time budget (counted, not guessed). Teach 7: ~1,000 prose words, three checks, a table and six
+ * fences. Apply 9: 4 provided lines to read, 9 to write. Practice 39: 55 lines of README, 40 of
+ * read-only ledger and audit, 53 to write across a test suite and the fix it justifies.
+ * 7 + 9 + 39 = 55, the lesson total.
+ */
 import type { PythonLesson } from "../../types"
 import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
@@ -529,6 +547,57 @@ The recorder answers a handful of different questions, and mixing them up is why
 }
 \`\`\`
 
+Here is the whole loop in one runnable piece, including \`call\`, which is the object the history is made of:
+
+\`\`\`python
+from unittest.mock import Mock, call
+
+def dispatch(gateway, invoices):
+    for invoice in invoices:
+        gateway.charge(invoice["id"], invoice["cents"])
+    return len(invoices)
+
+gateway = Mock()
+dispatch(gateway, [{"id": "a1", "cents": 500}, {"id": "b2", "cents": 250}])
+
+print(gateway.charge.call_count)                 # 2
+print(gateway.charge.call_args_list)             # [call('a1', 500), call('b2', 250)]
+print(gateway.charge.call_args_list == [call("a1", 500), call("b2", 250)])   # True
+gateway.charge.assert_called_with("b2", 250)     # the LAST call only
+\`\`\`
+
+\`gateway.charge\` is itself a \`Mock\`, invented on first access, so the history lives on the attribute rather than on \`gateway\`. Comparing \`call_args_list\` against a list of \`call(...)\` objects is the assertion that pins count, arguments **and** order at once, which is what catches a bug that charges the right customer the right amount twice.
+
+## Isolating state between tests
+
+Mocks are fresh every time you build one. Module-level state is not, and a suite that shares it is a suite where test order changes the result:
+
+\`\`\`python
+# store.py
+CHARGED = set()
+
+def reset():
+    """Empty the record. Tests call this so each one starts from the same place."""
+    CHARGED.clear()
+\`\`\`
+
+\`\`\`python
+# test_store.py
+from store import CHARGED, reset
+
+def test_first():
+    reset()
+    CHARGED.add("a1")
+    assert CHARGED == {"a1"}, f"expected only a1, got {CHARGED!r}"
+
+def test_second():
+    reset()               # without this, a1 is still here and this test fails
+    CHARGED.add("b2")
+    assert CHARGED == {"b2"}, f"expected only b2, got {CHARGED!r}"
+\`\`\`
+
+Note the shape of \`reset\`: it clears the existing set in place rather than rebinding \`CHARGED\` to a new one, because a module that did \`CHARGED = set()\` would leave every module that already imported the old object still pointing at it. The general rule is that a test owns its starting state. If two tests can only both pass in one order, one of them is testing the other one's leftovers.
+
 ## Pitfalls
 
 A plain \`Mock\` answers to anything. Call a method that does not exist and it silently hands back another \`Mock\` instead of failing:
@@ -652,6 +721,7 @@ print(sender.call_count)              # 2`,
   },
   apply: {
     id: "py-l4-testing-tooling-apply",
+    estimatedMinutes: 9,
     executionMode: "single-file",
     prompt: `Warm-up (one file): implement \`send_all(sender, messages)\` to call the injected \`sender\` once per
 message and return how many were sent. The provided \`run\` driver passes a recorder in as the
@@ -690,6 +760,7 @@ def run(messages):
   },
   practice: {
     id: "py-l4-testing-tooling-practice",
+    estimatedMinutes: 39,
     executionMode: "workspace",
     prompt: `Write the tests for ticket CS-023 in \`tests/test_regression.py\`, then fix
 \`billing/dispatch.py\`. A customer was charged twice for one invoice while the nightly run
