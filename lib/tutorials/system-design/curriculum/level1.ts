@@ -3023,7 +3023,8 @@ over-fetch a web-sized response. BFFs prevent one generic API from being pulled 
 directions by different clients.
 
 For internal, service-to-service concerns, a **service mesh** (Istio, Linkerd) is often the better
-tool than the gateway. Each service gets a sidecar proxy (Envoy) that handles mTLS between services,
+tool than the gateway. Each service gets a sidecar proxy (Envoy for Istio, its own Rust micro-proxy
+for Linkerd) that handles mTLS between services,
 retries, timeouts, circuit breaking, and traffic-shifting, controlled centrally without changing app
 code. Mental model: the **gateway is north-south** (client to system), the **mesh is east-west**
 (service to service). Add a **WAF** and **DDoS protection** at the very edge, in front of the
@@ -3982,9 +3983,9 @@ design choices, and it is entirely governed by one question: is the workload CPU
 Classic Apache prefork, Tomcat's default, most synchronous frameworks: a thread (or process) per
 in-flight request. Its great virtue is simplicity: you write straight-line blocking code
 (\`result = db.query(...)\`), the OS scheduler handles switching, and stack traces are clean. The
-cost is that each thread carries a real price. Each thread reserves a stack up front: on Linux with
-glibc that follows the process stack limit (\`RLIMIT_STACK\`, commonly 8MB), while a JVM picks its
-own smaller default (1MB via \`-Xss\`). At 8MB, 10,000 threads reserve roughly 80GB of address space
+cost is that each thread reserves a stack up front, and how much depends on the runtime: on Linux,
+glibc follows the process stack limit (\`RLIMIT_STACK\`, commonly 8MB), while a JVM picks its own
+smaller default (1MB via \`-Xss\`). At 8MB, 10,000 threads reserve roughly 80GB of address space
 before doing any work, and the scheduler pays context-switch overhead that grows with thread count.
 The killer is **blocking IO**: when a thread waits on a slow database or a downstream API, it is
 parked doing nothing but still consuming a thread. If your workload is 90% waiting on IO, your
