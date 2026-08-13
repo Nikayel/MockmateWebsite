@@ -692,9 +692,10 @@ minutes, which is the failure mode to avoid.
   load view). The cost is complexity pushed into every client and a hard dependency on fast registry
   propagation.
 
-A **service mesh** (Istio or Linkerd, Envoy sidecars) is the popular middle ground: client-side
-benefits (no central-LB hop, locality, per-request balancing, retries, mTLS) with **central
-configuration**. The price is real operational complexity (a control plane and a sidecar per pod).
+A **service mesh** (Istio with Envoy sidecars, or Linkerd with its own Rust micro-proxy) is the
+popular middle ground: client-side benefits (no central-LB hop, locality, per-request balancing,
+retries, mTLS) with **central configuration**. The price is real operational complexity (a control
+plane and a sidecar per pod).
 
 \`\`\`cswidget
 {
@@ -952,17 +953,17 @@ Gateway, Envoy-based gateways, Apigee, or a Netflix Zuul-style edge service.
     {
       "label": "No. Service-to-service traffic is a different layer's job.",
       "correct": true,
-      "feedback": "Right. East-west traffic belongs to the service mesh (Istio, Linkerd, Envoy sidecars), which handles mTLS, retries, and load balancing between services. The gateway owns the north-south boundary only."
+      "feedback": "Right. East-west traffic belongs to the service mesh (Istio with Envoy sidecars, or Linkerd with its own Rust micro-proxy), which handles mTLS, retries, and load balancing between services. The gateway owns the north-south boundary only."
     }
   ]
 }
 \`\`\`
 
 Draw the boundary carefully. The gateway handles **north-south** traffic (client to system).
-Service-to-service **east-west** traffic is the job of a **service mesh** (Istio, Linkerd, Envoy
-sidecars), which handles mTLS, retries, and load balancing *between* services. Routing internal calls
-through the public gateway is a common design error. Business logic belongs *inside services*, not in
-either the gateway or the mesh.
+Service-to-service **east-west** traffic is the job of a **service mesh** (Istio with Envoy sidecars,
+or Linkerd with its own Rust micro-proxy), which handles mTLS, retries, and load balancing *between*
+services. Routing internal calls through the public gateway is a common design error. Business logic
+belongs *inside services*, not in either the gateway or the mesh.
 
 \`\`\`cswidget
 {
@@ -1248,10 +1249,12 @@ management does not survive thousands of short-lived certs.
 ### Connection management: where the sharp edges live
 
 Every new backend connection means a handshake and consumes an **ephemeral port**. A proxy opening a
-fresh connection per request will exhaust its ~64K ephemeral ports and burn CPU on handshakes. The
-fixes are **keep-alive** (reuse a connection for many requests) and **connection pooling** (a warm
-pool per backend, multiplexing requests over it), making backend connection counts a function of
-concurrency and pool size, not raw request rate.
+fresh connection per request will exhaust its ephemeral ports and burn CPU on handshakes: Linux
+defaults to roughly 28k of them (the range 32768-60999), and that budget applies per (source IP,
+destination IP, destination port) tuple rather than per host. The fixes are **keep-alive** (reuse a
+connection for many requests) and **connection pooling** (a warm pool per backend, multiplexing
+requests over it), making backend connection counts a function of concurrency and pool size, not raw
+request rate.
 
 \`\`\`cswidget
 {
@@ -1531,11 +1534,11 @@ then decrement), so you run a **Lua script** via \`EVAL\`, which Redis executes 
 gives exact global enforcement. The cost is a network round trip to Redis on **every request** (0.5
 to 1ms added per call) and Redis becoming a hot dependency.
 
-**Approach 2: local approximation.** Give each node a slice of the budget: 2000/min total across 20
-nodes means 100/min per node, enforced purely in local memory with zero coordination. Fast, no shared
+**Approach 2: local approximation.** Give each node a slice of the budget: a global 100/min across 20
+nodes means 5/min per node, enforced purely in local memory with zero coordination. Fast, no shared
 dependency, but only correct when traffic is evenly balanced. If the load balancer sends a hot user
-disproportionately to a few nodes, those nodes throttle early while the global budget is underused.
-It also wastes budget: idle nodes' slices are unusable by busy nodes.
+disproportionately to a few nodes, those nodes burn their 5/min and throttle early while the global
+100/min sits underused. It also wastes budget: idle nodes' slices are unusable by busy nodes.
 
 **Approach 3: hybrid, the common production answer.** Nodes enforce locally from a **local token
 cache** for speed, and **asynchronously sync** their consumption to Redis every short interval (say
@@ -1551,11 +1554,11 @@ key sharding or local caching, and **clock skew / window alignment** across node
 time or logical windows, not each node's wall clock.
 
 \`\`\`
-naive per-node (BROKEN)          hybrid (production)
- node1: 100/min                   local cache enforces fast
- node2: 100/min   x20 nodes       async sync -> Redis every 100ms
- ...              = 2000/min       true up + re-divide budget
- user sprays -> 20x limit         overshoot bounded to ~1 interval
+naive per-node (BROKEN)           hybrid (production)
+ every node enforces the full     local cache enforces fast
+ 100/min itself, not a 5/min      async sync -> Redis every 100ms
+ slice: 20 x 100 = 2000/min       true up + re-divide budget
+ user sprays -> 20x the limit     overshoot bounded to ~1 interval
 \`\`\`
 
 Recap: naive per-node limits grant Nx, so either enforce exactly via atomic Redis ops (INCR / Lua,
@@ -2557,7 +2560,7 @@ export const systemDesignLevel4: DesignLevel = {
               "Assumptions: a polyglot microservice fleet behind autoscaling, where instance IP and port change constantly and stale routing causes user-visible errors.",
               "**Discovery:** a service registry as the source of truth. On Kubernetes, lean on the platform-managed path: a Service gives a stable name and the control plane keeps EndpointSlices in sync with pods that pass readiness, so instances appear only when warm and disappear on termination. Off Kubernetes, use Consul or etcd with self-registration: instances register on startup and heartbeat, and stop being advertised when heartbeats lapse. Explicitly avoid hardcoded IPs and long-TTL DNS: the classic sources of 'traffic to a terminated instance.'",
               "**Health-based removal:** active health checks (short interval, unhealthy after 2-3 consecutive failures) plus readiness gating for new instances plus passive outlier ejection for instances that fail real requests but probe green. With second-scale intervals and registry watch/push, a terminated or failing instance is out of every caller's view within seconds: the metric that actually matters.",
-              "**LB decision: client-side via a service mesh** (Istio or Linkerd with Envoy sidecars). It removes the central-LB hop, enables locality-aware and least-request routing (same-zone traffic cuts latency and cross-AZ cost), gives retries, circuit breaking, and mTLS uniformly, and keeps balancing logic out of each service's code (the sidecar handles it) while configuration stays central. The accepted tradeoff: running the mesh control plane and a sidecar per pod, and a dependence on fast endpoint propagation.",
+              "**LB decision: client-side via a service mesh** (Istio with Envoy sidecars, or Linkerd with its own Rust micro-proxy). It removes the central-LB hop, enables locality-aware and least-request routing (same-zone traffic cuts latency and cross-AZ cost), gives retries, circuit breaking, and mTLS uniformly, and keeps balancing logic out of each service's code (the sidecar handles it) while configuration stays central. The accepted tradeoff: running the mesh control plane and a sidecar per pod, and a dependence on fast endpoint propagation.",
               "**Fallbacks:** gRPC client-side LB backed by etcd for a gRPC-heavy fleet, or server-side LB (ALB/Envoy behind a stable VIP) when dumb clients and central control are worth the extra hop.",
               "Common wrong turn: hardcoding instance addresses or relying on long-TTL DNS, so terminated instances keep getting traffic and callers see connection errors during every scale-in and deploy.",
             ],
