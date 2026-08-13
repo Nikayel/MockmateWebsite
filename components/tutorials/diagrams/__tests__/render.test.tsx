@@ -20,6 +20,27 @@ describe("diagram components render via CsDiagram", () => {
     expect(html).toContain("ORDER BY")
   })
 
+  it("pipeline keeps the SQL wording only when no title is given", () => {
+    const html = render({ type: "pipeline", preset: "sql-select" })
+    expect(html).toContain("SQL logical execution order")
+    expect(html).toContain("Order of evaluation")
+  })
+
+  it("pipeline takes its heading and accessible name from an explicit title", () => {
+    // The type was built for one SQL lesson and hardcoded that identity into both the frame heading
+    // and the list's aria-label, so every non-SQL caller inherited it. Three System Design lessons
+    // render a pipeline, one of them a RAG query path, and a screen reader announced "SQL logical
+    // execution order" on all three.
+    const html = render({
+      type: "pipeline",
+      stages: [{ label: "retrieve" }, { label: "rerank" }, { label: "generate" }],
+      title: "RAG query path",
+    })
+    expect(html).toContain("RAG query path")
+    expect(html).not.toContain("SQL logical execution order")
+    expect(html).not.toContain("Order of evaluation")
+  })
+
   it("join shows both tables, the kind, and the result grid", () => {
     const html = render({
       type: "join",

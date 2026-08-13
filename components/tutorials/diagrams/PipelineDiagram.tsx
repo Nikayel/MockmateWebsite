@@ -5,18 +5,26 @@ import { expandPipeline } from "@/lib/tutorials/diagrams/logic"
 import type { PipelineSpec } from "@/lib/tutorials/diagrams/schema"
 
 /**
- * The logical execution-order pipeline (static). Fixes the #1 SQL misconception —
- * that clauses run in written order — by showing the order the engine actually
- * evaluates them: FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY. Plain
- * flex/DOM (no canvas), so it is keyboard- and screen-reader-legible as a list.
+ * An ordered left-to-right pipeline (static). Built for the #1 SQL misconception — that clauses run
+ * in written order — by showing the order the engine actually evaluates them:
+ * FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY. Plain flex/DOM (no canvas), so it is
+ * keyboard- and screen-reader-legible as a list.
+ *
+ * The SQL wording is the DEFAULT, not the identity. Any ordered set of stages renders here, and
+ * three System Design lessons already do, so a caller that is not about SQL passes `spec.title`.
+ * Without it those lessons announced "SQL logical execution order" to a screen reader on, among
+ * others, a lesson about a RAG query path.
  */
+const SQL_PIPELINE_TITLE = "SQL logical execution order"
+
 export function PipelineDiagram({ spec }: { spec: PipelineSpec }) {
   const stages = expandPipeline(spec)
   const highlight = new Set(spec.highlight ?? [])
+  const title = spec.title ?? SQL_PIPELINE_TITLE
 
   return (
-    <DiagramFrame label="Order of evaluation" caption={spec.caption}>
-      <ol className="flex flex-wrap items-stretch gap-y-3" aria-label="SQL logical execution order">
+    <DiagramFrame label={spec.title ?? "Order of evaluation"} caption={spec.caption}>
+      <ol className="flex flex-wrap items-stretch gap-y-3" aria-label={title}>
         {stages.map((stage, i) => {
           const isHot = highlight.has(stage.label)
           return (

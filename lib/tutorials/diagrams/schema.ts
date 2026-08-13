@@ -40,6 +40,16 @@ export const pipelineSpecSchema = z.object({
   stages: z.array(pipelineStageSchema).min(2).max(12).optional(),
   /** Labels to visually emphasize (e.g. highlight WHERE vs HAVING). */
   highlight: z.array(z.string()).optional(),
+  /**
+   * What this particular pipeline is, for the frame heading and the list's accessible name.
+   *
+   * The type was built for one SQL lesson and hardcoded that identity in both places, so every
+   * non-SQL caller inherited it: three System Design lessons, including the RAG query path, rendered
+   * the heading "Order of evaluation" and announced "SQL logical execution order" to a screen
+   * reader. `ladder` and `topology` already take an optional title for exactly this reason; this
+   * matches them. Omitted, the SQL wording stands, so the original caller is untouched.
+   */
+  title: z.string().min(1).optional(),
   caption: captionField,
 })
 
