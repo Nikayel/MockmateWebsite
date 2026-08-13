@@ -1,3 +1,21 @@
+/**
+ * L4: SOLID, strategy and factory.
+ *
+ * Difficulty is deliberately untouched, and the council measured no undemonstrated API in the
+ * reference at all: every fact this practice needs already has a fence or a read-only file behind
+ * it. The 9.0x Practice-to-Apply ratio is inside the depth spec's 12x threshold, so the 3-line
+ * Apply (a strategy dict lookup, which is the lesson's whole idea in its smallest form) stays.
+ *
+ * The one change is a stated rule rather than a sprung trap: two hidden tests grade that
+ * `quote_parcel` names no carrier and resolves through the registry it was handed, including a
+ * registry object this repo has never seen. That constraint was implied by the ticket's framing
+ * and is now written down in the README, per the depth spec's rule on hidden tests.
+ *
+ * Time budget (counted, not guessed). Teach 6: ~800 prose words, three checks, four fences.
+ * Apply 5: 5 provided lines to read, 3 to write. Practice 39: 40 lines of README, 55 of read-only
+ * registry, rates and the worked standard carrier, 27 to write across two files.
+ * 6 + 5 + 39 = 50, the lesson total.
+ */
 import type { PythonLesson } from "../../types"
 import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
@@ -51,6 +69,12 @@ Config lives in \`dispatch/rates.py\` under \`"glacier"\`.
 \`quote_parcel(code, parcel, registry, configs)\` returns the price in cents. A code that is not
 registered quotes at \`FALLBACK_CODE\` instead of raising, and the fallback's config is read under
 the code actually used.
+
+The point of the sprint is that this function stops changing. A carrier onboarded next month, by
+someone who never opens \`quotes.py\`, must price correctly the moment its module registers itself,
+so no carrier code may appear anywhere in the service. It resolves everything through the
+\`registry\` and \`configs\` it is handed, including in tests that hand it a registry this repo has
+never seen.
 
 Both \`dispatch/carriers/glacier.py\` and \`dispatch/quotes.py\` need work.
 `,
@@ -556,6 +580,7 @@ print(STRATEGIES.get("member", regular)(100))   # 90.0`,
   },
   apply: {
     id: "py-l4-solid-patterns-apply",
+    estimatedMinutes: 5,
     executionMode: "single-file",
     prompt: `Warm-up (one file): implement \`price_for(kind, amount)\` that applies a discount by \`kind\`. \`regular\`
 is full price, \`member\` is 10% off, \`vip\` is 20% off, and any unknown kind is full price. Round to
@@ -586,6 +611,7 @@ is full price, \`member\` is 10% off, \`vip\` is 20% off, and any unknown kind i
   },
   practice: {
     id: "py-l4-solid-patterns-practice",
+    estimatedMinutes: 39,
     executionMode: "workspace",
     prompt: `Implement the Glacier Freight carrier in \`dispatch/carriers/glacier.py\` and the quote service
 in \`dispatch/quotes.py\`. Ops onboards a carrier most weeks, so the standing rule is that adding
