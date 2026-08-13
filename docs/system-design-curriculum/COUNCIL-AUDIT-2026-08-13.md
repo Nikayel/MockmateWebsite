@@ -47,6 +47,28 @@ These are not suggestions. Each one has already cost a rewrite somewhere in this
 
 ## 1. Verdict
 
+> **RETRACTION, 2026-08-13, after the check rollout.** The thesis below ("depth migrated into the
+> answer key") does not survive measurement and is withdrawn. It rested on `teachWords`, which
+> counted fence bodies, and a widget spec is JSON: option labels, feedback, worked examples. The
+> levels that looked deep were the levels carrying widgets, and the four that looked thin were the
+> four carrying none. Measured on prose, with every fence stripped, the twelve levels run **485 to
+> 588 words** and the model-answer-to-prose ratio runs **1.03 to 1.15 across all twelve**, a spread
+> of 1.12x. There is no collapse, and there is no inversion at the tail: L7 (584) and L11 (555) both
+> carry more prose than L0 (485). Three authoring agents flagged the unit independently before the
+> tooling was corrected in `lib/tutorials/system-design/coverage.ts`, which now reports `proseWords`.
+>
+> **What survives, and it is still the important half.** The interactivity gap was real, measured
+> correctly, and is exactly what the evidence table's check column always showed: 343 of 343 checks
+> sat in eight levels, and 76 lessons across L7, L9, L10 and L11 had zero. The corpus was not
+> under-taught in those levels. It was under-*exercised*, and the word counts looked low precisely
+> because nothing was there to inflate them.
+>
+> **What this changes downstream.** SD-W4 (checks) and SD-W6 (visuals) are unaffected and remain
+> correct. **SD-W5 "Depth promotion" loses its premise** and must be re-scoped from "these levels are
+> thin" to specific closure gaps found by reading, or dropped. Section 7 already declined the L10
+> half of it for exactly this reason, on exactly this evidence, and should have generalised the
+> correction to the verdict rather than confining it to one level.
+
 This is a strong curriculum that stopped being built four levels from the end.
 
 Levels 0 through 6 and Level 8 are genuinely good, and the council spent real effort trying to break
@@ -344,6 +366,16 @@ them. The cumulative check counts inside the dose, not on top of it (`INTERACTIV
 ---
 
 #### SD-W5: Depth promotion and closure repair in L7, L9, L10 and L11
+
+> **RE-SCOPE REQUIRED before this runs.** See the retraction in section 1. The "depth promotion"
+> half of this workstream was justified by a word-count gap that turned out to be widget JSON, so
+> "raise these levels to 1,100-1,400 words" is not a goal, it is a recipe for padding. On prose the
+> four levels are 549 to 584 words against a corpus range of 485 to 588.
+>
+> The **closure repair** half is untouched and still worth doing: an exercise whose model answer
+> needs a fact the teach never demonstrated is a real defect regardless of word counts, and it is
+> found by reading a lesson against its own answer key, not by measuring it. Re-scope to that, and
+> drop every target expressed as a word count.
 
 **Effort:** 12 agent-days. **Depends on:** SD-W1. Partition by file.
 
