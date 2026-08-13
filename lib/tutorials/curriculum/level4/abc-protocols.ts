@@ -7,9 +7,17 @@ import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
 // ── Practice workspace: one export pipeline that uses BOTH tools at once ────────────────────
-// The practice exercise is deliberately unrelated to the apply Rectangle: the graded skill is
-// choosing between nominal (ABC) and structural (Protocol) conformance and knowing which of the
-// two the interpreter actually enforces, and when.
+// The graded skill is choosing between nominal (ABC) and structural (Protocol) conformance and
+// knowing which of the two the interpreter actually enforces, and when. Apply is a different
+// surface (shapes, one file) exercising the same three facts, so Practice is one step up rather
+// than the whole climb.
+//
+// Time budget (counted, not guessed). Teach 6: 1,050 prose words plus five checks, and the two
+// added fences (the inherited `describe` helper and the `@runtime_checkable` isinstance pair) that
+// close the closure holes the practice reference used to have. Apply 11: 45 provided lines to read
+// (two contracts and two vendor classes), 6 to write. Practice 28: 53 lines of README, 60 lines of
+// read-only base/contracts/vendor, 25 to write across two files, and the four registry decisions
+// that carry it. 6 + 11 + 28 = 45, the lesson total.
 
 const EXPORT_README = buildBrief({
   lesson: "py-l4-abc-protocols",
@@ -378,7 +386,34 @@ class Rectangle(Shape):
 }
 \`\`\`
 
-\`Shape()\` raises \`TypeError\` because you cannot instantiate a class that still has unimplemented abstract methods. \`Rectangle(3, 4)\` works and \`.area()\` returns \`12\`, as the demo below shows. This is nominal typing: \`Rectangle\` conforms because it explicitly declares \`class Rectangle(Shape)\`. Reach for an ABC when you own the hierarchy and want to share concrete helper code on the base or force implementers to fill in the blanks.
+\`Shape()\` raises \`TypeError\` because you cannot instantiate a class that still has unimplemented abstract methods. \`Rectangle(3, 4)\` works and \`.area()\` returns \`12\`, as the demo below shows. This is nominal typing: \`Rectangle\` conforms because it explicitly declares \`class Rectangle(Shape)\`.
+
+### The other half of the deal: what the base gives back
+
+An ABC is not only a list of methods you must write. It is also a place to put methods you get. Any *concrete* method on the base is inherited by every conformer, and it can call the abstract ones because a subclass is required to have filled them in:
+
+\`\`\`python
+class Shape(ABC):
+    @abstractmethod
+    def area(self):
+        ...
+
+    def describe(self):                       # concrete: every subclass inherits this
+        return f"{type(self).__name__} covers {self.area()}"
+
+class Rectangle(Shape):
+    def __init__(self, width, height):
+        self.width, self.height = width, height
+
+    def area(self):
+        return self.width * self.height
+
+print(Rectangle(3, 4).describe())     # Rectangle covers 12
+\`\`\`
+
+\`type(obj).__name__\` is the class's own name as a string. \`type(obj)\` gets the class and \`__name__\` lives on the class, not on the instance, so \`obj.__name__\` is an \`AttributeError\` for ordinary objects. It is what you want in any message about an object whose class you did not choose, an error like \`f"{type(value).__name__} is not supported"\` most of all.
+
+That inherited \`describe\` is the whole reason to prefer an ABC when you own the hierarchy: a Protocol can insist a method exists, but it has no body to hand anyone. A class that conforms structurally gets nothing for free.
 
 ### Protocols: conform by shape
 
@@ -395,6 +430,21 @@ def total_area(shapes: list[HasArea]) -> float:
 \`\`\`
 
 This is structural (duck) typing made checkable. A third-party \`Circle\` you cannot subclass still passes \`total_area\` as long as it has an \`area()\` method. Reach for a Protocol to accept things that already fit the shape, especially across library boundaries you do not control.
+
+By default that check happens only in \`mypy\`. To ask the question at runtime you opt the protocol in with \`@runtime_checkable\`, and then \`isinstance\` works on it like any other class:
+
+\`\`\`python
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class HasArea(Protocol):
+    def area(self) -> float: ...
+
+print(isinstance(Rectangle(3, 4), HasArea))   # True: it has area(), parentage irrelevant
+print(isinstance("hello", HasArea))           # False: no area method
+\`\`\`
+
+Read that second line carefully before you lean on it: \`isinstance\` against a protocol confirms the method *names* exist and nothing else. A class whose \`area\` takes three required arguments still passes.
 
 \`\`\`csdiagram
 {
@@ -527,29 +577,120 @@ print(Rectangle(3, 4).area())   # 12`,
   },
   apply: {
     id: "py-l4-abc-protocols-apply",
+    estimatedMinutes: 11,
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement a \`Rectangle\` class with \`__init__(self, width, height)\` and an
-\`area()\` method returning \`width * height\`. The provided \`run\` driver builds one and returns its
-area.
+    prompt: `Implement \`Rectangle\` so it inherits \`describe()\` from \`Shape\`, and \`total_area(shapes)\` so it
+sums only the shapes that satisfy \`HasArea\`.
 
-\`run(3, 4)\` is \`12\`.`,
-    starterCode: `class Rectangle:
-    def __init__(self, width, height):
-        # Store width and height on self.
-        pass
+\`Shape\` is an abstract base class with an abstract \`area()\` and one concrete method, \`describe()\`.
+\`HasArea\` is the same contract written as a runtime-checkable protocol. \`VendorDisc\` ships from a
+package you cannot edit and has an \`area()\`; \`Tally\` has no \`area()\` at all, and passing it to
+\`total_area\` must not raise.
+
+\`Rectangle(3, 4).area()\` is \`12\` and \`Rectangle(3, 4).describe()\` is \`"Rectangle covers 12"\`.
+\`run(3, 4)\` is \`{"described": "Rectangle covers 12", "total": 52}\`.`,
+    starterCode: `from abc import ABC, abstractmethod
+from typing import Protocol, runtime_checkable
+
+
+class Shape(ABC):
+    """Nominal contract: conform by inheriting, and inherit describe() in return."""
+
+    @abstractmethod
+    def area(self):
+        """Return the covered area as an int."""
+
+    def describe(self):
+        return f"{type(self).__name__} covers {self.area()}"
+
+
+@runtime_checkable
+class HasArea(Protocol):
+    """Structural contract: anything with an area() counts, whatever its parents."""
+
+    def area(self): ...
+
+
+class VendorDisc:
+    """Ships in a package you cannot edit, so it can never subclass Shape."""
+
+    def __init__(self, size):
+        self.size = size
 
     def area(self):
-        # Return width * height.
-        pass
+        return self.size * 10
+
+
+class Tally:
+    """Also vendored. It counts things and has no area at all."""
+
+    def __init__(self):
+        self.count = 0
+
+
+class Rectangle:
+    # TODO: conform to Shape the way that earns describe(), and implement area().
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+
+
+def total_area(shapes):
+    # TODO: add up the area of every shape that satisfies the contract, and skip the rest.
+    return 0
 
 
 def run(width, height):
-    return Rectangle(width, height).area()`,
+    rect = Rectangle(width, height)
+    return {
+        "described": rect.describe(),
+        "total": total_area([rect, VendorDisc(height), Tally()]),
+    }`,
     hints: [
-      "In `__init__`, set `self.width = width` and `self.height = height`.",
-      "In `area`, return `self.width * self.height`.",
+      "`describe()` is not something you write. It already exists on `Shape`, and there is exactly one way for `Rectangle` to end up with it.",
+      "`total_area` cannot call `.area()` on everything it is handed, because `Tally` has none. `HasArea` is decorated `@runtime_checkable`, so you are allowed to ask about it directly.",
+      "`class Rectangle(Shape)` is the inheritance, `return self.width * self.height` is the area, and `isinstance(s, HasArea)` is the filter inside the sum.",
     ],
-    referenceSolution: `class Rectangle:
+    referenceSolution: `from abc import ABC, abstractmethod
+from typing import Protocol, runtime_checkable
+
+
+class Shape(ABC):
+    """Nominal contract: conform by inheriting, and inherit describe() in return."""
+
+    @abstractmethod
+    def area(self):
+        """Return the covered area as an int."""
+
+    def describe(self):
+        return f"{type(self).__name__} covers {self.area()}"
+
+
+@runtime_checkable
+class HasArea(Protocol):
+    """Structural contract: anything with an area() counts, whatever its parents."""
+
+    def area(self): ...
+
+
+class VendorDisc:
+    """Ships in a package you cannot edit, so it can never subclass Shape."""
+
+    def __init__(self, size):
+        self.size = size
+
+    def area(self):
+        return self.size * 10
+
+
+class Tally:
+    """Also vendored. It counts things and has no area at all."""
+
+    def __init__(self):
+        self.count = 0
+
+
+class Rectangle(Shape):
     def __init__(self, width, height):
         self.width = width
         self.height = height
@@ -558,16 +699,42 @@ def run(width, height):
         return self.width * self.height
 
 
+def total_area(shapes):
+    return sum(shape.area() for shape in shapes if isinstance(shape, HasArea))
+
+
 def run(width, height):
-    return Rectangle(width, height).area()`,
+    rect = Rectangle(width, height)
+    return {
+        "described": rect.describe(),
+        "total": total_area([rect, VendorDisc(height), Tally()]),
+    }`,
     testCases: [
-      { input: { width: 3, height: 4 }, expected: 12, description: "3 by 4" },
-      { input: { width: 5, height: 5 }, expected: 25, description: "a square" },
-      { input: { width: 2, height: 10 }, expected: 20, description: "a wide rectangle" },
+      {
+        input: { width: 3, height: 4 },
+        expected: { described: "Rectangle covers 12", total: 52 },
+        description: "3 by 4, plus a vendor disc, minus the tally",
+      },
+      {
+        input: { width: 5, height: 5 },
+        expected: { described: "Rectangle covers 25", total: 75 },
+        description: "a square",
+      },
+      {
+        input: { width: 2, height: 10 },
+        expected: { described: "Rectangle covers 20", total: 120 },
+        description: "a wide rectangle",
+      },
+      {
+        input: { width: 0, height: 7 },
+        expected: { described: "Rectangle covers 0", total: 70 },
+        description: "a zero-width rectangle still describes and still counts",
+      },
     ],
   },
   practice: {
     id: "py-l4-abc-protocols-practice",
+    estimatedMinutes: 28,
     executionMode: "workspace",
     prompt: `Finish the reporting service's export pipeline, which has to carry two kinds of writer at
 once: writers you own, and writers that ship from a vendor package nobody here can edit.
