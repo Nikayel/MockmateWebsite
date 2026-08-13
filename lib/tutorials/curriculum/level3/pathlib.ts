@@ -230,7 +230,8 @@ export const pathlibLesson: PythonLesson = {
   difficulty: "medium",
   skills: ["pathlib", "files", "text-processing", "io"],
   teach: {
-    estimatedMinutes: 5,
+    // 7 min: the tree-walk section adds four worked fences to the original five-minute read.
+    estimatedMinutes: 7,
     markdown: `## Why file paths break in production
 
 The bug that ruins a data pipeline at 2am is rarely the algorithm. It is a path. A script that reads \`data/scores.txt\` works on your laptop and fails on the server because the two machines were launched from different directories. Hardcoded string paths are also fragile across operating systems, where the path separator differs. \`pathlib.Path\` exists to make paths a real object with methods instead of fragile strings you glue together by hand. As a data engineer you touch files constantly (CSVs, logs, exports), so getting this layer right is table stakes.
@@ -316,6 +317,40 @@ Once you have a \`Path\`, its parts are attributes rather than string surgery:
 }
 \`\`\`
 
+## Walking a tree, and describing what you found
+
+Real export folders are not flat. \`glob\` searches one directory level, \`rglob\` searches every level below the path you call it on, and both take a filename pattern rather than a suffix:
+
+\`\`\`python
+from pathlib import Path
+
+for path in Path("exports").rglob("*.csv"):
+    print(path.as_posix())
+# exports/june.csv
+# exports/north/alpha.csv
+# exports/north/deep/gamma.csv
+\`\`\`
+
+\`rglob\` yields paths in whatever order the filesystem hands them over, so sort when the order is part of your answer. Sorting \`Path\` objects compares them segment by segment, which is not the same as sorting their string forms, so pass \`sorted\` a key when a caller is going to read strings:
+
+\`\`\`python
+found = Path("exports").rglob("*.csv")
+paths = sorted(found, key=lambda path: path.as_posix())
+\`\`\`
+
+\`as_posix()\` is the one that gives you forward slashes on every OS, which is what you want the moment a path becomes data: a dict key, a report line, a value in a test.
+
+Two more methods turn one path into another. \`with_suffix\` swaps the extension, and \`relative_to\` strips a leading directory off:
+
+\`\`\`python
+source = Path("exports/north/alpha.2.csv")
+
+print(source.with_suffix(".txt").as_posix())      # exports/north/alpha.2.txt
+print(source.relative_to("exports").as_posix())   # north/alpha.2.csv
+\`\`\`
+
+\`with_suffix\` replaces only the final extension, so a dot in the middle of a filename survives it. Cutting the name at the first dot yourself does not, which is exactly the bug that turns \`alpha.2.csv\` into \`alpha.txt\`. And \`relative_to\` raises \`ValueError\` if the path is not actually under the directory you named, so it tells you when you have anchored something wrongly instead of quietly producing nonsense.
+
 ## Turning text into data
 
 \`read_text()\` hands you the entire file as one string. Split it into lines, then convert:
@@ -326,7 +361,7 @@ numbers = [int(line) for line in text.splitlines() if line.strip()]
 print(sum(numbers))   # 60
 \`\`\`
 
-\`splitlines()\` breaks on line boundaries and drops the \`\\n\` characters. The \`if line.strip()\` guard skips blank or whitespace-only lines so \`int()\` never receives an empty string. \`int()\` itself strips surrounding whitespace, so \`int(" 10 ")\` returns \`10\` without extra work. That is the shape of the Apply warm-up: sum the numbers in a string. The Practice reads real files with \`Path(path).read_text()\` and runs a line-by-line pipeline like this one over each of them.
+\`splitlines()\` breaks on line boundaries and drops the \`\\n\` characters. The \`if line.strip()\` guard skips blank or whitespace-only lines so \`int()\` never receives an empty string. \`int()\` itself strips surrounding whitespace, so \`int(" 10 ")\` returns \`10\` without extra work. The Practice reads real files with \`Path(path).read_text()\` and runs a line-by-line pipeline like this one over each of them, after finding those files with the tree walk above. The Apply warm-up is the finding half on its own: no disk, just paths in and paths out.
 
 ## Pitfalls
 
@@ -404,30 +439,73 @@ print(sum(numbers))   # 60`,
   apply: {
     id: "py-l3-pathlib-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`total_score(text)\`. Sum the integer on each non-blank line of
-the string \`text\`.
+    // Budget: 9 min. ~14 lines of prompt to read, ~7 lines to write. No disk: the learner
+    // handles the four Path methods the Practice needs (suffix, with_suffix, relative_to,
+    // as_posix) on paths that are handed to them, before the recursive search arrives.
+    estimatedMinutes: 9,
+    prompt: `Warm-up (one file): a report job has already been handed the paths it found. Implement
+\`summary_targets(root, paths)\`, which returns where each export's summary belongs.
 
-For \`"10\\n20\\n30"\` return \`60\`. Skip blank lines.`,
-    starterCode: `def total_score(text):
-    # Sum the integer on each non-blank line.
+Keep only the paths whose extension is \`.csv\`, swap that extension for \`.txt\`, and describe each
+result relative to \`root\` as a forward-slash string. Return them sorted.
+
+\`summary_targets("exports", ["exports/north/alpha.csv", "exports/notes.txt"])\` is
+\`["north/alpha.txt"]\`.`,
+    starterCode: `from pathlib import Path
+
+
+def summary_targets(root, paths):
+    # Keep the .csv paths, retarget them to .txt, and describe each one relative to root.
     pass`,
     hints: [
-      "`text.splitlines()` gives the lines without newline characters.",
-      "Skip blanks with `if line.strip()` so `int()` never sees an empty line.",
-      "`return sum(int(line) for line in text.splitlines() if line.strip())`.",
+      '`Path(p).suffix` is the extension, and it keeps its leading dot, so compare it against `".csv"` rather than `"csv"`.',
+      "`with_suffix` retargets the extension without touching a dot in the middle of a filename, and `relative_to(root)` strips the leading directory.",
+      "The answer is strings, not `Path` objects, so finish each one with `.as_posix()` and then `sorted(...)` the list you built.",
     ],
-    referenceSolution: `def total_score(text):
-    return sum(int(line) for line in text.splitlines() if line.strip())`,
+    referenceSolution: `from pathlib import Path
+
+
+def summary_targets(root, paths):
+    base = Path(root)
+    exports = [Path(path) for path in paths if Path(path).suffix == ".csv"]
+    targets = [export.with_suffix(".txt").relative_to(base).as_posix() for export in exports]
+    return sorted(targets)`,
     testCases: [
-      { input: { text: "10\n20\n30" }, expected: 60, description: "three numbers" },
-      { input: { text: "5\n5" }, expected: 10, description: "two numbers" },
-      { input: { text: "3\n\n4" }, expected: 7, description: "blank line skipped" },
-      { input: { text: "" }, expected: 0, description: "empty text" },
+      {
+        input: {
+          root: "exports",
+          paths: ["exports/north/alpha.csv", "exports/north/notes.txt"],
+        },
+        expected: ["north/alpha.txt"],
+        description: "only the csv is a reading file",
+      },
+      {
+        input: {
+          root: "exports",
+          paths: ["exports/south/beta.2.csv", "exports/june.csv"],
+        },
+        expected: ["june.txt", "south/beta.2.txt"],
+        description: "a dot inside the filename survives",
+      },
+      {
+        input: { root: "exports", paths: [] },
+        expected: [],
+        description: "nothing was found",
+      },
+      {
+        input: { root: "exports", paths: ["exports/readme.md", "exports/old/log.txt"] },
+        expected: [],
+        description: "no reading files at all",
+      },
     ],
   },
   practice: {
     id: "py-l3-pathlib-practice",
     executionMode: "workspace",
+    // Budget: 19 min. To read: README 44 lines, two starters 30, the five fixture files ~10, so
+    // ~85 lines. To write: 25 lines across two files (discovery 6, summarize 19). Lesson total
+    // is teach 7 + apply 9 + practice 19 = 35.
+    estimatedMinutes: 19,
     prompt: `Repair the nightly sensor report, which only ever sees the files sitting directly in
 \`exports/\` and misses everything the install teams nested inside subfolders. Implement
 \`find_reading_files\` and \`summary_path\` in \`catalog/discovery.py\`, then \`summarize_file\` and
