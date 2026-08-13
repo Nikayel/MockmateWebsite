@@ -505,7 +505,7 @@ The timeline is the same hybrid fan-out: push post ids to normal followers' time
 
 Likes and comment counts on a viral post get millions of increments. A single \`UPDATE ... SET like_count = like_count + 1\` row is a hot-row contention nightmare. Shard the counter across N sub-counters and sum them, or maintain an approximate count in Redis flushed periodically. Exact like counts are not worth serializing every write.
 
-**Interview nuance:** estimate to show you can size it. 100M photos/day at 2MB average is 200TB/day of new media before replication, and with 3x replication or erasure coding that is the storage bill the CDN then fronts. Read bandwidth dwarfs write bandwidth, which is the whole reason a CDN is non-negotiable.
+**Interview nuance:** estimate to show you can size it. 100M photos/day at 2MB average is 200TB/day of new media before replication, so ~600TB/day at 3x replication, or roughly 250 to 300TB/day erasure coded (parity shards instead of whole copies), which is the choice you make for cold media. Read bandwidth dwarfs write bandwidth, which is the whole reason a CDN is non-negotiable.
 
 **Recap:** metadata DB plus object storage plus CDN, upload direct to S3 with presigned URLs, generate resolution variants async, reuse hybrid fan-out for the feed, and never store image bytes in the database.
 `.trim()
@@ -517,7 +517,7 @@ Chat is a real-time delivery problem at massive concurrency. WhatsApp famously r
 
 ## Connection layer
 
-Messaging needs the server to push to the client the instant a message arrives, so you hold persistent connections, WebSocket (or MQTT, which WhatsApp used for battery efficiency). A tier of connection servers each hold hundreds of thousands to millions of open sockets. A user is connected to exactly one connection server at a time; a routing layer (a session registry in Redis mapping \`user_id -> connection_server\`) knows where each user is. When Alice sends to Bob, the system looks up Bob's connection server and forwards the message there over an internal pub/sub backplane (Kafka or a Redis pub/sub / a dedicated message bus).
+Messaging needs the server to push to the client the instant a message arrives, so you hold persistent connections, WebSocket (or MQTT, which Facebook Messenger adopted for battery efficiency on mobile; WhatsApp itself ran a customized binary XMPP, an XML-based messaging protocol). A tier of connection servers each hold hundreds of thousands to millions of open sockets. A user is connected to exactly one connection server at a time; a routing layer (a session registry in Redis mapping \`user_id -> connection_server\`) knows where each user is. When Alice sends to Bob, the system looks up Bob's connection server and forwards the message there over an internal pub/sub backplane (Kafka or a Redis pub/sub / a dedicated message bus).
 
 \`\`\`
 Alice ==WS== connSrv-A          connSrv-B ==WS== Bob
@@ -621,7 +621,7 @@ The **dispatch/matching engine** does candidate generation (query the rider's H3
       "It stays the same"
     ]
   },
-  "workedExample": "At 30 bits the interleaved key splits the 40075 km equator into 2 to the power 15, 32768 slices, so a cell is 40075 / 32768, about 1.2 km wide. Covering roughly 600 square km of a city like the lesson's Chicago takes 600 / (1.2 x 1.2), about 400 cells. With 200,000 drivers pinging every 4 to 5 seconds in that region, each cell's in-memory driver set holds about 200000 / 400 = 500 candidates, plenty for one cell-plus-neighbor-ring query. Slide bits up and the pool per cell thins fast, forcing candidate generation to expand its search rings before ranking by ETA.",
+  "workedExample": "At 30 bits the interleaved key gives longitude and latitude 15 bits each, so the 40075 km equator splits into 2 to the power 15, 32768 slices, about 1.2 km wide, while the 20038 km pole-to-pole span splits into those same 32768 slices, about 0.6 km tall. An even bit count always leaves the cell twice as wide as it is tall, which is another reason H3's hexagons won: on a geohash cell one step north is a different distance than one step east. Covering roughly 600 square km of a city like the lesson's Chicago takes 600 / (1.2 x 0.6), about 800 cells. With 200,000 drivers pinging every 4 to 5 seconds in that region, each cell's in-memory driver set holds about 200000 / 800 = 250 candidates, plenty for one cell-plus-neighbor-ring query. Slide bits up and the pool per cell thins fast, forcing candidate generation to expand its search rings before ranking by ETA.",
   "inputs": [
     {
       "kind": "slider",
@@ -654,9 +654,16 @@ The **dispatch/matching engine** does candidate generation (query the rider's H3
       "unit": "km"
     },
     {
+      "id": "cellHeightKm",
+      "label": "Cell height",
+      "expr": "20038 / pow(2, bits / 2)",
+      "format": "number",
+      "unit": "km"
+    },
+    {
       "id": "cellsCovering",
       "label": "Cells covering a 600 sq km city",
-      "expr": "600 / (cellWidthKm * cellWidthKm)",
+      "expr": "600 / (cellWidthKm * cellHeightKm)",
       "format": "number",
       "unit": "cells"
     },
@@ -2277,7 +2284,7 @@ A single ZSET has limits at tens of millions of members and high write rate, so 
 
 A single hot key (global likes, total views, a mega-popular player's score) taking millions of increments/sec becomes a write hotspot and lock contention point. The fix is a sharded/distributed counter: split the logical counter into N sub-counters (\`counter:0..N-1\`), increment a random shard per write so writes fan out, and sum the N shards on read. This trades a slightly more expensive read for massive write parallelism.
 
-Where exactness is not required, approximate structures are a big memory win. HyperLogLog counts unique items (unique players seen, unique visitors) with ~2 percent error in ~12 KB regardless of cardinality, versus gigabytes for an exact set. Count-Min Sketch estimates per-item frequencies and heavy hitters (approximate top-K of a stream) in fixed memory with bounded overcount. Use these when "about 4.2M unique" or "roughly the top trending items" is good enough.
+Where exactness is not required, approximate structures are a big memory win. HyperLogLog counts unique items (unique players seen, unique visitors) with ~0.8 percent error in ~12 KB regardless of cardinality, versus gigabytes for an exact set. Count-Min Sketch estimates per-item frequencies and heavy hitters (approximate top-K of a stream) in fixed memory with bounded overcount. Use these when "about 4.2M unique" or "roughly the top trending items" is good enough.
 
 \`\`\`
 score update -> DB (truth) + ZADD to segment ZSET (O(log n))
@@ -2840,7 +2847,7 @@ export const systemDesignLevel10: DesignLevel = {
               "How does the feed reuse fan-out patterns?",
             ],
             modelAnswerOutline: [
-              "Assumptions: 500M users, 100M photos/day at ~2MB average, global audience, read-heavy, feed freshness of seconds is fine. Estimate: 100M x 2MB = 200TB/day of new media before replication; with 3x that is ~600TB/day of storage growth. Read bandwidth is many multiples of write, which forces a CDN.",
+              "Assumptions: 500M users, 100M photos/day at ~2MB average, global audience, read-heavy, feed freshness of seconds is fine. Estimate: 100M x 2MB = 200TB/day of new media before replication; ~600TB/day at 3x replication, or roughly 250 to 300TB/day erasure coded, which is the choice you make for cold media. Read bandwidth is many multiples of write, which forces a CDN.",
               "**API:** `POST /uploads` returns a presigned S3 PUT URL plus a `media_key`; client PUTs bytes to S3 directly; `POST /posts` with the `media_key` and caption; `GET /feed?cursor=...`; `POST /posts/{id}/like`. **Data model:** metadata store `posts(post_id, user_id, caption, media_key, created_at, like_count)`, `users`, `follows` and inverse. Media store: S3 buckets holding the original plus variants (1080/640/320/thumb). Per-user timeline as Redis sorted sets of post ids.",
               "**High-level design:** client requests a presigned URL and uploads directly to S3, so app servers never carry image bytes. An S3 put-event lands on a queue; a transcode worker generates resolution variants and a thumbnail, writes their keys, marks the post ready, and enqueues fan-out. Fan-out is the hybrid: push post ids to normal followers, pull for celebrities. The read path loads the user's timeline of ids, batch-hydrates metadata, resolves media keys to CDN URLs, and returns a page by cursor. All media is served through a CDN with long TTLs because it is immutable.",
               "**Deep dive, media delivery:** the CDN offloads 90%+ of read traffic from origin, which is what makes 500M users affordable. Clients fetch the variant matching their viewport, cutting bandwidth. Like counts on viral posts are sharded sub-counters or an approximate Redis counter, avoiding hot-row contention.",
@@ -3839,7 +3846,7 @@ export const systemDesignLevel10: DesignLevel = {
               "**Top-K and rank:** use a Redis sorted set keyed by leaderboard segment. ZADD updates a score in O(log n), ZREVRANGE 0 k returns the top-K in O(log n + k), and ZREVRANK returns a player's rank in O(log n). 'My rank and neighbors' is ZREVRANK plus a ZREVRANGE around that index. This avoids the fatal `ORDER BY score LIMIT k` plus `COUNT(*) WHERE score > x` per request, which full-scans and collapses under load.",
               "**Scaling the ZSET:** shard by segment (region, league, daily/weekly window) so each set stays bounded, and keep a smaller global top-N ZSET merged from each shard's top entries for the global board. Exact global rank across all shards is costly, so global rank is bucketed/approximate while in-segment rank is exact. All-time boards are snapshotted on a cadence.",
               "**Distributed counters:** a single hot key (a viral player's score, global counts) taking millions of increments/sec is a write hotspot. Shard the counter into N sub-counters, increment a random shard per write, and sum on read, trading read cost for write parallelism.",
-              "**Approximation:** use HyperLogLog for unique counts (unique players seen) at ~12 KB with ~2 percent error, and Count-Min Sketch for heavy-hitter/top-K frequency estimates in streams, both trading bounded error for large memory savings.",
+              "**Approximation:** use HyperLogLog for unique counts (unique players seen) at ~12 KB with ~0.8 percent error, and Count-Min Sketch for heavy-hitter/top-K frequency estimates in streams, both trading bounded error for large memory savings.",
               "**Durability and real-time:** persist authoritative scores in a database and treat Redis as a rebuildable index via write-behind or an event stream, so a Redis failure is a rebuild not data loss. Push rank changes to clients over WebSocket/SSE, and recompute expensive global boards on a cadence. Common wrong turn: SQL sort-and-count per request (full scan, collapses under load) and a single global counter row that becomes a lock hotspot.",
             ],
           },
