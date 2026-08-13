@@ -873,7 +873,7 @@ On top of the protocol you need cert hygiene. Serve a modern cipher suite only (
 
 ## mTLS gives every workload an identity
 
-For **service-to-service** calls, ordinary TLS only proves the server's identity to the client. **Mutual TLS (mTLS)** makes both sides present certificates, so each workload cryptographically proves who it is. That cert becomes a portable **workload identity**: instead of "requests from inside the VPC are trusted," you get "this call came from the \`payments\` service, signed by our CA, cert not expired." A service mesh (Istio, Linkerd) or a sidecar (Envoy) typically issues short-lived certs (often 24 hours or less via SPIFFE/SVID) and rotates them automatically, so revocation is rarely needed because certs expire faster than you would notice a compromise.
+For **service-to-service** calls, ordinary TLS only proves the server's identity to the client. **Mutual TLS (mTLS)** makes both sides present certificates, so each workload cryptographically proves who it is. That cert becomes a portable **workload identity**: instead of "requests from inside the VPC are trusted," you get "this call came from the \`payments\` service, signed by our CA, cert not expired." A service mesh (Istio, Linkerd) typically issues short-lived certs (often 24 hours or less via SPIFFE/SVID) and rotates them automatically through the proxy it puts beside each workload, so revocation is rarely needed because certs expire faster than you would notice a compromise.
 
 \`\`\`
   north-south (edge)              east-west (internal)

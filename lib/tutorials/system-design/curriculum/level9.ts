@@ -413,7 +413,7 @@ The win is fewer proxies, lower per-Pod memory, and lower latency for the common
       "note": "An optional per-namespace waypoint proxy adds L7 features (retries, traffic splitting) only where you need them, instead of taxing every Pod in the fleet."
     }
   ],
-  "caption": "Different data paths for the same east-west problem: the sidecar tax is per Pod and per hop, while ambient pays per node and adds L7 only where needed. Cilium is a third path not drawn here, with policy in the kernel and no proxy at all."
+  "caption": "Different data paths for the same east-west problem: the sidecar tax is per Pod and per hop, while ambient pays per node and adds L7 only where needed. Cilium is a third path not drawn here, with policy in the kernel and no per-Pod proxy, though it authenticates in its agent rather than per connection."
 }
 \`\`\`
 

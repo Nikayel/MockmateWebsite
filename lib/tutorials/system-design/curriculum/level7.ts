@@ -149,7 +149,7 @@ Two carve-outs keep the policy sane. First, **security and P0 fixes ship even du
 
 **Interview nuance:** the policy only works if it **depoliticizes** the decision and has **shared accountability**. Dev and ops (or product and SRE) both sign the policy in advance, and leadership pre-commits to honoring the freeze. Without that pre-agreement, when the budget is blown the product VP will simply overrule the freeze for the quarter's big launch, and the SLO becomes theater. The budget's whole purpose is that nobody has to win that argument in the moment: the number already decided.
 
-Track burn over a rolling window and remember that **one bad incident can consume weeks of budget**. A 90-minute outage against a 43-minute monthly budget doesn't just fail the month, it can put you underwater for the next two windows. That is why the response to a blown budget is a freeze, not a shrug: you are already borrowing against the future.
+Track burn over a rolling window and remember that **one bad incident can consume weeks of budget**. A 90-minute outage against a 40-minute budget doesn't just fail the window, it can put you underwater for the next two. That is why the response to a blown budget is a freeze, not a shrug: you are already borrowing against the future.
 
 **Recap:** error budget = 1 - SLO and it is permission to fail that you spend, not hoard; the policy pre-agrees consequences (freeze at zero) with security carve-outs and shared accountability so the ship-versus-stabilize call is depoliticized before the incident, not fought during it.
 `.trim()
