@@ -19,12 +19,12 @@ The math: allowed downtime = (1 - availability) x window. For a 30-day month (43
 \`\`\`
 Nines     Availability   Downtime / month   Downtime / year
 two        99%            ~7.2 hours          ~3.65 days
-three      99.9%          ~43.8 minutes       ~8.76 hours
-four       99.99%         ~4.4 minutes        ~52.6 minutes
+three      99.9%          ~43.2 minutes       ~8.76 hours
+four       99.99%         ~4.3 minutes        ~52.6 minutes
 five       99.999%        ~26 seconds         ~5.26 minutes
 \`\`\`
 
-Notice the leap between each row. Going from 99.9% to 99.99% shrinks your monthly downtime budget from 43.8 minutes to 4.4 minutes. That is not "a bit better," it is a 10x reduction in the failure you are allowed, and every added nine costs roughly 10x more to achieve. The reason: the cheap failures (a bad deploy, a full disk) are gone by three nines, so the next nine forces you to attack rare, expensive causes: multi-AZ redundancy, automated failover measured in seconds, eliminating every manual step from recovery, and testing failure paths constantly. Human response time alone (someone gets paged, opens a laptop, diagnoses) blows a five-nines budget, so five nines effectively means no human in the recovery loop.
+Notice the leap between each row. Going from 99.9% to 99.99% shrinks your monthly downtime budget from 43.2 minutes to 4.3 minutes. That is not "a bit better," it is a 10x reduction in the failure you are allowed, and every added nine costs roughly 10x more to achieve. The reason: the cheap failures (a bad deploy, a full disk) are gone by three nines, so the next nine forces you to attack rare, expensive causes: multi-AZ redundancy, automated failover measured in seconds, eliminating every manual step from recovery, and testing failure paths constantly. Human response time alone (someone gets paged, opens a laptop, diagnoses) blows a five-nines budget, so five nines effectively means no human in the recovery loop.
 
 ## Dependencies combine
 
@@ -35,15 +35,15 @@ Notice the leap between each row. Going from 99.9% to 99.99% shrinks your monthl
   "type": "calc",
   "title": "Serial chain availability",
   "predictPrompt": {
-    "question": "Your checkout calls 3 dependencies in series, each 99.9% available. How much monthly downtime does the chain allow compared to the ~44 minutes a single 99.9% component gets?",
+    "question": "Your checkout calls 3 dependencies in series, each 99.9% available. How much monthly downtime does the chain allow compared to the ~43 minutes a single 99.9% component gets?",
     "options": [
-      "Still about 44 minutes",
+      "Still about 43 minutes",
       "About double",
       "About triple, over 2 hours",
       "More than a full day"
     ]
   },
-  "workedExample": "At the initial values, 3 serial components at 99.9% each give a chain availability of about 99.7%, which allows roughly 131 minutes of downtime in an average month instead of the 43.8 minutes one component gets on its own. Slide the component count up to 10 hops to watch the ceiling sink, then push per-component availability to 99.99% and see the chain recover.",
+  "workedExample": "At the initial values, 3 serial components at 99.9% each give a chain availability of about 99.7%, which allows roughly 129 minutes of downtime in a 30-day month instead of the 43.2 minutes one component gets on its own. Slide the component count up to 10 hops to watch the ceiling sink, then push per-component availability to 99.99% and see the chain recover.",
   "inputs": [
     {
       "kind": "slider",
@@ -79,7 +79,7 @@ Notice the leap between each row. Going from 99.9% to 99.99% shrinks your monthl
     {
       "id": "budget_minutes",
       "label": "Monthly error budget",
-      "expr": "(1 - (a ^ n)) * 43800",
+      "expr": "(1 - (a ^ n)) * 43200",
       "format": "number",
       "unit": "min"
     }
@@ -126,7 +126,7 @@ An average hides the tail. If 99 requests take 50 ms and one takes 5 seconds, th
 const errorBudgetsTeach = `
 ## The error budget is permission to fail
 
-An **error budget** is the inverse of your SLO: budget = 1 - SLO. A 99.9% SLO means 0.1% of requests are allowed to fail, and that 0.1% is a real, spendable resource. Over 28 days at 10 million requests, a 99.9% SLO buys you 10,000 failed requests, or about 43 minutes of full outage. The mental shift that makes this powerful: the budget is not a threat, it is permission to fail that much. It exists to be spent, not hoarded.
+An **error budget** is the inverse of your SLO: budget = 1 - SLO. A 99.9% SLO means 0.1% of requests are allowed to fail, and that 0.1% is a real, spendable resource. Over 28 days at 10 million requests, a 99.9% SLO buys you 10,000 failed requests, or about 40 minutes of full outage. The mental shift that makes this powerful: the budget is not a threat, it is permission to fail that much. It exists to be spent, not hoarded.
 
 Why spent, not hoarded? A team sitting at 100% budget remaining all quarter is not "doing great," it is over-investing in reliability the users did not ask for and under-shipping features they did. Perfect reliability is the wrong target because it means you shipped too slowly. The budget converts reliability from an argument ("is this safe enough?") into an account balance everyone can read.
 
@@ -1378,7 +1378,7 @@ Expand/contract migrates schema in ordered, individually-safe steps so that at n
 
 Each arrow is a separately deployable, separately reversible step. You never combine "add new" with "drop old" in one deploy, because that is exactly the destructive change that makes rollback impossible.
 
-For the physical DDL on a large hot table, a naive \`ALTER TABLE\` can lock the table and stall writes. **Online schema-change tools** (gh-ost, pt-online-schema-change for MySQL) build a shadow table, backfill it while capturing live changes via triggers or the binlog, and swap it in with a brief atomic rename, so the table stays writable throughout. Backfills must be **throttled** (chunked, watching replica lag), **idempotent** (safe to re-run), and **restartable** (checkpoint progress) because a multi-hour backfill will get interrupted.
+For the physical DDL on a large hot table, a naive \`ALTER TABLE\` can lock the table and stall writes. **Online schema-change tools** (gh-ost, pt-online-schema-change for MySQL) build a shadow table, backfill it while capturing live changes via triggers or the binlog, and swap it in with a brief atomic rename, so the table stays writable throughout. On Postgres the same step looks different: \`ADD COLUMN ... NULL\` is metadata-only and never rewrites the table, so the risk moves to the backfill, which you run as batched \`UPDATE\`s over key ranges with a short \`lock_timeout\` (the setting that makes a statement give up quickly instead of queueing on a lock and blocking every writer behind it). Backfills must be **throttled** (chunked, watching replica lag), **idempotent** (safe to re-run), and **restartable** (checkpoint progress) because a multi-hour backfill will get interrupted.
 
 **Interview nuance:** the classic disaster is renaming a column. \`ALTER TABLE users RENAME COLUMN email TO email_address\` looks trivial and is a trap: the instant it runs, every still-deployed old instance that selects \`email\` breaks, and you cannot roll the code back because the column named \`email\` no longer exists. The correct answer is expand/contract: add \`email_address\`, dual-write, backfill, migrate reads, then drop \`email\` in a later deploy. A rename is never one step in a live system.
 
@@ -1573,7 +1573,7 @@ export const systemDesignLevel7: DesignLevel = {
               "How does the policy depoliticize the release-vs-reliability decision?",
             ],
             modelAnswerOutline: [
-              "Assumptions: a product team owning a service with a 99.9% availability SLO over a rolling 28-day window, so the monthly budget is roughly 43 minutes of downtime or 0.1% of requests. Dev and SRE share on-call. The policy is signed by engineering, product, and the VP before it takes effect, which is the whole point.",
+              "Assumptions: a product team owning a service with a 99.9% availability SLO over a rolling 28-day window, so the budget is roughly 40 minutes of downtime or 0.1% of requests. Dev and SRE share on-call. The policy is signed by engineering, product, and the VP before it takes effect, which is the whole point.",
               "**100% to 50% remaining (healthy):** Normal operation. Ship features at full velocity, deploy on the normal cadence, run experiments. The budget exists to be spent, so consistently sitting near 100% triggers a review of whether the SLO is too loose or we are shipping too slowly.",
               "**50% to 10% remaining (caution):** Risky or large changes require a second reviewer and a rollback plan. The team allocates a fraction of the sprint to burning down known reliability debt in parallel, so we do not coast into a freeze.",
               "**0% (exhausted):** Automatic feature freeze. All release capacity redirects to reliability work: fixing the top burn sources, adding tests, hardening the failing dependency. The freeze lifts when the rolling window recovers the budget above a set threshold (say 20%).",
@@ -2181,7 +2181,7 @@ export const systemDesignLevel7: DesignLevel = {
             modelAnswerOutline: [
               "Assumptions: an e-commerce checkout service on Kubernetes with Postgres; the pricing change alters money math, so a bug is a revenue/trust incident. The column rename targets `orders.amount` (hot, millions of rows) to `orders.amount_cents`.",
               "**Pricing engine behind a flag.** Deploy the new engine dark: the code is present but gated by `flag('new_pricing_engine')`, defaulting off, so release is decoupled from deploy. Turn it on for an internal-employee allowlist first (dogfood), then 1% of real users. Run it as an **experiment**: compute the new price alongside the old for flagged users and log both, so I compare distributions before trusting it. Ramp 1% -> 5% -> 25% -> 100% while watching order-value distribution, checkout error rate, and support tickets. If anything looks wrong, flip the flag off in seconds, no redeploy. That kill switch is why a flag beats a plain canary here. After 100% and a stable week, delete the flag to avoid flag debt.",
-              "**Column rename with zero downtime (expand/contract).** 1. Expand: `ADD COLUMN amount_cents BIGINT NULL`; old code untouched. 2. Dual-write: deploy code that writes both `amount` and `amount_cents`; reads still use `amount`. 3. Backfill: a throttled, idempotent, restartable job copies `amount` -> `amount_cents` in chunks, watching replica lag, using gh-ost/pt-osc semantics so the table stays writable and never long-locks. 4. Migrate reads: behind a flag, switch reads to `amount_cents`, verify parity against `amount` for a bake period. 5. Contract: once nothing reads or writes `amount`, stop dual-writing, then in a final separate deploy `DROP COLUMN amount`.",
+              "**Column rename with zero downtime (expand/contract).** 1. Expand: `ADD COLUMN amount_cents BIGINT NULL`; old code untouched. 2. Dual-write: deploy code that writes both `amount` and `amount_cents`; reads still use `amount`. 3. Backfill: a throttled, idempotent, restartable job copies `amount` -> `amount_cents` in batched `UPDATE`s by id range, checkpointing after each batch and watching replica lag, with a short `lock_timeout` so the table stays writable and never long-locks. 4. Migrate reads: behind a flag, switch reads to `amount_cents`, verify parity against `amount` for a bake period. 5. Contract: once nothing reads or writes `amount`, stop dual-writing, then in a final separate deploy `DROP COLUMN amount`.",
               "**Why both-directional compatibility.** Mid-rollout, some pods run old code and some new. New code must tolerate rows where `amount_cents` is still NULL (forward compat during backfill); old code must tolerate the extra column existing (backward compat). Violate either and the mixed fleet breaks.",
               "Common wrong turn: rolling back the pricing code after a bad migration without rolling back the schema, or doing the rename in one `ALTER`. Either leaves deployed code pointing at a column that no longer matches, so rollback itself fails and the outage extends.",
             ],
