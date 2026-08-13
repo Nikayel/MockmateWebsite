@@ -58,10 +58,20 @@ system design that suffix is `· Learn System Design | CodeSparring`, 36 charact
 60-character display budget, so a lesson whose own title runs past 24 characters gets truncated
 before the searcher reads what the page is about.
 
+Verified against production on 2026-08-13. The two best-performing system design pages render:
+
+```
+Design a Stock Exchange / Order-Matching Engine · Learn System Design | CodeSparring   (84 chars)
+Leader Election, Leases, Fencing & Split-Brain · Learn System Design | CodeSparring    (83 chars)
+```
+
+The suffix ` · Learn System Design | CodeSparring` is 37 characters on its own. At a 60-character
+display budget the searcher sees neither the brand nor the end of the lesson title.
+
 **Do.** Keep the course label only where it fits. Change `learnLessonMetadata` so the composed title
 is measured against a budget and the suffix degrades: full label, then the short brand alone, then
-the bare lesson title. The root `title.template` still owns the brand, so the change lives in one
-function.
+the bare lesson title via `title.absolute`. The root `title.template` still owns the brand, so the
+change lives in one function.
 
 **Accept.** A test over the live corpus asserts the rendered title for every Learn lesson is at most
 60 characters, and that no title contains the brand twice. Position holds; CTR on the five pages
@@ -128,9 +138,13 @@ The four titles over 60 characters are handled by SEO-01's budget ladder rather 
 
 ### SEO-03 — Lesson pages publish no FAQ or article structured data
 
-**Evidence.** `components/seo/JsonLd.tsx` exists and is used on landing pages. Learn lessons emit
-canonical plus Open Graph and nothing else, so we forfeit rich-result eligibility on several hundred
-pages that answer a question directly.
+**Evidence.** Verified against production on 2026-08-13. Lesson pages DO emit JSON-LD, but only the
+four site-level blocks: `WebSite`, `Organization`, `SoftwareApplication` and `Person`. Every one
+describes CodeSparring the product. Nothing describes the lesson. So a page about fencing tokens
+tells Google it is a piece of software priced at $25 a month.
+
+That is good news for effort: the plumbing already fires on every page, so this is an addition rather
+than a build.
 
 **Do.** Emit `Article` JSON-LD on every lesson page (headline, description, `datePublished`,
 `dateModified`, author, canonical `@id`). Where a lesson has an explicit question-and-answer block,
@@ -138,6 +152,25 @@ emit `FAQPage` as well. Only mark up content that is actually visible on the pag
 
 **Accept.** Rich Results Test passes for one lesson per course. No "unparsable structured data"
 errors appear in Search Console 14 days after deploy.
+
+### SEO-36 — Every page ships a 37-term keywords meta tag
+
+**Evidence.** `app/layout.tsx:81` sets a global `keywords` array, so every page in the site renders
+the same 37-term block. On the stock exchange lesson it reads, in part: "LeetCode alternative",
+"cheap mock interviews", "interview anxiety practice", "24/7 mock interviews". None of that describes
+a page about order-matching engines.
+
+Google has ignored `meta name="keywords"` since 2009, so this is not costing rankings. It is costing
+two other things. It is roughly 700 bytes of identical payload on every page, and a stuffed
+keyword list is a low-quality signal to the crawlers that do still read it, including the AI crawlers
+we deliberately welcome in `app/robots.ts`.
+
+**Do.** Delete the `keywords` array from the root layout. Do not replace it with per-page keywords:
+the tag has no consumer worth serving.
+
+**Accept.** No `<meta name="keywords">` in the rendered HTML of any route. Rankings unchanged after
+four weeks, which is the expected result and worth recording so the deletion is not blamed for
+unrelated movement.
 
 ### SEO-04 — Leader election and fencing is our best single striking-distance page
 
