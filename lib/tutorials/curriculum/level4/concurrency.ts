@@ -24,14 +24,18 @@ to be bookkeeping you write rather than something you inherit.
 \`reset_calls()\`. Some paths succeed, some fail once and succeed on the next attempt, some always
 time out, and unknown paths are permanent failures.
 
+A batch may list the same path more than once, and every entry is its own piece of work: each one
+is fetched and each one gets its own size in the report.
+
 ## What to build
 
 **\`pipeline/policy.py\`** owns the failure policy:
 
 - \`should_retry(error, attempts)\` is true only for a transient failure that has not yet used
   \`MAX_ATTEMPTS\` attempts.
-- \`give_up(url, error)\` handles a failure that will not be retried again: a transient failure is
-  recorded as size \`0\`, and a permanent failure must reach the caller instead of being recorded.
+- \`give_up(url, error)\` settles a failure that will not be retried again, and always returns:
+  the size to record for a transient failure that ran out of attempts, or \`None\` for a failure
+  the report cannot absorb. \`None\` is the collector's signal to let the error out to the caller.
 
 **\`pipeline/collector.py\`** owns \`run_batch(executor, urls)\`, which returns:
 
@@ -135,9 +139,9 @@ def should_retry(error, attempts):
 
 
 def give_up(url, error):
-    """Settle a failure that will not be retried again. See README.md."""
-    # TODO: decide what a failure becomes once retrying is over: a recorded size,
-    # or something the caller has to deal with.
+    """Settle a failure that will not be retried again. Always returns. See README.md."""
+    # TODO: decide what a failure becomes once retrying is over: a size the report can
+    # record, or nothing the report can stand behind.
     return 0
 `
 
@@ -154,8 +158,8 @@ def give_up(url, error):
     if isinstance(error, TransientError):
         # Out of attempts: record it as empty rather than failing the whole sweep.
         return 0
-    # PermanentError (and anything unrecognised) is not this function's to swallow.
-    raise error
+    # PermanentError (and anything unrecognised) has no size the report can stand behind.
+    return None
 `
 
 const CONC_COLLECTOR_STARTER = String.raw`from harness.executor import as_completed
@@ -200,7 +204,10 @@ def run_batch(executor, urls):
                     was_retried[index] = True
                     next_wave.append(index)
                 else:
-                    sizes[index] = policy.give_up(urls[index], error)
+                    settled = policy.give_up(urls[index], error)
+                    if settled is None:
+                        raise
+                    sizes[index] = settled
         wave = next_wave
 
     return {
@@ -292,9 +299,14 @@ def run_tests(record):
             f"{policy.should_retry(error, 1)!r}"
         )
 
-    def exhausted_transient_is_recorded_as_zero():
+    def give_up_settles_transient_and_refuses_permanent():
         value = policy.give_up("/timeout", TransientError("timed out reading /timeout"))
-        assert value == 0, f"expected 0, got {value!r}"
+        assert value == 0, f"expected 0 for an exhausted transient failure, got {value!r}"
+        refused = policy.give_up("/missing", PermanentError("no such path: /missing"))
+        assert refused is None, (
+            f"expected None for a permanent failure, since the report has no size to record, "
+            f"got {refused!r}"
+        )
 
     def a_url_that_never_succeeds_does_not_sink_the_batch():
         result = sweep(["/a", "/timeout", "/e"])
@@ -321,7 +333,10 @@ def run_tests(record):
 
     record("a permanent failure reaches the caller", permanent_failure_reaches_the_caller)
     record("a permanent failure is never retried", permanent_failure_is_never_retried)
-    record("an exhausted transient failure records zero", exhausted_transient_is_recorded_as_zero)
+    record(
+        "give_up records an exhausted transient failure and refuses a permanent one",
+        give_up_settles_transient_and_refuses_permanent,
+    )
     record("one dead url does not sink the batch", a_url_that_never_succeeds_does_not_sink_the_batch)
     record("two flaky urls keep their places", two_flaky_urls_keep_their_places)
     record(
@@ -330,15 +345,55 @@ def run_tests(record):
     )
 `
 
+/**
+ * Read-only header for the APPLY exercise. It gives the single-file apply the same executor
+ * surface the practice workspace has (`submit` / `as_completed` / `result()`, and no `map`), so
+ * the ordering problem is already familiar by the time the practice adds failures and retries.
+ * `solution(urls)` exists because the single-file runner calls one top-level function with the
+ * test case's values; it builds the executor the learner's `fetch_all` is graded against.
+ */
+const APPLY_PREAMBLE = String.raw`# --- Read-only setup: a stand-in for concurrent.futures, because this runtime has no
+# --- OS threads. It has submit() and as_completed(), and deliberately no map().
+class FakeFuture:
+    def __init__(self, fn, arg):
+        self._value = fn(arg)
+
+    def result(self):
+        return self._value
+
+
+class OutOfOrderExecutor:
+    def submit(self, fn, arg):
+        return FakeFuture(fn, arg)
+
+
+def as_completed(futures):
+    """Yield the futures in completion order, which is deliberately not input order."""
+    futures = list(futures)
+    return iter(futures[1::2] + futures[0::2][::-1])
+
+
+SIZES = {"/a": 10, "/b": 20, "/c": 30, "/d": 40, "/e": 50}
+
+
+def fetch(url):
+    return SIZES[url]
+
+
+def solution(urls):
+    return fetch_all(OutOfOrderExecutor(), urls)
+# --- End of setup. Your work starts below. ---
+`
+
 export const concurrencyLesson: PythonLesson = {
   id: "py-l4-concurrency",
   title: "Threads, the GIL & concurrent.futures",
   summary: "Choose a concurrency model and parallelize a batch with a thread pool.",
-  estimatedMinutes: 40,
+  estimatedMinutes: 50,
   difficulty: "hard",
   skills: ["concurrency", "threading", "concurrent-futures", "gil"],
   teach: {
-    estimatedMinutes: 7,
+    estimatedMinutes: 10,
     markdown: `## Doing more than one thing at once
 
 Every real service waits: on a database, an HTTP API, a file, a message queue. If you fetch 100 URLs one at a time, your program spends nearly all its wall-clock time blocked, doing nothing. Concurrency lets those waits overlap, so 100 slow calls finish in roughly the time of the slowest one instead of the sum of all of them. Choosing the right model (threads, processes, or \`async\`) is a classic interview question because the wrong choice makes code either no faster or outright wrong.
@@ -456,7 +511,53 @@ with ThreadPoolExecutor(max_workers=4) as executor:
     print(list(executor.map(double, [1, 2, 3])))   # [2, 4, 6]
 \`\`\`
 
-\`executor.map\` returns results in **input order**, not completion order, even though the tasks finish out of order. Swap in \`ProcessPoolExecutor\` and the code is identical. For finer control, \`executor.submit(fn, x)\` returns a \`Future\`, and \`as_completed(futures)\` yields them as they finish. Two things to remember about \`map\`: it returns a **lazy iterator**, so wrap it in \`list(...)\` when you need a real list (the demo above does), and it re-raises a worker's exception when you iterate to that result, not when you call \`map\`.
+\`executor.map\` returns results in **input order**, not completion order, even though the tasks finish out of order. Swap in \`ProcessPoolExecutor\` and the code is identical. Two things to remember about \`map\`: it returns a **lazy iterator**, so wrap it in \`list(...)\` when you need a real list (the demo above does), and it re-raises a worker's exception when you iterate to that result, not when you call \`map\`.
+
+### submit, futures, and doing the bookkeeping yourself
+
+\`map\` hands you ordering for free, and the price is that you cannot react to one result before the rest arrive. When you need to handle each outcome the moment it lands, retry a failure, or report progress, you drop to \`executor.submit(fn, x)\`. It returns a **\`Future\`**: a handle to work whose outcome is not known yet. \`as_completed(futures)\` yields those futures **in completion order, which is not input order**, and \`future.result()\` either returns the value or **re-raises the exception the worker raised**.
+
+A \`Future\` carries no memory of what was submitted to produce it. It has no index and no argument on it. So the standard move is to build a dict from future to whatever you need back, at submit time:
+
+\`\`\`python
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def size_of(url):
+    if url == "/bad":
+        raise ValueError("no such path: " + url)
+    return len(url) * 10
+
+with ThreadPoolExecutor(max_workers=4) as executor:
+    pending = {executor.submit(size_of, url): url for url in ["/a", "/bb", "/bad"]}
+    for future in as_completed(pending):      # completion order, not input order
+        url = pending[future]                 # the future alone would not tell you this
+        try:
+            print(url, future.result())       # result() re-raises the worker's exception
+        except ValueError as error:
+            print(url, "failed:", error)
+\`\`\`
+
+That dict is the whole trick. If the caller wants results in **input order**, map each future to its *position* instead of its value, size a result list up front, and write into it by index. Appending as futures complete gives you completion order, which is the bug this pattern exists to prevent.
+
+### Retrying without retrying forever
+
+Concurrent work fails piecemeal: one call in fifty times out while the other forty-nine succeed. The first question to answer is whether a failure is **transient** (a timeout, a dropped connection, a 503, something a second attempt could fix) or **permanent** (a 404, a malformed request, a missing credential, something no number of attempts will fix). Retrying a permanent failure just multiplies the load on a service that already told you no, and it hides a real bug behind a slow one.
+
+The second question is the **attempt budget**. An unbounded retry loop turns one dead endpoint into a job that never finishes, so you cap attempts (two or three is typical) and decide what an exhausted failure becomes: a recorded zero, a skipped row, or an alert. Production code also spaces attempts out with backoff, usually exponential and jittered, so a fleet of retrying clients does not stampede a recovering service in lockstep.
+
+\`\`\`python
+def with_retries(fn, arg, max_attempts=2):
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return fn(arg)
+        except TimeoutError:                     # transient: worth another go
+            if attempt == max_attempts:
+                raise                            # budget spent, stop pretending
+        except ValueError:                       # permanent: retrying changes nothing
+            raise
+\`\`\`
+
+You met the reusable version of this in **Decorators with arguments & functools.wraps**, where \`retry(times, on)\` wraps a function so callers never see the loop. The decorator is the right shape when the retry is per call. When failures have to be re-submitted to a pool, the loop lives in the code that owns the pool, because the retry is a second wave of submissions rather than a second call in place.
 
 \`\`\`cswidget
 {
@@ -492,15 +593,9 @@ Independent tasks are safe to parallelize. Shared mutable state is not. \`count 
 
 ### Running where there are no threads
 
-This in-browser sandbox (Pyodide/WASM) has no OS threads, so building a pool raises \`RuntimeError: can't start new thread\`. A portable helper tries the pool and falls back to a sequential map, producing identical ordered results everywhere:
+This in-browser sandbox (Pyodide/WASM) has no OS threads, so building a real pool raises \`RuntimeError: can't start new thread\`. The demo above therefore falls back to a plain comprehension, which is honest about one thing and misleading about another: the results match, and nothing about ordering or failure handling gets exercised, because a sequential comprehension has neither problem to solve.
 
-\`\`\`python
-try:
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        return list(executor.map(double, numbers))
-except RuntimeError:
-    return [double(n) for n in numbers]
-\`\`\`
+So the exercises in this lesson do not use \`concurrent.futures\` at all. They hand you a **fake executor** that has one method, \`submit(fn, arg)\`, returning a future with one method, \`result()\`. There is no \`map\` on it, deliberately: \`map\` would do the ordering work that is the whole point. Its \`as_completed\` shuffles the futures so completion order is visibly not input order, and its futures store an exception instead of a value when the call raises. Those three behaviours are the ones that survive the move to a real \`ThreadPoolExecutor\`, so the bookkeeping you write here is the bookkeeping you would write against the real API.
 
 **Interview nuance:** Interviewers often follow up with "what is the difference between concurrency and parallelism?" Concurrency is structuring work so tasks make progress by interleaving, which is what a thread pool and \`async\` give you under the GIL. Parallelism is tasks running at the same instant on different cores, which is what a process pool gives you (or the experimental free-threaded no-GIL build added in Python 3.13). So a \`ThreadPoolExecutor\` buys you concurrency and overlaps I/O waits, but only processes buy you CPU parallelism. Naming that distinction, and tying it to the GIL, is exactly the signal they are listening for.
 
@@ -548,21 +643,57 @@ except RuntimeError:
   apply: {
     id: "py-l4-concurrency-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`run_all(numbers)\` to return a list with each number doubled, in
-order. (This is the sequential baseline; the workspace step parallelizes it.)
+    // Time budget (counted): 24 read-only preamble lines to read, 8 lines to write.
+    estimatedMinutes: 8,
+    prompt: `Implement \`fetch_all(executor, urls)\` to return one size per url, **in input order**.
 
-\`run_all([1, 2, 3])\` is \`[2, 4, 6]\`.`,
-    starterCode: `def run_all(numbers):
-    # Return each number doubled, in order.
+Everything above the marked line in the editor is a read-only stand-in for \`concurrent.futures\`,
+because this runtime has no OS threads. \`executor.submit(fetch, url)\` gives you a future,
+\`as_completed(futures)\` yields those futures in an order that is not input order, and
+\`future.result()\` gives you the value. There is no \`map\`. Every url here succeeds, so there is
+nothing to handle but the ordering.
+
+\`fetch_all(executor, ["/c", "/a"])\` is \`[30, 10]\`.`,
+    starterCode: `${APPLY_PREAMBLE}
+
+def fetch_all(executor, urls):
+    """Return one size per url, in the order the urls were given. See the prompt."""
+    # TODO: submit every url, then put each finished result where its url sits in the input.
     pass`,
-    hints: ["A comprehension keeps order: `[n * 2 for n in numbers]`.", "Return the new list."],
-    referenceSolution: `def run_all(numbers):
-    return [n * 2 for n in numbers]`,
+    hints: [
+      "A future does not remember what was submitted to produce it, so record what you need beside each future as you submit it.",
+      "You know how many results there will be before any of them arrive, and you know where each one belongs. Appending as futures complete would give you completion order.",
+      "Build the pairing at submit time with a dict, then write each `future.result()` into the position that dict gives you.",
+    ],
+    referenceSolution: `${APPLY_PREAMBLE}
+
+def fetch_all(executor, urls):
+    pending = {}
+    for index, url in enumerate(urls):
+        pending[executor.submit(fetch, url)] = index
+
+    sizes = [None] * len(urls)
+    for future in as_completed(list(pending)):
+        sizes[pending[future]] = future.result()
+    return sizes`,
     testCases: [
-      { input: { numbers: [1, 2, 3] }, expected: [2, 4, 6], description: "doubles in order" },
-      { input: { numbers: [] }, expected: [], description: "empty input" },
-      { input: { numbers: [10] }, expected: [20], description: "single item" },
-      { input: { numbers: [5, 0, -1] }, expected: [10, 0, -2], description: "negatives and zero" },
+      {
+        input: { urls: ["/a", "/b", "/c"] },
+        expected: [10, 20, 30],
+        description: "sizes come back in input order",
+      },
+      {
+        input: { urls: ["/c", "/a", "/b", "/d"] },
+        expected: [30, 10, 20, 40],
+        description: "input order is not completion order",
+      },
+      { input: { urls: ["/e"] }, expected: [50], description: "a single url" },
+      {
+        input: { urls: ["/a", "/b", "/a"] },
+        expected: [10, 20, 10],
+        description: "the same url twice keeps both places",
+      },
+      { input: { urls: [] }, expected: [], description: "no urls" },
     ],
   },
   practice: {
@@ -575,7 +706,8 @@ This runtime has no OS threads, so \`harness/executor.py\` is a fake executor th
 an order that is not input order, and its futures carry no url and no index. Two files are yours:
 
 - \`pipeline/policy.py\`: \`should_retry(error, attempts)\` and \`give_up(url, error)\` decide which
-  failures deserve another attempt, which are recorded as size \`0\`, and which must reach the caller.
+  failures deserve another attempt, which are recorded as size \`0\`, and which the report cannot
+  stand behind. \`give_up\` always returns a value.
 - \`pipeline/collector.py\`: \`run_batch(executor, urls)\` returns
   \`{"sizes": [...], "retried": [...]}\` with sizes in **input order** and the retried urls in input
   order.
@@ -584,10 +716,14 @@ an order that is not input order, and its futures carry no url and no index. Two
 for the full contract. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "A finished future tells you nothing about where it belongs, so decide what you record beside each future at submit time.",
-      "Fill a results list you sized up front rather than appending, and keep an attempt count per position. Retries are a second pass over the positions that failed and are worth trying again.",
-      "The future you get back from `executor.submit` is itself hashable, so a dict from future to position is enough bookkeeping to pair `as_completed` output with the url it came from. `future.result()` is where a failure re-appears, so that call belongs inside a `try` and the caught exception goes to the policy. In `policy.give_up`, a permanent failure is the one case that leaves the function by being raised rather than returned.",
+      "You paired futures to positions in the Apply step. The new part is that a position can need a second attempt, so a failure has to be able to send its position round again.",
+      "Keep an attempt count per position alongside the sizes. A retry is a second wave of submissions over the positions that failed and are still worth trying, so the outer shape is a loop over waves.",
+      "`future.result()` is where a failure re-appears, so that call belongs in a `try` and the caught exception goes to the policy.",
     ],
+    // Time budget (counted, not guessed): 156 lines to read (README 34, harness/executor.py 38,
+    // workers/fetch.py 38, visible tests 46) at roughly 8 lines a minute, plus about 34 lines to
+    // write across two files at roughly 2 minutes a line for the wave loop and the pairing dict.
+    estimatedMinutes: 32,
     workspace: {
       language: "python",
       primaryFilePath: "pipeline/collector.py",
