@@ -479,7 +479,7 @@ export const theOtherCallerLesson: PythonLesson = {
   title: "The other caller of the code you changed",
   summary:
     "Change a shared helper without breaking its second caller: map every call site, keep both contracts, and move the special case into the layer that wants it.",
-  estimatedMinutes: 26,
+  estimatedMinutes: 32,
   difficulty: "medium",
   skills: ["code reading", "code review", "minimal change", "regression tests"],
   teach: {
@@ -702,6 +702,7 @@ print("ceil:  billing is right, ops gets paged a minute early.")
 print("No single body satisfies both, so the difference belongs in a caller.")`,
   },
   apply: {
+    estimatedMinutes: 13,
     id: "py-l5-the-other-caller-apply",
     executionMode: "workspace",
     prompt: `Fix the early alerts without losing yesterday's usage fix: restore the documented
@@ -807,6 +808,7 @@ Some tests are hidden.`,
     },
   },
   practice: {
+    estimatedMinutes: 10,
     id: "py-l5-the-other-caller-practice",
     executionMode: "workspace",
     prompt: `Payroll grouping broke the day after a generated change made week starts land on

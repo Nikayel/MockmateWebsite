@@ -501,7 +501,7 @@ export const whereTheRuleLivesLesson: PythonLesson = {
   title: "Find where the rule lives",
   summary:
     "Trace one reported symptom across a small service to the duplicated business rule that drifted, then fix it in the layer that owns it.",
-  estimatedMinutes: 24,
+  estimatedMinutes: 31,
   difficulty: "medium",
   skills: ["code reading", "tracing", "code review", "minimal change"],
   teach: {
@@ -717,6 +717,7 @@ print(f"The copies disagree from {disagreements[0]} to {disagreements[-1]} cents
 print("Same rule, two homes. The drift zone is where customers see two prices.")`,
   },
   apply: {
+    estimatedMinutes: 11,
     id: "py-l5-where-the-rule-lives-apply",
     executionMode: "workspace",
     prompt: `Fix \`orders/checkout.py\` so it takes its shipping figure from the documented rule in
@@ -815,6 +816,7 @@ read-only files. Some tests are hidden.`,
     },
   },
   practice: {
+    estimatedMinutes: 11,
     id: "py-l5-where-the-rule-lives-practice",
     executionMode: "workspace",
     prompt: `Your helpdesk's ticket list and ticket page disagree about which tickets are escalated.
