@@ -27,15 +27,19 @@ import { describe, expect, it } from "vitest"
 import { buildSystemDesignCoverage, isBareLesson } from "../coverage"
 
 /**
- * Measured 2026-08-13 by `pnpm audit:sd`. Lower these as batches land; never raise them.
+ * Measured by `pnpm audit:sd`. Lower these as batches land; never raise them.
  *
  * - `bareLessons`: no check, no diagram, no simulation. Nothing to answer, nothing to see.
- * - `lessonsWithoutChecks`: 76 of these are the whole of L7, L9, L10 and L11, plus 2 in L6.
+ * - `lessonsWithoutChecks`: every lesson now asks the learner at least one question.
  * - `lessonsWithoutDiagramOrSim`: the visual gap, which is corpus-wide and not only in the tail.
+ *   This is the one still open, and SD-W6 is what lowers it.
+ *
+ * The first two reached zero on 2026-08-13, so they are no longer ratchets but floors: there is
+ * nowhere left to descend, and any movement at all is a regression.
  */
 const PINS = {
-  bareLessons: 44,
-  lessonsWithoutChecks: 78,
+  bareLessons: 0,
+  lessonsWithoutChecks: 0,
   lessonsWithoutDiagramOrSim: 105,
 } as const
 
@@ -49,7 +53,7 @@ const PINS = {
  *
  * Unlike the pins above, this one moves UP as batches land.
  */
-const MINIMUM_TOTAL_CHECKS = 343
+const MINIMUM_TOTAL_CHECKS = 516
 
 describe("system design coverage ratchet", () => {
   const coverage = buildSystemDesignCoverage()
@@ -92,13 +96,10 @@ describe("system design coverage ratchet", () => {
     )
   })
 
-  it("keeps every level that has checks today still carrying them", () => {
-    // The four levels at zero are the known gap. The other eight are finished work, and a sweep
-    // through a neighbouring level must not quietly cost them coverage.
-    const finished = coverage.levels.filter(
-      (level) => !["7", "9", "10", "11"].includes(String(level.levelId))
-    )
-    for (const level of finished) {
+  it("keeps every level carrying checks", () => {
+    // Previously this exempted L7, L9, L10 and L11, which were the known gap. They are not a gap
+    // any more, so the exemption is gone and all twelve levels are held to the same rule.
+    for (const level of coverage.levels) {
       expect(
         level.checks,
         `level ${level.levelId} (${level.slug}) lost its checks`
