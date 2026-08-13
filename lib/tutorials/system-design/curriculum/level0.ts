@@ -1102,13 +1102,15 @@ Retention belongs in the storage formula, not this one. A service holding 4.5 TB
 reads land almost entirely on the last week has an actively-read dataset of roughly 350 GB, and an
 80/20 cut on that suggests roughly 70 GB of hot data. Size the cache off the full 4.5 TB instead and
 you quote 900 GB, more than 10x what the read distribution asks for, and that error grows every time
-someone extends retention. Verify the hit rate assumption: if 100 GB of cache yields a 90%+ hit rate,
-you have removed 90% of read load from the datastore, which is what justifies the cache economically.
+someone extends retention. Then verify the hit rate the number buys you: 70 GB serving an 80% hit
+rate has removed four fifths of the read load from the datastore, which is what justifies the cache
+economically.
 
 Chasing a higher hit rate costs disproportionately more cache, not proportionally more. The skew that
 lets 20% of the data serve 80% of reads also means the leftover requests are spread thin across the
-long tail, so going from an 80% to a 90% hit rate roughly doubles the cache, and 99% needs most of the
-actively-read slice. Each extra nine is bought at a worse price than the one before it.
+long tail, so going from an 80% to a 90% hit rate costs a bit more than double (70 GB becomes about
+164 GB on this service), and 99% needs most of the actively-read slice. Each extra nine is bought at a
+worse price than the one before it.
 
 \`\`\`cswidget
 {
@@ -1187,7 +1189,7 @@ actively-read slice. Each extra nine is bought at a worse price than the one bef
     },
     {
       "id": "actively_read",
-      "label": "Actively read data (last 7 days)",
+      "label": "Actively read data (recency window)",
       "expr": "records_per_day * bytes_per_record * min(retention_days, 7)",
       "format": "bytes"
     },
