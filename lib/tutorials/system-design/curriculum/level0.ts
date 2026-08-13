@@ -871,7 +871,7 @@ a senior signal.
       "About 500,000"
     ]
   },
-  "workedExample": "At the initial values (50M DAU, 0.5 posts per user per day, 200 followers, push delivery) the posts table sees only 250 average write QPS, but push fan-out multiplies that into 50,000 feed inserts per second, while feed reads at 20 opens per user per day run 10,000 QPS for a 40:1 read:write ratio. Switch the strategy to pull to collapse the fan-out back to 250, then drag followers toward 10M to see why celebrities break pure push and why the hybrid caps the damage.",
+  "workedExample": "At the initial values (50M DAU, 0.5 posts per user per day, 200 followers, push delivery) the posts table sees only 250 average write QPS, but push fan-out multiplies that into 50,000 feed inserts per second, while feed reads at 20 opens per user per day run 10,000 QPS for a 40:1 read:write ratio. Switch the strategy to pull to collapse the fan-out back to 250, then drag followers toward 10M to see why celebrities break pure push. On hybrid the fan-out falls off a cliff at the 100k cutoff, because authors past it are pulled at read time instead of pushed.",
   "inputs": [
     {
       "kind": "slider",
@@ -917,7 +917,7 @@ a senior signal.
           "value": 1
         },
         {
-          "label": "Hybrid: push, capped at a 100k-follower celebrity cutoff",
+          "label": "Hybrid: push below a 100k-follower cutoff, pull above it",
           "value": 100000
         }
       ],
@@ -935,7 +935,7 @@ a senior signal.
     {
       "id": "fanout_write_qps",
       "label": "Effective fan-out write QPS",
-      "expr": "write_qps * min(followers, strategy_cap)",
+      "expr": "write_qps * max(1, followers * min(1, floor(strategy_cap / followers)))",
       "format": "compact",
       "unit": "QPS",
       "sparkline": {
@@ -957,7 +957,7 @@ a senior signal.
       "unit": ":1"
     }
   ],
-  "caption": "The naive write QPS understates the real load: the strategy multiplier decides where the fan-out cost lands."
+  "caption": "The naive write QPS understates the real load: the delivery strategy decides where the fan-out cost lands, and hybrid moves it off the write path once an author passes the cutoff."
 }
 \`\`\`
 
@@ -1089,18 +1089,26 @@ signal, because the CDN serves it from the edge and shields the origin.
 ### Cache sizing with the 80/20 rule
 
 You do not cache the whole corpus; you cache the hot working set. The Pareto assumption is that ~20%
-of data serves ~80% of requests, and often it is far more skewed (the recent and the viral). Size the
-cache from that hot fraction:
+of data serves ~80% of requests, and often it is far more skewed (the recent and the viral). That is
+two steps, in this order: first cut the retained corpus down to the slice that still gets read, then
+take the hot fraction of that slice.
 
 \`\`\`
-cache size ~= hot fraction (~20%) of the actively-read dataset
+actively-read dataset = objects/day  x  object size  x  recency window (days still being read)
+cache size           ~= hot fraction (~20%)  x  actively-read dataset
 \`\`\`
 
-For a service with a 4.5 TB actively-read dataset, an 80/20 cut suggests roughly 900 GB of hot data,
-but in practice the truly hot set is the last few days plus trending items, often a much smaller
-absolute number like tens to low hundreds of GB. Verify the hit rate assumption: if 100 GB of cache
-yields a 90%+ hit rate, you have removed 90% of read load from the datastore, which is what justifies
-the cache economically.
+Retention belongs in the storage formula, not this one. A service holding 4.5 TB over 90 days whose
+reads land almost entirely on the last week has an actively-read dataset of roughly 350 GB, and an
+80/20 cut on that suggests roughly 70 GB of hot data. Size the cache off the full 4.5 TB instead and
+you quote 900 GB, more than 10x what the read distribution asks for, and that error grows every time
+someone extends retention. Verify the hit rate assumption: if 100 GB of cache yields a 90%+ hit rate,
+you have removed 90% of read load from the datastore, which is what justifies the cache economically.
+
+Chasing a higher hit rate costs disproportionately more cache, not proportionally more. The skew that
+lets 20% of the data serve 80% of reads also means the leftover requests are spread thin across the
+long tail, so going from an 80% to a 90% hit rate roughly doubles the cache, and 99% needs most of the
+actively-read slice. Each extra nine is bought at a worse price than the one before it.
 
 \`\`\`cswidget
 {
@@ -1115,7 +1123,7 @@ the cache economically.
       "About 45 TB"
     ]
   },
-  "workedExample": "At the initial 50M records per day, 1,000 bytes each, and 90 days of retention, raw storage lands at 4.5 TB and ingress is a modest 500 KB/s, while the 80/20 cut sizes the hot cache at roughly 900 GB for the 80% hit target. Push bytes per record up to 2 MB (a photo instead of a row) and watch storage jump three orders of magnitude toward petabytes.",
+  "workedExample": "At the initial 50M records per day, 1,000 bytes each, and 90 days of retention, raw storage lands at 4.5 TB and ingress is a modest 500 KB/s, but only the last 7 days of that corpus is still being read, about 350 GB, so the 80/20 cut sizes the hot cache at roughly 70 GB for the 80% hit target. Drag retention out to 5 years and storage grows while the cache holds still, because the extra years are stored, not read. Push the hit target toward 99 and the cache climbs into the hundreds of GB, since each extra point has to reach further into the long tail.",
   "inputs": [
     {
       "kind": "slider",
@@ -1178,13 +1186,19 @@ the cache economically.
       "unit": "/s"
     },
     {
+      "id": "actively_read",
+      "label": "Actively read data (last 7 days)",
+      "expr": "records_per_day * bytes_per_record * min(retention_days, 7)",
+      "format": "bytes"
+    },
+    {
       "id": "cache_size",
-      "label": "Hot cache size (80/20 rule)",
-      "expr": "storage_total * 0.2 * cache_hit_target / 80",
+      "label": "Hot cache size for that hit target",
+      "expr": "actively_read * pow(cache_hit_target / 100, 7.2)",
       "format": "bytes"
     }
   ],
-  "caption": "Raw storage before replication and index overhead; the hot 20% scales up as you chase a hit rate above 80."
+  "caption": "Raw storage before replication and index overhead; the cache is sized off the actively read window, not the retained corpus, and each extra point of hit rate costs disproportionately more of it."
 }
 \`\`\`
 
@@ -1199,7 +1213,8 @@ hot 20% of reads -> cache size -> target hit rate -> read load removed
 
 Recap: size storage as objects x size x retention with metadata and blobs kept separate, multiply by
 replication factor and add index overhead, compute ingress and egress bandwidth separately (egress
-drives CDN), and size the cache from the hot ~20% against a target hit rate.
+drives CDN), and size the cache from the hot ~20% of the actively read window against a target hit
+rate.
 
 \`\`\`cswidget
 {
