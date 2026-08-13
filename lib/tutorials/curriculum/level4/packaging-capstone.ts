@@ -16,6 +16,21 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // package's public face. The hidden suite grades the seams, not the numbers: a brand new format
 // registered through the public `register` decorator and a stranger transport object injected at
 // the entry point must both work with zero further edits.
+//
+// The depth spec's "at most two levers" ceiling is deliberately exceeded here and nowhere else in
+// the level: composing the level IS this exercise's subject, and every file is a lever the level
+// already taught. The cost is paid down in scaffolding instead. Teach used to spend its second
+// half on money arithmetic (a `summarize` over raw orders, banker's rounding, how to store money)
+// with no relationship to packaging, and Apply was that same money function; both are now about
+// the package. The four APIs the reference used that no fence demonstrated (`feedstore.config`,
+// `feedstore.pipeline`, `FlakyTransport`, and the injected `pipeline` seam) each have one now.
+//
+// Time budget (counted, not guessed). Teach 9: ~1,150 prose words, three checks, a layout block
+// and three code fences. Apply 15: 40 provided lines to read (the source, two parsers, the table),
+// 13 to write across the two boundaries the package owns. Practice 61: 75 lines of README, 26 of
+// read-only transport, 112 to write across four files, and the four seams that carry it.
+// 9 + 15 + 61 = 85, the lesson total. The Practice-to-Apply ratio lands at 8.6x, inside the spec's
+// 12x smell threshold, against 16x before this pass.
 // ───────────────────────────────────────────────────────────────────────────
 
 const CAPSTONE_README = buildBrief({
@@ -596,7 +611,7 @@ export const packagingCapstoneLesson: PythonLesson = {
   difficulty: "hard",
   skills: ["packaging", "capstone", "type-hints", "testing"],
   teach: {
-    estimatedMinutes: 7,
+    estimatedMinutes: 9,
     markdown: `## Packaging: the last mile
 
 Your code only creates value once someone else can run it. Packaging is how you hand a colleague \`pip install feedstore\` instead of a folder and a prayer. A published package pins your version, declares its dependencies, and installs the same way on every machine, which is exactly what CI, Docker images, and teammates depend on.
@@ -644,46 +659,127 @@ The \`py3-none-any\` tag means pure Python, any interpreter, any OS. Nothing to 
 
 A shippable library is **structured** (a clean package with clear entry points), **typed** (hints on the public API so callers and \`mypy\` know the contract), **validated** (untrusted input parsed into typed values at the boundary), and **tested** (\`pytest\` over the real cases, run in CI). Your capstone hits all four.
 
-### Parsing at the boundary
+### Submodules do the work; \`__init__.py\` is the face
 
-Raw input is not your model. Each raw order arrives as a dict whose \`"amount"\` is a *string*, so \`summarize\` must parse it into a number before it can do arithmetic:
+Inside the wheel your package is a directory of submodules, one per job. A caller should not have to learn that map. They import from the package root, and \`__init__.py\` is where the root's names come from:
 
-\`\`\`python
-def summarize(raw_orders):
-    paid = [o for o in raw_orders if o["paid"]]
-    revenue = round(sum(float(o["amount"]) for o in paid), 2)
-    return {"count": len(raw_orders), "paid": len(paid), "revenue": revenue}
-
-rows = [{"amount": "10.0", "paid": True}, {"amount": "5.0", "paid": False}]
-print(summarize(rows))
-# {'count': 2, 'paid': 1, 'revenue': 10.0}
+\`\`\`text
+feedstore/
+    __init__.py     the public face: re-exports + the entry point
+    config.py       raw env mapping -> typed settings
+    parsers.py      the parser table and its lookup
+    pipeline.py     one run: fetch, parse, filter, report
+    transport.py    the feed source
 \`\`\`
 
-\`count\` is every order, \`paid\` is how many cleared, and \`revenue\` sums only the paid amounts. The capstone package has the same job at two boundaries: raw environment values become typed settings, and the raw text of a feed becomes rows.
+\`\`\`python
+# feedstore/__init__.py
+from feedstore.config import Settings, load_settings
+from feedstore.pipeline import Pipeline
+from feedstore.transport import FlakyTransport, TransportError
+
+__all__ = ["FlakyTransport", "Pipeline", "Settings", "TransportError", "load_settings", "run_feed"]
+
+
+def run_feed(env, transport):
+    return Pipeline(load_settings(env), transport).run()
+\`\`\`
+
+Now \`from feedstore import run_feed, FlakyTransport\` works, and \`feedstore.pipeline\` is free to be reorganised tomorrow without breaking a single caller. That is the point of the indirection: the import path is a contract, and a submodule path is a contract you did not mean to make.
+
+\`__all__\` is a plain list of strings that does exactly two things. It is the list \`from feedstore import *\` copies, and it is the documented public surface that linters and doc tools read. It does not hide anything: \`feedstore.config\` is still importable by anyone who wants it. It is a promise about what you will keep working, not a lock.
 
 \`\`\`cswidget
 {
   "type": "check",
   "kind": "predict",
-  "id": "round-once-at-the-end",
-  "prompt": "Each line total is unit_price times quantity times 1.0825 for tax, so the raw amounts carry many decimals. To keep the running total tidy you round each one to cents before adding it. Ten thousand orders later, how does your revenue compare to summing first and rounding once?",
+  "id": "what-dunder-all-actually-does",
+  "prompt": "You leave the internal PARSERS table out of feedstore.__all__. A caller then writes 'from feedstore.parsers import PARSERS' and mutates it. What happened?",
   "options": [
     {
-      "label": "Identical. Money is measured in cents anyway, so rounding earlier changes nothing",
-      "feedback": "It feels safe because every intermediate value looks like a real price. Each round throws away up to half a cent, and ten thousand discarded halves do not reliably cancel out."
-    },
-    {
-      "label": "It drifts away from the true total, because every intermediate round discards information permanently",
+      "label": "Nothing stopped them. __all__ only governs star-imports and documents intent",
       "correct": true,
-      "feedback": "Right, and this is why finance systems specify exactly where rounding happens. Carry full precision through the arithmetic and round once, at the moment a human or a ledger needs a number."
+      "feedback": "Right, and this is the whole reason a leading underscore is a convention rather than a guarantee. Python has no private. What you get is a stated surface, and the argument you can point at in review when someone reaches around it."
     },
     {
-      "label": "It is more accurate, since the total never carries sub-cent noise",
-      "feedback": "An appealing argument, and it is the one that gets this shipped. Sub-cent noise in an intermediate value is not an error, it is information. Deleting it early is what turns it into one."
+      "label": "The import raises ImportError, because a name absent from __all__ is not exported",
+      "feedback": "That would make __all__ an access-control mechanism, which is how most people first read it. It is only consulted by 'import *', and a direct submodule import never asks it anything."
     },
     {
-      "label": "It only matters if the amounts are floats. With Decimal the two orders of operations agree",
-      "feedback": "Decimal does fix representation, so 0.1 plus 0.2 is exactly 0.3. It does not restore digits you already rounded off, so early rounding loses the same money whatever the type."
+      "label": "It works, but only because parsers.py has no __all__ of its own",
+      "feedback": "Reasonable, and it correctly guesses that __all__ is per-module. Adding one to parsers.py would still not block the direct import, because __all__ never gates ordinary attribute access."
+    },
+    {
+      "label": "The name is importable but read-only, since module-level names outside __all__ are frozen",
+      "feedback": "Nothing in Python freezes a module attribute, and a dict would be mutable regardless of the name it is bound to. Genuinely protecting that table means not exposing the object, for example handing back a copy."
+    }
+  ]
+}
+\`\`\`
+
+### Hand the package its dependencies
+
+The sandbox has no network, so the feed source here is a stand-in. That constraint is also the design lesson: a package that *constructs* its own I/O client cannot be tested, replaced, or reused. A package that is *given* one can be all three. The retry policy is yours; the thing being retried is the caller's:
+
+\`\`\`python
+class TransportError(RuntimeError):
+    """One attempt failed. A later attempt may still succeed."""
+
+
+class FlakyTransport:
+    """A source that fails its first fail_times calls, then succeeds."""
+
+    def __init__(self, payload, fail_times=0):
+        self.payload = payload
+        self.fail_times = fail_times
+        self.calls = 0
+
+    def fetch(self):
+        self.calls += 1
+        if self.calls <= self.fail_times:
+            raise TransportError("fetch attempt " + str(self.calls) + " failed")
+        return self.payload
+
+
+def fetch_with_retries(transport, max_attempts):
+    last_error = None
+    for _ in range(max_attempts):
+        try:
+            return transport.fetch()
+        except TransportError as error:
+            last_error = error       # survives the except block; the bare name would not
+    raise last_error
+
+
+source = FlakyTransport("a1,7\\n", fail_times=2)
+print(fetch_with_retries(source, 3), source.calls)   # a1,7  3
+\`\`\`
+
+Two details there are worth stealing. The loop is bounded by an *attempt count*, not by "until it works", so a source that is genuinely down fails in bounded time instead of hanging. And the last error is captured into a variable, because Python deletes the \`except ... as error\` name at the end of the block: reading \`error\` after the \`for\` loop is a \`NameError\`.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "injected-vs-constructed-dependency",
+  "prompt": "Pipeline takes its transport as a constructor argument rather than building a FlakyTransport itself. A colleague calls that indirection for its own sake. What does the argument actually buy?",
+  "options": [
+    {
+      "label": "Any object with fetch() can be passed in, so the package works with sources it has never heard of and can be tested without one",
+      "correct": true,
+      "feedback": "Right, and note that no interface declaration was needed for it. Duck typing means the contract is the fetch() method, so a test double, a cached reader, and next year's real client all substitute freely."
+    },
+    {
+      "label": "It makes the pipeline faster, since the transport is built once and reused",
+      "feedback": "True as a side effect and irrelevant as a reason: you could cache a self-constructed client just as easily. The win is about who chooses the object, not how many times it is built."
+    },
+    {
+      "label": "It lets mypy verify the transport, which it could not do for a locally constructed one",
+      "feedback": "Backwards. A locally constructed object has a concrete known type, so it is the easier one to check. An injected parameter is exactly what needs a Protocol annotation before mypy can say anything useful."
+    },
+    {
+      "label": "It is required for packaging, because a wheel cannot contain code that instantiates network clients at import time",
+      "feedback": "A wheel happily contains anything. There is a real rule near here though: doing I/O at import time is a genuine packaging sin, because importing your package should never open a socket."
     }
   ]
 }
@@ -691,134 +787,209 @@ print(summarize(rows))
 
 ### Pitfalls
 
-- \`int("10.0")\` raises \`ValueError\` because \`"10.0"\` is not an integer literal. Parse decimal strings with \`float("10.0")\`.
-- Round once, at the very end. Sum first, then \`round(total, 2)\`. Floats cannot hold most decimals exactly, so \`0.1 + 0.2 == 0.3\` is \`False\` (it is \`0.30000000000000004\`), and rounding after each addition compounds that error.
+- Work at import time is work every caller pays for, including the test suite and the CLI's \`--help\`. Reading a config file, opening a connection, or calling an API from module scope makes your package slow and fragile to import. Define things at import time; do things when called. The one deliberate exception is registration: a \`@register("csv")\` decorator runs at import, which is precisely why the module defining the parsers has to be imported for them to exist.
+- A submodule that is never imported does not run. If \`feedstore/__init__.py\` never touches \`feedstore.parsers\`, no \`@register\` in that file has fired, and the table is empty in a way that looks like the decorator is broken.
 
-\`\`\`cswidget
-{
-  "type": "check",
-  "kind": "predict",
-  "id": "bankers-rounding-half-to-even",
-  "prompt": "A refund calculation lands on exactly 0.125 and you write round(0.125, 2). What comes back?",
-  "options": [
-    {
-      "label": "0.13, rounding the half up the way everyone was taught in school",
-      "feedback": "The rule almost every human uses, and it is why this shows up as a one cent discrepancy in a reconciliation report. Python rounds a tie to the nearest EVEN digit instead, so 2 wins over 3."
-    },
-    {
-      "label": "0.12, because Python rounds a tie to the nearest even digit",
-      "correct": true,
-      "feedback": "Right. Rounding half up biases every tie upward, and over a large ledger that bias accumulates. Half to even splits the ties, which is why it is the standard for money and statistics."
-    },
-    {
-      "label": "0.13, because round() works on the printed decimal text rather than the underlying float",
-      "feedback": "Worth discarding explicitly: round() operates on the binary value, never on its printed form. That distinction is exactly why round(2.675, 2) surprises people by giving 2.67."
-    },
-    {
-      "label": "0.12, but only by luck, since 0.125 is not exactly representable and lands just under the midpoint",
-      "feedback": "Sharp instinct, and it is the right explanation for round(2.675, 2). It does not apply here: 0.125 is one eighth, which binary floats hold exactly, so this really is a tie and the even rule decides it."
-    }
-  ]
-}
-\`\`\`
-
-**Interview nuance:** \`float\` cannot represent most base-10 fractions exactly, so a long chain of price additions drifts. \`round(total, 2)\` cleans up the display but not the stored value, and \`round\` uses banker's rounding, so \`round(0.125, 2)\` gives \`0.12\` (rounded to even), not \`0.13\`. Production money code stores integer cents or uses \`Decimal\`; reach for \`float\` only when a tiny rounding error is acceptable.
-
-\`\`\`cswidget
-{
-  "type": "check",
-  "kind": "predict",
-  "id": "how-to-store-money",
-  "prompt": "You are designing the orders table and the matching Python model for a real payments service. How should an amount be stored?",
-  "options": [
-    {
-      "label": "As a float, rounded to two decimals whenever it is displayed",
-      "feedback": "Simplest, and it is what the warm-up does because the numbers are small and rounded exactly once. In a payments service the drift eventually shows up as a ledger that does not balance, and nobody can tell you which cent went missing."
-    },
-    {
-      "label": "As an integer number of cents, converted to a display amount only at the boundary",
-      "correct": true,
-      "feedback": "Right. Integers are exact, they add without any representation error, and every arithmetic bug is pushed to the one conversion at the edge where you can test it. A NUMERIC column read into Decimal is the other defensible answer."
-    },
-    {
-      "label": "As a Decimal in Python, on top of a float column in the database",
-      "feedback": "Half of a good design, and the half people usually get right. The float column undoes it on every write and read, so the exactness only survives inside one process."
-    },
-    {
-      "label": "As a float in storage but Decimal in Python, since the precision only matters during arithmetic",
-      "feedback": "Storage is arithmetic's input, so the error is already baked in before you compute anything. Precision has to hold at every step, not only in the step you are looking at."
-    }
-  ],
-  "reveal": "This is the last habit of the level and it generalises past money: decide where exactness is required, keep the exact representation everywhere inside that boundary, and convert only at the edges where a human or another system needs a different shape."
-}
-\`\`\``,
-    demoCode: `from dataclasses import dataclass
+**Interview nuance:** "how do you ship it" is a design question wearing an ops costume. The answers that carry weight are the ones about boundaries: \`pyproject.toml\` as declarative metadata a tool reads without executing your code, a package root that is a deliberate public surface rather than whatever files happen to exist, untrusted input parsed into typed values once at the edge, and dependencies handed in rather than constructed, so the package can be tested at all. Version and upload are the easy part.`,
+    demoCode: `# One package, two boundaries: raw env -> typed settings, raw text -> rows.
+from dataclasses import dataclass
 
 
-@dataclass
-class Order:
-    id: int
-    amount: float
-    paid: bool
+@dataclass(frozen=True)
+class Settings:
+    source_format: str
+    min_score: int
 
 
-orders = [Order(1, 10.0, True), Order(2, 5.0, False)]
-paid = [o for o in orders if o.paid]
-print({"count": len(orders), "paid": len(paid), "revenue": round(sum(o.amount for o in paid), 2)})`,
+def load_settings(env):
+    raw = (env.get("FEED_MIN_SCORE") or "").strip()
+    return Settings(
+        source_format=(env.get("FEED_FORMAT") or "").strip() or "csv",
+        min_score=int(raw) if raw else 0,
+    )
+
+
+print(load_settings({}))
+print(load_settings({"FEED_FORMAT": "pipe", "FEED_MIN_SCORE": " 5 "}))`,
   },
   apply: {
     id: "py-l4-packaging-capstone-apply",
+    estimatedMinutes: 15,
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`summarize(raw_orders)\`. Each raw order is a dict with
-\`"amount"\` (a numeric string) and \`"paid"\` (a bool). Return
-\`{"count": <all>, "paid": <paid>, "revenue": <sum of paid amounts, rounded to 2>}\`.
+    prompt: `Implement \`load_settings(env)\` and \`run_feed(env, source)\`, the two boundaries a package like
+this owns.
 
-For one paid \`"10.0"\` and one unpaid \`"5.0"\`, revenue is \`10.0\`.`,
-    starterCode: `def summarize(raw_orders):
-    # count all, count paid, and sum paid amounts (float) rounded to 2 decimals.
-    pass`,
+\`load_settings(env)\` turns a raw env mapping into \`{"source_format": str, "min_score": int}\`.
+\`FEED_FORMAT\` defaults to \`"csv"\` and \`FEED_MIN_SCORE\` defaults to \`0\`; a key that is missing,
+empty, or only whitespace takes its default, and \`min_score\` comes back as an \`int\` rather than
+the string the environment gave you.
+
+\`run_feed(env, source)\` is the entry point. It loads the settings, fetches the raw feed from the
+\`source\` it was handed, parses it with the parser \`PARSERS\` holds for that format, keeps the rows
+whose \`score\` is at least \`min_score\`, and returns
+\`{"format": ..., "calls": ..., "parsed": ..., "kept": ...}\`, where \`calls\` is how many times the
+source was fetched. \`run_feed\` must never construct a source of its own: the graded \`report\` shim
+builds one and hands it in.
+
+\`report({"FEED_MIN_SCORE": "5"}, "a1,7\\nb2,3\\nc3,9\\n")\` is
+\`{"format": "csv", "calls": 1, "parsed": 3, "kept": 2}\`.`,
+    starterCode: `DEFAULT_FORMAT = "csv"
+DEFAULT_MIN_SCORE = 0
+
+
+class FeedSource:
+    """The partner feed source. Provided: it hands back its payload and counts the calls."""
+
+    def __init__(self, payload):
+        self.payload = payload
+        self.calls = 0
+
+    def fetch(self):
+        self.calls += 1
+        return self.payload
+
+
+def parse_csv(text):
+    rows = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        item_id, score = line.split(",")
+        rows.append({"id": item_id.strip(), "score": int(score)})
+    return rows
+
+
+def parse_pipe(text):
+    rows = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        item_id, score = line.split("|")
+        rows.append({"id": item_id.strip(), "score": int(score)})
+    return rows
+
+
+PARSERS = {"csv": parse_csv, "pipe": parse_pipe}
+
+
+def load_settings(env):
+    # TODO: read the two env keys, fall back to the defaults when a value is missing or blank,
+    # and give min_score its numeric type.
+    return {}
+
+
+def run_feed(env, source):
+    # TODO: settings, then the feed text from the source you were given, then the parser for
+    # this run's format, then the rows that clear the floor, then the report.
+    return {}
+
+
+def report(env, payload):
+    """Graded entry point: builds a source, then hands it to run_feed."""
+    return run_feed(env, FeedSource(payload))`,
     hints: [
-      'Filter paid orders: `[o for o in raw_orders if o["paid"]]`.',
-      'Revenue: `round(sum(float(o["amount"]) for o in paid), 2)`.',
-      "Return the three keys: `count`, `paid`, `revenue`.",
+      '`env.get(key)` can hand back `None` or `"  "`, and both of those mean the same thing here: use the default. Strip first, then decide.',
+      "`run_feed` composes four things it does not implement: `load_settings`, `source.fetch()`, `PARSERS[...]`, and a filter over the parsed rows. Every one of the four report keys is available once those have run.",
+      '`(env.get("FEED_FORMAT") or "").strip() or DEFAULT_FORMAT` collapses both blank cases; `int(raw)` gives `min_score` its type; `source.calls` is where the fetch count already lives.',
     ],
-    referenceSolution: `def summarize(raw_orders):
-    paid = [o for o in raw_orders if o["paid"]]
+    referenceSolution: `DEFAULT_FORMAT = "csv"
+DEFAULT_MIN_SCORE = 0
+
+
+class FeedSource:
+    """The partner feed source. Provided: it hands back its payload and counts the calls."""
+
+    def __init__(self, payload):
+        self.payload = payload
+        self.calls = 0
+
+    def fetch(self):
+        self.calls += 1
+        return self.payload
+
+
+def parse_csv(text):
+    rows = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        item_id, score = line.split(",")
+        rows.append({"id": item_id.strip(), "score": int(score)})
+    return rows
+
+
+def parse_pipe(text):
+    rows = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        item_id, score = line.split("|")
+        rows.append({"id": item_id.strip(), "score": int(score)})
+    return rows
+
+
+PARSERS = {"csv": parse_csv, "pipe": parse_pipe}
+
+
+def load_settings(env):
+    raw_score = (env.get("FEED_MIN_SCORE") or "").strip()
     return {
-        "count": len(raw_orders),
-        "paid": len(paid),
-        "revenue": round(sum(float(o["amount"]) for o in paid), 2),
-    }`,
+        "source_format": (env.get("FEED_FORMAT") or "").strip() or DEFAULT_FORMAT,
+        "min_score": int(raw_score) if raw_score else DEFAULT_MIN_SCORE,
+    }
+
+
+def run_feed(env, source):
+    settings = load_settings(env)
+    rows = PARSERS[settings["source_format"]](source.fetch())
+    kept = [row for row in rows if row["score"] >= settings["min_score"]]
+    return {
+        "format": settings["source_format"],
+        "calls": source.calls,
+        "parsed": len(rows),
+        "kept": len(kept),
+    }
+
+
+def report(env, payload):
+    """Graded entry point: builds a source, then hands it to run_feed."""
+    return run_feed(env, FeedSource(payload))`,
     testCases: [
       {
-        input: {
-          raw_orders: [
-            { id: 1, amount: "10.0", paid: true },
-            { id: 2, amount: "5.0", paid: false },
-          ],
-        },
-        expected: { count: 2, paid: 1, revenue: 10.0 },
-        description: "one paid, one not",
+        input: { env: { FEED_MIN_SCORE: "5" }, payload: "a1,7\nb2,3\nc3,9\n" },
+        expected: { format: "csv", calls: 1, parsed: 3, kept: 2 },
+        description: "the csv default, with a score floor",
       },
       {
-        input: { raw_orders: [] },
-        expected: { count: 0, paid: 0, revenue: 0 },
-        description: "empty",
+        input: { env: {}, payload: "a1,7\nb2,3\n" },
+        expected: { format: "csv", calls: 1, parsed: 2, kept: 2 },
+        description: "an empty env falls back to csv and a floor of 0",
       },
       {
-        input: {
-          raw_orders: [
-            { id: 1, amount: "3.0", paid: true },
-            { id: 2, amount: "7.0", paid: true },
-          ],
-        },
-        expected: { count: 2, paid: 2, revenue: 10.0 },
-        description: "all paid",
+        input: { env: { FEED_FORMAT: "pipe", FEED_MIN_SCORE: "4" }, payload: "b2|3\nc3|9\n" },
+        expected: { format: "pipe", calls: 1, parsed: 2, kept: 1 },
+        description: "a different format is looked up in the table",
+      },
+      {
+        input: { env: { FEED_FORMAT: "   ", FEED_MIN_SCORE: " " }, payload: "a1,7\n" },
+        expected: { format: "csv", calls: 1, parsed: 1, kept: 1 },
+        description: "blank values fall back to the defaults",
+      },
+      {
+        input: { env: { FEED_MIN_SCORE: "100" }, payload: "a1,7\nb2,3\n" },
+        expected: { format: "csv", calls: 1, parsed: 2, kept: 0 },
+        description: "a floor nothing clears still parses",
+      },
+      {
+        input: { env: {}, payload: "" },
+        expected: { format: "csv", calls: 1, parsed: 0, kept: 0 },
+        description: "an empty feed",
       },
     ],
   },
   practice: {
     id: "py-l4-packaging-capstone-practice",
+    estimatedMinutes: 61,
     executionMode: "workspace",
     prompt: `Capstone: ship the \`feedstore\` package so a caller can read one partner feed through its
 public API alone. Four files are yours: \`feedstore/config.py\` builds the run's settings from an
