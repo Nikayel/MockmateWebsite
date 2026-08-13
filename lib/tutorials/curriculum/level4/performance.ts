@@ -2,6 +2,21 @@
 // L4-M4: Performance & Production Practices
 // ───────────────────────────────────────────────────────────────────────────
 
+/**
+ * L4: profiling, complexity and memoization.
+ *
+ * Left deliberately as it stands on difficulty: the council measured this practice at 35 reference
+ * lines against a 5-line Apply, a 7x ratio well inside the depth spec's threshold, and its two
+ * levers (a repeated-work failure mode the teach section names, and an interaction between the two
+ * files the learner writes) are within the ceiling. The one real defect was closure: the reference
+ * calls `cache_clear()` and no fence in the lesson had shown it. Teach now demonstrates it next to
+ * `cache_info()`, with the two situations that force a clear.
+ *
+ * Time budget (counted, not guessed). Teach 7: ~1,000 prose words, four checks, five fences.
+ * Apply 8: 6 provided lines to read, 5 to write. Practice 40: 70 lines of README, 45 of read-only
+ * instrumentation, 35 to write across two files, and the profile to read before any of it.
+ * 7 + 8 + 40 = 55, the lesson total.
+ */
 import type { PythonLesson } from "../../types"
 import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
@@ -500,6 +515,19 @@ print(fib(30))   # 832040, instant thanks to the cache
 
 \`@lru_cache(maxsize=None)\` keeps every result; in Python 3.9+ the shorthand is \`@functools.cache\`. This is exactly what the warm-up asks for: a memoized \`fib\` where each \`n\` is computed once.
 
+The decorator also bolts two methods onto the function it wraps, and both matter once a cache is in real code rather than in an example:
+
+\`\`\`python
+fib(10)
+fib(10)
+print(fib.cache_info())    # CacheInfo(hits=1, misses=11, maxsize=None, currsize=11)
+
+fib.cache_clear()          # empty it: every entry gone, counters back to zero
+print(fib.cache_info())    # CacheInfo(hits=0, misses=0, maxsize=None, currsize=0)
+\`\`\`
+
+\`cache_info()\` is how you find out whether a cache is earning its memory: a hit rate near zero means you are paying to store results nobody asks for twice. \`cache_clear()\` is how you get a fresh start, and it is not optional in two situations. A test that asserts on how much work was done needs the cache emptied between cases or the second case inherits the first one's answers. And a cache over data that can change needs clearing when the data does, because a memoized function has no idea its inputs went stale. Note that each decorated function owns its own cache, so clearing one leaves the others full.
+
 ### Generators for memory
 
 A generator streams values instead of building a list, so it uses constant memory over huge sequences:
@@ -586,6 +614,7 @@ print(fib(30))   # 832040, instant, thanks to the cache`,
   },
   apply: {
     id: "py-l4-performance-apply",
+    estimatedMinutes: 8,
     executionMode: "single-file",
     prompt: `Warm-up (one file): implement \`fib(n)\` (the nth Fibonacci number) and memoize it with
 \`@lru_cache\` so repeated subproblems are computed once.
@@ -619,6 +648,7 @@ def fib(n):
   },
   practice: {
     id: "py-l4-performance-practice",
+    estimatedMinutes: 40,
     executionMode: "workspace",
     prompt: `Repair the nightly billing rollup on ticket CS-021. It has stopped finishing inside its
 window: the profile shows the plan catalog being walked again for every usage event, and the rate
