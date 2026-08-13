@@ -2,6 +2,14 @@ import type { PythonLesson } from "../../types"
 import { buildBrief } from "../brief"
 import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 
+// Time budget behind `estimatedMinutes` (counted, not guessed): teach 6 (about 1,200 prose words,
+// three checks, five fences), apply 5 (a 5-line prompt, a 6-line reference), practice 24 (60 README
+// lines plus ~90 lines of read-only modules and visible tests to read, 36 lines to write across two
+// files). Lesson total 35 = 6 + 5 + 24.
+//
+// Nothing here was softened. Apply at 4.5x is the tightest ramp in the module and it drills the
+// exact boundary the practice needs: a narrow except around one conversion inside a loop.
+
 const LG_README = buildBrief({
   lesson: "py-l3-logging-errors",
   kind: "bug-report",
@@ -533,6 +541,40 @@ def reading(row):
 
 \`from err\` sets \`__cause__\` on the new exception to the original one, so nothing is lost. The traceback then prints both, oldest first, joined by the line "The above exception was the direct cause of the following exception". Callers get your type; whoever reads the log still sees the \`KeyError\` and the line that raised it. Drop the \`from err\` and Python still chains it implicitly, as \`__context__\`, under the vaguer wording "During handling of the above exception, another exception occurred"; being explicit says you meant the translation. Use \`from None\` when the original really is noise and you want it suppressed.
 
+### Cleanup that runs on both exits
+
+A function that opens something has to close it whether the work succeeded or blew up. \`except\` runs only when an exception arrives; \`finally\` runs on every way out of the block, including a \`return\` and including an exception you are not catching:
+
+\`\`\`python
+class Handle:
+    def __init__(self):
+        self.closed = False
+
+    def close(self):
+        self.closed = True
+
+
+def read(handle, fail):
+    try:
+        if fail:
+            raise ValueError("bad batch")
+        return "ok"
+    finally:
+        handle.close()          # runs before the value is returned AND before the raise escapes
+
+
+handle = Handle()
+print(read(handle, False), handle.closed)   # ok True
+
+handle = Handle()
+try:
+    read(handle, True)
+except ValueError:
+    print("raised, and closed:", handle.closed)   # raised, and closed: True
+\`\`\`
+
+The ordering is the part worth remembering: on the failing call the \`finally\` block runs **before** the caller ever sees the \`ValueError\`. That is why cleanup belongs there rather than on the line after the loop, which an escaping exception simply skips.
+
 ### Pitfalls
 
 \`\`\`cswidget
@@ -622,6 +664,7 @@ print(safe_total(["1", "x", "3"]))   # 4`,
   apply: {
     id: "py-l3-logging-errors-apply",
     executionMode: "single-file",
+    estimatedMinutes: 5,
     prompt: `Warm-up (one file): implement \`safe_total(raws)\`. Total the strings in \`raws\` that parse as
 integers, **skipping** any that don't.
 
@@ -652,6 +695,7 @@ integers, **skipping** any that don't.
   practice: {
     id: "py-l3-logging-errors-practice",
     executionMode: "workspace",
+    estimatedMinutes: 24,
     prompt: `Repair the nightly meter import, which finishes green every morning while finance reports the
 billed totals are short. Its loop catches everything and continues, so unreadable rows disappear
 without a trace.
