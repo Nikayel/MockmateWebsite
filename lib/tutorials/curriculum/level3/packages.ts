@@ -79,7 +79,13 @@ const PKG_LEVELS_STARTER = String.raw`"""The severity table and its lookup (see 
 This module is the leaf of the package: nothing inside reportkit may be imported here.
 """
 
-# TODO: give the severity table a home here, and expose rank(name) over it.
+# TODO: the severity table belongs in this module. README.md lists the five ranks.
+
+
+def rank(name):
+    """Return the rank of a severity name. A name that is not a severity ranks 0."""
+    # TODO: answer from the table above.
+    return 0
 `
 
 const PKG_LEVELS_REFERENCE = String.raw`"""The severity table and its lookup. The leaf of the package: it imports nothing from reportkit."""
@@ -128,9 +134,15 @@ def worst(lines):
     return highest
 `
 
-const PKG_INIT_STARTER = String.raw`"""The reportkit package (see README.md)."""
+const PKG_INIT_STARTER = String.raw`"""The reportkit package (see README.md).
 
-# TODO: make the documented public import work, and pin the public API.
+Three names have to be reachable as reportkit.<name>: build_report, severity_of and worst.
+Nothing else may be.
+"""
+
+# TODO: import those three names here, each from the module that defines it.
+
+# TODO: declare __all__ over exactly the three public names.
 `
 
 const PKG_INIT_REFERENCE = String.raw`"""The reportkit package: summarise log lines."""
@@ -309,6 +321,42 @@ print(cart_total(["apple", "bread"]))   # 5
 
 \`from store.catalog import price_of\` is an **absolute import**, spelled from the project root. Inside a package you can also write the **relative** form \`from .catalog import price_of\`, where the leading dot means "this package". Relative imports only work inside a package, not in a file you run directly as a script.
 
+### What a leaf module usually owns
+
+The module every other module points at is normally the boring one: a table, and one lookup over it. Keeping the table and its lookup together is what lets the rest of the package ask a question instead of reaching into a dict it does not own.
+
+\`\`\`python
+# store/tiers.py  (the leaf: it imports nothing from store)
+TIER_ORDER = {"basic": 1, "plus": 2, "premium": 3}
+
+
+def tier_rank(name):
+    return TIER_ORDER.get(name, 0)
+\`\`\`
+
+\`dict.get(name, 0)\` is doing real work here. It answers for a name that is not in the table at all, so \`tier_rank\` never raises and callers can treat "unknown" as the bottom of the order.
+
+A module above the leaf then compares by that rank rather than by the string itself:
+
+\`\`\`python
+# store/accounts.py
+from store.tiers import tier_rank
+
+
+def best_tier(names):
+    best = "none"
+    for name in names:
+        if tier_rank(name) > tier_rank(best):
+            best = name
+    return best
+
+
+print(best_tier(["basic", "premium", "plus"]))   # premium
+print(best_tier([]))                             # none
+\`\`\`
+
+Two things to notice. Sorting or comparing the names directly would order them alphabetically, which is not the order anybody means. And the starting value \`"none"\` also ranks 0, so an empty list falls out of the same comparison instead of needing a special case. The same two moves come back in the Practice, over a different table.
+
 ### Pitfalls
 
 \`\`\`cswidget
@@ -441,46 +489,72 @@ print(price_of("candy"))   # 0`,
   apply: {
     id: "py-l3-packages-apply",
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`cart_total(prices, names)\`. Total the price of every name in
-\`names\`, looking each one up in the \`prices\` dict (missing items cost 0).
+    // Budget: 8 min. ~12 lines of prompt to read, ~9 lines to write (a table, a lookup with a
+    // default, and a sort by that lookup). This is the rung under the Practice: the same
+    // table-plus-rank shape the package's leaf module owns, before the layout question arrives.
+    estimatedMinutes: 8,
+    prompt: `Warm-up (one file): a billing report ranks account plans. The plans, best last, are
+\`free\`, \`starter\`, \`team\`, \`enterprise\`.
 
-For \`prices = {"apple": 3, "bread": 2}\` and \`names = ["apple", "bread"]\`, return \`5\`.`,
-    starterCode: `def cart_total(prices, names):
-    # Sum prices.get(name, 0) for each name.
+Write \`plan_rank(name)\`, which returns 1 for \`free\` up to 4 for \`enterprise\` and 0 for any other
+name, and \`top_plans(names)\`, which returns the plan names in \`names\` that are real plans, without
+duplicates, ordered best first.
+
+\`top_plans(["team", "free", "team", "gold"])\` is \`["team", "free"]\`.`,
+    starterCode: `def plan_rank(name):
+    # Return the rank of one plan name, or 0 if it is not a plan.
+    pass
+
+
+def top_plans(names):
+    # Keep the real plans, drop duplicates, order them best first.
     pass`,
     hints: [
-      "`prices.get(name, 0)` is the price of one item (0 if missing).",
-      "Add them across the cart with a generator expression in `sum(...)`.",
-      "`return sum(prices.get(name, 0) for name in names)`.",
+      "Put the four plans and their ranks in one dict, then let `plan_rank` answer from it. A dict lookup with a default covers the name that is not a plan.",
+      "A name is a real plan exactly when `plan_rank(name)` is above 0, and a `set` drops the duplicates for you.",
+      "`sorted` takes a `key`, and a bigger rank has to come first: `sorted(known, key=lambda name: -plan_rank(name))`.",
     ],
-    referenceSolution: `def cart_total(prices, names):
-    return sum(prices.get(name, 0) for name in names)`,
+    referenceSolution: `PLAN_ORDER = {"free": 1, "starter": 2, "team": 3, "enterprise": 4}
+
+
+def plan_rank(name):
+    return PLAN_ORDER.get(name, 0)
+
+
+def top_plans(names):
+    known = {name for name in names if plan_rank(name) > 0}
+    return sorted(known, key=lambda name: -plan_rank(name))`,
     testCases: [
       {
-        input: { prices: { apple: 3, bread: 2, milk: 4 }, names: ["apple", "bread"] },
-        expected: 5,
-        description: "two known items",
+        input: { names: ["team", "free", "team", "gold"] },
+        expected: ["team", "free"],
+        description: "duplicates and an unknown name",
       },
       {
-        input: { prices: { apple: 3, bread: 2, milk: 4 }, names: [] },
-        expected: 0,
-        description: "empty cart",
+        input: { names: ["free", "enterprise", "starter", "team"] },
+        expected: ["enterprise", "team", "starter", "free"],
+        description: "every plan, best first",
+      },
+      { input: { names: [] }, expected: [], description: "no names at all" },
+      {
+        input: { names: ["gold", "platinum"] },
+        expected: [],
+        description: "nothing that is a plan",
       },
       {
-        input: { prices: { apple: 3, bread: 2, milk: 4 }, names: ["milk", "milk"] },
-        expected: 8,
-        description: "repeated item",
-      },
-      {
-        input: { prices: { apple: 3, bread: 2, milk: 4 }, names: ["apple", "x"] },
-        expected: 3,
-        description: "unknown item is free",
+        input: { names: ["starter", "starter"] },
+        expected: ["starter"],
+        description: "one plan, twice",
       },
     ],
   },
   practice: {
     id: "py-l3-packages-practice",
     executionMode: "workspace",
+    // Budget: 22 min. To read: README 45 lines, report.py 14, three starters 30, so ~90 lines.
+    // To write: 22 lines across three files (levels 4, scan 14, __init__ 4). Lesson total is
+    // teach 5 + apply 8 + practice 22 = 35.
+    estimatedMinutes: 22,
     prompt: `Finish a half-done package split. A teammate started breaking \`reportkit\` into modules and
 stopped in the middle: \`reportkit/report.py\` is already migrated and read-only, \`reportkit/levels.py\`
 is empty, \`reportkit/scan.py\` still imports the severity table out of \`reportkit.report\`, and
