@@ -58,7 +58,24 @@ export interface LessonCoverage {
   levelId: number
   levelSlug: string
   title: string
+  /**
+   * Every word in `teach.markdown`, fence bodies included.
+   *
+   * Keep reading before using this as a depth signal. A widget spec is JSON, and a lesson carrying
+   * four checks carries several hundred words of option labels and feedback, so this number rises
+   * when interactivity is added and says nothing about how much the lesson explains. Authoring
+   * agents dosed checks off it and over-counted until three of them noticed independently.
+   */
   teachWords: number
+  /**
+   * Words of actual prose, with every fenced block removed.
+   *
+   * This is the depth signal. It is what the dosage rule (about one check per 300 words) is defined
+   * against, and it is what makes level comparisons honest: a lesson that draws its architecture in
+   * ASCII scores the same here as one that draws it with a diagram, where `teachWords` would reward
+   * the ASCII for being verbose.
+   */
+  proseWords: number
   /** `summary` is contracted as one line; this is how long it actually is. */
   summaryChars: number
   /** Inline retrieval questions. Uncapped: more recall practice is simply better. */
@@ -81,8 +98,12 @@ export interface LevelCoverage {
   title: string
   lessonCount: number
   teachWords: number
-  /** Mean teach words per lesson, rounded. The clearest single indicator of a thin level. */
-  averageTeachWords: number
+  proseWords: number
+  /**
+   * Mean PROSE words per lesson, rounded. The clearest single indicator of a thin level, and
+   * deliberately computed on prose rather than raw markdown so adding checks cannot flatter it.
+   */
+  averageProseWords: number
   checks: number
   heavy: number
   staticDiagrams: number
@@ -99,6 +120,7 @@ export interface SystemDesignCoverage {
     levelCount: number
     lessonCount: number
     teachWords: number
+    proseWords: number
     checks: number
     heavy: number
     staticDiagrams: number
@@ -107,6 +129,17 @@ export interface SystemDesignCoverage {
     /** Neither a retrieval check nor any diagram or simulation: pure prose. */
     bareLessons: number
   }
+}
+
+/**
+ * Strip every fenced block, custom or plain, leaving only prose.
+ *
+ * Handles the escaped-backtick form the level files actually use: teach markdown lives inside a
+ * TypeScript template literal, so the fences are written with escapes and a naive triple-backtick
+ * match finds nothing.
+ */
+function stripFences(markdown: string): string {
+  return markdown.replace(/```[^\n]*\n[\s\S]*?```/g, " ")
 }
 
 function countWords(text: string): number {
@@ -155,6 +188,7 @@ function measureLesson(
     levelSlug: level.slug,
     title: lesson.title,
     teachWords: countWords(markdown),
+    proseWords: countWords(stripFences(markdown)),
     summaryChars: lesson.summary.length,
     checks,
     heavy,
@@ -177,13 +211,15 @@ export function buildSystemDesignCoverage(
       mod.lessons.map((lesson) => measureLesson(lesson, level))
     )
     const teachWords = lessons.reduce((n, l) => n + l.teachWords, 0)
+    const proseWords = lessons.reduce((n, l) => n + l.proseWords, 0)
     return {
       levelId: level.id as number,
       slug: level.slug,
       title: level.title,
       lessonCount: lessons.length,
       teachWords,
-      averageTeachWords: lessons.length ? Math.round(teachWords / lessons.length) : 0,
+      proseWords,
+      averageProseWords: lessons.length ? Math.round(proseWords / lessons.length) : 0,
       checks: lessons.reduce((n, l) => n + l.checks, 0),
       heavy: lessons.reduce((n, l) => n + l.heavy.length, 0),
       staticDiagrams: lessons.reduce((n, l) => n + l.staticDiagrams.length, 0),
@@ -205,6 +241,7 @@ export function buildSystemDesignCoverage(
       levelCount: levelRows.length,
       lessonCount: allLessons.length,
       teachWords: levelRows.reduce((n, l) => n + l.teachWords, 0),
+      proseWords: levelRows.reduce((n, l) => n + l.proseWords, 0),
       checks: levelRows.reduce((n, l) => n + l.checks, 0),
       heavy: levelRows.reduce((n, l) => n + l.heavy, 0),
       staticDiagrams: levelRows.reduce((n, l) => n + l.staticDiagrams, 0),
