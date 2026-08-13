@@ -153,6 +153,14 @@ export interface PythonExercise {
 
   /** workspace grading — required when `executionMode === "workspace"`. */
   workspace?: WorkspaceScenarioConfig
+
+  /**
+   * Budgeted minutes for THIS phase, derived by counting lines to read and lines to write (see
+   * `docs/PYTHON-PRACTICE-DEPTH-SPEC.md` §3). Where present on both phases, the lesson's own
+   * `estimatedMinutes` must equal teach + apply + practice. Optional because most lessons predate
+   * the rule and still carry only a lesson-level figure.
+   */
+  estimatedMinutes?: number
 }
 
 export type PythonLevelSlug = "fundamentals" | "intermediate" | "applied" | "engineering"

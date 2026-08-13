@@ -583,7 +583,54 @@ Two details make or break a hand-rolled version. The slot has to be released in 
 
 ### Why this sandbox uses a helper
 
-\`asyncio.run\` refuses to start when a loop is already running and raises \`RuntimeError\`. This sandbox runs your code *inside* a loop, so the exercises hand you a stand-in for it. The warm-up gives you \`run_coroutines(coros)\`, which drives each coroutine with \`coro.send(None)\` and reads the return value off the resulting \`StopIteration\`. That works because its \`fetch_one\` awaits nothing, so a single \`send\` finishes it. The workspace exercise instead ships a small read-only loop of its own, with \`sleep\`, \`spawn\` and \`wait_all\` standing in for \`asyncio.sleep\`, \`asyncio.create_task\` and awaiting a \`gather\`. Either way you are writing real coroutines; only the door into the loop changes.
+\`asyncio.run\` refuses to start when a loop is already running and raises \`RuntimeError\`. This sandbox runs your code *inside* a loop, so the exercises hand you a stand-in for it. The warm-up ships a driver called \`run_all(coros)\` that drives every coroutine you give it together on a simulated tick clock, so sleeps overlap the way real I/O would. The workspace exercise ships a slightly larger read-only loop, \`pipeline/kernel.py\`, with \`sleep\`, \`spawn\` and \`wait_all\` standing in for \`asyncio.sleep\`, \`asyncio.create_task\` and awaiting a \`gather\`. Either way you are writing real coroutines; only the door into the loop changes.
+
+### The stand-in loop's API, running
+
+Four names are the whole of \`pipeline/kernel.py\`. This is them working:
+
+\`\`\`python
+from pipeline import kernel
+
+async def read(name, ticks):
+    await kernel.sleep(ticks)                 # stands in for asyncio.sleep
+    return name.upper()
+
+async def main():
+    slow = kernel.spawn(read("a", 3), "a")    # stands in for asyncio.create_task:
+    fast = kernel.spawn(read("b", 1), "b")    # registered with the loop now, not awaited
+    await kernel.wait_all([slow, fast])       # stands in for awaiting a gather of tasks
+    return [slow.result, fast.result], kernel.now()
+
+print(kernel.run(main()))     # (['A', 'B'], 3)
+\`\`\`
+
+Tick 3, not tick 4, because the two reads were in flight together. Note where the results live: \`spawn\` hands back a \`Task\` immediately, and after \`wait_all\` each task carries \`.done\`, \`.result\` and \`.error\`. A task whose coroutine raised stores the exception on \`.error\` instead of re-raising it out of \`wait_all\`.
+
+The fourth name is \`kernel.yield_now()\`. It is an await that costs no ticks: it gives the loop a turn and resumes you on the same tick. That is how one coroutine waits for a condition only another coroutine can change.
+
+\`\`\`python
+flag = {"ready": False}
+
+async def waiter():
+    while not flag["ready"]:
+        await kernel.yield_now()   # without this await, setter() never gets to run
+    return kernel.now()
+
+async def setter():
+    await kernel.sleep(2)
+    flag["ready"] = True
+
+async def main():
+    w = kernel.spawn(waiter(), "waiter")
+    s = kernel.spawn(setter(), "setter")
+    await kernel.wait_all([w, s])
+    return w.result
+
+print(kernel.run(main()))     # 2
+\`\`\`
+
+Delete the \`await\` from that loop and the program hangs forever. The condition can only change while \`setter\` is running, and \`setter\` can only run while \`waiter\` is suspended. That is the cooperative-scheduling rule from the top of this lesson in its smallest possible form, and it is exactly why \`asyncio.Semaphore\` waits with an await rather than a spin.
 
 \`\`\`cswidget
 {
@@ -667,62 +714,158 @@ def run_coroutines(coros):
 
 print(run_coroutines(fetch_one(n) for n in [1, 2, 3]))   # [10, 20, 30]`,
   },
+  // Apply budget 12: 34 provided lines to read (the _Sleep/sleep/fetch_one/run_all harness), 7 to
+  // write (one coroutine wrapper with a try/except, one call that hands the driver every coroutine
+  // at once). Practice budget 29: 96 lines of README plus read-only kernel and store to read, 14 to
+  // write across two files, and the two decisions that carry the exercise (where the bound goes and
+  // how acquire waits). 9 + 12 + 29 = 50, the lesson total.
   apply: {
     id: "py-l4-asyncio-apply",
+    estimatedMinutes: 12,
     executionMode: "single-file",
-    prompt: `Warm-up (one file): implement \`fetch_all(numbers)\` to build a \`fetch_one(n)\` coroutine for each
-number and run them all with the provided \`run_coroutines\` helper, returning the results in order.
+    prompt: `Implement \`fetch_all(numbers)\` so a batch of reads overlaps and one bad number costs the caller
+that number only.
 
-(In a normal program you'd write \`asyncio.run(asyncio.gather(*coros))\`; this sandbox is already
-inside an event loop, so \`run_coroutines\` stands in for it.)
+\`fetch_one(n)\` suspends for \`n\` ticks and then returns \`n * 10\`, or raises
+\`ValueError("bad number: n")\` when \`n\` is negative. \`run_all(coros)\` is provided: it drives every
+coroutine you hand it together on one simulated clock and returns their values in the order you
+gave them. A coroutine that raises tears the whole batch down, so a failing read has to be turned
+into the record \`{"error": str(exc)}\` before the driver ever sees it. Write \`read_one(n)\` to do
+that containment, and \`fetch_all(numbers)\` to run the whole batch.
 
-\`fetch_all([1, 2, 3])\` is \`[10, 20, 30]\`.`,
-    starterCode: `async def fetch_one(n):
+\`fetch_all([2, -1, 3])\` is \`[20, {"error": "bad number: -1"}, 30]\`.`,
+    starterCode: `class _Sleep:
+    """What an await hands back to the driver: 'wake me in this many ticks'."""
+
+    def __init__(self, ticks):
+        self.ticks = ticks
+
+    def __await__(self):
+        yield self
+
+
+async def sleep(ticks):
+    await _Sleep(ticks)
+
+
+async def fetch_one(n):
+    """Read one number: suspends for abs(n) ticks, then returns n * 10 or raises."""
+    await sleep(abs(n))
+    if n < 0:
+        raise ValueError("bad number: {}".format(n))
     return n * 10
 
 
-def run_coroutines(coros):
-    results = []
-    for coro in coros:
-        try:
-            coro.send(None)
-        except StopIteration as done:
-            results.append(done.value)
+def run_all(coros):
+    """Drive every coroutine together on one simulated clock. Values come back in order."""
+    coros = list(coros)
+    results = [None] * len(coros)
+    wake = [0] * len(coros)
+    done = [False] * len(coros)
+    now = 0
+    while not all(done):
+        ready = [i for i, finished in enumerate(done) if not finished and wake[i] <= now]
+        if not ready:
+            now = min(wake[i] for i, finished in enumerate(done) if not finished)
+            continue
+        for i in ready:
+            try:
+                signal = coros[i].send(None)
+            except StopIteration as stop:
+                done[i] = True
+                results[i] = stop.value
+            else:
+                wake[i] = now + signal.ticks
     return results
 
 
+async def read_one(n):
+    # TODO: read the number, and give back a record instead of letting a failure escape.
+    return None
+
+
 def fetch_all(numbers):
-    # TODO: build a fetch_one(n) coroutine for each number and pass them to run_coroutines.
-    pass`,
+    # TODO: get every number moving on the driver at once, and return the values in order.
+    return []`,
     hints: [
-      "Build the coroutines: `fetch_one(n) for n in numbers`.",
-      "Hand them to the provided runner: `run_coroutines(fetch_one(n) for n in numbers)`.",
-      "Return that result.",
+      "`run_all` overlaps whatever it is given in one call. Calling it once per number is a sequential loop wearing a driver's clothes.",
+      "`read_one` is a coroutine, so it can `await fetch_one(n)` and wrap that await in a `try`. What it returns on the failing branch is the record the caller sees for that number.",
+      '`except ValueError as exc: return {"error": str(exc)}` is the containment; `run_all(read_one(n) for n in numbers)` is the batch.',
     ],
-    referenceSolution: `async def fetch_one(n):
+    referenceSolution: `class _Sleep:
+    """What an await hands back to the driver: 'wake me in this many ticks'."""
+
+    def __init__(self, ticks):
+        self.ticks = ticks
+
+    def __await__(self):
+        yield self
+
+
+async def sleep(ticks):
+    await _Sleep(ticks)
+
+
+async def fetch_one(n):
+    """Read one number: suspends for abs(n) ticks, then returns n * 10 or raises."""
+    await sleep(abs(n))
+    if n < 0:
+        raise ValueError("bad number: {}".format(n))
     return n * 10
 
 
-def run_coroutines(coros):
-    results = []
-    for coro in coros:
-        try:
-            coro.send(None)
-        except StopIteration as done:
-            results.append(done.value)
+def run_all(coros):
+    """Drive every coroutine together on one simulated clock. Values come back in order."""
+    coros = list(coros)
+    results = [None] * len(coros)
+    wake = [0] * len(coros)
+    done = [False] * len(coros)
+    now = 0
+    while not all(done):
+        ready = [i for i, finished in enumerate(done) if not finished and wake[i] <= now]
+        if not ready:
+            now = min(wake[i] for i, finished in enumerate(done) if not finished)
+            continue
+        for i in ready:
+            try:
+                signal = coros[i].send(None)
+            except StopIteration as stop:
+                done[i] = True
+                results[i] = stop.value
+            else:
+                wake[i] = now + signal.ticks
     return results
 
 
+async def read_one(n):
+    try:
+        return await fetch_one(n)
+    except ValueError as exc:
+        return {"error": str(exc)}
+
+
 def fetch_all(numbers):
-    return run_coroutines(fetch_one(n) for n in numbers)`,
+    return run_all(read_one(n) for n in numbers)`,
     testCases: [
-      { input: { numbers: [1, 2, 3] }, expected: [10, 20, 30], description: "gathers in order" },
-      { input: { numbers: [] }, expected: [], description: "empty input" },
-      { input: { numbers: [5] }, expected: [50], description: "single item" },
+      { input: { numbers: [1, 2, 3] }, expected: [10, 20, 30], description: "results in order" },
+      { input: { numbers: [] }, expected: [], description: "empty batch" },
+      { input: { numbers: [5] }, expected: [50], description: "single read" },
+      {
+        input: { numbers: [2, -1, 3] },
+        expected: [20, { error: "bad number: -1" }, 30],
+        description: "a bad number becomes a record, the rest still read",
+      },
+      {
+        input: { numbers: [-4, -1] },
+        expected: [{ error: "bad number: -4" }, { error: "bad number: -1" }],
+        description: "an all-failing batch keeps its length and order",
+      },
+      { input: { numbers: [3, 3] }, expected: [30, 30], description: "duplicates read twice" },
     ],
   },
   practice: {
     id: "py-l4-asyncio-practice",
+    estimatedMinutes: 29,
     executionMode: "workspace",
     prompt: `Repair the media service's batch loader. \`fetch_batch(keys)\` in \`pipeline/fanout.py\` reads its
 keys one at a time and lets a single unreadable key end the whole batch, and storage now caps the
