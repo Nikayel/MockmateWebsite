@@ -4538,7 +4538,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-news-feed",
           title: "Design a News Feed / Timeline (Twitter)",
           summary:
-            "Use a hybrid fan-out, push posts to normal followers' timelines and pull celebrities at read time, store post ids not bodies so deletes stay cheap, paginate by cursor, and accept async fan-out lag (seconds) as the freshness tradeoff.",
+            "Push fan-out dies on celebrities and pull dies on power followers, so a home timeline pushes to normal followers and pulls the rest.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["news-feed", "fan-out", "celebrity"],
@@ -4587,7 +4587,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-instagram",
           title: "Design Instagram (Photo Sharing)",
           summary:
-            "Metadata DB plus object storage plus CDN, upload direct to S3 with presigned URLs, generate resolution variants async, reuse hybrid fan-out for the feed, shard viral like counters, and never store image bytes in the database.",
+            "The rule that makes a photo app scale: bytes go to object storage behind a CDN, the database gets a pointer, and uploads skip your app tier.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["instagram", "blob-storage", "cdn"],
@@ -4635,7 +4635,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-chat-messaging",
           title: "Design a Chat / Messaging System (WhatsApp)",
           summary:
-            "Hold WebSocket connections on a connection tier with a session registry, order per-conversation with sequence numbers (never global), dedup by client message id, store-and-forward for offline users, and fan out groups (hierarchically for very large channels).",
+            "Why chat promises per-conversation ordering and never a global one, and how store-and-forward reaches a phone that has been offline for a day.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["chat", "websocket", "presence"],
@@ -4683,7 +4683,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-notification-system",
           title: "Design a Notification / Push System",
           summary:
-            "An event flows through a queue to a preference filter, a renderer, priority per-channel lanes, and provider adapters with retries/failover, and an idempotency key checked against a dedup store is what prevents retries from double-sending.",
+            "A push pipeline is at-least-once by construction, so an idempotency key checked before dispatch is what stops a retry sending twice.",
           estimatedMinutes: 35,
           difficulty: "medium",
           skills: ["notifications", "fan-out", "queue"],
