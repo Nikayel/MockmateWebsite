@@ -172,21 +172,21 @@ Batch features (7-day average spend) recompute hourly or daily. Streaming featur
 {
   "type": "check",
   "kind": "predict",
-  "id": "great-offline-flat-online",
-  "prompt": "Your model scores an excellent AUC offline and lifts nothing online. Which single diagnostic separates the two causes this lesson named?",
+  "id": "the-feature-that-cannot-be-stored",
+  "prompt": "Three features for a ride-hailing model: seven-day average spend, clicks in the last five minutes, and the distance between this rider and this driver. Which one cannot live in the online store at all?",
   "options": [
     {
-      "label": "Retrain on more history, since a flat online result usually means the model is undertrained",
-      "feedback": "More data does not fix a value mismatch. If serving computes a different number than training did, or if training saw the future, a bigger training set reproduces the same problem at greater cost."
+      "label": "The seven-day average, since a week of history is too much per user",
+      "feedback": "A rolling average is a single number per user by the time it reaches the online store. The week of history lives offline, and the online side keeps only the latest value it produced."
     },
     {
-      "label": "Log the feature vectors actually served and compare them to the offline computed vectors for the same entity and timestamp",
+      "label": "The distance, since it depends on the request",
       "correct": true,
-      "feedback": "Right. A mismatch rate points at code divergence between the two implementations. A clean match points the other way, at a point in time join that let a post event value leak into a historical row."
+      "feedback": "Right. It is an on-demand feature, and there is no entity key you could precompute it under, because the rider and driver pair only exists once the request does. Batch and streaming tiers argue about how fresh a stored value is; this one is never stored."
     },
     {
-      "label": "Shorten the online store's refresh interval so features are fresher at inference",
-      "feedback": "Tempting, because staleness is a real failure mode and freshness tiers exist for it. But staleness would usually degrade both offline and online equally, and it does not explain an offline number that is too good."
+      "label": "The five-minute click count, since streaming cannot keep up",
+      "feedback": "Streaming features are exactly what that tier exists for, updated within seconds through Kafka plus Flink. Five minutes of clicks is a stored counter like any other, just refreshed far more often than a batch feature."
     }
   ],
   "reveal": "A feature store is one definition writing two stores, an as-of join that refuses to read the future, freshness tiers matched to each feature's SLA, and a skew monitor that compares served vectors against offline vectors. When you design one in an interview, say the monitor out loud: it is the difference between claiming the two paths agree and knowing it."
@@ -557,21 +557,21 @@ For under a few million vectors with existing Postgres, \`pgvector\` is genuinel
 {
   "type": "check",
   "kind": "predict",
-  "id": "swapping-the-embedding-model",
-  "prompt": "Six months into production a noticeably better embedding model ships. What does adopting it cost you?",
+  "id": "recall-decays-with-no-code-change",
+  "prompt": "A catalog turns over constantly, so the index takes a steady trickle of deletes alongside its inserts. Total vector count is flat, nobody has shipped code, and recall drifts down over months. Why?",
   "options": [
     {
-      "label": "A config change: point the pipeline at the new model for everything written from now on",
-      "feedback": "Tempting, and it is how most code migrations work. Vectors are different: old and new embeddings live in different spaces, so distances between them are meaningless and a mixed index quietly returns nonsense."
+      "label": "The embedding model has drifted away from the query distribution",
+      "feedback": "A model nobody has swapped does not drift: its output for a given input is fixed forever. Something inside the index changed, not the function that filled it."
     },
     {
-      "label": "A full re-embed and reindex of every stored vector, which at a billion vectors is a multi-day, expensive job",
+      "label": "Deleted vectors leave tombstones that degrade the graph",
       "correct": true,
-      "feedback": "Right. This is the migration nobody plans for, which is why you version your embeddings from day one and treat the model id as part of the index identity."
+      "feedback": "Right. HNSW absorbs inserts happily, but a delete cannot be stitched out of a graph cheaply, so it is marked and the walk still pays to visit it. Periodic offline rebuilds, hot-swapped in, are what restore the recall."
     },
     {
-      "label": "Nothing on the stored side, since query vectors are computed fresh at request time",
-      "feedback": "Query vectors are fresh, but they are compared against stored vectors produced by the old model. The comparison is what breaks, and a fresh query vector cannot fix a stale corpus."
+      "label": "The corpus has grown, and recall always falls with scale",
+      "feedback": "Recall does get harder as a corpus grows, which is why this sounds right. The count here is flat and the churn is deletes, so a falling number points at the structure rather than the scale."
     }
   ],
   "reveal": "The whole lesson is one budget surface with four corners: recall, latency, memory, and cost. HNSW buys recall and latency with RAM, IVF-PQ buys memory back with quantization, DiskANN buys cost back with a few milliseconds on NVMe, and exact search is only a reranker over a small candidate set. Then the operational half decides whether it survives: selective filters pushed into the index, tombstones cleaned by periodic rebuilds, offline builds hot-swapped in, and versioned embeddings so a model upgrade is a planned migration instead of a surprise."
@@ -634,21 +634,21 @@ Per-tenant rate limits and token budgets stop one team from consuming the shared
 {
   "type": "check",
   "kind": "predict",
-  "id": "provider-starts-failing",
-  "prompt": "Your gateway is live across six product teams when one provider starts returning overload errors on a third of its calls. What does a well built gateway do?",
+  "id": "rate-limit-did-not-bound-spend",
+  "prompt": "One team is capped at 50 requests per second and stays under it all month. Finance still gets a surprise bill from that team. What did the request-rate limit fail to bound?",
   "options": [
     {
-      "label": "Pass the error straight back so each application can decide how to handle it",
-      "feedback": "Honest, and it is what a thin proxy does. But it turns one provider's bad hour into a simultaneous outage in six products, which is the exact coupling the gateway was introduced to remove."
+      "label": "Nothing, since a rate limit caps requests and requests are what cost money",
+      "feedback": "Requests are what an ordinary API gateway meters, which is why the limit gets copied across unchanged. LLMs are priced per million tokens, so two calls inside the same limit can differ in cost by three orders of magnitude."
     },
     {
-      "label": "Retry with backoff, trip a circuit breaker on the degraded provider, shift traffic to a healthy provider or a cheaper model, and fall back to a cached answer rather than failing",
+      "label": "Tokens, which is what providers price",
       "correct": true,
-      "feedback": "Right. The unified API is what makes failover possible at all, and the circuit breaker is what stops you hammering something already on its knees."
+      "feedback": "Right. A hundred-token prompt and a hundred-thousand-token context are both one request, so spend needs a budget of its own. This is why the gateway meters tokens per request and attributes them per team, and enforces a token budget alongside the rate limit."
     },
     {
-      "label": "Queue every request until the provider recovers, so nothing is lost",
-      "feedback": "Queueing converts a visible error into unbounded latency while a user watches a stream that never starts. With a second provider available, waiting is choosing to be slow for no reason."
+      "label": "Latency, since long contexts take longer to generate",
+      "feedback": "True, and worth watching separately. A slow response and an expensive one are different problems though, and the bill arrived because nothing was counting tokens, not because anything was slow."
     }
   ],
   "reveal": "An AI gateway is one chokepoint doing five jobs: a unified API that makes providers substitutable, routing and failover on top of that substitutability, exact plus semantic caching as the largest cost lever, per tenant quotas and token metering so one team cannot drain the shared spend, and safety plus audit logging on the way in and out. The constraint on all of it is that the chokepoint must not become the outage: a couple of milliseconds of its own processing, multiple instances behind a load balancer, and streaming passed through rather than buffered."
@@ -1395,21 +1395,21 @@ Query patterns you must support: time-range scans, tag filters (served by an inv
 {
   "type": "check",
   "kind": "predict",
-  "id": "old-data-is-expensive",
-  "prompt": "Queries over the last year are slow and storage keeps growing, but nobody needs per second detail from ten months ago. What does a time-series database give you here?",
+  "id": "where-the-compression-comes-from",
+  "prompt": "A TSDB stores a sample in one or two bytes where the raw timestamp and float are sixteen. Where does that factor of ten come from?",
   "options": [
     {
-      "label": "A longer retention window on a bigger disk, since dropping data means losing history",
-      "feedback": "You do not have to choose between the history and the bill. Keeping every sample at full resolution means paying to store and scan detail that no query asks for."
+      "label": "A general purpose compressor over each block, as a filesystem would use",
+      "feedback": "A generic compressor does help and TSDBs do run one on top. It cannot know that your timestamps land on a near-constant interval or that consecutive floats differ in a handful of bits, so it leaves most of the win unclaimed."
     },
     {
-      "label": "Precomputed rollups at coarser intervals serving the old queries, raw data tiered onto cheaper storage, and anything past retention dropped as whole time chunks",
+      "label": "Encodings that exploit the shape of a series",
       "correct": true,
-      "feedback": "Right, and the last part is why partitioning by time matters so much. Expiring old data is dropping a chunk, which is a metadata operation, not a scan."
+      "feedback": "Right. Delta-of-delta stores the change in the interval, which is usually zero and packs into a bit or two rather than 64. XOR on consecutive values keeps only the bits that actually moved. Both are cheap because they assume something true about time series specifically."
     },
     {
-      "label": "A nightly delete of rows older than the retention window",
-      "feedback": "That is the row store answer and it is the expensive one. A delete scan competes with the ingest firehose for the same disk, at exactly the hours you were hoping to reclaim capacity."
+      "label": "Storing values at reduced precision",
+      "feedback": "That would be lossy, and a monitoring system quietly rounding your latency numbers is worse than no monitoring. Delta-of-delta and XOR are both exact: every original sample comes back unchanged."
     }
   ],
   "reveal": "A time-series database is a set of bets about a lopsided workload. Appends at the current timestamp, so LSM style storage instead of a B-tree fighting random writes. Columnar per series with delta-of-delta timestamps and XOR values, so a sample costs a byte or two instead of sixteen. Partitioned by time, so retention is a chunk drop and range queries read contiguous blocks. Rollups and tiering, so old data gets cheaper as it gets less interesting. And a hard rule underneath all of it: tags are bounded dimensions, because cardinality is what breaks first, every time."
