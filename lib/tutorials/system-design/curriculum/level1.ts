@@ -2780,6 +2780,174 @@ HTTP/2 multiplexing relieves.
 }
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "Short-polling against SSE, on the same message",
+  "actors": [
+    {
+      "id": "browser",
+      "label": "Browser"
+    },
+    {
+      "id": "server",
+      "label": "Server"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "useSse",
+      "label": "Switch to SSE",
+      "description": "The server holds one response open and pushes the moment an event exists."
+    }
+  ],
+  "steps": [
+    {
+      "from": "browser",
+      "to": "server",
+      "label": "GET /messages?since=42",
+      "kind": "request",
+      "status": "ok",
+      "when": "!useSse",
+      "state": {
+        "requests sent": "1",
+        "messages delivered": "0"
+      }
+    },
+    {
+      "from": "server",
+      "to": "browser",
+      "label": "200 OK, nothing new",
+      "kind": "response",
+      "status": "ok",
+      "when": "!useSse"
+    },
+    {
+      "from": "browser",
+      "label": "5 seconds pass",
+      "kind": "timer",
+      "status": "ok",
+      "when": "!useSse"
+    },
+    {
+      "from": "browser",
+      "to": "server",
+      "label": "GET /messages?since=42",
+      "kind": "request",
+      "status": "ok",
+      "when": "!useSse",
+      "state": {
+        "requests sent": "2",
+        "messages delivered": "0"
+      }
+    },
+    {
+      "from": "server",
+      "to": "browser",
+      "label": "200 OK, nothing new",
+      "kind": "response",
+      "status": "ok",
+      "when": "!useSse"
+    },
+    {
+      "from": "server",
+      "label": "message lands 1s after poll",
+      "kind": "note",
+      "status": "ok",
+      "when": "!useSse",
+      "state": {
+        "waiting on the server": "1 message"
+      }
+    },
+    {
+      "from": "browser",
+      "label": "4 more seconds of nothing",
+      "kind": "timer",
+      "status": "late",
+      "when": "!useSse"
+    },
+    {
+      "from": "browser",
+      "to": "server",
+      "label": "GET /messages?since=42",
+      "kind": "request",
+      "status": "ok",
+      "when": "!useSse",
+      "state": {
+        "requests sent": "3",
+        "messages delivered": "0"
+      },
+      "predict": {
+        "question": "The message landed one second after a poll came back empty, and this client polls every 5 seconds. How long does the user wait to see it?",
+        "options": [
+          "Almost no time: a poll is always in flight",
+          "About 4 seconds, until the next scheduled poll",
+          "A full 5 seconds, every time, by definition",
+          "It depends on how fast the server responds"
+        ]
+      }
+    },
+    {
+      "from": "server",
+      "to": "browser",
+      "label": "200 OK, one message at last",
+      "kind": "response",
+      "status": "late",
+      "when": "!useSse",
+      "state": {
+        "requests sent": "3",
+        "empty responses": "2",
+        "delay the user felt": "about 4s"
+      }
+    },
+    {
+      "from": "browser",
+      "to": "server",
+      "label": "GET /stream (event-stream)",
+      "kind": "request",
+      "status": "ok",
+      "when": "useSse",
+      "state": {
+        "requests sent": "1",
+        "messages delivered": "0"
+      }
+    },
+    {
+      "from": "server",
+      "to": "browser",
+      "label": "200 OK, held open",
+      "kind": "response",
+      "status": "ok",
+      "when": "useSse"
+    },
+    {
+      "from": "server",
+      "label": "message lands",
+      "kind": "note",
+      "status": "ok",
+      "when": "useSse",
+      "state": {
+        "waiting on the server": "1 message"
+      }
+    },
+    {
+      "from": "server",
+      "to": "browser",
+      "label": "event pushed immediately",
+      "kind": "event",
+      "status": "ok",
+      "when": "useSse",
+      "state": {
+        "requests sent": "1",
+        "empty responses": "0",
+        "delay the user felt": "milliseconds"
+      }
+    }
+  ],
+  "caption": "Polling faster does not remove the wait, it multiplies the empty requests: the average delay stays at half the interval however short you make it. SSE removes the wait instead of shrinking it, and it does so over plain HTTP, which is why a one-directional feed never needs a duplex connection to feel instant."
+}
+\`\`\`
+
 **WebSocket**: after an HTTP upgrade you get a full-duplex TCP connection, so both sides can push at
 low latency. This is the right tool for genuinely bidirectional, low-latency work: chat, presence,
 collaborative editing, multiplayer. The costs are real: the connection is stateful, so scaling across
