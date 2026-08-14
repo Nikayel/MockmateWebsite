@@ -3702,12 +3702,42 @@ periodic compaction.
 }
 \`\`\`
 
-Costs are real and interviewers probe them. OR-Set elements carry add/remove tags, and removed
-elements leave **tombstones** so a late-arriving add does not resurrect deleted data. Metadata and
-tombstones grow, so you need **garbage collection**, which itself needs some coordination or a
-causal-stability threshold. And CRDTs **cannot enforce global invariants**: "this username is
-globally unique" or "the balance never goes negative" require agreement, and agreement is exactly
-what CRDTs avoid. For invariants you need consensus.
+### The metadata bill, in bytes
+
+"CRDTs cost metadata" is the sentence everyone says, and it decides nothing until you size it. Take
+the editing trace these libraries benchmark against: roughly 260,000 keystrokes that leave about
+100,000 characters of surviving text. Store one record per keystroke and each record carries a unique
+position id, the replica id that minted it, a counter, and the character itself, which lands on the
+order of 30 bytes once the struct is counted. These are order-of-magnitude figures and the exact
+overhead depends on the library and its id encoding, but the ratio is not a rounding error.
+
+\`\`\`
+ 260,000 keystroke records x ~30 bytes  ->  ~8 MB of CRDT state
+ surviving text                         ->  ~100 KB
+ ratio                                  ->  ~80x
+
+ run-length encode instead: one record per RUN of consecutive
+ inserts, and ordinary typing is almost entirely runs
+ same document                          ->  a low single-digit multiple
+\`\`\`
+
+Eighty times is why the first generation of these libraries was unusable on a phone. Eight megabytes
+over a 1 Mbps mobile link is about a minute of staring at a blank document before it appears, and
+250 KB is not. That one number forces three decisions you would otherwise file under "nice to have":
+snapshot the materialized document so a new joiner never replays the op log, sync deltas against the
+client's state vector instead of shipping raw state, and run-length encode insertion runs in the
+representation itself.
+
+Tombstones are the other half of the bill, and they grow with **history** rather than with content.
+OR-Set elements carry add/remove tags, and removed elements leave **tombstones** so a late-arriving
+add does not resurrect deleted data. A set that has absorbed 10 million adds and removes over its
+lifetime holds a tag per operation at roughly 24 bytes each, so about 240 MB of metadata guarding
+live contents that might be a few tens of megabytes, and none of it shrinks on its own. That is why
+**garbage collection** is part of the design rather than an afterthought, and it needs some
+coordination or a causal-stability threshold to know that a late update can never arrive again. And
+CRDTs **cannot enforce global invariants**: "this username is globally unique" or "the balance never
+goes negative" require agreement, and agreement is exactly what CRDTs avoid. For invariants you need
+consensus.
 
 \`\`\`cswidget
 {
