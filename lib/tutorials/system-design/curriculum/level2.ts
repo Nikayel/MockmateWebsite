@@ -3225,6 +3225,45 @@ not billions of raw points.
 }
 \`\`\`
 
+### What the retention ladder is actually buying
+
+Those tier windows look arbitrary until you cost them, and costing them moves which one you would
+cut. Take a mid-size fleet: 10,000 hosts emitting 200 series each is 2 million active series, scraped
+every 10 seconds. Compression is what makes the per-point figure small: a naive row of timestamp plus
+float plus row overhead is 16 bytes or more, and delta-of-delta plus Gorilla gets the same point to
+roughly 2 bytes, which is where the 10x claim above comes from. Disk here is SSD-backed block
+storage at roughly 80 dollars per TB-month, approximate and drifting, and a TSDB cluster usually
+keeps two copies.
+
+\`\`\`
+2,000,000 series x 8,640 points/day x ~2 bytes  =  ~35 GB/day of raw
+
+flat: keep raw for 2 years
+  730 days x 35 GB           = ~25 TB   -> ~2,000 dollars a month, ~4,000 replicated
+
+the ladder, with 4 aggregates (min/max/sum/count) per rollup point
+  raw,       7 days          = ~250 GB
+  1-minute, 30 days          = ~700 GB
+  1-hour,    2 years         = ~280 GB
+  total                      = ~1.2 TB  ->   ~100 dollars a month,  ~200 replicated
+\`\`\`
+
+The ladder is about 20x cheaper, so roughly 3,800 dollars a month, and the gap widens every day
+because the flat plan grows 35 GB daily and the ladder does not. But read the tiers against each
+other, because the intuitive lever is the wrong one. **Resolution costs money, retention length
+barely does.** One month of 1-minute rollups is 700 GB, more than half the entire ladder, while two
+whole years of hourly rollups is 280 GB. If someone asks you to cut this bill, shortening the
+1-minute window from 30 days to 7 is worth about 540 GB and shortening the 2-year hourly window is
+worth almost nothing. Dropping a resolution tier is the lever; dropping history is theatre.
+
+What you are buying with that 3,800 dollars is resolution on old data, so name the tradeoff out loud
+rather than defaulting into it: past 30 days, an incident gets debugged at hourly granularity, and a
+team whose postmortems genuinely need raw-resolution detail on a year-old event is asking for roughly
+2,000 dollars a month per copy, which is a fine thing to buy on purpose and a bad thing to buy by
+forgetting to set a retention policy. Keep the two bills separate in your head as well. This one is disk, set
+by resolution and retention. The next one is memory, set by how many series exist at all, and it
+behaves nothing like this.
+
 ### The signature failure mode: cardinality explosion
 
 This is the single thing interviewers test. A time series is identified by its metric name plus its
