@@ -101,6 +101,88 @@ Microservices split each capability into its own deployable service with its own
 
 The decision rule: default to a modular monolith, then extract a service only when a concrete trigger appears. Real extraction triggers are (1) org scaling, when too many teams contend on one deploy pipeline (Conway's Law), (2) divergent deploy cadence, when one part ships hourly and the rest ships weekly, (3) divergent scaling profile, when one component needs 10x the hardware, (4) fault isolation for a critical path, and (5) a genuine polyglot need.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "What a split costs the request path",
+  "predictPrompt": {
+    "question": "One user request used to be four in-process calls. After the split it is four network calls to four services, each up 99.9 percent of the time. What is the availability of the request path?",
+    "options": [
+      "Still 99.9 percent, since every service meets its own target",
+      "About 99.6 percent, because the misses multiply along the chain",
+      "Better than 99.9 percent, because one service failing no longer takes the others with it"
+    ]
+  },
+  "workedExample": "Four services sit on one request path and each is up 99.9 percent of the time, so the path is up 0.999 to the fourth power: 99.6 percent. That is about 2.9 hours unavailable every 30 days, against the 43 minutes a single 99.9 percent service promises, and nothing was deployed badly to earn it. The four hops also add 5 ms each, so 20 ms of pure network lands on every request before any service does work. Now drag the count: this is a chain, so each service you add multiplies the miss rate rather than averaging it, which is why fault isolation only helps when the services are genuinely independent instead of serial.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "services",
+      "label": "Services on the request path",
+      "min": 1,
+      "max": 10,
+      "step": 1,
+      "initial": 4,
+      "unit": "services"
+    },
+    {
+      "kind": "select",
+      "id": "avail",
+      "label": "Availability of each service",
+      "options": [
+        {
+          "label": "99% (3.65 days a year)",
+          "value": 0.99
+        },
+        {
+          "label": "99.9% (8.8 hours a year)",
+          "value": 0.999
+        },
+        {
+          "label": "99.99% (53 minutes a year)",
+          "value": 0.9999
+        }
+      ],
+      "initial": 1
+    },
+    {
+      "kind": "slider",
+      "id": "hop",
+      "label": "Added latency per network hop",
+      "min": 1,
+      "max": 40,
+      "step": 1,
+      "initial": 5,
+      "unit": "ms"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "chain",
+      "label": "Availability of the whole path",
+      "expr": "pow(avail, services)",
+      "format": "percent",
+      "sparkline": {
+        "over": "services"
+      }
+    },
+    {
+      "id": "downtime",
+      "label": "Unavailable per 30 days",
+      "expr": "(1 - chain) * 2592000",
+      "format": "duration"
+    },
+    {
+      "id": "added",
+      "label": "Network latency added per request",
+      "expr": "services * hop / 1000",
+      "format": "duration"
+    }
+  ],
+  "caption": "Availability multiplies along a serial chain and latency adds, so a split you cannot tie to a named trigger buys you a worse request path for free. This is also the arithmetic behind the distributed monolith being the worst of both."
+}
+\`\`\`
+
 **Interview nuance:** the worst outcome is a distributed monolith: services that share a database or must be deployed together. You pay the full network and ops cost of microservices and still cannot deploy or scale independently, so you get every cost and no benefit. Interviewers probe for this by asking "what if two of your services need the same data?" The right answer is API or event access, never a shared table.
 
 Argue both directions from the requirements. If asked to justify microservices, ground it in a named trigger. If asked why not, cite the distributed-monolith risk and the ops overhead a small team cannot absorb.
@@ -2094,6 +2176,104 @@ Every data-intensive system eventually splits into two workloads that want oppos
     ]
   ],
   "caption": "The win is not mainly the compression, it is what never gets read: a column store touches only the columns the query names, so an aggregate over two columns of a 40 column table skips the other 38 before compression is even considered."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "What a column store never reads",
+  "predictPrompt": {
+    "question": "SUM(rev) over a billion-row, 40-column table. Where does most of the column store's advantage over the row store come from?",
+    "options": [
+      "The 5x to 20x compression columnar data achieves",
+      "Never reading the 38 columns the query does not name",
+      "Vectorized execution, a batch of values per instruction"
+    ]
+  },
+  "workedExample": "A billion rows, 40 columns, and 8 bytes a value. The row store stores a row contiguously, so reaching one column means reading every column of every row: 320 GB. The column store reads only the two columns the query names, 16 GB, and 5x compression takes that to 3.2 GB. Read the split before you move anything: 20x of the win came from skipping 38 columns, before one byte was decompressed, and 5x came from the compression everyone quotes first. Now drag the columns the query names upward, which is what SELECT star does, and watch the larger half of the advantage disappear while the compression stays exactly where it was.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "rows",
+      "label": "Rows in the table",
+      "min": 1000000,
+      "max": 10000000000,
+      "scale": "log",
+      "initial": 1000000000,
+      "unit": "rows"
+    },
+    {
+      "kind": "slider",
+      "id": "cols",
+      "label": "Columns in the table",
+      "min": 5,
+      "max": 60,
+      "step": 1,
+      "initial": 40
+    },
+    {
+      "kind": "slider",
+      "id": "touched",
+      "label": "Columns the query names",
+      "min": 1,
+      "max": 10,
+      "step": 1,
+      "initial": 2
+    },
+    {
+      "kind": "select",
+      "id": "comp",
+      "label": "Columnar compression",
+      "options": [
+        {
+          "label": "none",
+          "value": 1
+        },
+        {
+          "label": "5x",
+          "value": 5
+        },
+        {
+          "label": "20x",
+          "value": 20
+        }
+      ],
+      "initial": 1
+    }
+  ],
+  "outputs": [
+    {
+      "id": "rowbytes",
+      "label": "Row store reads",
+      "expr": "rows * cols * 8",
+      "format": "bytes"
+    },
+    {
+      "id": "colbytes",
+      "label": "Column store reads",
+      "expr": "rows * touched * 8 / comp",
+      "format": "bytes"
+    },
+    {
+      "id": "skipwin",
+      "label": "From skipping columns alone",
+      "expr": "cols / touched",
+      "format": "number",
+      "unit": "x",
+      "sparkline": {
+        "over": "touched"
+      }
+    },
+    {
+      "id": "totalwin",
+      "label": "Total advantage",
+      "expr": "rowbytes / colbytes",
+      "format": "number",
+      "unit": "x"
+    }
+  ],
+  "caption": "Compression is the smaller half of the story. The advantage lives in the columns that are never touched, which is why SELECT star on a columnar table throws the design away and why a wide table punishes the row store hardest."
 }
 \`\`\`
 
