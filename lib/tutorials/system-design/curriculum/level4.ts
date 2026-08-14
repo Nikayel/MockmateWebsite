@@ -2462,11 +2462,36 @@ framing: autoscaling handles *sustained load changes and gradual ramps* well, bu
 you must either pre-scale (if predictable) or hold **headroom** (run at 60% not 95%) so the existing
 fleet absorbs the burst while new capacity boots.
 
-\`\`\`
-  burst arrives ->  |####| traffic
-  reactive:         scrape(30s)+decide(30s)+boot(90s)+warm(30s) = ~3min late
-  warm pool:        attach pre-booted node = ~15s
-  scheduled:        capacity already up at 8:50 for the 9am spike
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Strategy",
+    "How the capacity arrives",
+    "How late it is for a 20 second burst"
+  ],
+  "rows": [
+    [
+      "Reactive (HPA on a metric)",
+      "Scrape 30s, decide 30s, boot 90s, warm 30s",
+      "About 3 minutes late"
+    ],
+    [
+      "Warm pool",
+      "Attach a node that is already booted and already warm",
+      "About 15 seconds"
+    ],
+    [
+      "Scheduled or predictive",
+      "Floor raised at 8:50 for the 9am spike",
+      "Already serving when the burst arrives"
+    ]
+  ],
+  "highlightCols": [
+    "How late it is for a 20 second burst"
+  ],
+  "caption": "None of these makes an unpredictable 20 second burst survivable by itself. Standing headroom, running the fleet at 60 percent rather than 95, is the only thing absorbing the burst while the rows above catch up."
+}
 \`\`\`
 
 Recap: scale on leading signals (queue depth via KEDA, RPS) not just lagging CPU, layer HPA + cluster
@@ -2724,17 +2749,142 @@ rock-solid*, because it is the one shared component. You deploy changes **cell b
 1, watch its metrics, then roll the rest. A bad release is caught at 10% blast radius instead of
 100%.
 
-\`\`\`
-        cell router (dumb, HA, the only shared thing)
-        /          |           \\
-   +--------+  +--------+   +--------+
-   | Cell 1 |  | Cell 2 |   | Cell 3 |   ...
-   | LB     |  | LB     |   | LB     |
-   | svc    |  | svc    |   | svc    |
-   | cache  |  | cache  |   | cache  |
-   | db-part|  | db-part|   | db-part|
-   +--------+  +--------+   +--------+
-   tenants A-J  tenants K-T  tenants U-Z
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Cells: one shared router in front of N independent stacks",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "router",
+      "label": "Cell router (dumb, HA, the only shared thing)",
+      "kind": "lb"
+    },
+    {
+      "id": "c1_lb",
+      "label": "Cell 1 load balancer",
+      "kind": "lb"
+    },
+    {
+      "id": "c1_svc",
+      "label": "Cell 1 service instances",
+      "kind": "service"
+    },
+    {
+      "id": "c1_data",
+      "label": "Cell 1 cache and DB partition",
+      "kind": "db"
+    },
+    {
+      "id": "c2_lb",
+      "label": "Cell 2 load balancer",
+      "kind": "lb"
+    },
+    {
+      "id": "c2_svc",
+      "label": "Cell 2 service instances",
+      "kind": "service"
+    },
+    {
+      "id": "c2_data",
+      "label": "Cell 2 cache and DB partition",
+      "kind": "db"
+    },
+    {
+      "id": "c3_lb",
+      "label": "Cell 3 load balancer",
+      "kind": "lb"
+    },
+    {
+      "id": "c3_svc",
+      "label": "Cell 3 service instances",
+      "kind": "service"
+    },
+    {
+      "id": "c3_data",
+      "label": "Cell 3 cache and DB partition",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "router",
+      "to": "c1_lb",
+      "kind": "sync",
+      "label": "tenant id maps to a cell"
+    },
+    {
+      "from": "router",
+      "to": "c2_lb",
+      "kind": "sync"
+    },
+    {
+      "from": "router",
+      "to": "c3_lb",
+      "kind": "sync"
+    },
+    {
+      "from": "c1_lb",
+      "to": "c1_svc",
+      "kind": "sync"
+    },
+    {
+      "from": "c1_svc",
+      "to": "c1_data",
+      "kind": "sync"
+    },
+    {
+      "from": "c2_lb",
+      "to": "c2_svc",
+      "kind": "sync"
+    },
+    {
+      "from": "c2_svc",
+      "to": "c2_data",
+      "kind": "sync"
+    },
+    {
+      "from": "c3_lb",
+      "to": "c3_svc",
+      "kind": "sync"
+    },
+    {
+      "from": "c3_svc",
+      "to": "c3_data",
+      "kind": "sync"
+    }
+  ],
+  "groups": [
+    {
+      "id": "cell1",
+      "label": "Cell 1 (tenants A to J)",
+      "nodes": [
+        "c1_lb",
+        "c1_svc",
+        "c1_data"
+      ]
+    },
+    {
+      "id": "cell2",
+      "label": "Cell 2 (tenants K to T)",
+      "nodes": [
+        "c2_lb",
+        "c2_svc",
+        "c2_data"
+      ]
+    },
+    {
+      "id": "cell3",
+      "label": "Cell 3 (tenants U to Z)",
+      "nodes": [
+        "c3_lb",
+        "c3_svc",
+        "c3_data"
+      ]
+    }
+  ],
+  "caption": "Nothing crosses a lane at runtime, which is the entire point: a poison request, a resource exhaustion or a bad deploy is confined to one cell's share of users. You deploy cell by cell, so a bad release is caught at 10 percent instead of 100. The bill is capacity fragmentation, because every cell carries its own headroom and cannot borrow a quiet cell's, plus a router you must obsess over because it is the one thing everybody shares."
+}
 \`\`\`
 
 ### Shuffle sharding
