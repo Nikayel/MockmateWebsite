@@ -2158,9 +2158,9 @@ New reviews, edits, and new places are comparatively low-rate. They update the s
   "prompt": "Which component answers coffee within 2km, open now, at least four stars, ranked by rating and distance, in one hop?",
   "options": [
     {
-      "label": "A search engine index holding a denormalized read model, doing the geo distance filter, the attribute filters and the ranking in one query",
+      "label": "The search engine index over a denormalized read model",
       "correct": true,
-      "feedback": "Right. The spatial part is only half the query, and it is the combination of geo, attributes, text and ranking in one place that makes a search engine the natural home."
+      "feedback": "Right. The spatial part is only half the query: geo distance, category, open now, price band, minimum rating and the ranking all resolve in a single pass over one index. It is that combination, not the geo filter alone, that makes a search engine the natural home."
     },
     {
       "label": "The relational source of truth, with a spatial index added to the places table",
@@ -2319,9 +2319,9 @@ Replication and quorums are the heart. With N replicas, a write is acknowledged 
   "prompt": "You set N=3, W=2, R=2, so any read quorum overlaps any write quorum. Have you made the store linearizable?",
   "options": [
     {
-      "label": "No: overlap gives a value at least as new as the last acknowledged write, but concurrent writes, read-repair timing and sloppy quorums still allow anomalies",
+      "label": "No: overlap buys freshness, not a single order over all operations",
       "correct": true,
-      "feedback": "Right, and saying it this precisely is the seniority signal. Quorum overlap is a freshness property, not a single global order over all operations."
+      "feedback": "Right, and saying it this precisely is the seniority signal. Overlap guarantees a value at least as new as the last acknowledged write, and says nothing about concurrent writes, read-repair timing or sloppy quorums, so anomalies remain. Quorum overlap is a freshness property, not a global order."
     },
     {
       "label": "Yes: an overlapping node is guaranteed to hold the latest write, which is what linearizability means",
@@ -2426,9 +2426,9 @@ write k=v -> coordinator -> replicas [N1,N2,N3]
   "prompt": "Pick the sentence you would actually say about tuning N, R and W.",
   "options": [
     {
-      "label": "Quorum overlap buys freshness relative to the last acknowledged write; for a true global order you need consensus such as Paxos or Raft",
+      "label": "Quorum overlap buys freshness; a global order needs consensus",
       "correct": true,
-      "feedback": "Right. It concedes exactly what quorums cannot do and names what would, which is what the interviewer is listening for."
+      "feedback": "Right. It concedes exactly what quorums cannot do, freshness relative to the last acknowledged write rather than a total order over operations, and it names what would buy the order: consensus such as Paxos or Raft. That pairing is what the interviewer is listening for."
     },
     {
       "label": "R plus W greater than N gives linearizability without paying for consensus",
@@ -2527,9 +2527,9 @@ The blob data is easy (write shards to storage nodes), but you need a massive in
   "prompt": "S3 promises strong read-after-write consistency, yet an object's bytes are spread over k plus m shards on many disks. Where does the guarantee come from?",
   "options": [
     {
-      "label": "From the metadata index: the write is not acknowledged until the index entry naming the new shards is durable and visible, so the index is the point of truth",
+      "label": "From the metadata index, which is the point of truth",
       "correct": true,
-      "feedback": "Right. Readers find an object through the index, so making the index commit the acknowledgement point is what makes the new version appear atomically."
+      "feedback": "Right. Readers find an object only through the index, so the write is not acknowledged until the index entry naming the new shards is durable and visible. Making the index commit the acknowledgement point is what makes a new version appear atomically."
     },
     {
       "label": "From writing all k plus m shards synchronously before acknowledging",
