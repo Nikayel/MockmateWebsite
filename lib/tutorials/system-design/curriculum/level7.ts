@@ -987,16 +987,16 @@ A call with no timeout inherits the operating system default, which for a TCP co
   "type": "check",
   "kind": "predict",
   "id": "deadline-propagation",
-  "prompt": "A user-facing request carries a 1 second budget. Service A spends 400 ms, then calls B with its own fresh 1 second timeout, and B calls C with another fresh 1 second timeout. What is the worst case?",
+  "prompt": "A user-facing request carries a 1 second budget. Service A spends 400 ms, then calls B with its own fresh 1 second timeout, and B calls C with another fresh 1 second timeout. Count the work the chain can spend on this one request, not the wall clock the user waits. What is the worst case?",
   "options": [
     {
       "label": "1 second, because the user's budget bounds the whole chain",
       "feedback": "Nothing enforces the user's budget across hops unless the remaining time is passed down. A fresh timeout at each hop is permission to start the clock over."
     },
     {
-      "label": "Up to 3 seconds of work across the chain, most of it producing a result the user already gave up on",
+      "label": "Up to 3 seconds of work across the chain",
       "correct": true,
-      "feedback": "Right. Three hops with fresh timeouts can legally spend 3x the user's budget. The fix is a shrinking deadline: tell B it has 600 ms left, and have B tell C what remains of that."
+      "feedback": "Right. Three hops with fresh timeouts can legally spend 3x the user's budget, most of it producing a result the user already gave up on. The wall clock is the smaller number here: the user stops waiting at 1.4 seconds, because A's own 1 second timeout on B fires 400 ms in. B and C keep burning server time behind that, which is the waste. The fix is a shrinking deadline: tell B it has 600 ms left, and have B tell C what remains of that."
     },
     {
       "label": "400 ms, because A already consumed the budget",
@@ -1013,6 +1013,8 @@ A call with no timeout inherits the operating system default, which for a TCP co
 ## Propagate a deadline, do not reset it
 
 If the user-facing request has a 1 second budget and it has already spent 400 ms, the call to service B must be told "you have 600 ms left," and service B must pass the remaining budget to service C. gRPC does this natively with deadlines; in HTTP you pass a header like \`X-Deadline\` or \`grpc-timeout\`. Without propagation each hop uses its own fresh timeout, so a 3-hop chain can legally spend 3x the user's budget doing work whose result the user already gave up waiting for.
+
+Two different quantities move here and it pays to name both, because interviewers ask which one you mean. The **wall clock the user waits** is bounded at 1.4 seconds: A spends 400 ms, then its own 1 second timeout on B fires and A gives up. The **work the chain spends** is up to 3 seconds, because B and C are still computing against clocks nobody reset. Propagation is what collapses the second number back onto the first.
 
 ## Retries need backoff, jitter, and a budget
 
