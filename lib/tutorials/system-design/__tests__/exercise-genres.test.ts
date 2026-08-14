@@ -55,10 +55,10 @@ const withSupplied = exercises.filter((e) => e.exercise.supplied)
  * it. It is here because it is the number the audit measured, so it is the one that has to be shown
  * moving; `SUPPLIED_FLOOR` is the check that something real replaced them.
  */
-const GENERATION_OPENER_PIN = 303
+const GENERATION_OPENER_PIN = 285
 
 /** Exercises handing the learner a read-only artifact. Ratchets UP only. */
-const SUPPLIED_FLOOR = 0
+const SUPPLIED_FLOOR = 20
 
 describe("system design exercise genres", () => {
   it("keeps shrinking the share of exercises that open by asking for a design", () => {
