@@ -1260,10 +1260,47 @@ checking whether you know which reads got expensive, not just that you sprinkled
 }
 \`\`\`
 
+### Hashing evens out keys, never one key
+
+Hash partitioning spreads keys evenly across partitions. It does nothing about a key that is hot by
+itself, because one key hashes to exactly one partition no matter how many partitions exist. A group
+chat with 200k members, a celebrity account, a mega-tenant: the partition owning that key carries a
+multiple of every peer's load while the rest of the cluster idles.
+
+The lightweight mitigation, and the one to name in a design write, is a **bucket suffix** (also
+called salting or key-splitting): split the one logical key into K physical keys and treat them as a
+set.
+
+\`\`\`
+one logical key            becomes K = 8 physical keys
+  conv:9f3                   conv:9f3#0, conv:9f3#1, ... conv:9f3#7
+                             each hashes independently, so they land on
+                             8 different partitions
+
+write: pick a bucket at random, or by writer id
+  append(conv:9f3#5, msg)    any one partition now absorbs about 1/8 of the
+                             conversation's write rate
+
+read: fan out to all K and merge
+  read(conv:9f3#0 .. #7) -> merge by message_id -> the last N messages
+                             8 parallel reads, merged by the coordinator
+
+  the trade is explicit and it is the whole point: write load on the hot
+  partition drops to 1/K, and every read of that key costs K partition hits
+  instead of 1. So you apply it to the handful of keys that are genuinely hot,
+  never across the keyspace, which means you also need per-key request-rate
+  monitoring to know which keys those are.
+\`\`\`
+
+The hot-key lesson later in this module works this out fully, alongside dynamic sub-partitioning and
+dedicated shards for whales. Carry two things now: hashing fixes skew across keys and never within
+one, and every fix for a hot key buys write spread with read fan-out.
+
 Recap: horizontal partitioning is the only way to scale writes and data past one node; range wins
-range scans but hotspots on sequential keys, hash spreads evenly but loses ranges and reshuffles on
-mod N, directory adds a flexible routing hop, and secondary indexes are either scatter-gather locals
-or write-costly globals.
+range scans but hotspots on sequential keys, hash spreads evenly across keys but loses ranges,
+reshuffles on mod N, and still leaves a single hot key on one partition until you split it with a
+bucket suffix; directory adds a flexible routing hop; and secondary indexes are either scatter-gather
+locals or write-costly globals.
 
 \`\`\`cswidget
 {
