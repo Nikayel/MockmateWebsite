@@ -2338,6 +2338,83 @@ nodes, deduplicating as it goes.
 
 \`\`\`cswidget
 {
+  "type": "calc",
+  "title": "Join rows versus people reached, by traversal depth",
+  "predictPrompt": {
+    "question": "On a social graph where the average person has 200 friends, how many intermediate rows does a 5-hop friends-of-friends self-join materialize before deduplication?",
+    "options": [
+      "About 1,000",
+      "About 1 million",
+      "About 320 billion",
+      "At most 1 billion, because that is how many people exist"
+    ]
+  },
+  "workedExample": "At the initial 200 friends each and 3 hops, the chain of self-joins materializes 200 x 200 x 200, which is 8 million intermediate rows. That is still well under the 1 billion people in the graph, so the join is producing roughly one row per person it finds and SQL copes. Now drag hops to 5: the same arithmetic gives 320 billion rows describing at most 1 billion distinct people, which is 320 rows materialized for every person a traversal would have visited once.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "avg_degree",
+      "label": "Average friends per person",
+      "min": 5,
+      "max": 1000,
+      "scale": "log",
+      "initial": 200,
+      "unit": "friends"
+    },
+    {
+      "kind": "slider",
+      "id": "hops",
+      "label": "Traversal depth",
+      "min": 1,
+      "max": 6,
+      "scale": "linear",
+      "step": 1,
+      "initial": 3,
+      "unit": "hops"
+    },
+    {
+      "kind": "slider",
+      "id": "people",
+      "label": "People in the graph",
+      "min": 100000,
+      "max": 3000000000,
+      "scale": "log",
+      "initial": 1000000000,
+      "unit": "people"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "join_rows",
+      "label": "Intermediate rows the self-join materializes",
+      "expr": "pow(avg_degree, hops)",
+      "format": "compact",
+      "unit": "rows",
+      "sparkline": {
+        "over": "hops"
+      }
+    },
+    {
+      "id": "reached",
+      "label": "Distinct people that depth can reach",
+      "expr": "min(join_rows, people)",
+      "format": "compact",
+      "unit": "people"
+    },
+    {
+      "id": "rows_per_person",
+      "label": "Rows materialized per distinct person found",
+      "expr": "join_rows / reached",
+      "format": "compact",
+      "unit": "x"
+    }
+  ],
+  "caption": "Paths grow exponentially with depth; people do not. The graph engine walks outward and dedupes as it goes, so its work tracks the people it reaches, while the join's work tracks the paths."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "check",
   "kind": "predict",
   "prompt": "Your app's only relationship query is 'show this user's direct friends', one hop, millions of times a day. Which store fits?",
