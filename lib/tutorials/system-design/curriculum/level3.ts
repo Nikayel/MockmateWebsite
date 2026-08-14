@@ -3303,7 +3303,7 @@ export const systemDesignLevel3: DesignLevel = {
           id: "sd-l3-vector-hybrid-search",
           title: "Vector, Semantic & Hybrid Search",
           summary:
-            "Embeddings plus ANN give semantic recall, BM25 catches exact tokens; fuse by rank with RRF, rerank the top-k with a cross-encoder, and plan re-embedding migrations.",
+            "Why vector search alone misses exact tokens, and how reciprocal rank fusion blends it with BM25 without comparing two incomparable scores.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["vector-search", "hybrid-search", "rag"],
@@ -3353,7 +3353,7 @@ export const systemDesignLevel3: DesignLevel = {
           id: "sd-l3-geospatial-indexing",
           title: "Geospatial Indexing: Geohash, Quadtree, S2 & H3",
           summary:
-            "Encode points into cell keys (geohash/S2/H3) so 2D proximity becomes an indexable range query, ring-query neighbors, tune cell size to radius, and defuse hot cells.",
+            "Why two B-tree indexes cannot answer 'find drivers near me', and how geohash, S2 and H3 turn 2D proximity into an indexable range scan.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["geospatial", "indexing", "data-modeling"],
@@ -3459,7 +3459,7 @@ export const systemDesignLevel3: DesignLevel = {
           id: "sd-l3-cdc-dual-write",
           title: "Keeping Derived Stores in Sync (CDC & Outbox)",
           summary:
-            "Never dual-write to a DB and a derived store: use the transactional outbox or log-based CDC through Kafka, with at-least-once delivery and idempotent, versioned consumers.",
+            "Why writing to your database and your cache in one handler always drifts, and what the transactional outbox and log-based CDC buy you instead.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["cdc", "outbox", "dual-write"],
