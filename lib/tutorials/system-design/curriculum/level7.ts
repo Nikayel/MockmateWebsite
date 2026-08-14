@@ -1193,6 +1193,59 @@ The thing that makes traces work across service boundaries is **context propagat
 
 **OpenTelemetry (OTel)** is the vendor-neutral standard that ties all three pillars together. It gives you: SDKs (per language) that produce metrics, logs, and traces with a common data model and automatic context propagation; instrumentation libraries that trace popular frameworks with near-zero code; and the **OTel Collector**, a separate process that receives your telemetry, processes it (batching, sampling, redaction, adding resource attributes), and exports it to whatever backends you choose (Prometheus for metrics, Loki/Elasticsearch for logs, Jaeger/Tempo for traces, or a vendor like Datadog/Honeycomb). The payoff is decoupling: your application code emits OTel and knows nothing about the backend, so you can switch vendors or fan out to several by editing Collector config, not redeploying every service.
 
+## Propagation past HTTP: a queue breaks the chain
+
+Auto-instrumentation only covers transports it knows how to reach into, and a message broker is not one of them. An HTTP client has a headers object the instrumentation can write on the way out and read on the way in. A message sitting on a queue has no HTTP request anywhere in it, so nothing gets stamped, the consumer starts a *fresh root span*, and the trace stops dead at "published to orders". You do the injecting and extracting yourself, into the message's own headers:
+
+\`\`\`js
+const { propagation, context, trace, ROOT_CONTEXT } = require("@opentelemetry/api")
+
+// PRODUCER: serialize the active context into a plain string map (the "carrier"),
+// then ship that map as the message's headers.
+const carrier = {}
+propagation.inject(context.active(), carrier)
+// carrier is now { traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01" }
+await producer.send({
+  topic: "orders",
+  messages: [{ value: payload, headers: carrier }],
+})
+
+// CONSUMER: rebuild the parent context out of the headers that rode along.
+const parentCtx = propagation.extract(ROOT_CONTEXT, message.headers)
+const span = tracer.startSpan("process order", undefined, parentCtx)
+// span.spanContext().traceId === "4bf92f3577b34da6a3ce929d0e0e4736"  (same trace)
+\`\`\`
+
+The carrier is nothing but a string map, which is the point: the same two calls work over Kafka record headers, SQS message attributes, an AMQP property table, or gRPC metadata. All that changes per transport is where you hand the map over.
+
+## One poll, many traces: span links
+
+Now the tree shape itself breaks. A consumer does not read one message, it polls and gets a *batch*, and those messages were published by unrelated requests, so one poll routinely holds messages from fifty different traces. A span has exactly one parent, so "which trace is this batch span in?" has no good answer: adopt the first message's context as the parent and the other forty-nine orders disappear from the traces that produced them.
+
+A **span link** is the primitive for that case: a reference from a span to another span's context that records causality *without* nesting the span underneath it. A parent is one; links are a list, so a single span can point at as many upstream contexts as the batch contained.
+
+\`\`\`js
+// One poll, three messages, three unrelated traces.
+const links = []
+for (const msg of batch.messages) {
+  const upstream = propagation.extract(ROOT_CONTEXT, msg.headers)
+  const spanContext = trace.getSpanContext(upstream) // { traceId, spanId, traceFlags }
+  if (spanContext) links.push({ context: spanContext })
+}
+
+// No parent context argument: the batch span is a root, joined to its inputs by links.
+const span = tracer.startSpan("process orders batch", { links })
+// links -> [ { traceId: "4bf92f..." }, { traceId: "a1b2c3..." }, { traceId: "9f8e7d..." } ]
+\`\`\`
+
+\`\`\`
+  trace 4bf92f...  POST /orders -> [publish order 1] --link--.
+  trace a1b2c3...  POST /orders -> [publish order 2] --link--+--> [process orders batch 40ms]
+  trace 9f8e7d...  POST /orders -> [publish order 3] --link--'         |-- inventory write [8ms]
+\`\`\`
+
+Each link carries an upstream trace id, so from the batch span every order that fed it is reachable, and the three producer traces keep their own shape instead of being force-fitted under one parent. Backends render this as a list of related traces beside the span rather than as nesting, which is the honest picture: a batch is a fan-in, not a branch of one request's tree.
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -1223,7 +1276,7 @@ The thing that makes traces work across service boundaries is **context propagat
 
 **Interview nuance:** be ready to talk cost control, because that is where these designs are won or lost. Cardinality drives metric cost, so keep labels bounded. Trace volume is enormous at scale, so you *sample*: **head-based** sampling decides at the first span (cheap, simple, but may drop the one trace you needed), while **tail-based** sampling buffers whole traces at the Collector and keeps the interesting ones (all errors, all slow requests) plus a small percentage of normal traffic (accurate, but the Collector must hold traces in memory). Logs get tiered storage: hot in a fast index for a few days, then rolled to cheap object storage (S3) for compliance retention.
 
-**Recap:** metrics for cheap aggregates and alerting, logs for structured per-event detail, traces for the causal cross-service path; propagate W3C trace context and share the trace id across all three; standardize on OpenTelemetry SDKs plus a Collector to decouple apps from backends; and control cost with bounded cardinality, trace sampling (tail-based keeps errors/slow), and tiered log retention.
+**Recap:** metrics for cheap aggregates and alerting, logs for structured per-event detail, traces for the causal cross-service path; propagate W3C trace context and share the trace id across all three; past HTTP nothing propagates for you, so inject the context into message headers on publish and extract it on consume, and join a batched poll to its inputs with span links instead of one parent; standardize on OpenTelemetry SDKs plus a Collector to decouple apps from backends; and control cost with bounded cardinality, trace sampling (tail-based keeps errors/slow), and tiered log retention.
 
 \`\`\`cswidget
 {

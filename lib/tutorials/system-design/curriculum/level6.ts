@@ -688,6 +688,54 @@ events per second.
 }
 \`\`\`
 
+### How many partitions: the one division
+
+Partition count is the first number an interviewer asks you for, and it is not a taste decision. A
+partition is one leader's log file plus the replication traffic that follows it, so plan on a
+conservative **~10 MB/s produced and ~10 MB/s consumed per partition**. That is a planning figure,
+not a hard ceiling: a partition on fast NVMe with big batches beats it, and one with tiny records
+read by six consumer groups falls short of it. Size on the conservative number, then say out loud
+why you added headroom.
+
+The rule is \`partitions ~= target throughput / per-partition throughput\`. Worked end to end on a
+1 million messages per second topic at 1 KB per message:
+
+- Ingest first: 1,000,000 x 1 KB = 1,000 MB/s, so **1 GB/s**.
+- Floor next: 1,000 MB/s / 10 MB/s per partition = **100 partitions**. Below that, one leader is
+  being asked for more than it sustains and lag grows no matter how many consumers you run.
+- The floor is not the answer. Partition count also caps consumer parallelism, and raising it later
+  remaps keys, so you provision above the floor: 150 to 200 here.
+- The ceiling is real too. Every partition costs open file handles, replication connections,
+  controller metadata, and rebalance time, so "just use thousands" is a wrong answer, not a safe one.
+
+The division is the same at any scale: 300 MB/s over 10 MB/s is a floor of 30, and 5 GB/s is a floor
+of 500. Convert events per second into bytes per second first, because the figure is a byte rate and
+a 200-byte event and a 4 KB event at the same event rate need very different topics.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A topic must absorb 600,000 events/sec at 1 KB each. Using the conservative ~10 MB/s-per-partition planning figure, what is the partition floor, and is it the number you would provision?",
+  "options": [
+    {
+      "label": "A floor of 60 partitions, and no: you provision above the floor",
+      "correct": true,
+      "feedback": "Right. Convert to a byte rate (600,000 x 1 KB = 600 MB/s), divide by the per-partition figure for the floor of 60, then provision above it because partition count also caps how many consumers can work and because raising it later remaps keys."
+    },
+    {
+      "label": "A floor of 60,000, from 600,000 events over 10 MB/s",
+      "feedback": "The 10 MB/s figure is a byte rate, so the numerator has to be one too: 600,000 events at 1 KB is 600 MB/s, and 600 over 10 is 60."
+    },
+    {
+      "label": "Exactly 60 partitions, because the floor is the number you provision at",
+      "feedback": "The floor is where lag starts even with unlimited consumers. It is a lower bound, not a target: partition count is also the cap on consumer parallelism, and you cannot raise it later without remapping keys."
+    }
+  ],
+  "reveal": "partitions ~= target throughput / per-partition throughput, at roughly 10 MB/s per partition. Get to a byte rate, divide for the floor, then provision above it and justify the multiple."
+}
+\`\`\`
+
 ### Durability from replication
 
 Each partition has one **leader** and N-1 **followers** (replication factor typically 3). Followers
@@ -818,7 +866,9 @@ of controllers, removing the external dependency, speeding failover, and scaling
 partitions.
 
 Recap: Kafka is a partitioned append-only log; sequential writes, page cache, and zero-copy explain
-its throughput; durability is leader/follower replication tuned by acks plus min.insync.replicas over
+its throughput; partition count comes from target byte rate divided by a conservative ~10 MB/s per
+partition, and you provision above that floor; durability is leader/follower replication tuned by
+acks plus min.insync.replicas over
 the ISR (durable = acks=all + min.insync.replicas>=2 + RF3); retention, segments, compaction, and
 tiered storage govern cost and replay; and KRaft removed ZooKeeper by making metadata a Raft quorum.
 
