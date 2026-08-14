@@ -2541,13 +2541,13 @@ path.
   "prompt": "The handler writes the DB, then the cache, then the search index. Each write succeeds 99.9 percent of the time, and you add retries on failure. Is the system safe from drift?",
   "options": [
     {
-      "label": "Yes: retries cover the rare failures, so the stores converge",
+      "label": "Yes, retries cover the rare failures and the stores converge",
       "feedback": "Tempting, and retries do narrow the window, but they cannot make three non-atomic writes atomic. A process that dies between writes never issues the retry, and a rolled-back DB transaction cannot un-write the cache."
     },
     {
-      "label": "No: the writes are not atomic, so crashes, rollbacks, and reordered concurrent writers still diverge the stores",
+      "label": "No, the three writes are not atomic",
       "correct": true,
-      "feedback": "Right. No transaction spans a database and a cache. Under load, partial failure is a steady drip of divergence, so the fix has to be structural, not more retries."
+      "feedback": "Right. No transaction spans a database and a cache, so a crash between writes, a rolled-back DB transaction, and two concurrent writers landing in different orders all leave the stores disagreeing. Under load that is a steady drip of divergence, so the fix has to be structural rather than more retries."
     },
     {
       "label": "Yes, as long as you write the cache before the DB",
