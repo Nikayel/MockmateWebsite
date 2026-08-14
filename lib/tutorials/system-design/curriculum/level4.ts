@@ -617,9 +617,9 @@ shared-dependency blip fail the whole fleet at once.
       "feedback": "Tempting, because failures usually look random. But every node shares this dependency, so their checks fail together, not independently."
     },
     {
-      "label": "Every node goes unhealthy at once and the pool empties: a total outage from a blip",
+      "label": "Every node goes unhealthy at once and the pool empties",
       "correct": true,
-      "feedback": "Right. Correlated checks turn a shared-dependency blip into a fleet-wide eviction. The mature design is deep enough to catch a truly broken node, with hysteresis, and never coupled so tightly that one blip fails everyone."
+      "feedback": "Right. Correlated checks turn a shared-dependency blip into a fleet-wide eviction, so ten seconds of database trouble becomes a total outage with no healthy node left to route to. The mature design is deep enough to catch a truly broken node, with hysteresis, and never coupled so tightly that one blip fails everyone."
     },
     {
       "label": "Nothing, health checks hold their last result through short blips",
