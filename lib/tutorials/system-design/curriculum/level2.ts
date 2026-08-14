@@ -1485,8 +1485,35 @@ structure the database must **keep in sync on every insert, update, and delete**
 one insert becomes eleven B-tree writes plus more WAL and more storage. Write-heavy tables should be
 deliberately under-indexed. Beyond the default B-tree, know the specialized types: **hash** (equality
 only, no ranges), **partial** (index only rows matching a predicate, e.g. \`WHERE status='active'\`,
-keeping it tiny), and **GIN/GiST** (Postgres inverted/generalized indexes for arrays, JSONB,
-full-text, and geospatial).
+keeping it tiny), **GIN/GiST** (Postgres inverted/generalized indexes for arrays, JSONB, full-text,
+and geospatial), and **expression** (also called functional) indexes, which index the *result* of an
+expression instead of a bare column.
+
+That last one is the cheap answer to "we need to filter on one field buried inside a JSON blob." The
+reflex is to index the whole document, which makes every key inside it searchable and charges you
+for all of them on every write:
+
+\`\`\`
+-- Indexes every key and value in the document. Broad, and expensive to maintain.
+CREATE INDEX charges_metadata_gin ON charges USING GIN (metadata);
+\`\`\`
+
+An expression index indexes one derived value instead, as if you had added a real column:
+
+\`\`\`
+CREATE INDEX charges_invoice_id ON charges ((metadata->>'invoice_id'));
+
+-- Used only when the query repeats the expression EXACTLY:
+SELECT * FROM charges WHERE metadata->>'invoice_id' = 'in_9f2c';    -- index scan
+SELECT * FROM charges WHERE metadata->'invoice_id'  = '"in_9f2c"';  -- different expression, seq scan
+\`\`\`
+
+The write cost is the difference that decides it. The GIN index extracts and indexes every key in
+the document on every insert and updates a posting list per key. The expression index evaluates one
+function and writes one B-tree entry. On a write-heavy table that gap is the entire argument, and
+the same trick works on ordinary columns whenever a query applies a function:
+\`CREATE INDEX ON users (lower(email))\` serves \`WHERE lower(email) = ?\`, which a plain index on
+\`email\` cannot.
 
 \`\`\`cswidget
 {
