@@ -10,26 +10,15 @@
  */
 import { z } from "zod"
 import { adminDb } from "@/lib/firebase-admin"
+import { courseIdFromLessonId } from "./course-id"
 import { tutorialLevelIdSchema } from "./level-id-schema"
-import type { CourseId, TutorialLessonProgress } from "./types"
+import type { TutorialLessonProgress } from "./types"
 
 const COLLECTION = "user_tutorial_progress"
 
 /** Deterministic, per-user-per-lesson document id. */
 export function progressDocId(userId: string, lessonId: string): string {
   return `${userId}__${lessonId}`
-}
-
-/**
- * Which course a lesson belongs to, from its id prefix (`sd-` → system-design, `sql-`/`de-` → the
- * data-engineering track, else python). Persisted on every progress doc so dashboards can group by
- * course without a backfill. `de-` is the prefix for the Data Engineering levels (L7+); the frozen
- * `sql-` ids share the same course.
- */
-function courseIdFromLessonId(lessonId: string): CourseId {
-  if (lessonId.startsWith("sd-")) return "system-design"
-  if (lessonId.startsWith("sql-") || lessonId.startsWith("de-")) return "data-engineering"
-  return "python"
 }
 
 const sectionStatusSchema = z.enum(["not_started", "in_progress", "completed"])

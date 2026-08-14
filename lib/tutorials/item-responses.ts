@@ -21,10 +21,11 @@
  */
 import { z } from "zod"
 import { adminDb } from "@/lib/firebase-admin"
+import { courseIdFromLessonId } from "./course-id"
 import { tutorialLevelIdSchema } from "./level-id-schema"
 import { getResearchConsent, isResearchUsable } from "./research-consent"
 import { toKnowledgeComponents } from "./knowledge-components"
-import type { CourseId, LearnItemResponse } from "./types"
+import type { LearnItemResponse } from "./types"
 
 const COLLECTION = "learn_item_responses"
 
@@ -84,16 +85,6 @@ export const learnItemResponseInputSchema = z.object({
 })
 
 export type LearnItemResponseInput = z.infer<typeof learnItemResponseInputSchema>
-
-/**
- * Which course a lesson belongs to, from its id prefix. Same derivation as
- * `progress.ts` so both collections group identically without a backfill.
- */
-function courseIdFromLessonId(lessonId: string): CourseId {
-  if (lessonId.startsWith("sd-")) return "system-design"
-  if (lessonId.startsWith("sql-") || lessonId.startsWith("de-")) return "data-engineering"
-  return "python"
-}
 
 /** Firestore doc ids cannot contain `/`; authored ids are kebab-case but never assume it. */
 function sanitizeIdPart(value: string): string {
