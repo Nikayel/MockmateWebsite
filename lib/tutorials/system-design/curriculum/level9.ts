@@ -1514,10 +1514,40 @@ Declare the desired infrastructure in **Terraform/OpenTofu or Pulumi**, keep it 
 
 ## Progressive delivery fixes big-bang rollout
 
-\`\`\`
-  rolling     : replace pods N at a time; cheap, no extra capacity, slow to detect a bad version
-  blue-green   : full parallel env, flip the router; instant rollback, but 2x capacity briefly
-  canary       : send 1% -> 5% -> 25% -> 100%, watch metrics, auto-halt on regression
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Rollout",
+    "How it moves",
+    "Extra capacity",
+    "How you find out it is bad"
+  ],
+  "highlightCols": [
+    "How you find out it is bad"
+  ],
+  "rows": [
+    [
+      "Rolling",
+      "Replace pods N at a time",
+      "None",
+      "Slowly, from whatever share of users is already on the new version"
+    ],
+    [
+      "Blue-green",
+      "Stand up a full parallel environment, then flip the router",
+      "Double, briefly",
+      "After the flip, from all of production at once"
+    ],
+    [
+      "Canary",
+      "1%, then 5%, 25%, 100%, baking between steps",
+      "One step's worth of pods",
+      "During the bake, from metrics on 1% of traffic, and it auto-halts"
+    ]
+  ],
+  "caption": "The three differ less in how they move traffic than in when you learn the version is bad and how much of production learns it with you. On a payments path that is the whole argument for canary with automated analysis."
+}
 \`\`\`
 
 For a **critical payments service** you want **canary with automated analysis and auto-rollback**. Tools: **Argo Rollouts** or **Flagger** shift traffic in steps, and between steps they **bake** (hold and observe) while querying Prometheus for your SLIs: error rate, p99 latency, and a business metric like payment-authorization-success-rate. If any metric breaches its threshold during the bake, the rollout **auto-aborts and shifts traffic back** to the stable version. No human in the loop at 3am. Blue-green is the alternative when you cannot tolerate two versions serving simultaneously (it flips atomically) but it costs double capacity during the window.
@@ -1913,10 +1943,26 @@ const cloudFinopsTeach = `
 
 Cost is a design axis, not an afterthought you hand to finance. **FinOps** is the practice of making engineering, finance, and product jointly own cloud spend, and it runs as a continuous loop of three pillars:
 
-\`\`\`
-  Inform   -> tag/allocate: know who spends what, per team/service/feature
-  Optimize -> rightsize, kill idle, buy commitments, use spot
-  Operate  -> governance: budgets, alerts, anomaly detection, accountability
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "The FinOps loop",
+  "stages": [
+    {
+      "label": "Inform",
+      "note": "tag and allocate, so the bill maps to an owner"
+    },
+    {
+      "label": "Optimize",
+      "note": "rightsize, kill idle, commitments, spot"
+    },
+    {
+      "label": "Operate",
+      "note": "budgets, alerts, anomaly detection, accountability"
+    }
+  ],
+  "caption": "It runs continuously rather than once: what Operate detects becomes the next round of Inform, and a team that cannot see its own spend has nothing to optimize."
+}
 \`\`\`
 
 ## Inform first
