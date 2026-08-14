@@ -694,7 +694,7 @@ routing plus health checks steer users to the nearest healthy region before a re
     {
       "label": "No; DNS steers new lookups in minutes",
       "correct": true,
-      "feedback": "Right. Every resolver in the chain is holding a cached answer you cannot revoke, so the change lands on the order of minutes no matter what the health check saw. Seconds-level failover has to come from a layer that sees every request: a load balancer or an anycast layer below DNS. DNS gets users to the right region eventually; per-request health, retries, and instant failover belong to the L4/L7 layer that takes over after resolution."
+      "feedback": "Right. Every resolver in the chain is holding a cached answer you cannot revoke, so the change lands on the order of minutes no matter what the health check saw. Seconds-level failover has to come from a layer that sees every request, which is the load balancer sitting below DNS. DNS gets users to the right region eventually; per-request health, retries, and instant failover belong to the L4/L7 layer that takes over after resolution."
     },
     {
       "label": "Yes, if you drop the TTL to 1 second",
