@@ -461,9 +461,9 @@ LIMIT 1;`,
 
 const orderingGuarantees: SqlLesson = {
   id: "de-l9-ordering-guarantees",
-  title: "Ordering and Checkpoints: Out-of-Order Arrival and the Bounded Apply",
+  title: "Kafka Ordering Guarantees and the Checkpointed Apply",
   summary:
-    "State what Kafka does and does not promise about order, catch inverted arrivals with LAG, and write the lsn-ordered, checkpoint-bounded apply that survives shuffled input and a rerun.",
+    "What Kafka does and does not promise about order, and the checkpoint-bounded apply that survives shuffled input and a rerun.",
   estimatedMinutes: 32,
   difficulty: "hard",
   skills: [

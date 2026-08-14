@@ -242,7 +242,7 @@ const logTopicPartitionOffset: SqlLesson = {
   id: "de-l9-log-topic-partition-offset",
   title: "The Log: Topics, Partitions, and Offsets",
   summary:
-    "The append-only log as a data structure: topics split into partitions, immutable offsets inside a partition, retention that eats the head, and the key choice that decides whether one partition carries the whole load.",
+    "Offsets are ordered only inside a partition, so the partition key decides whether a topic parallelizes or one partition carries the whole load.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
@@ -491,7 +491,7 @@ const consumerGroupsAndLag: SqlLesson = {
   id: "de-l9-consumer-groups-lag",
   title: "Consumer Groups and Measuring Lag",
   summary:
-    "How a consumer group divides a topic's partitions, what the committed offset really points at, and the one subtraction that turns broker metadata into the lag number an on-call engineer is paged about.",
+    "What the committed offset actually points at, and the one subtraction that turns broker metadata into the consumer lag an on-call engineer is paged about.",
   estimatedMinutes: 28,
   difficulty: "medium",
   skills: [
@@ -730,7 +730,7 @@ const deliverySemantics: SqlLesson = {
   id: "de-l9-delivery-semantics",
   title: "Delivery Semantics: What Each Guarantee Costs",
   summary:
-    "At-most-once and at-least-once are not settings, they are the order in which you commit and process. Derive both from crash-time metadata and name exactly which messages get lost and which get redelivered.",
+    "At-most-once and at-least-once are not settings, they are the order in which you commit and process, and a crash tells you which one you chose.",
   estimatedMinutes: 28,
   difficulty: "hard",
   skills: [
@@ -947,7 +947,7 @@ const kinesisShardMath: SqlLesson = {
   id: "de-l9-kinesis-shard-math",
   title: "Kinesis: Shard Math, Firehose Buffers, and the Chooser",
   summary:
-    "Size a stream with the arithmetic an interviewer actually asks for: two hard per-shard limits, the larger of the two, rounded up. Then why Firehose is near-real-time by construction, and how to pick between Streams, Firehose, and MSK.",
+    "Size a Kinesis stream the way an interviewer asks for it: two hard per-shard limits, take the larger, round up, then pick Streams, Firehose, or MSK.",
   estimatedMinutes: 28,
   difficulty: "medium",
   skills: [
