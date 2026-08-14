@@ -3448,6 +3448,41 @@ crash between them reopens the double-execution window.
 }
 \`\`\`
 
+### How long to keep the key, which is a money question and not a caution question
+
+The TTL is the one parameter in this design that nobody derives, and the instinct that gets it wrong
+is "this is payment data, never delete it." The charge row is the audit record and it keeps its full
+retention. The idempotency record is something else: a key, a request fingerprint, and a stored
+response body, useful only for as long as a client might still retry. So price the two instincts
+against each other at a service taking 1,000 charges a second. The figures below are approximate and
+storage prices move, so read them as orders of magnitude; the gap between the rows is the part that
+stays true.
+
+\`\`\`
+ 1,000 charges/sec  ->  ~86 million records/day, call it 90 million
+ one record = key + request fingerprint + stored response body ~= 1 KB
+ 90 million x 1 KB  ->  ~90 GB of new rows per day
+
+ primary transactional storage, all-in once you count replicas and
+ backups, is on the order of $0.50 per GB-month
+
+ TTL = 24 hours  ->  ~90 GB resident, flat forever        ->  ~$45/month
+ TTL = 7 days    ->  ~630 GB resident, flat forever       ->  ~$315/month
+ TTL = never     ->  ~33 TB after one year, still growing ->  ~$16,000/month
+                     and larger every month after that
+\`\`\`
+
+Twenty-four hours is the window Stripe publishes, and the reason is not caution. Every real retry
+arrives within seconds to minutes, so day two onward of that table serves nobody while its bill never
+stops climbing. Set the TTL to your clients' maximum retry horizon and no further.
+
+The same arithmetic settles a tempting micro-optimization in the other direction. Storing only a
+status and a charge id instead of the full response body takes the record from roughly 1 KB to
+roughly 100 bytes, which at a 24-hour TTL saves about 40 dollars a month and costs every client an
+extra round trip to fetch the charge it just created. Forty dollars a month does not buy an API
+change. Running the number is what tells you when to stop optimizing, and that is the same skill as
+knowing when to start.
+
 Distinguish the operation types:
 
 - **Naturally idempotent:** \`SET balance = 5\`, \`PUT user.email = x\`, delete by id. Applying
