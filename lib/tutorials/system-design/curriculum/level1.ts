@@ -1285,9 +1285,28 @@ of zero-trust architectures and service meshes (Istio, Linkerd) where "is this c
 orders service" cannot rely on network location. Each service gets a short-lived cert from an
 internal CA, and the mesh rotates them automatically.
 
+That identity has to be written down somewhere, and the somewhere is the certificate itself. The
+convention meshes follow is **SPIFFE**: a URI naming the workload goes in the certificate's Subject
+Alternative Name, and a certificate carrying one is called an **SVID**, a SPIFFE verifiable identity
+document. It is an ordinary X.509 cert whose subject happens to be a service rather than a hostname:
+
+\`\`\`
+# what a settlement service presents on every outbound and inbound connection
+Subject Alternative Name:  URI:spiffe://bank.example/ns/payments/sa/settlement
+Not Before:                2026-08-14 09:00:00
+Not After:                 2026-08-14 10:00:00     # one hour, rotated by the issuer (SPIRE)
+\`\`\`
+
+Two things follow from naming the workload in the cert rather than inferring it from an address.
+Authorization policy can be written against that name ("only
+\`spiffe://bank.example/ns/payments/sa/settlement\` may call ledger-write"), and every audit line can
+be keyed by an identity that was cryptographically verified during the handshake, instead of by a
+source IP that NAT, a restart, or a rescheduled pod can hand to something else an hour later.
+
 Recap: TLS 1.3 is a 1-RTT handshake (0-RTT on resumption, but only for idempotent requests due to
 replay), you cut cost with session resumption and connection reuse, you choose termination by trading
-internal visibility for edge features, and mTLS gives services cryptographic identity for zero-trust.
+internal visibility for edge features, and mTLS gives services cryptographic identity for zero-trust,
+carried as a SPIFFE URI inside each service's short-lived certificate.
 
 \`\`\`cswidget
 {
