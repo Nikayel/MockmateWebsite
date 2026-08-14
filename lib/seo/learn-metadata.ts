@@ -90,15 +90,71 @@ export function learnLevelMetadata(args: {
 }
 
 /**
+ * Google shows roughly 60 characters of a title before truncating it. That budget has to cover the
+ * lesson's own name, whatever course label we add, AND the ` | CodeSparring` the root template
+ * appends, because the searcher sees the composed string, not ours.
+ */
+const TITLE_BUDGET = 60
+const BRAND_SUFFIX = " | CodeSparring"
+
+/**
+ * Compose a lesson title that fits the SERP, degrading the suffix rather than the lesson name.
+ *
+ * ## The measurement that forced this
+ *
+ * Five system design lesson pages sat on page one of Google for 28 days and returned ZERO clicks:
+ * roughly 97 impressions at an average position near 7, where 2 to 4 percent CTR is normal, so two
+ * to four clicks were expected. Titles rendered like this in production:
+ *
+ *     Design a Stock Exchange / Order-Matching Engine · Learn System Design | CodeSparring   (84)
+ *     Leader Election, Leases, Fencing & Split-Brain · Learn System Design | CodeSparring    (83)
+ *
+ * The suffix ` · Learn System Design | CodeSparring` is 37 characters on its own, so at a
+ * 60-character display budget the searcher saw neither the brand nor the end of the lesson title.
+ * Every one of those pages was truncated before it said what it was about.
+ *
+ * ## The ladder
+ *
+ * Three rungs, each dropped only when the one above does not fit:
+ *
+ *  1. Full label: `Lesson · Learn System Design` + the template's ` | CodeSparring`.
+ *  2. Brand only: `Lesson` + ` | CodeSparring`. The course is recoverable from the URL and from
+ *     the breadcrumb rich result; the lesson name is not recoverable from anywhere.
+ *  3. Bare title via `title.absolute`, which bypasses the root template entirely. Reached only by
+ *     a lesson whose own name is already at or past the budget, where adding the brand would cut
+ *     into the words the searcher is scanning for.
+ *
+ * Rung 3 is why this returns `Metadata["title"]` rather than a string: `absolute` is the only way
+ * to opt out of a template Next.js otherwise applies unconditionally.
+ *
+ * The lesson title itself is NEVER truncated here. A title too long for the budget is a content
+ * defect (SEO-01's sibling ticket) and shortening it silently would hide that from the corpus test
+ * rather than fix it.
+ */
+export function composeLessonTitle(lessonTitle: string, courseLabel: string): Metadata["title"] {
+  const withLabel = `${lessonTitle} · Learn ${courseLabel}`
+  if (withLabel.length + BRAND_SUFFIX.length <= TITLE_BUDGET) return withLabel
+  if (lessonTitle.length + BRAND_SUFFIX.length <= TITLE_BUDGET) return lessonTitle
+  return { absolute: lessonTitle }
+}
+
+/**
  * `/learn/{track}/{levelSlug}/{lessonId}` — the canonical reading page.
  *
  * Takes the already-projected {@link PublicLessonPreview} rather than the authored lesson, so the
  * only lesson text that can reach a meta tag is text the public projection already publishes.
  */
 export function learnLessonMetadata(preview: PublicLessonPreview): Metadata {
-  return headFor({
-    path: publicLessonPath(preview.courseId, preview.levelSlug, preview.id),
+  const path = publicLessonPath(preview.courseId, preview.levelSlug, preview.id)
+  // `headFor` takes a plain string because every other Learn page fits comfortably; a lesson can
+  // reach the `absolute` rung, so it composes its own head and overrides just the title. The
+  // Open Graph title keeps the full label: no OG consumer enforces a 60-character budget, and
+  // Slack or LinkedIn showing the course is a gain rather than a truncation risk.
+  const title = composeLessonTitle(preview.title, LEARN_COURSE_LABEL[preview.courseId])
+  const base = headFor({
+    path,
     title: `${preview.title} · Learn ${LEARN_COURSE_LABEL[preview.courseId]}`,
     description: truncateForDescription(preview.summary),
   })
+  return { ...base, title }
 }
