@@ -1222,6 +1222,110 @@ only, no ranges), **partial** (index only rows matching a predicate, e.g. \`WHER
 keeping it tiny), and **GIN/GiST** (Postgres inverted/generalized indexes for arrays, JSONB,
 full-text, and geospatial).
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "What each extra index costs on the write path",
+  "predictPrompt": {
+    "question": "A table carries 4 secondary indexes and takes 5,000 inserts per second. How many B-tree writes per second does the storage engine actually perform?",
+    "options": [
+      "5,000: one write per row",
+      "10,000: the row and one index",
+      "20,000: one per index",
+      "25,000: the row plus one per index"
+    ]
+  },
+  "workedExample": "At the initial 4 secondary indexes, a single insert is 5 B-tree writes: the row itself plus one per index. At 5,000 inserts per second that is 20,000 index maintenance writes every second on top of the row writes, and across 500 million rows those four indexes occupy about 80 GB, which is 40 percent of the 200 GB table. Drag indexes up to 10 and read the bottom two outputs before deciding the eleventh one is free.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "indexes",
+      "label": "Secondary indexes on the table",
+      "min": 0,
+      "max": 12,
+      "scale": "linear",
+      "step": 1,
+      "initial": 4,
+      "unit": "indexes"
+    },
+    {
+      "kind": "slider",
+      "id": "insert_qps",
+      "label": "Inserts, updates and deletes per second",
+      "min": 100,
+      "max": 200000,
+      "scale": "log",
+      "initial": 5000,
+      "unit": "per second"
+    },
+    {
+      "kind": "slider",
+      "id": "rows",
+      "label": "Rows in the table",
+      "min": 1000000,
+      "max": 10000000000,
+      "scale": "log",
+      "initial": 500000000,
+      "unit": "rows"
+    },
+    {
+      "kind": "slider",
+      "id": "entry_bytes",
+      "label": "Bytes per index entry",
+      "min": 20,
+      "max": 120,
+      "scale": "linear",
+      "step": 4,
+      "initial": 40,
+      "unit": "bytes"
+    },
+    {
+      "kind": "slider",
+      "id": "row_bytes",
+      "label": "Bytes per row",
+      "min": 100,
+      "max": 2000,
+      "scale": "linear",
+      "step": 50,
+      "initial": 400,
+      "unit": "bytes"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "writes_per_insert",
+      "label": "B-tree writes per single insert",
+      "expr": "indexes + 1",
+      "format": "number",
+      "unit": "writes"
+    },
+    {
+      "id": "index_writes",
+      "label": "Index maintenance writes per second",
+      "expr": "insert_qps * indexes",
+      "format": "compact",
+      "unit": "per second",
+      "sparkline": {
+        "over": "indexes"
+      }
+    },
+    {
+      "id": "index_bytes",
+      "label": "Storage the indexes occupy",
+      "expr": "rows * indexes * entry_bytes",
+      "format": "bytes"
+    },
+    {
+      "id": "index_share",
+      "label": "Index bytes as a share of the table",
+      "expr": "index_bytes / (rows * row_bytes)",
+      "format": "percent"
+    }
+  ],
+  "caption": "Reads get faster one query at a time. Writes get slower on every insert, update and delete, and the index set routinely rivals the table it serves. The index you deliberately did not add is worth saying out loud."
+}
+\`\`\`
+
 Recap: pick the index by the query, order composite columns as equality-then-sort per the
 leftmost-prefix rule, make it covering when a hot query justifies the width, and remember every index
 taxes every write.
