@@ -2487,9 +2487,9 @@ You do not mutate in place. Three options: **upcasting** (a transform step that 
   "prompt": "An event type must change 'amount' from a string to an integer, a change no default can smooth over. The topic is on full compatibility and four teams you have never met consume it. What is the senior move?",
   "options": [
     {
-      "label": "Publish a new topic such as 'orders.v2', run v1 and v2 together until every consumer has migrated, then retire v1",
+      "label": "Publish a new topic such as 'orders.v2'",
       "correct": true,
-      "feedback": "Right. A true break cannot be made additive, so you version the contract itself and let each consumer migrate on its own schedule instead of forcing four teams into one synchronized cutover."
+      "feedback": "Right. A true break cannot be made additive, so you version the contract itself: run v1 and v2 side by side, let each of the four teams migrate on its own schedule, and retire v1 only once its consumer lag reaches zero everywhere. No synchronized cutover across teams you do not control."
     },
     {
       "label": "Register the new schema and coordinate a simultaneous deploy of every producer and consumer",
