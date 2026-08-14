@@ -2459,6 +2459,58 @@ partitions at the cost of a window where a strict-quorum read might miss the val
 }
 \`\`\`
 
+### When N is not one number: datacenter-scoped quorums
+
+Everything above assumed a single pool of N replicas. Run the same store in two regions and N splits.
+Cassandra's \`NetworkTopologyStrategy\` sets the **replication factor per datacenter**, so
+\`{dc1: 3, dc2: 3}\` means six replicas per key, three in each, and the consistency level then says
+*which* of those six an operation waits on. Same write, one client in dc1, five settings:
+
+\`\`\`
+ Keyspace {dc1: 3, dc2: 3}: 6 replicas per key. Client and coordinator
+ are in dc1. The write is sent to all 6 either way; the level only sets
+ how many acknowledgements the coordinator waits for before returning.
+
+ level          waits for                           dc2 unreachable
+ LOCAL_ONE      1 replica in dc1                    succeeds
+ LOCAL_QUORUM   2 of the 3 replicas in dc1          succeeds
+ QUORUM         4 of the 6 replicas, anywhere       fails, only 3 remain
+ EACH_QUORUM    2 of 3 in dc1 AND 2 of 3 in dc2     fails
+ ALL            all 6                               fails
+\`\`\`
+
+The \`LOCAL_\` prefix means "scoped to the coordinator's datacenter", which is what keeps the
+cross-region round trip off the critical path. Note what that costs: R+W>N holds **within** dc1 when
+reads and writes are both LOCAL_QUORUM (2 + 2 > 3), so a dc1 reader sees the latest dc1 write, but
+nothing overlaps across datacenters, and a reader in dc2 can miss a write acknowledged in dc1 until
+asynchronous replication lands. Buying that cross-region overlap means EACH_QUORUM writes, which
+pays a cross-region round trip on every write and stops accepting writes entirely the moment one
+datacenter is unreachable. Plain QUORUM is the setting people reach for by habit and regret: a
+majority of *all* six can never be assembled inside one surviving datacenter.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A keyspace replicates {dc1: 3, dc2: 3}. A network fault makes dc2 unreachable from dc1. A client in dc1 writes at consistency level QUORUM. Does the write succeed?",
+  "options": [
+    {
+      "label": "Yes: a quorum of the local datacenter's three replicas is still reachable and acknowledges it",
+      "feedback": "That is LOCAL_QUORUM, which is scoped to the coordinator's datacenter. Plain QUORUM is not datacenter-aware at all: it counts replicas across the whole cluster."
+    },
+    {
+      "label": "No: QUORUM counts all 6 replicas, so it needs 4",
+      "correct": true,
+      "feedback": "Right. QUORUM is a majority of the total replication factor, 4 of 6 here, which can never be assembled inside one datacenter of 3. This is the tuning mistake behind 'our writes stop whenever the other region blips'."
+    },
+    {
+      "label": "Yes, hinted handoff covers dc2",
+      "feedback": "Hints keep the missed writes for later delivery, but a hint is not an acknowledgement and does not count toward the level. The coordinator still needs 4 real acks before it can return success."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance, map numbers to intent:** W=N maximizes durability but breaks writes if any
 replica is down. R=1, W=N gives fast reads and slow fragile writes. R=N, W=1 the reverse. W=1, R=1 is
 fastest and weakest (no overlap). Also mention **flexible quorums** (write and read sets defined to
@@ -2468,7 +2520,9 @@ full data, cutting storage cost while preserving overlap).
 Recap: N/R/W is a per-operation dial, R+W>N forces read/write overlap so a read sees the latest
 acknowledged write, but that is quorum consistency not linearizability, quorum latency tracks the
 slowest node in the set, and sloppy quorum plus hinted handoff buy availability during partitions at
-the cost of consistency.
+the cost of consistency. Across datacenters the replication factor is set per datacenter and the
+level chooses the scope: LOCAL_ONE and LOCAL_QUORUM stay inside the coordinator's datacenter,
+EACH_QUORUM demands a quorum in every one, and plain QUORUM counts a majority of them all.
 
 \`\`\`cswidget
 {
