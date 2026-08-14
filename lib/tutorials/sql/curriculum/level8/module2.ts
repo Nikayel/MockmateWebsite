@@ -730,7 +730,7 @@ SELECT * FROM (SELECT * FROM untouched EXCEPT SELECT * FROM actual)`,
 
 const changeBatchMerge: SqlLesson = {
   id: "de-l8-change-batch-merge",
-  title: "Merge Semantics: In-Batch Duplicates, Tied Versions, and Redelivery",
+  title: "Merge Semantics: Duplicates, Tied Timestamps, Redelivery",
   summary:
     "Apply a redelivered change batch to a dimension when two changes for one key carry the same timestamp, and keep the merge idempotent.",
   estimatedMinutes: 26,

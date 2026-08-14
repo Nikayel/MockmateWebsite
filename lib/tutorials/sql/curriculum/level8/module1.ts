@@ -141,7 +141,7 @@ const dagsAndTaskStates: SqlLesson = {
   id: "de-l8-dags-and-task-states",
   title: "Runs, Task States, and the Data Interval",
   summary:
-    "Read an orchestrator's own metadata to tell which runs and tasks are healthy, and explain why a run is responsible for a time range rather than for the moment it happened to execute.",
+    "Why an orchestrator run owns a data interval rather than the clock time it executed, and how task states tell you which runs are healthy.",
   estimatedMinutes: 26,
   difficulty: "easy",
   skills: [
@@ -848,7 +848,7 @@ const retriesSlasAlerting: SqlLesson = {
   id: "de-l8-retries-slas-alerting",
   title: "Retries, SLAs, and the Alert You Page On",
   summary:
-    "Decide what deserves a page: separate the transient failures a retry absorbed from exhausted retries and SLA misses, then build the on-call triage report unaided.",
+    "Decide what actually deserves a page: the transient failures a retry already absorbed, versus exhausted retries and SLA misses.",
   estimatedMinutes: 28,
   difficulty: "medium",
   skills: [

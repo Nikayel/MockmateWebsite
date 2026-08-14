@@ -472,7 +472,7 @@ const lateDataAudit: SqlLesson = {
   id: "de-l8-late-data-audit",
   title: "Late Data: Quantify the Silent Loss, Then Heal It",
   summary:
-    "Measure exactly how many rows a strict watermark load dropped without raising an error, then repair the pipeline with a rolling reprocessing window that self-heals.",
+    "Measure how many rows a strict watermark load dropped without raising an error, then heal it with a rolling reprocessing window.",
   estimatedMinutes: 28,
   difficulty: "hard",
   skills: [
