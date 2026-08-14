@@ -38,16 +38,16 @@ raw logs -> ETL -> feature pipeline      request -> feature fetch (online store)
   "prompt": "A teammate proposes deleting the feedback log arrow to save storage, arguing that the warehouse already keeps every raw click and impression event. What actually breaks?",
   "options": [
     {
-      "label": "Nothing important, because the offline plane can rebuild training rows from the raw event logs",
+      "label": "Nothing: raw event logs can rebuild the rows",
       "feedback": "Tempting, and it is why this gets cut. Raw logs record what the user did, not what the model predicted or which feature values it scored. Without that pairing you cannot reconstruct a training row or say whether the model was wrong."
     },
     {
-      "label": "You lose the paired prediction and outcome, so you can neither build tomorrow's training set nor detect drift",
+      "label": "The pairing of prediction with outcome is gone",
       "correct": true,
-      "feedback": "Right. The loop only closes if every prediction is written back next to the outcome it was predicting. This is the piece juniors leave off the diagram."
+      "feedback": "Right. The loop only closes if every prediction is written back next to the outcome it was predicting, so losing it means you can neither build tomorrow's training set nor detect drift. This is the piece juniors leave off the diagram."
     },
     {
-      "label": "Serving latency rises, because the ranking service now has to write outcomes on the request path",
+      "label": "Serving gets slower on the request path",
       "feedback": "Backwards. Removing a write cannot make the request path slower. The cost of dropping the feedback log is paid later, in the offline plane, when there is nothing to retrain on."
     }
   ]
@@ -229,12 +229,12 @@ The user's last few clicks reach the recommender within seconds via Kafka plus F
       "feedback": "Volume is not the problem. At recommender scale six months is billions of events, and more of a biased sample just measures the bias more precisely."
     },
     {
-      "label": "Users could only click what the old model showed them, and popular items were shown more, so the logs measure the old policy as much as user preference",
+      "label": "The logs record the old policy as much as user preference",
       "correct": true,
-      "feedback": "Right. Position bias and popularity bias make the log a record of what you already recommended. Train on it naively and the model learns to reproduce yesterday's ranking."
+      "feedback": "Right. Users could only click what the old model chose to show them, and popular items were shown more often, so position bias and popularity bias are baked into the log. Train on it naively and the model learns to reproduce yesterday's ranking."
     },
     {
-      "label": "Click labels are noisy because users misclick and change their minds",
+      "label": "Click labels are noisy: users misclick",
       "feedback": "Misclicks are real, but noise that is random averages out over millions of events. The damage here is systematic: the items you never showed have no data at all, and no amount of averaging recovers them."
     }
   ]
