@@ -432,6 +432,19 @@ unaudited rather than clean. A confidently empty agent result reads exactly like
 
 Repair is deliberately NOT in this ticket, per the separate-diagnosis-from-repair rule.
 
+**Second pass, same day, added a defect class the first pass did not look for.** Re-running the audit
+found **44 exercises whose model answer grades a requirement the prompt never states**, written up in
+`docs/SD-UNSTATED-REQUIREMENTS-2026-08-14.md`. Closure asks whether the learner was given the facts;
+this asks whether they were given the question, and the two fail independently. One of the 44 is not a
+scope gap but a **direct contradiction**: `sd-l6-sync-vs-async` (apply, `level6.ts:3523`) instructs the
+learner to make inventory async and then grades them for not keeping it synchronous.
+
+Worth recording about the re-run itself: it was launched without noticing this ticket was already
+SHIPPED, so the closure half was duplicated work. The duplicate closure numbers were discarded rather
+than published, because two documents with competing counts are worse than one. The unstated-requirement
+class survived because it was genuinely new. A re-audit is not free, but a re-audit asked a different
+question is not waste.
+
 **Effort:** 0.5 agent-days to re-scope, then unknown.
 
 The council's SD-W5 "Depth promotion" was premised on L7, L9, L10 and L11 being thin, measured by
