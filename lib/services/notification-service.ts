@@ -335,7 +335,9 @@ export async function sendNotification(
   userId: string,
   type: NotificationType,
   variables: Record<string, any>,
-  priority: "critical" | "high" | "medium" | "low" = "medium"
+  // Kept for call-site compatibility; only the email path consumed it, and that
+  // path was removed 2026-08-14.
+  _priority: "critical" | "high" | "medium" | "low" = "medium"
 ): Promise<NotificationSendResult> {
   try {
     // Get notification knowledge
