@@ -2366,7 +2366,7 @@ Conflicts happen because two clients can write the same key on different replica
 
 ## The LSM write path
 
-A write appends to a commit log for durability, then updates an in-memory sorted structure (memtable). When the memtable fills, it flushes to an immutable sorted file on disk (SSTable). Reads may check several SSTables, so a bloom filter per SSTable skips ones that cannot contain the key. Background compaction merges SSTables, drops tombstones (deletes), and keeps read amplification bounded. This design makes writes sequential and fast.
+A write appends to a commit log for durability, then updates an in-memory sorted structure (memtable). When the memtable fills, it flushes to an immutable sorted file on disk (SSTable). Every write is therefore sequential and fast, and nothing is ever updated in place.
 
 \`\`\`cswidget
 {
@@ -2375,9 +2375,9 @@ A write appends to a commit log for durability, then updates an in-memory sorted
   "prompt": "An LSM write only appends to a commit log and updates an in-memory memtable. Where does the cost reappear?",
   "options": [
     {
-      "label": "On reads: a key may sit in the memtable or in any of several SSTables, which is why each SSTable carries a bloom filter and compaction runs in the background",
+      "label": "On reads, which now have several places to look for one key",
       "correct": true,
-      "feedback": "Right. The design buys sequential writes by scattering a key's history across immutable files, and bloom filters plus compaction are what keep read amplification bounded."
+      "feedback": "Right. Sequential writes are bought by scattering a key's history across the memtable and a pile of immutable SSTables, so a read may have to consider all of them. Two mechanisms keep that bounded: a bloom filter per SSTable, which skips files that cannot hold the key, and background compaction, which merges files and drops tombstones."
     },
     {
       "label": "Nowhere: the memtable answers reads, because it holds the working set",
@@ -2390,6 +2390,8 @@ A write appends to a commit log for durability, then updates an in-memory sorted
   ]
 }
 \`\`\`
+
+Reads may check several SSTables, so a bloom filter per SSTable skips ones that cannot contain the key. Background compaction merges SSTables, drops tombstones (deletes), and keeps read amplification bounded.
 
 Membership uses gossip: nodes periodically exchange state so the cluster learns of joins and failures without a central coordinator. Hinted handoff keeps writes available during a brief node outage: a neighbor accepts the write with a hint and replays it when the owner returns.
 
@@ -2602,7 +2604,7 @@ Durability comes from replication. Each partition has a leader and followers; th
 
 ## Delivery semantics
 
-At-most-once means a message may be lost but never redelivered (fire and forget, no retries). At-least-once means every message is delivered but may be duplicated (retry on failure, ack after processing), which is the pragmatic default. Exactly-once is the hard one, and the crucial nuance is that exactly-once delivery over a network is impossible; what systems provide is exactly-once processing.
+At-most-once means a message may be lost but never redelivered (fire and forget, no retries). At-least-once means every message is delivered but may be duplicated (retry on failure, ack after processing), which is the pragmatic default.
 
 \`\`\`cswidget
 {
@@ -2611,9 +2613,9 @@ At-most-once means a message may be lost but never redelivered (fire and forget,
   "prompt": "A candidate says: we will use exactly-once delivery, so a consumer never sees a duplicate. What is the correct framing?",
   "options": [
     {
-      "label": "At-least-once delivery from the broker plus idempotent consumers that dedupe on a message id, which together give exactly-once processing",
+      "label": "At-least-once delivery plus idempotent consumers",
       "correct": true,
-      "feedback": "Right. Delivery over a network cannot be exactly once, so the guarantee is moved into processing: reprocessing a duplicate has no effect."
+      "feedback": "Right. Delivery over a network cannot be exactly once, so the guarantee moves into processing: the consumer dedupes on a message id or an idempotency key, and reprocessing a duplicate has no effect. That pairing is what people mean when they say exactly-once processing."
     },
     {
       "label": "At-most-once delivery, which is the only setting that truly prevents duplicates",
@@ -2626,6 +2628,8 @@ At-most-once means a message may be lost but never redelivered (fire and forget,
   ]
 }
 \`\`\`
+
+Exactly-once is the hard one, and the crucial nuance is that exactly-once delivery over a network is impossible; what systems provide is exactly-once processing.
 
 **Interview nuance:** if you claim "exactly-once delivery," expect a challenge. The correct framing: we get at-least-once delivery from the broker plus idempotent consumers (dedupe on a message id or use an idempotency key) so that reprocessing a duplicate has no effect. Kafka's "exactly-once" is at-least-once delivery combined with idempotent producers (a producer id plus sequence number so the broker drops duplicate appends) and transactional writes that tie the consume-process-produce cycle to an atomic offset commit.
 
@@ -3464,7 +3468,7 @@ A web crawler is the canonical large-scale batch pipeline: discover, fetch, dedu
 
 ## The frontier
 
-The heart is the frontier: the queue of URLs to fetch. It is not a single FIFO. It must do two jobs at once: prioritize (crawl important, fresh, high-PageRank pages first) and enforce politeness (never hammer one host). The classic design (Mercator style) uses two layers of queues: front queues for priority (a URL is assigned to a priority band) and back queues for politeness (each back queue holds URLs for exactly one host, and a per-host timer enforces a minimum delay, respecting \`Crawl-delay\` and robots.txt). A heap of "next-fetch-time per host" tells the fetchers which host is due. This is what keeps you from sending 10,000 requests/sec to one small site and getting your IP blocked.
+The heart is the frontier: the queue of URLs to fetch.
 
 \`\`\`cswidget
 {
@@ -3488,6 +3492,8 @@ The heart is the frontier: the queue of URLs to fetch. It is not a single FIFO. 
   ]
 }
 \`\`\`
+
+So the frontier is not a single FIFO. It must do two jobs at once: prioritize (crawl important, fresh, high-PageRank pages first) and enforce politeness (never hammer one host). The classic design (Mercator style) uses two layers of queues: front queues for priority (a URL is assigned to a priority band) and back queues for politeness (each back queue holds URLs for exactly one host, and a per-host timer enforces a minimum delay, respecting \`Crawl-delay\` and robots.txt). A heap of "next-fetch-time per host" tells the fetchers which host is due. This is what keeps you from sending 10,000 requests/sec to one small site and getting your IP blocked.
 
 **Interview nuance:** politeness is the single most common thing juniors omit and the first thing interviewers probe. Say explicitly: fetch robots.txt per host (and cache it), enforce a per-host rate limit / min delay, identify with a real User-Agent, and back off on 429/503. A crawler without politeness gets banned and is useless.
 
