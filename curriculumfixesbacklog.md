@@ -483,19 +483,121 @@ lessons. Do not build an autograder under this ticket.
 
 **Accept.** The reveal panel renders rubric dimensions. Ships behind a flag on one level first.
 
-### CUR-12 — Remaining council workstreams, not yet ticketed
+### CUR-12 — Remaining council workstreams, now ticketed
 
-Carried here so they are not lost. Each needs expanding into a full ticket before an agent runs it,
-following the shape above.
+**Expanded 2026-08-14, and three of the six did not survive contact with a measurement.**
 
-| Council id | What | Rough effort |
-| --- | --- | --- |
-| SD-W8 | The AI-era content build: what 2026 interviews ask about LLM serving, agents, evals, cost per token, multi-tenancy. Coordinate with `seofixesbacklog.md` SEO-19, since "llm serving" and "model gateway" already draw impressions with no page addressed to them. | 5 days |
-| SD-W9 | The cost and estimation spine: cost as a first-class design axis, which is under-taught everywhere and now routinely asked. | 3 days |
-| SD-W10 | Spoiler and scaffolding repair: prompts that hand over the approach rather than stating the problem. | 2 days |
-| SD-W12 | The currency batch: dated framings ("the 2024 to 2025 shift"), version claims, and anything that will read as stale in a year. | 2 days |
-| SD-W13 | Wire lessons to the timed drills, so the curriculum and the interview surface reference each other. | 2 days |
-| SD-W14 | Duplication and ownership cleanup: one L6 lesson re-teaches a quarter of `sd-l6-kafka-internals`. | 1 day |
+SD-W8, SD-W10 and SD-W12 were each premised on a shortage that is not in the corpus. That is the
+same failure as SD-W5, which asserted four levels were thin on a metric that was really counting
+widget JSON. Four retractions out of seven workstreams is a pattern about the METHOD, not bad luck:
+the council reasoned from what a 208-lesson curriculum built in a hurry probably looks like, and
+wrote tickets against the guess. Every ticket below now carries the number that either supports it or
+kills it, and a ticket with no number in its Evidence line should not be run.
+
+#### SD-W8 — The AI-era content build. **RETRACTED as a content gap; kept as a ranking one.**
+
+**Evidence against.** The claim was that 2026 interviews ask about LLM serving, agents, evals and
+cost per token, and that "llm serving" and "model gateway" draw impressions with no page addressed to
+them. There are nine lessons addressed to exactly this: `sd-l11-llm-inference-serving` (KV cache,
+PagedAttention, continuous batching), `sd-l11-model-gateway` (titled "Model Gateway / LLM Router / AI
+Gateway"), `sd-l11-llm-agents`, `sd-l11-llm-eval-guardrails`, `sd-l11-rag-architecture`,
+`sd-l11-finetune-rag-prompting`, `sd-l11-vector-db-ann`, `sd-l2-vector-embeddings` and
+`sd-l3-vector-hybrid-search`. All are in the sitemap, and Search Console shows 13 of 15
+`specialized-systems` lessons drawing impressions over the 30 days to 2026-08-13, the second-highest
+rate of any level.
+
+**What is left of it.** Those pages exist and rank poorly, which is a position problem and belongs to
+`seofixesbacklog.md`, not here. Do not author new AI lessons against this ticket.
+
+**Effort:** 0. Closed.
+
+#### SD-W9 — The cost and estimation spine. **STANDS, and the number is sharper than the claim.**
+
+**Evidence.** 197 of 208 lessons mention cost somewhere. Only 16 attach an actual figure (a dollar
+amount or a quantified rate) anywhere in the teach or either model answer. So cost is not missing, it
+is decorative: named as a consideration in 95 percent of lessons and quantified in 8 percent. A
+learner cannot practise a judgement they are never shown being made.
+
+**Do.** Not a new lesson. Pick the lessons where a cost number changes the decision (storage tiering,
+replication factor, multi-region, retention, GPU serving) and put a real figure into the model answer
+so the tradeoff has a magnitude. Reuse the `calc` widget where the arithmetic is the point.
+
+**Accept.** Lessons with a quantified cost figure rise from 16, and no lesson gains the word "cost"
+without a number attached.
+
+**Effort:** 3 days.
+
+#### SD-W10 — Spoiler and scaffolding repair. **RETRACTED.**
+
+**Evidence against.** A scan for prompts that name the mechanism ("using X", "via X", "based on X")
+returns 18 of 416, and reading them shows most are constraints rather than approaches: "with a minute
+budget", "with a 30ms read", "with a different request id". The handful that do name a technique name
+the lesson's OWN topic, which is not a spoiler: `sd-l6-event-sourcing` may say "using event
+sourcing", and `sd-l7-burn-rate-alerting` may say "using multi-window multi-burn-rate alerting",
+because the learner is there to practise that named thing. `sd-l5-outbox-messaging` opening with
+"using a distributed transaction" is naming the approach the lesson goes on to reject, which is a
+framing device.
+
+The DSA statement sweep found 18 real spoilers in 163 scenarios and is the reason this was expected
+here. Free-response design prompts are a different shape: there is no single algorithm to give away.
+
+**Effort:** 0. Closed.
+
+#### SD-W12 — The currency batch. **RETRACTED.**
+
+**Evidence against.** Six lessons of 208 contain a year string, across 23 sites. Reading them: the
+overwhelming majority are synthetic DATA, not dated framings — Cassandra partition keys like
+`(conv_42, 2026-07)`, DynamoDB sort keys like `CONV#2026-07-23T09:14`, and index-cost examples
+using `2026-06-30`. The only prose dates are in `sd-l1-versioning`, where "as Stripe has done since
+2011" and "a business that integrated in 2013" are historical facts making the point about long-lived
+API contracts. Those do not go stale; that is the lesson.
+
+No lesson contains a "the 2024 to 2025 shift" framing of the kind the workstream describes.
+
+**Effort:** 0. Closed.
+
+#### SD-W13 — Wire lessons to the timed drills. **STANDS.**
+
+**Evidence.** 3 of 208 lessons reference the interview or drill surface at all. The curriculum and
+the thing it is preparing you for do not point at each other, so a learner finishing
+`sd-l7-burn-rate-alerting` gets no route to a timed round on it, and a learner who stumbles in a
+round gets no route back to the lesson.
+
+**Do.** A cross-link component at the end of a lesson, pointing at the drill that exercises the same
+skill, and the reverse link on the drill. Requires a skill-to-drill mapping; the lessons already
+carry `skills`, so start there rather than hand-maintaining a table.
+
+**Accept.** Every lesson whose skill has a matching drill links to it, and a test asserts the mapping
+resolves (a dead link here is invisible until a learner clicks it).
+
+**Effort:** 2 days.
+
+#### SD-W14 — Duplication and ownership cleanup. **STANDS, and it is also an SEO problem.**
+
+**Evidence.** Eleven lesson pairs share most of a title or two or more skills. The ones worth acting
+on, with the shared-skill count:
+
+| Pair | Shared skills |
+| --- | --- |
+| `sd-l2-time-series` / `sd-l11-time-series-storage` | 2 |
+| `sd-l2-vector-embeddings` / `sd-l11-vector-db-ann` | 2 |
+| `sd-l5-delivery-idempotency` / `sd-l6-delivery-semantics` | 2 |
+| `sd-l1-backpressure-shedding` / `sd-l4-load-shedding-backpressure` | 2 |
+| `sd-l1-resilience-primitives` / `sd-l7-timeouts-retries` | 1 |
+| `sd-l3-replication-lag-session` / `sd-l5-session-guarantees` | 1 |
+
+Both members of the first two pairs are titled "Vector Databases &..." and "Time-Series
+Databases...", so they compete for the same query as well as re-teaching each other. `sd-l10-*` pairs
+are excluded: a case study applying an L4 concept is the design, not duplication.
+
+**Do.** For each pair, decide which lesson OWNS the concept and cut the other back to the part that is
+genuinely different, linking to the owner. Retitle the non-owner so the two stop competing in search.
+Lesson ids are progress keys and must not change.
+
+**Accept.** No pair shares two or more skills with a title overlap above 0.4, and no two lessons carry
+the same head noun phrase in their titles.
+
+**Effort:** 1 day.
 
 ---
 
