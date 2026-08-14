@@ -1272,11 +1272,78 @@ You do not encrypt terabytes directly with a master key. Instead a **Data Encryp
 }
 \`\`\`
 
-\`\`\`
- plaintext --AES-256-GCM(DEK)--> ciphertext   [stored together]
-     DEK --wrap(KEK in KMS/HSM)--> wrapped DEK  [stored together]
-     KEK  never leaves the HSM boundary
- breach of storage alone  => attacker has ciphertext + wrapped DEK, no KEK => useless
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Envelope encryption, and where the breach boundary falls",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "app",
+      "label": "Application (encrypts and decrypts locally)",
+      "kind": "service"
+    },
+    {
+      "id": "ciphertext",
+      "label": "Ciphertext (AES-256-GCM under the DEK)",
+      "kind": "db"
+    },
+    {
+      "id": "wrapped",
+      "label": "Wrapped DEK, one per tenant or per user",
+      "kind": "db"
+    },
+    {
+      "id": "kms",
+      "label": "KMS or HSM (the root of trust)",
+      "kind": "external"
+    }
+  ],
+  "edges": [
+    {
+      "from": "app",
+      "to": "ciphertext",
+      "kind": "sync",
+      "label": "AES-256-GCM(DEK) on write"
+    },
+    {
+      "from": "app",
+      "to": "wrapped",
+      "kind": "sync",
+      "label": "the DEK is stored beside the data it protects, wrapped by the KEK"
+    },
+    {
+      "from": "app",
+      "to": "kms",
+      "kind": "sync",
+      "label": "unwrap(wrapped DEK): a live, authorized, audited call"
+    },
+    {
+      "from": "kms",
+      "to": "app",
+      "kind": "feedback",
+      "label": "the plaintext DEK, in memory only"
+    }
+  ],
+  "groups": [
+    {
+      "id": "storage",
+      "label": "Storage: everything a stolen snapshot contains",
+      "nodes": [
+        "ciphertext",
+        "wrapped"
+      ]
+    },
+    {
+      "id": "hardware",
+      "label": "Hardware boundary: the KEK never leaves it",
+      "nodes": [
+        "kms"
+      ]
+    }
+  ],
+  "caption": "A storage breach yields ciphertext plus a wrapped DEK and no KEK, so the snapshot is noise. Read the same picture backwards and it is your erasure story: destroy one per-user DEK and every copy of that user, backups included, becomes unrecoverable."
+}
 \`\`\`
 
 ## The granularity ladder
@@ -1441,12 +1508,86 @@ If every secret lives in Vault, the app needs a credential to authenticate to Va
 
 The workload then fetches **dynamic, short-lived secrets**: instead of a shared static DB password, Vault generates a unique DB credential that lives 1 hour and is auto-revoked. A leak is self-limiting, and every credential is traceable to one workload.
 
-\`\`\`
- secret zero solved:
-   platform (K8s/cloud) --signs--> short-lived OIDC/SVID for the pod
-   pod --presents identity--> [Vault] --verifies issuer--> issues
-        dynamic DB cred (TTL 1h), unique per pod, auto-revoked
-   no static credential ever stored on the pod
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Solving secret zero with workload identity",
+  "nodes": [
+    {
+      "id": "platform",
+      "label": "Platform (Kubernetes or cloud) as identity issuer",
+      "kind": "external"
+    },
+    {
+      "id": "pod",
+      "label": "Pod (no static credential is ever written to it)",
+      "kind": "service"
+    },
+    {
+      "id": "vault",
+      "label": "Vault or secret store (trusts the platform's OIDC issuer)",
+      "kind": "service"
+    },
+    {
+      "id": "db",
+      "label": "Database",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "platform",
+      "to": "pod",
+      "kind": "sync",
+      "label": "signs a short-lived OIDC token or SPIFFE SVID"
+    },
+    {
+      "from": "pod",
+      "to": "vault",
+      "kind": "sync",
+      "label": "presents that identity, because it has no pre-placed secret to present instead"
+    },
+    {
+      "from": "vault",
+      "to": "pod",
+      "kind": "feedback",
+      "label": "dynamic DB credential: unique to this pod, TTL 1 hour, auto-revoked"
+    },
+    {
+      "from": "pod",
+      "to": "db",
+      "kind": "sync",
+      "label": "connects with a credential that expires on its own"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "platform"
+      ],
+      "note": "Secret zero is the requirement. If every secret lives in Vault, something must authenticate the pod to Vault, and a long-lived static token just recreates the problem you were avoiding. The platform is the only party that already knows which workload is which."
+    },
+    {
+      "adds": [
+        "pod"
+      ],
+      "note": "So the platform signs a short-lived identity for the pod (IRSA on EKS, GKE Workload Identity, or a SPIFFE SVID). Nothing static is written to the box, which removes the file that otherwise leaks through git history, CI logs, crash dumps, and container images."
+    },
+    {
+      "adds": [
+        "vault"
+      ],
+      "note": "Vault verifies the issuer rather than checking a password, so this is the one audited choke point where least-privilege policy decides which secrets this workload may read and every read is logged."
+    },
+    {
+      "adds": [
+        "db"
+      ],
+      "note": "The credential handed back is dynamic: unique to this pod and dead within the hour. That is what makes the blast-radius question answerable, one pod, one hour, one audit trail."
+    }
+  ],
+  "caption": "No static credential ever reaches the pod, so the leak that does happen is bounded by a TTL and traceable to a single workload."
+}
 \`\`\`
 
 **Interview nuance:** rotation and dynamic secrets are useless without **least-privilege policies and per-access audit logging**. Every secret read should be logged (who, which workload, when) so a leak has a blast-radius answer, and policies should scope each workload to only the secrets it needs. Pair this with **leaked-credential scanning** (pre-commit hooks, GitHub secret scanning) to catch the static keys that inevitably slip through, and auto-revoke on detection.
