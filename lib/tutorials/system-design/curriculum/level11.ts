@@ -286,13 +286,106 @@ First, code divergence: the training pipeline computes "average order value over
 
 ## The dual-store architecture
 
-\`\`\`
-                 +------------------ feature definition (one) ------------------+
-                 |                                                              |
-   raw events -> feature pipeline ---> OFFLINE store (warehouse / Parquet) ---> point-in-time join -> training data
-                          |                                                                          (train time)
-                          +---------> ONLINE store (Redis / DynamoDB)  ---> low-latency get -> inference
-                                                                                            (serve time)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "One definition, two stores",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "events",
+      "label": "Raw events",
+      "kind": "queue"
+    },
+    {
+      "id": "pipeline",
+      "label": "Feature pipeline (one definition, both stores)",
+      "kind": "service"
+    },
+    {
+      "id": "offline",
+      "label": "Offline store (warehouse or Parquet, full history with timestamps)",
+      "kind": "db"
+    },
+    {
+      "id": "pit",
+      "label": "Point-in-time as-of join",
+      "kind": "service"
+    },
+    {
+      "id": "training",
+      "label": "Training data (the value known strictly before the label)",
+      "kind": "db"
+    },
+    {
+      "id": "online",
+      "label": "Online store (Redis or DynamoDB, latest value per entity)",
+      "kind": "cache"
+    },
+    {
+      "id": "inference",
+      "label": "Inference (single-digit-ms point lookup)",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "events",
+      "to": "pipeline",
+      "kind": "sync"
+    },
+    {
+      "from": "pipeline",
+      "to": "offline",
+      "kind": "sync",
+      "label": "every value, stamped with when it was true"
+    },
+    {
+      "from": "pipeline",
+      "to": "online",
+      "kind": "sync",
+      "label": "only the latest value per entity key"
+    },
+    {
+      "from": "offline",
+      "to": "pit",
+      "kind": "sync",
+      "label": "large as-of joins"
+    },
+    {
+      "from": "pit",
+      "to": "training",
+      "kind": "sync",
+      "label": "joined as of event time T"
+    },
+    {
+      "from": "online",
+      "to": "inference",
+      "kind": "sync",
+      "label": "get by entity key"
+    }
+  ],
+  "groups": [
+    {
+      "id": "traintime",
+      "label": "Train time (throughput, correctness)",
+      "nodes": [
+        "offline",
+        "pit",
+        "training"
+      ]
+    },
+    {
+      "id": "servetime",
+      "label": "Serve time (latency)",
+      "nodes": [
+        "online",
+        "inference"
+      ]
+    }
+  ],
+  "caption": "One definition feeding both stores is what removes code-divergence skew. The as-of join on the training side is what stops a row from reading a value the future produced, and no amount of shared code does that for you."
+}
 \`\`\`
 
 The offline store holds the full history of every feature value with timestamps, in a warehouse or Parquet on S3, optimized for large point-in-time joins. The online store holds only the latest value per entity, in Redis or DynamoDB, optimized for single-digit-ms point lookups by entity key. Both are populated by one pipeline from one definition, which is what guarantees the serving path and the training path compute the feature identically.
