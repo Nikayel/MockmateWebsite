@@ -1582,6 +1582,42 @@ moves assignment computation to the broker-side coordinator and makes rebalances
 removing the stop-the-world join barrier. Tuning \`session.timeout.ms\`/\`heartbeat.interval.ms\`
 sensibly (e.g., 45s/3s) avoids spurious rebalances from a GC pause.
 
+### The revoke callback, and what it does not fix
+
+A rebalance takes partitions away from a consumer that is mid-batch, and the default behaviour is
+brutal: whatever it processed since its last commit is uncommitted, so the new owner starts there and
+does it again. You get one hook to narrow that, \`ConsumerRebalanceListener\`, whose
+\`onPartitionsRevoked\` runs on the losing consumer while it still owns the partitions:
+
+\`\`\`java
+consumer.subscribe(List.of("orders"), new ConsumerRebalanceListener() {
+    @Override
+    public void onPartitionsRevoked(Collection<TopicPartition> revoked) {
+        // Still the owner, for a moment longer. Finish the work in hand,
+        // then commit exactly what completed, before letting go.
+        finishInFlightBatch();
+        consumer.commitSync();
+    }
+
+    @Override
+    public void onPartitionsAssigned(Collection<TopicPartition> assigned) {
+        // The new owner resumes from the offsets committed above,
+        // not from the last five-second auto-commit.
+    }
+});
+\`\`\`
+
+Under the eager protocol this fires for every partition the consumer holds, because eager revokes
+everything; under cooperative rebalancing it fires only for the partitions actually moving.
+
+Now the honest part, which is the part interviewers push on. This **shrinks** the duplicate window,
+it does not close it. Without the callback the new owner replays back to the last periodic commit,
+potentially seconds of work; with it, it replays only the batch in flight. But the callback runs only
+when the consumer is alive to run it. A \`kill -9\`, a hardware failure, or a pod hung long enough to
+miss \`session.timeout.ms\` all produce a rebalance with no revoke callback anywhere, and the new
+owner picks up from the last commit that actually landed. So the guarantee is unchanged: still
+at-least-once, still duplicates around every crash, still idempotent handlers.
+
 ### Stateful consumers, and what a handoff costs them
 
 Plenty of consumers are stateless: read an event, write a row, done. The interesting ones are
