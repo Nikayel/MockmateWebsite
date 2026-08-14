@@ -2858,7 +2858,7 @@ export const systemDesignLevel6: DesignLevel = {
           id: "sd-l6-consumer-groups",
           title: "Consumer Groups, Rebalancing & Scaling",
           summary:
-            "Group size is capped by partition count; commit-after-process gives at-least-once so handlers must be idempotent; cooperative rebalancing and static membership avoid stop-the-world, and you scale on lag.",
+            "Why a 13th consumer on a 12-partition topic does nothing, and how to make a rolling deploy cause zero rebalances.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["consumer-groups", "rebalancing", "lag"],
@@ -2907,7 +2907,7 @@ export const systemDesignLevel6: DesignLevel = {
           id: "sd-l6-compaction-retention",
           title: "Log Compaction, Retention & Tiered Storage",
           summary:
-            "Delete-retention makes a replayable stream, compaction makes a rebuildable table/changelog with tombstones, tiered storage makes long retention cheap, and dedup must cover the replay window.",
+            "Delete retention makes a Kafka topic a stream; compaction makes it a rebuildable table. Plus tiered storage and the dedup-window trap.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["compaction", "retention", "tiered-storage"],
@@ -2962,7 +2962,7 @@ export const systemDesignLevel6: DesignLevel = {
           id: "sd-l6-delivery-semantics",
           title: "Delivery Semantics: At-Most / At-Least / Exactly-Once",
           summary:
-            "Ack timing sets the guarantee (commit-before-process is at-most-once, process-before-commit is at-least-once); exactly-once delivery over a network is impossible, so you convert at-least-once into effectively-once processing at the consumer, and Kafka EOS covers only a read-process-write loop inside Kafka.",
+            "Exactly-once delivery is impossible, so ack timing plus idempotency is the real answer, and Kafka EOS stops at Kafka's edge.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["delivery-semantics", "exactly-once"],
@@ -3010,7 +3010,7 @@ export const systemDesignLevel6: DesignLevel = {
           id: "sd-l6-idempotency-dedup",
           title: "Idempotency & Deduplication",
           summary:
-            "Neutralize at-least-once duplicates with natural idempotency, state machines with expected-version checks, or a dedup store that saves the result (not a boolean) under an idempotency key; resolve the concurrent race with an atomic check-and-set and size the TTL to cover both the client-retry and broker-replay windows.",
+            "The two things that break idempotency in production: the concurrent-duplicate race, and a dedup TTL shorter than the replay window.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["idempotency", "dedup"],
@@ -3058,7 +3058,7 @@ export const systemDesignLevel6: DesignLevel = {
           id: "sd-l6-retries-dlq-backpressure",
           title: "Retries, Dead-Letter Queues & Backpressure",
           summary:
-            "Retry transient errors with capped exponential backoff plus jitter, send permanent failures and exhausted retries to an alerted redrivable DLQ, never retry in place on an ordered partition (use retry topics to avoid head-of-line blocking), and lean on the durable log as your backpressure buffer while autoscaling on consumer lag.",
+            "How to retry a flaky downstream without a thundering herd, and why one poison message wedges an entire Kafka partition.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["retries", "dlq", "backpressure"],
