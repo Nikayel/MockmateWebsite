@@ -4508,9 +4508,70 @@ on your database or app tier.
 }
 \`\`\`
 
+### When the object you stored is not the object you serve
+
+Everything above assumes the bytes a viewer wants are the bytes the uploader sent. True for a JPEG,
+false for video. One 4 GB 4K MP4 is unplayable on a phone on 3G: the player has to buffer megabytes
+before the first frame, and a single dip in bandwidth stalls it. Serving that same file to a 4K TV
+and to that phone is not a delivery problem you can solve with a CDN, because there is only one
+thing to deliver. The upload path stays exactly as taught; the read path grows three steps, and all
+three products live in object storage.
+
+**1. Transcode into a ladder of renditions.** Once the raw upload lands, an async worker re-encodes
+it at several resolution and bitrate pairs, so a version exists for every plausible network:
+
+\`\`\`
+raw/{videoId}/source.mp4     3840x2160, 45 Mbps    <- what the creator uploaded, never served
+  ->  hls/{videoId}/240p/     426x240,   0.4 Mbps
+  ->  hls/{videoId}/480p/     854x480,   1.2 Mbps
+  ->  hls/{videoId}/720p/    1280x720,   3.0 Mbps
+  ->  hls/{videoId}/1080p/   1920x1080,  6.0 Mbps
+  ->  hls/{videoId}/2160p/   3840x2160, 18.0 Mbps
+\`\`\`
+
+**2. Cut every rendition into segments, and write a manifest.** Each rendition is chopped into short
+independently decodable chunks, usually 2 to 6 seconds, each stored as its own immutable object. A
+**manifest** is a small text file listing the renditions and their segments. That pairing is what
+HLS and DASH are: HLS is Apple's format (an \`.m3u8\` manifest with \`.ts\` or \`.m4s\` segments),
+DASH is the ISO equivalent (an \`.mpd\` manifest). Same job, two spellings.
+
+\`\`\`
+hls/{videoId}/master.m3u8            # the manifest the player fetches first
+  #EXT-X-STREAM-INF:BANDWIDTH=400000,RESOLUTION=426x240
+  240p/index.m3u8
+  #EXT-X-STREAM-INF:BANDWIDTH=3000000,RESOLUTION=1280x720
+  720p/index.m3u8
+
+hls/{videoId}/720p/index.m3u8        # one rendition's segment list
+  #EXTINF:4.0
+  seg_00001.ts
+  #EXTINF:4.0
+  seg_00002.ts
+\`\`\`
+
+**3. Let the player pick a rendition per segment.** This is **adaptive bitrate**. The client reads
+the master manifest, times how long the last segment took to arrive, and chooses which rendition to
+request next. Every rendition was cut on the same boundaries, so switching mid-playback is seamless:
+
+\`\`\`
+t=0s    fetch master.m3u8, start conservatively   ->  720p/seg_00001.ts
+t=4s    that segment arrived in 1.1s, plenty spare ->  1080p/seg_00002.ts
+t=8s    viewer steps into a lift, took 3.8s        ->  480p/seg_00003.ts
+t=12s   still bad                                  ->  240p/seg_00004.ts
+t=16s   back on wifi                               ->  1080p/seg_00005.ts
+\`\`\`
+
+The choice belongs to the client, made fresh at every segment boundary, which is how one stored
+library serves a 3G phone and a 4K TV with the server knowing nothing about either. It is also
+kinder to the CDN than the single file was: segments are immutable, so they cache at the edge with
+very long TTLs, and the hot read set becomes a pile of small cacheable objects instead of one
+enormous range-requested blob.
+
 Recap: Keep bytes in object storage with eleven-nines durability and only the key plus metadata in
 the DB, move files with presigned URLs and multipart upload so they bypass your servers, and control
-cost and latency with lifecycle tiering and a CDN.
+cost and latency with lifecycle tiering and a CDN. When one stored object cannot serve every
+viewer, transcode it into a rendition ladder, segment each rendition beside a manifest, and let the
+player switch renditions per segment.
 
 \`\`\`cswidget
 {
