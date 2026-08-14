@@ -606,9 +606,9 @@ tiered storage govern cost and replay; and KRaft removed ZooKeeper by making met
   "prompt": "One design choice, the partitioned append-only commit log, explains both Kafka's throughput and its replay. How?",
   "options": [
     {
-      "label": "Appends are sequential disk writes served back through the page cache, and retained records mean a consumer can rewind its offset over the same bytes",
+      "label": "Appends are sequential, and retained records stay rewindable",
       "correct": true,
-      "feedback": "Right: the same immutable log that makes writes disk-friendly is what leaves history in place for offsets to rewind."
+      "feedback": "Right. The same immutable log makes the write path a pure sequential append served back out of the page cache, and it leaves the history in place afterwards, so a consumer group can move its offset backward over the very same bytes. One data model, both properties."
     },
     {
       "label": "The log lets the broker delete each record after delivery, keeping disks small and fast",
@@ -645,9 +645,9 @@ single partition, capping you at one broker's throughput and one consumer.
   "prompt": "A ledger consumer reads a 100-partition topic and applies events assuming chronological order across the whole topic. What happens under load?",
   "options": [
     {
-      "label": "It can silently apply a withdrawal before its deposit: order holds within a partition only, never across partitions",
+      "label": "It can apply a withdrawal before its deposit",
       "correct": true,
-      "feedback": "Right: 100 partitions are 100 independent sequences interleaved by wall-clock chance, and no cross-partition order is ever promised."
+      "feedback": "Right, and it does so silently. Order holds within a partition only, so 100 partitions are 100 independent sequences interleaved by wall-clock chance and nothing promises order across them. The ledger applies what it reads, in whatever order it happens to read it."
     },
     {
       "label": "Nothing: record timestamps let the consumer reconstruct global order automatically",
@@ -776,9 +776,9 @@ ordering plus reassembly).
   "prompt": "A celebrity account floods its partition, so you salt the key and its events spread across 8 partitions. What did you just trade away?",
   "options": [
     {
-      "label": "Strict per-account ordering: it now holds only within each salted sub-stream, and a downstream merge must re-establish order by sequence number",
+      "label": "Strict per-account ordering",
       "correct": true,
-      "feedback": "Right: every hot-key mitigation trades ordering scope for throughput, because order lives only inside a single partition."
+      "feedback": "Right. Order lives inside a single partition, so once the account's events land on eight of them, ordering survives only within each salted sub-stream and a downstream merge has to re-establish the account-level sequence by sequence number. Every hot-key mitigation trades ordering scope for throughput."
     },
     {
       "label": "Durability, because salted records skip replication",
