@@ -3040,6 +3040,230 @@ The compatibility mode literally dictates your deploy order, which is why it mat
 
 The rule that follows: **add fields with defaults, never remove or rename a required field.** A field with a default lets an old consumer that never heard of it simply fall back, and lets a new consumer read old records that lack it. Renaming is the classic trap, because a rename is a delete plus an add and breaks both directions at once.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Backward compatibility dictates the deploy order",
+  "frames": [
+    {
+      "note": "A topic on backward compatibility. Three v1 records are already on the log carrying a promo_code field, and both consumers still run the v1 reader schema. The plan is to drop the field.",
+      "rows": [
+        {
+          "label": "log",
+          "cells": [
+            {
+              "text": "v1 rec, has promo_code"
+            },
+            {
+              "text": "v1 rec, has promo_code"
+            },
+            {
+              "text": "v1 rec, has promo_code"
+            }
+          ]
+        },
+        {
+          "label": "consumers",
+          "cells": [
+            {
+              "text": "C1 on v1 reader"
+            },
+            {
+              "text": "C2 on v1 reader"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Try producers first. The registry accepts v2, because dropping a field is legal under backward compatibility, and the producer starts writing records without promo_code.",
+      "rows": [
+        {
+          "label": "log",
+          "cells": [
+            {
+              "text": "v1 rec, has promo_code",
+              "state": "dim"
+            },
+            {
+              "text": "v1 rec, has promo_code",
+              "state": "dim"
+            },
+            {
+              "text": "v2 rec, no promo_code",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "consumers",
+          "cells": [
+            {
+              "text": "C1 on v1 reader",
+              "state": "active"
+            },
+            {
+              "text": "C2 on v1 reader",
+              "state": "active"
+            }
+          ]
+        }
+      ],
+      "predict": {
+        "question": "The v1 readers now meet a record with no promo_code. What happens?",
+        "options": [
+          "They read it fine, the registry already approved v2",
+          "They break, their schema still declares a field nobody writes",
+          "They pause until someone upgrades them"
+        ]
+      }
+    },
+    {
+      "note": "They break. Backward compatibility promises a NEW reader can read OLD bytes. It never promised an old reader can read new bytes, so shipping the producer first strands every consumer, in production, with no compiler to catch it.",
+      "rows": [
+        {
+          "label": "log",
+          "cells": [
+            {
+              "text": "v1 rec, has promo_code",
+              "state": "dim"
+            },
+            {
+              "text": "v1 rec, has promo_code",
+              "state": "dim"
+            },
+            {
+              "text": "v2 rec, no promo_code",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "consumers",
+          "cells": [
+            {
+              "text": "C1 fails to decode",
+              "state": "dropped"
+            },
+            {
+              "text": "C2 fails to decode",
+              "state": "dropped"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Rewind and take the order the mode dictates. Consumers deploy first onto the v2 reader schema, which by definition reads the v1 bytes already sitting on the log.",
+      "rows": [
+        {
+          "label": "log",
+          "cells": [
+            {
+              "text": "v1 rec, has promo_code"
+            },
+            {
+              "text": "v1 rec, has promo_code"
+            },
+            {
+              "text": "v1 rec, has promo_code"
+            }
+          ]
+        },
+        {
+          "label": "consumers",
+          "cells": [
+            {
+              "text": "C1 on v2 reader",
+              "state": "new"
+            },
+            {
+              "text": "C2 on v2 reader",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Only now do producers move to v2 and stop writing promo_code. Every reader already handles both shapes, so the field disappears with no synchronized cutover across teams you do not control.",
+      "rows": [
+        {
+          "label": "log",
+          "cells": [
+            {
+              "text": "v1 rec, has promo_code",
+              "state": "dim"
+            },
+            {
+              "text": "v1 rec, has promo_code",
+              "state": "dim"
+            },
+            {
+              "text": "v2 rec, no promo_code",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "consumers",
+          "cells": [
+            {
+              "text": "C1 on v2 reader",
+              "state": "active"
+            },
+            {
+              "text": "C2 on v2 reader",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The registry checks the new version against the rule at registration time, on first produce. It cannot upgrade a running consumer, so the mode tells you the safe order rather than removing the need for one.",
+      "rows": [
+        {
+          "label": "backward",
+          "cells": [
+            {
+              "text": "consumers first",
+              "state": "active"
+            },
+            {
+              "text": "then producers"
+            }
+          ]
+        },
+        {
+          "label": "forward",
+          "cells": [
+            {
+              "text": "producers first"
+            },
+            {
+              "text": "then consumers"
+            }
+          ]
+        },
+        {
+          "label": "full",
+          "cells": [
+            {
+              "text": "either order"
+            },
+            {
+              "text": "optional fields with defaults only"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "The compatibility mode is not a property of the schema alone, it is an instruction about deploy order. Backward means consumers first, forward means producers first, and a registry that accepted your v2 has said nothing about which side you may restart."
+}
+\`\`\`
+
 ## Making a genuinely breaking change
 
 You do not mutate in place. Three options: **upcasting** (a transform step that reads v1 and rewrites it to v2 shape on read), the **tolerant reader** pattern (consumers ignore unknown fields and tolerate missing optional ones, so most additive change needs no coordination), or, for a real break, **publish a new topic** (\`user.v2\`) and run both until every consumer has migrated, then retire v1. New topic is the honest answer when the change cannot be made additive.
