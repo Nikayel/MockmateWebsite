@@ -3023,6 +3023,49 @@ Concretely for microservices: give every workload a cryptographic **identity** (
 
 The payoff is **blast-radius containment**. If one service is compromised, it holds a narrowly scoped identity, can reach only its explicit dependencies, and every call it tries is authenticated and logged, so lateral movement is slow, loud, and bounded instead of instant and silent.
 
+## The mesh has two enforcement modes, and one of them is an instrument
+
+Turning on mTLS is not a single switch. A service mesh sets an enforcement mode per destination, and it has two settings worth knowing by name. **Strict** means the destination's sidecar refuses any inbound connection that is not mutually authenticated. **Permissive** means the same sidecar accepts both plaintext and mTLS on the same port, and tags every connection in its telemetry with which of the two it was, plus the peer's workload identity when there is one.
+
+That second mode is easy to read as a weaker posture you settle for. It is better understood as a measuring device. While it is on, the mesh reports, for every source and destination pair carrying real production traffic, whether that call is already mutually authenticated. Look at what a single destination's telemetry says after a week in permissive mode.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Inbound caller of payments-api",
+    "What permissive mode does and reports",
+    "What strict mode would have done"
+  ],
+  "rows": [
+    [
+      "checkout-svc, sidecar injected",
+      "Accepted. Tagged mTLS, peer identity spiffe://prod/ns/shop/sa/checkout-svc",
+      "Accepted, identically"
+    ],
+    [
+      "search-svc, sidecar injected last month",
+      "Accepted. Tagged mTLS, peer identity resolved",
+      "Accepted, identically"
+    ],
+    [
+      "settlement-batch, a VM outside the mesh",
+      "Accepted. Tagged PLAINTEXT, no peer identity, and now it is on the list",
+      "Connection refused. The nightly settlement job fails, and nobody predicted it because this caller appears in no architecture diagram"
+    ],
+    [
+      "an unowned cron job on a build host",
+      "Accepted. Tagged PLAINTEXT, and its existence is now a fact rather than a rumour",
+      "Connection refused, and you find out what it did from whoever complains"
+    ]
+  ],
+  "highlightCols": [
+    "What permissive mode does and reports"
+  ],
+  "caption": "The plaintext rows are the point. They exist in production either way; permissive mode is what makes them visible before they become an outage, because a caller has to be accepted in order to be observed. The real call graph, as opposed to the documented one, is a byproduct of running this mode under live traffic. The price is honest too: while a destination is permissive, an unauthenticated caller is still getting in, so this mode buys information by deferring enforcement."
+}
+\`\`\`
+
 **Interview nuance:** the classic wrong turn is **bolting security on at the end** ("we will add auth before launch"). Threat modeling is valuable precisely because it is done at design time, when changing a trust boundary is a diagram edit rather than a rewrite. And the classic zero-trust misconception is that it is a product you buy; it is an architecture principle (verify every request, no implicit network trust) that mTLS, identity-aware proxies, and micro-segmentation implement.
 
 **Recap:** STRIDE walks a data-flow diagram's trust boundaries to surface spoofing/tampering/repudiation/info-disclosure/DoS/elevation threats, each mapping to a defense; apply least privilege, defense in depth, fail secure, complete mediation, secure defaults, and assume-breach; and implement zero-trust (never trust, always verify) with workload identity, mTLS via a service mesh, identity-aware proxies replacing VPNs, and micro-segmentation to contain lateral movement and blast radius.
