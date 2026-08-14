@@ -950,17 +950,17 @@ rotation (ACME/Let's Encrypt, AWS ACM) as part of a TLS design.
   "prompt": "TLS 1.3 0-RTT lets a returning client send application data in its very first flight, saving a full round trip. Should you enable it for every endpoint, including 'POST /charge'?",
   "options": [
     {
-      "label": "Yes; the early data is encrypted, so it is as safe as any other TLS traffic",
-      "feedback": "Tempting because encryption feels like the whole story, but replay is a different threat: an attacker who captures the encrypted flight can resend it verbatim, without ever decrypting a byte."
+      "label": "Yes; the early data is encrypted",
+      "feedback": "Tempting because encryption feels like the whole story, so it reads as safe as any other TLS traffic. But replay is a different threat: an attacker who captures the encrypted flight can resend it verbatim, without ever decrypting a byte."
     },
     {
-      "label": "No; 0-RTT early data is replayable, so only idempotent requests may ride it",
+      "label": "No; 0-RTT early data is replayable",
       "correct": true,
-      "feedback": "Right. A captured 'POST /charge' replayed five times is five charges. Allow 0-RTT for GETs, or for writes guarded by an idempotency key, and never for raw non-idempotent writes."
+      "feedback": "Right, so only idempotent requests may ride it. A captured 'POST /charge' replayed five times is five charges, and nothing in the protocol stops that, because the saved round trip is exactly the exchange that would have proved freshness. Allow 0-RTT for GETs, or for writes guarded by an idempotency key, and never for raw non-idempotent writes."
     },
     {
-      "label": "No, because 0-RTT only works on the very first connection to a server, before any trust exists",
-      "feedback": "Backwards: 0-RTT only exists on resumption, after a first full handshake has already issued a session ticket. The risk is not missing trust; it is that the saved round trip removes the replay protection."
+      "label": "No; 0-RTT only works on a first connection",
+      "feedback": "Backwards, and the reason matters: 0-RTT only exists on resumption, after a first full handshake has already issued a session ticket. So trust is not the missing piece. The risk is that the saved round trip removes the replay protection."
     }
   ]
 }
@@ -1226,17 +1226,17 @@ from Wi-Fi to cellular (new IP) keeps the same connection instead of re-handshak
   "prompt": "H3 removes TCP-level HOL blocking, folds the handshakes together, and survives network switches. Where do you roll it out first?",
   "options": [
     {
-      "label": "Everywhere at once; a better protocol is better on every link",
-      "feedback": "Tempting, but H3's wins come from loss and mobility. A stable low-loss datacenter link rarely triggers HOL blocking, some middleboxes throttle or block UDP, and QUIC's user-space stack can burn more CPU than kernel TCP."
+      "label": "Everywhere at once",
+      "feedback": "Tempting, because a better protocol sounds better on every link, but H3's wins come from loss and mobility. A stable low-loss datacenter link rarely triggers HOL blocking, some middleboxes throttle or block UDP, and QUIC's user-space stack can burn more CPU than kernel TCP."
     },
     {
-      "label": "The mobile-facing edge, where loss and network switches are common",
+      "label": "The mobile-facing edge",
       "correct": true,
-      "feedback": "Right. Per-stream recovery pays off exactly where packets get lost, and connection migration saves the Wi-Fi-to-cellular handoff. Stable internal links keep most of the benefit already via warm H2 connections."
+      "feedback": "Right, because that is where loss and network switches actually happen. Per-stream recovery pays off exactly where packets get lost, and connection migration saves the Wi-Fi-to-cellular handoff that would otherwise cost a fresh handshake. Stable internal links already keep most of the benefit via warm H2 connections."
     },
     {
-      "label": "The internal service-to-service links first, since you control both ends there",
-      "feedback": "Controlling both ends makes the rollout easy, which is the temptation, but the benefit is tiny: stable links rarely lose packets, and gRPC runs on HTTP/2 today anyway."
+      "label": "The internal service-to-service links",
+      "feedback": "Controlling both ends makes the rollout easy, which is the temptation, but internal links are where the benefit is smallest: stable paths rarely lose packets, nothing migrates between networks, and gRPC runs on HTTP/2 today anyway."
     }
   ]
 }
