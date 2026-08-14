@@ -1298,6 +1298,68 @@ HLC(A) < HLC(B), which pure wall clocks do not. HLC needs **no special hardware*
 why **CockroachDB and MongoDB use it**. Its limit: HLC gives causal ordering and monotonicity, but it
 cannot by itself give *external* (linearizable) consistency across nodes.
 
+### The residual window, and what a read does about it
+
+HLC fixes causality but it cannot make two clocks agree, so a gap survives: a write stamped slightly
+*after* your read timestamp may in real time have happened slightly *before* it, because the node
+that stamped it runs ahead. A system on commodity hardware closes that gap on the read path. It
+configures a **maximum clock offset** (CockroachDB's default is 500ms), and every read at timestamp
+T carries an **uncertainty interval** \`[T, T + max offset]\`. A value found inside that interval
+cannot be ordered against the read, so the transaction does not guess. It **restarts at a higher
+timestamp**, above the ambiguous value, which makes the value unambiguously past.
+
+\`\`\`
+ max offset 500ms. Txn R starts on node n2 and reads at T = 10:00:00.000,
+ so its uncertainty interval is [10:00:00.000, 10:00:00.500].
+
+ Versions stored for key acct/9 (MVCC, HLC-stamped):
+   v1  09:59:58.900  balance 40   below T, definitely in R's past
+   v2  10:00:00.180  balance 90   INSIDE the interval, real order unknown
+   v3  10:00:04.000  balance 25   above the interval, definitely later
+
+ t0  R reads acct/9 and finds v2 stamped 10:00:00.180
+ t1  did v2 happen before or after R started? The node that stamped it
+     may run up to 500ms ahead, so that stamp could be real time
+     09:59:59.680. Unknowable from the timestamps alone.
+ t2  returning 40 might discard a write that really came first, and
+     returning 90 at timestamp T would place it in R's past on a guess
+ t3  R restarts with its read timestamp pushed just above v2, so v2 is
+     now definitely past, and reads 90
+ t4  v3 sits outside the new interval, so it stays invisible to R
+\`\`\`
+
+That restart is the commodity-hardware counterpart to Spanner's commit-wait, and the pair is worth
+saying out loud in an interview: the same clock uncertainty has to be paid somewhere, and you choose
+where. Spanner pays it on every **write**, holding locks for roughly 2 epsilon before acknowledging.
+CockroachDB pays it on the **reads that actually hit an ambiguous value**, as a restart. Writes stay
+cheap, contended recent rows restart more often, and a wider offset means a wider window and more
+restarts. That is also why the offset is enforced rather than advisory: a node that discovers its
+clock has drifted beyond the configured maximum shuts itself down instead of serving orders it
+cannot justify.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A read transaction at timestamp T finds a value stamped 180ms after T. The configured maximum clock offset is 500ms, so that value sits inside the read's uncertainty interval. What does the transaction do?",
+  "options": [
+    {
+      "label": "Returns the older value, since the newer one is stamped after the read timestamp and is therefore in the future",
+      "feedback": "A stamp above T is exactly what makes it ambiguous rather than future. The writer's clock may run up to 500ms ahead, so a stamp of T plus 180ms can belong to an event that really happened before this read began."
+    },
+    {
+      "label": "Restarts at a timestamp above that value, because their real order is unknown",
+      "correct": true,
+      "feedback": "Right. Push the read timestamp above the ambiguous value and retry: the value is now definitely in the past, so the result cannot violate the real order. The cost is a restart, which is why a wide offset is expensive."
+    },
+    {
+      "label": "Waits out the 500ms window and then returns the newer value",
+      "feedback": "That is commit-wait, and Spanner pays it on the WRITE path. Waiting does not help a reader: the ambiguous write already exists, so the only safe move is to order yourself after it."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -1405,7 +1467,7 @@ the transaction spends all of it still holding its locks.
   "columns": ["Approach", "How it orders writes", "What it guarantees", "What it costs"],
   "rows": [
     ["LWW on wall clock", "highest timestamp wins", "Nothing under skew: an older write can beat a newer one", "Silent data loss, with no error to alert on"],
-    ["HLC", "physical time (NTP) plus a logical counter", "Causal and monotonic ordering", "No special hardware"],
+    ["HLC", "physical time (NTP) plus a logical counter", "Causal and monotonic ordering", "No special hardware, paid for later by read restarts inside the uncertainty interval"],
     ["TrueTime", "an [earliest, latest] interval plus commit-wait ε", "External consistency, that is, global linearizability", "GPS and atomic clocks in every datacenter, plus a few ms on every commit"]
   ],
   "highlightCols": ["What it guarantees"],
@@ -1423,7 +1485,9 @@ is the tell that someone has not built this.
 Recap: NTP/PTP drift is tens of milliseconds and real, LWW on wall-clock timestamps silently drops
 writes under skew, HLC gives causal + monotonic timestamps on plain NTP hardware, and TrueTime's
 bounded interval plus commit-wait buys global external consistency at the cost of GPS/atomic-clock
-infrastructure and a few ms per commit.
+infrastructure and a few ms per commit. The skew HLC cannot remove is handled on the read path: a
+read carries an uncertainty interval of [T, T + max offset] and restarts at a higher timestamp when
+it meets a value inside it, which is where commodity hardware pays what Spanner pays at commit.
 
 \`\`\`cswidget
 {
