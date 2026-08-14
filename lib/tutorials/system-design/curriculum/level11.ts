@@ -2025,10 +2025,109 @@ TSDBs use **LSM-tree** style storage (buffer writes in memory, flush sorted immu
 
 Together these routinely get metrics down to around 1 to 2 bytes per sample versus 16 raw, which is what makes million-point-per-second ingestion economically possible.
 
-\`\`\`
-write path: memory buffer (recent, WAL-backed) --flush--> compressed columnar chunks
-partition by TIME (e.g. 2h blocks) and by SERIES/shard
-query: pick time chunks -> filter series by tags via inverted index -> scan + aggregate -> gap-fill
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Two paths over one set of time-partitioned chunks",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "writes",
+      "label": "Incoming samples (appends at the current timestamp)",
+      "kind": "client"
+    },
+    {
+      "id": "membuf",
+      "label": "Memory buffer (recent, WAL-backed)",
+      "kind": "cache"
+    },
+    {
+      "id": "chunks",
+      "label": "Compressed columnar chunks, partitioned by time (2h blocks) and by series",
+      "kind": "db"
+    },
+    {
+      "id": "retention",
+      "label": "Rollups and retention (1m, 1h, 1d, then drop the chunk)",
+      "kind": "db"
+    },
+    {
+      "id": "query",
+      "label": "Query: CPU for these hosts over the last 6 hours",
+      "kind": "client"
+    },
+    {
+      "id": "index",
+      "label": "Inverted index (tag to series)",
+      "kind": "db"
+    },
+    {
+      "id": "scan",
+      "label": "Scan, aggregate, then gap-fill",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "writes",
+      "to": "membuf",
+      "kind": "sync",
+      "label": "append, never update the past"
+    },
+    {
+      "from": "membuf",
+      "to": "chunks",
+      "kind": "sync",
+      "label": "flush, delta-of-delta and XOR encoded"
+    },
+    {
+      "from": "chunks",
+      "to": "retention",
+      "kind": "async",
+      "label": "expiring old data is dropping a chunk, not deleting rows"
+    },
+    {
+      "from": "query",
+      "to": "index",
+      "kind": "sync",
+      "label": "filter series by tags"
+    },
+    {
+      "from": "index",
+      "to": "chunks",
+      "kind": "sync",
+      "label": "pick only the time chunks for those series"
+    },
+    {
+      "from": "chunks",
+      "to": "scan",
+      "kind": "sync",
+      "label": "one contiguous columnar read"
+    }
+  ],
+  "groups": [
+    {
+      "id": "writepath",
+      "label": "Write path",
+      "nodes": [
+        "writes",
+        "membuf",
+        "chunks",
+        "retention"
+      ]
+    },
+    {
+      "id": "readpath",
+      "label": "Read path",
+      "nodes": [
+        "query",
+        "index",
+        "scan"
+      ]
+    }
+  ],
+  "caption": "Partitioning by time is what pays for all three: the write path only ever appends, the read path skips whole chunks, and retention expires data by dropping a chunk instead of scanning for rows to delete."
+}
 \`\`\`
 
 ## Keeping old data cheap
