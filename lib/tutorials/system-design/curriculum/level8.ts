@@ -1028,6 +1028,252 @@ Store session/refresh tokens in HttpOnly, Secure, SameSite cookies. HttpOnly mea
 
 JWT validation hygiene: verify the signature and pin the algorithm, explicitly rejecting \`alg: none\` and preventing algorithm confusion (an attacker swapping RS256 for HS256 to sign with the public key). Check \`aud\` (this token is for me), \`iss\`, and \`exp\`. Rotate signing keys and publish them via JWKS so verifiers pick up new keys without a deploy. For logout and revocation, either rely on the short TTL plus refresh revocation, or maintain a denylist of revoked token IDs (jti) with entries expiring at the token's natural expiry so the list stays small.
 
+## Killing every session for one user: the per-user epoch
+
+Notice what the three revocation tools so far can and cannot do. A short TTL bounds a leak but never ends one on demand. Refresh revocation stops renewal but leaves the current access token alive until it expires. A \`jti\` denylist kills a token you can name, which means it can only reach the tokens you recorded when you issued them. None of the three answers "terminate every session for this one user, right now," which is a question regulators, support desks, and your own incident runbook all ask.
+
+The mechanism that does answer it is a **per-user revocation epoch**: one stored timestamp per user, meaning "sessions issued before this instant are dead." Every access token already carries an issued-at claim (\`iat\`), so the gateway gains one comparison, \`iat >= epoch\`, and revoking every session for a user becomes a single write.
+
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "One write kills every session: epoch versus jti denylist",
+  "frames": [
+    {
+      "note": "User u_42 has three live access tokens: their laptop, their phone, and one an attacker lifted. All three are inside their 5-minute TTL, so all three verify. The stored epoch says sessions issued at or after 09:00 are good.",
+      "rows": [
+        {
+          "label": "u_42 epoch",
+          "cells": [
+            {
+              "text": "valid_after = 09:00"
+            }
+          ]
+        },
+        {
+          "label": "laptop token",
+          "cells": [
+            {
+              "text": "iat 09:05"
+            },
+            {
+              "text": "09:05 >= 09:00, accepted"
+            }
+          ]
+        },
+        {
+          "label": "phone token",
+          "cells": [
+            {
+              "text": "iat 09:12"
+            },
+            {
+              "text": "09:12 >= 09:00, accepted"
+            }
+          ]
+        },
+        {
+          "label": "attacker token",
+          "cells": [
+            {
+              "text": "iat 09:20"
+            },
+            {
+              "text": "09:20 >= 09:00, accepted"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "09:30, the compromise is reported. Try the denylist first. It denies a jti you can name, and stateless issuance means the gateway recorded only the one token it happened to mint a row for.",
+      "predict": {
+        "question": "Support needs every session for u_42 dead now. What does a per-token jti denylist require before it can do that?",
+        "options": [
+          "Nothing extra: denying the user id covers all their tokens",
+          "The jti of every outstanding token, so you must have stored a row per issued token",
+          "Only the newest jti, because older tokens have already expired"
+        ]
+      },
+      "rows": [
+        {
+          "label": "denylist",
+          "cells": [
+            {
+              "text": "jti a1b2 added",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "laptop token a1b2",
+          "cells": [
+            {
+              "text": "on the list, rejected",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "phone token c3d4",
+          "cells": [
+            {
+              "text": "jti never recorded",
+              "state": "active"
+            },
+            {
+              "text": "still accepted",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "attacker token e5f6",
+          "cells": [
+            {
+              "text": "jti never recorded",
+              "state": "active"
+            },
+            {
+              "text": "still accepted",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Now the epoch instead. One write: set u_42's valid_after to 09:30. Nothing is enumerated, nothing per-token is stored, and the gateway's next check on each token fails the comparison it was already making.",
+      "rows": [
+        {
+          "label": "u_42 epoch",
+          "cells": [
+            {
+              "text": "valid_after = 09:30",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "laptop token",
+          "cells": [
+            {
+              "text": "iat 09:05 < 09:30"
+            },
+            {
+              "text": "rejected",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "phone token",
+          "cells": [
+            {
+              "text": "iat 09:12 < 09:30"
+            },
+            {
+              "text": "rejected",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "attacker token",
+          "cells": [
+            {
+              "text": "iat 09:20 < 09:30"
+            },
+            {
+              "text": "rejected",
+              "state": "dropped"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The real user signs in again at 09:31. The fresh token's iat is at or after the epoch, so it passes with no cleanup step and no un-blocking. The epoch is a high-water mark, not a list that grows.",
+      "rows": [
+        {
+          "label": "u_42 epoch",
+          "cells": [
+            {
+              "text": "valid_after = 09:30"
+            }
+          ]
+        },
+        {
+          "label": "fresh token",
+          "cells": [
+            {
+              "text": "iat 09:31 >= 09:30",
+              "state": "new"
+            },
+            {
+              "text": "accepted",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "storage cost",
+          "cells": [
+            {
+              "text": "one row per user",
+              "state": "active"
+            },
+            {
+              "text": "not one per issued token",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The price is honesty about statelessness: the gateway now reads something per request. Keep epochs in a fast store replicated to every region and cache each one briefly at the edge, which makes the cache TTL your worst-case kill latency.",
+      "rows": [
+        {
+          "label": "epoch store",
+          "cells": [
+            {
+              "text": "Redis or DynamoDB, all regions"
+            },
+            {
+              "text": "cached ~5s per gateway",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "kill latency",
+          "cells": [
+            {
+              "text": "one write, then the cache TTL",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "still needed",
+          "cells": [
+            {
+              "text": "purge refresh families too"
+            },
+            {
+              "text": "or the user renews back in",
+              "state": "dropped"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "A denylist is keyed by token, so it reaches only the tokens you enumerated. An epoch is keyed by user, so one write reaches every token that user will ever hold from before that instant. They solve different problems: the denylist kills one leaked token without disturbing the user's other sessions, the epoch is the sign-out-everywhere switch. The cost of the epoch is that verification is no longer a pure signature check."
+}
+\`\`\`
+
 **Recap:** pick opaque sessions when instant revocation matters and stateless JWTs when cross-service scale matters, then use the hybrid (short JWT + revocable refresh token) with rotation and reuse detection to kill stolen tokens, keep tokens in HttpOnly/Secure/SameSite cookies or a BFF (never localStorage), and validate JWTs strictly (no alg:none, check aud/iss/exp, rotate via JWKS).
 
 \`\`\`cswidget

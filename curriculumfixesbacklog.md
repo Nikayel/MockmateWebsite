@@ -483,6 +483,21 @@ it most.
 
 ### CUR-10 — The AI-resistant exercise genres (council SD-W7)
 
+**SHIPPED 2026-08-14.** Both genres live on **20 practice exercises across 10 level files**, each with
+a read-only `supplied` artifact (median 1,736 characters) and a 4-row rubric. Exercises opening with
+"Design" fall from 303 to 285; the corpus is still exactly 416 with unique ids, so every conversion
+was in place and no learner's saved answer was orphaned.
+
+Critique landed on L2, L3, L4 and L9 (a proposed schema, a session-consistency design, an autoscaling
+config, a service map). Diagnosis landed on L1, L5, L6, L7, L10 and L11 (incident timelines where the
+signals do not all point the same way).
+
+The verifier shipped BEFORE the sweep and is the reason this is trustworthy: `auditSuppliedExercise`
+plus 13 unit cases that each feed it one synthetic defect, because a corpus test on a clean corpus
+passes whether the rules are sharp or vacuous. The rule that matters most is that an artifact may
+never state its own verdict, since a critique exercise dies silently: the learner reads the answer
+back off the page and it still scores as complete.
+
 **Effort:** 5 agent-days. This is the ticket the owner actually asked the council about.
 
 **Evidence.** All 416 exercises are generation tasks and 303 of them open with the word "Design".
@@ -512,6 +527,27 @@ things a model fails at in a way a rubric can show.
 at least twenty lessons. A test asserts `supplied` never appears in the editable answer buffer.
 
 ### CUR-11 — Turn the reveal panel into a rubric (council SD-W11)
+
+**SHIPPED 2026-08-14.** `RubricSelfScore` renders inside the reveal on the 20 exercises that carry a
+rubric. Three bands per named dimension, self-scored, summarised by naming the weak axes rather than
+computing a grade.
+
+Two design decisions worth recording because a later refactor would drop them silently:
+
+**The rubric renders BEFORE the model answer**, and a test asserts the DOM order. Read the outline
+first and you grade the answer you now wish you had written, so the two judgements have to be made in
+that order to stay separate. A tamper run confirmed the assertion fails when they are swapped.
+
+**Scores stay in localStorage and no percentage is computed.** A self-score is a learner's ten-second
+opinion of their own prose; the moment it reaches Firestore somebody averages it into a mastery
+signal. `rubric` also joins `GATED_FIELD_NAMES`, because a "strong" band states the bar an answer
+must clear, which is answer content under another noun.
+
+**Deviation from the acceptance line, deliberate.** The ticket said "ships behind a flag on one level
+first". It ships gated on CONTENT PRESENCE instead: the panel renders only where a rubric is
+authored, which gives the same controlled rollout without adding a flag. This repo labels flags with
+no readers as orphans, and `DesignAnswerPanel` is a client component that would need new plumbing to
+reach the server-side flag store.
 
 **Effort:** 3 agent-days.
 
