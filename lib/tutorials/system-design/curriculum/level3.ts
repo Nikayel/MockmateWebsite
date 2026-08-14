@@ -2687,7 +2687,7 @@ export const systemDesignLevel3: DesignLevel = {
           id: "sd-l3-read-replicas",
           title: "Read Scaling with Replicas",
           summary:
-            "Single-leader replication scales reads linearly but never writes; pick async/sync/semi-sync by durability vs latency, watch lag, and shard only when writes outgrow one leader.",
+            "Why read replicas scale reads but never writes, and how to pick async, sync or semi-sync replication by durability against latency.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["replication", "read-replicas", "scaling"],
@@ -2736,7 +2736,7 @@ export const systemDesignLevel3: DesignLevel = {
           id: "sd-l3-replication-topologies",
           title: "Replication Topologies & Consistency",
           summary:
-            "Single-leader avoids conflicts, multi-leader buys local writes at the cost of write-write conflicts, leaderless uses R+W>N quorums; resolve conflicts losslessly and reason with PACELC.",
+            "Single-leader, multi-leader and leaderless replication compared: which conflicts each one admits, and what PACELC says about the price.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["replication", "consistency", "conflict-resolution"],
@@ -2841,7 +2841,7 @@ export const systemDesignLevel3: DesignLevel = {
           id: "sd-l3-partitioning-strategies",
           title: "Partitioning Strategies: Range vs Hash vs Directory",
           summary:
-            "Range wins range scans but hotspots on sequential keys, hash spreads evenly but loses ranges, directory adds a flexible routing hop; map every dominant query to its partitions.",
+            "Range, hash and directory partitioning compared: what each one costs you in hotspots, lost range scans and extra routing hops.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["partitioning", "sharding", "skew"],
@@ -2939,7 +2939,7 @@ export const systemDesignLevel3: DesignLevel = {
           id: "sd-l3-shard-key-hotspots",
           title: "Shard-Key Selection, Hotspots & the Celebrity Problem",
           summary:
-            "A good shard key is high-cardinality, evenly accessed, and query-aligned; a celebrity is one key on one node, so split the key, dedicate shards, or change the read pattern.",
+            "How to pick a shard key that will not hotspot, and what to do when one celebrity key drives all its traffic onto a single node.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["shard-key", "hot-key", "celebrity"],
