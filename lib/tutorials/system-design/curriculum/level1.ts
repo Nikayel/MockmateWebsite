@@ -2622,13 +2622,44 @@ The same pattern extends beyond synchronous APIs. Webhooks should carry an event
 can dedupe redelivered events, and message-queue consumers should dedupe on a key so a redelivered
 Kafka or SQS message is processed once.
 
+### Where the redelivery comes from
+
+At-least-once is not something the network does to a queue. It is a consequence of where the consumer
+records its progress. A Kafka partition is an append-only sequence with a number per record, nothing
+is removed when it is read, and a consumer group stores one number back in the broker: the
+**committed offset**, meaning "the next record I still need". A restarted consumer resumes from that
+number and from nothing else, so when you commit it decides what a crash costs:
+
+\`\`\`
+# Option A: do the work, then commit.
+poll     -> record at offset 41
+process  -> charge the card   [succeeded]
+crash before the commit lands
+restart  -> committed offset is still 41 -> record 41 is delivered AGAIN
+# at-least-once: nothing is lost, some records are handled twice
+
+# Option B: commit, then do the work.
+poll     -> record at offset 41
+commit   -> 42
+crash before processing
+restart  -> committed offset is 42 -> record 41 is never delivered again
+# at-most-once: nothing is handled twice, some records are silently lost
+\`\`\`
+
+No ordering gives you both, because the commit lands in the broker and the side effect lands in the
+card processor, and no single write covers the two. So the choice is really which failure you can
+absorb, and a handler that dedupes on an event id makes the duplicate free while nothing makes a
+silent loss free. That is why "commit after the work" is the default in every consumer worth copying,
+and why the dedup key is not optional once you pick it.
+
 **Interview nuance:** interviewers push on the concurrency case. "Store a flag" is the answer that
 fails; "store the response behind a unique-constraint insert so concurrent duplicates converge" is
 the one that passes.
 
 Recap: give mutating requests a client-generated idempotency key, store the full response behind a
 unique constraint with a TTL, and return it on any retry so at-least-once delivery becomes
-effectively-once and nobody double-charges.
+effectively-once and nobody double-charges; on a log-based queue the committed offset is the progress
+marker, so commit after the work and let dedup absorb the replay.
 
 \`\`\`cswidget
 {
