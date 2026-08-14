@@ -4307,6 +4307,52 @@ If one signing key protects every session and you just delete it, every valid to
 }
 \`\`\`
 
+## The same principle one level harder: rotating a trust anchor
+
+A JWKS key is easy to overlap because verifiers fetch the key set at runtime, so "trust both for a while" is a publish. A **root CA** is the hard version: it is a trust anchor baked into every service's local trust store, and nothing fetches it at runtime. There are exactly two ways to make clients accept certificates under a new root, and knowing which one a compromise allows is the whole question.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Question",
+    "Cross-signing",
+    "Trust-bundle overlap"
+  ],
+  "rows": [
+    [
+      "What you actually produce",
+      "A cross-certificate: the NEW root's public key and subject, signed by the OLD root's private key. The new root now appears as a link inside a chain that terminates at the old one",
+      "No certificate at all. You edit configuration, so every service's trust store lists the new root alongside the old"
+    ],
+    [
+      "A client that trusts only the old root meets a leaf issued under the new root",
+      "It validates: leaf, intermediate, new root (via the cross-certificate), old root, which it already trusts. Nothing on the client changed",
+      "It rejects the leaf, until that client's own trust bundle has been updated"
+    ],
+    [
+      "What has to reach every machine",
+      "Nothing, and that is the entire appeal. It works on clients you do not control and cannot reconfigure",
+      "A config change on each of thousands of services, plus telemetry proving each one landed"
+    ],
+    [
+      "Where the trust ultimately terminates",
+      "At the OLD root. The chain is worth exactly as much as the key that signed the cross-certificate",
+      "At whichever roots the bundle lists, each standing on its own"
+    ],
+    [
+      "Usable when the old root's private key is the compromised thing?",
+      "No. The attacker holds that key too, so they can mint their own cross-certificates and their own leaves, and every chain you build still terminates at a key you are trying to stop trusting",
+      "Yes. Distributing both roots is what creates the overlap, and removing the compromised root from the bundles is what finally ends it"
+    ]
+  ],
+  "highlightCols": [
+    "Trust-bundle overlap"
+  ],
+  "caption": "Cross-signing is the standard move for a NEW root that nobody trusts yet: a healthy, widely-deployed old root vouches for it so existing clients validate immediately, which is how Let's Encrypt's root reached a browser population it could not update. It is the wrong tool the moment the old root's key is the thing that leaked, because a chain terminating at a stolen key is a chain the attacker can build too. That leaves the slower path: get the new root into every trust store, reissue underneath it, and remove the old root last. Same overlapping-validity principle as the JWKS rotation above, paid for in a config rollout instead of a signature."
+}
+\`\`\`
+
 **Eradication and recovery.** Remove the attacker's foothold, rotate all potentially-exposed secrets, then restore from a known-good state and watch closely for reinfection. This is where **immutable, object-locked backups** pay off: if the attacker also ran ransomware, a ransomware-resistant backup is your clean recovery path.
 
 ## Forensics and the legal clock, in parallel
@@ -5171,16 +5217,16 @@ export const systemDesignLevel8: DesignLevel = {
               "Design the breach response for a compromised root Certificate Authority signing key at a payments provider (a Stripe-scale system) where the key secures mTLS between thousands of internal services and any rotation risks a full internal outage.",
             thinkAbout: [
               "Why is a root CA harder to rotate than a JWT signing key?",
-              "How does cross-signing plus staged trust distribution avoid a total outage?",
+              "Why can a compromised root not cross-sign its own replacement?",
               "How do you contain the compromise while the staged rotation is in flight?",
             ],
             modelAnswerOutline: [
               "Assumptions: the compromised key is the private key of an internal root CA that signs the certificates every service uses for mTLS. Thousands of services trust this root. Naively revoking it makes every service distrust every other service at once: a total internal outage. This is the highest-stakes version of 'rotate a widely-used key.'",
               "**Why it is hard:** unlike a JWT signing key, a root CA is a trust anchor baked into every service's trust store. You cannot just publish a new one and flip; every workload has to trust the new root before you can stop trusting the old one.",
-              "**Cross-signing and staged trust distribution:** (1) generate a new root CA in an HSM, (2) push the new root into every service's trust bundle so services trust BOTH old and new roots (a config rollout, not a cutover), (3) once telemetry confirms every workload trusts the new root, reissue leaf/intermediate certs signed by the new root (short-lived, via SPIFFE/SPIRE so this is automated and fast), (4) only then remove the compromised root from trust stores. The overlap window prevents the outage, the same overlapping-validity principle as JWKS applied to a PKI trust anchor.",
+              "**Staged trust distribution:** (1) generate a new root CA in an HSM, (2) push the new root into every service's trust bundle so services trust BOTH old and new roots (a config rollout, not a cutover), (3) once telemetry confirms every workload trusts the new root, reissue leaf/intermediate certs signed by the new root (short-lived, via SPIFFE/SPIRE so this is automated and fast), (4) only then remove the compromised root from trust stores. The overlap window prevents the outage, the same overlapping-validity principle as JWKS applied to a PKI trust anchor. Note what I deliberately do not do: cross-sign the new root with the old one. That is the usual way to launch a root nobody trusts yet, but here the old root's private key is exactly what leaked, so any chain terminating at it is a chain the attacker can forge too.",
               "**Containment meanwhile:** shrink certificate TTLs hard (SPIFFE issues minutes-long certs), and use the CRL/OCSP path to revoke the specific compromised intermediates without yet touching the root.",
               "**Detection and forensics:** CA usage is tightly audited, so alert on any signing operation not originating from the approved issuance pipeline, and preserve HSM audit logs (they are your chain of custody). Legal: a payments provider under PCI-DSS plus GDPR notifies card networks/acquirers and the supervisory authority on the regulatory clocks, in parallel with the technical response.",
-              "Common wrong turn: revoking the root immediately. It is decisive and catastrophic, freezing all internal mTLS. Staged cross-signed trust distribution is the only way to rotate a trust anchor without downtime.",
+              "Common wrong turn: revoking the root immediately. It is decisive and catastrophic, freezing all internal mTLS. Staged trust-bundle distribution is the only way to rotate a compromised trust anchor without downtime.",
             ],
           },
         },
