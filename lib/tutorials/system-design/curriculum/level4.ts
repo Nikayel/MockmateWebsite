@@ -70,13 +70,146 @@ anything where the working set must be co-located. There you buy the big box and
 write throughput or dataset size truly forces it. The honest framing: **scale-out for the stateless
 web/app tier, scale-up (then shard) for the stateful data tier.**
 
-\`\`\`
-  scale UP (vertical)            scale OUT (horizontal)
-  +-------------+                +----+  +----+  +----+
-  |  bigger box |     vs         | n1 |  | n2 |  | n3 |  ... n500
-  +-------------+                +----+  +----+  +----+
-  1 failure domain,                 \\      |      /
-  hard ceiling                    [ shared state: Redis / DB / S3 ]
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Scale out: interchangeable nodes with their state pushed outside",
+  "nodes": [
+    {
+      "id": "clients",
+      "label": "Clients",
+      "kind": "client"
+    },
+    {
+      "id": "lb",
+      "label": "Load balancer (any node, any request)",
+      "kind": "lb"
+    },
+    {
+      "id": "n1",
+      "label": "App node n1 (stateless)",
+      "kind": "service"
+    },
+    {
+      "id": "n2",
+      "label": "App node n2 ... n500 (stateless)",
+      "kind": "service"
+    },
+    {
+      "id": "sessions",
+      "label": "Session store: Redis, or a signed JWT the client carries",
+      "kind": "cache"
+    },
+    {
+      "id": "objects",
+      "label": "Object storage for uploads (S3 or GCS), never local disk",
+      "kind": "db"
+    },
+    {
+      "id": "database",
+      "label": "Database: durable data, scaled up then sharded",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "clients",
+      "to": "lb",
+      "kind": "sync"
+    },
+    {
+      "from": "lb",
+      "to": "n1",
+      "kind": "sync",
+      "label": "1/N of traffic"
+    },
+    {
+      "from": "lb",
+      "to": "n2",
+      "kind": "sync"
+    },
+    {
+      "from": "n1",
+      "to": "sessions",
+      "kind": "sync",
+      "label": "read or validate"
+    },
+    {
+      "from": "n2",
+      "to": "sessions",
+      "kind": "sync"
+    },
+    {
+      "from": "n1",
+      "to": "objects",
+      "kind": "sync"
+    },
+    {
+      "from": "n2",
+      "to": "objects",
+      "kind": "sync"
+    },
+    {
+      "from": "n1",
+      "to": "database",
+      "kind": "sync"
+    },
+    {
+      "from": "n2",
+      "to": "database",
+      "kind": "sync"
+    }
+  ],
+  "groups": [
+    {
+      "id": "fleet",
+      "label": "Stateless fleet: any node serves any request",
+      "nodes": [
+        "n1",
+        "n2"
+      ]
+    },
+    {
+      "id": "state",
+      "label": "Externalized state, shared by every node",
+      "nodes": [
+        "sessions",
+        "objects",
+        "database"
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "clients",
+        "lb",
+        "n1",
+        "n2"
+      ],
+      "note": "Scale out puts commodity nodes behind one balancer, which is what buys linear capacity and turns a node death into the loss of 1/N rather than everything. It only works if the balancer is free to send any request to any node."
+    },
+    {
+      "adds": [
+        "sessions"
+      ],
+      "note": "A session held in one node's process memory forces the balancer to pin that user to that node, and kills the session outright when the node dies. Moving it to Redis, or making it a signed JWT the client carries, is what buys back the freedom to spread requests."
+    },
+    {
+      "adds": [
+        "objects"
+      ],
+      "note": "An upload written to local disk is readable only from the node that happened to receive it, so every later request for that file has to land on the same node. User assets go to object storage for the same reason sessions do."
+    },
+    {
+      "adds": [
+        "database"
+      ],
+      "note": "Durable data stays in the database, and this is the tier the lesson does NOT scale out: write ordering and a co-located working set are hard to split, so buy the bigger box and shard only when throughput forces it."
+    }
+  ],
+  "caption": "Scale up is the other option and needs no code change, but it has a hard top SKU, a price curve that runs super-linear past commodity sizes, and one failure domain. Once state is external the nodes are cattle: booted from an image and replaced rather than nursed."
+}
 \`\`\`
 
 Recap: scale-out is the web-tier default because it beats the cost, ceiling, and
@@ -448,11 +581,36 @@ mechanism, different justification.
 }
 \`\`\`
 
-\`\`\`
-   variable durations:
-   RR  -> buried node still gets its turn   (bad: hotspot)
-   LC  -> skip the buried node              (good)
-   P2C -> pick 2 random, send to lighter    (good + O(1), no herd, no global state)
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Algorithm",
+    "What it does when request durations vary",
+    "Verdict"
+  ],
+  "rows": [
+    [
+      "Round robin",
+      "The node already buried in slow work still gets its turn",
+      "Hotspot: requests pile up behind the slowest node"
+    ],
+    [
+      "Least connections",
+      "Skips the buried node and picks the one with the fewest in flight",
+      "Good, but it needs a live connection count for every backend"
+    ],
+    [
+      "Power of two choices",
+      "Picks 2 backends at random and sends to the lighter of the two",
+      "Good, and O(1) with no herd and no global state"
+    ]
+  ],
+  "highlightCols": [
+    "Verdict"
+  ],
+  "caption": "Round robin is fine while nodes are identical and requests cost the same. The moment durations vary, the difference in this table is the whole lesson."
+}
 \`\`\`
 
 Recap: round robin for identical stateless nodes, least-connections for variable durations,
