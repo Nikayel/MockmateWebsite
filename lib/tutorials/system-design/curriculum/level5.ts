@@ -2147,6 +2147,76 @@ failures (majority 3); a 4-node cluster *also* tolerates only 1 failure (majorit
 costing an extra machine and an extra vote to collect. The classic wrong turn is a 2-node cluster:
 majority is 2, so a single failure leaves no majority and a hung, unwritable system.
 
+### Serving a read is not free either
+
+Everything above is the write path. Reads have their own trap, and it is the one interviewers use to
+separate people who have read the paper from people who have run the thing: **a deposed leader does
+not know it was deposed.** Partition a leader away from its cluster and it keeps its role until its
+own timers fire. It has committed no wrong data, but its state machine is frozen at whatever it last
+applied, so a read answered from local state can miss writes a newer leader has already committed.
+Leader completeness protects the *new* leader; it says nothing about the old one.
+
+The fix is **ReadIndex**: before serving, the leader re-confirms it is still the leader.
+
+\`\`\`
+ A) Stale read from a partitioned leader, no confirmation
+ t0  S1 leads term 4, applied through index 812, x = 5
+ t1  the network splits S1 from S2..S5; S1 hears nothing, keeps its role
+ t2  S3 wins term 5 with 3 votes and commits index 813, SET x = 9
+ t3  a client reads x from S1, which answers 5 from local state
+     <- stale, and S1 has no way to know
+
+ B) The same read through ReadIndex
+ t0  S1 records its current commit index: 812
+ t1  S1 sends one heartbeat round and waits for a majority to answer in
+     term 4
+ t2  only S1 answers, which is 1 of 5 and not a majority
+ t3  S1 serves nothing, and steps down as soon as it learns of term 5
+     <- no stale value leaves the node
+
+ C) ReadIndex on a leader that really is the leader
+ t0  S3 (term 5) records its commit index: 813
+ t1  heartbeat round; S2 and S4 answer in term 5, so 3 of 5 is a
+     majority and no other leader can have committed behind its back
+ t2  S3 waits until its state machine has applied index 813
+ t3  S3 serves x = 9 from local state, with no log entry written
+\`\`\`
+
+Read the three steps off trace C, because that is the answer an interviewer wants: record the commit
+index, confirm leadership with a heartbeat quorum, wait until that index is applied locally, then
+serve. It costs one round trip of heartbeats and no disk write, and a leader can batch many pending
+reads behind a single confirmation round. A **leader lease** trims even that round trip by having
+the leader treat a recent successful heartbeat as valid for a bounded window, which is faster and
+only as safe as your bound on clock drift.
+
+The cheap alternative is a **follower read**: answer from a follower's local state and accept
+staleness. That is serializable, not linearizable, and calling it consistent is the classic wrong
+turn. A follower can be made linearizable the same way, by asking the leader for the current read
+index and waiting until it has applied that index itself.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A Raft leader is partitioned from the other four nodes and its election timer has not yet fired. A client read arrives and the leader answers it straight from its own state machine. What can go wrong?",
+  "options": [
+    {
+      "label": "Nothing: leader completeness means a leader holds every committed entry, so its state is current",
+      "feedback": "Leader completeness is a promise about a NEWLY ELECTED leader: it holds everything committed before its term. It says nothing about a leader that has already been replaced and has not found out."
+    },
+    {
+      "label": "It can return a value a newer leader has already replaced",
+      "correct": true,
+      "feedback": "Right. A majority elected someone else in a higher term and has been committing writes this node never saw. It is not lying, it just has no way to know it stopped leading until it hears from someone, which is exactly the gap ReadIndex closes."
+    },
+    {
+      "label": "The read blocks until the partition heals",
+      "feedback": "Nothing blocks. The node still believes it leads, so it answers immediately out of local state. Silence from the rest of the cluster is not something the read path notices."
+    }
+  ]
+}
+\`\`\`
+
 **Paxos family.** Basic Paxos solves single-value consensus; Multi-Paxos chains it for a log and
 underlies Chubby and Spanner. Paxos is more flexible but famously hard to implement correctly, which
 is why Raft constrains leadership to trade flexibility for a protocol engineers can get right. The
@@ -2157,6 +2227,9 @@ which randomized timeouts operationalize.
 Recap: Raft splits consensus into randomized-timeout leader election, majority-quorum log replication
 with commit-on-majority, and four safety properties that make committed entries immortal; minority
 partitions stall safely, membership changes use joint consensus, and clusters should be odd-sized.
+On the read path, a linearizable read costs a ReadIndex confirmation (record the commit index,
+re-confirm leadership with a heartbeat quorum, wait for that index to apply) because a deposed
+leader does not know it was deposed.
 
 \`\`\`cswidget
 {
