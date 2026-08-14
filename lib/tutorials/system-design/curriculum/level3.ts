@@ -375,6 +375,79 @@ reconcile the exact ranges that differ.
 - **Application merge:** hand both versions to business logic (shopping-cart union is the classic
   Dynamo example).
 
+### CRDTs, worked: the delete is the hard part
+
+"Merge by union" is the answer everyone reaches for, and it is right for adds and wrong for removes.
+A union has no memory of a deletion, so a replica that never saw the delete re-supplies the item and
+the item comes back. That is **delete resurrection**, and it is the classic Dynamo cart bug: an item
+the user removed reappears at checkout.
+
+The fix is an **OR-Set** (observed-remove set). Every add carries a **unique tag**, and a remove
+records the tags it has actually **observed** as tombstones. Merge is then "union of the adds, minus
+every observed tag", which is well defined no matter what order updates arrive in.
+
+\`\`\`
+naive union, two replicas of one cart:
+
+  A (phone):  add socks; add lamp        A = {socks, lamp}
+  B (laptop): remove socks               B = {}
+  merge(A, B) = A union B                  = {socks, lamp}
+  the remove vanished. Socks are back. This is delete resurrection.
+
+OR-Set: tag every add, tombstone the tags a remove observed.
+
+  A: add socks -> socks:(a1)
+     add lamp  -> lamp:(a2)              adds = {socks:(a1), lamp:(a2)}
+  B: it has replicated socks:(a1) and removes socks
+                                         tombstones = {a1}
+
+  merge = adds minus tombstoned tags
+        = {socks:(a1), lamp:(a2)} - {a1}
+        = {lamp:(a2)}                    socks stays deleted, lamp survives
+
+now the two races, which resolve differently and should:
+
+  stale add: the phone retries its original "add socks" carrying tag a1
+    adds = {socks:(a1), lamp:(a2)}       tombstones = {a1}
+    -> {lamp:(a2)}                       the delete wins, because the delete
+                                         already observed a1
+
+  fresh add: the user genuinely re-adds socks, which mints a NEW tag a3
+    adds = {socks:(a1), socks:(a3), lamp:(a2)}   tombstones = {a1}
+    -> {socks:(a3), lamp:(a2)}           the add wins, because no remove has
+                                         observed a3
+\`\`\`
+
+That asymmetry is what **add-wins** means, and it is narrower than it sounds: a concurrent add wins
+only if it is a genuinely new add. A duplicate of an already-observed add loses to the tombstone, so
+a retry, a hinted-handoff replay, or a slow replica catching up cannot resurrect anything. The cost
+is that tombstones accumulate, so they need a garbage-collection horizon (drop tombstones older than
+the longest tolerable replica downtime).
+
+**Sets are one CRDT family; ordered text needs another.** Two regions both inserting "at position 5"
+cannot merge on integer indexes, because each insert shifts the other's index. **Sequence CRDTs**
+(**RGA** and **LSEQ** are the two standard designs, shipped in production by **Yjs** and
+**Automerge**) fix this by giving every character an immutable id and anchoring each insert to the id
+it follows rather than to a position:
+
+\`\`\`
+base document, character ids in brackets:  H[h1] e[e1] l[l1] l[l2] o[o1]
+
+  EU leader inserts " there" anchored after o1
+  US leader inserts "!"      anchored after o1        (concurrent, same anchor)
+
+  both anchors are the SAME id, so the merge needs a deterministic tiebreak:
+  order competing inserts by replica id, and "eu" sorts before "us"
+
+  merged = Hello + " there" + "!"  ->  "Hello there!"
+
+  both edits survive, every replica computes the same string, and neither
+  side had to know the other's index.
+\`\`\`
+
+That is why a notes or document product answers "how do you merge concurrent edits" with a sequence
+CRDT rather than last-write-wins: LWW would keep one of the two paragraphs and drop the other.
+
 **Interview nuance:** do not answer with a CAP binary ("CP or AP"). Reason with **PACELC**: if there
 is a **P**artition, choose **A**vailability or **C**onsistency; **E**lse (normal operation) choose
 **L**atency or **C**onsistency. Dynamo-style stores are PA/EL; a single-leader RDBMS is PC/EC. Then
