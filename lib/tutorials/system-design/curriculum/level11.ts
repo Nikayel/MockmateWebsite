@@ -2743,19 +2743,80 @@ export const systemDesignLevel11: DesignLevel = {
           practice: {
             id: "sd-l11-feature-store-practice",
             prompt:
-              "Design the feature store for a real-time fraud model at a payments company processing 20k transactions/sec, where features include 5-second, 1-minute, and 24-hour aggregates over card and device, and a stale or skewed feature directly lets fraud through.",
+              "Read the incident timeline below and say what is happening to the fraud model: name why the challenger scores far better than the champion on the offline holdout while catching less fraud on live authorizations, say which signals rule out code-divergence skew and streaming staleness, and say what has to change in the training-row build.",
             thinkAbout: [
-              "How do you maintain multi-scale streaming aggregates without recomputing in the request path?",
-              "Why does point-in-time correctness matter when chargeback labels arrive weeks later?",
-              "How do you degrade when the streaming pipeline lags?",
+              "A served-versus-offline vector mismatch rate of 0.01% eliminates one of the two skew sources this lesson named. Which one, and what is left standing?",
+              "A training row is built for a transaction from January. After the March 3 pipeline change, what moment in time does that row's 24-hour aggregate come from?",
+              "Why can a holdout metric improve while every live measurement moves the other way?",
+              "Which readings stayed flat across the two weeks, and what does each flat reading eliminate?",
             ],
             modelAnswerOutline: [
-              "Assumptions: 20k TPS, sub-10ms feature-fetch budget on the authorization path, features span very short windows (5s, 1m) to long windows (24h), and correctness is a security property, not just accuracy.",
-              "**The hard part is streaming aggregates at multiple time scales.** Use a streaming engine (Flink or Kafka Streams) maintaining windowed aggregations per card and per device: count and sum over 5-second, 1-minute, and 24-hour sliding windows. Flink writes the current window state into the online store (Redis, or an in-memory keyed state) so the auth path does a point lookup, not a recompute. The 5-second and 1-minute windows are the differentiator for velocity fraud (many rapid attempts) and demand real streaming, not batch.",
-              "**Dual store with one definition still holds:** the same window definitions materialize both to the offline store (for point-in-time training joins over historical transactions) and to the online store. Point-in-time correctness is critical here because fraud labels (chargebacks) arrive weeks later; joining the current 24-hour aggregate onto an old transaction would leak the future and inflate offline metrics while missing live fraud.",
-              "**Latency:** the auth path cannot afford a recompute, so features must be precomputed and read in under 10ms; co-locate Redis, batch the reads, and keep card/device keys hot. On-demand features (amount versus the card's usual amount) combine the request with a stored profile.",
-              "**Skew and freshness monitoring:** because a stale feature is exploitable, alarm on streaming lag (Flink watermark delay) and on served-versus-offline vector mismatch. If the streaming pipeline lags, the model is effectively blind to velocity, so degrade to a stricter rule-based fallback rather than approving on stale features.",
-              "Common wrong turn: computing short-window aggregates in the request path (too slow at 20k TPS) or ignoring streaming lag, which silently disables the exact velocity features that catch fraud.",
+              "What the evidence points at: training rows built after March 3 carry aggregate values that only became true long after the transaction they describe. The build reads card_agg_24h and device_agg_24h as they stand at build time instead of replaying the timestamped history, so a row for a January transaction is stamped with that card's velocity counters as of March. This is time divergence, and it is what the as-of join was doing before build time fell from 3h10m to 21m.",
+              "**Why the offline number rose.** A card's 24-hour counters are elevated precisely because the fraud already happened on it, so the label is sitting inside the feature. A holdout built by the same pipeline rewards the model for reading it, which is how the challenger clears 0.947 against 0.891 with tighter calibration. A live authorization has no future to read, so none of that signal exists at inference time. The shadow run said this out loud on March 12: on the 4,100 analyst-confirmed fraud transactions the challenger cleared the decline threshold on 58 percent against the champion's 71 percent, on identical traffic.",
+              "**Ruled out by the flat signals.** Served-versus-offline vector mismatch held at 0.01% in both weeks, so both paths compute the same values from the same definitions and code divergence is not in play. Flink watermark lag p99 at 380ms then 410ms, and a feature null rate flat at 0.03%, say the velocity features were fresh and present on the auth path, so the model was not blind to 5-second and 1-minute velocity. Peak throughput flat at 21k tps rules out a load change.",
+              "**Ruled out as a distraction.** Redis feature-fetch p99 doubling from 3.1ms to 6.8ms after the March 15 resize is real and deserves its own ticket, but the auth path still lands at 38ms inside a 50ms budget, and fetch latency does not change which transactions a model flags. The marginally better false-decline rate, 0.39% against 0.42%, is what a model that has become less willing to flag anything looks like, not evidence of an improvement.",
+              "**Where this goes next.** Rebuild training rows with an as-of join that takes each aggregate's last value strictly before the transaction timestamp, then retrain. Expect holdout AUC to fall back toward the champion's range: that drop is the confirmation the leak is gone, not a regression. Keep the shadow gate binding, since a challenger below the champion on analyst-confirmed fraud does not ship on an offline number, and add a pipeline assertion that fails the build when a training row references an aggregate snapshot later than its own event time.",
+            ],
+            supplied: {
+              label: "Incident timeline: fraud model challenger",
+              body: `**The service.** A fraud model scores every card authorization inline at up to 21k transactions/sec. Its features are count and sum aggregates per card and per device over 5-second, 1-minute and 24-hour windows, maintained by Flink and written to Redis for the auth path. Training rows are built in the warehouse from the same window definitions. Labels are chargebacks, which land 30 to 60 days later, plus analyst-confirmed fraud from the sampled manual-review queue, which lands in 2 to 4 days.
+
+**Timeline.**
+
+- March 3. Training-pipeline release note: "training-row build now reads each aggregate from the current card_agg_24h and device_agg_24h tables instead of replaying the timestamped history. Build time falls from 3h10m to 21m."
+- March 10. A challenger model is trained on the new pipeline. Offline holdout AUC 0.947 against the champion's 0.891, and calibration on the same holdout is tighter.
+- March 12 to March 14. The challenger runs in shadow on live authorizations while the champion decides. Of the 4,100 transactions analysts later confirmed as fraud, the champion scored above the decline threshold on 71 percent, the challenger on 58 percent. The launch is held to the quarter date and proceeds.
+- March 15. The Redis feature cluster is resized from 12 to 18 nodes in a maintenance window.
+- March 17, 09:00. The challenger takes 100 percent of authorizations.
+- March 24. Weekly review. Feature importance by gain ranks card_txn_count_24h first in the challenger; it ranked fourth in the champion.
+
+**Dashboards, champion week (March 10 to 17) against challenger week (March 17 to 24).**
+
+| Signal | Champion week | Challenger week |
+| --- | --- | --- |
+| Analyst-confirmed fraud scored above threshold | 71% | 57% |
+| False-decline rate | 0.42% | 0.39% |
+| Served-versus-offline feature vector mismatch | 0.01% | 0.01% |
+| Flink watermark lag p99 | 380ms | 410ms |
+| Feature null rate on the auth path | 0.03% | 0.03% |
+| Redis feature-fetch p99 | 3.1ms | 6.8ms |
+| Auth path p99, budget 50ms | 34ms | 38ms |
+| Peak throughput | 21k tps | 21k tps |
+`,
+            },
+            rubric: [
+              {
+                name: "Which skew source this is",
+                weak: "Settles on the two paths computing features differently, or on the model architecture having regressed between champion and challenger.",
+                adequate:
+                  "Names point-in-time correctness as the issue but never says what a January training row now holds.",
+                strong:
+                  "Names time divergence and states that a row for a January transaction carries the card_agg_24h value as it stood at build time rather than at the transaction.",
+              },
+              {
+                name: "Why offline rose while live fell",
+                weak: "Treats the 0.947 holdout score as evidence the challenger is stronger and the production drop as unexplained noise.",
+                adequate:
+                  "Says the offline metric is inflated without saying what information the aggregate carries that a live request cannot have.",
+                strong:
+                  "Ties the elevated 24-hour counters to the fraud having already happened, so the holdout pays for reading the label while a live authorization has no future to read.",
+              },
+              {
+                name: "Hypotheses eliminated",
+                weak: "Leaves streaming lag, the Redis resize and code divergence standing beside whatever cause it settles on.",
+                adequate:
+                  "Drops code divergence on the 0.01% mismatch rate but makes no use of the flat watermark lag or null rate.",
+                strong:
+                  "Eliminates code divergence on the 0.01% mismatch, staleness on the 380ms Flink watermark and 0.03% null rate, and the Redis resize on an auth path still inside budget.",
+              },
+              {
+                name: "What changes and what confirms it",
+                weak: "Stops at retraining or adding features, leaving the training-row build exactly as the March 3 note describes it.",
+                adequate:
+                  "Restores the as-of join but names no measurement that would show the leak is gone afterwards.",
+                strong:
+                  "Restores the as-of join on each aggregate's last value before the event time and expects holdout AUC to fall back toward 0.891 as the confirming signal.",
+              },
             ],
           },
         },
@@ -3027,19 +3088,81 @@ export const systemDesignLevel11: DesignLevel = {
           practice: {
             id: "sd-l11-llm-inference-serving-practice",
             prompt:
-              "Design the inference tier for a coding-assistant product like an IDE autocomplete feature, where 2M developers expect sub-200ms first token on short completions but occasionally send 8K-token file contexts, all on a capped GPU budget.",
+              "Read the incident timeline below and say what is happening to the coding assistant: name the mechanism that put roughly 2.4s onto time to first token, say which signals rule out KV-cache pressure and a traffic change, and say what you would change about release 4.11.",
             thinkAbout: [
-              "Why does an 8K prefill in a shared batch blow the TTFT of small completions?",
-              "How does prefix caching turn a re-sent file context into a tiny delta prefill?",
-              "How do you isolate long-context traffic from the fast lane?",
+              "Which stage does time to first token measure, and what does an inter-token latency that barely moved say about the other stage?",
+              "Requests per second and median prompt length both held steady while prompt tokens prefilled per second went up more than 8x. What produces that combination?",
+              "What does a prefix cache match on, and what does that imply about where a per-request value can sit in a prompt?",
+              "Which readings stayed flat, and which suspect does each one remove?",
             ],
             modelAnswerOutline: [
-              "Assumptions: 2M developers, a bimodal workload of tiny fast completions (the common case, sub-200ms TTFT expected) and occasional 8K-token whole-file prompts (expensive prefill), on a fixed GPU budget.",
-              "**The core tension** is that an 8K prefill is compute-heavy and, in a shared batch, its prefill blows the TTFT of the small completions queued behind it. So I disaggregate prefill and decode and, more importantly, isolate the long-context traffic. A dedicated prefill pool handles the heavy 8K prompts with chunked prefill so they interleave and never fully block; a decode pool streams tokens. Short completions get a fast lane, ideally a smaller distilled model tuned for autocomplete, so the common case hits sub-200ms TTFT without competing with 8K prefills.",
-              "**Prefix caching is a major win here:** an IDE resends largely the same file context on each keystroke, so caching the KV of the unchanged prefix means each new completion only prefills the small delta, turning an 8K prefill into a tiny one. This is the single biggest lever for both latency and GPU budget in an autocomplete workload.",
-              "**Throughput on a capped budget:** PagedAttention plus continuous batching to pack the decode pool, FP8 quantization to fit more concurrency, and speculative decoding (a tiny draft model proposing tokens the main model verifies) to cut inter-token latency on completions. Autoscale on GPU utilization and queue depth, and shed or delay non-interactive requests first when saturated.",
-              "**Latency guard:** a hard TTFT budget on the fast lane, with cancellation when the developer keeps typing (each keystroke supersedes the last request), which both improves felt latency and reclaims GPU work.",
-              "Common wrong turn: one undifferentiated pool where an 8K-context request periodically stalls everyone's autocomplete, and no prefix caching, so the same file context is re-prefilled on every keystroke and burns the GPU budget.",
+              "What the evidence points at: the fleet is doing roughly eight times the prefill work for the same requests. Prompt tokens prefilled per second went from 1.4M to 11.8M while completion requests held flat at 9.0k/sec and median prompt length held at 8.0k tokens, so each keystroke is now prefilling a whole file that used to be prefilled once and then reused.",
+              "**The mechanism.** Release 4.11 moved a session header carrying the request id, the cursor byte offset and a wall-clock timestamp to the front of every prompt, ahead of the file body. A prefix cache matches on a prefix, so a field that differs on every request sitting at token zero means no two prompts share one, and the KV of the 8k file body behind it can never be reused. With the old order the file body led, an IDE resending the same file matched nearly all of it, and only the small delta was prefilled.",
+              "**Why it lands on TTFT and not on the stream.** TTFT is prefill, compute-bound and scaling with prompt length, which is the 180ms to 2.6s move and the sampled trace showing 2.6s before the first token. Decode is untouched: inter-token latency went 21ms to 23ms and decode queue depth stayed between 0 and 3, so nothing about token streaming changed.",
+              "**Ruled out by the flat signals.** KV cache blocks in use went from 63% to 58%, so the fleet is not out of KV memory and concurrency is not capped by it. Flat 9.0k requests/sec and an unchanged 8.0k median prompt length rule out both a traffic surge and developers suddenly sending larger files. The 5xx rate flat at 0.02% says requests are waiting rather than failing. GPU utilization at 99% is the consequence of the extra prefill work, not an independent cause, and the 48-versus-52 GPU shortfall predates the alert by weeks.",
+              "**Ruled out by timing.** The Monday 22:00 driver roll and FP16-to-FP8 weight swap were followed by sixteen hours of TTFT p95 at 180ms, so neither moved anything at 14:05 Tuesday. FP8 weights also free memory the KV cache grows into rather than shrinking the cache, which matches blocks in use falling rather than rising.",
+              "**Where this goes next.** Put the volatile header back behind the stable file body so the shared prefix starts at token zero again, or carry it out of band so it never enters the cached region, and expect prefilled tokens/sec to fall back toward 1.4M and TTFT p95 toward 180ms. Chunked prefill and a separate prefill pool are still worth having so one 8k prompt cannot block the fast lane, but neither removes work that only exists because a cache stopped matching.",
+            ],
+            supplied: {
+              label: "Incident timeline: autocomplete TTFT",
+              body: `**The service.** vLLM serves a 13B completion model on 48 GPUs in one undifferentiated pool for 2M developers. On each keystroke pause the IDE sends the open file plus a short instruction block and streams back a completion of 20 to 60 tokens. PagedAttention, continuous batching and prefix caching are all enabled, and their settings have not changed this month. The autocomplete SLO is TTFT p95 under 200ms.
+
+**Timeline, all times UTC.**
+
+- Monday 22:00. A maintenance window rolls the GPU driver and swaps model weights from FP16 to FP8. TTFT p95 on short completions holds at 180ms through Tuesday morning.
+- Tuesday 14:05. Release 4.11 ships a repo-aware prompt template. The release note: "prompt template reordered. The prompt now opens with a session header carrying the request id, the cursor byte offset and the wall-clock timestamp; the file body and the instruction block follow it. Previously the file body came first and the header was appended last."
+- Tuesday 14:11. The TTFT p95 alert fires.
+- Tuesday 14:30. On-call notes the fleet is 48 GPUs where capacity planning had asked for 52 in January.
+- Tuesday 15:40. A sampled trace of a 3.1s completion shows 2.6s of prefill before the first token, then 500ms of decode for 22 output tokens.
+
+**Dashboards, 13:00 to 14:00 against 14:20 to 15:40.**
+
+| Signal | Before | After |
+| --- | --- | --- |
+| TTFT p95, short completions | 180ms | 2.6s |
+| Inter-token latency p95 | 21ms | 23ms |
+| Completion requests/sec | 9.1k | 9.0k |
+| Prompt tokens prefilled/sec | 1.4M | 11.8M |
+| Median prompt length | 7.9k tokens | 8.0k tokens |
+| GPU utilization, fleet median | 71% | 99% |
+| KV cache blocks in use | 63% | 58% |
+| Decode queue depth | 0 to 2 | 0 to 3 |
+| HTTP 5xx rate | 0.02% | 0.02% |
+`,
+            },
+            rubric: [
+              {
+                name: "Prefill versus decode",
+                weak: "Reads the incident as the fleet being generally overloaded and never separates first-token time from streaming speed.",
+                adequate:
+                  "Places the cost in prefill but does not use the flat 23ms inter-token latency to clear the decode path.",
+                strong:
+                  "Puts the whole 2.4s in prefill on the sampled trace showing 2.6s before the first token, and clears decode on inter-token latency holding at 23ms.",
+              },
+              {
+                name: "Mechanism behind the extra prefill",
+                weak: "Attributes the jump to GPU utilization hitting 99% without saying what created the additional prefill work.",
+                adequate:
+                  "Connects release 4.11 to the slowdown but not the header's position to a prefix cache that stops matching.",
+                strong:
+                  "States that a per-request session header now sits at token zero, so no two prompts share a prefix and the 8k file body is re-prefilled on every keystroke.",
+              },
+              {
+                name: "Hypotheses eliminated",
+                weak: "Leaves the FP8 swap, the four missing GPUs and KV-cache pressure standing beside whatever cause it settles on.",
+                adequate:
+                  "Rules out a traffic change on the flat 9.0k requests/sec but makes no use of the KV block reading or the Monday timing.",
+                strong:
+                  "Eliminates KV pressure on blocks falling to 58%, traffic on flat 9.0k requests/sec and 8.0k prompts, and the FP8 swap on sixteen hours of 180ms after it.",
+              },
+              {
+                name: "Remedy and the number that confirms it",
+                weak: "Reaches for more GPUs or a larger batch, with no statement of which metric would move if it worked.",
+                adequate:
+                  "Moves the session header behind the file body without naming a signal that would show the cache matching again.",
+                strong:
+                  "Puts the volatile header after the stable file body and expects prefilled tokens/sec back near 1.4M and TTFT p95 near 180ms.",
+              },
             ],
           },
         },
