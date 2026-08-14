@@ -17,6 +17,7 @@ import { rememberLevel } from "@/lib/tutorials/level-preference"
 import { TeachPanel } from "./TeachPanel"
 import { ExerciseRunner } from "./ExerciseRunner"
 import { WorkspaceExerciseRunner, type WorkspaceEditorState } from "./WorkspaceExerciseRunner"
+import { useLearnTimeTracker } from "./useLearnTimeTracker"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
 import { LessonRail } from "./LessonRail"
 import { type UpNextLesson } from "./LessonOutline"
@@ -54,6 +55,7 @@ export interface LessonPlayerProps {
 
 export function LessonPlayer({ lesson, level, nav, onSectionComplete }: LessonPlayerProps) {
   const { reload } = useTutorialProgressSync(lesson.id, level.id)
+  useLearnTimeTracker(lesson.id, level.id)
 
   const sections = useTutorialStore((s) => s.sections)
   const storeLessonId = useTutorialStore((s) => s.lessonId)

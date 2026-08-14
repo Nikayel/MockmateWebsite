@@ -16,6 +16,7 @@ import { fetchDesignAnswer, saveDesignAnswer } from "@/lib/tutorials/design-answ
 import { useCompletedLessons } from "./useCompletedLessons"
 import { SegmentedTeachPanel } from "./SegmentedTeachPanel"
 import { DesignAnswerPanel } from "./DesignAnswerPanel"
+import { useLearnTimeTracker } from "./useLearnTimeTracker"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
 import { LessonRail } from "./LessonRail"
 import { type UpNextLesson } from "./LessonOutline"
@@ -74,6 +75,7 @@ export function SystemDesignLessonPlayer({
   onSectionComplete,
 }: SystemDesignLessonPlayerProps) {
   const { reload } = useTutorialProgressSync(lesson.id, level.id)
+  useLearnTimeTracker(lesson.id, level.id)
 
   const sections = useTutorialStore((s) => s.sections)
   const storeLessonId = useTutorialStore((s) => s.lessonId)

@@ -17,6 +17,7 @@ import { useCompletedLessons } from "./useCompletedLessons"
 import { TeachPanel } from "./TeachPanel"
 import { SqlExerciseRunner } from "./SqlExerciseRunner"
 import { WorkspaceExerciseRunner, type WorkspaceEditorState } from "./WorkspaceExerciseRunner"
+import { useLearnTimeTracker } from "./useLearnTimeTracker"
 import { useTutorialProgressSync } from "./useTutorialProgressSync"
 import { LessonRail } from "./LessonRail"
 import { type UpNextLesson } from "./LessonOutline"
@@ -52,6 +53,7 @@ export interface SqlLessonPlayerProps {
 
 export function SqlLessonPlayer({ lesson, level, nav, onSectionComplete }: SqlLessonPlayerProps) {
   const { reload } = useTutorialProgressSync(lesson.id, level.id)
+  useLearnTimeTracker(lesson.id, level.id)
 
   const sections = useTutorialStore((s) => s.sections)
   const storeLessonId = useTutorialStore((s) => s.lessonId)
