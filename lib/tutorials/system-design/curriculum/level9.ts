@@ -850,24 +850,24 @@ In a cloud-native world instances vanish routinely: spot reclamation, autoscale 
 {
   "type": "check",
   "kind": "predict",
-  "prompt": "A legacy service is being made platform-ready. Which change actually buys dev and prod parity?",
+  "prompt": "A node is drained during a cluster upgrade. One service ignores SIGTERM and keeps working until the platform kills it 30 seconds later. Its sessions are in Redis and its uploads are in S3. What does a user see?",
   "options": [
     {
-      "label": "Build one image per environment, each with the right config file baked in",
-      "feedback": "That is the anti-pattern the config factor names. Three builds means the artifact you tested is not the artifact you shipped."
+      "label": "Nothing goes wrong, since no state lived on that instance",
+      "feedback": "Externalizing state is what makes an instance safe to replace, and this team did that part. It says nothing about the requests that were mid-flight when the signal arrived."
     },
     {
-      "label": "Build one image and inject config as environment variables or mounted secrets at run time",
+      "label": "Requests already in flight are cut off at the kill",
       "correct": true,
-      "feedback": "Right. One immutable artifact promoted unchanged through the environments is the whole point, and it is what makes a rollback just re-running the previous release."
+      "feedback": "Right. Disposability has two halves and this service only did one of them. On SIGTERM the process is supposed to stop accepting new work, finish what it is already holding, and exit. Ignoring the signal spends the whole grace period taking on more work for the kill to destroy."
     },
     {
-      "label": "Keep the config file in the image and have a startup script rewrite it in place",
-      "feedback": "Mutating the container at boot reintroduces drift and makes the running state something nobody can reproduce from the repository."
+      "label": "The platform waits for the process to finish rather than killing it",
+      "feedback": "The grace period is a bound, not a promise. When it expires the process dies whatever it was doing, which is why draining has to be the process's own job."
     },
     {
-      "label": "Store all config in the database so every instance reads identical values",
-      "feedback": "Tempting, but the database connection string has to come from somewhere, and you have now made process startup depend on a service that may be down."
+      "label": "Only queued background jobs are lost, since HTTP requests are drained by the load balancer",
+      "feedback": "A load balancer can stop sending new requests, which is a different thing from finishing the ones it already sent. Those are still inside the process when it dies."
     }
   ],
   "reveal": "Config in the environment so one image runs everywhere, stateless disposable processes with session in Redis and files in object storage, backing services attached by URL and credentials, strict build, release, and run separation, and logs streamed to stdout rather than a local file that dies with the instance. Together those are what make a process safe for the platform to kill, move, and restart."
@@ -934,24 +934,24 @@ UPLOAD --> S3 event --> Lambda (per-file, stateless, auto-scale)
 {
   "type": "check",
   "kind": "predict",
-  "prompt": "A Lambda that queries Postgres scales to 800 concurrent instances during a spike. The database pool holds 200 connections. What happens, and what is the fix?",
+  "prompt": "A five-step nightly pipeline runs as one 12-minute function. It fails on the last step, and the retry starts again from step one and redoes everything. What is the right shape?",
   "options": [
     {
-      "label": "Nothing: Lambda multiplexes many invocations onto one shared connection",
-      "feedback": "Each instance handles exactly one request at a time and opens its own connection. There is no sharing between instances for the platform to multiplex over."
+      "label": "Raise the timeout, since 12 minutes is close to the cap",
+      "feedback": "The cap is not what failed, and there is nowhere to raise it to past 15 minutes anyway. The problem is that one invocation has no notion of partial progress, so every retry pays for all five steps again."
     },
     {
-      "label": "The database runs out of connections; bound the function with reserved concurrency and pool through a connection proxy",
+      "label": "One function per step, with an orchestrator between them",
       "correct": true,
-      "feedback": "Right. The function scales far past what the store can absorb, so you cap it deliberately and put something like RDS Proxy in front to hold the pool."
+      "feedback": "Right. Step Functions or a durable-workflow engine gives each step its own function with declarative retries and timeouts, so a failure retries only the step that failed, and you read a visible execution history instead of guessing inside one opaque invocation."
     },
     {
-      "label": "Lambda throttles itself automatically to protect the database",
-      "feedback": "The regional concurrency limit protects the account, not your database. Nothing in the platform knows how many connections Postgres can take."
+      "label": "Checkpoint progress to the function's local disk between steps",
+      "feedback": "Nothing on an instance's local disk survives to the next invocation, and the retry may not even land on the same instance. Durable progress has to go to DynamoDB, S3, or a queue."
     },
     {
-      "label": "The 15-minute execution limit stops it, so the spike drains safely",
-      "feedback": "That limit bounds how long one invocation may run, not how many run at once, so it does nothing about connection pressure."
+      "label": "Add provisioned concurrency so the function is always warm and does not fail",
+      "feedback": "Provisioned concurrency buys you out of cold starts, which cost latency on the p99 tail. It has nothing to say about a step that failed for its own reasons."
     }
   ],
   "reveal": "FaaS trades capacity management for instant scale and per-invocation billing, which is a genuine win for spiky event-driven glue. The bill comes back as cold starts on the p99 tail, a hard execution limit, no durable local state, and a cost model that inverts under high steady load. The failure interviewers probe for is scale a downstream cannot absorb: bound it with reserved concurrency and a connection proxy, and orchestrate multi-step work with Step Functions instead of one long function."
@@ -1119,24 +1119,24 @@ Instead of a review board that manually approves each deploy, you encode policy:
 {
   "type": "check",
   "kind": "predict",
-  "prompt": "A platform team ships a portal, service templates, and a GitOps pipeline. Six months later, shipping a new service still means filing a ticket and waiting two days for that team to run it. What went wrong?",
+  "prompt": "Every change to your cluster goes through a reviewed pull request and Argo CD reconciles it. An attacker with registry access replaces the image sitting behind a tag your manifest already references. What stops it from running?",
   "options": [
     {
-      "label": "Nothing structural: two days is a reasonable review time for a production change",
-      "feedback": "Review is not the problem, the queue is. If the paved road runs through another team's backlog, going around it is faster, so people go around it."
+      "label": "Argo CD reverts it, because actual state no longer matches Git",
+      "feedback": "Argo compares the manifest to the cluster, and the manifest still names the same tag it always did. Desired state never changed, so there is no drift for the reconciler to find."
     },
     {
-      "label": "The platform became a ticket queue, so the bottleneck moved rather than disappeared",
+      "label": "Nothing in Git or Argo: admission has to verify the image",
       "correct": true,
-      "feedback": "Right. Platform as product means self-service by default, and the honest success metrics are adoption and lead time, not tickets closed."
+      "feedback": "Right, and this is why supply-chain control belongs in the platform rather than bolted on. The repository is the record of what you asked for, not of what a tag currently points at. Sign at build with cosign, attach SLSA provenance, and let the admission controller refuse anything whose signature and provenance do not match your pipeline."
     },
     {
-      "label": "They should have skipped the platform and let each team run its own Kubernetes setup",
-      "feedback": "That is the cognitive load the platform exists to remove, and it produces 40 differently broken pipelines. The fix is self-service, not abandonment."
+      "label": "The pull-request review would have caught the change before it merged",
+      "feedback": "There was no pull request. The swap happened downstream of the repository entirely, which is precisely the gap the Git audit trail does not cover."
     },
     {
-      "label": "GitOps was the wrong control plane; pushing from CI would have been faster",
-      "feedback": "Push-based CI would hand an external system cluster-admin credentials and cost you the audit trail, and it would not touch the human approval queue that is the actual delay."
+      "label": "The Gatekeeper policy that requires resource limits on every manifest",
+      "feedback": "That policy reads the manifest, and the manifest is fine. A rule about the shape of a workload is a different control from a rule about where its image came from, and you want both."
     }
   ],
   "reveal": "An IDP is a product: golden paths that scaffold, deploy, and observe a service with no ticket, abstraction over the messy layers, and guardrails encoded as admission policy instead of a review board. GitOps underneath makes Git the declarative source of truth, which buys audit, rollback by revert, and self-healing against drift, while SBOMs, cosign signatures, and SLSA provenance let admission verify an image came from your pipeline unmodified."
