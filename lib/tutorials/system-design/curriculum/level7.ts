@@ -1253,14 +1253,56 @@ Level 1's resilience-primitives lesson sketched the circuit-breaker state machin
 
 A circuit breaker is a state machine wrapped around a dependency that trips like an electrical breaker so you stop sending requests into a failure.
 
-\`\`\`
-                trip on failure rate
-     CLOSED  ---------------------------->  OPEN
-       ^                                      |
-       |                                      | after cooldown
-       | probe succeeds                       v
-       +---------------- HALF-OPEN <----------+
-                probe fails -> back to OPEN
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Circuit breaker states",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "closed",
+      "label": "CLOSED: traffic flows, failures counted over a rolling window",
+      "kind": "service"
+    },
+    {
+      "id": "open",
+      "label": "OPEN: calls fail instantly, nothing reaches the dependency",
+      "kind": "service"
+    },
+    {
+      "id": "half_open",
+      "label": "HALF-OPEN: a few trial requests, after a cooldown of about 5 s",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "closed",
+      "to": "open",
+      "kind": "sync",
+      "label": "error rate or slow-call rate crosses the threshold, above a minimum request volume"
+    },
+    {
+      "from": "open",
+      "to": "half_open",
+      "kind": "sync",
+      "label": "cooldown elapses"
+    },
+    {
+      "from": "half_open",
+      "to": "closed",
+      "kind": "feedback",
+      "label": "probe succeeds"
+    },
+    {
+      "from": "half_open",
+      "to": "open",
+      "kind": "feedback",
+      "label": "probe fails: re-open and wait another cooldown"
+    }
+  ],
+  "caption": "Open is the state doing the work: failing fast spares your callers a 500 ms timeout on every request, and it sheds all load off the sick dependency so it can drain its queue instead of being pinned down."
+}
 \`\`\`
 
 - **Closed** is normal: requests flow, and the breaker counts failures over a rolling window.
