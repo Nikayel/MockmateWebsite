@@ -207,6 +207,182 @@ The same request looks different at three points. At the **load balancer** you c
 
 \`\`\`cswidget
 {
+  "type": "steps",
+  "title": "One hour of traffic, three measurement points, three numbers",
+  "frames": [
+    {
+      "note": "Measured at the server, the app sees 1,000 requests and one 5xx. Clean internal numbers, and also the limit of what this vantage point can possibly know: a request that never reached the app cannot appear in either the numerator or the denominator.",
+      "rows": [
+        {
+          "label": "Counted as good",
+          "cells": [
+            {
+              "text": "999 served under 300 ms"
+            }
+          ]
+        },
+        {
+          "label": "Counted as bad",
+          "cells": [
+            {
+              "text": "1 x 5xx"
+            }
+          ]
+        },
+        {
+          "label": "Invisible from here",
+          "cells": [
+            {
+              "text": "anything that never reached the app",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "Reported availability",
+          "cells": [
+            {
+              "text": "99.9%",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Move the measurement to the load balancer, the boundary you actually own, and its own 502s join the failures. Same hour of traffic, six bad events instead of one, and the number falls to 99.4 percent.",
+      "rows": [
+        {
+          "label": "Counted as good",
+          "cells": [
+            {
+              "text": "999 served under 300 ms"
+            }
+          ]
+        },
+        {
+          "label": "Counted as bad",
+          "cells": [
+            {
+              "text": "1 x 5xx"
+            },
+            {
+              "text": "5 x 502 from the LB itself",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "Invisible from here",
+          "cells": [
+            {
+              "text": "requests that never reached the LB",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "Reported availability",
+          "cells": [
+            {
+              "text": "99.4%",
+              "state": "active"
+            }
+          ]
+        }
+      ],
+      "predict": {
+        "question": "The load balancer returned five of its own 502s this hour. Which vantage point counts them against you?",
+        "options": [
+          "Only the load balancer, because the app never saw those requests",
+          "Both, since a 502 is a server error either way",
+          "Neither, since the request never reached application code"
+        ]
+      }
+    },
+    {
+      "note": "Real-user monitoring counts the attempts that never reached your infrastructure at all: a DNS failure, a dark region. It is the truest number and the noisiest, because the user's flaky last mile now counts against you too.",
+      "rows": [
+        {
+          "label": "Counted as good",
+          "cells": [
+            {
+              "text": "999 served under 300 ms"
+            }
+          ]
+        },
+        {
+          "label": "Counted as bad",
+          "cells": [
+            {
+              "text": "1 x 5xx"
+            },
+            {
+              "text": "5 x 502 from the LB itself"
+            },
+            {
+              "text": "20 never arrived (DNS, dead region)",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "Now yours as well",
+          "cells": [
+            {
+              "text": "the user's own flaky wifi",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "Reported availability",
+          "cells": [
+            {
+              "text": "97.5%",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Three numbers, one hour of traffic, and not one of them is a mistake. So an availability figure without its measurement point is not yet a claim. Measure availability at the boundary you own, measure latency with client RUM alongside server-side, and say which you used.",
+      "rows": [
+        {
+          "label": "Availability",
+          "cells": [
+            {
+              "text": "measure at the load balancer"
+            }
+          ]
+        },
+        {
+          "label": "Latency",
+          "cells": [
+            {
+              "text": "client RUM plus server-side"
+            }
+          ]
+        },
+        {
+          "label": "Every time you quote one",
+          "cells": [
+            {
+              "text": "state where you measured it",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Step through the same hour from each vantage point. The server-side number is the flattering one precisely because it cannot see the failures that stopped short of the app."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "check",
   "kind": "predict",
   "id": "latency-mean-hides-tail",

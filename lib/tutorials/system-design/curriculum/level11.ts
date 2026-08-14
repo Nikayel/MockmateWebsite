@@ -735,6 +735,164 @@ Shipping a model is not shipping a stateless service, and treating it like one i
 
 Rollout strategies form a ladder of increasing exposure with a measurement gate at each rung. Shadow (or dark launch) runs the new model on live traffic and logs its predictions but serves the old model's output, so you compare decisions on identical inputs with zero user risk. Canary sends a small traffic slice (1 to 5 percent) to the new model and watches business and operational metrics. A/B splits traffic to attribute a metric change causally. Interleaving, used in ranking, mixes results from two models in one list to compare them with far fewer samples. The non-negotiable piece is automatic rollback: a controller watches an online metric (CTR, revenue, error rate, latency) and reverts to the previous artifact on regression, which requires keeping that previous artifact hot for an instant switch, not a redeploy.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "The Rollout Ladder, and What a Green Health Check Misses",
+  "frames": [
+    {
+      "note": "Model v4 is deployed. The artifact loaded, the process answers, latency is normal and nothing is erroring. Every signal on this frame is about uptime, and not one of them is about the predictions.",
+      "rows": [
+        {
+          "label": "health check",
+          "cells": [
+            {
+              "text": "200 OK",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "error rate",
+          "cells": [
+            {
+              "text": "0.0 percent"
+            }
+          ]
+        },
+        {
+          "label": "latency",
+          "cells": [
+            {
+              "text": "within budget"
+            }
+          ]
+        },
+        {
+          "label": "decision quality",
+          "cells": [
+            {
+              "text": "not measured by any of this",
+              "state": "dropped"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "predict": {
+        "question": "The new model is loaded and healthy. Which rung is the first one that measures its decisions instead of its uptime, at zero risk to users?",
+        "options": [
+          "Canary, sending 1 to 5 percent of real traffic to it",
+          "Shadow, scoring live traffic and serving none of it",
+          "A/B, splitting traffic to attribute a metric change"
+        ]
+      },
+      "note": "Shadow runs v4 on the same live inputs and logs what it would have said, while users keep receiving v3's output. Identical inputs, two decisions, and no user exposure at all.",
+      "rows": [
+        {
+          "label": "served to users",
+          "cells": [
+            {
+              "text": "v3, the current model",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "scored, not served",
+          "cells": [
+            {
+              "text": "v4 in shadow",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "what you learn",
+          "cells": [
+            {
+              "text": "same inputs, decisions compared"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Canary is the first rung a user actually meets, so it is small and it is gated on a business metric. Notice which rows moved and which did not: the operational signals are still perfect.",
+      "rows": [
+        {
+          "label": "traffic split",
+          "cells": [
+            {
+              "text": "98 percent v3"
+            },
+            {
+              "text": "2 percent v4",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "error rate",
+          "cells": [
+            {
+              "text": "still 0.0 percent"
+            }
+          ]
+        },
+        {
+          "label": "click-through on the slice",
+          "cells": [
+            {
+              "text": "down sharply",
+              "state": "dropped"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The controller watches the online metric rather than the health check, and reverts by pointing the serving binary at the previous artifact id. That is a config change measured in seconds, and only because v3 was kept hot instead of redeployed.",
+      "rows": [
+        {
+          "label": "traffic split",
+          "cells": [
+            {
+              "text": "100 percent v3",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "registry pointer",
+          "cells": [
+            {
+              "text": "current = v3",
+              "state": "new"
+            },
+            {
+              "text": "v4 held back",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "time to revert",
+          "cells": [
+            {
+              "text": "seconds, no redeploy",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Each rung buys information about decisions, which is the one thing uptime monitoring cannot supply. Rollback is a pointer change only because the previous artifact never left the machine."
+}
+\`\`\`
+
 ## Separate weights from serving code
 
 The registry holds versioned, reproducible artifacts (weights plus the feature schema plus preprocessing) addressed by id; the serving binary loads an artifact by id. This lets you roll a model forward or back by pointing at a different id without shipping code, and it makes rollback a config change measured in seconds.
