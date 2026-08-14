@@ -903,10 +903,100 @@ Compare two vectors:
 }
 \`\`\`
 
-\`\`\`
-node A: [1,0,0] --send--> node B receives, takes max, bumps self -> [1,1,0]
-meanwhile node C, no contact: [0,0,1]
-compare [1,1,0] vs [0,0,1]: A-slot 1>0 but C-slot 0<1 -> neither dominates -> CONCURRENT
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "Vector clocks detecting concurrency",
+  "actors": [
+    {
+      "id": "a",
+      "label": "Node A"
+    },
+    {
+      "id": "b",
+      "label": "Node B"
+    },
+    {
+      "id": "c",
+      "label": "Node C"
+    }
+  ],
+  "steps": [
+    {
+      "from": "a",
+      "label": "local event, A bumps its own slot",
+      "kind": "note",
+      "state": {
+        "V(A)": "[1,0,0]",
+        "V(B)": "[0,0,0]",
+        "V(C)": "[0,0,0]"
+      }
+    },
+    {
+      "from": "a",
+      "to": "b",
+      "label": "message carrying [1,0,0]",
+      "kind": "request",
+      "state": {
+        "V(A)": "[1,0,0]",
+        "V(B)": "[0,0,0]",
+        "V(C)": "[0,0,0]"
+      }
+    },
+    {
+      "from": "b",
+      "label": "element-wise max, then bump own slot",
+      "kind": "note",
+      "state": {
+        "V(A)": "[1,0,0]",
+        "V(B)": "[1,1,0]",
+        "V(C)": "[0,0,0]"
+      }
+    },
+    {
+      "from": "c",
+      "label": "local event, no contact with A or B",
+      "kind": "note",
+      "state": {
+        "V(A)": "[1,0,0]",
+        "V(B)": "[1,1,0]",
+        "V(C)": "[0,0,1]"
+      }
+    },
+    {
+      "from": "b",
+      "label": "compare [1,1,0] against [0,0,1]",
+      "kind": "note",
+      "state": {
+        "V(A)": "[1,0,0]",
+        "V(B)": "[1,1,0]",
+        "V(C)": "[0,0,1]"
+      },
+      "predict": {
+        "question": "B holds [1,1,0] and C holds [0,0,1]. Which relationship do the vectors prove?",
+        "options": [
+          "B happened before C, because B leads in the A slot and the B slot",
+          "C happened before B, because C leads in the C slot",
+          "Neither dominates, so the two events are concurrent",
+          "Nothing at all: vectors only order events on the same node"
+        ]
+      }
+    },
+    {
+      "from": "c",
+      "label": "neither dominates: concurrent",
+      "kind": "note",
+      "status": "late",
+      "state": {
+        "V(A)": "[1,0,0]",
+        "V(B)": "[1,1,0]",
+        "V(C)": "[0,0,1]",
+        "result": "concurrent, surface both as siblings"
+      }
+    }
+  ],
+  "caption": "Dominance has to hold in every slot at once: B leads in the A and B slots, C leads in the C slot, so no causal order exists between them. A Lamport clock would still hand you an order here and never tell you it was arbitrary."
+}
 \`\`\`
 
 That detection is why **Dynamo and Riak use vector clocks (technically version vectors, one entry per
