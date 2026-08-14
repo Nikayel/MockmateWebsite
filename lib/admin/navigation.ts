@@ -109,6 +109,14 @@ export const ADMIN_NAV: readonly AdminNavEntry[] = [
     permission: "view_analytics",
   },
   {
+    name: "Learn Usage",
+    href: "/admin/learn-usage",
+    section: "Operations",
+    // Matches the base gate of /api/admin/learn-usage. The route's per-user branch
+    // additionally requires view_user_details, but the page itself is the platform view.
+    permission: "view_analytics",
+  },
+  {
     name: "Bugfix Quality",
     href: "/admin/bugfix-quality",
     section: "Operations",
