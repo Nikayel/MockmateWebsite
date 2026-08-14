@@ -5137,13 +5137,61 @@ A single hot key (global likes, total views, a mega-popular player's score) taki
 
 Where exactness is not required, approximate structures are a big memory win. HyperLogLog counts unique items (unique players seen, unique visitors) with ~0.8 percent error in ~12 KB regardless of cardinality, versus gigabytes for an exact set. Count-Min Sketch estimates per-item frequencies and heavy hitters (approximate top-K of a stream) in fixed memory with bounded overcount. Use these when "about 4.2M unique" or "roughly the top trending items" is good enough.
 
-\`\`\`
-score update -> DB (truth) + ZADD to segment ZSET (O(log n))
-top-K:  ZREVRANGE segment 0 k          (O(log n + k))
-my rank: ZREVRANK segment player       (O(log n))
-global:  merge top-N of each shard ZSET
-hot counter: INCR counter:rand(0..N) ; read = SUM(counter:0..N-1)
-unique count: HyperLogLog ; trending top-K: Count-Min Sketch
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "What the board is asked for",
+    "Structure and call",
+    "Cost per request"
+  ],
+  "rows": [
+    [
+      "rank, the naive way",
+      "SELECT COUNT(*) WHERE score > my_score",
+      "grows with the player base, on every request"
+    ],
+    [
+      "score update",
+      "DB holds the truth, then ZADD into the segment ZSET",
+      "O(log n)"
+    ],
+    [
+      "top K",
+      "ZREVRANGE segment 0 k",
+      "O(log n + k)"
+    ],
+    [
+      "my rank",
+      "ZREVRANK segment player",
+      "O(log n)"
+    ],
+    [
+      "global board",
+      "merge the top N of each shard ZSET",
+      "one small merge, and exact global rank stays expensive"
+    ],
+    [
+      "a single hot counter",
+      "INCR counter:rand(0..N-1), read SUMs the N sub-counters",
+      "writes fan out N ways, reads cost N"
+    ],
+    [
+      "unique players seen",
+      "HyperLogLog",
+      "about 12 KB at any cardinality, roughly 0.8 percent error"
+    ],
+    [
+      "trending top K",
+      "Count-Min Sketch",
+      "fixed memory, bounded overcount"
+    ]
+  ],
+  "highlightCols": [
+    "Cost per request"
+  ],
+  "caption": "The top ten was never the expensive half: with an index it is a ten row walk. Rank is the half with no shortcut, and the sorted set is what gives both in O(log n). Redis is a rebuildable index here, not the system of record."
+}
 \`\`\`
 
 Durability matters: Redis is the fast serving/index layer, not the system of record. Persist authoritative scores in a database and treat the ZSET as a rebuildable index (write-behind, or rebuild from an event stream), so a Redis loss is a rebuild, not data loss.
@@ -5467,11 +5515,106 @@ Determinism is a hard requirement, not a nice-to-have, because regulators and re
 
 Recovery uses event sourcing. Before the engine acts on an accepted event, append it to a durable, replicated journal (the sequenced event log). On a crash, spin up a fresh engine and replay the journal to reconstruct the exact book state; periodic snapshots bound replay time so you replay from the last snapshot forward rather than from the beginning of the day. Because matching is deterministic, replay is guaranteed to rebuild the identical book.
 
-\`\`\`
-orders --> pre-trade risk checks --> Sequencer (assign seq #, append to journal)
-   --> [single-threaded matching engine per instrument, in-memory book]
-   --> fills + book deltas --> market-data bus (multicast/streaming)
-Journal (replicated) --replay--> hot-standby replica (deterministic takeover)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "One deterministic path from order to fill",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "orders",
+      "label": "Orders in (limit, market, cancel)",
+      "kind": "client"
+    },
+    {
+      "id": "risk",
+      "label": "Pre-trade risk checks",
+      "kind": "service"
+    },
+    {
+      "id": "seq",
+      "label": "Sequencer: assigns the sequence number, appends to the journal",
+      "kind": "service"
+    },
+    {
+      "id": "journal",
+      "label": "Journal (replicated): the input every replay starts from",
+      "kind": "db"
+    },
+    {
+      "id": "engine",
+      "label": "Single-threaded matching engine per instrument, order book in memory, price-time priority",
+      "kind": "service"
+    },
+    {
+      "id": "standby",
+      "label": "Hot-standby replica: replays the journal for deterministic takeover",
+      "kind": "service"
+    },
+    {
+      "id": "fills",
+      "label": "Fills and book deltas",
+      "kind": "queue"
+    },
+    {
+      "id": "bus",
+      "label": "Market-data bus (multicast or streaming)",
+      "kind": "queue"
+    },
+    {
+      "id": "subs",
+      "label": "Subscribers (traders, feeds, audit)",
+      "kind": "client"
+    }
+  ],
+  "edges": [
+    {
+      "from": "orders",
+      "to": "risk",
+      "kind": "sync"
+    },
+    {
+      "from": "risk",
+      "to": "seq",
+      "kind": "sync",
+      "label": "accepted orders only"
+    },
+    {
+      "from": "seq",
+      "to": "journal",
+      "kind": "sync",
+      "label": "append before matching"
+    },
+    {
+      "from": "journal",
+      "to": "engine",
+      "kind": "sync",
+      "label": "one ordered input stream"
+    },
+    {
+      "from": "journal",
+      "to": "standby",
+      "kind": "async",
+      "label": "same stream, same result"
+    },
+    {
+      "from": "engine",
+      "to": "fills",
+      "kind": "sync"
+    },
+    {
+      "from": "fills",
+      "to": "bus",
+      "kind": "sync"
+    },
+    {
+      "from": "bus",
+      "to": "subs",
+      "kind": "sync"
+    }
+  ],
+  "caption": "Sharding the matching engine per instrument is the only sharding allowed: within an instrument a single thread over one ordered journal is what makes an audit able to replay every fill exactly."
+}
 \`\`\`
 
 Market-data fan-out must not slow matching: publish trades and book deltas onto a separate high-throughput multicast or streaming bus so slow subscribers cannot backpressure the matcher. Availability comes from hot-standby replicas that consume the same sequenced log and can take over deterministically, plus pre-trade risk checks in front of the matcher (credit/position limits) so bad orders never reach the book.
