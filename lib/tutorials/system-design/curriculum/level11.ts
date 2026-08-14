@@ -130,31 +130,31 @@ First, code divergence: the training pipeline computes "average order value over
                                                                                             (serve time)
 \`\`\`
 
+The offline store holds the full history of every feature value with timestamps, in a warehouse or Parquet on S3, optimized for large point-in-time joins. The online store holds only the latest value per entity, in Redis or DynamoDB, optimized for single-digit-ms point lookups by entity key. Both are populated by one pipeline from one definition, which is what guarantees the serving path and the training path compute the feature identically.
+
 \`\`\`cswidget
 {
   "type": "check",
   "kind": "predict",
-  "id": "why-two-stores",
-  "prompt": "One pipeline writes the same feature into two different stores. Why not keep one store and read history out of it at inference time?",
+  "id": "which-skew-survives-one-definition",
+  "prompt": "One definition materializes into both stores, so training and serving compute a feature with identical logic. Of the two skew sources named earlier, which one is still standing?",
   "options": [
     {
-      "label": "You could, once the warehouse is fast enough; the split is a leftover from older tooling",
-      "feedback": "Tempting, because it sounds like a speed problem you can buy your way out of. The two access patterns are different shapes, not different speeds: one is a huge as-of join over history, the other is a single key lookup."
+      "label": "Neither. A shared definition is the whole point of a feature store",
+      "feedback": "This is the claim a feature store makes on the box, and it is half right. One definition does close the code path, so the two implementations can no longer disagree about time zones or rounding. It says nothing about which moment in time a value was read from."
     },
     {
-      "label": "Training needs the full timestamped history for large as-of joins, while serving needs one low latency lookup of the latest value per entity, and no single store is good at both",
+      "label": "Time divergence, which identical code does nothing to prevent",
       "correct": true,
-      "feedback": "Right. That is why the offline side is a warehouse or Parquet and the online side is Redis or DynamoDB. The skew protection comes from the shared definition upstream, not from sharing storage."
+      "feedback": "Right. Both paths can run the same transformation perfectly and still build a training row from a value that did not exist yet when the label happened. That is a join problem rather than a code problem, and the next section is the fix."
     },
     {
-      "label": "The online store is just a cache of the offline store, so it can be dropped once the warehouse is fast",
-      "feedback": "It is not a cache of history. It holds only the latest value per entity and has no timeline at all, so it could not serve a training join even if you wanted it to."
+      "label": "Code divergence, because the serving path still reads through service code",
+      "feedback": "The service code does the reading, not the computing. It fetches a value the shared pipeline already wrote, which is precisely the divergence a single definition removes."
     }
   ]
 }
 \`\`\`
-
-The offline store holds the full history of every feature value with timestamps, in a warehouse or Parquet on S3, optimized for large point-in-time joins. The online store holds only the latest value per entity, in Redis or DynamoDB, optimized for single-digit-ms point lookups by entity key. Both are populated by one pipeline from one definition, which is what guarantees the serving path and the training path compute the feature identically.
 
 ## Point-in-time correctness
 
@@ -743,6 +743,30 @@ const llmAgentsTeach = `
 
 An LLM agent is a loop: the model is given a goal and a set of tools (functions it can call), it reasons about the next step, emits a tool call, your system executes the tool, feeds the result back, and the loop repeats until the model declares the task done. This unlocks multi-step tasks (book a trip, triage a ticket, run a data analysis) but introduces failure modes a single LLM call never had: infinite loops, runaway cost, side effects that fire twice, and prompt injection delivered through tool outputs. The engineering is almost entirely about controlling those.
 
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "agent-stuck-in-a-loop",
+  "prompt": "An agent gets stuck calling the same search tool over and over with slightly different arguments. Nothing crashes, nothing errors, and the bill keeps climbing. What stops it?",
+  "options": [
+    {
+      "label": "A prompt telling the model not to repeat a call it already made",
+      "feedback": "Tempting, because the looping is model behavior and prompts shape model behavior. But a prompt is a request, not a limit. A confused model can ignore it for hours while nothing in the system objects."
+    },
+    {
+      "label": "Hard limits enforced outside the model",
+      "correct": true,
+      "feedback": "Right, and this is the first thing to name when you are asked to design an agent. A controller counts steps, cumulative tokens, and wall clock time, and aborts to a partial answer or a human when any of them runs out. The bound is a property of your code, not of the model's cooperation."
+    },
+    {
+      "label": "A stronger reasoning strategy so it plans before acting",
+      "feedback": "Better planning makes this happen less often, which is worth having. It is not a guarantee, and the failure you are guarding against is precisely the case where the model's reasoning has already gone wrong."
+    }
+  ]
+}
+\`\`\`
+
 ## The orchestration loop and its bounds
 
 \`\`\`
@@ -753,30 +777,6 @@ loop (controller enforces limits):
   execute tool (sandboxed, with timeout)
   append result to context
   until model emits "final answer" OR a bound is hit
-\`\`\`
-
-\`\`\`cswidget
-{
-  "type": "check",
-  "kind": "predict",
-  "id": "agent-stuck-in-a-loop",
-  "prompt": "An agent gets stuck calling the same search tool over and over with slightly different arguments. Nothing crashes, nothing errors, and the bill keeps climbing. What stops it?",
-  "options": [
-    {
-      "label": "A better prompt that tells the model not to repeat a tool call it has already made",
-      "feedback": "Tempting, because the looping is model behavior and prompts shape model behavior. But a prompt is a request, not a limit. A confused model can ignore it for hours while nothing in the system objects."
-    },
-    {
-      "label": "A controller that enforces hard bounds on step count, cumulative tokens, and wall clock time, and aborts to a partial answer or a human",
-      "correct": true,
-      "feedback": "Right, and this is the first thing to name when you are asked to design an agent. The bound is a property of your code, not of the model's cooperation."
-    },
-    {
-      "label": "A stronger reasoning strategy so the model plans the whole task before acting",
-      "feedback": "Better planning makes this happen less often, which is worth having. It is not a guarantee, and the failure you are guarding against is precisely the case where the model's reasoning has already gone wrong."
-    }
-  ]
-}
 \`\`\`
 
 The controller is the load-bearing component. Without hard bounds on step count, cumulative token spend, and wall-clock time, a confused agent will loop forever calling the same tool, quietly spending hundreds of dollars. Every production agent has these three governors, plus a cost budget per task that aborts and returns a partial or escalates to a human when exceeded. Interview nuance: the first thing a strong candidate names is the bound, not the reasoning strategy.
@@ -1319,7 +1319,7 @@ Level 2's "Time-Series Databases" lesson introduced the TSDB and its append-heav
 
 ## Cardinality is the dominant failure mode
 
-A **series** is identified by a metric name plus a set of key/value **tags/labels**, for example \`cpu_usage{host="web-1", region="us-east", pod="abc"}\`. Each unique combination of tag values is a distinct series with its own timeline. This is the single most important concept in the whole topic: **cardinality is the number of distinct series**, and cardinality explosion is the dominant failure mode. Put a high-cardinality tag like \`user_id\`, \`request_id\`, \`pod_uuid\`, or \`email\` on a metric and you can go from thousands of series to tens of millions, blowing up the in-memory index, slowing every query, and OOM-killing the database. The rule: tags must be **bounded, low-cardinality dimensions** (region, host, status code), never unbounded identifiers.
+A **series** is identified by a metric name plus a set of key/value **tags/labels**, for example \`cpu_usage{host="web-1", region="us-east", pod="abc"}\`. Each unique combination of tag values is a distinct series with its own timeline. This is the single most important concept in the whole topic: **cardinality is the number of distinct series**, and cardinality explosion is the dominant failure mode. Put a high-cardinality tag like \`user_id\`, \`request_id\`, \`pod_uuid\`, or \`email\` on a metric and you can go from thousands of series to tens of millions, blowing up the in-memory index, slowing every query, and OOM-killing the database. The rule: tags must be **bounded, low-cardinality dimensions** (region, host, status code), never unbounded identifiers. Bounded means bounded over time as well as across the fleet: a value set that grows with every deploy or every visit is unbounded even when only a handful of values are live right now, because the series it already created stay in the index.
 
 \`\`\`cswidget
 {
@@ -1333,24 +1333,24 @@ A **series** is identified by a metric name plus a set of key/value **tags/label
   ],
   "items": [
     {
-      "label": "'region', with a dozen possible values",
+      "label": "'deploy_env', one of prod, staging or dev",
       "bucket": "Safe as a tag",
-      "feedback": "Bounded by geography and it changes about once a year. This is the shape a tag is supposed to have."
+      "feedback": "Three values that will still be three values next year. This is the shape a tag is supposed to have."
     },
     {
-      "label": "'http_status_code'",
+      "label": "'build_sha' of the running binary",
+      "bucket": "Explodes cardinality",
+      "feedback": "The hard one, because only a handful of builds are live at any instant. The value set grows with every deploy and the retired series stay in the index, so the count climbs forever even though the fleet never does."
+    },
+    {
+      "label": "'customer_tier', one of free, pro or enterprise",
       "bucket": "Safe as a tag",
-      "feedback": "A closed set defined by a spec. Even the long tail of exotic codes is dozens of values, not millions."
+      "feedback": "A closed set the business defines and changes about never. Grouping by it is exactly what a tag is for."
     },
     {
-      "label": "'user_id'",
+      "label": "'session_id'",
       "bucket": "Explodes cardinality",
-      "feedback": "One series per user, growing every time you sign someone up. This is the textbook way to take down a time-series database."
-    },
-    {
-      "label": "'request_id'",
-      "bucket": "Explodes cardinality",
-      "feedback": "Worse than user id, because it is unbounded in time as well as in population. Every request creates a series that will never receive a second sample."
+      "feedback": "A fresh value on every visit, so the series count tracks your traffic rather than your infrastructure. Success alone is enough to OOM the index."
     },
     {
       "label": "'instance_type', drawn from the cloud provider's catalog",
