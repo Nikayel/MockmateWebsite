@@ -655,11 +655,72 @@ the product almost never needs global linearizability; it needs "the user sees t
 which read-your-writes delivers far more cheaply. Reserve linearizability for the few operations that
 truly need it (a uniqueness constraint, a distributed lock, a "claim this seat" check).
 
-\`\`\`
-user writes comment -> LEADER (LSN=1042)  --returns token 1042-->
-   later read carries token 1042 ->
-      pick replica whose applied LSN >= 1042, else wait/route to leader
-   => the write is never missing for this user (read-your-writes)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Read-your-writes with a version token",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "writer",
+      "label": "User posts a comment (phone)",
+      "kind": "client"
+    },
+    {
+      "id": "reader",
+      "label": "The same user reads seconds later (laptop, a different session)",
+      "kind": "client"
+    },
+    {
+      "id": "router",
+      "label": "Read router: compares the token against each replica's applied LSN",
+      "kind": "lb"
+    },
+    {
+      "id": "leader",
+      "label": "Leader: commits the comment at LSN 1042",
+      "kind": "db"
+    },
+    {
+      "id": "replica",
+      "label": "Replica whose applied LSN is at or past 1042",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "writer",
+      "to": "leader",
+      "kind": "sync",
+      "label": "the write commits"
+    },
+    {
+      "from": "leader",
+      "to": "writer",
+      "kind": "feedback",
+      "label": "returns version token 1042, stored with the user rather than the session"
+    },
+    {
+      "from": "reader",
+      "to": "router",
+      "kind": "sync",
+      "label": "every later read carries token 1042"
+    },
+    {
+      "from": "router",
+      "to": "replica",
+      "kind": "sync",
+      "label": "already past 1042, so a replica can serve this read safely"
+    },
+    {
+      "from": "router",
+      "to": "leader",
+      "kind": "sync",
+      "label": "no replica has caught up yet: wait, or fall back to the leader"
+    }
+  ],
+  "caption": "The token bounds staleness precisely and travels with the user, so this is read-your-writes across devices without pinning every read to the leader."
+}
 \`\`\`
 
 Recap: replication lag causes user-visible bugs, each violating a specific session guarantee;
@@ -1493,11 +1554,61 @@ senior interviewer. Always pair a write policy with how and when entries become 
 consistency window: with a 60s TTL and no invalidation you are promising up-to-60s-stale reads, fine
 for a product page and unacceptable for an account balance.
 
-\`\`\`
-READ (cache-aside)                WRITE (invalidate-on-write)
-  app -> cache?                     app -> DB (source of truth)
-   hit  -> return                   then -> DELETE cache key
-   miss -> DB -> set cache          next read re-populates
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Cache-aside reads plus invalidate-on-write",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "read_app",
+      "label": "App on a read",
+      "kind": "service"
+    },
+    {
+      "id": "write_app",
+      "label": "App on a write",
+      "kind": "service"
+    },
+    {
+      "id": "cache",
+      "label": "Cache (TTL with jitter, LRU or LFU eviction)",
+      "kind": "cache"
+    },
+    {
+      "id": "db",
+      "label": "Database: the source of truth",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "read_app",
+      "to": "cache",
+      "kind": "sync",
+      "label": "GET the key; a hit returns immediately"
+    },
+    {
+      "from": "read_app",
+      "to": "db",
+      "kind": "sync",
+      "label": "on a miss, read the source of truth, then SET the key so the next read hits"
+    },
+    {
+      "from": "write_app",
+      "to": "db",
+      "kind": "sync",
+      "label": "the write lands in the database first"
+    },
+    {
+      "from": "write_app",
+      "to": "cache",
+      "kind": "sync",
+      "label": "then DELETE the key, never update it: two writers can otherwise leave the stale value behind"
+    }
+  ],
+  "caption": "Only requested data is ever cached, and a cache outage degrades to slower database reads rather than an outage. Deleting on write ends staleness at the write instead of waiting out a TTL."
+}
 \`\`\`
 
 Recap: default to cache-aside reads plus invalidate-on-write, pick a write policy by its durability
