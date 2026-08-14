@@ -2125,6 +2125,95 @@ The order row and the "there is an event to publish" fact commit atomically, in 
 in one database. A separate **relay** process reads unpublished outbox rows and publishes them to
 Kafka, marking them sent after the broker acknowledges.
 
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "The transactional outbox, one box at a time",
+  "nodes": [
+    {
+      "id": "svc",
+      "label": "Order service",
+      "kind": "service"
+    },
+    {
+      "id": "db",
+      "label": "Postgres (orders + outbox, one txn)",
+      "kind": "db"
+    },
+    {
+      "id": "relay",
+      "label": "Relay (polling or Debezium CDC)",
+      "kind": "service"
+    },
+    {
+      "id": "broker",
+      "label": "Kafka topic",
+      "kind": "queue"
+    },
+    {
+      "id": "consumer",
+      "label": "Consumer (inbox dedup table)",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "svc",
+      "to": "db",
+      "kind": "sync",
+      "label": "one local txn"
+    },
+    {
+      "from": "db",
+      "to": "relay",
+      "kind": "async",
+      "label": "unpublished rows"
+    },
+    {
+      "from": "relay",
+      "to": "broker",
+      "kind": "async",
+      "label": "publish"
+    },
+    {
+      "from": "relay",
+      "to": "db",
+      "kind": "feedback",
+      "label": "mark published"
+    },
+    {
+      "from": "broker",
+      "to": "consumer",
+      "kind": "async",
+      "label": "at-least-once"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "svc",
+        "db"
+      ],
+      "note": "No transaction spans Postgres and Kafka, so the requirement to never lose or fabricate an event is met by writing the order row and the event row in one local transaction: both or neither."
+    },
+    {
+      "adds": [
+        "relay"
+      ],
+      "note": "A separate relay publishes unpublished rows and only marks them sent after the broker acknowledges, which is why a relay crash costs a duplicate rather than a lost event."
+    },
+    {
+      "adds": [
+        "broker",
+        "consumer"
+      ],
+      "note": "Delivery is therefore at-least-once, so the consumer records each event id in an inbox table inside the same transaction as its side effect. That is what makes the end-to-end result effectively-once."
+    }
+  ],
+  "caption": "The outbox makes the write and the intent to publish atomic, the relay is deliberately at-least-once, and the consumer inbox turns duplicates into no-ops. Nothing here delivers exactly once."
+}
+\`\`\`
+
 \`\`\`cswidget
 {
   "type": "check",
