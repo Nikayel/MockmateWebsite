@@ -915,6 +915,28 @@ The classic implementation is the **sidecar** model: a proxy (Envoy) is injected
 }
 \`\`\`
 
+## Price the sidecar tax
+
+"Real memory and CPU per Pod" is only an argument once it has a size, because the same tax is a rounding error on one fleet and a headcount on another. The figures below are approximate US-region list prices and typical sidecar reservations, good to an order of magnitude and no further; the ratios are the durable part.
+
+\`\`\`
+a typical sidecar reservation      ~0.1 vCPU and ~100 MB per Pod
+general-purpose compute            ~0.045 dollars per vCPU-hour  =  ~33 dollars per vCPU-month
+
+40 services, ~500 Pods
+  500 x 0.1 vCPU  =    50 vCPU  =   ~1,600 dollars a month
+250 services, ~5,000 Pods
+  5,000 x 0.1 vCPU =  500 vCPU  =  ~16,000 dollars a month
+
+one 16 vCPU node packed with 30 Pods
+  30 x 0.1 vCPU   =     3 vCPU reserved by proxies, about a fifth of the box,
+                        held whether or not those proxies are carrying traffic
+\`\`\`
+
+Two decisions fall out. **The tax scales with Pod count, not with request rate.** That reservation is charged against node capacity the moment the Pod schedules, so a fleet of many small, mostly idle services pays the most per unit of useful work, and the same rightsizing and bin-packing argument that applies to your application containers applies to the proxies beside them.
+
+**The migration is worth it at one end of that table and not the other.** At a few hundred Pods the sidecar bill is small enough that it will never be the argument that wins, so if you decline a mesh at that size, decline it on operational grounds (a proxy fleet to run, upgrade, and debug) rather than pretending the money decided it. At thousands of Pods it is a five-figure monthly line plus per-traversal latency compounding on every deep call path, and that is where a sidecarless data plane pays for its own migration.
+
 ## The sidecarless / ambient shift
 
 The 2024 to 2025 shift is meshes that cut this tax:
@@ -922,7 +944,7 @@ The 2024 to 2025 shift is meshes that cut this tax:
 - **Istio Ambient** splits the mesh into a per-node L4 component (ztunnel) handling mTLS for all Pods on the node, plus an optional per-namespace L7 proxy (waypoint) only where you need retries/splitting. The ztunnels carry traffic to each other over **HBONE**, an mTLS tunnel that keeps each workload's own identity on the connection, so per-connection mTLS survives even though most Pods pay no per-Pod proxy.
 - **Cilium** takes a different route to the same goal. It enforces identity-based L3/L4 policy in the kernel via **eBPF**, does mutual authentication in its agent using SPIFFE workload identities (off the datapath, because eBPF does not perform a TLS handshake), and gets confidentiality from transparent node-to-node encryption with **WireGuard** or **IPsec**. The result is authenticated, encrypted east-west traffic with no per-Pod proxy at all, but it is not per-connection mTLS.
 
-The win is fewer proxies, lower per-Pod memory, and lower latency for the common L4 path. Maturity differs by implementation, and the difference matters in an interview: Istio's ambient mode went GA in 1.24 (November 2024), while Cilium's mutual authentication is still beta. Either way this is the direction of new adoption. **Gateway API** is the converging standard for both north-south and (via GAMMA) east-west config, which lets you swap the underlying implementation with less lock-in than the older bespoke CRDs.
+The win is fewer proxies, lower per-Pod memory, and lower latency for the common L4 path. Put the earlier arithmetic through it: those 5,000 Pods sit on maybe 170 nodes, so ambient replaces 5,000 sidecars with 170 ztunnels, and even at a couple of times a sidecar's reservation each that is roughly 34 vCPU rather than 500, which is about 1,100 dollars a month rather than 16,000, plus waypoints only in the namespaces that genuinely need L7. Roughly an order of magnitude, which is the kind of gap that justifies a migration on its own. Maturity differs by implementation, and the difference matters in an interview: Istio's ambient mode went GA in 1.24 (November 2024), while Cilium's mutual authentication is still beta. Either way this is the direction of new adoption. **Gateway API** is the converging standard for both north-south and (via GAMMA) east-west config, which lets you swap the underlying implementation with less lock-in than the older bespoke CRDs.
 
 \`\`\`csdiagram
 {
