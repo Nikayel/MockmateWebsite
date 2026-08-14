@@ -283,13 +283,73 @@ often the wrong question; the right one is "what does X do to *this* operation d
 }
 \`\`\`
 
-\`\`\`
-             partition!
-   client -> [ node1 ] --X-- [ node2 ] <- client
-                 |                 |
-   CP: node2 (minority) refuses -> availability lost, C kept
-   AP: both accept, reconcile later -> A kept, C lost
-   CA: not an option; P is a fact of nature
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Two regions, one severed link, and the choice CAP forces",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "clientUs",
+      "label": "US client",
+      "kind": "client"
+    },
+    {
+      "id": "clientEu",
+      "label": "EU client",
+      "kind": "client"
+    },
+    {
+      "id": "us",
+      "label": "Replica 1 (US, majority side)",
+      "kind": "db"
+    },
+    {
+      "id": "eu",
+      "label": "Replica 2 (EU, minority side)",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "clientUs",
+      "to": "us",
+      "kind": "sync",
+      "label": "write"
+    },
+    {
+      "from": "clientEu",
+      "to": "eu",
+      "kind": "sync",
+      "label": "write"
+    },
+    {
+      "from": "us",
+      "to": "eu",
+      "kind": "replication",
+      "label": "link severed"
+    }
+  ],
+  "groups": [
+    {
+      "id": "usSide",
+      "label": "US side of the partition",
+      "nodes": [
+        "clientUs",
+        "us"
+      ]
+    },
+    {
+      "id": "euSide",
+      "label": "EU side of the partition",
+      "nodes": [
+        "clientEu",
+        "eu"
+      ]
+    }
+  ],
+  "caption": "CP: replica 2 refuses the write it cannot coordinate, so availability is lost on the minority side and linearizability is kept. AP: both replicas accept and reconcile after the heal, so availability is kept and consistency is lost. CA is not an operating point, because P is a fact of nature for anything spanning a network."
+}
 \`\`\`
 
 Recap: CAP is a forced choice **only during a partition** between linearizable consistency and
