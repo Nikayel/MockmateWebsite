@@ -2157,9 +2157,53 @@ far better because adjacent values share a type and range.
 }
 \`\`\`
 
+### The durability tier above a local fsync
+
+A local fsync covers exactly one failure: this process or this machine dying and coming back. It
+does not cover the machine not coming back. If the disk is destroyed, or the instance is gone, or
+the region is unreachable, that fsync'd WAL record is unreadable and the acknowledged transaction is
+lost with it. The durability chain has one more link, and it is a choice you make at commit time:
+**how far the WAL record must travel before the acknowledgment goes out.**
+
+Postgres exposes this as the setting that decides where the COMMIT waits:
+
+\`\`\`
+COMMIT arrives
+  |
+  |-- synchronous_commit = off          ack here. Nothing is fsync'd. A crash loses recent commits.
+  |-- synchronous_commit = local        ack here. Local WAL fsync'd. Survives a crash+restart.
+  |-- synchronous_commit = remote_write ack here. A standby RECEIVED the record and wrote it
+  |                                     (its OS has it; its own fsync may still be pending).
+  |-- synchronous_commit = remote_apply ack here. A standby fsync'd AND replayed it, so a read
+  |                                     on that standby already sees this transaction.
+\`\`\`
+
+Walk the same COMMIT through the last two and the cost is visible:
+
+\`\`\`
+local only:                                  remote_write to an AZ-adjacent standby:
+  append WAL record       ~0.05 ms             append WAL record         ~0.05 ms
+  fsync                   ~0.5  ms             fsync                     ~0.5  ms
+  ------------------------------               ship record to standby    ~0.5  ms  (round trip)
+  ack                     ~0.55 ms             standby acknowledges
+                                               ------------------------------
+  primary disk dies -> transaction gone        ack                       ~1.05 ms
+
+                                               primary disk dies -> the standby still has it
+\`\`\`
+
+So the extra round trip roughly doubles commit latency and buys the one failure the local fsync
+never covered. Two consequences follow directly. Distance is the cost, so a synchronous standby
+belongs in the same region and ideally an adjacent availability zone, where the round trip is under
+a millisecond rather than the tens of milliseconds a cross-continent hop costs. And the sync standby
+is now in your commit path, so if it goes away, commits block: keep at least two candidates, or
+accept that losing the standby stalls writes. Everything beyond that first standby stays
+asynchronous, contributing read capacity and disaster recovery without taxing every commit.
+
 Recap: writes land in in-memory pages in the buffer pool and are flushed lazily at checkpoints, while
 a sequentially-written, fsync'd WAL provides the actual durability and crash recovery, all of it
-shaped by the ~100x gap between sequential and random I/O.
+shaped by the ~100x gap between sequential and random I/O. Durability is a tier, not a switch: a
+local fsync survives a crash, and only a synchronous standby survives the machine.
 
 \`\`\`cswidget
 {
