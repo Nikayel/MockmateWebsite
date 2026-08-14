@@ -1543,14 +1543,51 @@ minute budget prevents that.
 
 ### The canonical 6-phase clock for a 45-minute round
 
-\`\`\`
-Phase                        Budget   Exit criterion
-1 Clarify + scope + NFRs     ~5 min   You have functional + non-functional reqs and the constraint that matters
-2 Estimation (entities/QPS)  ~2 min   You have a read/write QPS and rough storage number to size with
-3 API surface                ~5 min   The 3-5 core endpoints (or events) are named with inputs/outputs
-4 High-level design          ~15 min  A complete boxes-and-arrows design where every functional req is satisfied
-5 Deep dive(s)               ~10 min  The tightest NFR bottleneck is addressed with a committed choice
-6 Wrap-up                    ~3 min   Top remaining bottleneck, failure mode, monitoring, cost driver stated
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Phase",
+    "Budget",
+    "Exit criterion"
+  ],
+  "rows": [
+    [
+      "1. Clarify, scope, NFRs",
+      "~5 min",
+      "You have functional and non-functional reqs plus the constraint that matters"
+    ],
+    [
+      "2. Estimation (entities, QPS)",
+      "~2 min",
+      "You have a read and write QPS and a rough storage number to size with"
+    ],
+    [
+      "3. API surface",
+      "~5 min",
+      "The 3 to 5 core endpoints or events are named with inputs and outputs"
+    ],
+    [
+      "4. High-level design",
+      "~15 min",
+      "A complete boxes-and-arrows design where every functional req is satisfied"
+    ],
+    [
+      "5. Deep dive(s)",
+      "~10 min",
+      "The tightest NFR bottleneck is addressed with a committed choice"
+    ],
+    [
+      "6. Wrap-up",
+      "~3 min",
+      "Top remaining bottleneck, failure mode, monitoring, and cost driver stated"
+    ]
+  ],
+  "highlightCols": [
+    "Budget"
+  ],
+  "caption": "Phases 1 and 2 together are only about 5 to 7 minutes. The bulk of the clock goes to phases 4 and 5, which is what the interviewer is actually scoring."
+}
 \`\`\`
 
 Notice that phases 1 and 2 together take only about 5 to 7 minutes. Requirements and estimation are
@@ -1991,9 +2028,37 @@ option's one real advantage ready, and re-state the assumption that made you ove
 documented seam for scale. "At 10x traffic this assumption breaks, and then I'd shard by user" shows
 evolution-over-time thinking without you having to build the sharded version now.
 
-\`\`\`
-Choice --> pick the lens --> state the assumption --> commit --> name what you gave up
- (SQL?)    (CAP / push-pull)   (reads >> writes)      (NoSQL)    (cross-entity txns)
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "Turning a fact into a decision",
+  "stages": [
+    {
+      "label": "The choice",
+      "note": "SQL or NoSQL?"
+    },
+    {
+      "label": "Pick the lens",
+      "note": "CAP/PACELC, push vs pull"
+    },
+    {
+      "label": "State the assumption",
+      "note": "reads outnumber writes 100 to 1"
+    },
+    {
+      "label": "Commit",
+      "note": "NoSQL, said out loud"
+    },
+    {
+      "label": "Name what you gave up",
+      "note": "easy cross-entity transactions"
+    }
+  ],
+  "highlight": [
+    "Name what you gave up"
+  ],
+  "caption": "A fact names a technology. A decision runs the whole chain, and the last link, naming the cost, is the one candidates skip."
+}
 \`\`\`
 
 Recap: Frame every major choice through a principled lens, commit to one option on a stated
