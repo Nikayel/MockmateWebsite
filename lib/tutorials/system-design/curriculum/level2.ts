@@ -4109,6 +4109,148 @@ them: Postgres as the system of record, Redis for a hot cache, Elasticsearch for
 blobs, a warehouse for analytics via CDC. The cost is operational surface area and keeping derived
 data in sync, so you justify each store, you do not collect them.
 
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "One product, five stores, each one justified",
+  "reveal": "staged",
+  "nodes": [
+    {
+      "id": "api",
+      "label": "Product API",
+      "kind": "service"
+    },
+    {
+      "id": "postgres",
+      "label": "Postgres (system of record)",
+      "kind": "db"
+    },
+    {
+      "id": "redis",
+      "label": "Redis (session and flag cache)",
+      "kind": "cache"
+    },
+    {
+      "id": "s3",
+      "label": "S3 (blob bytes by signed URL)",
+      "kind": "db"
+    },
+    {
+      "id": "search",
+      "label": "Elasticsearch (ranked full-text)",
+      "kind": "db"
+    },
+    {
+      "id": "cdc",
+      "label": "CDC stream (Debezium)",
+      "kind": "queue"
+    },
+    {
+      "id": "warehouse",
+      "label": "ClickHouse (columnar scans)",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "api",
+      "to": "postgres",
+      "kind": "sync",
+      "label": "orders, multi-row ACID"
+    },
+    {
+      "from": "api",
+      "to": "redis",
+      "kind": "sync",
+      "label": "session by key"
+    },
+    {
+      "from": "api",
+      "to": "s3",
+      "kind": "sync",
+      "label": "upload, key row in Postgres"
+    },
+    {
+      "from": "api",
+      "to": "search",
+      "kind": "sync",
+      "label": "ranked product search"
+    },
+    {
+      "from": "postgres",
+      "to": "cdc",
+      "kind": "async",
+      "label": "row change stream"
+    },
+    {
+      "from": "cdc",
+      "to": "search",
+      "kind": "async",
+      "label": "reindex documents"
+    },
+    {
+      "from": "cdc",
+      "to": "warehouse",
+      "kind": "async",
+      "label": "load facts"
+    }
+  ],
+  "groups": [
+    {
+      "id": "record",
+      "label": "Systems of record",
+      "nodes": [
+        "postgres",
+        "s3"
+      ]
+    },
+    {
+      "id": "derived",
+      "label": "Derived, rebuildable from the record",
+      "nodes": [
+        "search",
+        "warehouse"
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "api",
+        "postgres"
+      ],
+      "note": "Start on one well-indexed relational box. It answers the joins, holds the multi-row ACID transactions, and serves tens of thousands of QPS, so every store after this one has to beat it on a driver you can name."
+    },
+    {
+      "adds": [
+        "redis"
+      ],
+      "note": "Sessions and feature flags are read by a known key on every single request against a single-digit-millisecond budget. That is a latency and access-pattern driver, not a scale one, and it is the pattern a relational index serves worst per dollar."
+    },
+    {
+      "adds": [
+        "s3"
+      ],
+      "note": "Product images are megabytes each. Blob bytes inside a row bloat the page cache and every backup, so the bytes move to object storage and the row keeps only the key. Postgres stays the record for what the object IS."
+    },
+    {
+      "adds": [
+        "search"
+      ],
+      "note": "Typo-tolerant, ranked, faceted search is a query shape a B-tree cannot answer at any size of machine. This is the first store bought for query complexity rather than for volume, and it is derived data: you can drop it and rebuild."
+    },
+    {
+      "adds": [
+        "cdc",
+        "warehouse"
+      ],
+      "note": "Finance wants a year of orders scanned per dashboard load, and that scan would evict the OLTP cache the checkout depends on. Analytics moves to a columnar store fed by change data capture, so the API still writes in exactly one place."
+    }
+  ],
+  "caption": "Read the notes as five arguments. A store enters only when a driver the existing ones cannot serve shows up, and the dashed lanes mark which stores you could lose and rebuild from the record."
+}
+\`\`\`
+
 **Interview nuance:** Reason with **PACELC**, not a CAP one-liner. CAP only speaks about behavior
 during a partition; PACELC adds the normal case: even when there is no partition (Else), you still
 trade **Latency** against **Consistency**. Spanner chooses consistency and pays latency; Dynamo
