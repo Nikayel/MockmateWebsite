@@ -621,7 +621,7 @@ ORDER BY workload;`,
 
 const platformCostShowdown: SqlLesson = {
   id: "de-l7-platform-cost-showdown",
-  title: "Snowflake, BigQuery, Fabric: The 2026 Landscape and the Cost Showdown",
+  title: "Snowflake vs BigQuery vs Fabric: The 2026 Cost Showdown",
   summary:
     "Speak the 2026 warehouse market in one screen, then price a month of workloads under three billing archetypes and pick the cheapest platform per workload.",
   estimatedMinutes: 30,

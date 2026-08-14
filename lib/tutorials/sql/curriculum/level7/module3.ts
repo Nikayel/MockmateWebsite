@@ -279,9 +279,9 @@ INSERT INTO files (file_path, partition_dt, record_count, file_size_in_bytes, ad
 
 const icebergMetadata: SqlLesson = {
   id: "de-l7-iceberg-metadata",
-  title: "What Iceberg Solves: Snapshots, Manifests, and the Metadata Tree",
+  title: "Iceberg Snapshots, Manifests, and the Metadata Tree",
   summary:
-    "What an open table format adds on top of raw Parquet in object storage, and how to read Iceberg's snapshot and file metadata to see exactly which files a query would scan.",
+    "What an open table format adds on top of raw Parquet, and how Iceberg's snapshot and manifest metadata reveals which files a query will scan.",
   estimatedMinutes: 28,
   difficulty: "medium",
   skills: [
@@ -495,7 +495,7 @@ const upsertMergeSemantics: SqlLesson = {
   id: "de-l7-upsert-merge-semantics",
   title: "MERGE Semantics: Upserts That Survive a Rerun",
   summary:
-    "Implement warehouse MERGE semantics with INSERT ... ON CONFLICT DO UPDATE, guard the update so a late-arriving old row cannot overwrite a newer one, collapse a redelivered batch to one row per key first, and prove the load is idempotent by running it twice.",
+    "How to write a MERGE-style upsert that survives a rerun, guarding against late-arriving old rows and collapsing a redelivered batch to one row per key.",
   estimatedMinutes: 30,
   difficulty: "hard",
   skills: [
@@ -858,7 +858,7 @@ const timeTravelCompaction: SqlLesson = {
   id: "de-l7-time-travel-compaction",
   title: "Time Travel, Snapshot Expiry, and the Compaction Plan",
   summary:
-    "Reconstruct a table as of an earlier snapshot from metadata alone, then pick the compaction candidates that fix the small-files problem streaming writes create.",
+    "Reconstruct a table as of an earlier snapshot from metadata alone, then pick the compaction candidates that fix streaming's small-files problem.",
   estimatedMinutes: 30,
   difficulty: "hard",
   skills: [
