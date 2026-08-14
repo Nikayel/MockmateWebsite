@@ -2642,7 +2642,7 @@ export const systemDesignLevel4: DesignLevel = {
           id: "sd-l4-api-gateway-bff",
           title: "API Gateway & Backend-for-Frontend",
           summary:
-            "A thin, horizontally scaled gateway owns north-south cross-cutting concerns, BFFs shape payloads per client type, the mesh owns east-west, and business logic stays in services.",
+            "What belongs at an API gateway, what belongs in a BFF, and how to stop the edge rotting into a god-object full of business logic.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["gateway", "bff"],
@@ -2688,7 +2688,7 @@ export const systemDesignLevel4: DesignLevel = {
           id: "sd-l4-tls-connection-mgmt",
           title: "TLS Termination & Connection Management",
           summary:
-            "Terminate TLS at the edge and re-encrypt with mTLS inside, pool and keep-alive connections, and fix H2/gRPC/WebSocket pinning with client-side or per-stream balancing.",
+            "Where to terminate TLS, and why a long-lived gRPC or WebSocket connection pins to one backend so your scale-up adds pods that get no traffic.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["tls", "connection-management"],
@@ -2743,7 +2743,7 @@ export const systemDesignLevel4: DesignLevel = {
           id: "sd-l4-rate-limit-algorithms",
           title: "Rate Limiting Algorithms",
           summary:
-            "Token bucket for burst-friendly limits, sliding-window counter for accuracy without the log's memory, never raw fixed window, and always a 429 + Retry-After contract.",
+            "Why a fixed window lets a client send double its limit in two seconds, and what token bucket and sliding-window counter do about it.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["rate-limiting", "token-bucket"],
@@ -2839,7 +2839,7 @@ export const systemDesignLevel4: DesignLevel = {
           id: "sd-l4-load-shedding-backpressure",
           title: "Load Shedding, Adaptive Concurrency & Backpressure",
           summary:
-            "Shed early and by priority, adapt concurrency limits via Little's Law, bound every queue, propagate deadlines, and brown out features instead of failing everything.",
+            "Why an unbounded queue turns 150 percent load into zero throughput, and what adaptive concurrency, priority shedding and brownout do instead.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["load-shedding", "backpressure", "concurrency"],
@@ -2946,7 +2946,7 @@ export const systemDesignLevel4: DesignLevel = {
           id: "sd-l4-capacity-planning",
           title: "Capacity Planning & Back-of-Envelope Sizing",
           summary:
-            "Size with Little's Law, divide by a 50-70% utilization target because queues explode near 100%, add N+1 AZ redundancy, and split capacity across reserved/on-demand/spot.",
+            "Turn RPS and latency into a defensible instance count with Little's Law, a utilization target, and an explicit N+1 availability-zone factor.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["capacity", "sizing", "littles-law"],
@@ -2996,7 +2996,7 @@ export const systemDesignLevel4: DesignLevel = {
           id: "sd-l4-cell-shuffle-sharding",
           title: "Cell-Based Architecture & Shuffle Sharding",
           summary:
-            "Cells are self-contained stacks behind a dumb HA router that cap any failure at one cell's share; shuffle sharding makes full overlap between two tenants statistically rare.",
+            "How cells cap a bad deploy at one slice of users, and why shuffle sharding makes two tenants sharing total fate a 1-in-28 event.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["cells", "shuffle-sharding", "blast-radius"],
