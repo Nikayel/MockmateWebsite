@@ -1745,7 +1745,7 @@ Batch processing sees a whole bounded dataset and computes an answer. Stream pro
 
 ## Three clocks
 
-*Event time* is when the thing actually happened (stamped by the producing device). *Ingestion time* is when the broker received it. *Processing time* is when your operator sees it. These differ because of network delay, mobile clients going offline, retries, and partition skew. A phone can buffer events for 30 seconds in a tunnel, then flush them. If you aggregate by processing time, that burst lands in the wrong 5-minute bucket and your per-user counts are silently wrong. Correct real-time analytics almost always uses **event time**.
+*Event time* is when the thing actually happened (stamped by the producing device). *Ingestion time* is when the broker received it. *Processing time* is when your operator sees it. These differ because of network delay, mobile clients going offline, retries, and partition skew. A phone can sit in a tunnel for 30 seconds with its events piling up locally, then flush the whole batch the instant it reconnects.
 
 \`\`\`cswidget
 {
@@ -1769,6 +1769,8 @@ Batch processing sees a whole bounded dataset and computes an answer. Stream pro
   ]
 }
 \`\`\`
+
+If you aggregate by processing time, that burst lands in the wrong 5-minute bucket and your per-user counts are silently wrong: the tunnel period reads as empty and the reconnect minute reads as a spike, and neither number ever happened. Correct real-time analytics almost always uses **event time**, because the producing device already stamped the only clock that describes when the thing occurred.
 
 ## Windows
 
