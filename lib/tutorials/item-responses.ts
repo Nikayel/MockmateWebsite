@@ -86,8 +86,11 @@ export const learnItemResponseInputSchema = z.object({
 
 export type LearnItemResponseInput = z.infer<typeof learnItemResponseInputSchema>
 
-/** Firestore doc ids cannot contain `/`; authored ids are kebab-case but never assume it. */
-function sanitizeIdPart(value: string): string {
+/**
+ * Firestore doc ids cannot contain `/`; authored ids are kebab-case but never assume it.
+ * Exported for the sibling learn-time service so both telemetry writers mangle ids identically.
+ */
+export function sanitizeIdPart(value: string): string {
   return value.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 120)
 }
 
