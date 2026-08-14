@@ -2706,6 +2706,90 @@ arriving) rather than the *symptom* (CPU rising), buying precious lead time.
 }
 \`\`\`
 
+### The queue you scale on has its own clock
+
+Scaling on a backlog makes the queue's redelivery rules part of your scaling design, and the one that
+bites is SQS's **visibility timeout**. \`ReceiveMessage\` does not remove a message, it **hides** it:
+the message goes invisible to every other consumer for the length of the visibility timeout, and the
+worker removes it for good only by calling \`DeleteMessage\` when the job is done. The clock starts at
+**receive**, not at the worker's last sign of life, so a job that merely runs longer than the timeout
+is indistinguishable from a job whose worker died. Here is a 300-second transcode against the
+30-second default, with the delete at the end of the job and nothing crashing at all:
+
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "One job, one 30 second visibility timeout",
+  "stages": [
+    {
+      "label": "t=0 worker A receives job 42",
+      "note": "hidden from other consumers until t=30"
+    },
+    {
+      "label": "t=30 the timeout lapses",
+      "note": "A is 10% done and has deleted nothing"
+    },
+    {
+      "label": "t=31 worker B receives job 42",
+      "note": "two workers now transcode the same file"
+    },
+    {
+      "label": "t=60, t=90, t=120 ...",
+      "note": "it reappears every 30s: a third worker, a fourth"
+    },
+    {
+      "label": "t=300 A finishes and deletes",
+      "note": "duplicate output written, CPU paid several times over"
+    }
+  ],
+  "highlight": [
+    "t=30 the timeout lapses"
+  ],
+  "caption": "No worker failed here. The only fault is a job that outlives its lease, which the queue cannot tell apart from a job whose worker died."
+}
+\`\`\`
+
+Two fixes, and they trade against each other. Set the timeout **above the longest job you have
+measured** (600 seconds over a 300-second maximum) so the message stays hidden for the whole run and
+reappears only if the worker really did die. Or **extend the lease while working**: call
+\`ChangeMessageVisibility\` on a heartbeat so a long job keeps pushing its own deadline out. The fixed
+timeout is simpler and is what most fleets ship, and its cost is that a genuinely crashed job now
+sits invisible for the full 600 seconds before anyone retries it. The safety margin you bought is
+also added latency on every crash. Kafka has the same shape under different names: a consumer that
+does not come back to \`poll()\` within \`max.poll.interval.ms\` is presumed dead, its partitions are
+revoked and reassigned, and whoever takes them re-consumes the records it was working on.
+
+This feeds straight back into the scaler. SQS publishes the backlog as two numbers:
+\`ApproximateNumberOfMessages\` for messages waiting and visible, and
+\`ApproximateNumberOfMessagesNotVisible\` for messages a worker has received but not yet deleted. A
+message that reappears mid-job moves from the second number back into the first, so a too-short
+timeout inflates the pending backlog with jobs that are already being processed and the scaler adds
+workers for work the fleet is doing right now.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "sqs-visibility-timeout-redelivery",
+  "prompt": "A transcode runs 300 seconds and deletes its SQS message only once it finishes. The visibility timeout is left at the 30-second default, and no worker crashes. What happens?",
+  "options": [
+    {
+      "label": "It completes once, because redelivery is a response to a crashed worker",
+      "feedback": "Redelivery has no way to tell the difference. SQS knows only that the message was not deleted before its timeout expired, and a job still grinding away looks identical to a worker that died holding it."
+    },
+    {
+      "label": "A second worker receives the same job while the first is still running",
+      "correct": true,
+      "feedback": "Right. Receive hides the message for 30 seconds and the clock starts at receive, so at t=30 job 42 is visible again and the next poller takes it. It then reappears every 30 seconds after that. Put the timeout above the longest job you have measured, or heartbeat ChangeMessageVisibility while the job runs."
+    },
+    {
+      "label": "The message is discarded at t=30 and that upload is lost",
+      "feedback": "Expiry is what makes a message visible again, not what removes it. Messages leave an SQS queue on delete, at the retention limit, or into a dead-letter queue after too many receives."
+    }
+  ]
+}
+\`\`\`
+
 Below the pod layer sits the **cluster/node autoscaler**. HPA asking for 40 more pods does nothing if
 there is no node to place them on; the Cluster Autoscaler (or Karpenter) provisions new VMs when pods
 are unschedulable. Separately, the **Vertical Pod Autoscaler (VPA)** right-sizes each pod's
@@ -2781,9 +2865,10 @@ fleet absorbs the burst while new capacity boots.
 }
 \`\`\`
 
-Recap: scale on leading signals (queue depth via KEDA, RPS) not just lagging CPU, layer HPA + cluster
-autoscaler + VPA, and because reactive scaling always trails a fast burst by 2 to 5 minutes of lag,
-hide that lag with warm pools, scheduled pre-scaling, and standing headroom.
+Recap: scale on leading signals (queue depth via KEDA, RPS) not just lagging CPU, know what the queue
+does with a message while a worker holds it so redelivery does not inflate the signal you scale on,
+layer HPA + cluster autoscaler + VPA, and because reactive scaling always trails a fast burst by 2 to
+5 minutes of lag, hide that lag with warm pools, scheduled pre-scaling, and standing headroom.
 
 \`\`\`cswidget
 {
