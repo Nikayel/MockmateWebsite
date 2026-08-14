@@ -689,6 +689,20 @@ a replica already past it) before serving. This bounds staleness precisely and w
 devices** if the token travels with the user (in a cookie, the session store, or the client). It is
 how you get read-your-writes without pinning everything to the leader.
 
+Both ends of that comparison have names in Postgres: \`pg_current_wal_lsn()\` on the leader is the
+current write position (the token you hand back), and \`pg_last_wal_replay_lsn()\` on a replica is how
+far it has replayed. The routing rule is one comparison between those two values.
+
+\`\`\`
+on the leader, immediately after the commit:
+  SELECT pg_current_wal_lsn();          -> 0/16B3A28    hand this back as the token
+
+on each replica, heartbeated to the read router:
+  SELECT pg_last_wal_replay_lsn();
+    replica-1  -> 0/16B3A28   at or past the token  -> may serve this read
+    replica-2  -> 0/16B39F0   behind the token      -> must not serve this read
+\`\`\`
+
 \`\`\`cswidget
 {
   "type": "replication-lag",
@@ -719,6 +733,75 @@ how you get read-your-writes without pinning everything to the leader.
   "caption": "Match the bug to its session guarantee, then buy just that guarantee: sticky routing to the leader is the simple single-device fix, and a version token that reads wait on delivers read-your-writes cross-device without pinning everything to the leader."
 }
 \`\`\`
+
+### An LSN is a position in one log, so sharding breaks the token
+
+The catch nobody mentions until it bites: an LSN is a position **inside one leader's write-ahead
+log** and means nothing anywhere else. That is fine with one leader. Add shards, each with its own
+leader and its own independent WAL, and a single scalar token stops being comparable.
+
+\`\`\`
+shard A leader WAL:  ... 1041, 1042   <- the user's post commits here, token = 1042
+shard B leader WAL:  ...  877,  878   <- unrelated writes, a separate sequence
+
+a timeline read fans out to both shards carrying token 1042:
+
+  ask a replica of shard B "is your applied position at or past 1042?"
+    it replays B's WAL and is at 878   -> "no", so the read waits forever
+    or B is a busier shard and is at 3300 -> "yes", and the token guaranteed
+                                             nothing, because 3300 and 1042
+                                             were never on the same axis
+
+fix 1, a per-shard map:  {A: 1042, B: 878}
+  correct, and it grows with the fan-out. A timeline read touching 40 shards
+  carries 40 entries, and every client has to merge maps as it reads.
+
+fix 2, one clock that is comparable everywhere: a hybrid logical clock.
+\`\`\`
+
+### Hybrid logical clocks: one value comparable across independent sequences
+
+A **hybrid logical clock (HLC)** timestamp is a pair \`(physical_ms, counter)\`, compared
+lexicographically. The physical half tracks wall-clock milliseconds so the value stays anchored to
+real time and every node reaches it on its own within a few ms. The counter half breaks ties inside a
+millisecond and absorbs clock skew, so correctness never depends on clocks being perfectly synced.
+Each node keeps its own \`(l, c)\` and updates it on every local event and every message received:
+
+\`\`\`
+local event or send, with wall clock pt:
+  l' = max(l, pt)
+  c' = (l' == l) ? c + 1 : 0
+
+receiving a message stamped (m.l, m.c), with wall clock pt:
+  l' = max(l, m.l, pt)
+  if   l' == l and l' == m.l:  c' = max(c, m.c) + 1
+  elif l' == l:                c' = c + 1
+  elif l' == m.l:              c' = m.c + 1
+  else:                        c' = 0
+
+walk it: shard A's wall clock reads 1000, shard B's reads 997 (3ms of skew)
+
+  A commits the post.  A's last HLC = (999, 0), pt = 1000
+     l' = max(999, 1000) = 1000, and l' != l, so c' = 0
+     token = (1000, 0)
+
+  B commits something unrelated in the same instant. B's last = (997, 4), pt = 997
+     l' = max(997, 997) = 997, and l' == l, so c' = 5
+     stamp = (997, 5)                    (997, 5) < (1000, 0), ordered, no ambiguity
+
+  the laptop's fan-out read arrives at a replica of shard B carrying (1000, 0).
+  the replica's clock is (997, 6) and its wall clock now reads 999:
+     l' = max(997, 1000, 999) = 1000, l' == m.l, so c' = 0 + 1 = 1
+     the replica's clock is now (1000, 1), and it holds the read until it has
+     applied everything stamped at or before (1000, 0)
+\`\`\`
+
+That is the property an LSN cannot have: \`(1000, 0)\` means the same thing on every node in the
+system, so a fan-out read carries **one** token instead of a map of forty, and a replica that has
+never heard of shard A can still answer "have I applied everything at or before (1000, 0)?" This is
+why CockroachDB and YugabyteDB stamp every transaction with an HLC. The price is that the physical
+half must stay within a bounded skew of real time (NTP, or a cloud time service), and a node whose
+clock jumps outside that bound has to be fenced off rather than trusted.
 
 **Interview nuance:** be clear that these guarantees are **strictly weaker than linearizability**.
 Linearizability means a single, global, real-time order that every client agrees on; it is expensive
