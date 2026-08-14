@@ -342,9 +342,9 @@ one that actually shapes your latency budget day to day.
       "feedback": "That is CAP-only thinking, the exact junior tell this lesson names. The coordination that makes a write linearizable happens on every write, healthy network or not."
     },
     {
-      "label": "A round trip to a quorum of regions before the write is acknowledged, tens of milliseconds",
+      "label": "A quorum round trip before every acknowledgement",
       "correct": true,
-      "feedback": "Right. The write waits on the second-fastest region every single time. That steady-state tax is the ELC half of PACELC."
+      "feedback": "Right. The write waits on the second-fastest region every single time, which is tens of milliseconds across three regions. That steady-state tax is the ELC half of PACELC, and it is charged whether or not a partition ever happens."
     },
     {
       "label": "Only reads pay a cost; writes commit locally and replicate in the background",
@@ -456,9 +456,9 @@ tying the L-vs-C choice to a concrete latency SLO.
       "feedback": "Physically impossible: one cross-region round trip already blows the 20ms budget four times over. An SLO is a constraint the consistency choice must obey."
     },
     {
-      "label": "EL nearest-replica reads, with session guarantees patching the cases that need read-your-writes",
+      "label": "EL nearest-replica reads",
       "correct": true,
-      "feedback": "Right. Serve locally in single-digit milliseconds, accept eventual consistency, and cure the one staleness users notice with a targeted guarantee instead of global coordination."
+      "feedback": "Right. Serving from the nearest replica costs single-digit milliseconds and fits inside the 20ms budget, at the price of eventual consistency. Then cure the one staleness users actually notice, their own write missing, with a targeted session guarantee instead of global coordination."
     },
     {
       "label": "EC, but only switched on when a partition is detected",
