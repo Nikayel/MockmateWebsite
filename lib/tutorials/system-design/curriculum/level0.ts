@@ -343,12 +343,12 @@ sharding.
       "feedback": "Tempting, because replication does solve durability and read scaling. But during a partition the replicas cannot reach each other, and holding both promises at once is the single thing replication cannot buy you."
     },
     {
-      "label": "Pick one: stale data or refused requests",
+      "label": "Pick one, serve stale data or refuse the read",
       "correct": true,
       "feedback": "Right. Serving reads from a replica that cannot sync risks stale data, and refusing those reads sacrifices availability. There is no third door. For a feed, a few seconds of staleness beats an error page, which is the AP stance the next paragraph defends."
     },
     {
-      "label": "Buy better hardware so partitions never happen",
+      "label": "Buy hardware so partitions never happen",
       "feedback": "Better networks lower the rate of partitions and never reach zero, so this is a when rather than an if. A design that assumes partitions never happen has no answer at all when the interviewer forces the choice."
     }
   ]
@@ -1475,8 +1475,8 @@ minute budget prevents that.
   "prompt": "You have 45 minutes. How much of the clock do requirements plus estimation together deserve?",
   "options": [
     {
-      "label": "About 15 to 20 minutes, since a design built on wrong requirements is worthless",
-      "feedback": "Tempting, and it is exactly how strong engineers fail this round: 15 minutes of polished requirements leaves no time to design or dive. Requirements are the setup, not the main event."
+      "label": "About 15 to 20 minutes",
+      "feedback": "Tempting, because a design built on wrong requirements really is worthless. But this is exactly how strong engineers fail the round: 15 minutes of polished requirements leaves no clock for the design or the dive. Requirements are the setup, not the main event."
     },
     {
       "label": "About 5 to 7 minutes",
@@ -1484,8 +1484,8 @@ minute budget prevents that.
       "feedback": "Right. Phases 1 and 2 together get about 5 to 7 minutes: enough for the functional and non-functional reqs, the constraint that matters, and a QPS and storage number. The bulk of the clock goes to design and deep dives, which is what is actually scored."
     },
     {
-      "label": "Almost none, jump straight to the diagram",
-      "feedback": "Skipping scope entirely means designing the wrong system. You still need the requirements and the binding constraint before drawing, it just takes minutes, not a quarter of the round."
+      "label": "Almost none, jump to the diagram",
+      "feedback": "Skipping scope entirely means designing the wrong system, and no amount of drawing recovers from that. You still need the requirements and the binding constraint first, it just takes minutes rather than a quarter of the round."
     }
   ]
 }
@@ -1956,17 +1956,17 @@ assumption, quantify the trade, and name what you gave up.
   "prompt": "You committed to Cassandra and the interviewer asks 'why not Postgres?' What is happening, and what is the strong reply?",
   "options": [
     {
-      "label": "They disagree with the pick, so walk it back and switch to Postgres",
-      "feedback": "Tempting read, but the probe is usually not disagreement. Reversing instantly signals you never understood why you chose, which is worse than the original pick being debatable."
+      "label": "They disagree, so walk it back and switch",
+      "feedback": "Tempting read, but the probe is usually not disagreement. Reversing the moment you are questioned signals you never understood why you chose, which is worse than the original pick being debatable."
     },
     {
-      "label": "They are checking you understood the trade: name the losing option's one real advantage, then re-state the assumption that overruled it",
+      "label": "They are checking you understood the trade",
       "correct": true,
-      "feedback": "Right. Postgres offers easy transactions and mature SQL; your multi-region write requirement is what overruled it. Holding the position with the trade visible is exactly what is being graded."
+      "feedback": "Right, so hold the position with the trade visible. Name the losing option's one real advantage, Postgres offers easy transactions and mature SQL, then re-state the assumption that overruled it, which here is your multi-region write requirement. That pair is what is being graded."
     },
     {
-      "label": "They want an exhaustive list of every alternative database",
-      "feedback": "Enumerating options without a stance is the stall that reads as indecision. One committed choice with the losing option's advantage acknowledged beats a catalog."
+      "label": "They want every alternative listed",
+      "feedback": "Enumerating options without a stance is the stall that reads as indecision. One committed choice, with the losing option's advantage acknowledged out loud, beats a catalog every time."
     }
   ],
   "reveal": "In the design write, run the chain on every major choice: pick the lens, state the assumption, commit, quantify the trade, and name what you gave up, plus the seam where 10x traffic would make you revisit."
@@ -2235,16 +2235,16 @@ template to the actual prompt.
   "prompt": "Time to build your own one-page template. What makes it survive contact with a real prompt?",
   "options": [
     {
-      "label": "Word-for-word memorization, so you can deliver it identically in every round",
-      "feedback": "Tempting, because pressure rewards memorization. But a verbatim monologue is itself pitfall territory: it reads as not listening the moment the prompt deviates from your plan."
+      "label": "Word-for-word memorization you deliver identically every round",
+      "feedback": "Tempting, because pressure rewards memorization. But a verbatim monologue is itself pitfall territory: it reads as not listening the moment the prompt deviates from the plan you rehearsed."
     },
     {
-      "label": "A backbone of phases, stock questions, and checklists that you adapt out loud to the prompt in front of you",
+      "label": "A backbone of phases and checklists you adapt out loud",
       "correct": true,
-      "feedback": "Right. Internalize the structure until you can reproduce it in 60 seconds, then bend it visibly: skip phases when told to, and move the deep dive to wherever this specific prompt is hard."
+      "feedback": "Right. Internalize the phases, the stock clarifying questions, and the estimation checklist until you can reproduce them in 60 seconds, then bend the structure visibly: skip phases when the interviewer says to, and move the deep dive to wherever this specific prompt is hard."
     },
     {
-      "label": "No template at all; improvising every round keeps you flexible",
+      "label": "No template at all, so improvising keeps you flexible",
       "feedback": "Under interview pressure working memory shrinks. With no backbone you will drop a phase, usually estimation or the wrap-up, and the rubric notices exactly those absences."
     }
   ],
