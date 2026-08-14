@@ -1171,10 +1171,98 @@ The two combine in practice: anycast to the nearest edge/CDN PoP terminates TLS 
 connection close to the user, then the edge forwards over warm long-haul connections to a healthy
 origin region chosen by GSLB.
 
-\`\`\`
-User -> [Anycast IP, BGP -> nearest PoP] -> edge TLS terminate
-     -> GSLB picks healthy origin region -> origin
-  fail a region: withdraw BGP (seconds)  |  flip DNS (minutes, TTL-bound)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Anycast to the nearest edge, GSLB to a healthy origin",
+  "nodes": [
+    {
+      "id": "user",
+      "label": "User",
+      "kind": "client"
+    },
+    {
+      "id": "pop",
+      "label": "Nearest PoP (one anycast IP announced by BGP)",
+      "kind": "cdn"
+    },
+    {
+      "id": "edge",
+      "label": "Edge TLS termination",
+      "kind": "lb"
+    },
+    {
+      "id": "gslb",
+      "label": "GSLB: health checked region steering",
+      "kind": "lb"
+    },
+    {
+      "id": "origin_us",
+      "label": "Origin region us-east (live traffic)",
+      "kind": "service"
+    },
+    {
+      "id": "origin_eu",
+      "label": "Origin region eu-west (live traffic)",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "user",
+      "to": "pop",
+      "kind": "sync",
+      "label": "routing fabric picks the nearest PoP"
+    },
+    {
+      "from": "pop",
+      "to": "edge",
+      "kind": "sync"
+    },
+    {
+      "from": "edge",
+      "to": "gslb",
+      "kind": "sync",
+      "label": "warm long haul connections"
+    },
+    {
+      "from": "gslb",
+      "to": "origin_us",
+      "kind": "sync",
+      "label": "healthy"
+    },
+    {
+      "from": "gslb",
+      "to": "origin_eu",
+      "kind": "sync",
+      "label": "healthy"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "user",
+        "pop"
+      ],
+      "note": "The requirement is steering with no client-side cache to wait out, so the same IP is announced from many PoPs and BGP delivers each user to the topologically nearest one. Withdraw that announcement and traffic reconverges in seconds."
+    },
+    {
+      "adds": [
+        "edge"
+      ],
+      "note": "A TLS handshake costs round trips, and round trips across an ocean are the expensive kind, so the connection terminates at the PoP rather than at the origin. Production anycast balancers use consistent hashing here so a backend change does not rehash every flow."
+    },
+    {
+      "adds": [
+        "gslb",
+        "origin_us",
+        "origin_eu"
+      ],
+      "note": "The edge still has to choose where to send the request, which is the second, coarser decision: GSLB health checks pick a live origin region. Running both regions active-active only works if the survivor has the headroom to absorb the other one's share."
+    }
+  ],
+  "caption": "Failing a region out has two speeds, and the gap between them is the most probed point in this topic: withdraw the BGP announcement and traffic moves in seconds, or flip DNS and wait out the TTL plus resolver misbehavior, which is minutes."
+}
 \`\`\`
 
 ### Active-active vs active-passive, and draining
@@ -1579,9 +1667,98 @@ thousands of RPCs as streams over that single connection, all **pinned to whatev
 picked at connect time**. Add ten new backend pods and existing clients keep hammering the old ones;
 the new pods sit idle.
 
-\`\`\`
-gRPC client --- one long-lived H2 connection ---> backend A  (all streams pinned)
-new backends B,C come up  ->  get zero traffic until clients reconnect
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Why a scale-up leaves the new pods cold",
+  "nodes": [
+    {
+      "id": "client",
+      "label": "gRPC client (one long lived HTTP/2 connection)",
+      "kind": "client"
+    },
+    {
+      "id": "lb",
+      "label": "L7 LB (balances at connect time)",
+      "kind": "lb"
+    },
+    {
+      "id": "backend_a",
+      "label": "Backend A: every stream pinned here",
+      "kind": "service"
+    },
+    {
+      "id": "backend_b",
+      "label": "Backend B: new pod",
+      "kind": "service"
+    },
+    {
+      "id": "backend_c",
+      "label": "Backend C: new pod",
+      "kind": "service"
+    },
+    {
+      "id": "rebalance",
+      "label": "Per stream balancing, client side LB, or max connection age",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "client",
+      "to": "lb",
+      "kind": "sync",
+      "label": "thousands of RPCs multiplexed as streams"
+    },
+    {
+      "from": "lb",
+      "to": "backend_a",
+      "kind": "sync",
+      "label": "chosen once, at connect time"
+    },
+    {
+      "from": "lb",
+      "to": "backend_b",
+      "kind": "sync",
+      "label": "no traffic until a client reconnects"
+    },
+    {
+      "from": "lb",
+      "to": "backend_c",
+      "kind": "sync"
+    },
+    {
+      "from": "rebalance",
+      "to": "client",
+      "kind": "feedback",
+      "label": "re-resolve and rebalance"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "client",
+        "lb",
+        "backend_a"
+      ],
+      "note": "A layer 7 balancer makes its choice when the CONNECTION is established, and a gRPC client opens one and keeps it, so every stream that rides it is pinned to backend A no matter how many requests that is."
+    },
+    {
+      "adds": [
+        "backend_b",
+        "backend_c"
+      ],
+      "note": "Scaling up satisfies the capacity requirement on paper and nothing else: no mechanism revisits an established connection, so the new pods stay cold while A runs hot. WebSockets pin exactly the same way."
+    },
+    {
+      "adds": [
+        "rebalance"
+      ],
+      "note": "Only ending the pinning fixes it. Envoy balances individual H2 streams rather than connections, a client side balancer spreads RPCs itself, and a max-connection-age policy forces clients to re-resolve after a scale event."
+    }
+  ],
+  "caption": "This is the shape behind the follow-up question: if you say you terminate gRPC at the L7 load balancer and stop there, expect to be asked why the new pods got no traffic after the scale-up."
+}
 \`\`\`
 
 The fixes: **client-side load balancing** (the client spreads RPCs itself, via gRPC's round_robin
