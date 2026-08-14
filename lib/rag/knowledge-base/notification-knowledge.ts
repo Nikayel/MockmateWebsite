@@ -245,13 +245,13 @@ export const NOTIFICATION_KNOWLEDGE: NotificationKnowledge[] = [
       {
         tone: "informative",
         template:
-          "Based on the forgetting curve, your retention of '{problemName}' ({pattern}) is at ~{retention}%. A 10-minute review now will boost it back to 95%+.",
+          "Based on the forgetting curve, your retention of '{problemName}' ({pattern}) is at ~{retention}%. A quick review brings it back.",
         variables: ["problemName", "pattern", "retention"],
       },
       {
         tone: "supportive",
         template:
-          "Remember '{problemName}'? You crushed it {daysSince} days ago! Let's keep that {pattern} pattern fresh in your mind.",
+          "Remember '{problemName}'? You had a strong session on it {daysSince} days ago. A quick review keeps the {pattern} pattern fresh.",
         variables: ["problemName", "daysSince", "pattern"],
       },
     ],
@@ -386,7 +386,7 @@ export const NOTIFICATION_KNOWLEDGE: NotificationKnowledge[] = [
       {
         tone: "motivational",
         template:
-          "You're on fire with a {streakDays}-day streak! Keep the momentum - quick practice session before midnight?",
+          "You're on a streak: {streakDays} days. A quick session before midnight keeps it going.",
         variables: ["streakDays"],
       },
     ],
@@ -459,19 +459,18 @@ export const NOTIFICATION_KNOWLEDGE: NotificationKnowledge[] = [
       {
         tone: "celebratory",
         template:
-          "🎉 Amazing! You've mastered {pattern}! That's {totalMastered} patterns down. Next up: {nextPattern}!",
+          "Nice work. {pattern} is down, {totalMastered} patterns total. Next up: {nextPattern}.",
         variables: ["pattern", "totalMastered", "nextPattern"],
       },
       {
         tone: "celebratory",
         template:
-          "🔥 {problemCount} problems solved! You're in the top {percentile}% of CodeSparring users. Keep crushing it!",
+          "{problemCount} problems solved. You're in the top {percentile}% of CodeSparring users.",
         variables: ["problemCount", "percentile"],
       },
       {
         tone: "celebratory",
-        template:
-          "🔥 {streakDays}-day streak! Your consistency is paying off. Keep the momentum going!",
+        template: "{streakDays}-day streak. Your consistency is paying off.",
         variables: ["streakDays"],
       },
     ],
@@ -507,7 +506,7 @@ export const NOTIFICATION_KNOWLEDGE: NotificationKnowledge[] = [
       {
         tone: "supportive",
         template:
-          "{pattern} appears in {companyFrequency}% of {companyName} interviews, but your success rate is {successRate}%. Let's work on this together!",
+          "{pattern} comes up often in {companyName} interviews, and your success rate is {successRate}%. Worth some focused practice.",
         variables: ["pattern", "companyFrequency", "companyName", "successRate"],
       },
       {
@@ -632,13 +631,13 @@ export const NOTIFICATION_KNOWLEDGE: NotificationKnowledge[] = [
       {
         tone: "supportive",
         template:
-          "You've been crushing it with {consecutiveDays} days straight! Your brain needs rest to consolidate learning. Take tomorrow lighter.",
+          "{consecutiveDays} days straight. Rest consolidates learning, so take tomorrow lighter.",
         variables: ["consecutiveDays"],
       },
       {
         tone: "informative",
         template:
-          "Interview tomorrow! You're well prepared. Rest today - a fresh mind performs 20% better. Light review only if needed.",
+          "Interview tomorrow. You're prepared. Rest today and come back fresh. Light review only if needed.",
         variables: [],
       },
     ],

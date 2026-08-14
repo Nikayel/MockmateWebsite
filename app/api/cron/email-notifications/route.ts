@@ -30,7 +30,6 @@ import {
   sendBehindScheduleEmail,
   sendWelcomeEmail,
   canSendEmail,
-  calculateRetention,
   isReasonableHourForUser,
   isInQuietHours,
   isToday,
@@ -283,10 +282,8 @@ async function processWelcomeEmails(now: Date, results: any): Promise<void> {
               id: notificationRef.id,
               userId,
               type: "welcome",
-              title: "Welcome to CodeSparring! 🎉",
-              body: profile.full_name
-                ? `Hey ${profile.full_name.split(" ")[0]}, you're all set! Start your first practice session to begin crushing those interviews.`
-                : "You're all set! Start your first practice session to begin crushing those interviews.",
+              title: "Welcome to CodeSparring",
+              body: "You're set. Start your first practice session whenever you're ready.",
               link: "/practice",
               read: false,
               createdAt: now.toISOString(),
@@ -437,7 +434,7 @@ async function processInactivityReminders(now: Date, results: any): Promise<void
       }
 
       // Send inactivity email
-      const result = await sendInactivityEmail(profile.email, {
+      const result = await sendInactivityEmail(userId, profile.email, {
         userName: profile.full_name || "",
         userEmail: profile.email,
         hoursSinceLastSession,
@@ -575,7 +572,7 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
       // Send reminder for the most overdue problem
       const mostOverdue = problemsDue.sort((a, b) => b.daysOverdue - a.daysOverdue)[0]
 
-      const result = await sendSpacedRepetitionEmail(profile.email, {
+      const result = await sendSpacedRepetitionEmail(userId, profile.email, {
         userName: profile.full_name || "",
         userEmail: profile.email,
         topic: mostOverdue.title,
@@ -609,7 +606,6 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
             topic: mostOverdue.title,
             problem_id: mostOverdue.problem_id,
             mastery_level: mostOverdue.mastery_level,
-            retention_estimate: calculateRetention(mostOverdue.daysOverdue, mostOverdue.last_score),
           },
           created_at: now.toISOString(),
         })
@@ -705,7 +701,7 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
       // Send reminder for the most overdue topic
       const mostOverdue = topicsDue.sort((a, b) => b.daysSinceReview - a.daysSinceReview)[0]
 
-      const result = await sendSpacedRepetitionEmail(profile.email, {
+      const result = await sendSpacedRepetitionEmail(userId, profile.email, {
         userName: profile.full_name || "",
         userEmail: profile.email,
         topic: mostOverdue.topic.topic_name,
@@ -737,10 +733,6 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
           sent_at: now.toISOString(),
           metadata: {
             topic: mostOverdue.topic.topic_name,
-            retention_estimate: calculateRetention(
-              mostOverdue.daysSinceReview,
-              mostOverdue.topic.performance_score
-            ),
           },
           created_at: now.toISOString(),
         })
@@ -929,7 +921,7 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
           if (patternsToFocus.length >= 3) break
         }
 
-        const result = await sendInterviewCountdownEmail(profile.email, {
+        const result = await sendInterviewCountdownEmail(userId, profile.email, {
           userName: profile.full_name || "",
           userEmail: profile.email,
           targetCompany:
@@ -965,7 +957,7 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
             (totalQuestions - questionsCompleted) / daysUntilInterview
           )
 
-          const result = await sendBehindScheduleEmail(profile.email, {
+          const result = await sendBehindScheduleEmail(userId, profile.email, {
             userName: profile.full_name || "",
             userEmail: profile.email,
             targetCompany:
@@ -989,7 +981,7 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
 
       // 3. Daily roadmap reminder (if there are questions for today)
       if (todaysQuestions.length > 0) {
-        const result = await sendDailyRoadmapEmail(profile.email, {
+        const result = await sendDailyRoadmapEmail(userId, profile.email, {
           userName: profile.full_name || "",
           userEmail: profile.email,
           targetCompany:
@@ -1113,7 +1105,10 @@ async function processStreakAlerts(results: {
  * Handles: expired subscriptions, 7-day reminders, 1-day reminders
  */
 async function processSubscriptionExpiry(now: Date, results: any): Promise<void> {
-  const { sendSubscriptionCancellationEmail, sendTrialEndingEmail } = await import("@/lib/email")
+  // Yearly Pro is a ONE-TIME payment: the trial-ending template ("your payment
+  // method is charged") is false for this audience, so expiry uses its own
+  // templates that say what actually happens (downgrade, nothing charged).
+  const { sendYearlyExpiredEmail, sendYearlyExpiryReminderEmail } = await import("@/lib/email")
 
   const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
   const oneDayFromNow = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000)
@@ -1143,20 +1138,16 @@ async function processSubscriptionExpiry(now: Date, results: any): Promise<void>
         results.subscriptionExpiry.downgrades++
         logger.info("[Cron] Downgraded user - yearly plan expired", { userId })
 
-        // Send expiration email (check timezone)
+        // Send the goodbye email. Transactional: the downgrade happens exactly once,
+        // so skipping on the local-hours window would drop this email forever.
         if (profile.email) {
-          const timezoneCheck = canSendToUserTimezone(profile)
-          if (timezoneCheck.canSend) {
-            try {
-              await sendSubscriptionCancellationEmail(profile.email, {
-                userName: profile.full_name || "",
-                userEmail: profile.email,
-                isImmediate: true,
-                accessUntil: now.toISOString(),
-              })
-            } catch (emailError) {
-              logger.error("[Cron] Failed to send expiry email", { userId, error: emailError })
-            }
+          try {
+            await sendYearlyExpiredEmail(profile.email, {
+              userName: profile.full_name || "",
+              userEmail: profile.email,
+            })
+          } catch (emailError) {
+            logger.error("[Cron] Failed to send expiry email", { userId, error: emailError })
           }
         }
       } catch (error) {
@@ -1191,10 +1182,10 @@ async function processSubscriptionExpiry(now: Date, results: any): Promise<void>
         if (!timezoneCheck.canSend) continue
 
         try {
-          await sendTrialEndingEmail(profile.email, {
+          await sendYearlyExpiryReminderEmail(profile.email, {
             userName: profile.full_name || "",
             userEmail: profile.email,
-            trialEndDate: profile.subscription_current_period_end as string,
+            expiryDate: profile.subscription_current_period_end as string,
           })
 
           await db.collection("profiles").doc(userId).update({
@@ -1231,10 +1222,10 @@ async function processSubscriptionExpiry(now: Date, results: any): Promise<void>
         if (!timezoneCheck.canSend) continue
 
         try {
-          await sendTrialEndingEmail(profile.email, {
+          await sendYearlyExpiryReminderEmail(profile.email, {
             userName: profile.full_name || "",
             userEmail: profile.email,
-            trialEndDate: profile.subscription_current_period_end as string,
+            expiryDate: profile.subscription_current_period_end as string,
           })
 
           await db.collection("profiles").doc(userId).update({

@@ -1,55 +1,75 @@
 /**
- * Email Templates for CodeSparring
+ * Email templates for CodeSparring.
  *
- * DELIVERABILITY OPTIMIZED: These templates are designed to land in Primary inbox.
+ * Voice contract (2026-08-14 email council): sentence case, lowkey and direct, no hype,
+ * no invented statistics, no emoji, no en/em dashes as punctuation. Claims come from the
+ * pricing truth sheet only. The sender stays personal ("Nikayel from CodeSparring") for
+ * Primary-inbox placement; the signature is a plain "Nikayel".
  *
- * Strategy:
- * - Personal tone (from Nikayel, not "the team")
- * - Clean, minimal styling (not marketing-heavy)
- * - Single CTA per email
- * - Different footer strategies based on email type:
- *   - Transactional (welcome, payment, subscription): No unsubscribe needed
- *   - Reminder emails: Subtle preferences link
+ * Structure rules:
+ * - Every template ships an HTML part and a matching plain-text part.
+ * - Transactional emails (welcome, billing) carry no unsubscribe footer.
+ * - Reminder emails carry a tokenized one-click unsubscribe plus a preferences link.
+ * - User-controlled strings (names, topics, company names) are HTML-escaped at this
+ *   boundary; they arrive from Firestore profiles and roadmaps, which users write.
+ *
+ * lib/email/__tests__/email-content-guard.test.ts enforces the banned-phrase list,
+ * character rules, and text parity. Change copy here, run that test.
  */
 
-import { calculateRetention } from "./brevo"
 import { getAppBaseUrl } from "../site-url"
 
 // Email type determines footer behavior
-type EmailType = "transactional" | "reminder" | "marketing"
+type EmailType = "transactional" | "reminder"
 
-/**
- * The preferences link every reminder and marketing email carries in its footer.
- *
- * These two were the last hardcoded apex-host URLs in the email system. `www` is canonical (see
- * `lib/seo/site.ts`) and the apex answers with a 308, so every one of these clicks paid for an extra
- * round trip before the account page even started loading - on the one link a recipient clicks when
- * they are already annoyed enough to want the emails to stop. Every other URL in an email already
- * flows through `getAppBaseUrl` via `notifications.ts`; these did not.
- *
- * Resolved per call rather than at module load so a deployment that sets `NEXT_PUBLIC_APP_URL`
- * later in the boot sequence is still honoured.
- */
+export interface EmailRenderOptions {
+  /** Tokenized no-login unsubscribe URL; reminder footers render it when present. */
+  unsubscribeUrl?: string
+  /** Hidden preview line shown by inbox list views; use sparingly. */
+  preheader?: string
+}
+
+/** The preferences link every reminder email carries in its footer. */
 function accountPreferencesUrl(): string {
   return `${getAppBaseUrl()}/account`
 }
 
-// Clean email wrapper with tasteful styling
-const emailWrapper = (content: string, emailType: EmailType = "transactional") => {
+/** Escape user-controlled text before interpolating it into HTML. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+}
+
+function firstNameOf(userName: string | undefined): string {
+  return userName?.split(" ")[0] || "there"
+}
+
+// Clean email wrapper with minimal styling
+const emailWrapper = (
+  content: string,
+  emailType: EmailType = "transactional",
+  options: EmailRenderOptions = {}
+) => {
   const preferencesUrl = accountPreferencesUrl()
 
-  // Footer varies by email type
+  // Reminder emails must be trivially escapable without logging in. The tokenized
+  // unsubscribe link works signed out; the preferences link covers finer control.
+  // A postal address line belongs here once the owner supplies one (see the
+  // launch checklist); never fabricate an address.
   const footer =
     emailType === "reminder"
-      ? `<p style="margin-top: 32px; font-size: 13px; color: #888;">
-        <a href="${preferencesUrl}" style="color: #888;">change email preferences</a>
+      ? `<p style="margin-top: 32px; font-size: 13px; color: #666;">
+        ${options.unsubscribeUrl ? `<a href="${options.unsubscribeUrl}" style="color: #666;">unsubscribe</a> &middot; ` : ""}<a href="${preferencesUrl}" style="color: #666;">email preferences</a>
        </p>`
-      : emailType === "marketing"
-        ? `<p style="margin-top: 32px; font-size: 13px; color: #888;">
-        You signed up for CodeSparring updates.<br>
-        <a href="${preferencesUrl}" style="color: #888;">unsubscribe</a>
-       </p>`
-        : "" // transactional emails don't need unsubscribe
+      : ""
+
+  const preheaderHtml = options.preheader
+    ? `<div style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">${escapeHtml(options.preheader)}</div>`
+    : ""
 
   return `
 <!DOCTYPE html>
@@ -59,7 +79,7 @@ const emailWrapper = (content: string, emailType: EmailType = "transactional") =
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.7; color: #1a1a1a; max-width: 560px; margin: 0 auto; padding: 32px 20px; background-color: #ffffff;">
-
+  ${preheaderHtml}
   <!-- Subtle brand header -->
   <div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #f0f0f0;">
     <span style="font-size: 15px; font-weight: 600; color: #333;">CodeSparring</span>
@@ -76,26 +96,29 @@ const emailWrapper = (content: string, emailType: EmailType = "transactional") =
 `
 }
 
-// Styled CTA button - looks good but not overly promotional
+// Styled CTA button
 const ctaButton = (text: string, url: string) => `
   <p style="margin: 24px 0;">
     <a href="${url}" style="display: inline-block; background-color: #0066cc; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 500; font-size: 14px;">${text}</a>
   </p>
 `
 
-// Simple text link (less promotional)
-const ctaLink = (text: string, url: string) => `
-  <a href="${url}" style="color: #0066cc; text-decoration: none;">${text}</a>
-`
+/** Plain-text footer for reminder emails; mirrors the HTML footer. */
+function reminderTextFooter(options: EmailRenderOptions = {}): string {
+  const lines = ["---"]
+  if (options.unsubscribeUrl) lines.push(`unsubscribe: ${options.unsubscribeUrl}`)
+  lines.push(`email preferences: ${accountPreferencesUrl()}`)
+  return lines.join("\n")
+}
 
 // Signature block
-const signature = (includeTitle = true) => `
+const signature = (includeTitle = false) => `
   <p style="margin-top: 24px; color: #333;">
-    – nikayel${includeTitle ? `<br><span style="color: #666; font-size: 14px;">founder, codesparring</span>` : ""}
+    Nikayel${includeTitle ? `<br><span style="color: #666; font-size: 14px;">founder, CodeSparring</span>` : ""}
   </p>
 `
 
-// WELCOME EMAIL (Transactional - no unsubscribe needed)
+// WELCOME EMAIL (transactional)
 
 export interface WelcomeEmailData {
   userName: string
@@ -104,35 +127,27 @@ export interface WelcomeEmailData {
 }
 
 export function getWelcomeEmailSubject(): string {
-  return "quick hello from nikayel"
+  return "Quick hello from Nikayel"
 }
 
 export function getWelcomeEmailHtml(data: WelcomeEmailData): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
+  const firstName = escapeHtml(firstNameOf(data.userName))
 
   const content = `
-    <p>hey ${firstName},</p>
+    <p>Hey ${firstName},</p>
 
-    <p>i'm nikayel – a cs senior at sac state who built codesparring because i kept bombing interviews even after grinding leetcode for months.</p>
+    <p>Thanks for signing up. Quick orientation so you know what you have:</p>
 
-    <p>turns out i was studying wrong. cramming doesn't work because your brain forgets 70% of what you learned within 24 hours. what works is short, spaced-out practice sessions.</p>
-
-    <p>so i built this thing for myself, and it actually helped. now i want to share it.</p>
-
-    <p><strong>here's what you can practice:</strong></p>
     <ul style="padding-left: 20px; color: #333;">
-      <li style="margin-bottom: 6px;">dsa patterns (two pointers, sliding window, trees, dp)</li>
-      <li style="margin-bottom: 6px;">system design for scale questions</li>
-      <li style="margin-bottom: 6px;">debugging under pressure like a real interview</li>
+      <li style="margin-bottom: 6px;">Interview practice with an AI interviewer: DSA (170+ scenarios across 18 patterns) and debugging. You code, it asks follow-ups, you get feedback at the end.</li>
+      <li style="margin-bottom: 6px;">Free courses at <a href="${data.appUrl}/learn" style="color: #0066cc; text-decoration: none;">/learn</a>: Python, SQL and data engineering, system design, and applied JS and React. No paywall on any of them.</li>
     </ul>
 
-    ${ctaButton("start practicing", `${data.appUrl}/dashboard`)}
+    <p>Short, regular sessions beat cramming. That's the whole design.</p>
 
-    <p style="color: #666; font-size: 14px; margin-top: 20px;">
-      <strong>tip:</strong> 15 mins a day beats 2-hour cram sessions. tried both. trust me.
-    </p>
+    ${ctaButton("Start practicing", `${data.appUrl}/dashboard`)}
 
-    <p>if you have questions, just reply – it goes straight to me.</p>
+    <p>If something is confusing or broken, reply to this email. It comes straight to me.</p>
 
     ${signature(true)}
   `
@@ -141,34 +156,28 @@ export function getWelcomeEmailHtml(data: WelcomeEmailData): string {
 }
 
 export function getWelcomeEmailText(data: WelcomeEmailData): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
+  const firstName = firstNameOf(data.userName)
 
   return `
-hey ${firstName},
+Hey ${firstName},
 
-i'm nikayel – a cs senior at sac state who built codesparring because i kept bombing interviews even after grinding leetcode for months.
+Thanks for signing up. Quick orientation so you know what you have:
 
-turns out i was studying wrong. cramming doesn't work because your brain forgets 70% of what you learned within 24 hours. what works is short, spaced-out practice sessions.
+- Interview practice with an AI interviewer: DSA (170+ scenarios across 18 patterns) and debugging. You code, it asks follow-ups, you get feedback at the end.
+- Free courses at ${data.appUrl}/learn: Python, SQL and data engineering, system design, and applied JS and React. No paywall on any of them.
 
-so i built this thing for myself, and it actually helped. now i want to share it.
+Short, regular sessions beat cramming. That's the whole design.
 
-here's what you can practice:
-- dsa patterns (two pointers, sliding window, trees, dp)
-- system design for scale questions
-- debugging under pressure like a real interview
+Start practicing: ${data.appUrl}/dashboard
 
-start practicing: ${data.appUrl}/dashboard
+If something is confusing or broken, reply to this email. It comes straight to me.
 
-tip: 15 mins a day beats 2-hour cram sessions. tried both. trust me.
-
-if you have questions, just reply – it goes straight to me.
-
-– nikayel
-founder, codesparring
+Nikayel
+founder, CodeSparring
   `.trim()
 }
 
-// INACTIVITY REMINDER (Reminder - needs preferences link)
+// INACTIVITY REMINDER (reminder)
 
 export interface InactivityEmailData {
   userName: string
@@ -179,84 +188,65 @@ export interface InactivityEmailData {
   appUrl: string
 }
 
-export function getInactivityEmailSubject(hours: number): string {
+export function getInactivityEmailSubject(hours: number, lastTopic?: string): string {
   if (hours < 48) {
-    return "quick check in"
+    return "Pick up where you left off"
   } else if (hours < 72) {
-    return "been a few days"
-  } else {
-    return "following up"
+    return "Been a few days"
   }
+  return lastTopic ? `Still on ${lastTopic}?` : "Pick up where you left off"
 }
 
-export function getInactivityEmailHtml(data: InactivityEmailData): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
+export function getInactivityEmailHtml(
+  data: InactivityEmailData,
+  options: EmailRenderOptions = {}
+): string {
+  const firstName = escapeHtml(firstNameOf(data.userName))
   const days = Math.floor(data.hoursSinceLastSession / 24)
-  const retentionEstimate = calculateRetention(days, 70)
-  const forgottenPercent = 100 - retentionEstimate
-
-  // Only show specific percentage if it's meaningful (15%+), otherwise keep it general
-  const forgettingMessage =
-    forgottenPercent >= 15
-      ? `not trying to nag, but there's science here – by day ${days} without review, you've likely forgotten around ${forgottenPercent}% of what you learned. it's called the forgetting curve.`
-      : `not trying to nag, but there's science here – memory fades fast without review. even a quick session helps lock things in.`
 
   const content = `
-    <p>hey ${firstName},</p>
+    <p>Hey ${firstName},</p>
 
-    <p>noticed it's been ${days} day${days !== 1 ? "s" : ""} since your last practice session.</p>
+    <p>It's been ${days} day${days !== 1 ? "s" : ""} since your last session.</p>
 
-    <p>${forgettingMessage}</p>
+    ${data.lastTopic ? `<p>You were working on <strong>${escapeHtml(data.lastTopic)}</strong>. A short review now does more than a long session later.</p>` : ""}
 
-    ${data.lastTopic ? `<p>you were working on <strong>${data.lastTopic}</strong>. might be worth a quick 5-min review.</p>` : ""}
+    ${data.streakDays && data.streakDays > 0 ? `<p>You also had a <strong>${data.streakDays}-day streak</strong> going.</p>` : ""}
 
-    ${data.streakDays && data.streakDays > 0 ? `<p>also, you had a <strong>${data.streakDays}-day streak</strong> going. just saying.</p>` : ""}
+    <p>Even 10 minutes counts.</p>
 
-    ${ctaButton("do a quick session", `${data.appUrl}/dashboard`)}
+    ${ctaButton("Do a quick session", `${data.appUrl}/dashboard`)}
 
-    <p style="color: #666; font-size: 14px;">even 5 minutes helps more than you'd think.</p>
-
-    ${signature(false)}
+    ${signature()}
   `
 
-  return emailWrapper(content, "reminder")
+  return emailWrapper(content, "reminder", options)
 }
 
-export function getInactivityEmailText(data: InactivityEmailData): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
+export function getInactivityEmailText(
+  data: InactivityEmailData,
+  options: EmailRenderOptions = {}
+): string {
+  const firstName = firstNameOf(data.userName)
   const days = Math.floor(data.hoursSinceLastSession / 24)
-  const retentionEstimate = calculateRetention(days, 70)
-  const forgottenPercent = 100 - retentionEstimate
-
-  // Only show specific percentage if it's meaningful (15%+), otherwise keep it general
-  const forgettingMessage =
-    forgottenPercent >= 15
-      ? `not trying to nag, but there's science here – by day ${days} without review, you've likely forgotten around ${forgottenPercent}% of what you learned. it's called the forgetting curve.`
-      : `not trying to nag, but there's science here – memory fades fast without review. even a quick session helps lock things in.`
 
   return `
-hey ${firstName},
+Hey ${firstName},
 
-noticed it's been ${days} day${days !== 1 ? "s" : ""} since your last practice session.
+It's been ${days} day${days !== 1 ? "s" : ""} since your last session.
 
-${forgettingMessage}
+${data.lastTopic ? `You were working on ${data.lastTopic}. A short review now does more than a long session later.\n` : ""}${data.streakDays && data.streakDays > 0 ? `You also had a ${data.streakDays}-day streak going.\n` : ""}
+Even 10 minutes counts.
 
-${data.lastTopic ? `you were working on ${data.lastTopic}. might be worth a quick 5-min review.` : ""}
+Do a quick session: ${data.appUrl}/dashboard
 
-${data.streakDays && data.streakDays > 0 ? `also, you had a ${data.streakDays}-day streak going. just saying.` : ""}
+Nikayel
 
-do a quick session: ${data.appUrl}/dashboard
-
-even 5 minutes helps more than you'd think.
-
-– nikayel
-
----
-change email preferences: ${data.appUrl}/account
+${reminderTextFooter(options)}
   `.trim()
 }
 
-// SPACED REPETITION REMINDER (Reminder)
+// SPACED REPETITION REMINDER (reminder)
 
 export interface SpacedRepetitionEmailData {
   userName: string
@@ -271,117 +261,68 @@ export interface SpacedRepetitionEmailData {
 }
 
 export function getSpacedRepetitionEmailSubject(data: SpacedRepetitionEmailData): string {
-  return `good time to review ${data.topic}`
+  return `Good time to review ${data.topic}`
 }
 
-export function getSpacedRepetitionEmailHtml(data: SpacedRepetitionEmailData): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
-  const retentionEstimate = calculateRetention(data.daysSinceReview, data.lastScore || 70)
+/** The one preheader in the system; inbox preview for the review nudge. */
+export const SPACED_REPETITION_PREHEADER = "A short review beats a long cram session."
+
+export function getSpacedRepetitionEmailHtml(
+  data: SpacedRepetitionEmailData,
+  options: EmailRenderOptions = {}
+): string {
+  const firstName = escapeHtml(firstNameOf(data.userName))
+  const topic = escapeHtml(data.topic)
   const reviewUrl = data.scenarioId
     ? `${data.appUrl}/interview/${data.scenarioId}`
     : `${data.appUrl}/dashboard`
 
   const content = `
-    <p>hey ${firstName},</p>
+    <p>Hey ${firstName},</p>
 
-    <p>you practiced <strong>${data.topic}</strong> ${data.daysSinceReview} days ago${data.lastScore ? ` and scored ${data.lastScore}%` : ""}.</p>
+    <p>You practiced <strong>${topic}</strong> ${data.daysSinceReview} days ago${data.lastScore ? ` and scored ${data.lastScore}%` : ""}.</p>
 
-    <p>based on the forgetting curve, your retention is around <strong>${retentionEstimate}%</strong> right now. this is actually the optimal time to review – challenging enough to strengthen the memory, but not so late that you've forgotten everything.</p>
+    <p>It just came up for review. The schedule is spaced repetition: reviewing right around the point you start to forget is what makes it stick, so now is a better time than later.</p>
 
-    ${data.pattern ? `<p style="color: #666;">pattern: ${data.pattern}</p>` : ""}
+    ${data.pattern ? `<p style="color: #666;">Pattern: ${escapeHtml(data.pattern)}</p>` : ""}
 
-    ${ctaButton(`review ${data.topic}`, reviewUrl)}
+    ${ctaButton(`Review ${topic}`, reviewUrl)}
 
-    <p style="color: #666; font-size: 14px;">each review roughly doubles how long you remember it.</p>
-
-    ${signature(false)}
+    ${signature()}
   `
 
-  return emailWrapper(content, "reminder")
+  return emailWrapper(content, "reminder", {
+    preheader: SPACED_REPETITION_PREHEADER,
+    ...options,
+  })
 }
 
-export function getSpacedRepetitionEmailText(data: SpacedRepetitionEmailData): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
-  const retentionEstimate = calculateRetention(data.daysSinceReview, data.lastScore || 70)
+export function getSpacedRepetitionEmailText(
+  data: SpacedRepetitionEmailData,
+  options: EmailRenderOptions = {}
+): string {
+  const firstName = firstNameOf(data.userName)
+  const reviewUrl = data.scenarioId
+    ? `${data.appUrl}/interview/${data.scenarioId}`
+    : `${data.appUrl}/dashboard`
 
   return `
-hey ${firstName},
+Hey ${firstName},
 
-you practiced ${data.topic} ${data.daysSinceReview} days ago${data.lastScore ? ` and scored ${data.lastScore}%` : ""}.
+You practiced ${data.topic} ${data.daysSinceReview} days ago${data.lastScore ? ` and scored ${data.lastScore}%` : ""}.
 
-based on the forgetting curve, your retention is around ${retentionEstimate}% right now. this is the optimal time to review.
+It just came up for review. The schedule is spaced repetition: reviewing right around the point you start to forget is what makes it stick, so now is a better time than later.
 
-review now: ${data.appUrl}/dashboard
+${data.pattern ? `Pattern: ${data.pattern}\n` : ""}
+Review now: ${reviewUrl}
 
-each review roughly doubles how long you remember it.
+Nikayel
 
-– nikayel
-
----
-change email preferences: ${data.appUrl}/account
+${reminderTextFooter(options)}
   `.trim()
 }
 
-// MILESTONE CELEBRATION (Transactional - triggered by their action)
-
-export interface MilestoneEmailData {
-  userName: string
-  userEmail: string
-  milestoneType: "problems_solved" | "streak" | "pattern_mastered" | "first_session"
-  milestoneValue: number | string
-  appUrl: string
-}
-
-export function getMilestoneEmailSubject(data: MilestoneEmailData): string {
-  switch (data.milestoneType) {
-    case "problems_solved":
-      return `you hit ${data.milestoneValue} problems`
-    case "streak":
-      return `${data.milestoneValue} days in a row`
-    case "pattern_mastered":
-      return `you got ${data.milestoneValue} down`
-    case "first_session":
-      return "first one done"
-    default:
-      return "nice progress"
-  }
-}
-
-export function getMilestoneEmailHtml(data: MilestoneEmailData): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
-  let milestoneContent = ""
-
-  switch (data.milestoneType) {
-    case "problems_solved":
-      milestoneContent = `<p>just noticed you hit <strong>${data.milestoneValue} problems solved</strong>. that's solid progress.</p>`
-      break
-    case "streak":
-      milestoneContent = `<p>you've been at it for <strong>${data.milestoneValue} days straight</strong>. consistency like that is what actually moves the needle.</p>`
-      break
-    case "pattern_mastered":
-      milestoneContent = `<p>looks like you've got <strong>${data.milestoneValue}</strong> pretty locked in. that pattern should stick with you.</p>`
-      break
-    case "first_session":
-      milestoneContent = `<p>you finished your first practice session. the hardest part is starting – you got that done.</p>`
-      break
-  }
-
-  const content = `
-    <p>hey ${firstName},</p>
-
-    ${milestoneContent}
-
-    <p>keep it up. you're building real skills here.</p>
-
-    ${ctaButton("keep practicing", `${data.appUrl}/dashboard`)}
-
-    ${signature(false)}
-  `
-
-  return emailWrapper(content, "transactional")
-}
-
-// ROADMAP: DAILY PRACTICE REMINDER (Reminder)
+// ROADMAP: DAILY PRACTICE REMINDER (reminder)
 
 export interface DailyRoadmapEmailData {
   userName: string
@@ -402,81 +343,86 @@ export interface DailyRoadmapEmailData {
 
 export function getDailyRoadmapEmailSubject(data: DailyRoadmapEmailData): string {
   if (data.daysUntilInterview <= 3) {
-    return `${data.daysUntilInterview} days left – today's prep`
+    return `${data.daysUntilInterview} days left: today's prep`
   }
-  return `today's ${data.targetCompany} prep`
+  return `Today's ${data.targetCompany} prep`
 }
 
-export function getDailyRoadmapEmailHtml(data: DailyRoadmapEmailData): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
+export function getDailyRoadmapEmailHtml(
+  data: DailyRoadmapEmailData,
+  options: EmailRenderOptions = {}
+): string {
+  const firstName = escapeHtml(firstNameOf(data.userName))
+  const company = escapeHtml(data.targetCompany)
   const progressPercent = Math.round((data.questionsCompleted / data.totalQuestions) * 100)
 
   const questionsHtml = data.todaysQuestions
     .map(
       (q) =>
-        `<li style="margin-bottom: 8px;"><strong>${q.title}</strong><br><span style="color: #666; font-size: 13px;">${q.pattern} · ${q.difficulty}</span></li>`
+        `<li style="margin-bottom: 8px;"><strong>${escapeHtml(q.title)}</strong><br><span style="color: #666; font-size: 13px;">${escapeHtml(q.pattern)} &middot; ${escapeHtml(q.difficulty)}</span></li>`
     )
     .join("\n")
 
   const urgencyNote =
     data.daysUntilInterview <= 7
-      ? `<p style="color: #c00; font-weight: 500;">${data.daysUntilInterview} day${data.daysUntilInterview !== 1 ? "s" : ""} until your ${data.targetCompany} interview.</p>`
+      ? `<p style="font-weight: 500;">${data.daysUntilInterview} day${data.daysUntilInterview !== 1 ? "s" : ""} until your ${company} interview.</p>`
       : ""
 
   const onTrackNote = !data.isOnTrack
-    ? `<p style="color: #996600; font-size: 14px;">heads up: you're a bit behind schedule. try to knock these out today.</p>`
+    ? `<p style="color: #666; font-size: 14px;">Heads up: you're a bit behind schedule. Today's set gets you back on track.</p>`
     : ""
 
   const content = `
-    <p>hey ${firstName},</p>
+    <p>Hey ${firstName},</p>
 
     ${urgencyNote}
 
-    <p>here's today's practice for your <strong>${data.targetCompany}</strong> roadmap:</p>
+    <p>Here's today's practice for your <strong>${company}</strong> roadmap:</p>
 
     <ul style="padding-left: 20px; margin: 16px 0;">
       ${questionsHtml}
     </ul>
 
-    <p style="color: #666; font-size: 14px;">progress: ${data.questionsCompleted}/${data.totalQuestions} (${progressPercent}%)</p>
+    <p style="color: #666; font-size: 14px;">Progress: ${data.questionsCompleted}/${data.totalQuestions} (${progressPercent}%)</p>
 
     ${onTrackNote}
 
-    ${ctaButton("start today's practice", `${data.appUrl}/roadmap`)}
+    ${ctaButton("Start today's practice", `${data.appUrl}/roadmap`)}
 
-    ${signature(false)}
+    ${signature()}
   `
 
-  return emailWrapper(content, "reminder")
+  return emailWrapper(content, "reminder", options)
 }
 
-export function getDailyRoadmapEmailText(data: DailyRoadmapEmailData): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
+export function getDailyRoadmapEmailText(
+  data: DailyRoadmapEmailData,
+  options: EmailRenderOptions = {}
+): string {
+  const firstName = firstNameOf(data.userName)
   const questionsText = data.todaysQuestions
     .map((q, i) => `${i + 1}. ${q.title} (${q.pattern}, ${q.difficulty})`)
     .join("\n")
 
   return `
-hey ${firstName},
+Hey ${firstName},
 
-${data.daysUntilInterview <= 7 ? `${data.daysUntilInterview} days until your ${data.targetCompany} interview.` : ""}
-
-here's today's practice:
+${data.daysUntilInterview <= 7 ? `${data.daysUntilInterview} day${data.daysUntilInterview !== 1 ? "s" : ""} until your ${data.targetCompany} interview.\n` : ""}
+Here's today's practice:
 
 ${questionsText}
 
-progress: ${data.questionsCompleted}/${data.totalQuestions}
+Progress: ${data.questionsCompleted}/${data.totalQuestions}
 
-start practicing: ${data.appUrl}/roadmap
+Start today's practice: ${data.appUrl}/roadmap
 
-– nikayel
+Nikayel
 
----
-change email preferences: ${data.appUrl}/account
+${reminderTextFooter(options)}
   `.trim()
 }
 
-// ROADMAP: INTERVIEW COUNTDOWN (Reminder)
+// ROADMAP: INTERVIEW COUNTDOWN (reminder)
 
 export interface InterviewCountdownEmailData {
   userName: string
@@ -496,51 +442,92 @@ export function getInterviewCountdownEmailSubject(data: InterviewCountdownEmailD
   return `${data.daysUntilInterview} days until ${data.targetCompany}`
 }
 
-export function getInterviewCountdownEmailHtml(data: InterviewCountdownEmailData): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
+export function getInterviewCountdownEmailHtml(
+  data: InterviewCountdownEmailData,
+  options: EmailRenderOptions = {}
+): string {
+  const firstName = escapeHtml(firstNameOf(data.userName))
+  const company = escapeHtml(data.targetCompany)
   const progressPercent = Math.round((data.questionsCompleted / data.totalQuestions) * 100)
 
   const focusPatterns =
     data.patternsToFocus.length > 0
-      ? `<p><strong>focus areas:</strong></p><ul style="padding-left: 20px;">${data.patternsToFocus.map((p) => `<li>${p}</li>`).join("")}</ul>`
+      ? `<p><strong>Focus areas:</strong></p><ul style="padding-left: 20px;">${data.patternsToFocus.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>`
       : ""
 
   const finalTips =
     data.daysUntilInterview <= 3
       ? `
     <div style="background-color: #f8f8f8; padding: 16px; border-radius: 6px; margin: 16px 0;">
-      <p style="margin: 0 0 8px 0; font-weight: 500;">final stretch tips:</p>
+      <p style="margin: 0 0 8px 0; font-weight: 500;">Final stretch:</p>
       <ul style="padding-left: 20px; margin: 0; color: #666; font-size: 14px;">
-        <li>review patterns you've solved – don't learn new ones now</li>
-        <li>get good sleep – it consolidates memory</li>
-        <li>practice explaining your approach out loud</li>
+        <li>Review patterns you've solved; don't learn new ones now</li>
+        <li>Get good sleep; it consolidates memory</li>
+        <li>Practice explaining your approach out loud</li>
       </ul>
     </div>
   `
       : ""
 
   const content = `
-    <p>hey ${firstName},</p>
+    <p>Hey ${firstName},</p>
 
-    <p>your <strong>${data.targetCompany}</strong> interview is ${data.daysUntilInterview === 1 ? "tomorrow" : `in ${data.daysUntilInterview} days`}.</p>
+    <p>Your <strong>${company}</strong> interview is ${data.daysUntilInterview === 1 ? "tomorrow" : `in ${data.daysUntilInterview} days`}.</p>
 
-    <p>you've completed <strong>${progressPercent}%</strong> of your roadmap (${data.questionsCompleted}/${data.totalQuestions}).</p>
+    <p>You've completed <strong>${progressPercent}%</strong> of your roadmap (${data.questionsCompleted}/${data.totalQuestions}).</p>
 
     ${focusPatterns}
 
     ${finalTips}
 
-    ${ctaButton("continue preparing", `${data.appUrl}/roadmap`)}
+    ${ctaButton("Continue preparing", `${data.appUrl}/roadmap`)}
 
-    <p style="color: #666; font-size: 14px;">you've put in the work. trust your prep.</p>
+    <p style="color: #666; font-size: 14px;">You've put in the work.</p>
 
-    ${signature(false)}
+    ${signature()}
   `
 
-  return emailWrapper(content, "reminder")
+  return emailWrapper(content, "reminder", options)
 }
 
-// ROADMAP: BEHIND SCHEDULE ALERT (Reminder)
+export function getInterviewCountdownEmailText(
+  data: InterviewCountdownEmailData,
+  options: EmailRenderOptions = {}
+): string {
+  const firstName = firstNameOf(data.userName)
+  const progressPercent = Math.round((data.questionsCompleted / data.totalQuestions) * 100)
+  const focusText =
+    data.patternsToFocus.length > 0
+      ? `\nFocus areas:\n${data.patternsToFocus.map((p) => `- ${p}`).join("\n")}\n`
+      : ""
+  const tipsText =
+    data.daysUntilInterview <= 3
+      ? `
+Final stretch:
+- Review patterns you've solved; don't learn new ones now
+- Get good sleep; it consolidates memory
+- Practice explaining your approach out loud
+`
+      : ""
+
+  return `
+Hey ${firstName},
+
+Your ${data.targetCompany} interview is ${data.daysUntilInterview === 1 ? "tomorrow" : `in ${data.daysUntilInterview} days`}.
+
+You've completed ${progressPercent}% of your roadmap (${data.questionsCompleted}/${data.totalQuestions}).
+${focusText}${tipsText}
+Continue preparing: ${data.appUrl}/roadmap
+
+You've put in the work.
+
+Nikayel
+
+${reminderTextFooter(options)}
+  `.trim()
+}
+
+// ROADMAP: BEHIND SCHEDULE ALERT (reminder)
 
 export interface BehindScheduleEmailData {
   userName: string
@@ -553,32 +540,57 @@ export interface BehindScheduleEmailData {
 }
 
 export function getBehindScheduleEmailSubject(data: BehindScheduleEmailData): string {
-  return `catching up on ${data.targetCompany} prep`
+  return `Catching up on ${data.targetCompany} prep`
 }
 
-export function getBehindScheduleEmailHtml(data: BehindScheduleEmailData): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
+export function getBehindScheduleEmailHtml(
+  data: BehindScheduleEmailData,
+  options: EmailRenderOptions = {}
+): string {
+  const firstName = escapeHtml(firstNameOf(data.userName))
+  const company = escapeHtml(data.targetCompany)
 
   const content = `
-    <p>hey ${firstName},</p>
+    <p>Hey ${firstName},</p>
 
-    <p>you're <strong>${data.questionsBehind} questions behind</strong> on your ${data.targetCompany} roadmap with ${data.daysUntilInterview} days left.</p>
+    <p>You're <strong>${data.questionsBehind} questions behind</strong> on your ${company} roadmap with ${data.daysUntilInterview} days left.</p>
 
-    <p>no stress – here's how to catch up: aim for <strong>${data.suggestedDailyQuestions} questions per day</strong> from here on out.</p>
+    <p>Here's the catch-up math: aim for <strong>${data.suggestedDailyQuestions} questions per day</strong> from here on out.</p>
 
-    <p style="color: #666; font-size: 14px;">don't try to do it all at once. consistent daily practice (even 1-2 problems) beats cramming.</p>
+    <p style="color: #666; font-size: 14px;">Don't try to do it all at once. Consistent daily practice, even 1 or 2 problems, beats cramming.</p>
 
-    ${ctaButton("start catching up", `${data.appUrl}/roadmap`)}
+    ${ctaButton("Start catching up", `${data.appUrl}/roadmap`)}
 
-    <p style="color: #666; font-size: 14px;">every problem you solve increases your odds. progress over perfection.</p>
-
-    ${signature(false)}
+    ${signature()}
   `
 
-  return emailWrapper(content, "reminder")
+  return emailWrapper(content, "reminder", options)
 }
 
-// PAYMENT FAILURE (Transactional)
+export function getBehindScheduleEmailText(
+  data: BehindScheduleEmailData,
+  options: EmailRenderOptions = {}
+): string {
+  const firstName = firstNameOf(data.userName)
+
+  return `
+Hey ${firstName},
+
+You're ${data.questionsBehind} questions behind on your ${data.targetCompany} roadmap with ${data.daysUntilInterview} days left.
+
+Here's the catch-up math: aim for ${data.suggestedDailyQuestions} questions per day from here on out.
+
+Don't try to do it all at once. Consistent daily practice, even 1 or 2 problems, beats cramming.
+
+Start catching up: ${data.appUrl}/roadmap
+
+Nikayel
+
+${reminderTextFooter(options)}
+  `.trim()
+}
+
+// PAYMENT FAILURE (transactional)
 
 export interface PaymentFailedEmailData {
   userName: string
@@ -588,51 +600,51 @@ export interface PaymentFailedEmailData {
 }
 
 export function getPaymentFailedEmailSubject(): string {
-  return "issue with your payment"
+  return "Your CodeSparring payment didn't go through"
 }
 
 export function getPaymentFailedEmailHtml(data: PaymentFailedEmailData): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
+  const firstName = escapeHtml(firstNameOf(data.userName))
 
   const content = `
-    <p>hey ${firstName},</p>
+    <p>Hey ${firstName},</p>
 
-    <p>heads up – we had trouble processing your payment for CodeSparring Pro.${data.failureReason ? ` (${data.failureReason})` : ""}</p>
+    <p>Heads up: we had trouble processing your payment for CodeSparring Pro.${data.failureReason ? ` (${escapeHtml(data.failureReason)})` : ""}</p>
 
-    <p>to keep your Pro access, you'll need to update your payment method.</p>
+    <p>To keep your Pro access, you'll need to update your payment method.</p>
 
-    ${ctaButton("update payment method", `${data.appUrl}/account`)}
+    ${ctaButton("Update payment method", `${data.appUrl}/account`)}
 
-    <p style="color: #666; font-size: 14px;">we'll retry automatically in a few days. if it still fails, your account will move to the free plan.</p>
+    <p style="color: #666; font-size: 14px;">We'll retry in a few days. If it still fails, your account moves to the free plan.</p>
 
-    <p>questions? just reply to this email.</p>
+    <p>Questions? Just reply to this email.</p>
 
-    ${signature(false)}
+    ${signature()}
   `
 
   return emailWrapper(content, "transactional")
 }
 
 export function getPaymentFailedEmailText(data: PaymentFailedEmailData): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
+  const firstName = firstNameOf(data.userName)
 
   return `
-hey ${firstName},
+Hey ${firstName},
 
-heads up – we had trouble processing your payment for CodeSparring Pro.${data.failureReason ? ` (${data.failureReason})` : ""}
+Heads up: we had trouble processing your payment for CodeSparring Pro.${data.failureReason ? ` (${data.failureReason})` : ""}
 
-to keep your Pro access, update your payment method:
+To keep your Pro access, update your payment method:
 ${data.appUrl}/account
 
-we'll retry automatically in a few days. if it still fails, your account will move to the free plan.
+We'll retry in a few days. If it still fails, your account moves to the free plan.
 
-questions? just reply to this email.
+Questions? Just reply to this email.
 
-– nikayel
+Nikayel
   `.trim()
 }
 
-// SUBSCRIPTION CONFIRMATION (Transactional)
+// SUBSCRIPTION CONFIRMATION (transactional)
 
 export interface SubscriptionConfirmationEmailData {
   userName: string
@@ -640,51 +652,69 @@ export interface SubscriptionConfirmationEmailData {
   planName: string
   amount: number
   currency: string
+  /**
+   * Monthly plans: the renewal date. One-time yearly plans: the access-until date.
+   * The isOneTime flag decides which framing renders; yearly must NEVER read as
+   * auto-renewing (the cron downgrades yearly at period end, nothing is charged).
+   */
   nextBillingDate?: string
+  isOneTime?: boolean
   appUrl: string
 }
 
+function formatBillingDate(iso: string | undefined): string {
+  if (!iso) return "N/A"
+  const parsed = new Date(iso)
+  if (isNaN(parsed.getTime())) return "N/A"
+  return parsed.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+}
+
 export function getSubscriptionConfirmationEmailSubject(): string {
-  return "you're all set with Pro"
+  return "You're set with Pro"
 }
 
 export function getSubscriptionConfirmationEmailHtml(
   data: SubscriptionConfirmationEmailData
 ): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
-  const formattedDate = data.nextBillingDate
-    ? new Date(data.nextBillingDate).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : "N/A"
+  const firstName = escapeHtml(firstNameOf(data.userName))
+  const formattedDate = formatBillingDate(data.nextBillingDate)
+
+  const planBlock = data.isOneTime
+    ? `
+      <p style="margin: 0; color: #666; font-size: 14px;">
+        Plan: ${escapeHtml(data.planName)}<br>
+        Amount: ${escapeHtml(data.currency)} ${data.amount.toFixed(2)}, one-time payment<br>
+        Access until: ${formattedDate}
+      </p>`
+    : `
+      <p style="margin: 0; color: #666; font-size: 14px;">
+        Plan: ${escapeHtml(data.planName)}<br>
+        Amount: ${escapeHtml(data.currency)} ${data.amount.toFixed(2)}<br>
+        Renews: ${formattedDate}
+      </p>`
+
+  const oneTimeNote = data.isOneTime
+    ? `<p>This is a one-time payment, not an auto-renewing subscription. Nothing else gets charged. We'll email you before your year is up.</p>`
+    : ""
 
   const content = `
-    <p>hey ${firstName},</p>
+    <p>Hey ${firstName},</p>
 
-    <p>thanks for upgrading to Pro. your subscription is now active.</p>
+    <p>Thanks for upgrading. Pro is active on your account.</p>
 
     <div style="background-color: #f8f8f8; padding: 16px; border-radius: 6px; margin: 16px 0;">
-      <p style="margin: 0 0 8px 0; font-weight: 500;">subscription details</p>
-      <p style="margin: 0; color: #666; font-size: 14px;">
-        plan: ${data.planName}<br>
-        amount: ${data.currency} ${data.amount.toFixed(2)}<br>
-        next billing: ${formattedDate}
-      </p>
+      ${planBlock}
     </div>
 
-    <p><strong>with Pro you get:</strong></p>
-    <ul style="padding-left: 20px; color: #333;">
-      <li>35 interview sessions per month</li>
-      <li>unlimited code execution</li>
-      <li>advanced AI feedback</li>
-      <li>priority support (just reply to any email)</li>
-    </ul>
+    ${oneTimeNote}
 
-    ${ctaButton("start practicing", `${data.appUrl}/dashboard`)}
+    <p>Pro gives you 35 interview sessions a month, spaced repetition scheduling, and a personalized study roadmap.</p>
 
-    ${signature(false)}
+    ${ctaButton("Start practicing", `${data.appUrl}/dashboard`)}
+
+    <p>Questions or anything broken, just reply.</p>
+
+    ${signature()}
   `
 
   return emailWrapper(content, "transactional")
@@ -693,38 +723,37 @@ export function getSubscriptionConfirmationEmailHtml(
 export function getSubscriptionConfirmationEmailText(
   data: SubscriptionConfirmationEmailData
 ): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
-  const formattedDate = data.nextBillingDate
-    ? new Date(data.nextBillingDate).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : "N/A"
+  const firstName = firstNameOf(data.userName)
+  const formattedDate = formatBillingDate(data.nextBillingDate)
+
+  const planBlock = data.isOneTime
+    ? `Plan: ${data.planName}
+Amount: ${data.currency} ${data.amount.toFixed(2)}, one-time payment
+Access until: ${formattedDate}
+
+This is a one-time payment, not an auto-renewing subscription. Nothing else gets charged. We'll email you before your year is up.`
+    : `Plan: ${data.planName}
+Amount: ${data.currency} ${data.amount.toFixed(2)}
+Renews: ${formattedDate}`
 
   return `
-hey ${firstName},
+Hey ${firstName},
 
-thanks for upgrading to Pro. your subscription is now active.
+Thanks for upgrading. Pro is active on your account.
 
-subscription details:
-- plan: ${data.planName}
-- amount: ${data.currency} ${data.amount.toFixed(2)}
-- next billing: ${formattedDate}
+${planBlock}
 
-with Pro you get:
-- 35 interview sessions per month
-- unlimited code execution
-- advanced AI feedback
-- priority support
+Pro gives you 35 interview sessions a month, spaced repetition scheduling, and a personalized study roadmap.
 
-start practicing: ${data.appUrl}/dashboard
+Start practicing: ${data.appUrl}/dashboard
 
-– nikayel
+Questions or anything broken, just reply.
+
+Nikayel
   `.trim()
 }
 
-// SUBSCRIPTION CANCELLATION (Transactional)
+// SUBSCRIPTION CANCELLATION (transactional)
 
 export interface SubscriptionCancellationEmailData {
   userName: string
@@ -735,35 +764,29 @@ export interface SubscriptionCancellationEmailData {
 }
 
 export function getSubscriptionCancellationEmailSubject(isImmediate: boolean): string {
-  return isImmediate ? "your Pro access has ended" : "confirming your cancellation"
+  return isImmediate ? "Your Pro access has ended" : "Confirming your cancellation"
 }
 
 export function getSubscriptionCancellationEmailHtml(
   data: SubscriptionCancellationEmailData
 ): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
-  const formattedDate = data.accessUntil
-    ? new Date(data.accessUntil).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : "today"
+  const firstName = escapeHtml(firstNameOf(data.userName))
+  const formattedDate = data.accessUntil ? formatBillingDate(data.accessUntil) : "today"
 
   if (data.isImmediate) {
     return emailWrapper(
       `
-      <p>hey ${firstName},</p>
+      <p>Hey ${firstName},</p>
 
-      <p>your CodeSparring Pro subscription has ended. you're now on the free plan (8 sessions per month).</p>
+      <p>Your CodeSparring Pro subscription has ended. You're now on the free plan (8 sessions per month).</p>
 
-      <p>your progress and history are still here if you want to come back.</p>
+      <p>Your progress and history are still here if you want to come back.</p>
 
-      ${ctaButton("resubscribe anytime", `${data.appUrl}/pricing`)}
+      ${ctaButton("Resubscribe anytime", `${data.appUrl}/pricing`)}
 
-      <p>if there's anything we could've done better, i'd genuinely love to hear it – just reply.</p>
+      <p>If there's anything that would've made it better, reply and tell me.</p>
 
-      ${signature(false)}
+      ${signature()}
     `,
       "transactional"
     )
@@ -771,19 +794,19 @@ export function getSubscriptionCancellationEmailHtml(
 
   return emailWrapper(
     `
-    <p>hey ${firstName},</p>
+    <p>Hey ${firstName},</p>
 
-    <p>got your cancellation request. your Pro subscription is set to end on <strong>${formattedDate}</strong>.</p>
+    <p>Got your cancellation request. Your Pro subscription is set to end on <strong>${formattedDate}</strong>.</p>
 
-    <p>you'll have full Pro access until then, so make the most of it.</p>
+    <p>You'll have full Pro access until then, so make the most of it.</p>
 
-    <p>changed your mind?</p>
+    <p>Changed your mind?</p>
 
-    ${ctaButton("reactivate subscription", `${data.appUrl}/account`)}
+    ${ctaButton("Reactivate subscription", `${data.appUrl}/account`)}
 
-    <p>if there's anything we could've done better, i'd genuinely love to hear it – just reply.</p>
+    <p>If there's anything that would've made it better, reply and tell me.</p>
 
-    ${signature(false)}
+    ${signature()}
   `,
     "transactional"
   )
@@ -792,47 +815,137 @@ export function getSubscriptionCancellationEmailHtml(
 export function getSubscriptionCancellationEmailText(
   data: SubscriptionCancellationEmailData
 ): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
-  const formattedDate = data.accessUntil
-    ? new Date(data.accessUntil).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : "today"
+  const firstName = firstNameOf(data.userName)
+  const formattedDate = data.accessUntil ? formatBillingDate(data.accessUntil) : "today"
 
   if (data.isImmediate) {
     return `
-hey ${firstName},
+Hey ${firstName},
 
-your CodeSparring Pro subscription has ended. you're now on the free plan (8 sessions per month).
+Your CodeSparring Pro subscription has ended. You're now on the free plan (8 sessions per month).
 
-your progress and history are still here if you want to come back.
+Your progress and history are still here if you want to come back.
 
-resubscribe anytime: ${data.appUrl}/pricing
+Resubscribe anytime: ${data.appUrl}/pricing
 
-if there's anything we could've done better, i'd genuinely love to hear it – just reply.
+If there's anything that would've made it better, reply and tell me.
 
-– nikayel
+Nikayel
     `.trim()
   }
 
   return `
-hey ${firstName},
+Hey ${firstName},
 
-got your cancellation request. your Pro subscription is set to end on ${formattedDate}.
+Got your cancellation request. Your Pro subscription is set to end on ${formattedDate}.
 
-you'll have full Pro access until then, so make the most of it.
+You'll have full Pro access until then, so make the most of it.
 
-changed your mind? reactivate: ${data.appUrl}/account
+Changed your mind? Reactivate: ${data.appUrl}/account
 
-if there's anything we could've done better, i'd genuinely love to hear it – just reply.
+If there's anything that would've made it better, reply and tell me.
 
-– nikayel
+Nikayel
   `.trim()
 }
 
-// TRIAL ENDING (Transactional - billing notification)
+// YEARLY PLAN EXPIRED (transactional; sent by the cron on downgrade day)
+
+export interface YearlyExpiredEmailData {
+  userName: string
+  userEmail: string
+  appUrl: string
+}
+
+export function getYearlyExpiredEmailSubject(): string {
+  return "Your year of Pro has ended"
+}
+
+export function getYearlyExpiredEmailHtml(data: YearlyExpiredEmailData): string {
+  const firstName = escapeHtml(firstNameOf(data.userName))
+
+  const content = `
+    <p>Hey ${firstName},</p>
+
+    <p>Your year of Pro ended today. Yearly Pro is a one-time payment, so nothing was charged.</p>
+
+    <p>Your account is now on the free plan: 8 interview sessions a month. Your progress, history, and reviews all stay put.</p>
+
+    <p>If you want Pro again, it's at <a href="${data.appUrl}/pricing" style="color: #0066cc; text-decoration: none;">${data.appUrl}/pricing</a>.</p>
+
+    <p>Thanks for being a customer this year.</p>
+
+    ${signature()}
+  `
+
+  return emailWrapper(content, "transactional")
+}
+
+export function getYearlyExpiredEmailText(data: YearlyExpiredEmailData): string {
+  const firstName = firstNameOf(data.userName)
+
+  return `
+Hey ${firstName},
+
+Your year of Pro ended today. Yearly Pro is a one-time payment, so nothing was charged.
+
+Your account is now on the free plan: 8 interview sessions a month. Your progress, history, and reviews all stay put.
+
+If you want Pro again, it's at ${data.appUrl}/pricing.
+
+Thanks for being a customer this year.
+
+Nikayel
+  `.trim()
+}
+
+// YEARLY EXPIRY REMINDER (transactional billing notice; 7-day and 1-day marks)
+
+export interface YearlyExpiryReminderEmailData {
+  userName: string
+  userEmail: string
+  expiryDate: string
+  appUrl: string
+}
+
+export function getYearlyExpiryReminderEmailSubject(data: YearlyExpiryReminderEmailData): string {
+  return `Your Pro access ends ${formatBillingDate(data.expiryDate)}`
+}
+
+export function getYearlyExpiryReminderEmailHtml(data: YearlyExpiryReminderEmailData): string {
+  const firstName = escapeHtml(firstNameOf(data.userName))
+  const formattedDate = formatBillingDate(data.expiryDate)
+
+  const content = `
+    <p>Hey ${firstName},</p>
+
+    <p>Heads up: your year of Pro ends on <strong>${formattedDate}</strong>. Yearly Pro is a one-time payment, so nothing gets charged automatically.</p>
+
+    <p>If you want to keep Pro, you can renew at <a href="${data.appUrl}/pricing" style="color: #0066cc; text-decoration: none;">${data.appUrl}/pricing</a>. Otherwise your account moves to the free plan (8 sessions a month) and all your progress and history stay put.</p>
+
+    ${signature()}
+  `
+
+  return emailWrapper(content, "transactional")
+}
+
+export function getYearlyExpiryReminderEmailText(data: YearlyExpiryReminderEmailData): string {
+  const firstName = firstNameOf(data.userName)
+  const formattedDate = formatBillingDate(data.expiryDate)
+
+  return `
+Hey ${firstName},
+
+Heads up: your year of Pro ends on ${formattedDate}. Yearly Pro is a one-time payment, so nothing gets charged automatically.
+
+If you want to keep Pro, you can renew at ${data.appUrl}/pricing. Otherwise your account moves to the free plan (8 sessions a month) and all your progress and history stay put.
+
+Nikayel
+  `.trim()
+}
+
+// TRIAL ENDING (transactional; the Stripe trial_will_end path ONLY, where a real
+// auto-charge is coming. Yearly expiry uses the reminder template above instead.)
 
 export interface TrialEndingEmailData {
   userName: string
@@ -841,70 +954,162 @@ export interface TrialEndingEmailData {
   appUrl: string
 }
 
-export function getTrialEndingEmailSubject(): string {
-  return "your trial ends in 3 days"
+export function getTrialEndingEmailSubject(data: TrialEndingEmailData): string {
+  return `Your Pro trial ends ${formatBillingDate(data.trialEndDate)}`
 }
 
 export function getTrialEndingEmailHtml(data: TrialEndingEmailData): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
-  const formattedDate = data.trialEndDate
-    ? new Date(data.trialEndDate).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : "soon"
+  const firstName = escapeHtml(firstNameOf(data.userName))
+  const formattedDate = formatBillingDate(data.trialEndDate)
 
   const content = `
-    <p>hey ${firstName},</p>
+    <p>Hey ${firstName},</p>
 
-    <p>heads up – your Pro trial ends on <strong>${formattedDate}</strong>.</p>
+    <p>Your Pro trial ends on <strong>${formattedDate}</strong>. After that, your payment method is charged for Pro ($25/month) unless you cancel first.</p>
 
-    <p>after that, your payment method will be charged automatically. if you don't want to continue, you can cancel before then.</p>
+    ${ctaButton("Manage subscription", `${data.appUrl}/account`)}
 
-    <p><strong>with Pro you get:</strong></p>
-    <ul style="padding-left: 20px; color: #333;">
-      <li>35 interview sessions per month</li>
-      <li>unlimited code execution</li>
-      <li>advanced AI feedback</li>
-    </ul>
+    <p>Questions, just reply.</p>
 
-    ${ctaButton("manage subscription", `${data.appUrl}/account`)}
-
-    <p>have questions? just reply.</p>
-
-    ${signature(false)}
+    ${signature()}
   `
 
   return emailWrapper(content, "transactional")
 }
 
 export function getTrialEndingEmailText(data: TrialEndingEmailData): string {
-  const firstName = data.userName?.split(" ")[0] || "there"
-  const formattedDate = data.trialEndDate
-    ? new Date(data.trialEndDate).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : "soon"
+  const firstName = firstNameOf(data.userName)
+  const formattedDate = formatBillingDate(data.trialEndDate)
 
   return `
-hey ${firstName},
+Hey ${firstName},
 
-heads up – your Pro trial ends on ${formattedDate}.
+Your Pro trial ends on ${formattedDate}. After that, your payment method is charged for Pro ($25/month) unless you cancel first.
 
-after that, your payment method will be charged automatically. if you don't want to continue, you can cancel before then.
+Manage subscription: ${data.appUrl}/account
 
-with Pro you get:
-- 35 interview sessions per month
-- unlimited code execution
-- advanced AI feedback
+Questions, just reply.
 
-manage subscription: ${data.appUrl}/account
+Nikayel
+  `.trim()
+}
 
-have questions? just reply.
+// ACTIVATION NUDGE (reminder; signed up 2-4 days ago, never ran a session)
 
-– nikayel
+export interface ActivationNudgeEmailData {
+  userName: string
+  userEmail: string
+  appUrl: string
+}
+
+export function getActivationNudgeEmailSubject(): string {
+  return "A 10-minute first session"
+}
+
+export function getActivationNudgeEmailHtml(
+  data: ActivationNudgeEmailData,
+  options: EmailRenderOptions = {}
+): string {
+  const firstName = escapeHtml(firstNameOf(data.userName))
+
+  const content = `
+    <p>Hey ${firstName},</p>
+
+    <p>You signed up a couple of days ago but haven't run a session yet. Fair enough, starting is the hard part.</p>
+
+    <p>Two low-pressure ways in:</p>
+
+    <ul style="padding-left: 20px; color: #333;">
+      <li style="margin-bottom: 6px;">Pick a DSA scenario and try it with the AI interviewer. Ten minutes is enough to see how it works.</li>
+      <li style="margin-bottom: 6px;">Or skip interviews entirely and start a free course at <a href="${data.appUrl}/learn" style="color: #0066cc; text-decoration: none;">/learn</a>: Python, SQL, system design, or JS and React. No paywall.</li>
+    </ul>
+
+    ${ctaButton("Try a first session", `${data.appUrl}/dashboard`)}
+
+    <p>If something put you off or confused you, reply and tell me. I read everything.</p>
+
+    ${signature()}
+  `
+
+  return emailWrapper(content, "reminder", options)
+}
+
+export function getActivationNudgeEmailText(
+  data: ActivationNudgeEmailData,
+  options: EmailRenderOptions = {}
+): string {
+  const firstName = firstNameOf(data.userName)
+
+  return `
+Hey ${firstName},
+
+You signed up a couple of days ago but haven't run a session yet. Fair enough, starting is the hard part.
+
+Two low-pressure ways in:
+
+- Pick a DSA scenario and try it with the AI interviewer. Ten minutes is enough to see how it works.
+- Or skip interviews entirely and start a free course at ${data.appUrl}/learn: Python, SQL, system design, or JS and React. No paywall.
+
+Try a first session: ${data.appUrl}/dashboard
+
+If something put you off or confused you, reply and tell me. I read everything.
+
+Nikayel
+
+${reminderTextFooter(options)}
+  `.trim()
+}
+
+// FIRST-SESSION FEEDBACK ASK (reminder; one lifetime send after the first session)
+
+export interface FirstSessionFeedbackEmailData {
+  userName: string
+  userEmail: string
+  appUrl: string
+}
+
+export function getFirstSessionFeedbackEmailSubject(): string {
+  return "How was your first session?"
+}
+
+export function getFirstSessionFeedbackEmailHtml(
+  data: FirstSessionFeedbackEmailData,
+  options: EmailRenderOptions = {}
+): string {
+  const firstName = escapeHtml(firstNameOf(data.userName))
+
+  const content = `
+    <p>Hey ${firstName},</p>
+
+    <p>You finished your first practice session. Quick question: how was it?</p>
+
+    <p>I'm the founder and I read every reply. What felt off, what was confusing, what almost made you close the tab. One sentence is plenty.</p>
+
+    <p>Nothing to click, just hit reply.</p>
+
+    ${signature()}
+  `
+
+  return emailWrapper(content, "reminder", options)
+}
+
+export function getFirstSessionFeedbackEmailText(
+  data: FirstSessionFeedbackEmailData,
+  options: EmailRenderOptions = {}
+): string {
+  const firstName = firstNameOf(data.userName)
+
+  return `
+Hey ${firstName},
+
+You finished your first practice session. Quick question: how was it?
+
+I'm the founder and I read every reply. What felt off, what was confusing, what almost made you close the tab. One sentence is plenty.
+
+Nothing to click, just hit reply.
+
+Nikayel
+
+${reminderTextFooter(options)}
   `.trim()
 }

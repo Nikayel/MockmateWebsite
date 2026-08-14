@@ -22,10 +22,8 @@ async function createWelcomeNotification(userId: string, displayName?: string): 
       id: notificationRef.id,
       userId,
       type: "welcome",
-      title: "Welcome to CodeSparring! 🎉",
-      body: displayName
-        ? `Hey ${displayName.split(" ")[0]}, you're all set! Start your first practice session to begin crushing those interviews.`
-        : "You're all set! Start your first practice session to begin crushing those interviews.",
+      title: "Welcome to CodeSparring",
+      body: "You're set. Start your first practice session whenever you're ready.",
       link: "/practice",
       read: false,
       createdAt: new Date().toISOString(),

@@ -1,16 +1,25 @@
 /**
  * Email Notification Service
  *
- * Handles sending all types of notification emails:
- * - Welcome emails (on signup)
- * - Inactivity reminders (24h+)
- * - Spaced repetition reminders (based on forgetting curve)
- * - Milestone celebrations
+ * The send functions for every email CodeSparring delivers:
+ * - Welcome (on signup, with a cron fallback)
+ * - Activation nudge (signed up, never ran a session)
+ * - Inactivity, spaced repetition, and roadmap reminders (cron)
+ * - First-session feedback ask (cron)
+ * - Billing: payment failed, subscription confirm/cancel, trial ending,
+ *   yearly expiry reminder, yearly expired
+ *
+ * Reminder-class senders take the userId so they can mint a tokenized no-login
+ * unsubscribe link and the matching List-Unsubscribe headers. Transactional and
+ * billing emails carry neither: they are triggered by the user's own account
+ * activity and must always deliver.
  */
 
 import { sendEmail, upsertContact, EmailResult } from "./brevo"
 import { getAppBaseUrl } from "../site-url"
 import { DEFAULT_TIMEZONE, getTodayInTimezone, getDateInTimezone } from "./timezone"
+import { listUnsubscribeHeaders, unsubscribeUrlFor, type UnsubscribeCategory } from "./unsubscribe"
+import type { EmailRenderOptions } from "./templates"
 import {
   getWelcomeEmailSubject,
   getWelcomeEmailHtml,
@@ -24,18 +33,17 @@ import {
   getSpacedRepetitionEmailHtml,
   getSpacedRepetitionEmailText,
   SpacedRepetitionEmailData,
-  getMilestoneEmailSubject,
-  getMilestoneEmailHtml,
-  MilestoneEmailData,
   getDailyRoadmapEmailSubject,
   getDailyRoadmapEmailHtml,
   getDailyRoadmapEmailText,
   DailyRoadmapEmailData,
   getInterviewCountdownEmailSubject,
   getInterviewCountdownEmailHtml,
+  getInterviewCountdownEmailText,
   InterviewCountdownEmailData,
   getBehindScheduleEmailSubject,
   getBehindScheduleEmailHtml,
+  getBehindScheduleEmailText,
   BehindScheduleEmailData,
   getPaymentFailedEmailSubject,
   getPaymentFailedEmailHtml,
@@ -53,9 +61,34 @@ import {
   getTrialEndingEmailHtml,
   getTrialEndingEmailText,
   TrialEndingEmailData,
+  getYearlyExpiredEmailSubject,
+  getYearlyExpiredEmailHtml,
+  getYearlyExpiredEmailText,
+  YearlyExpiredEmailData,
+  getYearlyExpiryReminderEmailSubject,
+  getYearlyExpiryReminderEmailHtml,
+  getYearlyExpiryReminderEmailText,
+  YearlyExpiryReminderEmailData,
+  getActivationNudgeEmailSubject,
+  getActivationNudgeEmailHtml,
+  getActivationNudgeEmailText,
+  ActivationNudgeEmailData,
+  getFirstSessionFeedbackEmailSubject,
+  getFirstSessionFeedbackEmailHtml,
+  getFirstSessionFeedbackEmailText,
+  FirstSessionFeedbackEmailData,
 } from "./templates"
 
-const APP_URL = getAppBaseUrl()
+/** Unsubscribe link + headers for one reminder-class send. */
+function reminderDelivery(
+  userId: string,
+  category: UnsubscribeCategory
+): { renderOptions: EmailRenderOptions; headers?: Record<string, string> } {
+  return {
+    renderOptions: { unsubscribeUrl: unsubscribeUrlFor(userId, category) },
+    headers: listUnsubscribeHeaders(userId, category),
+  }
+}
 
 export async function sendWelcomeEmail(
   userId: string,
@@ -73,7 +106,7 @@ export async function sendWelcomeEmail(
   const data: WelcomeEmailData = {
     userName: displayName || "",
     userEmail: email,
-    appUrl: APP_URL,
+    appUrl: getAppBaseUrl(),
   }
 
   return sendEmail({
@@ -85,20 +118,62 @@ export async function sendWelcomeEmail(
   })
 }
 
-export async function sendInactivityEmail(
+// ACTIVATION NUDGE (reminder; rides the inactivity unsubscribe category)
+
+export async function sendActivationNudgeEmail(
+  userId: string,
   email: string,
-  data: Omit<InactivityEmailData, "appUrl">
+  data: Omit<ActivationNudgeEmailData, "appUrl">
 ): Promise<EmailResult> {
-  const emailData: InactivityEmailData = {
-    ...data,
-    appUrl: APP_URL,
-  }
+  const emailData: ActivationNudgeEmailData = { ...data, appUrl: getAppBaseUrl() }
+  const delivery = reminderDelivery(userId, "inactivity")
 
   return sendEmail({
     to: [{ email, name: data.userName }],
-    subject: getInactivityEmailSubject(data.hoursSinceLastSession),
-    htmlContent: getInactivityEmailHtml(emailData),
-    textContent: getInactivityEmailText(emailData),
+    subject: getActivationNudgeEmailSubject(),
+    htmlContent: getActivationNudgeEmailHtml(emailData, delivery.renderOptions),
+    textContent: getActivationNudgeEmailText(emailData, delivery.renderOptions),
+    headers: delivery.headers,
+    tags: ["activation-nudge", "onboarding"],
+  })
+}
+
+// FIRST-SESSION FEEDBACK ASK (reminder; rides the inactivity unsubscribe category)
+
+export async function sendFirstSessionFeedbackEmail(
+  userId: string,
+  email: string,
+  data: Omit<FirstSessionFeedbackEmailData, "appUrl">
+): Promise<EmailResult> {
+  const emailData: FirstSessionFeedbackEmailData = { ...data, appUrl: getAppBaseUrl() }
+  const delivery = reminderDelivery(userId, "inactivity")
+
+  return sendEmail({
+    to: [{ email, name: data.userName }],
+    subject: getFirstSessionFeedbackEmailSubject(),
+    htmlContent: getFirstSessionFeedbackEmailHtml(emailData, delivery.renderOptions),
+    textContent: getFirstSessionFeedbackEmailText(emailData, delivery.renderOptions),
+    headers: delivery.headers,
+    tags: ["first-session-feedback", "onboarding"],
+  })
+}
+
+// INACTIVITY REMINDER
+
+export async function sendInactivityEmail(
+  userId: string,
+  email: string,
+  data: Omit<InactivityEmailData, "appUrl">
+): Promise<EmailResult> {
+  const emailData: InactivityEmailData = { ...data, appUrl: getAppBaseUrl() }
+  const delivery = reminderDelivery(userId, "inactivity")
+
+  return sendEmail({
+    to: [{ email, name: data.userName }],
+    subject: getInactivityEmailSubject(data.hoursSinceLastSession, data.lastTopic),
+    htmlContent: getInactivityEmailHtml(emailData, delivery.renderOptions),
+    textContent: getInactivityEmailText(emailData, delivery.renderOptions),
+    headers: delivery.headers,
     tags: ["inactivity", "re-engagement"],
   })
 }
@@ -106,58 +181,39 @@ export async function sendInactivityEmail(
 // SPACED REPETITION REMINDER
 
 export async function sendSpacedRepetitionEmail(
+  userId: string,
   email: string,
   data: Omit<SpacedRepetitionEmailData, "appUrl">
 ): Promise<EmailResult> {
-  const emailData: SpacedRepetitionEmailData = {
-    ...data,
-    appUrl: APP_URL,
-  }
+  const emailData: SpacedRepetitionEmailData = { ...data, appUrl: getAppBaseUrl() }
+  const delivery = reminderDelivery(userId, "spaced_repetition")
 
   return sendEmail({
     to: [{ email, name: data.userName }],
     subject: getSpacedRepetitionEmailSubject(emailData),
-    htmlContent: getSpacedRepetitionEmailHtml(emailData),
-    textContent: getSpacedRepetitionEmailText(emailData),
+    htmlContent: getSpacedRepetitionEmailHtml(emailData, delivery.renderOptions),
+    textContent: getSpacedRepetitionEmailText(emailData, delivery.renderOptions),
+    headers: delivery.headers,
     tags: ["spaced-repetition", "learning"],
-  })
-}
-
-// MILESTONE CELEBRATION
-
-export async function sendMilestoneEmail(
-  email: string,
-  data: Omit<MilestoneEmailData, "appUrl">
-): Promise<EmailResult> {
-  const emailData: MilestoneEmailData = {
-    ...data,
-    appUrl: APP_URL,
-  }
-
-  return sendEmail({
-    to: [{ email, name: data.userName }],
-    subject: getMilestoneEmailSubject(emailData),
-    htmlContent: getMilestoneEmailHtml(emailData),
-    tags: ["milestone", "celebration"],
   })
 }
 
 // ROADMAP: DAILY PRACTICE REMINDER
 
 export async function sendDailyRoadmapEmail(
+  userId: string,
   email: string,
   data: Omit<DailyRoadmapEmailData, "appUrl">
 ): Promise<EmailResult> {
-  const emailData: DailyRoadmapEmailData = {
-    ...data,
-    appUrl: APP_URL,
-  }
+  const emailData: DailyRoadmapEmailData = { ...data, appUrl: getAppBaseUrl() }
+  const delivery = reminderDelivery(userId, "roadmap")
 
   return sendEmail({
     to: [{ email, name: data.userName }],
     subject: getDailyRoadmapEmailSubject(emailData),
-    htmlContent: getDailyRoadmapEmailHtml(emailData),
-    textContent: getDailyRoadmapEmailText(emailData),
+    htmlContent: getDailyRoadmapEmailHtml(emailData, delivery.renderOptions),
+    textContent: getDailyRoadmapEmailText(emailData, delivery.renderOptions),
+    headers: delivery.headers,
     tags: ["roadmap", "daily-reminder"],
   })
 }
@@ -165,18 +221,19 @@ export async function sendDailyRoadmapEmail(
 // ROADMAP: INTERVIEW COUNTDOWN
 
 export async function sendInterviewCountdownEmail(
+  userId: string,
   email: string,
   data: Omit<InterviewCountdownEmailData, "appUrl">
 ): Promise<EmailResult> {
-  const emailData: InterviewCountdownEmailData = {
-    ...data,
-    appUrl: APP_URL,
-  }
+  const emailData: InterviewCountdownEmailData = { ...data, appUrl: getAppBaseUrl() }
+  const delivery = reminderDelivery(userId, "roadmap")
 
   return sendEmail({
     to: [{ email, name: data.userName }],
     subject: getInterviewCountdownEmailSubject(emailData),
-    htmlContent: getInterviewCountdownEmailHtml(emailData),
+    htmlContent: getInterviewCountdownEmailHtml(emailData, delivery.renderOptions),
+    textContent: getInterviewCountdownEmailText(emailData, delivery.renderOptions),
+    headers: delivery.headers,
     tags: ["roadmap", "interview-countdown"],
   })
 }
@@ -184,18 +241,19 @@ export async function sendInterviewCountdownEmail(
 // ROADMAP: BEHIND SCHEDULE ALERT
 
 export async function sendBehindScheduleEmail(
+  userId: string,
   email: string,
   data: Omit<BehindScheduleEmailData, "appUrl">
 ): Promise<EmailResult> {
-  const emailData: BehindScheduleEmailData = {
-    ...data,
-    appUrl: APP_URL,
-  }
+  const emailData: BehindScheduleEmailData = { ...data, appUrl: getAppBaseUrl() }
+  const delivery = reminderDelivery(userId, "roadmap")
 
   return sendEmail({
     to: [{ email, name: data.userName }],
     subject: getBehindScheduleEmailSubject(emailData),
-    htmlContent: getBehindScheduleEmailHtml(emailData),
+    htmlContent: getBehindScheduleEmailHtml(emailData, delivery.renderOptions),
+    textContent: getBehindScheduleEmailText(emailData, delivery.renderOptions),
+    headers: delivery.headers,
     tags: ["roadmap", "behind-schedule"],
   })
 }
@@ -206,10 +264,7 @@ export async function sendPaymentFailedEmail(
   email: string,
   data: Omit<PaymentFailedEmailData, "appUrl">
 ): Promise<EmailResult> {
-  const emailData: PaymentFailedEmailData = {
-    ...data,
-    appUrl: APP_URL,
-  }
+  const emailData: PaymentFailedEmailData = { ...data, appUrl: getAppBaseUrl() }
 
   return sendEmail({
     to: [{ email, name: data.userName }],
@@ -226,10 +281,7 @@ export async function sendSubscriptionConfirmationEmail(
   email: string,
   data: Omit<SubscriptionConfirmationEmailData, "appUrl">
 ): Promise<EmailResult> {
-  const emailData: SubscriptionConfirmationEmailData = {
-    ...data,
-    appUrl: APP_URL,
-  }
+  const emailData: SubscriptionConfirmationEmailData = { ...data, appUrl: getAppBaseUrl() }
 
   return sendEmail({
     to: [{ email, name: data.userName }],
@@ -246,10 +298,7 @@ export async function sendSubscriptionCancellationEmail(
   email: string,
   data: Omit<SubscriptionCancellationEmailData, "appUrl">
 ): Promise<EmailResult> {
-  const emailData: SubscriptionCancellationEmailData = {
-    ...data,
-    appUrl: APP_URL,
-  }
+  const emailData: SubscriptionCancellationEmailData = { ...data, appUrl: getAppBaseUrl() }
 
   return sendEmail({
     to: [{ email, name: data.userName }],
@@ -260,20 +309,51 @@ export async function sendSubscriptionCancellationEmail(
   })
 }
 
-// TRIAL ENDING NOTIFICATION
+// YEARLY PLAN EXPIRED (downgrade-day goodbye; one-time payment, nothing charged)
+
+export async function sendYearlyExpiredEmail(
+  email: string,
+  data: Omit<YearlyExpiredEmailData, "appUrl">
+): Promise<EmailResult> {
+  const emailData: YearlyExpiredEmailData = { ...data, appUrl: getAppBaseUrl() }
+
+  return sendEmail({
+    to: [{ email, name: data.userName }],
+    subject: getYearlyExpiredEmailSubject(),
+    htmlContent: getYearlyExpiredEmailHtml(emailData),
+    textContent: getYearlyExpiredEmailText(emailData),
+    tags: ["subscription", "yearly-expired"],
+  })
+}
+
+// YEARLY EXPIRY REMINDER (7-day and 1-day marks before a one-time yearly plan ends)
+
+export async function sendYearlyExpiryReminderEmail(
+  email: string,
+  data: Omit<YearlyExpiryReminderEmailData, "appUrl">
+): Promise<EmailResult> {
+  const emailData: YearlyExpiryReminderEmailData = { ...data, appUrl: getAppBaseUrl() }
+
+  return sendEmail({
+    to: [{ email, name: data.userName }],
+    subject: getYearlyExpiryReminderEmailSubject(emailData),
+    htmlContent: getYearlyExpiryReminderEmailHtml(emailData),
+    textContent: getYearlyExpiryReminderEmailText(emailData),
+    tags: ["subscription", "yearly-expiry-reminder"],
+  })
+}
+
+// TRIAL ENDING NOTIFICATION (Stripe trial_will_end only: a real auto-charge is coming)
 
 export async function sendTrialEndingEmail(
   email: string,
   data: Omit<TrialEndingEmailData, "appUrl">
 ): Promise<EmailResult> {
-  const emailData: TrialEndingEmailData = {
-    ...data,
-    appUrl: APP_URL,
-  }
+  const emailData: TrialEndingEmailData = { ...data, appUrl: getAppBaseUrl() }
 
   return sendEmail({
     to: [{ email, name: data.userName }],
-    subject: getTrialEndingEmailSubject(),
+    subject: getTrialEndingEmailSubject(emailData),
     htmlContent: getTrialEndingEmailHtml(emailData),
     textContent: getTrialEndingEmailText(emailData),
     tags: ["subscription", "trial-ending"],
@@ -287,7 +367,8 @@ export interface NotificationPreferences {
   welcome_email: boolean
   inactivity_reminders: boolean
   spaced_repetition_reminders: boolean
-  milestone_celebrations: boolean
+  /** Deprecated: milestone emails were removed 2026-08-14; field kept because stored docs carry it. */
+  milestone_celebrations?: boolean
   roadmap_reminders: boolean
   marketing_emails: boolean
   timezone?: string
@@ -301,7 +382,6 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   welcome_email: true,
   inactivity_reminders: true,
   spaced_repetition_reminders: true,
-  milestone_celebrations: true,
   roadmap_reminders: true,
   marketing_emails: false,
   preferred_hours: [9, 10, 11, 14, 15, 19, 20],
