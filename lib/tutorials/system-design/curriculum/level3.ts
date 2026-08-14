@@ -818,6 +818,255 @@ the indexed term, so a lookup hits one index partition, but writes must update a
 that may live on a different node, making writes slower and asynchronous (DynamoDB GSI). The index
 does not live for free on one node.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "A secondary index on a sharded table: local versus global",
+  "frames": [
+    {
+      "note": "The orders table is sharded by order_id. The partition function knows nothing about status, so a query filtering on status has no idea which partition to ask.",
+      "rows": [
+        {
+          "label": "p0 (orders 1-25)",
+          "cells": [
+            {
+              "text": "order 11 status=NEW"
+            },
+            {
+              "text": "order 24 status=SHIPPED"
+            }
+          ]
+        },
+        {
+          "label": "p1 (orders 26-50)",
+          "cells": [
+            {
+              "text": "order 31 status=SHIPPED"
+            },
+            {
+              "text": "order 47 status=NEW"
+            }
+          ]
+        },
+        {
+          "label": "p2 (orders 51-75)",
+          "cells": [
+            {
+              "text": "order 52 status=NEW"
+            },
+            {
+              "text": "order 70 status=NEW"
+            }
+          ]
+        },
+        {
+          "label": "p3 (orders 76-100)",
+          "cells": [
+            {
+              "text": "order 88 status=SHIPPED"
+            },
+            {
+              "text": "order 92 status=NEW"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "A local index lives beside its own partition's data and can only answer for those rows, so the coordinator scatters the read to all four partitions and merges. The query is now bounded by the slowest node.",
+      "predict": {
+        "question": "Every partition carries a local index on status. The query is status=SHIPPED. How many partitions does the read touch?",
+        "options": [
+          "One: the index points straight at the matching rows",
+          "All four: each index only covers its own partition",
+          "Two: an index halves the search space"
+        ]
+      },
+      "rows": [
+        {
+          "label": "p0 (orders 1-25)",
+          "cells": [
+            {
+              "text": "local index on status",
+              "state": "active"
+            },
+            {
+              "text": "1 match returned",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "p1 (orders 26-50)",
+          "cells": [
+            {
+              "text": "local index on status",
+              "state": "active"
+            },
+            {
+              "text": "1 match returned",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "p2 (orders 51-75)",
+          "cells": [
+            {
+              "text": "local index on status",
+              "state": "active"
+            },
+            {
+              "text": "0 matches, scanned anyway",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "p3 (orders 76-100)",
+          "cells": [
+            {
+              "text": "local index on status",
+              "state": "active"
+            },
+            {
+              "text": "1 match returned",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The write side is where the local index wins. A new order touches one partition and that partition's own index, inside one node and one transaction.",
+      "rows": [
+        {
+          "label": "p0 (orders 1-25)",
+          "cells": [
+            {
+              "text": "idle",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "p1 (orders 26-50)",
+          "cells": [
+            {
+              "text": "idle",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "p2 (orders 51-75)",
+          "cells": [
+            {
+              "text": "order 61 status=NEW written",
+              "state": "new"
+            },
+            {
+              "text": "local index updated here",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "p3 (orders 76-100)",
+          "cells": [
+            {
+              "text": "idle",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "A global index is partitioned by the indexed term rather than by the data, so the same status=SHIPPED read hits exactly one index partition and then fetches the three orders it names.",
+      "rows": [
+        {
+          "label": "global index gp0",
+          "cells": [
+            {
+              "text": "term status=NEW",
+              "state": "dim"
+            },
+            {
+              "text": "orders 11, 47, 52, 70, 92",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "global index gp1",
+          "cells": [
+            {
+              "text": "term status=SHIPPED",
+              "state": "active"
+            },
+            {
+              "text": "orders 24, 31, 88",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "data partitions",
+          "cells": [
+            {
+              "text": "p0"
+            },
+            {
+              "text": "p1"
+            },
+            {
+              "text": "p3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The cost moved onto the write. The entry belongs to whichever index partition owns that term, which is normally a different node, so the update is cross-node and usually asynchronous. That is the trade: read-cheap, write-expensive.",
+      "predict": {
+        "question": "Order 61 is written on data partition p2 with status=NEW. Where must its global index entry go?",
+        "options": [
+          "Onto p2, beside the row it describes",
+          "Onto gp0, the index partition that owns status=NEW, on another node",
+          "Nowhere: a global index is rebuilt on a schedule"
+        ]
+      },
+      "rows": [
+        {
+          "label": "data partition p2",
+          "cells": [
+            {
+              "text": "order 61 status=NEW",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "global index gp0",
+          "cells": [
+            {
+              "text": "term status=NEW gains order 61",
+              "state": "new"
+            },
+            {
+              "text": "a different node",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Local index: single-node writes, scatter-gather reads. Global index: single-partition reads, cross-node asynchronous writes. Pick by which side your dominant query sits on."
+}
+\`\`\`
+
 **Interview nuance:** always map the dominant queries onto the partition scheme out loud. "This query
 hits one partition, that one is scatter-gather bounded by the slowest node." Interviewers are
 checking whether you know which reads got expensive, not just that you sprinkled the word "shard."
@@ -1098,6 +1347,83 @@ hashing helps: it is one key, so it is one node. Mitigations, roughly in order o
 - **Caching + fan-out-on-read:** for a celebrity's timeline, cache aggressively and read the
   celebrity's posts at read time rather than fanning out writes to 100M follower inboxes (the classic
   Twitter hybrid).
+
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "The celebrity key: what more shards buy, and what only splitting the key buys",
+  "predictPrompt": {
+    "question": "One celebrity key draws 30 percent of all traffic on a 32-shard cluster. You double the cluster to 64 shards. What happens to the shard that owns that key?",
+    "options": [
+      "Its load halves, like every other shard's",
+      "It barely moves: one key still lives on one shard",
+      "It drops to the cluster average once vnodes rebalance"
+    ]
+  },
+  "workedExample": "Start at 32 shards, one celebrity key drawing 30 percent of all traffic, and no key splitting (1 bucket). The other 70 percent spreads across 32 shards, so an ordinary shard carries 70 / 32, about 2.19 percent of all traffic. The shard that owns the celebrity carries its own ordinary slice plus the entire 30 percent, about 32.19 percent, which is roughly 14.7 times an ordinary shard. Now drag the shard count to 64 and watch the imbalance get worse rather than better: ordinary shards halve to about 1.09 percent while the hot shard barely moves, so the ratio climbs past 28. Only the bucket slider touches it. Splitting the key across 8 salted buckets drops the hot shard to about 5.94 percent and the imbalance to roughly 2.7.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "shards",
+      "label": "Physical shards in the cluster",
+      "min": 8,
+      "max": 256,
+      "scale": "log",
+      "initial": 32,
+      "unit": "shards"
+    },
+    {
+      "kind": "slider",
+      "id": "hotShare",
+      "label": "Traffic aimed at the one celebrity key",
+      "min": 1,
+      "max": 60,
+      "scale": "linear",
+      "step": 1,
+      "initial": 30,
+      "unit": "percent of all traffic"
+    },
+    {
+      "kind": "slider",
+      "id": "buckets",
+      "label": "Salted buckets the hot key is split across",
+      "min": 1,
+      "max": 64,
+      "scale": "linear",
+      "step": 1,
+      "initial": 1,
+      "unit": "buckets"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "normalShard",
+      "label": "Load on an ordinary shard",
+      "expr": "(100 - hotShare) / shards",
+      "format": "number",
+      "unit": "percent of all traffic"
+    },
+    {
+      "id": "hotShard",
+      "label": "Load on the shard owning the hot key",
+      "expr": "hotShare / buckets + normalShard",
+      "format": "number",
+      "unit": "percent of all traffic"
+    },
+    {
+      "id": "imbalance",
+      "label": "Hot shard versus an ordinary shard",
+      "expr": "hotShard / normalShard",
+      "format": "number",
+      "unit": "x",
+      "sparkline": {
+        "over": "shards"
+      }
+    }
+  ],
+  "caption": "Consistent hashing balances load across keys and cannot split load within one key. Buying more shards moves every number here except the one that matters; splitting the key is what moves it."
+}
+\`\`\`
 
 **Entity groups / co-location:** deliberately put data that is transacted together on the same
 partition so common operations stay single-shard (Google Megastore's entity groups, and the reason
