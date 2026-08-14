@@ -705,11 +705,13 @@ spec:
         periodSeconds: 2
       lifecycle:
         preStop:
-          exec:
-            # Runs BEFORE SIGTERM, and the kubelet blocks on it. Ten seconds of staying
-            # healthy and serving while the endpoint deletion reaches every proxy.
-            command: ["sleep", "10"]
+          # Runs BEFORE SIGTERM, and the kubelet blocks on it. Ten seconds of staying
+          # healthy and serving while the endpoint deletion reaches every proxy.
+          sleep:
+            seconds: 10
 \`\`\`
+
+The native \`sleep\` action is 1.30 and later. Before that the same pause was written \`exec: {command: ["/bin/sh", "-c", "sleep 10"]}\`, which needs a shell inside the image, so it silently does nothing on the distroless base recommended at the top of this lesson. A \`preStop\` hook that fails is logged and then skipped, and the Pod goes straight to SIGTERM, which is the failure mode where you shipped the fix and kept the bug.
 
 Walk the resulting order once, because the useful part is that \`preStop\` runs first. Second 0: the Pod is marked terminating, endpoint removal starts propagating, and the kubelet runs the hook. Seconds 0 to 10: the container is untouched and still answering, so the stragglers arriving from proxies that have not caught up are served normally. Second 10: the hook returns, the container gets SIGTERM, and the app stops accepting new connections and finishes what it is holding. Second 45: SIGKILL, and anything unfinished is lost. So the grace period has to exceed the hook plus your longest request, which is why 45 is written here rather than the default 30: a 10 second hook plus a request that can legitimately take 30 seconds does not fit in 30.
 
