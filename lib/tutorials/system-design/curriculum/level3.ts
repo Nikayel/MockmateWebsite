@@ -2229,17 +2229,17 @@ query into a 1D or hierarchical key** you can index, shard, and range-scan.
   "prompt": "You add B-tree indexes on lat and lng and run 'WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?'. Why does this stay slow at scale?",
   "options": [
     {
-      "label": "The database can use an index for only one of the two range predicates; the other still filters a huge candidate strip",
+      "label": "Only one of the two range predicates can use an index",
       "correct": true,
-      "feedback": "Right. Two independent range predicates do not compose in one B-tree, so the query scans an entire latitude band and filters the rest. That is exactly why we encode both dimensions into a single indexable key."
+      "feedback": "Right. Two independent range predicates do not compose in one B-tree, so the engine picks one, scans an entire latitude band, and filters the rest of the candidate strip row by row. That is exactly why we encode both dimensions into a single indexable key."
     },
     {
       "label": "B-trees cannot index floating point columns",
       "feedback": "Tempting if you have heard B-trees prefer discrete keys, but they index floats fine. The blocker is the shape of the query, not the column type."
     },
     {
-      "label": "The query plan is fine; the only real issue is that Euclidean distance is wrong on a sphere",
-      "feedback": "Spherical distance is a real second problem, but even with perfect distance math the two-range predicate cannot use a B-tree effectively. The index shape fails first."
+      "label": "The plan is fine, the real problem is spherical distance",
+      "feedback": "Spherical distance is a real second problem, but even with perfect distance math the two-range predicate still cannot use a B-tree effectively. The index shape fails first."
     }
   ]
 }
@@ -2388,19 +2388,19 @@ per-cell caps, separate sharding, and caching.
 {
   "type": "check",
   "kind": "predict",
-  "prompt": "A concert ends and thirty thousand riders and drivers flood the single cell around the stadium. What fails, and what is the fix?",
+  "prompt": "A concert ends and thirty thousand riders and drivers flood the single cell around the stadium. What breaks first?",
   "options": [
     {
-      "label": "Nothing fails: the cell key still indexes every point, so queries stay fast",
-      "feedback": "The index stays correct, but one cell now holds a giant point set on one shard, so every nearby query scans it and every ping writes to it. Correctness survives; the hotspot does not."
+      "label": "Nothing breaks, the cell key still indexes every point",
+      "feedback": "The index stays correct, and that is the trap: correctness survives while throughput does not. One cell now holds a giant point set on one shard, so every nearby query scans it and every driver ping writes to it."
     },
     {
-      "label": "One hot cell hammers a single shard on reads and writes; subdivide it to a finer resolution, cap points per cell, shard it separately, and cache results",
+      "label": "One hot cell saturates a single shard",
       "correct": true,
-      "feedback": "Right. The hot cell is the failure mode that separates senior answers, and the fix is deliberate: adaptive subdivision plus caps, separate sharding, and caching, not a bigger machine."
+      "feedback": "Right. Reads and writes for the whole stadium land on the one shard that owns that cell, and no amount of index tuning moves them. The fix is deliberate: subdivide that cell to a finer resolution, cap points per cell, shard it separately, and cache the popular results."
     },
     {
-      "label": "The geohash or H3 library automatically splits hot cells for you",
+      "label": "The geohash or H3 library splits hot cells for you",
       "feedback": "Tempting because the schemes are hierarchical, so finer levels always exist, but nothing switches levels on your behalf. Deciding when and where to drop to a finer resolution is your design decision."
     }
   ],
