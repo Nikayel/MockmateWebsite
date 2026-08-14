@@ -3787,9 +3787,9 @@ An ad click aggregator ingests a high-volume stream of click events and produces
   "prompt": "A click consumer restarts and Kafka redelivers the last batch. Your aggregator does a plain increment per event. What did the advertiser get billed for?",
   "options": [
     {
-      "label": "Clicks that happened once but were counted twice, because at-least-once delivery plus a blind increment double counts on every replay",
+      "label": "Clicks that happened once and were counted twice",
       "correct": true,
-      "feedback": "Right, and because clicks are money, that is fraud by bug. The fix is dedup on a click id, or a processor whose state update and offset commit are atomic."
+      "feedback": "Right, and because clicks are money that is fraud by bug. At-least-once delivery plus a blind increment double counts on every replay. The fix is dedup on a click id, or a processor whose state update and offset commit are atomic."
     },
     {
       "label": "Nothing extra: the offsets were committed, so redelivered events are skipped",
@@ -3816,9 +3816,9 @@ The naive design fails immediately. If you just do \`counter++\` per event on an
   "prompt": "Ingestion lags by ten minutes during a spike. If you window clicks by the time your consumer saw them, what happens to the per minute campaign counts?",
   "options": [
     {
-      "label": "Clicks are attributed to the wrong minute, so the shape of the campaign's traffic is wrong even when the daily total is right",
+      "label": "Clicks are attributed to the wrong minute, so the shape is wrong",
       "correct": true,
-      "feedback": "Right, which is why you window on event time, when the click happened, rather than processing time, when you saw it."
+      "feedback": "Right. The daily total can still come out right while the shape of the campaign's traffic is nonsense, which is the harder error to notice. That is why you window on event time, when the click happened, rather than processing time, when you saw it."
     },
     {
       "label": "Nothing: the counts are identical, just delivered ten minutes later",
@@ -3884,9 +3884,9 @@ Hot campaigns create counter hotspots; a viral ad might take millions of increme
   "prompt": "The advertiser dashboard shows 41,102 clicks for a campaign and the billing run shows 40,987. Which is right, and why do both exist?",
   "options": [
     {
-      "label": "Billing: the batch or replayed path recomputes exact, deduplicated, fraud filtered numbers over the raw log, while the streaming path trades a little accuracy for immediacy",
+      "label": "Billing, because the batch path recomputes over the raw log",
       "correct": true,
-      "feedback": "Right. The fast path is allowed to be approximate precisely because a slower authoritative path reconciles it, which is the whole point of Lambda and Kappa."
+      "feedback": "Right. The batch or replayed path recomputes exact, deduplicated, fraud filtered numbers from the retained raw log, while the streaming path trades a little accuracy for immediacy. The fast path is allowed to be approximate precisely because a slower authoritative path reconciles it, which is the whole point of Lambda and Kappa."
     },
     {
       "label": "The dashboard: it is closest to the live stream, and the batch job is a stale snapshot",
@@ -4227,9 +4227,9 @@ The matching rule is price-time priority over a limit order book: for buys, high
   "prompt": "The matching engine is single threaded per instrument. Why is that better here than a thread pool taking a lock per order?",
   "options": [
     {
-      "label": "The bottleneck is determinism and tail latency, not CPU throughput: locks cost microseconds and thread scheduling would decide tie breaks",
+      "label": "The bottleneck is determinism and tail latency, not throughput",
       "correct": true,
-      "feedback": "Right. A lock free single writer over a sequenced input stream gives reproducible output and a tight tail, which a sharded transactional database cannot."
+      "feedback": "Right. A lock costs microseconds this domain does not have, and worse, thread scheduling would decide tie breaks, which makes the output different on every run. A lock free single writer over a sequenced input stream gives reproducible fills and a tight tail, which a sharded transactional database cannot."
     },
     {
       "label": "Because one thread gets more CPU cache to itself than several threads combined",
@@ -4258,9 +4258,9 @@ The order book lives entirely in memory (arrays or intrusive structures per pric
   "prompt": "Each fill needs a timestamp, and two orders arriving together need a tie break. Where do both come from?",
   "options": [
     {
-      "label": "From the sequence number the sequencer assigned, because reading a wall clock or randomizing a tie makes a replay produce different fills",
+      "label": "From the sequence number the sequencer assigned",
       "correct": true,
-      "feedback": "Right. Determinism means the same ordered input always yields identical output, so every decision has to be a function of the sequenced stream."
+      "feedback": "Right. Determinism means the same ordered input always yields identical output, so every decision has to be a function of the sequenced stream. Read a wall clock or randomize a tie and the replay produces different fills, which is exactly what the audit forbids."
     },
     {
       "label": "From the machine clock, kept tightly synchronized so all engines agree",
@@ -4298,9 +4298,9 @@ Market-data fan-out must not slow matching: publish trades and book deltas onto 
   "prompt": "The primary matching engine dies mid session. How does the exchange come back with the identical book?",
   "options": [
     {
-      "label": "Replay the replicated sequenced journal from the last snapshot into a fresh engine, which reproduces every fill because matching is deterministic",
+      "label": "Replay the replicated journal from the last snapshot",
       "correct": true,
-      "feedback": "Right. Event sourcing plus determinism is what makes recovery exact rather than approximate, and snapshots exist only to bound how much of the day you replay."
+      "feedback": "Right. Because matching is deterministic, replaying the sequenced journal into a fresh engine reproduces every fill exactly rather than approximately, which is what event sourcing buys here. The snapshot exists only to bound how much of the day you have to replay."
     },
     {
       "label": "Restore the most recent snapshot and accept that fills after it are lost",
