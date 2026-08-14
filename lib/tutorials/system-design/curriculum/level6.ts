@@ -1720,12 +1720,93 @@ Since delivery itself cannot be exactly-once (the impossibility is stated above 
 }
 \`\`\`
 
-\`\`\`
-  producer --(at-least-once delivery, may duplicate)--> broker --> consumer
-                                                                      |
-                              [ idempotency / transaction here ]  <---+
-                                                                      |
-                                                            effectively-once effect
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Where the exactly-once promise actually lives",
+  "nodes": [
+    {
+      "id": "producer",
+      "label": "Producer (retries a lost ack)",
+      "kind": "service"
+    },
+    {
+      "id": "broker",
+      "label": "Broker (at-least-once)",
+      "kind": "queue"
+    },
+    {
+      "id": "consumer",
+      "label": "Consumer (process, then commit)",
+      "kind": "service"
+    },
+    {
+      "id": "dedup",
+      "label": "Idempotency key store (atomic check-and-set)",
+      "kind": "db"
+    },
+    {
+      "id": "effect",
+      "label": "Effect applied once",
+      "kind": "external"
+    }
+  ],
+  "edges": [
+    {
+      "from": "producer",
+      "to": "broker",
+      "kind": "async",
+      "label": "may duplicate"
+    },
+    {
+      "from": "broker",
+      "to": "consumer",
+      "kind": "async",
+      "label": "redelivers until acked"
+    },
+    {
+      "from": "consumer",
+      "to": "broker",
+      "kind": "feedback",
+      "label": "commit after success"
+    },
+    {
+      "from": "consumer",
+      "to": "dedup",
+      "kind": "sync",
+      "label": "seen this key?"
+    },
+    {
+      "from": "dedup",
+      "to": "effect",
+      "kind": "sync",
+      "label": "first time only"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "producer",
+        "broker"
+      ],
+      "note": "A sender that never gets an ack cannot tell a lost message from a lost ack, so the requirement to never lose a message forces it to retry, and the broker has to accept the duplicate."
+    },
+    {
+      "adds": [
+        "consumer"
+      ],
+      "note": "The guarantee is decided by where the ack sits. Committing after the work is what makes this at-least-once: a crash in between means the broker redelivers rather than drops."
+    },
+    {
+      "adds": [
+        "dedup",
+        "effect"
+      ],
+      "note": "The requirement is that the charge happens once, and no transport can supply that, so the promise has to be paid at the consumer by an atomic check-and-set the effect passes through."
+    }
+  ],
+  "caption": "Delivery stays at-least-once the whole way. Exactly-once is a property of the effect, not of the transport, which is why Kafka EOS covers only offsets and records inside Kafka and an email, a charge, or a non-transactional write needs its own idempotency key."
+}
 \`\`\`
 
 ## Interview nuance: what Kafka EOS actually covers
