@@ -1823,9 +1823,9 @@ A single user lives in the primary DB, read replicas, Redis caches, an Elasticse
       "feedback": "That erases the user, but it also destroys your disaster-recovery and ransomware protection for every other user. Immutable backups exist for a reason."
     },
     {
-      "label": "Destroy the user's per-user encryption key so the backup copy becomes unrecoverable",
+      "label": "Destroy the user's per-user encryption key",
       "correct": true,
-      "feedback": "Right. This is crypto-shredding: encrypt each user's data with a per-user key, and erase by destroying that key. The ciphertext frozen in old backups becomes noise, which regulators accept as effective erasure."
+      "feedback": "Right, and the backup copy becomes unrecoverable. This is crypto-shredding: encrypt each user's data with a per-user key, and erase by destroying that key. The ciphertext frozen in old backups becomes noise, the snapshot stays immutable for disaster recovery, and regulators accept it as effective erasure."
     }
   ]
 }
@@ -1907,9 +1907,9 @@ Three defenses that share a theme: prove what happened, block the obvious attack
       "feedback": "They were logged, but an admin who can rewrite or delete entries can erase their own trail afterward. Evidence you cannot trust is not evidence."
     },
     {
-      "label": "Little to none: an admin-level attacker can quietly rewrite the history you would investigate with",
+      "label": "Little to none: an admin can rewrite the trail",
       "correct": true,
-      "feedback": "Right. The whole value of an audit log is that nobody, including an insider with admin, can silently alter it. That is why it must be separate from application logs and tamper-evident."
+      "feedback": "Right. An admin-level attacker can quietly rewrite or delete the history you would investigate with, and evidence you cannot trust is not evidence. The whole value of an audit log is that nobody, including an insider with admin, can silently alter it, which is why it must be separate from application logs and tamper-evident."
     },
     {
       "label": "Full value as long as the log entries are encrypted",
@@ -2067,9 +2067,9 @@ Lessons    -> blameless postmortem, fix root cause
       "feedback": "Tempting, but verifiers cannot tell attacker-minted tokens from legitimate ones. Both were signed by the same key, and both fail verification the instant that key disappears."
     },
     {
-      "label": "Every user is logged out at once: you have added a self-inflicted outage to the breach",
+      "label": "Every user is logged out at once",
       "correct": true,
-      "feedback": "Right. A hard cutover invalidates every valid token simultaneously. The fix is overlapping validity: add the new key, flip signing, shrink TTLs so old tokens age out fast, then pull the compromised 'kid'."
+      "feedback": "Right, so you have added a self-inflicted outage on top of the breach. A hard cutover invalidates every valid token simultaneously, because verifiers cannot tell attacker-minted tokens from legitimate ones. The fix is overlapping validity: add the new key to the JWKS, flip signing to it, shrink TTLs so old tokens age out fast, then pull the compromised 'kid'."
     },
     {
       "label": "Nothing changes until the tokens expire on their own",
