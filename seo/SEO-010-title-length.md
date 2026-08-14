@@ -5,6 +5,25 @@
 **Blocking:** no
 **Effort:** small, this is a short list
 
+## Status: the metadata half is fixed in code. What is left is the content half.
+
+**Updated 2026-08-13.** This ticket used to be the whole problem. It is now the smaller part of it.
+
+The larger part was never the titles: it was that `learnLessonMetadata` bolted
+` · Learn System Design` onto every one of them, and `app/layout.tsx` then appended
+` | CodeSparring`, for 37 characters of suffix against a roughly 60-character budget. So a lesson
+whose own name ran past 24 characters truncated before the searcher read what the page was about.
+Five system design pages sat on page one for 28 days at an average position near 7 and returned
+zero clicks against an expected two to four.
+
+That is fixed. The suffix now degrades in three rungs (full course label, brand alone, then
+`title.absolute`) and `lib/seo/__tests__/learn-title-budget.test.ts` asserts over the live corpus
+that composition never makes a title longer than the lesson's own name plus the brand.
+
+**What remains is exactly the 27 lessons whose own titles exceed 60 characters**, which now render
+with no suffix at all and still do not fit. The metadata layer deliberately does NOT truncate them:
+silently shortening a title would hide this list from the test that should surface it.
+
 ## Why
 
 Lesson titles become the SERP title. Google truncates around 60 characters, and the title template
@@ -51,3 +70,7 @@ No lesson title exceeds 60 characters, or the remaining ones are deliberate and 
 
 The hygiene test (`lib/tutorials/__tests__/lesson-content-hygiene.test.ts`) reports this count on
 every run without failing, so the number stays visible as the corpus grows.
+
+`lib/seo/__tests__/learn-title-budget.test.ts` covers the other half and DOES fail: it asserts that
+the composed title never exceeds the lesson's own title length plus the brand, so the suffix bug
+cannot come back while this list is being worked through.

@@ -5,6 +5,22 @@
 **Blocking:** no
 **Effort:** large but parallelizable, and it is the highest leverage copy pass available
 
+## Status: the System Design half is being rewritten now (2026-08-13)
+
+This ticket is live work, not a backlog item. A twelve-agent sweep, one per System Design level
+file, is rewriting every summary over 160 characters to a single searcher-facing sentence, tracked
+as SEO-35 in `curriculumfixesbacklog.md`. The Python and Data Engineering halves are untouched.
+
+Two things worth carrying forward when that lands:
+
+1. **The reporter becomes an assertion.** `lesson-content-hygiene.test.ts` currently prints the
+   count and passes, which CLAUDE.md's "enforce a convention with a test, not a document" rule says
+   is enforcement by nobody. It flips to failing once the System Design number reaches zero, with a
+   grandfathered allow-list for whatever remains in the other two courses.
+2. **The metadata fallback was the defect, not a workaround for it.** `truncateForDescription` cuts
+   at 155 on a word boundary, which is correct behaviour applied to text that should never have
+   needed it. Do not "fix" this by raising the truncation limit: Google shows what Google shows.
+
 ## Why
 
 Each lesson's authored `summary` is now its `<meta name="description">` and the text Google shows
