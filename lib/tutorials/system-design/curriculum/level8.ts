@@ -43,6 +43,219 @@ The core rule: never store a password, store a verifier you cannot reverse. Use 
 
 Every password gets a unique random per-user salt, stored alongside the hash. Salt defeats precomputed rainbow tables and means two users with the same password get different hashes. A pepper is an optional secret added to every hash that lives outside the database (in a KMS or app config), so a database-only dump still lacks the pepper needed to crack anything. Salt is per-user and public; pepper is global and secret.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "What each storage choice leaves an attacker holding",
+  "frames": [
+    {
+      "note": "The stolen table, worst case first. Three users, and two of them happened to pick the same password. Stored as plaintext the breach is total and instant, which everyone already knows. The next option is closer to this than people expect.",
+      "rows": [
+        {
+          "label": "ada",
+          "cells": [
+            {
+              "text": "hunter2",
+              "state": "dropped"
+            },
+            {
+              "text": "taken instantly",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "bo",
+          "cells": [
+            {
+              "text": "hunter2",
+              "state": "dropped"
+            },
+            {
+              "text": "taken instantly",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "cy",
+          "cells": [
+            {
+              "text": "correct horse",
+              "state": "dropped"
+            },
+            {
+              "text": "taken instantly",
+              "state": "dropped"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Now stored as unsalted SHA-256. It really is one-way, so nothing here reverses. Read the stored column and ask what it hands over anyway, before a single guess is made.",
+      "predict": {
+        "question": "Ada and Bo happen to have chosen the same password. What does an unsalted hash column give the attacker for free?",
+        "options": [
+          "Nothing at all: a one-way hash reveals nothing about its input",
+          "That Ada and Bo share a password, since equal inputs hash equal",
+          "Ada's password directly, because SHA-256 can be reversed"
+        ]
+      },
+      "rows": [
+        {
+          "label": "ada",
+          "cells": [
+            {
+              "text": "sha256 f52fc0d1",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "bo",
+          "cells": [
+            {
+              "text": "sha256 f52fc0d1",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "cy",
+          "cells": [
+            {
+              "text": "sha256 9b7423ae"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Two identical digests leak that Ada and Bo share a password, and one precomputed rainbow-table lookup maps that digest to hunter2 for both accounts at once. One lookup, two accounts taken, no guessing at all.",
+      "rows": [
+        {
+          "label": "ada",
+          "cells": [
+            {
+              "text": "sha256 f52fc0d1",
+              "state": "active"
+            },
+            {
+              "text": "rainbow table: hunter2",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "bo",
+          "cells": [
+            {
+              "text": "sha256 f52fc0d1",
+              "state": "active"
+            },
+            {
+              "text": "rainbow table: hunter2",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "cy",
+          "cells": [
+            {
+              "text": "sha256 9b7423ae"
+            },
+            {
+              "text": "rainbow table: no hit yet"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Add a unique random salt per user, stored in the clear right beside the hash. Ada and Bo now hold different digests for the same password, so the equality leak is gone and no precomputed table can cover every possible salt.",
+      "rows": [
+        {
+          "label": "ada",
+          "cells": [
+            {
+              "text": "salt 7q2v, hash 1ac9",
+              "state": "new"
+            },
+            {
+              "text": "must be attacked alone",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "bo",
+          "cells": [
+            {
+              "text": "salt k83m, hash e410",
+              "state": "new"
+            },
+            {
+              "text": "must be attacked alone",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "cy",
+          "cells": [
+            {
+              "text": "salt z0rt, hash 55bd",
+              "state": "new"
+            },
+            {
+              "text": "must be attacked alone",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Salt kills precomputation, not brute force, and SHA-256 is fast enough to brute force each user separately. argon2id tuned to 50 to 100 ms per verify is what prices every single guess, and a pepper held in a KMS means the dumped table on its own cannot even start.",
+      "rows": [
+        {
+          "label": "in the dump",
+          "cells": [
+            {
+              "text": "argon2id hash"
+            },
+            {
+              "text": "per-user salt"
+            }
+          ]
+        },
+        {
+          "label": "NOT in the dump",
+          "cells": [
+            {
+              "text": "the pepper, held in a KMS",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "attacker rate",
+          "cells": [
+            {
+              "text": "one guess per verify, per user",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Three controls, three different jobs: the salt kills precomputation, the memory-hard KDF prices each guess, and the pepper is the piece a database-only dump does not contain. Naming all three is what survives a database dump means."
+}
+\`\`\`
+
 **Interview nuance:** "Survives a database dump" is the phrase to earn. It means: memory-hard KDF, per-user salt, and ideally a pepper held in a KMS the DB backup does not contain. If your answer is "we encrypt the passwords," that is wrong, passwords are hashed not encrypted, because you never need to reverse them.
 
 ## MFA and the recovery attack surface

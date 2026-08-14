@@ -969,6 +969,91 @@ Self-hosting an LLM means the GPU is the budget, and inference efficiency is the
 
 A transformer generates one token at a time. For each new token it attends over all previous tokens, so it caches the key and value tensors of every prior token: the KV cache. That cache grows with sequence length and must stay in GPU memory (HBM) for the whole request. A single long-context request can hold gigabytes of KV cache. Since GPU memory is fixed (say 80GB on an H100, minus the model weights), the KV cache, not compute, is what caps how many requests you can run at once. Interview nuance: this is why "just batch more" is not free. Every concurrent request reserves KV memory.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "What Actually Caps Concurrency on One GPU",
+  "predictPrompt": {
+    "question": "An 80 GB GPU holds a 16 GB model, leaving 64 GB, and one request at an 8k sequence reserves 1 GB of KV cache. The team raises the context limit to 32k. How many requests run at once now?",
+    "options": [
+      "Still 64: context length changes latency, not how many requests fit",
+      "About 16, because each request now reserves four times the KV memory",
+      "More than 64, since longer prompts spend more of their time compute-bound"
+    ]
+  },
+  "workedExample": "The initial values are an 80 GB card holding 16 GB of weights, so 64 GB is left for KV cache. At 0.125 MB per token and an 8,192 token sequence one request reserves 1 GB, so 64 requests fit at once, and notice that nothing about the GPU's compute entered that calculation. Raise the sequence length and concurrency falls in proportion. Then drag the weights down to 4 GB, which is the AWQ move: KV per request does not change by a single byte, there is simply more room to put it.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "gpumem",
+      "label": "GPU memory (HBM)",
+      "min": 24,
+      "max": 192,
+      "scale": "linear",
+      "step": 8,
+      "initial": 80,
+      "unit": "GB"
+    },
+    {
+      "kind": "slider",
+      "id": "weights",
+      "label": "Model weights resident on the card",
+      "min": 4,
+      "max": 140,
+      "scale": "linear",
+      "step": 2,
+      "initial": 16,
+      "unit": "GB"
+    },
+    {
+      "kind": "slider",
+      "id": "kvpertoken",
+      "label": "KV cache per token",
+      "min": 0.02,
+      "max": 1,
+      "scale": "linear",
+      "step": 0.005,
+      "initial": 0.125,
+      "unit": "MB"
+    },
+    {
+      "kind": "slider",
+      "id": "seqlen",
+      "label": "Sequence length (prompt plus output)",
+      "min": 512,
+      "max": 131072,
+      "scale": "log",
+      "initial": 8192,
+      "unit": "tokens"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "kvfree",
+      "label": "Memory left for KV cache",
+      "expr": "max(gpumem - weights, 0)",
+      "format": "number",
+      "unit": "GB"
+    },
+    {
+      "id": "kvperreq",
+      "label": "KV cache one request reserves",
+      "expr": "seqlen * kvpertoken / 1024",
+      "format": "number",
+      "unit": "GB"
+    },
+    {
+      "id": "concurrent",
+      "label": "Concurrent requests that fit",
+      "expr": "floor(kvfree / kvperreq)",
+      "format": "number",
+      "unit": "requests"
+    }
+  ],
+  "caption": "Concurrency is capped by KV memory, not by FLOPs. That is why batching more is never free, and why quantizing weights buys room for the cache rather than shrinking the cache."
+}
+\`\`\`
+
 ## PagedAttention and continuous batching
 
 Classic serving pre-allocates a contiguous KV block per request sized to the max length, so a request that generates 50 tokens still reserves memory for thousands. That fragmentation wastes most of the KV memory. PagedAttention (the core vLLM idea) treats KV cache like virtual memory: it allocates in small fixed pages on demand and maps them with a page table. Waste drops to near zero, so you fit far more concurrent requests in the same GPU, which directly raises throughput.
