@@ -1885,9 +1885,9 @@ Multi-AZ and multi-region are not the same tool, and conflating them is a common
       "feedback": "Three data centers, one region. Multi-AZ protects against losing a building, not against losing the region all three of them sit in."
     },
     {
-      "label": "It goes down, because every zone is inside the failed region: multi-AZ is high availability within a region, not disaster recovery across regions",
+      "label": "It goes down: every zone is inside the failed region",
       "correct": true,
-      "feedback": "Right. Multi-AZ is cheap precisely because the zones are close enough for synchronous replication, and that closeness is exactly why they share a regional fate."
+      "feedback": "Right. Multi-AZ is high availability within a region, not disaster recovery across regions. It is cheap precisely because the zones sit close enough for synchronous replication, and that closeness is exactly why all three share a regional fate. Surviving the loss of a region means paying for a copy in a different one."
     },
     {
       "label": "It stays up with higher latency, since traffic reroutes to another region",
@@ -1973,9 +1973,9 @@ Traffic steering sits on top: **GeoDNS** (route by client location, but DNS TTL 
       "feedback": "Async is what makes those writes fast and available, and it is also what makes the remote copy lag and the two copies conflict. It buys the speed by giving up the consistency claim."
     },
     {
-      "label": "You cannot have all three across a WAN: either pay the cross-region round trip with synchronous replication or a globally consistent store, or accept eventual consistency and own a conflict story such as single-writer-region per record",
+      "label": "You cannot have all three across a WAN",
       "correct": true,
-      "feedback": "Right. Single-writer-region avoids conflicts entirely at the cost of cross-region write latency for non-local records, which is why it is the most common sane choice."
+      "feedback": "Right. Strong consistency, writes accepted in both regions, and no added write latency do not come together across a wide-area link. Either you pay the cross-region round trip with synchronous replication or a globally consistent store such as Spanner, or you accept eventual consistency and own a conflict story. Single-writer-region per record is the most common sane choice: it avoids conflicts entirely at the cost of cross-region write latency for non-local records."
     },
     {
       "label": "Multi-region is always the wrong call, and multi-AZ is enough",
@@ -2122,9 +2122,9 @@ Which brings in **static stability**, the AWS-coined principle that ties this to
       "feedback": "More replicas of the same shared fate change nothing, because every additional node loads the same poison."
     },
     {
-      "label": "All of them, and independent cells would have held it to roughly one Nth of users, because a change rolls cell by cell and stops after the first one regresses",
+      "label": "All of them, and independent cells would have bounded it",
       "correct": true,
-      "feedback": "Right. Redundancy keeps you up when a component dies, while blast-radius reduction limits how many users any one change or poison input can reach. They are different properties and a serious design needs both."
+      "feedback": "Right. Every node loaded the same poison, so redundancy bought nothing here: it keeps you up when a component dies, while blast-radius reduction limits how many users any one change or poison input can reach. Independent cells would have held this to roughly one Nth of users, because the change rolls cell by cell and stops after the first cell regresses. Different properties, and a serious design needs both."
     },
     {
       "label": "About a third, since a config rollout moves one availability zone at a time",
