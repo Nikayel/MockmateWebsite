@@ -3242,6 +3242,118 @@ loader) subscribe and apply. The outbox is the right tool when you need domain e
 (\`OrderPlaced\`) rather than raw row diffs; CDC is the right tool when you want to mirror table
 state to derived stores with no application changes.
 
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "One atomic write, everything else derived",
+  "nodes": [
+    {
+      "id": "handler",
+      "label": "Request handler: one transaction, one store",
+      "kind": "service"
+    },
+    {
+      "id": "primary",
+      "label": "Primary database: the business row and the outbox row commit together",
+      "kind": "db"
+    },
+    {
+      "id": "relay",
+      "label": "Relay or Debezium: reads unpublished outbox rows, or tails logical decoding and the binlog",
+      "kind": "service"
+    },
+    {
+      "id": "broker",
+      "label": "Kafka: one durable, ordered event stream",
+      "kind": "queue"
+    },
+    {
+      "id": "cache_sink",
+      "label": "Cache updater: keyed by primary id, version-guarded",
+      "kind": "cache"
+    },
+    {
+      "id": "search_sink",
+      "label": "Search index sink: a replayed event applies as a no-op",
+      "kind": "service"
+    },
+    {
+      "id": "lag_alerts",
+      "label": "Replication-slot and consumer-lag alerts",
+      "kind": "external"
+    }
+  ],
+  "edges": [
+    {
+      "from": "handler",
+      "to": "primary",
+      "kind": "sync",
+      "label": "the business change and the intent to publish commit or fail together"
+    },
+    {
+      "from": "primary",
+      "to": "relay",
+      "kind": "sync",
+      "label": "unpublished rows, or the change stream"
+    },
+    {
+      "from": "relay",
+      "to": "broker",
+      "kind": "async",
+      "label": "publishes, then marks the row sent"
+    },
+    {
+      "from": "broker",
+      "to": "cache_sink",
+      "kind": "async",
+      "label": "at-least-once"
+    },
+    {
+      "from": "broker",
+      "to": "search_sink",
+      "kind": "async",
+      "label": "at-least-once"
+    },
+    {
+      "from": "relay",
+      "to": "lag_alerts",
+      "kind": "async",
+      "label": "a slot the connector stops advancing pins WAL until the primary's disk fills"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "handler",
+        "primary"
+      ],
+      "note": "A database and a cache share no transaction, so the requirement is one atomic write: the row and the event describing it land in the same commit or neither does."
+    },
+    {
+      "adds": [
+        "relay",
+        "broker"
+      ],
+      "note": "The commit has to reach the other stores even if the process dies right after it, so a separate reader turns the durable log into an ordered stream rather than the handler making a second write."
+    },
+    {
+      "adds": [
+        "cache_sink",
+        "search_sink"
+      ],
+      "note": "Every derived store is now a subscriber. The relay can crash after publishing but before marking the row sent, so the requirement each consumer must meet is idempotence: key by primary id and guard with a version or LSN."
+    },
+    {
+      "adds": [
+        "lag_alerts"
+      ],
+      "note": "The log is now load-bearing, which creates a new failure to watch: a stalled consumer stops the replication slot advancing, and pinned WAL takes the primary down with a full disk."
+    }
+  ],
+  "caption": "At-least-once delivery plus idempotent, versioned consumers is the honest contract. Exactly-once end to end across a broker and heterogeneous sinks is not on offer."
+}
+\`\`\`
+
 \`\`\`cswidget
 {
   "type": "check",

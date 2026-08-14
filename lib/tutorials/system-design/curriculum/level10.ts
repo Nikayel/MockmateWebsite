@@ -4023,12 +4023,185 @@ The ledger is the source of truth, and it must be double-entry and immutable. In
 
 A charge spans several systems (your wallet/ledger, an external provider like Stripe or Adyen, and the orders service), and you cannot hold a distributed ACID transaction across an external API. Use a saga (an orchestrated sequence of local transactions with compensating actions). The orchestrator: (1) reserves funds in the ledger as a pending entry, (2) calls the provider with an idempotency key, (3) on success posts the settled ledger entries and marks the order paid, (4) on failure posts a compensating reversal. State lives in a durable workflow so a crash resumes rather than orphans money.
 
-\`\`\`
-client --idem key--> Payment API --> dedup check
-   |                                     |
-   v                                     v
-saga orchestrator --> ledger (pending) --> provider (charge, idem) --> ledger (settle) --> order paid
-        \\--- on failure ---> compensating reversal entry ---/
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "The charge as a saga over an append-only ledger",
+  "nodes": [
+    {
+      "id": "client",
+      "label": "Client (mints one idempotency key per logical intent)",
+      "kind": "client"
+    },
+    {
+      "id": "api",
+      "label": "Payment API",
+      "kind": "service"
+    },
+    {
+      "id": "dedup",
+      "label": "Dedup table (idempotency key, unique, written before the work)",
+      "kind": "db"
+    },
+    {
+      "id": "saga",
+      "label": "Saga orchestrator in a durable workflow (a crash resumes rather than orphans money)",
+      "kind": "service"
+    },
+    {
+      "id": "pending",
+      "label": "Ledger: pending entry",
+      "kind": "db"
+    },
+    {
+      "id": "provider",
+      "label": "Provider (Stripe, Adyen), called with an idempotency key",
+      "kind": "external"
+    },
+    {
+      "id": "settle",
+      "label": "Ledger: settled double-entry pair, summing to zero",
+      "kind": "db"
+    },
+    {
+      "id": "order",
+      "label": "Order marked paid",
+      "kind": "service"
+    },
+    {
+      "id": "reversal",
+      "label": "Compensating reversal entry (appended, never a delete)",
+      "kind": "db"
+    },
+    {
+      "id": "webhook",
+      "label": "Provider webhook (at-least-once, deduped on the provider event id)",
+      "kind": "external"
+    },
+    {
+      "id": "recon",
+      "label": "Daily reconciliation against the settlement report",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "client",
+      "to": "api",
+      "kind": "sync",
+      "label": "idempotency key"
+    },
+    {
+      "from": "api",
+      "to": "dedup",
+      "kind": "sync",
+      "label": "stored before any work"
+    },
+    {
+      "from": "dedup",
+      "to": "saga",
+      "kind": "sync",
+      "label": "a repeat key returns the first result instead of charging again"
+    },
+    {
+      "from": "saga",
+      "to": "pending",
+      "kind": "sync",
+      "label": "reserve funds"
+    },
+    {
+      "from": "pending",
+      "to": "provider",
+      "kind": "sync",
+      "label": "charge"
+    },
+    {
+      "from": "provider",
+      "to": "settle",
+      "kind": "sync",
+      "label": "on success"
+    },
+    {
+      "from": "settle",
+      "to": "order",
+      "kind": "sync"
+    },
+    {
+      "from": "provider",
+      "to": "reversal",
+      "kind": "async",
+      "label": "on failure"
+    },
+    {
+      "from": "reversal",
+      "to": "pending",
+      "kind": "feedback",
+      "label": "reverses the pending entry"
+    },
+    {
+      "from": "provider",
+      "to": "webhook",
+      "kind": "async",
+      "label": "confirmation arrives later"
+    },
+    {
+      "from": "webhook",
+      "to": "saga",
+      "kind": "feedback",
+      "label": "handler is idempotent too"
+    },
+    {
+      "from": "settle",
+      "to": "recon",
+      "kind": "sync",
+      "label": "sum the entries, compare to the report"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "client",
+        "api",
+        "dedup"
+      ],
+      "note": "One dropped acknowledgement otherwise becomes a double charge, so every mutating request carries a client-generated idempotency key and the dedup row is written before the work is done."
+    },
+    {
+      "adds": [
+        "saga",
+        "pending"
+      ],
+      "note": "You cannot hold a distributed transaction across an external provider, so the charge becomes a sequence of local transactions and the first one only reserves funds as a pending entry."
+    },
+    {
+      "adds": [
+        "provider",
+        "settle",
+        "order"
+      ],
+      "note": "The provider call is the step that can time out, so it carries its own idempotency key, and only on success do the settled pair and the paid order follow."
+    },
+    {
+      "adds": [
+        "reversal"
+      ],
+      "note": "An audit trail cannot survive an overwrite, so a failure is corrected by appending a compensating reversal rather than by editing what was already recorded."
+    },
+    {
+      "adds": [
+        "webhook"
+      ],
+      "note": "Providers confirm asynchronously and their webhooks are at-least-once as well, so that handler dedupes on the provider event id before it touches the saga."
+    },
+    {
+      "adds": [
+        "recon"
+      ],
+      "note": "Entries that disagree with the money that actually moved are an incident, so the day's entries are summed and compared with the provider settlement report."
+    }
+  ],
+  "caption": "Balances are never a column here: every account balance is a derived sum over these immutable entries, which is what makes reconciliation mechanical."
+}
 \`\`\`
 
 Providers confirm asynchronously via webhooks, which are themselves at-least-once, so webhook handlers must be idempotent too (dedup on the provider's event id). Reconcile daily by summing ledger entries and comparing to the provider's settlement report; any drift is an incident. Layer PCI scope reduction (never store raw PANs, tokenize via the provider) and fraud hooks on top.
@@ -4600,13 +4773,164 @@ Storage is a purpose-built TSDB (Prometheus TSDB, Cortex/Mimir, InfluxDB, Timesc
 
 You do not keep raw 1-second resolution for a year. Downsample: keep raw for a short window (e.g., 15 days), then pre-aggregate into 5-minute and 1-hour rollups (min/max/avg/count) for longer retention. A dashboard showing last quarter reads cheap hourly rollups, not billions of raw points. Retention tiers plus rollups are the cost-control lever alongside cardinality.
 
-\`\`\`
-hosts -> agents (batch, compress) -> Kafka -> ingester (TSDB write)
-                                                  |
-   raw (hot, in-mem/SSD) --downsample--> 5m/1h rollups (cold, object store)
-                                                  |
-   Query engine (label index, range scan) -> dashboards
-   Rule evaluator (every 15s) -> alerts -> dedup/group -> notify (PagerDuty/Slack)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Firehose in, dashboards and pages out",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "hosts",
+      "label": "Thousands of hosts",
+      "kind": "client"
+    },
+    {
+      "id": "agents",
+      "label": "Agents: batch and compress (or the platform scrapes /metrics)",
+      "kind": "service"
+    },
+    {
+      "id": "kafka",
+      "label": "Kafka: buffers the firehose so spiky producers cannot stall storage",
+      "kind": "queue"
+    },
+    {
+      "id": "ingester",
+      "label": "Ingester (TSDB write path, cardinality limits on label values)",
+      "kind": "service"
+    },
+    {
+      "id": "hot",
+      "label": "Recent blocks, hot: memory or SSD, delta-of-delta timestamps plus XOR floats, about 1.3 bytes per sample",
+      "kind": "db"
+    },
+    {
+      "id": "rollups",
+      "label": "5m and 1h rollups (min, max, avg, count), cold in object storage",
+      "kind": "db"
+    },
+    {
+      "id": "query",
+      "label": "Query engine (label index, then a range scan over one series)",
+      "kind": "service"
+    },
+    {
+      "id": "dash",
+      "label": "Dashboards",
+      "kind": "client"
+    },
+    {
+      "id": "rules",
+      "label": "Rule evaluator (every 15s)",
+      "kind": "service"
+    },
+    {
+      "id": "alerts",
+      "label": "Alert manager: dedup, group, silence, route",
+      "kind": "service"
+    },
+    {
+      "id": "notify",
+      "label": "PagerDuty, Slack, email",
+      "kind": "external"
+    }
+  ],
+  "edges": [
+    {
+      "from": "hosts",
+      "to": "agents",
+      "kind": "sync"
+    },
+    {
+      "from": "agents",
+      "to": "kafka",
+      "kind": "async",
+      "label": "batched and compressed"
+    },
+    {
+      "from": "kafka",
+      "to": "ingester",
+      "kind": "async"
+    },
+    {
+      "from": "ingester",
+      "to": "hot",
+      "kind": "sync",
+      "label": "partitioned by time"
+    },
+    {
+      "from": "hot",
+      "to": "rollups",
+      "kind": "async",
+      "label": "downsample once the raw retention window passes"
+    },
+    {
+      "from": "hot",
+      "to": "query",
+      "kind": "sync",
+      "label": "recent, full resolution"
+    },
+    {
+      "from": "rollups",
+      "to": "query",
+      "kind": "sync",
+      "label": "a quarter-long chart reads these"
+    },
+    {
+      "from": "query",
+      "to": "dash",
+      "kind": "sync"
+    },
+    {
+      "from": "query",
+      "to": "rules",
+      "kind": "sync",
+      "label": "the same query path, on a schedule"
+    },
+    {
+      "from": "rules",
+      "to": "alerts",
+      "kind": "sync",
+      "label": "firing conditions"
+    },
+    {
+      "from": "alerts",
+      "to": "notify",
+      "kind": "sync",
+      "label": "one incident, not 500 pages"
+    }
+  ],
+  "groups": [
+    {
+      "id": "ingest",
+      "label": "Ingest path",
+      "nodes": [
+        "agents",
+        "kafka",
+        "ingester"
+      ]
+    },
+    {
+      "id": "storage",
+      "label": "Storage tiers: hot raw, cold rollups",
+      "nodes": [
+        "hot",
+        "rollups"
+      ]
+    },
+    {
+      "id": "read",
+      "label": "Read paths: dashboards and alerting",
+      "nodes": [
+        "query",
+        "dash",
+        "rules",
+        "alerts"
+      ]
+    }
+  ],
+  "caption": "Cost is controlled at two levers, and both are visible here: cardinality limits at the ingester, and retention tiers between the hot and cold stores."
+}
 \`\`\`
 
 Alerting is periodic rule evaluation. A rule engine runs queries on a schedule (e.g., every 15s), \`avg(rate(errors[5m])) > 0.05\`, and on a firing condition creates an alert. Crucially, an alert manager deduplicates and groups (one incident, not 500 pages from 500 hosts), applies silences/inhibitions, and routes to PagerDuty/Slack/email.
