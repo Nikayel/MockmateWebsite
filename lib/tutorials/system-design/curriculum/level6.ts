@@ -865,6 +865,121 @@ segments to S3-class object storage so retention cost decouples from broker disk
 of controllers, removing the external dependency, speeding failover, and scaling to far more
 partitions.
 
+### One cluster is one failure domain: MirrorMaker 2
+
+Everything above describes a cluster, and a cluster is one latency domain as well as one failure
+domain. Replication inside it is a tight loop: followers fetch continuously and the ISR shrinks the
+moment one falls behind, which is fine over a rack-to-rack network and hostile over a WAN. Stretching
+a single cluster across datacenters puts every \`acks=all\` produce behind a cross-country round trip
+and makes ISR membership flap on ordinary WAN jitter.
+
+The Kafka-native answer is a separate cluster per site and **MirrorMaker 2** (MM2) between them. MM2
+is a set of Kafka Connect connectors: it consumes from a source cluster and produces into a target
+cluster, **asynchronously**, with no coupling of the source's produce path to the target's health.
+Three things it does that you should be able to name:
+
+- **Remote topics are renamed by source alias.** Mirroring \`page_views\` from the cluster aliased
+  \`us-east\` into another cluster creates \`us-east.page_views\` there. So a target can take mirrors
+  of the same topic from several sources at once (\`us-east.page_views\`, \`eu-west.page_views\`)
+  without collision, and a consumer on the target can subscribe to the pattern and read all of them.
+- **Consumer-group offsets are replicated and translated.** Offsets differ between clusters because
+  the mirror's records land at their own positions, so MM2 maintains an offset mapping and writes
+  translated group offsets on the target. A group failing over resumes near where it was, not at
+  zero, and "near" is the honest word.
+- **The topologies it supports are active-passive (one-way DR), active-active (each site mirrors the
+  other, with the alias prefix preventing an infinite loop), and hub-and-spoke aggregation (many
+  sites mirroring into one cluster).**
+
+The cost is fixed and you should state it before you are asked: mirroring is async, so the target
+lags the source by the replication lag, and losing a site loses whatever tail had not been mirrored.
+Recovery point objective equals mirror lag, not zero. Confluent **Cluster Linking** is the same shape
+built into the broker instead of Connect, and it preserves offsets byte for byte so no translation is
+needed, at the price of being a vendor feature.
+
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "MirrorMaker 2: independent clusters, async mirroring",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "prod-us",
+      "label": "Producers in us-east",
+      "kind": "client"
+    },
+    {
+      "id": "kafka-us",
+      "label": "Cluster us-east (RF=3, local ISR)",
+      "kind": "queue"
+    },
+    {
+      "id": "prod-eu",
+      "label": "Producers in eu-west",
+      "kind": "client"
+    },
+    {
+      "id": "kafka-eu",
+      "label": "Cluster eu-west (RF=3, local ISR)",
+      "kind": "queue"
+    },
+    {
+      "id": "mm2",
+      "label": "MirrorMaker 2 (Connect): records + translated offsets",
+      "kind": "service"
+    },
+    {
+      "id": "kafka-agg",
+      "label": "Target cluster: us-east.page_views, eu-west.page_views",
+      "kind": "queue"
+    },
+    {
+      "id": "local",
+      "label": "Latency-sensitive consumer, reads locally",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "prod-us",
+      "to": "kafka-us",
+      "kind": "sync",
+      "label": "acks=all, in-region"
+    },
+    {
+      "from": "prod-eu",
+      "to": "kafka-eu",
+      "kind": "sync",
+      "label": "acks=all, in-region"
+    },
+    {
+      "from": "kafka-us",
+      "to": "mm2",
+      "kind": "replication",
+      "label": "consume page_views"
+    },
+    {
+      "from": "kafka-eu",
+      "to": "mm2",
+      "kind": "replication",
+      "label": "consume page_views"
+    },
+    {
+      "from": "mm2",
+      "to": "kafka-agg",
+      "kind": "async",
+      "label": "produce prefixed mirrors, lag > 0"
+    },
+    {
+      "from": "kafka-us",
+      "to": "local",
+      "kind": "sync",
+      "label": "no WAN hop"
+    }
+  ],
+  "caption": "Each site produces into its own cluster, so ISR and acks stay inside one region and a WAN partition never blocks a produce. MM2 consumes from each source and produces prefixed mirrors into the target, asynchronously: the target is always behind by the mirror lag, which is exactly the tail a site loss forfeits."
+}
+\`\`\`
+
 Recap: Kafka is a partitioned append-only log; sequential writes, page cache, and zero-copy explain
 its throughput; partition count comes from target byte rate divided by a conservative ~10 MB/s per
 partition, and you provision above that floor; durability is leader/follower replication tuned by
