@@ -582,16 +582,16 @@ using bloom filters and compaction to keep reads sane.
   "prompt": "A teammate says: 'Cassandra benchmarks faster than Postgres, so we should use an LSM engine for everything.' What is the accurate correction?",
   "options": [
     {
-      "label": "LSM is faster at writes because they are sequential appends, but it pays with read amplification and background compaction that spikes latency; a read-heavy or range-scan-heavy workload still favors a B+tree.",
+      "label": "Neither is faster; each moves the cost somewhere else",
       "correct": true,
-      "feedback": "Right. Neither engine is simply faster. You are choosing where to pay: LSM shifts cost onto reads and compaction, a B+tree shifts it onto writes."
+      "feedback": "Right. LSM wins the write path because writes are sequential appends to a memtable and a commit log, and it pays for that with read amplification (the key may sit in the memtable or any SSTable) and with background compaction that competes for disk exactly when you are busiest. A B+tree pays on the write side instead, through full-page writes and the WAL, and hands back clean 3-to-4-page point reads and fast range scans. A read-heavy or range-scan-heavy workload still favors the B+tree."
     },
     {
-      "label": "They are right: append-only writes make LSM faster across the board.",
+      "label": "They are right: append-only writes make LSM faster everywhere",
       "feedback": "Tempting, because the write path really is faster. But every overwrite lives in multiple SSTables until compaction merges them, so reads fan out across files, and compaction competes for disk exactly when you are busiest."
     },
     {
-      "label": "B+trees are always faster because mature SQL engines are better optimized.",
+      "label": "B+trees are faster because SQL engines are better optimized",
       "feedback": "Maturity is not the axis. A write-heavy ingest workload genuinely overwhelms in-place page updates, which is exactly the problem LSM engines were built to solve."
     }
   ],
@@ -622,17 +622,17 @@ secondary index match still needs a second read to fetch the row from the heap.
   "prompt": "A table has one composite index on (a, b, c). A query filters 'WHERE b = 5' with no condition on a. Can the index serve that query efficiently?",
   "options": [
     {
-      "label": "Yes. b is one of the indexed columns, so the database can seek straight to b = 5.",
-      "feedback": "Tempting, and it is the most common indexing mistake in practice. The index is sorted by a first, so rows with b = 5 are scattered across every a group and there is no single place to seek."
+      "label": "Yes, b is an indexed column, so it can seek to b = 5",
+      "feedback": "Tempting, and it is the most common indexing mistake in practice. Being present in the index is not the same as being seekable in it, because an index is one sorted list, not three."
     },
     {
-      "label": "No. The index is sorted by a first, so b is only ordered within each a group, and a lone b filter has no efficient path.",
+      "label": "No, b is only ordered inside each a group",
       "correct": true,
-      "feedback": "Right. An index on (a, b, c) serves prefixes: a alone, a and b, or all three. b alone cannot use the sort order."
+      "feedback": "Right. The index on (a, b, c) is sorted by a first, then by b within equal a, then by c within equal (a, b). So it serves prefixes: a alone, a and b, or all three. With a unpinned, the entries for b = 5 are scattered across every a group and there is no single place to start the seek."
     },
     {
-      "label": "Yes, but only if the query also sorts by c.",
-      "feedback": "Adding a sort on c does not help. Without pinning a, the entries for b = 5 are still spread across the whole index."
+      "label": "Yes, but only if the query also sorts by c",
+      "feedback": "Adding a sort on c does not help. Without pinning a, the entries for b = 5 are still spread across the whole index, and a sort cannot conjure locality that the key order never had."
     }
   ]
 }
@@ -1117,16 +1117,16 @@ This is what lets a database absorb many writes to the same hot page as one even
   "prompt": "A transaction commits and the client receives success. At that moment, has the updated data page reached its home in the data file on disk?",
   "options": [
     {
-      "label": "Yes. Commit means the data is on disk; that is the whole point of durability.",
+      "label": "Yes, commit means the data is on disk; that is durability",
       "feedback": "Tempting, and half right: something did reach disk before the acknowledgment. But it is not the data page, which is still sitting dirty in the buffer pool waiting for a checkpoint."
     },
     {
-      "label": "Usually not. The page is still dirty in the buffer pool, so something else must be providing the durability.",
+      "label": "Usually not; the page is still dirty in the buffer pool",
       "correct": true,
-      "feedback": "Right. Data pages flush lazily at checkpoints. Keep reading: the durability gap you just spotted is exactly what the write-ahead log closes."
+      "feedback": "Right. Writes modify the page in the buffer pool and mark it dirty, and dirty pages flush lazily in batches at a checkpoint, which is what lets many writes to one hot page cost a single eventual disk write. So at commit time the page has usually not reached its home in the data file, and something else must be carrying the durability. Keep reading: the gap you just spotted is exactly what the write-ahead log closes."
     },
     {
-      "label": "Yes, because the database called 'write()' on the data file.",
+      "label": "Yes, because the database called 'write()' on the data file",
       "feedback": "Even after 'write()', the bytes can sit in the volatile OS page cache, which power loss wipes. Only an explicit fsync is durable, and the data page has not even gotten that far."
     }
   ]

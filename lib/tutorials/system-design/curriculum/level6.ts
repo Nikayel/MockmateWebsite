@@ -2143,9 +2143,9 @@ Two requests both read Account #42 at version 100 and both try to append. To pre
   "prompt": "Last month's Deposited 100 event should have been 70. What is the event-sourced correction?",
   "options": [
     {
-      "label": "Append a compensating adjustment event of minus 30 with a reason; the fold makes current state right while history stays intact",
+      "label": "Append a compensating adjustment event of minus 30",
       "correct": true,
-      "feedback": "Right: like an accountant's correcting entry, you never edit history; the log stays an honest record and replay stays deterministic."
+      "feedback": "Right. Carry a reason on it, and the fold then produces the correct current balance while the original event stays exactly as written. The audit chain is unbroken and every past replay still reproduces what the system believed at the time. This is an accountant's correcting entry, not an eraser."
     },
     {
       "label": "Update the stored event in place; state is derived anyway, so nothing else changes",
@@ -2172,9 +2172,9 @@ Event sourcing adds real complexity: eventual consistency in read models, replay
   "prompt": "An operator accidentally deletes every snapshot for a 10-year-old account with 100k events. What is permanently lost?",
   "options": [
     {
-      "label": "Nothing: snapshots are a cache, so the deterministic fold rebuilds state from the log; you only pay replay time until new snapshots are taken",
+      "label": "Nothing: snapshots are a cache, not truth",
       "correct": true,
-      "feedback": "Right: this combines the two ideas: the log is the sole source of truth and the fold is deterministic, while snapshots merely bound replay cost."
+      "feedback": "Right. The log is the sole source of truth and the fold is deterministic, so the same 100k events rebuild the same state. What you lost is only the shortcut, and you pay full replay time on each read until new snapshots are taken."
     },
     {
       "label": "The current balance: it lived in the latest snapshot",
@@ -2355,9 +2355,9 @@ The projection updates *after* the write commits, so there is a lag (usually mil
   "prompt": "A seller edits a product and instantly reloads the page, which reads the Elasticsearch projection. They see the old data. What broke, and which class of fix applies?",
   "options": [
     {
-      "label": "Read-your-writes broke because the projection lags the commit; fix with client echo, a versioned read, or briefly routing that user's read to the write model",
+      "label": "Read-your-writes broke: the projection lags",
       "correct": true,
-      "feedback": "Right: the projection updates after the commit, so you bridge that lag explicitly rather than hand-waving eventual consistency."
+      "feedback": "Right. The projection updates after the write commits, so an instant reload races it. Bridge that lag explicitly: client echo of the just-submitted value, a versioned read that waits for the projection to reach the write's version, or briefly routing that seller's own read to the write model."
     },
     {
       "label": "The write was lost, so the command pipeline needs retries",
@@ -2409,9 +2409,9 @@ Because projections are derived and idempotent, you can drop a read model and **
   "prompt": "Six months after launch you need a brand-new admin dashboard rollup that never existed before. Using the CQRS machinery, how do you build it without touching the write model?",
   "options": [
     {
-      "label": "Write a new idempotent projection handler and replay the event stream from offset 0 until the rollup catches up",
+      "label": "Write a new handler and replay from offset 0",
       "correct": true,
-      "feedback": "Right: rebuild-by-replay works because projections are derived and handlers are idempotent, which is the strongest operational reason to adopt CQRS."
+      "feedback": "Right. Make the handler idempotent and replaying the existing stream backfills six months of history for free, while the write model never learns the rollup exists. Rebuild-by-replay is the strongest operational reason to adopt CQRS."
     },
     {
       "label": "Dual-write the rollup from the command handler going forward, backfilling by hand",
