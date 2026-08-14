@@ -1176,10 +1176,14 @@ async function processSubscriptionExpiry(now: Date, results: any): Promise<void>
         // so skipping on the local-hours window would drop this email forever.
         if (profile.email) {
           try {
-            await sendYearlyExpiredEmail(profile.email, {
+            const emailResult = await sendYearlyExpiredEmail(profile.email, {
               userName: profile.full_name || "",
               userEmail: profile.email,
             })
+            if (emailResult.success) {
+              await updateEmailTracking(userId, profile, now)
+              await logEmailNotification(userId, "yearly_expired", now)
+            }
           } catch (emailError) {
             logger.error("[Cron] Failed to send expiry email", { userId, error: emailError })
           }
@@ -1216,7 +1220,7 @@ async function processSubscriptionExpiry(now: Date, results: any): Promise<void>
         if (!timezoneCheck.canSend) continue
 
         try {
-          await sendYearlyExpiryReminderEmail(profile.email, {
+          const emailResult = await sendYearlyExpiryReminderEmail(profile.email, {
             userName: profile.full_name || "",
             userEmail: profile.email,
             expiryDate: profile.subscription_current_period_end as string,
@@ -1226,6 +1230,10 @@ async function processSubscriptionExpiry(now: Date, results: any): Promise<void>
             yearly_expiry_reminder_7day_sent: true,
             updated_at: now.toISOString(),
           })
+          if (emailResult.success) {
+            await updateEmailTracking(userId, profile, now)
+            await logEmailNotification(userId, "yearly_expiry_7day", now)
+          }
 
           results.subscriptionExpiry.reminders7d++
         } catch (error) {
@@ -1256,7 +1264,7 @@ async function processSubscriptionExpiry(now: Date, results: any): Promise<void>
         if (!timezoneCheck.canSend) continue
 
         try {
-          await sendYearlyExpiryReminderEmail(profile.email, {
+          const emailResult = await sendYearlyExpiryReminderEmail(profile.email, {
             userName: profile.full_name || "",
             userEmail: profile.email,
             expiryDate: profile.subscription_current_period_end as string,
@@ -1266,6 +1274,10 @@ async function processSubscriptionExpiry(now: Date, results: any): Promise<void>
             yearly_expiry_reminder_1day_sent: true,
             updated_at: now.toISOString(),
           })
+          if (emailResult.success) {
+            await updateEmailTracking(userId, profile, now)
+            await logEmailNotification(userId, "yearly_expiry_1day", now)
+          }
 
           results.subscriptionExpiry.reminders1d++
         } catch (error) {

@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
+import { FieldValue } from "firebase-admin/firestore"
 import { adminDb } from "@/lib/firebase-admin"
 import { updateQuotaForSubscriptionTierAdmin } from "@/lib/stripe-helpers"
 import {
@@ -57,6 +58,39 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 // Create a child logger for payment events
 const paymentLogger = logger.child({ service: "stripe-webhook" })
+
+/**
+ * Record a billing email against the same accounting the cron reads: the
+ * profile's rate-limit counters and the email_notifications audit log. Billing
+ * emails are never BLOCKED by the 3/day limit (they must deliver), but leaving
+ * them invisible to it let a billing-heavy day stack reminder emails on top.
+ * Never throws; accounting must not break a webhook.
+ */
+async function recordBillingEmail(userId: string, emailType: string): Promise<void> {
+  const nowIso = new Date().toISOString()
+  try {
+    await Promise.all([
+      adminDb
+        .collection("profiles")
+        .doc(userId)
+        .set(
+          { last_email_sent_at: nowIso, emails_sent_today: FieldValue.increment(1) },
+          { merge: true }
+        ),
+      adminDb.collection("email_notifications").add({
+        user_id: userId,
+        email_type: emailType,
+        status: "sent",
+        scheduled_at: nowIso,
+        sent_at: nowIso,
+        created_at: nowIso,
+        source: "stripe-webhook",
+      }),
+    ])
+  } catch (error) {
+    paymentLogger.warn("Failed to record billing email accounting", { userId, emailType, error })
+  }
+}
 
 /**
  * Hard cap on failed charge attempts before a subscription is marked past_due (which revokes Pro),
@@ -548,12 +582,18 @@ export async function POST(request: NextRequest) {
                   amount: (session.amount_total || 0) / 100,
                   currency: session.currency?.toUpperCase() || "USD",
                   nextBillingDate: currentPeriodEnd,
-                }).catch((emailError) => {
-                  paymentLogger.error("Failed to send subscription confirmation email", {
-                    userId,
-                    error: emailError,
-                  })
                 })
+                  .then((result) =>
+                    result?.success
+                      ? recordBillingEmail(userId, "subscription_confirmation")
+                      : undefined
+                  )
+                  .catch((emailError) => {
+                    paymentLogger.error("Failed to send subscription confirmation email", {
+                      userId,
+                      error: emailError,
+                    })
+                  })
               : Promise.resolve(),
           ])
 
@@ -747,6 +787,10 @@ export async function POST(request: NextRequest) {
             subscription_current_period_end: oneYearFromNow.toISOString(),
             subscription_type: "yearly",
             last_quota_reset: now.toISOString(), // Track when quota was last reset for monthly resets
+            // A repurchase starts a fresh year, so the expiry reminders are owed
+            // again; without this reset a second year would end silently.
+            yearly_expiry_reminder_7day_sent: false,
+            yearly_expiry_reminder_1day_sent: false,
             // Redemption receipt for this one-time purchase. The self-service and cron recovery paths
             // in lib/stripe-helpers.ts refuse to grant a session that is already recorded here, so
             // whichever of the webhook or a recovery gets there first, the year is granted exactly
@@ -840,14 +884,20 @@ export async function POST(request: NextRequest) {
           const userEmail = profile?.email || session.customer_email
           if (userEmail) {
             try {
-              await sendSubscriptionConfirmationEmail(userEmail, {
+              // isOneTime: yearly is a single payment the cron expires; the email
+              // must say "access until", never "renews" or "next billing".
+              const result = await sendSubscriptionConfirmationEmail(userEmail, {
                 userName: profile?.full_name || "",
                 userEmail,
                 planName: "Pro (Yearly)",
                 amount: (session.amount_total || 0) / 100,
                 currency: session.currency?.toUpperCase() || "USD",
                 nextBillingDate: oneYearFromNow.toISOString(),
+                isOneTime: true,
               })
+              if (result?.success) {
+                await recordBillingEmail(userId, "subscription_confirmation")
+              }
             } catch (emailError) {
               paymentLogger.error("Failed to send subscription confirmation email", {
                 userId,
@@ -933,16 +983,28 @@ export async function POST(request: NextRequest) {
             })
           }
 
-          // Send payment failure email notification on EVERY failure. The customer needs to fix their
-          // card during the retry window; that is the whole point of not locking them out yet.
+          // Send one payment-failure email PER INVOICE. Stripe retries the same
+          // invoice several times and emits payment_failed on each attempt, and
+          // webhooks can redeliver; the customer needs one "fix your card" email
+          // per bill, not one per attempt.
           const profile = profileDoc.data()
-          if (profile?.email) {
+          const alreadyEmailedForInvoice =
+            typeof invoice.id === "string" &&
+            profile?.last_payment_failed_email_invoice === invoice.id
+          if (profile?.email && !alreadyEmailedForInvoice) {
             try {
-              await sendPaymentFailedEmail(profile.email, {
+              const result = await sendPaymentFailedEmail(profile.email, {
                 userName: profile.full_name || "",
                 userEmail: profile.email,
                 failureReason: invoice.last_finalization_error?.message || "Payment declined",
               })
+              if (result?.success) {
+                await profileRef.set(
+                  { last_payment_failed_email_invoice: invoice.id || null },
+                  { merge: true }
+                )
+                await recordBillingEmail(userId, "payment_failed")
+              }
               paymentLogger.info("Payment failure email sent", { userId, email: profile.email })
             } catch (emailError) {
               paymentLogger.error("Failed to send payment failure email", {
@@ -950,6 +1012,11 @@ export async function POST(request: NextRequest) {
                 error: emailError,
               })
             }
+          } else if (alreadyEmailedForInvoice) {
+            paymentLogger.info("Payment failure email already sent for this invoice", {
+              userId,
+              invoiceId: invoice.id,
+            })
           }
         }
       }
@@ -1338,11 +1405,12 @@ export async function POST(request: NextRequest) {
             const trialEndDate = subscription.trial_end
               ? new Date(subscription.trial_end * 1000).toISOString()
               : undefined
-            await sendTrialEndingEmail(profile.email, {
+            const result = await sendTrialEndingEmail(profile.email, {
               userName: profile.full_name || "",
               userEmail: profile.email,
               trialEndDate,
             })
+            if (result?.success) await recordBillingEmail(userId, "trial_ending")
             paymentLogger.info("Trial ending email sent", { userId })
           } catch (emailError) {
             paymentLogger.error("Failed to send trial ending email", { userId, error: emailError })
@@ -1400,12 +1468,13 @@ export async function POST(request: NextRequest) {
           // Send cancellation confirmation email
           if (profile?.email) {
             try {
-              await sendSubscriptionCancellationEmail(profile.email, {
+              const result = await sendSubscriptionCancellationEmail(profile.email, {
                 userName: profile.full_name || "",
                 userEmail: profile.email,
                 accessUntil: currentPeriodEnd,
                 isImmediate: false,
               })
+              if (result?.success) await recordBillingEmail(userId, "subscription_cancellation")
             } catch (emailError) {
               paymentLogger.error("Failed to send cancellation email", {
                 userId,
@@ -1448,12 +1517,13 @@ export async function POST(request: NextRequest) {
           // Send immediate cancellation email
           if (profile?.email && event.type === "customer.subscription.deleted") {
             try {
-              await sendSubscriptionCancellationEmail(profile.email, {
+              const result = await sendSubscriptionCancellationEmail(profile.email, {
                 userName: profile.full_name || "",
                 userEmail: profile.email,
                 accessUntil: new Date().toISOString(),
                 isImmediate: true,
               })
+              if (result?.success) await recordBillingEmail(userId, "subscription_cancellation")
             } catch (emailError) {
               paymentLogger.error("Failed to send cancellation email", {
                 userId,
