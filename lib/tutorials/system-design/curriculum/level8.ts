@@ -2569,7 +2569,213 @@ The unifying idea is that every event gets a risk score from a pipeline of **fea
 
 **Interview nuance:** the tradeoff to name explicitly is **friction versus conversion**. A hard block on anything suspicious kills signups and revenue and generates support tickets from real users. The senior move is graduated friction: invisible checks for the 95% who are clearly fine, a light challenge for the ambiguous middle, hard action only for high-confidence abuse. State the metric: you are optimizing fraud caught per unit of legitimate-user friction, not fraud caught in isolation.
 
-**Recap:** layer breached-password checks, MFA, and velocity/impossible-travel against credential stuffing and ATO; use fingerprinting, behavioral signals, and invisible challenges for bots; raise cost and lower value (phone verification, per-device limits, reputation) against Sybil/fake accounts; score every event with features+rules+ML and respond with graduated, auditable, reversible step-up friction instead of blunt blocks.
+## When the abuse is a race: admission control at the edge
+
+Everything above assumes you have time to score a session before it does damage. Some abuse denies you that time. A limited-inventory drop (concert tickets, a sneaker release, a vaccine slot) is a race in which the entire contest is decided in the first few seconds, and a bot's advantage there is not volume, it is latency: it submits in 40 ms while a human is still reading the page. Scoring that never gets to run is not a defense.
+
+The control that changes the shape of the problem is a **virtual waiting room**, an admission queue at the edge (Queue-it and similar vendors sell one; a homegrown one is a signed-token queue in front of your CDN origin). Every arriving session is parked in the queue and released to the buy flow at a rate you choose. Walk one on-sale both ways and the difference is not marginal.
+
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "One on-sale, with and without an admission queue",
+  "frames": [
+    {
+      "note": "10:00:00 exactly. 20k tickets, 200k real fans, and 50k automated sessions all arrive in the same second. Checkout can hold about 2k concurrent sessions. Nothing is admitting or ordering anyone.",
+      "rows": [
+        {
+          "label": "arrivals at t=0",
+          "cells": [
+            {
+              "text": "200k fans + 50k bot sessions"
+            }
+          ]
+        },
+        {
+          "label": "checkout capacity",
+          "cells": [
+            {
+              "text": "~2k concurrent sessions"
+            }
+          ]
+        },
+        {
+          "label": "admission rule",
+          "cells": [
+            {
+              "text": "first request served wins",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "A bot posts to the buy endpoint about 40 ms after the clock flips. A human has to see the page render, read it, and click, which is several seconds at best.",
+      "predict": {
+        "question": "Bots are 20 percent of sessions but submit 100x faster. With no admission control, how much of the 20k inventory do they hold at t=9s?",
+        "options": [
+          "Roughly 20 percent, in proportion to their share of sessions",
+          "Nearly all of it: when the only rule is who arrives first, the fastest client takes every contested seat",
+          "None: the site is overloaded, so every request fails equally"
+        ]
+      },
+      "rows": [
+        {
+          "label": "bot session",
+          "cells": [
+            {
+              "text": "POST /buy at t+40ms",
+              "state": "active"
+            },
+            {
+              "text": "seat held"
+            }
+          ]
+        },
+        {
+          "label": "fan session",
+          "cells": [
+            {
+              "text": "POST /buy at t+6s"
+            },
+            {
+              "text": "sold out",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "inventory",
+          "cells": [
+            {
+              "text": "20k gone by t+9s",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "risk scoring",
+          "cells": [
+            {
+              "text": "never got to run",
+              "state": "dropped"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Now put the queue in front. Every session hits the edge and is parked with a position. The buy flow is not merely slow to reach, it is unreachable without a release token, so arriving 40 ms early buys a slightly better position and nothing else.",
+      "rows": [
+        {
+          "label": "edge queue",
+          "cells": [
+            {
+              "text": "250k sessions holding position",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "buy flow",
+          "cells": [
+            {
+              "text": "rejects anyone without a token",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "release rate",
+          "cells": [
+            {
+              "text": "1.5k sessions per minute",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The position is a signed token bound to the session, so it cannot be minted or edited. Opening 500 tabs still costs 500 positions from one device, which is now 500 linked entries rather than 500 anonymous racers.",
+      "rows": [
+        {
+          "label": "queue token",
+          "cells": [
+            {
+              "text": "signed: position, issued_at, sid",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "forged position",
+          "cells": [
+            {
+              "text": "signature check fails",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "500 tabs, one device",
+          "cells": [
+            {
+              "text": "500 positions, all linked",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The second thing the queue buys is the one people miss. A session now waits minutes between arriving and being able to spend, and that wait is exactly the window in which fingerprinting and behavioral scoring have time to reach a verdict.",
+      "rows": [
+        {
+          "label": "while waiting",
+          "cells": [
+            {
+              "text": "session is fingerprinted, scored",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "high-risk session",
+          "cells": [
+            {
+              "text": "released slower or shadow-queued",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "checkout load",
+          "cells": [
+            {
+              "text": "1.5k/min, a number you chose",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "fastest bot wins",
+          "cells": [
+            {
+              "text": "no longer a strategy",
+              "state": "dropped"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Two effects, and name both. Controlled release turns an unbounded arrival spike into a throughput you picked, and the wait inserts time between arrival and purchase, which is the only reason scoring gets to happen before inventory is spent. The costs are real too: every fan waits, the queue itself has to survive the spike the origin was going to receive, and the release rate becomes a business decision about how fast the inventory drains."
+}
+\`\`\`
+
+**Recap:** layer breached-password checks, MFA, and velocity/impossible-travel against credential stuffing and ATO; use fingerprinting, behavioral signals, and invisible challenges for bots; raise cost and lower value (phone verification, per-device limits, reputation) against Sybil/fake accounts; score every event with features+rules+ML and respond with graduated, auditable, reversible step-up friction instead of blunt blocks; and when the abuse is a race for limited inventory, put a signed-token admission queue in front so releases happen at a rate you choose and scoring has time to run.
 
 \`\`\`cswidget
 {
