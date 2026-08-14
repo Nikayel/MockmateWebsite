@@ -1116,11 +1116,39 @@ You parse each source document (PDF, HTML, Confluence, tickets) into clean text,
 
 You never filter after generation, because the model has already seen forbidden text. You attach the user's group memberships to the query and filter candidates by the ACL metadata on each chunk before assembly, ideally as a pre-filter inside the vector query so you do not retrieve what the user cannot read. Retrieval is the security boundary.
 
+That gives three rungs, not two. A vector store holds vectors in named collections, and most stores let one collection be subdivided into **namespaces**: disjoint sets of vectors inside the index, where a query names the namespace it searches and cannot see outside it. Here is the same question asked three ways, on a corpus holding records for every patient.
+
+\`\`\`
+query: "what did my last lab result say", asked by patient 4471
+
+(a) post-filter, one shared index
+    hits = search(collection="records", k=20)
+    hits = [h for h in hits if h.metadata["patient_id"] == 4471]
+    other patients' chunks were read into your process before the predicate ran,
+    and the k you asked for is mostly spent on chunks you then throw away
+
+(b) pre-filter, one shared index
+    hits = search(collection="records", k=20, filter={"patient_id": 4471})
+    nothing foreign is retrieved, so this is the version to write.
+    the index still physically contains 5M patients, and the only thing keeping
+    4,999,999 of them out of this answer is that one argument
+
+(c) per-tenant namespace
+    hits = search(collection="records", namespace="p-4471", k=20)
+    the namespace holds this patient's vectors and no others, so there is no
+    predicate to omit. drop the scope and the query fails or returns nothing;
+    it cannot return someone else's records
+\`\`\`
+
+Both (b) and (c) return the right chunks today. They differ in what a bug can do. Under (b) correctness rests on a predicate being present and right on every call path, including the new endpoint someone adds next quarter, the admin tool that passes \`filter=None\`, and the freshly ingested chunk whose \`patient_id\` came back null. Under (c) the query is issued against a set that contains one patient's vectors, so those same bugs return nothing instead of returning a stranger's chart. Correct by predicate versus impossible by construction is the distinction an auditor is asking about, and it is worth saying out loud in an interview.
+
+Physical partitioning is not free: each index or namespace carries fixed overhead, so five million of them is its own problem. The usual shape is to partition the corpus that is actually regulated and leave the rest shared, and to shard rather than split per user when the tenant count is huge. Hashing \`patient_id\` into a few thousand namespaces means each holds a few thousand patients, the pre-filter still runs inside the namespace, and the blast radius of a missing predicate drops from the whole corpus to one shard. The shared knowledge base of policies, which everyone may read, stays in one collection queried without any tenant scope at all.
+
 Instruct the model to say "I do not know" when context is weak, and verify citations by checking each cited claim resolves to a retrieved chunk. Measure the RAG triad: context relevance (did retrieval fetch the right chunks), faithfulness (is the answer supported by context), answer relevance (did it address the question). Without this triad you cannot tell a retrieval bug from a generation bug.
 
 **Interview nuance:** when latency is probed, note that the reranker and embedding calls are the cost, not the vector search. Cache embeddings for repeated queries, run rerank on a small candidate set, and stream the answer so time-to-first-token hides generation latency.
 
-**Recap:** RAG is ingestion (parse, chunk, embed, index with ACL metadata) plus a query path of hybrid retrieval, a mandatory reranker, ACL-filtered context assembly, grounded generation with citations, and the RAG triad for eval.
+**Recap:** RAG is ingestion (parse, chunk, embed, index with ACL metadata) plus a query path of hybrid retrieval, a mandatory reranker, ACL-filtered context assembly (a pre-filter at minimum, a per-tenant namespace when a leak would be unacceptable), grounded generation with citations, and the RAG triad for eval.
 
 \`\`\`cswidget
 {
