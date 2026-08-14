@@ -5495,7 +5495,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-metrics-monitoring",
           title: "Design a Metrics & Monitoring System (Prometheus/Datadog)",
           summary:
-            "Buffer the ingestion firehose through Kafka into a compressed TSDB partitioned by time, control cost with cardinality limits plus retention tiers and downsampled rollups, serve dashboards from a label-indexed query engine, and evaluate alert rules on a schedule with a dedup/group/route alert manager.",
+            "High-cardinality labels are what actually take a metrics platform down, and retention tiers with rollups are the other half of the cost story.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["monitoring", "time-series", "alerting"],
@@ -5540,7 +5540,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-ad-click-aggregator",
           title: "Design an Ad Click Aggregator / Real-Time Analytics",
           summary:
-            "Dedup clicks idempotently (bloom/windowed store or Flink exactly-once) so at-least-once delivery does not double-count, window on event time with watermarks and allowed lateness for out-of-order clicks, use Lambda/Kappa so a fast approximate stream is reconciled by an exact batch (or replayable) source of truth, and shard hot-campaign counters.",
+            "Idempotent counting so a Kafka replay does not double-bill, event-time windows with watermarks, and a batch path that reconciles the fast one.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["ad-aggregator", "streaming", "dedup"],
@@ -5585,7 +5585,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-leaderboard-topk",
           title: "Design a Leaderboard / Top-K / Distributed Counter",
           summary:
-            "Use a Redis sorted set for O(log n) updates and top-K/rank reads instead of SQL sort-per-request, shard the ZSET by segment with a merged global top-N, break hot counters into summed sub-counters for write parallelism, reach for HyperLogLog and Count-Min Sketch when approximate is good enough, and keep authoritative scores in a database with Redis as a rebuildable index.",
+            "Why a rank query melts under load when the top ten does not, and how a sharded sorted set answers both while the database stays the truth.",
           estimatedMinutes: 40,
           difficulty: "medium",
           skills: ["leaderboard", "redis", "approximation", "case-study"],
@@ -5630,7 +5630,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-stock-exchange",
           title: "Design a Stock Exchange / Order-Matching Engine",
           summary:
-            "Match by price-time priority in an in-memory order book, process a single-writer sequenced event stream single-threaded (Disruptor style) for lock-free determinism and microsecond latency, shard by instrument for scale, keep matching fully deterministic (no wall-clock, no randomness), recover by replaying a replicated event journal from snapshots, and fan out market data on a separate bus with hot standbys.",
+            "Why a matching engine is single-threaded and in-memory: determinism and tail latency beat throughput, and a replayed journal rebuilds the book.",
           estimatedMinutes: 45,
           difficulty: "hard",
           skills: ["low-latency", "matching-engine", "event-sourcing", "case-study"],
