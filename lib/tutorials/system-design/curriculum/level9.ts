@@ -1086,13 +1086,84 @@ That last point is the real constraint. Edge data stores are built for reads-eve
 
 **Interview nuance:** the two failure modes interviewers listen for are (1) pushing heavy compute, a full Node app, or a large working set out to the edge, where the runtime is deliberately small and the PoP holds no data to work on, and (2) putting strong-consistency data (balances, inventory, idempotency keys) in eventually consistent edge KV and getting stale reads or lost updates. Also flag that **observability is harder**: your code runs in hundreds of PoPs, so you lean on the platform's aggregated logs and tracing rather than SSHing into a box.
 
-\`\`\`
-USER --> nearest PoP (V8 isolate, <5ms start / WASM <1ms)
-            | route, auth/JWT, A/B, personalize, cache
-            | strong-consistency data? --> origin
-            v
-          ORIGIN region: DB txns, heavy compute, full Node
-   edge data: KV (eventual), read replicas, Durable Objects (pinned strong)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "What runs in the PoP and what stays at the origin",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "user",
+      "label": "User",
+      "kind": "client"
+    },
+    {
+      "id": "pop",
+      "label": "Nearest PoP: route, verify JWT, A/B, personalize, cache",
+      "kind": "cdn"
+    },
+    {
+      "id": "kv",
+      "label": "Workers KV (eventual, propagation in seconds)",
+      "kind": "cache"
+    },
+    {
+      "id": "dobj",
+      "label": "Durable Object (pinned to one place, strong)",
+      "kind": "db"
+    },
+    {
+      "id": "origin",
+      "label": "Origin region: DB transactions, heavy compute, full Node",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "user",
+      "to": "pop",
+      "kind": "sync",
+      "label": "under 5 ms isolate start"
+    },
+    {
+      "from": "pop",
+      "to": "kv",
+      "kind": "sync",
+      "label": "read-mostly"
+    },
+    {
+      "from": "pop",
+      "to": "dobj",
+      "kind": "sync",
+      "label": "strong, one key"
+    },
+    {
+      "from": "pop",
+      "to": "origin",
+      "kind": "sync",
+      "label": "cold or strong data"
+    }
+  ],
+  "groups": [
+    {
+      "id": "edge",
+      "label": "Edge PoP: request path",
+      "nodes": [
+        "pop",
+        "kv",
+        "dobj"
+      ]
+    },
+    {
+      "id": "core",
+      "label": "Origin region",
+      "nodes": [
+        "origin"
+      ]
+    }
+  ],
+  "caption": "A V8 isolate starts in under 5 ms and a WASM module in under a millisecond, so the code travels cheaply. The data does not: a PoP caches what is hot and holds nothing else, KV and regional read replicas are eventually consistent, and only a Durable Object pinned to one location gives a strong write, at that location's latency."
+}
 \`\`\`
 
 **Recap:** V8 isolates start in under 5ms and WASM sub-ms, so edge compute delivers global sub-50ms TTFB for lightweight request-path work like routing, auth, and personalization, while heavy compute, large working sets, and strong-consistency data stay at the origin, because an edge runtime is deliberately small, a PoP holds only what is hot, and edge data is eventually consistent by default.
@@ -2239,11 +2310,94 @@ The cost is brutal: you implement the **same business logic twice**, once in a b
 
 The reaction: delete the batch layer. There is **one streaming path**, and the durable log (Kafka) is the system of record with long retention. If you need to recompute history (bug fix, new metric), you **replay the log** from the beginning through the same streaming code. One codebase, one set of logic, no drift. Kappa is the default for new systems when the streaming engine can express your logic and the log retention is affordable.
 
-\`\`\`
-  Lambda                          Kappa
-  events -> batch layer  \\        events -> Kafka (retained) -> stream job -> serving
-         -> speed layer  -> serve                   ^                |
-  (two codebases, merged)                            +-- replay to recompute
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Lambda against Kappa",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "events",
+      "label": "Event stream",
+      "kind": "queue"
+    },
+    {
+      "id": "kafka",
+      "label": "Kappa: the same events, retained in Kafka",
+      "kind": "queue"
+    },
+    {
+      "id": "batch",
+      "label": "Lambda batch layer (all history, accurate)",
+      "kind": "service"
+    },
+    {
+      "id": "speed",
+      "label": "Lambda speed layer (live, approximate)",
+      "kind": "service"
+    },
+    {
+      "id": "merge",
+      "label": "Serving layer (merges the two)",
+      "kind": "db"
+    },
+    {
+      "id": "job",
+      "label": "Stream job (one codebase)",
+      "kind": "service"
+    },
+    {
+      "id": "tables",
+      "label": "Iceberg tables (real time and reporting)",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "events",
+      "to": "batch",
+      "kind": "async",
+      "label": "reprocess history"
+    },
+    {
+      "from": "events",
+      "to": "speed",
+      "kind": "async",
+      "label": "live"
+    },
+    {
+      "from": "batch",
+      "to": "merge",
+      "kind": "sync",
+      "label": "accurate, hours old"
+    },
+    {
+      "from": "speed",
+      "to": "merge",
+      "kind": "sync",
+      "label": "recent, approximate"
+    },
+    {
+      "from": "kafka",
+      "to": "job",
+      "kind": "sync",
+      "label": "read once"
+    },
+    {
+      "from": "job",
+      "to": "tables",
+      "kind": "sync",
+      "label": "exactly-once sink"
+    },
+    {
+      "from": "job",
+      "to": "kafka",
+      "kind": "feedback",
+      "label": "replay to recompute"
+    }
+  ],
+  "caption": "Lambda buys accuracy and freshness with two layers, and pays for it forever in the same business logic written twice against two engines. Kappa keeps one streaming path and replays the retained log when history has to be recomputed, and landing that stream in Iceberg tables serves the reporting consumer from the same codebase."
+}
 \`\`\`
 
 ## Event-time, watermarks, and delivery
