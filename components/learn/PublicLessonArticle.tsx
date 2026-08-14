@@ -6,6 +6,8 @@ import { Footer } from "@/components/footer"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { LessonUnlockCard } from "./LessonUnlockCard"
 import { BreadcrumbJsonLd } from "@/components/seo/JsonLd"
+import { LessonJsonLd } from "@/components/seo/LessonJsonLd"
+import { truncateForDescription } from "@/lib/seo/learn-metadata"
 import {
   LEARN_COURSE_LABEL,
   LEARN_HUB_PATH,
@@ -146,7 +148,9 @@ function SampleBlock({ label, code }: { label: string; code: string }) {
   return (
     <figure className="mt-6">
       <figcaption className="text-muted-foreground mb-1.5 text-xs font-medium">{label}</figcaption>
-      <pre className="overflow-x-auto rounded-lg border border-gray-700/50 bg-gray-900/80 p-3 font-mono text-xs leading-relaxed text-gray-200">
+      {/* Theme tokens, matching the markdown fence. This carried the same hardcoded grays with
+          no dark: variant, so a worked example rendered a dark box on a light page. */}
+      <pre className="border-border bg-card/40 text-foreground/90 overflow-x-auto rounded-lg border p-3 font-mono text-xs leading-relaxed">
         <code>{code}</code>
       </pre>
     </figure>
@@ -163,6 +167,7 @@ export function PublicLessonArticle({
   const courseLabel = LEARN_COURSE_LABEL[preview.courseId]
   const coursePath = trackPath(preview.courseId)
   const levelHref = levelPath(preview.courseId, preview.levelSlug)
+  const lessonPath = publicLessonPath(preview.courseId, preview.levelSlug, preview.id)
   const demoLanguage = DEMO_LANGUAGE[preview.courseId]
 
   return (
@@ -186,9 +191,19 @@ export function PublicLessonArticle({
             { name: preview.levelTitle, url: levelHref },
             {
               name: preview.title,
-              url: publicLessonPath(preview.courseId, preview.levelSlug, preview.id),
+              url: lessonPath,
             },
           ]}
+        />
+        {/* Structured data describing THE LESSON. Until this landed, the only JSON-LD on a lesson
+            page was the four site-level blocks, every one of which describes CodeSparring the
+            product, so a page about fencing tokens told Google it was software priced at $25 a
+            month. The description is the same string the meta tag carries, built by the same
+            truncation, so the two cannot drift. */}
+        <LessonJsonLd
+          preview={preview}
+          path={lessonPath}
+          description={truncateForDescription(preview.summary)}
         />
         <nav aria-label="Breadcrumb" className="mb-6">
           <ol className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
