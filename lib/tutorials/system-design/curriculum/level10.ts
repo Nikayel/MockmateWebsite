@@ -2120,24 +2120,30 @@ Because the underlying data is stable, you cache hard: popular \`(cell, filter)\
 {
   "type": "check",
   "kind": "predict",
-  "prompt": "A candidate reuses their Uber design here: a high throughput location ingest tier feeding a volatile in-memory geo index. What is wrong with it?",
+  "prompt": "Open now is computed from a place's stored hours and the current time. You are caching popular result pages for an hour. What goes wrong?",
   "options": [
     {
-      "label": "Places barely move, so it builds write throughput the workload never generates and gives up the rebuildable search index that makes the reads cheap",
+      "label": "A closed shop keeps appearing as open until the entry expires",
       "correct": true,
-      "feedback": "Right. The senior move is to say out loud that this is read heavy over near static data, so you precompute, denormalize and cache instead of optimizing writes."
+      "feedback": "Right. Every other filter here, category, price band, minimum rating, is a property of the data, so a cached page only goes stale when the data changes. Open now is a property of the clock, so the answer rots on its own with nothing to invalidate it."
     },
     {
-      "label": "Nothing is wrong, since the read side is the same nearest neighbor query in both systems",
-      "feedback": "The read side is not the same. Yelp filters on category, open now, price and rating and then ranks, which is a search engine query, not a nearest driver lookup."
+      "label": "Nothing, because the hours are stored data and the entry is invalidated whenever a place is edited",
+      "feedback": "Invalidation on edit is the right policy for this workload, and it is the wrong tool here: nobody edited the place. The shop closed because the clock moved past its closing time."
     },
     {
-      "label": "An in-memory index cannot answer a radius query",
-      "feedback": "It can, and Uber's does. The mismatch is the workload: near static data read constantly, versus moving points written constantly."
+      "label": "The ranking drifts during the hour, because new reviews change the ratings it sorted on",
+      "feedback": "True and tolerable: an hour old ordering by rating is a slightly stale ordering, not a wrong answer. Claiming a closed shop is open is a wrong answer."
+    },
+    {
+      "label": "The cache key collides, since the current time is not part of the query",
+      "feedback": "Nothing collides: every request for that query string is answered from one entry, which is exactly what makes the cache worth having. The problem is that the one entry stops being true."
     }
   ]
 }
 \`\`\`
+
+That is the one filter that fights the caching policy. Keep open-now evaluation out of the cached artifact (cache the candidate set and apply the hours filter at request time), or give result pages carrying that filter a TTL of minutes rather than hours.
 
 New reviews, edits, and new places are comparatively low-rate. They update the source of truth, then flow through an indexing pipeline that updates the ES read model and invalidates affected cache entries. You never optimize this path for high throughput because the workload does not have it.
 
@@ -2260,14 +2266,14 @@ hot key: replicate k to N3,N5,N7 -> client picks a random replica
   ],
   "items": [
     {
-      "label": "Adding a fifth node without collapsing the hit rate",
+      "label": "One physical node owning twice its share of the key space",
       "bucket": "Consistent hashing plus virtual nodes fixes it",
-      "feedback": "On the ring a new node steals keys only from its neighbor, so about 1/N of keys move instead of nearly all of them."
+      "feedback": "This is what virtual nodes are for. Raw ring positions are random and come out lumpy; 100 to 200 points per physical node average that away."
     },
     {
-      "label": "Load piling on one node because ring positions came out lumpy",
+      "label": "A dead node's whole key range landing on the next node clockwise",
       "bucket": "Consistent hashing plus virtual nodes fixes it",
-      "feedback": "Virtual nodes are exactly this fix: 100 to 200 points per physical node even out both steady load and the redistribution when a node dies."
+      "feedback": "That is what happens with one point per node. With virtual nodes the dead node's points are scattered around the ring, so its load spreads over many survivors instead of one."
     },
     {
       "label": "One key so popular it saturates a single node's CPU and network",
@@ -2278,6 +2284,16 @@ hot key: replicate k to N3,N5,N7 -> client picks a random replica
       "label": "Ten thousand requests missing at once when a hot key's TTL lapses",
       "bucket": "Needs a different mechanism",
       "feedback": "Placement is irrelevant to a stampede. Coalesce the in flight fetch, jitter the TTLs, or serve stale while revalidating."
+    },
+    {
+      "label": "A scan of cold keys evicting the small set that everything reads",
+      "bucket": "Needs a different mechanism",
+      "feedback": "This is an eviction policy question. LRU treats the scan as recent and throws the popular set out; LFU keeps what is read often, which is exactly the case it beats LRU on."
+    },
+    {
+      "label": "A node dying while the keys it held still have to be served",
+      "bucket": "Needs a different mechanism",
+      "feedback": "The ring decides where those keys go next, and it holds no data. Serving them without a trip to the database needs a replica per shard, promoted by a sentinel or by cluster gossip."
     }
   ],
   "reveal": "Three questions, three answers. Placement is consistent hashing with virtual nodes, never hash mod N, because mod N reshuffles the world on any membership change and stampedes the database. Eviction is LRU by default, LFU when a small popular set must survive a scan, with TTL almost always on as well, and Redis samples rather than maintaining exact recency so writes stay O(1). Survival is per failure: replicate a hot key and read a random replica, coalesce plus jitter against a stampede, and keep primary and replicas per shard so a failover is a promotion rather than an outage."
@@ -2570,20 +2586,24 @@ GET range -> metadata lookup -> read shards covering range -> (reconstruct if sh
 {
   "type": "check",
   "kind": "predict",
-  "prompt": "Why is keeping three full copies of every object the wrong default at exabyte scale?",
+  "prompt": "Erasure coding is the default for the bulk of an exabyte catalog. Where does plain three-copy replication still win?",
   "options": [
     {
-      "label": "It costs 3x storage and tolerates fewer simultaneous losses than a k plus m code that costs roughly 1.4x",
+      "label": "On hot small objects, where a read is one copy and no reconstruction",
       "correct": true,
-      "feedback": "Right, and quantifying it is the tell. Erasure coding buys more failure tolerance for less space, which is why it is the default for large and cold objects."
+      "feedback": "Right. Erasure coding is paid for in CPU on write and in read amplification whenever a shard is missing, since a degraded read has to fetch k survivors and reconstruct. A replicated read takes any single whole copy, so the objects you serve constantly and cheaply are the ones that keep it."
     },
     {
-      "label": "Three copies cannot reach eleven nines of durability under any placement",
-      "feedback": "With good placement and repair, replication can be made extremely durable. The objection is economic, not that it fails the durability bar."
+      "label": "Nowhere: once the code is implemented, erasure coding is strictly cheaper",
+      "feedback": "Cheaper in storage, yes, roughly 1.4x against 3x. It is not free: you pay encode CPU on every write and reconstruction work on every degraded read, which is a bad trade for a small object served constantly."
     },
     {
-      "label": "Replication reads are slower, because you must compare copies before returning",
-      "feedback": "Replication is the faster read: you take any one copy, with no reconstruction math. That is exactly why hot small objects sometimes keep it."
+      "label": "On the coldest archive tier, where nobody notices a slow degraded read",
+      "feedback": "Backwards. Cold bulk data is where the storage multiplier dominates and latency does not, which is exactly the case erasure coding was made for."
+    },
+    {
+      "label": "On objects that must survive more than m simultaneous shard losses",
+      "feedback": "Raise m and the code survives more losses at a little more overhead. Three copies tolerate only two losses, so replication is the weaker option on that axis, not the stronger one."
     }
   ],
   "reveal": "This is a durability engineering problem, and cost is the axis. Erasure coding stores k data plus m parity shards so any k reconstruct the object, giving more tolerance than 3x replication at roughly 1.4x overhead, paid for in encode CPU and degraded read amplification. The metadata index is the other half of the system: bucket plus key partitioned across a scalable store, sorted and range partitioned so prefix listing does not touch every shard, and committed durably before the ack, which is where strong read-after-write comes from. Multipart upload and range GET make huge objects practical, and checksums plus scrubbing plus reconstruction keep the eleven nines true over years."
@@ -3415,8 +3435,8 @@ Real commerce does not charge instantly, so you need reservation holds. When a b
       "feedback": "Failing fast still costs a full round trip through your stack per request, and five million of them in one second melt the tier long before the correctness argument matters."
     },
     {
-      "label": "No: shard the hot item's counter across nodes so the writes fan out",
-      "feedback": "You cannot shard a single seat. The genuinely contended item is serialized by definition, which is exactly why the answer is to shed and pace arrivals instead."
+      "label": "No: add read replicas of the inventory row so the check is cheaper",
+      "feedback": "Replicas serve reads. The decrement is a write against one row, and all five million arrivals want that same write, so read scaling never touches the contended path."
     }
   ]
 }
