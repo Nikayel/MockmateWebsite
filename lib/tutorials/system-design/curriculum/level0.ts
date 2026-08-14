@@ -1216,6 +1216,45 @@ plan for roughly 15k peak read QPS and 1.5k peak write QPS.
 you can defend the shape of the calculation and that you convert average to peak. Saying "I will assume
 a 3x peak multiplier because of the daily traffic curve" scores; a single unexplained number does not.
 
+### Two more lines: what you store and what you cache
+
+Peak QPS sizes the serving tier. Two more lines off the same assumptions size the datastore and the
+cache, and they are the other two numbers an interviewer asks for by name. Storage first, with the
+multiplier candidates forget:
+
+\`\`\`
+objects/day = writes/day        = 5 x 10^7
+object size (a row plus metadata) = 1 KB = 10^3 bytes
+
+raw/day    = 5 x 10^7 x 10^3 B  = 5 x 10^10 B  = 50 GB/day
+raw over a 90-day retention     = 50 GB x 90   ~= 4.5 TB
+
+provisioned = raw x replication factor
+RF = 3, because a durable store keeps three copies of every byte
+provisioned = 4.5 TB x 3        ~= 13.5 TB
+\`\`\`
+
+The replication factor is not a rounding error. Quote the raw 4.5 TB and you have understated what you
+actually pay for and provision by 3x, so say "4.5 TB raw, about 13.5 TB at RF=3" and the interviewer
+can challenge the RF instead of the whole line.
+
+Cache is sized off a different corpus, and this is where the common error lives. You do not cache what
+you retain, you cache what is still being read, and then only the hot fraction of that. The Pareto
+assumption is that the hot ~20% of objects serves ~80% of reads:
+
+\`\`\`
+actively-read window = objects/day x object size x days still being read
+                     = 5 x 10^7 x 10^3 B x 7 days   ~= 350 GB
+cache size          ~= 20% of the actively-read window
+                     = 0.2 x 350 GB                 ~= 70 GB, buying an ~80% hit rate
+\`\`\`
+
+Retention belongs on the storage line only. Size the cache off the retained 4.5 TB and you quote
+900 GB, more than ten times what the read distribution asks for, and the error grows every time
+somebody extends retention. Quote the cache with the hit rate it buys: 70 GB serving 80% of reads has
+taken four fifths of the read load off the datastore, and that is the sentence that justifies the
+spend.
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -1281,7 +1320,8 @@ storage to three significant figures while the design goes untouched. Estimate o
 the next decision, then move.
 
 Recap: decompose into stated assumptions, label units, round to powers of ten, convert average to peak
-with a 2 to 3x multiplier, and compute only the numbers that change the architecture.
+with a 2 to 3x multiplier, take storage from raw times the replication factor and cache from the hot
+fraction of the actively-read window, and compute only the numbers that change the architecture.
 
 \`\`\`cswidget
 {
