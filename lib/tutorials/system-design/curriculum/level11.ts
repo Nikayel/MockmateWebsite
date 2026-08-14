@@ -1435,7 +1435,7 @@ export const systemDesignLevel11: DesignLevel = {
           id: "sd-l11-ml-blueprint",
           title: "End-to-End ML System Blueprint",
           summary:
-            "Frame business metric to ML objective to label, split an offline training plane from an online serving plane, cascade candidate generation to ranking to re-ranking to hit latency, and close a feedback log so you can retrain and detect drift.",
+            "Why an ML system design interview is about the plumbing rather than the model: two planes, a cascade, and the feedback log juniors leave off the diagram.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["ml-systems", "serving", "drift"],
@@ -1481,7 +1481,7 @@ export const systemDesignLevel11: DesignLevel = {
           id: "sd-l11-feature-store",
           title: "Feature Stores & Training/Serving Skew",
           summary:
-            "A feature store uses a dual offline/online store fed by one definition to kill code-divergence skew, enforces point-in-time as-of joins to prevent label leakage, tiers features by freshness SLA, and proves correctness by comparing served vectors to offline vectors.",
+            "Why a model looks excellent offline and lifts nothing in production, and how one feature definition plus an as-of join kill training/serving skew.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["feature-store", "training-serving-skew", "point-in-time"],
@@ -1527,7 +1527,7 @@ export const systemDesignLevel11: DesignLevel = {
           id: "sd-l11-realtime-recommendation",
           title: "Real-Time Recommendation Systems",
           summary:
-            "Cascade two-tower plus ANN candidate generation into a multi-task ranker into diversity re-ranking to hit p99 under 100ms, feed recent clicks through Kafka/Flink for real-time reaction, handle cold start with content features and popularity, and evaluate with exploration plus online A/B to escape feedback-loop bias.",
+            "How a recommender narrows millions of items to a dozen in under 100ms, and why your click logs measure the old ranker as much as they measure taste.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["recommendation", "two-tower", "ann"],
@@ -1573,7 +1573,7 @@ export const systemDesignLevel11: DesignLevel = {
           id: "sd-l11-online-serving-rollout",
           title: "Online Model Serving & Rollout",
           summary:
-            "Roll models out through shadow to canary to A/B with automatic rollback on an online metric, keep versioned artifacts in a registry so rollback is a hot config switch, pick batch/real-time/streaming inference with micro-batching for throughput, spend your latency budget on feature fetch, and always have a graceful degradation ladder for when the model is unavailable.",
+            "A model can load cleanly and still predict badly, so ship it through shadow and canary with automatic rollback and a degradation ladder underneath.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["model-serving", "rollout", "fallback"],
@@ -1627,7 +1627,7 @@ export const systemDesignLevel11: DesignLevel = {
           id: "sd-l11-rag-architecture",
           title: "RAG (Retrieval-Augmented Generation) Architecture",
           summary:
-            "RAG is ingestion (parse, chunk, embed, index with ACL metadata) plus a query path of hybrid retrieval, a mandatory reranker, ACL-filtered context assembly, grounded generation with citations, and the RAG triad for eval.",
+            "Why a demo RAG feels dumb in production: the reranker and the ACL pre-filter are the stages teams skip, and retrieval is the security boundary.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["rag", "retrieval", "grounding"],
@@ -1673,7 +1673,7 @@ export const systemDesignLevel11: DesignLevel = {
           id: "sd-l11-vector-db-ann",
           title: "Vector Databases & ANN Search",
           summary:
-            "ANN trades recall for speed via HNSW (RAM, high recall), IVF-PQ (quantized, memory-cheap), or DiskANN (SSD-scale); tune ef_search / nprobe; handle filtered search as a pre-filter pushed into the index; and plan for rebuilds and re-embedding migrations.",
+            "Choosing between HNSW, IVF-PQ and DiskANN is a memory budget question rather than a recall question, and selective filters must live inside the index.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["vector-db", "ann", "hnsw"],
@@ -1719,7 +1719,7 @@ export const systemDesignLevel11: DesignLevel = {
           id: "sd-l11-model-gateway",
           title: "Model Gateway / LLM Router / AI Gateway",
           summary:
-            "An AI gateway is a unified multi-provider API adding failover and routing, exact plus semantic caching, per-tenant quotas and cost metering, retries/timeouts/circuit breakers with streaming passthrough, and input/output safety plus audit logging, all without becoming a SPOF.",
+            "One chokepoint between your apps and every LLM provider, doing failover, semantic caching as the largest cost lever, and per-team token budgets.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["model-gateway", "llm-router", "caching"],
@@ -1765,7 +1765,7 @@ export const systemDesignLevel11: DesignLevel = {
           id: "sd-l11-llm-inference-serving",
           title: "LLM Inference Serving (GPU Economics)",
           summary:
-            "LLM serving is capped by KV-cache memory, so use PagedAttention to kill fragmentation and continuous batching to keep the GPU saturated; reason in TTFT (prefill) vs inter-token (decode) vs throughput; and add quantization, parallelism, prefix caching, and speculative decoding to stretch a fixed GPU fleet.",
+            "LLM serving is capped by KV cache memory rather than compute, which is why PagedAttention and continuous batching decide how many requests a GPU holds.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["llm-inference", "gpu", "vllm"],
@@ -1811,7 +1811,7 @@ export const systemDesignLevel11: DesignLevel = {
           id: "sd-l11-llm-agents",
           title: "LLM Agents & Orchestration",
           summary:
-            "An agent is a bounded loop; the controller enforces step/token/time/cost limits, tool calls are schema-validated and sandboxed, side-effecting tools are idempotent, memory can be durable and resumable, and the central safety problem is prompt injection via tool output, contained by treating output as untrusted, least-privilege scoping, and human approval gates.",
+            "An agent is a loop that needs hard bounds in your code, idempotent tools, and the assumption that every byte of tool output is attacker-controlled.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["llm-agents", "orchestration", "tool-calling"],
@@ -1857,7 +1857,7 @@ export const systemDesignLevel11: DesignLevel = {
           id: "sd-l11-llm-eval-guardrails",
           title: "LLM Evaluation & Guardrails",
           summary:
-            "Gate every change with offline golden-set eval (programmatic checks, calibrated LLM-as-judge, regression suite) plus online canary/A-B, enforce input and output guardrails at runtime (PII, injection, schema, moderation, groundedness), and close the loop by feeding production failures back into the eval sets.",
+            "Eval is the CI of an LLM feature and guardrails are its WAF: no prompt change ships without a golden-set gate, no output reaches a user unfiltered.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["llm-eval", "guardrails", "safety"],
@@ -1903,7 +1903,7 @@ export const systemDesignLevel11: DesignLevel = {
           id: "sd-l11-finetune-rag-prompting",
           title: "Fine-Tuning vs RAG vs Prompting",
           summary:
-            "Prompting for behavior, RAG for fresh/private knowledge, fine-tuning (via LoRA adapters, rarely full) for style/format/latency; they compose; drive continuous improvement with a data flywheel; and never fine-tune for knowledge that changes when RAG keeps it fresh.",
+            "Prompting for behavior, RAG for knowledge, fine-tuning for style and cost, and why fine-tuning on facts that change is the expensive mistake teams make.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["fine-tuning", "rag", "lora"],
@@ -1957,7 +1957,7 @@ export const systemDesignLevel11: DesignLevel = {
           id: "sd-l11-streaming-realtime-analytics",
           title: "Streaming / Real-Time Analytics Pipelines",
           summary:
-            "Kafka backbone, Flink windows keyed on event time with watermarks for late data, exactly-once via checkpointing where counts must be right, HyperLogLog and Count-Min Sketch for bounded-memory counting, and a Druid/Pinot/ClickHouse serving layer for sub-second queries.",
+            "Counting billions of events a day is a fight against exact counting and late data, won with event-time watermarks and bounded-memory sketches.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["real-time-analytics", "streaming", "olap"],
@@ -2003,7 +2003,7 @@ export const systemDesignLevel11: DesignLevel = {
           id: "sd-l11-globally-consistent-multiregion",
           title: "Globally-Consistent Multi-Region Data",
           summary:
-            "Cross-region synchronous writes cost 100+ ms because of the speed of light, so use consensus plus TrueTime/HLC for correct ordering, geo-partition rows to their home region for local reads and writes, add follower reads and leases, and choose a consistency level per workload instead of paying for global strong consistency everywhere.",
+            "Strong consistency with single-digit-ms writes on every continent is not purchasable, so geo-partition each row to a home region and pay the ocean rarely.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["multi-region", "spanner", "geo-partitioning"],
@@ -2057,7 +2057,7 @@ export const systemDesignLevel11: DesignLevel = {
           id: "sd-l11-iot-edge-ingestion",
           title: "IoT / Edge Ingestion Architecture",
           summary:
-            "Filter and buffer at the edge, connect over MQTT with per-device certs, absorb bursts and reconnects with a Kafka buffer and backpressure, fork into a seconds-latency hot path and a durable cold path, and drive control and OTA through a device shadow with canary rollout.",
+            "Ingesting from millions of devices that are offline half the time: filter at the edge, buffer and replay, and dedupe on a device-supplied event id.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["iot", "edge", "mqtt"],
@@ -2102,7 +2102,7 @@ export const systemDesignLevel11: DesignLevel = {
           id: "sd-l11-time-series-storage",
           title: "Time-Series Databases & Storage Design",
           summary:
-            "A TSDB exploits append-only, columnar, delta-of-delta + XOR compressed storage partitioned by time, keeps old data cheap with downsampling and hot/warm/cold tiering plus retention, serves time-range + tag-filtered aggregations, and lives or dies by controlling tag cardinality.",
+            "What breaks a metrics database first is tag cardinality, every time, and what makes one affordable is delta-of-delta and XOR compression.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["time-series", "cardinality", "downsampling"],
