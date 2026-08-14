@@ -63,6 +63,154 @@ costs a disk \`fsync\` (often a few ms), and why "group commit" batches many tra
 \`fsync\`, and flags the tradeoff: \`synchronous_commit = off\` in Postgres returns faster but risks
 losing the last few hundred ms of commits on a crash. Money says on; a like counter can say off.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "What COMMIT ok promises, and when",
+  "actors": [
+    {
+      "id": "app",
+      "label": "Application"
+    },
+    {
+      "id": "db",
+      "label": "Postgres"
+    },
+    {
+      "id": "wal",
+      "label": "WAL on disk"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "async",
+      "label": "synchronous_commit = off",
+      "description": "the acknowledgment no longer waits for the fsync"
+    }
+  ],
+  "steps": [
+    {
+      "from": "app",
+      "to": "db",
+      "kind": "request",
+      "label": "BEGIN, debit A, credit B",
+      "state": {
+        "WAL on disk": "empty",
+        "Client believes": "in flight"
+      }
+    },
+    {
+      "from": "db",
+      "kind": "note",
+      "label": "Both writes buffered in memory"
+    },
+    {
+      "from": "db",
+      "to": "wal",
+      "kind": "request",
+      "label": "append the WAL record",
+      "state": {
+        "WAL on disk": "in the OS page cache",
+        "Client believes": "in flight"
+      }
+    },
+    {
+      "from": "db",
+      "to": "wal",
+      "kind": "request",
+      "label": "fsync the WAL record",
+      "when": "!async",
+      "predict": {
+        "question": "The WAL record has been written. Why has Postgres still not acknowledged the commit?",
+        "options": [
+          "It has: the write call already reached the disk",
+          "The write only reached the OS page cache, which a power loss erases",
+          "It still has to write the data pages themselves first"
+        ]
+      },
+      "state": {
+        "WAL on disk": "durable",
+        "Client believes": "in flight"
+      }
+    },
+    {
+      "from": "wal",
+      "to": "db",
+      "kind": "response",
+      "label": "fsync returned",
+      "when": "!async"
+    },
+    {
+      "from": "db",
+      "to": "app",
+      "kind": "response",
+      "label": "COMMIT ok",
+      "when": "!async",
+      "state": {
+        "WAL on disk": "durable",
+        "Client believes": "committed"
+      }
+    },
+    {
+      "from": "db",
+      "kind": "note",
+      "label": "Power loss one second later",
+      "status": "error",
+      "when": "!async"
+    },
+    {
+      "from": "db",
+      "kind": "note",
+      "label": "Restart replays the WAL record",
+      "when": "!async",
+      "state": {
+        "WAL on disk": "durable",
+        "Client believes": "committed"
+      }
+    },
+    {
+      "from": "db",
+      "to": "app",
+      "kind": "response",
+      "label": "COMMIT ok, no fsync yet",
+      "status": "late",
+      "when": "async",
+      "predict": {
+        "question": "With 'synchronous_commit = off', what sits on durable storage at the moment the client is told COMMIT ok?",
+        "options": [
+          "The WAL record; the fsync is just bookkeeping that happens later",
+          "Nothing yet: the record is still only in the OS page cache",
+          "The WAL record and the data pages, which is why it is faster"
+        ]
+      },
+      "state": {
+        "WAL on disk": "still in the OS page cache",
+        "Client believes": "committed"
+      }
+    },
+    {
+      "from": "db",
+      "kind": "note",
+      "label": "Power loss one second later",
+      "status": "error",
+      "when": "async"
+    },
+    {
+      "from": "db",
+      "kind": "note",
+      "label": "Restart finds no record to replay",
+      "status": "error",
+      "when": "async",
+      "state": {
+        "WAL on disk": "gone",
+        "Client believes": "committed"
+      }
+    }
+  ],
+  "caption": "Flip the toggle and watch the acknowledgment move to the left of the fsync. The client's belief never changes; only whether anything backs it up does."
+}
+\`\`\`
+
 ### When is strict ACID worth its cost?
 
 When a violated invariant means lost money, double-charged users, or corrupted balances, pay for it:
