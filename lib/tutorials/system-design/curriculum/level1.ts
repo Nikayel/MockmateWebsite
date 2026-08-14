@@ -474,9 +474,9 @@ by port, and know that L4 sees only the 4-tuple while L7 can read and route on r
       "feedback": "Tempting because 'load balancer' sounds like one thing, but path-based routing requires parsing the request, and L4 sees only the 4-tuple, never a URL."
     },
     {
-      "label": "An L7 proxy that terminates the connection and parses every request, paying CPU and latency for it",
+      "label": "An L7 proxy that parses every request",
       "correct": true,
-      "feedback": "Right. Path routing quietly assumes an L7 proxy, and the honest version of the design names its cost: TLS termination and request parsing on every request."
+      "feedback": "Right. Something had to read the URL to tell '/api' from '/images', and only an L7 proxy reads URLs. The honest version of the design names the bill that comes with it: the proxy terminates the connection, parses every request, and charges CPU and latency on each one."
     },
     {
       "label": "Nothing extra; DNS can do this split before traffic reaches any LB",
@@ -688,13 +688,13 @@ routing plus health checks steer users to the nearest healthy region before a re
   "prompt": "Your design needs region failover within 5 seconds of a health check failing. Can DNS routing alone, Geo or latency or weighted plus health checks, deliver that?",
   "options": [
     {
-      "label": "Yes; health checks make the authoritative server stop handing out the dead region's IP immediately",
-      "feedback": "Health checks do fix what new resolutions receive, which is real and valuable, but everyone who already resolved keeps the cached answer until it expires. New lookups heal fast; existing users do not."
+      "label": "Yes; health checks pull the dead IP immediately",
+      "feedback": "Health checks do fix what new resolutions receive, which is real and valuable, but the authoritative server only controls answers it is asked for. Everyone who already resolved keeps the cached answer until it expires, so new lookups heal fast while existing users stay pointed at the corpse."
     },
     {
-      "label": "No; DNS steers new lookups on the order of minutes, so seconds-level failover needs a load balancer or anycast layer below it",
+      "label": "No; DNS steers new lookups in minutes",
       "correct": true,
-      "feedback": "Right. DNS gets users to the right region eventually; per-request health, retries, and instant failover belong to the L4/L7 layer that takes over after resolution."
+      "feedback": "Right. Every resolver in the chain is holding a cached answer you cannot revoke, so the change lands on the order of minutes no matter what the health check saw. Seconds-level failover has to come from a layer that sees every request: a load balancer or an anycast layer below DNS. DNS gets users to the right region eventually; per-request health, retries, and instant failover belong to the L4/L7 layer that takes over after resolution."
     },
     {
       "label": "Yes, if you drop the TTL to 1 second",
@@ -853,9 +853,9 @@ means you keep the opened window.
       "feedback": "Tempting, but the responses are small. Bandwidth limits how fast bytes flow once they are flowing; it does nothing about the round trips you burn before any byte flows."
     },
     {
-      "label": "Setup ceremony; roughly 2 RTTs of handshake per call, around 12 seconds of pure setup",
+      "label": "Setup ceremony; about 2 RTTs per call",
       "correct": true,
-      "feedback": "Right. TCP plus TLS 1.3 costs about 2 RTTs before the first request byte, times 30 calls at 200ms per RTT. Each fresh connection also restarts slow start, so none of them ever reaches full speed."
+      "feedback": "Right, and the arithmetic is worth doing out loud. TCP plus TLS 1.3 costs about 2 RTTs before the first request byte, so 30 calls at 200ms per RTT is roughly 12 seconds of pure handshake before you count a single millisecond of work. Each fresh connection also restarts slow start, so none of them ever reaches full speed either."
     },
     {
       "label": "Server processing time; 30 requests is a real load",
@@ -910,9 +910,9 @@ reach for UDP when late data is worthless and watch TIME_WAIT/port exhaustion un
       "feedback": "The tiny RTT does hide the handshake cost, which is why this feels safe, but every closed connection sits in TIME_WAIT for about 60 seconds holding an ephemeral port, and each fresh connection restarts slow start."
     },
     {
-      "label": "The proxy exhausts its ~28k ephemeral ports as closed connections pile up in TIME_WAIT, and throughput never leaves slow start",
+      "label": "The proxy runs out of ephemeral ports",
       "correct": true,
-      "feedback": "Right. One source IP talking to one backend IP has a hard port budget, and 60-second TIME_WAIT holds burn through it fast at high churn. Connection pooling fixes the ports, the handshakes, and the slow-start ramp in one move."
+      "feedback": "Right. One source IP talking to one backend IP has a hard budget of roughly 28k ephemeral ports, and every closed connection holds one in TIME_WAIT for about 60 seconds, so churn at thousands per second burns the budget long before anything else complains. Throughput never leaves slow start either. Connection pooling fixes the ports, the handshakes, and the slow-start ramp in one move."
     },
     {
       "label": "The network link saturates from all the extra traffic",
