@@ -717,6 +717,39 @@ Fast burn (14.4x over 1 hour) means something is badly wrong right now and you w
 
 Each alert requires both a long window and a short window to be over threshold simultaneously. The long window (1 hour) gives significance so you do not page on a 30-second spike. The short window (5 minutes) makes the alert *reset quickly* once the problem is fixed, so you are not stuck with a firing page for an hour after recovery. Requiring both cuts false positives (a brief blip fails the long window) and flapping (a recovered incident clears the short window fast). This is the multi-window multi-burn-rate pattern.
 
+## The rule, written out
+
+The table above is a policy. This is the same rung as something a monitoring system evaluates every 30 seconds, written in PromQL, which is where these rules usually live. Two pieces carry it: \`rate(counter[5m])\` is the per-second increase of a counter averaged across a range window, and \`sum()\` collapses the per-instance series into one number, so a ratio of two summed rates is the error ratio over that window.
+
+\`\`\`yaml
+# 99.9% objective, so the budget is 1 - 0.999 = 0.001 and the fast-burn
+# threshold is 14.4 * 0.001 = 0.0144, an observed error rate of 1.44%.
+groups:
+  - name: checkout-slo
+    rules:
+      # Name each window's error ratio once, so the alert reads as plain arithmetic.
+      - record: job:slo_errors:ratio_rate1h
+        expr: >
+          sum(rate(http_requests_total{job="checkout", status=~"5.."}[1h]))
+          / sum(rate(http_requests_total{job="checkout"}[1h]))
+      - record: job:slo_errors:ratio_rate5m
+        expr: >
+          sum(rate(http_requests_total{job="checkout", status=~"5.."}[5m]))
+          / sum(rate(http_requests_total{job="checkout"}[5m]))
+
+      - alert: CheckoutFastBurn
+        expr: >
+          job:slo_errors:ratio_rate1h > (14.4 * 0.001)
+          and
+          job:slo_errors:ratio_rate5m > (14.4 * 0.001)
+        labels:
+          severity: page
+\`\`\`
+
+That \`and\` is the entire multi-window pattern in one operator: PromQL's \`and\` keeps a series from the left side only where the right side also has a sample surviving its own comparison, so neither window can fire the rule alone. Note there is no \`for:\` clause. The 1-hour window already supplies the significance a \`for:\` would buy, and stacking one on top would only delay the page.
+
+The other two rungs are this same file with three substitutions: medium burn is \`6\` with \`[6h]\` and \`[30m]\`, slow burn is \`1\` with \`[3d]\` and \`[6h]\` and a \`severity: ticket\` label instead of \`page\`. The multiplier and the pair of windows are the only things a rung actually chooses.
+
 \`\`\`cswidget
 {
   "type": "check",
