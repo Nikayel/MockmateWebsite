@@ -394,16 +394,16 @@ RAG is the default GenAI design because it solves two problems an LLM cannot sol
   "prompt": "Before you read the ingestion section: a teammate proposes 4000 token chunks so that no answer is ever split across a chunk boundary. What goes wrong?",
   "options": [
     {
-      "label": "Nothing, as long as the context window is large enough to hold several of them",
+      "label": "Nothing, if the context window holds several of them",
       "feedback": "Window size is not the constraint that bites first. The damage happens at retrieval, before the window is even involved."
     },
     {
-      "label": "One embedding now has to represent 4000 tokens of mixed content, so it matches queries vaguely, and every retrieved chunk spends the context budget on mostly irrelevant text",
+      "label": "One embedding now has to stand for 4000 tokens of mixed content",
       "correct": true,
-      "feedback": "Right. A chunk is the unit of both retrieval and context spend. Oversized chunks dilute the embedding and waste the window, which is why the usual baseline is a few hundred tokens with a little overlap."
+      "feedback": "Right. A chunk is the unit of both retrieval and context spend, so an oversized one matches queries vaguely and then spends your whole window on mostly irrelevant text. This is why the usual baseline is a few hundred tokens with a little overlap."
     },
     {
-      "label": "Retrieval gets slower, because a bigger chunk produces a bigger vector to compare",
+      "label": "Retrieval slows, since a bigger chunk means a bigger vector",
       "feedback": "Chunk length does not change the embedding dimension. A one sentence chunk and a ten page chunk both become the same fixed length vector, which is exactly why the long one is so lossy."
     }
   ]
@@ -529,12 +529,12 @@ Laid out side by side, the choice is really one question, and it is a budget que
       "feedback": "That is what happens when the filter is loose, which is why this design survives testing. At 0.1 percent selectivity the arithmetic turns against you: an unfiltered top 100 is expected to contain a fraction of one matching vector."
     },
     {
-      "label": "Far fewer results than asked for, sometimes none, because the unfiltered top 100 rarely contains that tenant's vectors at all",
+      "label": "Far fewer results than asked for, sometimes none",
       "correct": true,
-      "feedback": "Right, and the failure is quiet: no error, just a short list. Selective predicates have to be pushed into the index so the graph walk only visits allowed nodes."
+      "feedback": "Right, and the failure is quiet: no error, just a short list, because the unfiltered top 100 rarely contains any of that tenant's vectors at all. Selective predicates have to be pushed into the index so the graph walk only visits allowed nodes."
     },
     {
-      "label": "Results belonging to other tenants leak into the response",
+      "label": "Vectors from other tenants leak into the response",
       "feedback": "The filter does run before anything is returned, so foreign vectors are dropped. The bug here is a correctness of coverage problem, not a leak."
     }
   ]
@@ -604,13 +604,13 @@ request -> exact-match cache?  hit -> return (0 tokens, ~1ms)
   "prompt": "The second row of that flow returns a stored answer when a new prompt is near enough in meaning to an old one. What is the failure this design has to be tuned against?",
   "options": [
     {
-      "label": "Misses, which waste an embedding call and an index lookup before you route to the provider anyway",
+      "label": "Misses, which waste an embedding call and an index lookup",
       "feedback": "A miss does cost you an embedding and a lookup, but that is a couple of milliseconds against a provider call measured in seconds. It is a tax, not a failure."
     },
     {
-      "label": "A similarity threshold set too loose returns a cached answer to a question that only sounded similar, so the user gets a confidently wrong response",
+      "label": "A threshold set too loose serves an answer to the wrong question",
       "correct": true,
-      "feedback": "Right, and it is worse than a normal cache bug because the answer is fluent and plausible. Two prompts differing by one negation or one identifier can sit very close in embedding space."
+      "feedback": "Right, and it is worse than a normal cache bug because the answer comes back fluent and plausible rather than obviously broken. Two prompts differing by one negation or one identifier can sit very close in embedding space, so the user is told something confidently wrong."
     },
     {
       "label": "The cache grows without bound as traffic increases",
@@ -724,12 +724,12 @@ Quantization shrinks the model weights so more of the GPU is left over and the m
       "feedback": "Throughput and per request latency pull against each other. A bigger batch shares the GPU across more sequences, so it tends to make the wait worse, not better."
     },
     {
-      "label": "Attack prefill: chunked prefill, prefix caching for the shared system prompt, or a separate pool for the prefill stage",
+      "label": "Attack the prefill stage rather than decode",
       "correct": true,
-      "feedback": "Right. The complaint is time to first token, which is prefill, and prefill is dominated by prompt length. Caching the KV of a shared system prompt means you stop paying for it on every request."
+      "feedback": "Right. The complaint is time to first token, which is prefill, and prefill is dominated by prompt length. Chunked prefill stops one long prompt blocking the rest, prefix caching means the shared system prompt is not re-prefilled on every request, and a separate prefill pool keeps a burst of long prompts off the decode path."
     },
     {
-      "label": "Turn on speculative decoding so a small model drafts tokens for the big one to verify",
+      "label": "Turn on speculative decoding so a small model drafts tokens",
       "feedback": "A good lever aimed at the wrong metric. Speculative decoding cuts inter token latency, which is the part these users already say is fine."
     }
   ],
