@@ -301,6 +301,52 @@ MFA adds a second factor so a leaked password alone is not enough. Ranked by str
 }
 \`\`\`
 
+## Number matching is what binds an approval to a login
+
+Push bombing works because a tap is one bit and that bit carries no information about where the attempt came from. The attacker already has the password, so they replay the login at 02:00 over and over until a half-asleep user taps approve to stop the buzzing. The fix is to make completing the prompt require something only the real login screen shows: **number matching**. The server picks a short code, renders it on the screen that started the attempt, and the phone asks the user to type that code instead of offering an approve button. Walk both flows through the same attack and the difference is mechanical, not a matter of user education.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "What happens",
+    "Tap-to-approve",
+    "Number matching"
+  ],
+  "rows": [
+    [
+      "Attacker submits the stolen password at 02:00",
+      "Server pushes 'Approve sign-in?' to the user's phone",
+      "Server generates the code 42, renders it on the login screen that made the request (the attacker's screen), and pushes a numeric prompt to the phone"
+    ],
+    [
+      "What the phone shows",
+      "Two buttons, Approve and Deny",
+      "A number pad and the instruction 'type the code shown on your screen'"
+    ],
+    [
+      "What the user can do with it",
+      "Approve, with nothing to check it against",
+      "Nothing: they are not looking at any login screen, so they hold no code to type"
+    ],
+    [
+      "Attacker repeats the login 30 times",
+      "The 30th prompt gets tapped and a session is issued",
+      "Thirty numeric prompts, still no code in the user's hands, no button to tap by mistake"
+    ],
+    [
+      "The real user signs in",
+      "Taps approve, byte-for-byte the same event as the attacker's",
+      "Reads 42 off their own login screen, types 42, approved"
+    ]
+  ],
+  "highlightCols": [
+    "Number matching"
+  ],
+  "caption": "The attacker sees the code, since it renders on the screen they are driving, and that is exactly the point: they cannot get it to the victim. Completing the prompt now proves the approver is looking at the screen that started the attempt, which is the binding a tap never had. Rate-limit the challenges as well, for example three outstanding prompts per account per hour, then stop sending and raise an alert, so the bombing cannot run long enough to wear anyone down."
+}
+\`\`\`
+
 The uncomfortable truth: account recovery is the real attack surface. Attackers rarely crack a good hash; they take over the reset flow. A "forgot password" email link, an SMS code, or a support agent who can be socially engineered is often weaker than the login itself. Recovery must be as strong as the primary factor: signed single-use tokens with short expiry, rate limits, and re-verification of a second factor before letting anyone change the password or MFA settings.
 
 ## Stop credential stuffing without leaking who exists
