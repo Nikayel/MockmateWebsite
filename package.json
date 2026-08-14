@@ -18,6 +18,7 @@
     "test": "vitest run",
     "audit:bugfix": "tsx scripts/audit-bugfix-scenarios.ts",
     "audit:sd": "tsx scripts/audit-system-design-curriculum.ts",
+    "audit:checks": "tsx scripts/audit-check-shape.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:integration": "firebase emulators:exec --only firestore --project codesparring-integration \"vitest run --config vitest.integration.config.ts\"",
