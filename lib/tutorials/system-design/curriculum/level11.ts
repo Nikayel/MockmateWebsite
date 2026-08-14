@@ -2444,9 +2444,39 @@ The **ingestion gateway** sits behind the broker and does device provisioning an
 
 Control flows the other way via a **device shadow / digital twin**: a cloud-side JSON document of each device's desired and reported state. You write the desired state, and the device reconciles when it next connects, which is exactly how **OTA firmware rollouts** work: stage to 1% (canary), watch crash/health telemetry, then ramp, so a bad image cannot brick 10M devices at once.
 
+## The on-device half of an OTA
+
+The canary bounds how many devices take a bad image. It does nothing for the ones that already took it, and a device that overwrote its only firmware with an image that will not boot is a brick: it never reconnects, so there is nothing to roll back and no telemetry to roll back on. The recovery has to live on the device, which is why firmware storage is laid out as **two slots** and a rollout is a swap between them rather than an overwrite.
+
+\`\`\`
+flash layout, one device      slot A: v41 (running)      slot B: v40 (idle)
+
+1. download      v42 is written into the IDLE slot, B. The running slot is untouched,
+                 so a cellular link that dies mid-download costs a retry and nothing else.
+
+2. verify        check the image signature against a public key burned into the device.
+                 fails -> discard B, keep running A, report it. Nothing was installed.
+
+3. mark          tell the bootloader: next boot try slot B, and flag the attempt as a trial.
+
+4. reboot        the bootloader boots B and arms a watchdog.
+
+5a. it lives     the application comes up, reaches the network, and confirms itself inside
+                 the watchdog window. The trial flag clears. B is now the running slot and
+                 A is the idle one, holding v41 as the known-good image to fall back to.
+
+5b. it does not  the watchdog fires with no confirmation. The bootloader clears the trial
+                 flag and boots A. The device is back on v41 with no truck roll, and reports
+                 the failed attempt the next time it connects.
+\`\`\`
+
+Two properties carry that, and both are easy to lose. The slot being written is never the slot currently executing, so a power cut partway through a write still leaves a bootable device. And "it lives" has to be confirmed by something above the bootloader, an application that got as far as talking to the network, because a device whose kernel boots and whose radio stack is broken passes a boot-success check and is still unreachable forever.
+
+The cloud half and the device half compose into one story. The shadow says which version a device should be on, the canary ramp says how many devices try it at a time, and the A/B slots say what happens to a device where the answer turns out to be wrong. Ship to 1 percent with no on-device fallback and you have not limited the damage, you have bricked 1 percent of the fleet.
+
 **Interview nuance:** the classic failure is assuming devices are always online. Without offline buffering you silently lose data during every outage; without dedupe you double-count the replay. And a thundering herd of reconnects after a regional outage can DDoS your own broker, so devices need randomized exponential backoff with jitter on reconnect, and the broker needs connection-rate limiting.
 
-**Recap:** filter and buffer at the edge, connect over MQTT with per-device certs, absorb bursts and reconnects with a Kafka buffer and backpressure, fork into a seconds-latency hot path and a durable cold path, and drive control and OTA through a device shadow with canary rollout.
+**Recap:** filter and buffer at the edge, connect over MQTT with per-device certs, absorb bursts and reconnects with a Kafka buffer and backpressure, fork into a seconds-latency hot path and a durable cold path, and drive control and OTA through a device shadow with a canary rollout on the cloud side and two firmware slots on the device side, so a bad image is bounded in blast radius and recoverable on the units that took it.
 
 \`\`\`cswidget
 {
