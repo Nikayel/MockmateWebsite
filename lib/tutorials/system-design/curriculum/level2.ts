@@ -958,9 +958,72 @@ increment so each write is a single short operation rather than a read-modify-wr
 }
 \`\`\`
 
+### The top rung: keep the events, not just the count
+
+Every fix so far throws the individual events away and keeps a number. Sharded rows keep N numbers.
+A Redis buffer flushed every few seconds keeps one number and loses whatever sat in memory when the
+process died. That is the right trade for a like badge and the wrong one the moment the count
+settles into money, because a lossy in-memory buffer leaves nothing to recount from and no way to
+answer "was that event real?" after the fact.
+
+The rung above sharding stops treating the counter as the write target at all. Each event is
+appended to a **durable, retained, partitioned log** (Kafka, Kinesis). Take those three words
+literally, because each one does work:
+
+- **Durable**: the broker replicates and fsyncs the record before acknowledging, so it is not a
+  memory buffer.
+- **Retained**: the broker keeps records for a configured window rather than deleting them once a
+  consumer has read them. This is the property that makes a *second* pass over the same data
+  possible, and it is the one people forget a log has.
+- **Partitioned**: the record key picks a partition, so ordering is per key and throughput scales
+  with partition count instead of capping at one row.
+
+Take an ad-impression counter that is billed to advertisers monthly:
+
+\`\`\`
+# One topic, partitioned by the entity being counted, records kept for 14 days.
+kafka-topics --create --topic impressions \\
+  --partitions 256 \\
+  --config retention.ms=1209600000    # records survive being consumed
+
+# The producer appends. The key decides the partition.
+produce(topic="impressions", key=str(campaign_id),
+        value={"event_id": "9f2c-41ab", "campaign_id": 42,
+               "viewer": "u_88", "ts": 1723600000})
+\`\`\`
+
+Appending is cheap and coordination-free: no row is locked, no version is checked, and two events
+for different campaigns never touch each other. Now the same log feeds two readers with two
+different guarantees.
+
+\`\`\`
+# Reader 1, fast and approximate. A stream job folds each window into a hot store.
+for window in stream.read("impressions", window="2s"):
+    for campaign_id, n in count_by_key(window):
+        redis.incrby(f"impr:{campaign_id}", n)   # the dashboard reads this, seconds stale
+
+# Reader 2, exact and durable. A batch job re-reads the SAME retained records and
+# writes one settled row per campaign per day.
+SELECT campaign_id, count(DISTINCT event_id) AS impressions
+FROM   impression_events                 -- the log's records, landed for query
+WHERE  ts >= :day_start AND ts < :day_end
+GROUP  BY campaign_id;                   -- this is the number that gets invoiced
+\`\`\`
+
+Reader 2 exists only because the records were still there to read a second time, which is what
+retention bought. It also repairs Reader 1 rather than trusting it: \`count(DISTINCT event_id)\`
+makes the aggregate idempotent, so an event the stream job counted twice across a crash and restart
+contributes once here, and the settled number overwrites the fast one on reconciliation.
+
+The rung you belong on is set by what the number is for. Shard the rows for a like badge, buffer in
+Redis when losing a few seconds is survivable, and keep the raw events in a retained log the moment
+someone will need the count to be exact after the fact.
+
 Recap: MVCC makes readers and writers not block each other by versioning rows, at the cost of vacuum
 and bloat from long transactions; choose optimistic control under low contention and pessimistic
-under high, and for a hot key shard the counter instead of serializing writers behind one lock.
+under high, and for a hot key shard the counter instead of serializing writers behind one lock. When
+the count has to be exact and durable, escalate past the counter entirely to a retained event log
+that can be re-aggregated.
 
 \`\`\`cswidget
 {
