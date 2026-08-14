@@ -2161,16 +2161,16 @@ co-locate or denormalize.
   "prompt": "A teammate opens a schema review with: 'Joins are slow, so I denormalized the whole schema up front for performance.' What is the strongest objection?",
   "options": [
     {
-      "label": "None. Reads usually dominate, so removing joins everywhere is a safe default.",
+      "label": "None; reads dominate, so dropping joins everywhere is safe",
       "feedback": "Tempting because reads often do dominate, but indexed, bounded joins already run in single-digit milliseconds. Blanket denormalization buys an unmeasured read win while making every write a fan-out with anomaly risk."
     },
     {
-      "label": "Which query is hot? Without a named read path and a real read/write ratio, you are paying guaranteed write-time costs for a read win nobody measured.",
+      "label": "Which query is hot, and what is its read/write ratio?",
       "correct": true,
-      "feedback": "Right. Denormalization is a targeted trade: name the specific query, its read/write ratio, and the scale trigger (like a cross-shard join). Copy facts for that one path, not for the whole schema."
+      "feedback": "Right. An indexed, bounded join is already a handful of B-tree seeks in single-digit milliseconds, so denormalizing the whole schema pays guaranteed write-time costs for a read win nobody measured. Denormalization is a targeted trade: name the specific query, its read/write ratio, and the scale trigger, such as a join that would otherwise scatter-gather across shards. Copy the fact for that one path, not for the whole schema."
     },
     {
-      "label": "Denormalization is never acceptable; third normal form is the rule.",
+      "label": "Denormalization is never acceptable; third normal form is the rule",
       "feedback": "Tempting as a purity rule, but wrong in the other direction: a hot read path, especially one that would otherwise scatter-gather across shards, is exactly when deliberately copying a fact is correct."
     }
   ]
@@ -2321,16 +2321,16 @@ materialized views when you want join-free reads without hand-maintaining the co
   "prompt": "Your order-history page renders 20k times per second; product names change a few times a day. You want join-free reads but do not want to hand-write fan-out sync code. Which design fits?",
   "options": [
     {
-      "label": "Fully denormalize and update every copy by hand inside the product-rename transaction.",
+      "label": "Denormalize and update every copy by hand on rename",
       "feedback": "Tempting because it keeps every copy perfectly fresh, but you are hand-maintaining exactly the fan-out logic you wanted to avoid, and renames get slower and riskier as copies multiply."
     },
     {
-      "label": "Keep the normalized schema as the source of truth and maintain a materialized view (or summary table) for the page.",
+      "label": "Keep the schema normalized and maintain a materialized view",
       "correct": true,
-      "feedback": "Right. The read path becomes a join-free scan, the write path stays anomaly-proof, and the database or pipeline owns keeping the copy fresh, at the cost of brief staleness on a slow-changing cosmetic field."
+      "feedback": "Right. The source of truth stays normalized, so writes remain cheap and update anomalies stay structurally impossible, while the database (or a summary table refreshed by a pipeline) owns keeping the precomputed copy fresh. The page becomes a join-free scan and you never hand-write fan-out sync. The bill is brief staleness, which is the right currency for a cosmetic field that changes a few times a day."
     },
     {
-      "label": "Stay fully normalized; a three-table indexed join can serve 20k reads per second.",
+      "label": "Stay fully normalized; an indexed three-table join serves 20k reads per second",
       "feedback": "Often true on a single node, which makes it tempting, but the moment orders shard that join becomes a cross-shard scatter-gather, and 20k reads/sec against a few writes/day is exactly the ratio that justifies a maintained copy."
     }
   ],
