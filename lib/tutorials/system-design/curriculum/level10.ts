@@ -6942,19 +6942,82 @@ export const systemDesignLevel10: DesignLevel = {
           practice: {
             id: "sd-l10-rate-limiter-practice",
             prompt:
-              "Design Stripe's API rate limiter, which must enforce multiple simultaneous limits per account (a steady request-rate limit, a concurrent-request limit, and a per-endpoint limit on expensive operations like charge creation) across a global multi-region fleet handling hundreds of thousands of requests/sec, while staying fast enough to add negligible latency.",
+              "Read the incident timeline below and say what is happening to acct_4KQ. Account for why its concurrency rejections keep climbing after the ledger service recovered, tie the counter value 512 to a quantity elsewhere in the timeline, and say what the flat rate layer and the eu-west counter each eliminate.",
             thinkAbout: [
-              "Why layer several limiter types, and what does the concurrency limiter catch?",
-              "Why enforce per-region buckets instead of a strict global counter?",
-              "How do you keep the limiter within a single-digit-ms budget?",
+              "Which of the three layers is issuing the 429s, and what does the rate layer's untouched token bucket eliminate?",
+              "Follow one timed-out charge call through the concurrency layer, from the INCR to the 504. What happens to the slot it took?",
+              "The counter reads 512 while the load balancer sees 6 open connections for the account. Which of those two numbers is its real concurrency?",
             ],
             modelAnswerOutline: [
-              "Assumptions: several limiter types run at once, limits are per account and per endpoint, traffic is global, and the limiter is on the hot path so it must be a single-digit-millisecond in-region operation.",
-              "**Layered limiters, each a Redis Lua token bucket** (Stripe's public design favors token buckets for controlled bursts). Layer one: a request-rate limiter (tokens/sec per account). Layer two: a concurrency limiter counting in-flight requests (increment on start, decrement on completion, reject over the concurrent-slot budget), protecting against slow requests piling up even when the rate looks fine. Layer three: a per-endpoint limiter with tighter buckets for expensive operations (charge creation, report generation) so a costly endpoint cannot starve cheap traffic. A request must pass all applicable layers.",
-              "**Locality and scale:** run the limiter in the same region as the request and shard the Redis keyspace by account so a hot account's counters live on one node and lookups are one round trip. Keep the script tiny with a strict timeout; on Redis failure, fall back to a permissive local limiter, fail open for read APIs, fail closed for mutating money endpoints.",
-              "**Global consistency:** strict global counting across regions needs cross-region coordination that blows the latency budget, so enforce per-region buckets sized to the account's share and accept that a client spraying across regions could briefly exceed the global cap by a bounded amount, a deliberate accuracy-for-latency trade.",
-              "**Load shedding** sits above all of this: when the overall system is unhealthy, a separate shedder drops the lowest-priority traffic (test-mode calls, non-critical endpoints) first.",
-              "Response: 429 with `Retry-After`, plus a distinct signal for concurrency-limit rejections so clients reduce parallelism rather than just slow their rate. Common wrong turn: a single global counter with cross-region synchronous coordination, trading away the latency budget for accuracy the business does not need.",
+              "**What is happening:** `rl:inflight:acct_4KQ` has stopped tracking in-flight requests and is now a running total of requests that never reached the path that decrements it. Each of Tuesday's gateway timeouts cancelled the handler after the `INCR` and before the response path, and the key carries no TTL (`TTL` returns -1), so a slot taken that way is never given back. The counter reads 512 while the account's real concurrency is the 6 open connections the load balancer reports, and because 512 is far past the budget of 40, every charge call is rejected no matter how little traffic the account sends.",
+              "**The arithmetic ties the counter to the timeouts:** 3.1% of the roughly 16,500 charge calls acct_4KQ sent between 09:12 and 11:00 is about 512, which is exactly what the key holds. The rejection rate going 4%, then 22%, then 61% while the ledger p99 fell back to 190ms is the signature of a value that only ratchets: the load dropped and the number did not.",
+              "**What the flat signals eliminate:** rate-layer rejections are 0 all week and the token bucket held 100 tokens at three sampled rejections, so the account is not over its request rate. The endpoint layer rejected nothing on any route. Redis CPU is flat at 22% with no evictions and a Lua p99 flat at 1.9ms, so neither limiter latency nor Redis saturation is involved, and the local-fallback counter reads 0, so nothing failed open onto a permissive local limiter.",
+              "**Ruling out the coincident deploy and the region hypothesis:** the Tue 02:50 change added an endpoint bucket for `/v1/reports`, but that route's traffic is unchanged at 3 req/min and it has rejected nothing. Per-region buckets can let an account exceed a global cap, but that error admits too much traffic rather than rejecting it, and eu-west's counter reads 2 while 96% of the account's traffic is in us-east. Neither explains a counter that only rises.",
+              "**What closes it:** make a slot self-releasing instead of trusting a decrement to run. Register each in-flight request as its own key with a TTL comfortably longer than the 10s gateway timeout and count the set, or hold the decrement in a deferred path that also runs on cancellation, and add a reconciliation sweep, since this counter can only drift upward. The one-time repair is deleting the key so the next `INCR` recreates it at 0.",
+              "**Keep the layer:** the concurrency limiter is precisely what catches Tuesday's failure, slow downstream calls piling up while the request rate still looks fine, so deleting it gives back the protection it was added for. Common wrong turn: raising the budget from 40 to some larger number, which buys a few hours before the same ratchet passes it.",
+            ],
+            supplied: {
+              label: "Incident timeline",
+              body: `
+**System:** payments API. Every \`POST /v1/charges\` passes three limiter layers in the caller's region, each a Redis Lua script sharded by account.
+
+- **Rate layer**, key \`rl:rate:{acct}\`: token bucket, capacity 100, refill 100/s. TTL 60s, set when the key is created.
+- **Concurrency layer**, key \`rl:inflight:{acct}\`: the handler runs \`INCR\` before it calls the ledger service and \`DECR\` on the path that returns a response to the client. Budget 40 in flight. The key is created by \`INCR\` and no TTL is set on it.
+- **Endpoint layer**, key \`rl:ep:{acct}:{route}\`: a tighter bucket per expensive route.
+
+A rejection from any layer returns 429. The concurrency layer's 429 carries \`X-RateLimit-Signal: concurrency\`.
+
+**Timeline**
+- Tue 02:50 deploy adds an endpoint-layer bucket for \`POST /v1/reports\`. That route's traffic is unchanged at 3 req/min all week.
+- Tue 09:12 ledger service p99 goes from 180ms to 9.4s. 3.1% of charge calls exceed the gateway's 10s timeout; the gateway returns 504 to the caller and cancels the handler's context.
+- Tue 09:20 acct_4KQ starts seeing 429s carrying the concurrency signal, 4% of its charge calls.
+- Tue 09:12 to 11:00 acct_4KQ sends roughly 16,500 charge calls.
+- Tue 11:00 ledger p99 back to 190ms and the timeout rate back to 0.0%. acct_4KQ's concurrency rejections keep climbing: 22% at 11:00, 61% at 14:00.
+- Wed 04:00 overnight trough. acct_4KQ sends 3 req/s and the load balancer reports 6 open connections for it. 100% of its charge calls are rejected with the concurrency signal.
+- Wed 09:00 \`GET rl:inflight:acct_4KQ\` returns 512. \`TTL rl:inflight:acct_4KQ\` returns -1.
+
+**Signals**
+- Redis CPU flat at 22%, no evictions, 0 rejected connections. Limiter Lua p99 flat at 1.9ms since Friday.
+- Rate-layer rejections for acct_4KQ: 0 all week. Sampled at three of the concurrency rejections, its token bucket held 100 tokens.
+- Local-fallback counter (the limiter runs a permissive local bucket when Redis is unreachable): 0 for the week.
+- Endpoint layer: 0 rejections on any route, including \`/v1/reports\`.
+- acct_4KQ sends 96% of its traffic to us-east and 4% to eu-west. \`rl:inflight:acct_4KQ\` in eu-west reads 2.
+- 11 other accounts saw no gateway timeouts on Tuesday. Their \`rl:inflight\` values sit between 0 and 31 and none of them has been rejected.
+`.trim(),
+            },
+            rubric: [
+              {
+                name: "Cause named",
+                weak: "Blames the account's own traffic or Redis capacity, and leaves the counter reading 512 during a 3 req/s trough unexplained.",
+                adequate:
+                  "Says the in-flight counter is too high without saying which request outcome left it that way.",
+                strong:
+                  "States that the 10s gateway timeouts cancelled handlers after the INCR and before the response path that decrements, and that with no TTL on rl:inflight those slots are never returned.",
+              },
+              {
+                name: "Evidence tied to the numbers",
+                weak: "Treats 512 as an arbitrary reading and never connects it to anything else in the timeline.",
+                adequate:
+                  "Notes that 512 is far above the budget of 40 but does not derive it from the timeout rate.",
+                strong:
+                  "Derives 512 from 3.1% of the roughly 16,500 charge calls sent between 09:12 and 11:00, and reads the 4, 22, 61 percent climb after the ledger recovered as a value that only ratchets.",
+              },
+              {
+                name: "Hypotheses ruled out",
+                weak: "Offers a single cause and tests it against none of the flat signals.",
+                adequate:
+                  "Rules out the rate layer but leaves the Tue 02:50 deploy or the per-region buckets standing as live possibilities.",
+                strong:
+                  "Uses the flat signals by name: 0 rate-layer rejections with 100 tokens in the bucket, Redis at 22% with a 1.9ms script p99, 0 local-fallback events, unchanged /v1/reports traffic, and eu-west reading 2.",
+              },
+              {
+                name: "Remedy and blast radius",
+                weak: "Stops at the diagnosis, or proposes deleting the concurrency layer that exists to catch a slow downstream.",
+                adequate:
+                  "Says the decrement has to run on every path, without covering the process that dies between the INCR and the DECR.",
+                strong:
+                  "Makes the slot self-releasing with a per-request key whose TTL outlives the 10s gateway timeout, names deleting the key as the immediate repair, and keeps the layer.",
+              },
             ],
           },
         },
@@ -6991,19 +7054,83 @@ export const systemDesignLevel10: DesignLevel = {
           practice: {
             id: "sd-l10-unique-id-generator-practice",
             prompt:
-              "Design the primary-key generation strategy for Discord's message store, which writes billions of messages/day into Cassandra, needs ids that sort by creation time so a channel's history can be range-scanned efficiently, and must let clients derive a message's approximate timestamp from its id offline, all without a central sequence service.",
+              "Read the incident report below and say what is happening to the 41 messages. Explain why every affected id decodes into the same 1.412s span on one host, say what the etcd lease audit and the sequence peak each eliminate, and say what the store did with the second write to that primary key.",
             thinkAbout: [
-              "How does a time-sortable id become the Cassandra clustering key and cursor?",
-              "How do clients decode the timestamp offline from the id?",
-              "Why is per-channel ordering enough despite small cross-worker clock differences?",
+              "Which field of a Snowflake id moves when a host's clock steps backwards, and which two fields carry on as if nothing happened?",
+              "Two hypotheses produce duplicate ids: two processes holding one worker id, and one process reusing a timestamp. Which does the etcd audit close?",
+              "All 41 were delivered live and acked by fan-out. Between the socket and the stored row, where can the message still be lost?",
             ],
             modelAnswerOutline: [
-              "Assumptions: writes are enormous (billions/day), messages are stored in Cassandra partitioned by channel, and the id must be both the ordering key for range scans and a client-decodable timestamp source. This is exactly the Snowflake use case, and Discord in fact uses Snowflake ids.",
-              "**Design:** generate 64-bit Snowflake ids with the timestamp in the high 41 bits from a Discord-specific epoch (not Unix, to maximize usable years), then worker and process bits, then a per-ms sequence. Store messages in Cassandra with partition key `channel_id` and clustering key the Snowflake `message_id` ascending. Because the id sorts by time, fetching a channel's recent history is a single efficient clustering-order range scan (id < cursor, limit 50), and pagination just carries the last id as the cursor. No secondary time index is needed because time is embedded in the key.",
-              "**Client-side timestamp:** since the epoch and bit layout are published, a client extracts `(id >> 22) + epoch` to recover the creation time in milliseconds without a server round trip, powering relative timestamps and offline ordering reasoning.",
-              "**Coordination-free at scale:** each id-generating worker mints locally, so billions/day spread across many workers never touch a central sequence; 4,096 ids/ms/worker is far more than any worker needs. Worker/process ids are assigned at process startup.",
-              "**Clock safety:** a backward clock jump on a worker would risk a duplicate or out-of-order id in a channel, so the generator refuses to issue while its clock is behind the last-issued timestamp, and hosts run disciplined NTP. Because ordering only needs to be correct per channel and ids are globally unique, small cross-worker clock differences only perturb the ordering of messages sent within the same millisecond, which is acceptable.",
-              "Tradeoff: embedding time in the key makes ids enumerable and leaks message volume per channel, but message ids are already scoped to authorized channel members, so the risk is contained; the payoff is index-free time-ordered range scans and offline-decodable timestamps. Common wrong turn: random UUID message ids, which force a separate time index and make Cassandra range scans and cursor pagination far more expensive.",
+              "**What is happening:** ids minted on `msg-gw-14` inside the 03:14:22.6 to 03:14:24.0 span were minted twice. The NTP step of -1.412s moved that host's clock back into a range it had already issued in, and nothing stopped the generator from re-issuing those 41-bit timestamps. The worker id is fixed for the process and the 12-bit sequence restarts each millisecond, so the whole 64-bit id repeats. Cassandra applies the second `INSERT` at that primary key as an upsert, so the second message replaces the first message's columns in place. The first message was never deleted, it was overwritten, which is why the row still exists, holds another author's text, and appears nowhere in the delete audit.",
+              "**Why the evidence lands where it does:** all 41 ids decode through `(id >> 22) + epoch` into a window 1.412s wide, exactly the size of the step, and all 41 came from the three gateway processes on the one host the hypervisor migrated. A cause outside the id generator would not respect either boundary.",
+              "**What the flat signals eliminate:** Cassandra logged 0 write timeouts, 0 dropped mutations and 0 unavailable exceptions, and repair ran clean on Wednesday, so nothing was lost or left unreplicated on write. The gateway acked all 41 with no socket errors, so delivery is intact and the loss is at the row. Fleet volume of 480K messages/min is inside the normal overnight band, so this is not load.",
+              "**Ruling out the other duplicate-id hypothesis and the coincident deploy:** two processes sharing a worker id would produce exactly these collisions, but the audit shows 96 distinct etcd leases with no expiry or reissue in the window and worker ids 41, 42 and 43 held on that host since Monday. Sequence exhaustion is out too, since the peak was 610 of 4,096 per millisecond, nowhere near a wrap. The Wed 21:40 cursor change is coincident rather than causal: the messages are equally absent from a direct primary-key read, and every other host's channels paginate normally.",
+              "**What closes it:** the generator has to track the last-issued timestamp and refuse to issue while the clock sits behind it, waiting or erroring rather than emitting a possibly duplicate id. A refusal counter reading 0 across the fleet is consistent with nothing being armed to fire. Configure NTP to slew rather than step where it can, and treat a live migration as a reason to pause issuance until the clock is verified. The 41 overwritten rows cannot be recovered from Cassandra, since the upsert left no prior version; recovery has to come from the fan-out log.",
+              "**Alternatives worth pricing:** ULID or UUIDv7 keep time in the high bits without a worker-id lease but carry the same clock dependency. A lightweight transaction (`IF NOT EXISTS`) on the message id turns a silent overwrite into a visible failure at a real cost per write, and a per-channel sequence removes the clock entirely at the cost of the coordination Snowflake exists to avoid. Common wrong turn: widening the sequence bits, which does nothing about a timestamp that repeats.",
+            ],
+            supplied: {
+              label: "Incident report: missing messages",
+              body: `
+**System:** chat service, 96 gateway processes. Messages land in Cassandra table \`messages\`, \`PRIMARY KEY ((channel_id), message_id)\`, clustered by \`message_id\` ascending. Cassandra applies an \`INSERT\` at an existing primary key as an upsert: the new columns replace the stored row's.
+
+\`message_id\` is a 64-bit Snowflake minted inside the gateway process: 41 bits of milliseconds since a service epoch, 10 bits of worker id leased from etcd at process start, 12 bits of per-millisecond sequence. Clients decode the send time as \`(id >> 22) + epoch\`. History reads are a clustering-order range scan, \`WHERE channel_id = ? AND message_id < ? LIMIT 50\`.
+
+**Reports, Thursday: 41 messages across 9 channels**
+- Each was delivered live over the gateway socket and seen by other members, and is absent when the channel is reopened.
+- Support looked up the id the sending client had recorded. In all 41 cases the row exists and holds a different message body, written by a different author in the same channel within the same second.
+- A direct read by primary key returns that other message, not the original.
+
+**What the ids decode to**
+- All 41 decode to send times inside the span 03:14:22.6 to 03:14:24.0.
+- All 41 were written by the 3 gateway processes on host \`msg-gw-14\`.
+
+**Host and cluster state**
+- 03:14:22.6 the hypervisor live-migrated \`msg-gw-14\`. Its NTP daemon logged \`time reset -1.412s\` at 03:14:22.6, then no further step that day.
+- The generator exports \`id.clock_regression_refusals\`. It reads 0 for the week on every host in the fleet, \`msg-gw-14\` included.
+- etcd worker-id lease audit for Thursday: 96 leases, all distinct, none expired or reissued. The three processes on \`msg-gw-14\` hold worker ids 41, 42 and 43, held since Monday.
+- Per-millisecond sequence use on those three processes peaked at 610 of 4,096 during the window.
+
+**Signals**
+- Cassandra: 0 write timeouts, 0 dropped mutations, 0 unavailable exceptions on Thursday. Compaction and tombstone counts flat. Repair ran clean Wed 02:00.
+- Gateway fan-out acked all 41; 0 socket errors in the window.
+- Moderation delete audit: no delete recorded against any of the 41 ids.
+- A history pagination cursor change shipped Wed 21:40. Channels served by other hosts paginate normally.
+- Fleet message volume at 03:14 Thursday was 480K/min, inside the normal overnight band.
+`.trim(),
+            },
+            rubric: [
+              {
+                name: "Cause named",
+                weak: "Attributes the loss to a Cassandra write failure or a deletion, neither of which appears in any log in the report.",
+                adequate:
+                  "Says two writes collided on one id but does not say what made the same id come back on that host.",
+                strong:
+                  "States that the -1.412s step let msg-gw-14 re-issue timestamps it had already used, so the full 64-bit id repeated with the worker id fixed and the per-millisecond sequence restarting.",
+              },
+              {
+                name: "What the store did with the duplicate",
+                weak: "Leaves it unexplained that the row is present and holding another author's message.",
+                adequate:
+                  "Calls it a primary-key collision without saying what Cassandra does with an INSERT at an existing key.",
+                strong:
+                  "Says the second INSERT upserted over the first row's columns, which is why the message is gone, the row exists, and the delete audit is empty.",
+              },
+              {
+                name: "Hypotheses ruled out",
+                weak: "Names one cause and tests it against neither the etcd audit nor the flat Cassandra counters.",
+                adequate:
+                  "Eliminates one alternative, usually the Wed 21:40 cursor change, and leaves duplicate worker ids standing.",
+                strong:
+                  "Closes duplicate worker ids on the 96 distinct leases, sequence wrap on the 610 of 4,096 peak, delivery on the clean fan-out acks, and the cursor change on the direct primary-key read.",
+              },
+              {
+                name: "Remedy and recovery",
+                weak: "Stops at the diagnosis, or moves to random UUIDs without pricing what that costs the clustering-order range scan.",
+                adequate:
+                  "Says the host's clock has to be disciplined, leaving the generator free to issue ids while its clock sits behind.",
+                strong:
+                  "Puts a last-issued-timestamp guard in the generator that refuses to issue on a backward jump, and says the 41 overwritten rows survive only in the fan-out log.",
+              },
             ],
           },
         },
