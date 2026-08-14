@@ -46,6 +46,17 @@ interface PredictShape {
   levelId: number
   prompt: string
   correctIsLongest: boolean
+  /**
+   * The tell the first version of this gate did not measure, and which the sweep it was written
+   * to drive promptly created.
+   *
+   * Twelve agents were told to reduce correct-is-longest. Most did it by chopping the correct
+   * label and leaving the distractors untouched, which does not flatten the tell, it INVERTS it.
+   * On L6 the agent edited zero distractor labels across nineteen rewritten checks: "always pick
+   * the longest" fell from 87 percent to 38, while "always pick the shortest" rose from 8 percent
+   * to 49. A one-sided gate produced a one-sided fix, exactly as Goodhart predicts.
+   */
+  correctIsShortest: boolean
   correctInTopTwo: boolean
   /** Longest label in the option set, which is what a length-guessing learner clicks. */
   longestLabel: number
@@ -76,6 +87,7 @@ function collectPredicts(): PredictShape[] {
             levelId: level.id as number,
             prompt: spec.prompt,
             correctIsLongest: correctLength === descending[0],
+            correctIsShortest: correctLength === descending[descending.length - 1],
             correctInTopTwo: correctLength >= descending[Math.min(1, descending.length - 1)],
             longestLabel: descending[0],
             correctLabel: correctLength,
@@ -103,22 +115,26 @@ const PREDICTS = collectPredicts()
  * not chance). Until a level reaches it, its pin is simply where it stands.
  */
 const LONGEST_PINS: Record<number, number> = {
-  0: 13,
-  1: 21,
-  2: 25,
-  3: 14,
-  4: 18,
-  5: 23,
-  6: 34,
-  7: 26,
-  8: 27,
-  9: 24,
-  10: 65,
-  11: 19,
+  0: 9,
+  1: 11,
+  2: 9,
+  3: 9,
+  4: 8,
+  5: 13,
+  6: 15,
+  7: 11,
+  8: 11,
+  9: 12,
+  10: 26,
+  11: 8,
 }
 
-/** Corpus-wide pin: 309 of 386 today (80 percent). The ticket's target is 40 percent. */
-const CORPUS_LONGEST_PIN = 309
+/**
+ * Corpus-wide pin. 309 of 386 (80 percent) when this file landed; 142 of 386 (37 percent) after
+ * the twelve-agent sweep, which is under the ticket's 40 percent target. Ratcheted here in the
+ * commit that verified the sweep, per this file's own rule that the batch lowers its own pin.
+ */
+const CORPUS_LONGEST_PIN = 142
 
 /**
  * A label long enough to be its own paragraph is the shape this gate is really about: it
@@ -128,6 +144,29 @@ const CORPUS_LONGEST_PIN = 309
  */
 const LABEL_CHAR_CEILING = 210
 const OVERLONG_LABEL_PIN = 3
+
+/**
+ * The inverse tell, pinned at what the first sweep left behind (158 of 386, 41 percent).
+ *
+ * Deliberately not pinned at chance. Moving justification out of a correct label makes it
+ * shorter, and that is the fix working, not the fix failing; a short correct answer is very
+ * often just the right answer. The line that matters is the next assertion.
+ */
+const CORPUS_SHORTEST_PIN = 158
+
+/**
+ * The number that actually describes the exploit, and the one this file should have led with.
+ *
+ * A guessing learner picks ONE strategy and sticks to it, so the exploitable rate is
+ * `max(longest, shortest)`, not either alone. Before the sweep that was 309/386 (80 percent,
+ * all of it "click the longest"). After, it is 158/386 (41 percent, now "click the shortest").
+ * Chance is near 33 percent for a three-option check, so 41 percent is a real remaining edge,
+ * which is why the pin sits at today's number rather than being declared done.
+ *
+ * Closing the last eight points needs distractor REBALANCING, not more chopping: the remaining
+ * signal is checks where the correct label was cut and its distractors were never touched.
+ */
+const BEST_LENGTH_STRATEGY_PIN = 158
 
 function countLongest(rows: PredictShape[]): number {
   return rows.filter((r) => r.correctIsLongest).length
@@ -163,6 +202,41 @@ describe("predict checks do not leak their answer through label length", () => {
       ).toBeLessThanOrEqual(LONGEST_PINS[levelId])
     }
   )
+
+  it("never lets the INVERSE length tell grow past the one it replaced", () => {
+    // Added after the first sweep, because the first sweep created this. Twelve agents were
+    // told to reduce correct-is-longest and most did it by chopping the correct label while
+    // leaving the distractors untouched, which inverts the tell rather than flattening it.
+    // Corpus-wide, correct-is-shortest went from roughly 8 percent to 41 percent.
+    //
+    // Pinned generously on purpose. Some inversion is the honest cost of moving justification
+    // out of the label, and a short correct answer is often simply the right answer. What must
+    // not happen is the inverse becoming a BETTER strategy than the one we just removed.
+    const shortest = PREDICTS.filter((p) => p.correctIsShortest).length
+    const longest = countLongest(PREDICTS)
+    expect(
+      shortest,
+      `correct-is-shortest is ${shortest}/${PREDICTS.length} against correct-is-longest ` +
+        `${longest}. The fix for a long correct label is to move its justification into that ` +
+        `option's feedback AND rebalance the distractors, not to chop one label and stop.`
+    ).toBeLessThanOrEqual(CORPUS_SHORTEST_PIN)
+  })
+
+  it("keeps the best blind length strategy near chance", () => {
+    // The metric that cannot be gamed by moving the tell around, and the one that should have
+    // been written first. A guessing learner picks ONE strategy, so what matters is the best
+    // one available, not either direction alone.
+    const longest = countLongest(PREDICTS)
+    const shortest = PREDICTS.filter((p) => p.correctIsShortest).length
+    const best = Math.max(longest, shortest)
+    const share = (best / PREDICTS.length) * 100
+    expect(
+      best,
+      `the best blind length strategy pays ${share.toFixed(1)}% ` +
+        `(longest ${longest}, shortest ${shortest}, pin ${BEST_LENGTH_STRATEGY_PIN}). ` +
+        `Chance is near 33% for a three-option check.`
+    ).toBeLessThanOrEqual(BEST_LENGTH_STRATEGY_PIN)
+  })
 
   it("never ships more paragraph-length option labels than it has today", () => {
     // The mechanism behind the ratio, caught directly: a label carrying its own
