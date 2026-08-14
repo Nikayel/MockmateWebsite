@@ -1112,16 +1112,16 @@ Ride-sharing is the canonical "moving objects" system. The defining property is 
 {
   "type": "check",
   "kind": "predict",
-  "prompt": "Geohash, S2 and H3 all attack the same problem. What do they do to the coordinates?",
+  "prompt": "A bounding-box scan is O(n) per query. What does a spatial index have to do to the coordinates to make proximity cheap?",
   "options": [
     {
-      "label": "Map two dimensions onto one sortable key, so nearby points share a prefix or land in adjacent cells and proximity becomes a key or range lookup",
+      "label": "Map two dimensions onto one sortable key",
       "correct": true,
-      "feedback": "Right. Once nearby means adjacent in one dimension, the query touches a cell and its neighbor ring instead of scanning rows."
+      "feedback": "Right. Once nearby points share a prefix or land in adjacent cells, proximity is a key or range lookup: the query touches one cell and its neighbor ring instead of scanning rows. The schemes named in the next section, geohash, quadtree, S2 and H3, are four ways of doing exactly this."
     },
     {
       "label": "Compress the coordinates so more rows fit in memory for the scan",
-      "feedback": "The scan itself is the problem, not the row width. The point is to stop scanning."
+      "feedback": "The scan itself is the problem, not the row width. Halving the bytes per row halves nothing about the O(n) shape of the query."
     },
     {
       "label": "Precompute the distance from every driver to every rider",
