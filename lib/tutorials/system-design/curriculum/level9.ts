@@ -574,6 +574,88 @@ Kubernetes schedules those images onto nodes and keeps the declared state true:
 
 Every container should set resource **requests** (what the scheduler reserves) and **limits** (the hard ceiling). Requests plus limits determine the **QoS class**: \`Guaranteed\` (requests == limits) is evicted last, \`BestEffort\` (nothing set) is evicted first under node pressure. Use **affinity/anti-affinity** and **taints/tolerations** to spread replicas across zones, and a **PodDisruptionBudget** so a voluntary drain never takes more than N Pods down at once.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Requests pack the node, limits do not",
+  "predictPrompt": {
+    "question": "A node has 4 CPU. Every pod requests 0.5 CPU and sets a limit of 2 CPU. How many pods does the scheduler place on that node?",
+    "options": [
+      "Two, because 2 CPU is the most a pod is allowed to use",
+      "Eight, because the scheduler reserves the request and never reads the limit",
+      "Four, the average of the request and the limit"
+    ]
+  },
+  "workedExample": "A 4 CPU node, each pod requesting 0.5 CPU and capped at 2. The scheduler reserves the request and nothing else, so it fits 8 pods and calls the node full: 8 times 0.5 is exactly the 4 CPU it had to give. The limit played no part in that decision. If all 8 pods ran up to their ceiling at once they would ask for 16 CPU from 4 CPU of hardware, a 4x overcommit the kernel settles by throttling everyone, including the pod that stayed inside its request. Requests are the promise the scheduler keeps, limits are the ceiling the kernel enforces, and the gap between them is the overcommit you chose. Drag the request up and watch density fall while the ceiling does not move.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "nodecpu",
+      "label": "Allocatable CPU on the node",
+      "min": 2,
+      "max": 64,
+      "step": 1,
+      "initial": 4,
+      "unit": "CPU"
+    },
+    {
+      "kind": "slider",
+      "id": "request",
+      "label": "CPU request per pod",
+      "min": 0.1,
+      "max": 4,
+      "step": 0.1,
+      "initial": 0.5,
+      "unit": "CPU"
+    },
+    {
+      "kind": "slider",
+      "id": "limit",
+      "label": "CPU limit per pod",
+      "min": 0.5,
+      "max": 8,
+      "step": 0.5,
+      "initial": 2,
+      "unit": "CPU"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "pods",
+      "label": "Pods the scheduler fits",
+      "expr": "floor(nodecpu / request)",
+      "format": "number",
+      "unit": "pods",
+      "sparkline": {
+        "over": "request"
+      }
+    },
+    {
+      "id": "reserved",
+      "label": "CPU reserved by those pods",
+      "expr": "pods * request",
+      "format": "number",
+      "unit": "CPU"
+    },
+    {
+      "id": "ceiling",
+      "label": "CPU they may demand at once",
+      "expr": "pods * limit",
+      "format": "number",
+      "unit": "CPU"
+    },
+    {
+      "id": "overcommit",
+      "label": "Overcommit at full tilt",
+      "expr": "ceiling / nodecpu",
+      "format": "number",
+      "unit": "x"
+    }
+  ],
+  "caption": "Setting requests equal to limits buys the Guaranteed QoS class and an honest node, and pays for it in packing density. Setting them far apart buys density and pays for it in CPU throttling that hits well-behaved pods alongside the greedy one."
+}
+\`\`\`
+
 ## Probes drive safe rollouts
 
 - **startupProbe:** gates the other two until a slow-booting app is up, so a cold JVM is not killed prematurely.
