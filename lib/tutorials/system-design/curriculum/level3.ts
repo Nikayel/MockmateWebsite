@@ -4013,10 +4013,103 @@ target is **at-least-once delivery plus idempotent consumers**. Make every consu
 the same event: key the cache/index write by the event's primary key and use last-writer-wins on a
 version/LSN, or dedupe on event id. Then a duplicate is a no-op.
 
+### The event that never applies, and the partition it stops
+
+Idempotence handles the duplicate. It does nothing for the opposite failure: an event the consumer
+**cannot** apply, ever. A null in a column the sink declares non-null, a schema change the sink has
+not learned, a row referencing a merchant that was hard-deleted. Retrying that is not eventual
+success, it is an infinite loop, and the loop is expensive because of how ordering works.
+
+Kafka orders events **per partition**, not per topic, and a consumer reads a partition
+**sequentially**: it cannot commit offset 4101 while 4100 is still unapplied without abandoning the
+ordering guarantee the whole design rests on. So one permanently-failing event stops that partition
+dead. Every event behind it, for every key that hashes there, waits forever. That is **head-of-line
+blocking**, and since the partition holds many product ids, it takes out a slice of the catalog
+rather than one product.
+
+\`\`\`
+partition 7 of cdc.public.products, keyed by product_id:
+
+  offset 4098   product 91   price update    applied
+  offset 4099   product 44   title update    applied
+  offset 4100   product 17   price = null    sink rejects, retry, reject, retry...
+  offset 4101   product 91   stock update    never read
+  offset 4102   product 63   new product     never read
+  ...           the rest of partition 7      never read
+
+  lag on partition 7 climbs forever while partitions 0 to 6 stay healthy, which
+  is why the alert has to be per partition and not the topic average.
+\`\`\`
+
+The fix is a **bounded retry budget followed by a dead-letter queue (DLQ)**: retry a few times with
+backoff, because most failures really are transient, and if the event still fails, publish it to a
+separate **dead-letter topic**, commit its offset, and move on.
+
+\`\`\`
+apply(event):
+  for attempt in 1..3:                     # bounded, so transient failures get their chance
+      try:     sink.upsert(event); commit(offset); return
+      except TransientError:  sleep(backoff(attempt))
+      except PermanentError:  break        # a schema violation will not fix itself
+
+  dlq.publish({event, topic, partition, offset, error, attempts})
+  commit(offset)                           # THIS line is what unblocks partition 7
+  alert_if(dlq_rate > threshold)           # a DLQ nobody watches is silent data loss
+\`\`\`
+
+Two rules separate a working DLQ from a bin. It must be **monitored and drained**, because a growing
+DLQ is exactly the derived-store divergence this whole architecture existed to prevent, now
+accumulating quietly in a topic instead of loudly in a search result. And it must be **replayable**:
+once the bug is fixed you republish the parked events into the main topic. Note the ordering you gave
+up to unblock the partition: a replayed event arrives after events that were behind it, so the
+version guard on the consumer is what stops a resurrected old value overwriting newer state. The
+idempotent consumer and the DLQ are one mechanism, not two.
+
 Operational reality: you also need **backfills and replays** (snapshot the current table state to
 bootstrap a brand-new index, then switch to the live stream), and you must **monitor replication slot
 / consumer lag**. A Postgres logical replication slot that a stalled Debezium connector stops
 advancing will pin WAL and eventually fill the disk, taking the primary down.
+
+### The sinks are mostly configuration, and the warehouse is the odd one out
+
+You rarely hand-write these consumers. **Kafka Connect** is the standard sink runtime and ships
+connectors for Elasticsearch, S3, JDBC, Snowflake and the rest: you supply a config naming the topic,
+the target, the key, and the error policy, and the connector owns polling, offsets, retries, and the
+dead-letter topic.
+
+\`\`\`
+# Kafka Connect sink config; the REST API takes the same keys as JSON
+connector.class = io.confluent.connect.elasticsearch.ElasticsearchSinkConnector
+topics          = cdc.public.products
+key.ignore      = false        # document id = the Kafka key = product id
+write.method    = upsert       # idempotent, so a redelivery is a no-op
+
+errors.tolerance                              = all     # a bad record must not kill the task
+errors.retry.timeout                          = 60000   # the bounded retry budget, in ms
+errors.deadletterqueue.topic.name             = dlq.products-to-elasticsearch
+errors.deadletterqueue.context.headers.enable = true    # parks topic/partition/offset/error
+\`\`\`
+
+The warehouse breaks the pattern, because a column store hates row-at-a-time writes: a thousand
+single-row inserts into Snowflake or BigQuery cost far more than one file holding the same thousand
+rows, and they litter the table with tiny partitions that every later scan has to open. So the
+analytics leg **batches on the way in**. A stream processor (**Flink**, Spark Structured Streaming,
+or a Kafka Connect S3 sink) buffers a few minutes of change events and writes them to object storage
+as **Parquet**, the columnar, compressed format a warehouse scans efficiently, and the warehouse
+bulk-loads those files with \`COPY INTO\`.
+
+\`\`\`
+cdc.public.products
+  -> Flink, 5-minute tumbling window, dedupe by (product_id, version)
+  -> s3://lake/products/dt=2026-08-14/part-0007.parquet     one ~100MB file
+  -> COPY INTO analytics.products FROM @stage/products/     one bulk load
+
+  search and cache: seconds of lag, event at a time
+  warehouse:        minutes of lag, file at a time
+
+  they are separate consumer groups on the same topic, each at its own offset,
+  so the slow leg never backpressures the fast one.
+\`\`\`
 
 **Interview nuance:** if the interviewer says "just write to the DB and the cache," name the
 dual-write problem explicitly and reach for outbox or CDC. If they push on "why not exactly-once,"
@@ -4025,8 +4118,10 @@ robust, and it is what Kafka-based pipelines actually run.
 
 Recap: never dual-write to a DB and a derived store; commit the change and its event together via a
 transactional outbox, or tap the DB log with CDC (Debezium), publish through Kafka, and make
-consumers idempotent so at-least-once delivery is correct, while monitoring replication-slot lag and
-supporting snapshot backfills.
+consumers idempotent so at-least-once delivery is correct; bound retries and dead-letter the events
+that will never apply so one poison record cannot block a partition, batch the warehouse leg through
+Parquet files instead of row-at-a-time writes, and monitor replication-slot lag, per-partition
+consumer lag and DLQ depth while supporting snapshot backfills.
 
 \`\`\`cswidget
 {
