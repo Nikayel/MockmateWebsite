@@ -465,11 +465,49 @@ Once you have an SLO and an error budget, the question is when to wake a human. 
 
 You pick a burn rate and a window so that tripping means you would consume a meaningful fraction of your total budget. The Google SRE canonical setup for a 99.9% SLO:
 
-\`\`\`
-Alert type     Burn rate   Long window   Short window   Budget spent   Action
-Fast burn      14.4x       1 hour        5 min          ~2% in 1h      Page now
-Medium burn    6x          6 hours       30 min         ~5% in 6h      Page
-Slow burn      1x          3 days        6 hours        ~10% in 3d     Ticket
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Alert type",
+    "Burn rate",
+    "Long window",
+    "Short window",
+    "Budget spent",
+    "Action"
+  ],
+  "rows": [
+    [
+      "Fast burn",
+      "14.4x",
+      "1 hour",
+      "5 min",
+      "~2% in 1h",
+      "Page now"
+    ],
+    [
+      "Medium burn",
+      "6x",
+      "6 hours",
+      "30 min",
+      "~5% in 6h",
+      "Page"
+    ],
+    [
+      "Slow burn",
+      "1x",
+      "3 days",
+      "6 hours",
+      "~10% in 3d",
+      "Ticket"
+    ]
+  ],
+  "highlightCols": [
+    "Long window",
+    "Short window"
+  ],
+  "caption": "Both highlighted windows must be over threshold at the same moment for the alert to fire. The long one supplies significance so a 30 second spike cannot page anyone, and the short one supplies fast reset so a fixed incident does not leave a page burning for an hour."
+}
 \`\`\`
 
 Fast burn (14.4x over 1 hour) means something is badly wrong right now and you will blow the whole month's budget in a couple of days at this rate: that pages a human immediately. Medium burn (6x over 6 hours) is slower but still spends a twentieth of the month in an afternoon, so it also pages, just without the drop-everything urgency. Slow burn (1x over 3 days) is a chronic bleed that is not an emergency but must not be ignored: that files a ticket for business hours.
@@ -586,10 +624,36 @@ When you own a service at 3am and it is misbehaving, you do not have time to sta
 
 They are complementary, not competing. RED tells you the checkout API's p99 doubled; USE tells you it is because the Postgres connection pool is saturated and requests are queuing for a connection.
 
-\`\`\`
-  request-driven service   ->  RED   (Rate, Errors, Duration)
-  underlying resource       ->  USE   (Utilization, Saturation, Errors)
-  every service, always     ->  4 golden signals
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "What you are instrumenting",
+    "Framework",
+    "What you emit"
+  ],
+  "rows": [
+    [
+      "Request-driven service (API, gRPC endpoint, web handler)",
+      "RED",
+      "Rate, Errors, Duration, per endpoint"
+    ],
+    [
+      "Underlying resource (CPU, disk, NIC, connection pool, thread pool)",
+      "USE",
+      "Utilization, Saturation, Errors, per resource"
+    ],
+    [
+      "Every service, always",
+      "The four golden signals",
+      "Latency, Traffic, Errors, Saturation"
+    ]
+  ],
+  "highlightCols": [
+    "Framework"
+  ],
+  "caption": "They are complementary rather than competing: RED tells you the checkout p99 doubled, and USE tells you it doubled because the Postgres connection pool is saturated and requests are queuing for a connection."
+}
 \`\`\`
 
 ## The cardinality trap

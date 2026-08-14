@@ -2699,6 +2699,239 @@ What to capture per event: actor (user or service identity), action, resource, t
 }
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Editing one line of a hash-chained audit log",
+  "frames": [
+    {
+      "note": "Every entry stores a hash over its own contents plus the previous entry's hash, so the log is a chain rather than a pile. Entry 2 is the one an insider would rather nobody saw.",
+      "rows": [
+        {
+          "label": "entry 1",
+          "cells": [
+            {
+              "text": "user 42 read invoice 900"
+            },
+            {
+              "text": "prev 0000"
+            },
+            {
+              "text": "hash a17c"
+            }
+          ]
+        },
+        {
+          "label": "entry 2",
+          "cells": [
+            {
+              "text": "admin 7 DELETED invoice 901"
+            },
+            {
+              "text": "prev a17c"
+            },
+            {
+              "text": "hash b93e"
+            }
+          ]
+        },
+        {
+          "label": "entry 3",
+          "cells": [
+            {
+              "text": "user 42 read invoice 902"
+            },
+            {
+              "text": "prev b93e"
+            },
+            {
+              "text": "hash c04f"
+            }
+          ]
+        },
+        {
+          "label": "entry 4",
+          "cells": [
+            {
+              "text": "user 91 read invoice 903"
+            },
+            {
+              "text": "prev c04f"
+            },
+            {
+              "text": "hash d55a"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Admin 7 has write access to the store and rewrites entry 2 in place, changing DELETED to read. The contents changed, so the hash computed over those contents changes with them.",
+      "predict": {
+        "question": "Entry 2 has just been rewritten in place. What does the rest of the chain do about it?",
+        "options": [
+          "Nothing: entry 2 still stores the same prev value it always did",
+          "Entry 3 now points at a hash no entry produces, so the break is visible",
+          "The later hashes recompute silently, so the edit leaves no trace"
+        ]
+      },
+      "rows": [
+        {
+          "label": "entry 1",
+          "cells": [
+            {
+              "text": "user 42 read invoice 900",
+              "state": "dim"
+            },
+            {
+              "text": "prev 0000",
+              "state": "dim"
+            },
+            {
+              "text": "hash a17c",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "entry 2",
+          "cells": [
+            {
+              "text": "admin 7 read invoice 901",
+              "state": "active"
+            },
+            {
+              "text": "prev a17c"
+            },
+            {
+              "text": "hash 6e21",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "entry 3",
+          "cells": [
+            {
+              "text": "user 42 read invoice 902"
+            },
+            {
+              "text": "prev b93e"
+            },
+            {
+              "text": "hash c04f"
+            }
+          ]
+        },
+        {
+          "label": "entry 4",
+          "cells": [
+            {
+              "text": "user 91 read invoice 903",
+              "state": "dim"
+            },
+            {
+              "text": "prev c04f",
+              "state": "dim"
+            },
+            {
+              "text": "hash d55a",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Entry 3 still stores prev b93e and nothing in the log hashes to b93e any more. The break is both detectable and located: everything from entry 2 onward is provably downstream of a tampered record.",
+      "rows": [
+        {
+          "label": "entry 2",
+          "cells": [
+            {
+              "text": "admin 7 read invoice 901",
+              "state": "active"
+            },
+            {
+              "text": "hash is now 6e21",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "entry 3",
+          "cells": [
+            {
+              "text": "prev b93e: matches nothing",
+              "state": "dropped"
+            },
+            {
+              "text": "chain breaks here",
+              "state": "dropped"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Removing the entry instead of editing it fails the same way. Entry 3 still points at b93e and no entry now produces it, so a hole in the chain is exactly as loud as an edit.",
+      "rows": [
+        {
+          "label": "entry 2",
+          "cells": [
+            {
+              "text": "deleted outright",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "entry 3",
+          "cells": [
+            {
+              "text": "prev b93e: matches nothing",
+              "state": "dropped"
+            },
+            {
+              "text": "chain breaks here",
+              "state": "dropped"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Chaining makes tampering detectable after the fact. WORM makes it impossible in the first place: S3 Object Lock in compliance mode refuses both writes until the retention date passes. Combine them, which is why the write path goes to WORM and chains the hashes.",
+      "rows": [
+        {
+          "label": "S3 Object Lock",
+          "cells": [
+            {
+              "text": "overwrite entry 2: REFUSED",
+              "state": "dropped"
+            },
+            {
+              "text": "delete entry 2: REFUSED",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "hash chain",
+          "cells": [
+            {
+              "text": "verifies end to end",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "This is what tamper-evident buys you and what it does not: the chain proves an edit happened and says where, and the WORM store is what stops it landing at all."
+}
+\`\`\`
+
 ## OWASP application defenses at the gateway
 
 The OWASP API Security Top 10 is the standard checklist. The one interviewers hammer is **BOLA (Broken Object Level Authorization)**, also called IDOR: the server returns object 456 because the URL asked for it, without checking that this caller owns 456. The fix is an authorization check on every object access, \`caller owns resource\`, never trusting an ID from the client. Others: input validation and parameterized queries (SQL injection), blocking **SSRF** (validate and allowlist any URL the server fetches, or an attacker pivots to your cloud metadata endpoint), and **mass assignment** (never bind a request body straight onto a model, or a user sets \`isAdmin=true\`). Centralize what you can at the API gateway (schema validation, rate limits, auth) but object-level authorization has to live in the service that knows ownership.
@@ -2876,6 +3109,220 @@ When a key or credential is compromised, panic causes two classic mistakes: wipi
 ## Rotate a widely-used key without downtime
 
 If one signing key protects every session and you just delete it, every valid token instantly becomes invalid and the whole userbase is logged out. The answer is to design for **overlapping key validity** ahead of time. Publish keys via a **JWKS** (JSON Web Key Set) endpoint with a key id (\`kid\`) in each token header. To rotate: (1) add the new key to the JWKS so verifiers accept both old and new, (2) flip signing to the new key, (3) after tokens signed with the old key have expired, remove the old key. Because verifiers trust both during the overlap, nobody is logged out. Under compromise you compress this: shrink token TTLs immediately so old tokens age out fast, force re-authentication for genuinely affected sessions, and pull the compromised \`kid\` from the JWKS. Short-lived credentials from a secrets manager (Vault, cloud KMS) make this routine rather than heroic.
+
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Rotating a compromised signing key without logging everyone out",
+  "frames": [
+    {
+      "note": "One key, kid k1, signs every session token, and the JWKS endpoint publishes it. Verifiers fetch that set and check each token against it on every single request.",
+      "rows": [
+        {
+          "label": "JWKS publishes",
+          "cells": [
+            {
+              "text": "k1"
+            }
+          ]
+        },
+        {
+          "label": "Signing with",
+          "cells": [
+            {
+              "text": "k1"
+            }
+          ]
+        },
+        {
+          "label": "4M live tokens",
+          "cells": [
+            {
+              "text": "kid k1: verify OK"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The SIEM confirms k1 is compromised. The instinct under pressure is to pull it from the JWKS immediately, right now, before the attacker mints anything else.",
+      "predict": {
+        "question": "You delete k1 from the JWKS this second. What happens to the four million live sessions signed with it?",
+        "options": [
+          "They keep working until each token's own exp passes",
+          "Every one of them is rejected on its next request",
+          "Only sessions created after the deletion are affected"
+        ]
+      },
+      "rows": [
+        {
+          "label": "JWKS publishes",
+          "cells": [
+            {
+              "text": "k1 removed",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "Signing with",
+          "cells": [
+            {
+              "text": "k1",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "4M live tokens",
+          "cells": [
+            {
+              "text": "kid k1: checked against what?",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Verification is a lookup against the published set on every request, so removing k1 rejects all four million at once. That is a self-inflicted outage stacked on top of the breach, which is the second panic mistake this lesson opened with.",
+      "rows": [
+        {
+          "label": "JWKS publishes",
+          "cells": [
+            {
+              "text": "nothing",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "4M live tokens",
+          "cells": [
+            {
+              "text": "all rejected",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "Consequence",
+          "cells": [
+            {
+              "text": "every user logged out at once",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The designed-for path instead. Step one: add k2 to the JWKS. Verifiers now accept either key and nothing has changed for anybody yet, which is the point.",
+      "rows": [
+        {
+          "label": "JWKS publishes",
+          "cells": [
+            {
+              "text": "k1"
+            },
+            {
+              "text": "k2",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "Signing with",
+          "cells": [
+            {
+              "text": "k1"
+            }
+          ]
+        },
+        {
+          "label": "4M live tokens",
+          "cells": [
+            {
+              "text": "kid k1: verify OK"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Step two: flip signing to k2. New tokens carry kid k2, and the old k1 tokens still verify because k1 is still published. This overlap window is a design decision made before the incident, not during it.",
+      "rows": [
+        {
+          "label": "JWKS publishes",
+          "cells": [
+            {
+              "text": "k1"
+            },
+            {
+              "text": "k2"
+            }
+          ]
+        },
+        {
+          "label": "Signing with",
+          "cells": [
+            {
+              "text": "k2",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "Live tokens",
+          "cells": [
+            {
+              "text": "kid k1: verify OK"
+            },
+            {
+              "text": "kid k2: verify OK",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Step three: once every k1 token has aged past its exp, drop k1. Nobody was logged out. Under compromise you compress the window by shrinking token TTLs first and forcing re-auth on the sessions you believe are affected.",
+      "rows": [
+        {
+          "label": "JWKS publishes",
+          "cells": [
+            {
+              "text": "k2"
+            },
+            {
+              "text": "k1 removed",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "Signing with",
+          "cells": [
+            {
+              "text": "k2"
+            }
+          ]
+        },
+        {
+          "label": "Live tokens",
+          "cells": [
+            {
+              "text": "kid k2: verify OK"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Overlapping validity has to exist before you need it. Short-lived credentials from a secrets manager make this routine; one long-lived signing key makes every rotation an outage."
+}
+\`\`\`
 
 **Eradication and recovery.** Remove the attacker's foothold, rotate all potentially-exposed secrets, then restore from a known-good state and watch closely for reinfection. This is where **immutable, object-locked backups** pay off: if the attacker also ran ransomware, a ransomware-resistant backup is your clean recovery path.
 
