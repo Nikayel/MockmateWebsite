@@ -612,9 +612,9 @@ separate from ACID isolation, and always reach for the weakest model that is sti
       "feedback": "Safer against staleness, but every operation now pays leader or quorum coordination in latency and availability, including data like counters that never needed it."
     },
     {
-      "label": "Every operation pays coordination it may not need, and availability drops under partition",
+      "label": "Every path pays coordination it does not need",
       "correct": true,
-      "feedback": "Right. Coordination cost rises monotonically toward the strong end, and anything stronger than causal must block or reject during a partition. The graded skill is matching each piece of data to the weakest model that keeps it correct."
+      "feedback": "Right. Coordination cost rises monotonically toward the strong end, so a leader or quorum round trip now lands on paths that never needed one, and anything stronger than causal must block or reject writes during a partition. The graded skill is matching each piece of data to the weakest model that keeps it correct."
     },
     {
       "label": "Linearizability cannot actually be built in practice",
@@ -920,17 +920,17 @@ any instant, two nodes can disagree about "now" by tens of milliseconds.
   "prompt": "Node A's clock runs 50 ms ahead of node B's. A user writes a fresh value on node B at real time T. A stale retry of an older write then lands on node A. Under last-writer-wins on wall-clock timestamps, which write survives?",
   "options": [
     {
-      "label": "Node B's write: it happened later in real time, so LWW keeps it",
-      "feedback": "Tempting, because LWW is supposed to keep the latest write. But LWW compares timestamps, not real time: node A stamps the stale retry T plus 50 ms, which is higher than B's stamp."
+      "label": "Node B's write, the genuinely newer one",
+      "feedback": "Tempting, because LWW is supposed to keep the latest write. But it compares timestamps, not real time, and node A's clock runs 50 ms ahead, so the stale retry carries the higher stamp and B's newer value loses."
     },
     {
-      "label": "Node A's stale retry: its timestamp reads T plus 50 ms, so it wins and B's newer write is discarded",
+      "label": "Node A's stale retry",
       "correct": true,
-      "feedback": "Right. The skewed clock hands the older write the higher timestamp, and LWW drops the genuinely newer value with no error and no log entry. Clock skew is a correctness input, not just a dashboard metric."
+      "feedback": "Right. Node A stamps the stale retry T plus 50 ms, which reads higher than B's stamp, so LWW keeps the older write and discards the genuinely newer one with no error and no log entry. Clock skew is a correctness input, not just a dashboard metric."
     },
     {
-      "label": "Neither: LWW detects the conflict and keeps both versions",
-      "feedback": "Keeping both versions is what version vectors and sibling values do. Plain LWW detects nothing: it keeps the higher timestamp and silently throws the other write away."
+      "label": "Neither: LWW keeps both versions",
+      "feedback": "Keeping both versions is what version vectors and sibling values do. Plain LWW detects nothing: it compares the two stamps, keeps the higher one, and silently throws the other write away."
     }
   ]
 }
