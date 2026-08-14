@@ -254,7 +254,7 @@ const grainAudit: SqlLesson = {
   id: "de-l7-grain-audit",
   title: "Grain Rehearsal: Say the Sentence, Then Prove It in SQL",
   summary:
-    "Review declared grain in one screen, then do the new work: audit a raw ride-share extract against its declared grain with executable SQL before any star gets built.",
+    "How to prove a table's declared grain with executable SQL, on a raw ride-share extract, before you build a star schema on top of it.",
   estimatedMinutes: 22,
   difficulty: "medium",
   skills: [
@@ -458,9 +458,9 @@ FROM raw, clean;`,
 
 const semiAdditiveAudit: SqlLesson = {
   id: "de-l7-semi-additive-audit",
-  title: "Semi-Additive Rehearsal: The Wrong Sum and the Right Sum, Side by Side",
+  title: "Semi-Additive Measures: The Wrong Sum and the Right Sum",
   summary:
-    "Review measure additivity in one screen, then grade the new artifact: a single query that shows the naive cross-day SUM next to the correct as-of total so the delta is visible.",
+    "Why summing a balance across days gives the wrong answer, and how one query can show the naive SUM beside the correct as-of total.",
   estimatedMinutes: 24,
   difficulty: "medium",
   skills: [
@@ -715,7 +715,7 @@ const scd2Rehearsal: SqlLesson = {
   id: "de-l7-scd2-rehearsal",
   title: "SCD2 Under the Clock: Apply the Change Batch",
   summary:
-    "A timed rehearsal of the interview's stock modeling scenario: apply an incoming multi-driver change batch to a Type 2 dimension with a script that is safe to run twice.",
+    "A timed rehearsal of the stock interview modeling task: apply a multi-driver change batch to a Type 2 dimension with a script that is safe to run twice.",
   estimatedMinutes: 30,
   difficulty: "hard",
   skills: [
@@ -1131,7 +1131,7 @@ const kimballVsObt: SqlLesson = {
   id: "de-l7-kimball-vs-obt",
   title: "Kimball vs One Big Table: The 10 GB Join-Side Heuristic",
   summary:
-    "Decide star schema versus One Big Table per data mart using consumer needs and the ~10 GB join-side heuristic, then price what the denormalization actually costs.",
+    "When to choose a star schema over One Big Table, using consumer needs and the 10 GB join-side heuristic instead of dogma.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
