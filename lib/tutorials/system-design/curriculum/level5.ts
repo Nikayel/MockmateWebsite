@@ -3565,6 +3565,65 @@ lattice (for a counter, element-wise max; for a set, union).
   by design.
 - **RGA / sequence CRDTs**: ordered lists for collaborative text (the basis of Yjs and Automerge).
 
+### How a sequence CRDT orders concurrent inserts
+
+The counter and the set both merge values. A sequence has to merge *positions*, and that is where the
+obvious representation fails: an array index is not a stable name for a place. "Insert at index 1"
+means something different the moment somebody else's insert shifts the text. So a sequence CRDT gives
+every element a **unique, densely orderable position id** and inserts carry the id rather than the
+index. Densely orderable means there is always room to mint a new id strictly between any two
+existing ones.
+
+\`\`\`
+ Document "AC". Each character carries a position id:
+   A -> 0.20        C -> 0.60
+
+ Two offline clients both type at "index 1", between A and C:
+   client r1 inserts B, minting a position between 0.20 and 0.60 -> 0.40
+   client r2 inserts X, minting a position between 0.20 and 0.60 -> 0.40
+
+ With array indices
+   apply r1 then r2 -> A X B C
+   apply r2 then r1 -> A B X C        two replicas, two documents
+
+ With position ids, sorting on (position, replica id)
+   ids are (0.40, r1) and (0.40, r2); the replica id breaks the tie the
+   same way on every replica, so both orders sort to A B X C, in any
+   delivery order and however many times a message is redelivered
+\`\`\`
+
+Deleting is where the other piece of CRDT machinery appears. A delete does not remove the position,
+it marks it dead and keeps it, and that dead marker is a **tombstone**. It has to stay because a
+concurrent insert on another replica may already be anchored between that character and its
+neighbour. Drop the position and that insert has nowhere to land; keep the tombstone and the insert
+still sorts into the right slot, invisible neighbour and all. The decimal above is a teaching convenience: real implementations use a variable-length
+identifier (a list of digits, or a path through a tree) because unbounded dense insertion needs
+unbounded precision, and ids plus tombstones are the metadata that makes a long-lived document need
+periodic compaction.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "Two offline clients each insert a character at index 1 of the same document. Their operations reach the other replicas in different orders. What makes the merged text identical everywhere?",
+  "options": [
+    {
+      "label": "Applying the operations in timestamp order, so every replica replays the same sequence of index operations",
+      "feedback": "Timestamps do give you an order, but the operations are still index-based, and index 1 names a different place once another insert has shifted the text. Replaying in a fixed order still lands a character in the wrong slot."
+    },
+    {
+      "label": "Each insert carries a unique position id that sorts the same way on every replica",
+      "correct": true,
+      "feedback": "Right. The order comes from the ids, not from delivery: unique and densely orderable, so each insert has a defined place between its neighbours no matter when it arrives or how often."
+    },
+    {
+      "label": "The server rewrites the second operation's index",
+      "feedback": "That is operational transform with a central server, which is the design a sequence CRDT exists to avoid. It also has nothing to transform against after an hour offline."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`cswidget
 {
   "type": "partition-sim",
@@ -3651,7 +3710,9 @@ updates to merge*.
 
 Recap: CRDTs give Strong Eventual Consistency because their merges are commutative, associative, and
 idempotent, they cost metadata and tombstones and cannot enforce global invariants, and they only
-converge if paired with anti-entropy (gossip, Merkle trees, read repair, hinted handoff).
+converge if paired with anti-entropy (gossip, Merkle trees, read repair, hinted handoff). A sequence
+CRDT takes its order from unique, densely orderable position ids rather than array indices, and its
+tombstones are what hold the anchor points open for a concurrent insert beside a deleted character.
 
 \`\`\`cswidget
 {
