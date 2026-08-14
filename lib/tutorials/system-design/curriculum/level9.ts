@@ -14,12 +14,58 @@ const monolithVsMicroservicesTeach = `
 
 This is the most-tested architecture tradeoff in system design rounds, and the industry mood has swung back toward starting monolithic. Amazon Prime Video famously moved a video quality-monitoring pipeline off distributed serverless steps and back into a single process, cutting cost about 90%. Shopify runs a modular monolith at enormous scale. The strong senior answer is not "microservices are modern" but "match the architecture to the org and the load."
 
-\`\`\`
- Monolith            Modular Monolith           Microservices
- one deploy          one deploy                 many deploys
- no enforced         enforced module            network boundaries
- boundaries          boundaries, single DB      DB-per-service
- fastest to build    fast + refactorable        independent scaling
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Dimension",
+    "Monolith",
+    "Modular monolith",
+    "Microservices"
+  ],
+  "highlightCols": [
+    "Modular monolith"
+  ],
+  "rows": [
+    [
+      "Deploy",
+      "One deploy",
+      "One deploy",
+      "Many, one per service"
+    ],
+    [
+      "Boundaries",
+      "None enforced",
+      "Enforced module interfaces",
+      "Network boundaries"
+    ],
+    [
+      "Data",
+      "One database",
+      "One database",
+      "A database per service"
+    ],
+    [
+      "Scaling",
+      "Scale the whole app",
+      "Scale the whole app",
+      "Scale one service on its own"
+    ],
+    [
+      "Strength",
+      "Fastest to build and reason about",
+      "Fast, and keeps the seams you split on later",
+      "Independent deploys, scaling, fault isolation"
+    ],
+    [
+      "Paid for with",
+      "Internals rot without discipline",
+      "The discipline to keep the seams honest",
+      "A network hop per call, sagas, tracing, ops"
+    ]
+  ],
+  "caption": "The fourth column nobody asks for is the distributed monolith: many deploys over one shared database, which pays every microservices cost and keeps every monolith constraint. Default to the highlighted column and extract a service only when a named trigger appears."
+}
 \`\`\`
 
 A plain monolith is one codebase, one deploy, one database. It is the fastest way to ship and the easiest to reason about, because a call across features is a function call, not a network hop. Its weakness is that without discipline the internals turn to spaghetti and one team's change blocks another's deploy.
@@ -1961,10 +2007,48 @@ Every data-intensive system eventually splits into two workloads that want oppos
 
 **OLAP (Online Analytical Processing)** is your analytics engine: revenue by region by day, funnel conversion, cohort retention. The access pattern is a few huge queries that scan millions to billions of rows but touch only a handful of columns, aggregating as they go. The layout that serves this is a **column store**: each column is stored contiguously, so a \`SUM(revenue) GROUP BY region\` reads only the \`revenue\` and \`region\` columns off disk and skips the other 40. Because a column holds one data type with low cardinality, columnar data compresses 5x to 20x (run-length, dictionary, delta encoding), which means less I/O, and engines run **vectorized execution** (process a batch of column values per CPU instruction) instead of row-at-a-time. Snowflake, BigQuery, ClickHouse, and Redshift are OLAP engines, usually fed a **denormalized star schema** (fact table plus dimension tables) so a query joins less.
 
-\`\`\`
-  row store (OLTP)                 column store (OLAP)
-  [id|name|region|rev] [id|...]    [id,id,id,...] [region,region,...] [rev,rev,...]
-  read one row = 1 page            SUM(rev) reads only the rev column, compressed
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Dimension",
+    "Row store (OLTP)",
+    "Column store (OLAP)"
+  ],
+  "rows": [
+    [
+      "On disk",
+      "A row's columns sit contiguously",
+      "A column's values sit contiguously"
+    ],
+    [
+      "Fetch one whole record",
+      "One page read",
+      "One read per column, then reassemble"
+    ],
+    [
+      "SUM(rev) GROUP BY region",
+      "Reads all 40 columns of every row",
+      "Reads the rev and region columns only"
+    ],
+    [
+      "Compression",
+      "Mixed types in a page compress poorly",
+      "One type per column, 5x to 20x"
+    ],
+    [
+      "Execution",
+      "Row at a time",
+      "Vectorized: a batch of column values per instruction"
+    ],
+    [
+      "Built for",
+      "Many small high-concurrency transactions",
+      "A few huge scanning aggregates"
+    ]
+  ],
+  "caption": "The win is not mainly the compression, it is what never gets read: a column store touches only the columns the query names, so an aggregate over two columns of a 40 column table skips the other 38 before compression is even considered."
+}
 \`\`\`
 
 ## Never run analytics on the OLTP primary
