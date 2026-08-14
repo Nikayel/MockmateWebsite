@@ -1443,11 +1443,41 @@ A stream processor (Flink, or Spark Structured Streaming) consumes partitions an
 
 Exact distinct counts and exact top-K over a firehose need unbounded memory (a set of every id seen). You trade a bounded error for bounded memory:
 
-\`\`\`
-HyperLogLog  -> unique counts (cardinality) in ~12 KB per key, ~0.8% error
-Count-Min Sketch -> per-item frequency in fixed memory, over-counts only
-Top-K (heavy hitters, on top of CMS) -> trending items without a full sort
-t-digest / DDSketch -> p50/p95/p99 latency quantiles in a tiny footprint
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Structure",
+    "What it answers",
+    "What it costs, and how it is wrong"
+  ],
+  "rows": [
+    [
+      "HyperLogLog",
+      "Unique count (cardinality) for a key",
+      "About 12 KB per key, about 0.8% error, and per-partition sketches merge into a global count"
+    ],
+    [
+      "Count-Min Sketch",
+      "How often one item appeared",
+      "Fixed memory, and it over-counts only, never under-counts"
+    ],
+    [
+      "Top-K heavy hitters, built on a Count-Min Sketch",
+      "Which items are trending",
+      "Bounded memory, and no full sort of the catalog"
+    ],
+    [
+      "t-digest or DDSketch",
+      "p50, p95 and p99 latency",
+      "A tiny footprint per series, with error concentrated away from the tails you care about"
+    ]
+  ],
+  "highlightCols": [
+    "What it costs, and how it is wrong"
+  ],
+  "caption": "Each row buys bounded memory with a bounded, known error. Saying the error out loud is what makes it a deliberate trade rather than a shortcut you forgot to fix."
+}
 \`\`\`
 
 The HyperLogLog error is derivable rather than memorized: standard error is about 1.04/sqrt(register count), so Redis's 16,384 registers at six bits each (hence the ~12 KB) land near 0.8%. Halving the error costs 4x the registers, which is why the default sits where it does.
