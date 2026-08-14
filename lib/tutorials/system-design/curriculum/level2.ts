@@ -2084,6 +2084,88 @@ name and avatar for display) and **reference the unbounded remainder** (the full
 lives in its own collection, keyed by post id). This gives you a fast first render and a scalable
 long tail.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Embedding an unbounded array, in bytes",
+  "predictPrompt": {
+    "question": "A post document embeds its entire comment array at roughly 800 bytes per comment. How many comments fit before the 16MB cap makes the write fail outright?",
+    "options": [
+      "About 2,000",
+      "About 20,000",
+      "About 200,000",
+      "There is no hard limit; the document just keeps growing"
+    ]
+  },
+  "workedExample": "The initial post is 12 KB of ordinary fields plus 500 embedded comments at 800 bytes each, so the document is about 412 KB, a comfortable 2.6 percent of the 16MB cap. The number that actually matters is the third output: about 20,000 comments before a write is simply rejected. Drag comments to 100,000, which a popular thread reaches, and the document is 80 MB, five times over the cap, while every read of that post has long been dragging the whole array across the wire to render twenty of them. The hybrid figure never moves, because it embeds a bounded 20 and references the rest.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "base_kb",
+      "label": "The post's own fields",
+      "min": 1,
+      "max": 200,
+      "scale": "linear",
+      "step": 1,
+      "initial": 12,
+      "unit": "KB"
+    },
+    {
+      "kind": "slider",
+      "id": "comments",
+      "label": "Comments on the post",
+      "min": 10,
+      "max": 1000000,
+      "scale": "log",
+      "initial": 500,
+      "unit": "comments"
+    },
+    {
+      "kind": "slider",
+      "id": "comment_bytes",
+      "label": "Bytes per embedded comment",
+      "min": 200,
+      "max": 4000,
+      "scale": "linear",
+      "step": 100,
+      "initial": 800,
+      "unit": "bytes"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "doc_bytes",
+      "label": "Document size with the whole array embedded",
+      "expr": "base_kb * 1000 + comments * comment_bytes",
+      "format": "bytes",
+      "sparkline": {
+        "over": "comments"
+      }
+    },
+    {
+      "id": "cap_share",
+      "label": "Share of the 16MB document cap",
+      "expr": "doc_bytes / 16000000",
+      "format": "percent"
+    },
+    {
+      "id": "headroom",
+      "label": "Comments this document can hold before writes fail",
+      "expr": "floor((16000000 - base_kb * 1000) / comment_bytes)",
+      "format": "compact",
+      "unit": "comments"
+    },
+    {
+      "id": "hybrid_bytes",
+      "label": "Hybrid: newest 20 embedded, the rest referenced",
+      "expr": "base_kb * 1000 + 20 * comment_bytes",
+      "format": "bytes"
+    }
+  ],
+  "caption": "Embedding is free while the array is bounded. The cap is the hard failure, and the read cost arrives long before it: one read returns the whole thing whether the page renders twenty comments or twenty thousand."
+}
+\`\`\`
+
 **Interview nuance:** The question that separates juniors from seniors is transactions. **Atomicity
 is guaranteed per document.** A single document update (including nested fields and arrays) is
 atomic, all-or-nothing. Multi-document transactions exist in modern MongoDB but are the exception,
