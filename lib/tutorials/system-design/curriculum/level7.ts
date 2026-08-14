@@ -201,6 +201,31 @@ An **SLO** (Service Level Objective) is an SLI plus a target plus a window: "99.
 
 An **SLA** (Service Level Agreement) is the external, contractual version with teeth: financial penalties (service credits) if you miss it. You always set the internal SLO stricter than the SLA, so your own alerting fires before you owe customers money.
 
+## Good and valid do not have to be events
+
+Nothing in "good over valid" says the units must be requests. When the harm a user suffers scales with *duration* instead of with a count, the honest indicator counts seconds on both sides: **good seconds over valid seconds**. Same ratio, same discipline about what "valid" excludes, different unit.
+
+Voice calling is the clean case. Counted as events, one 40-minute call shredded by dropouts and one 2-second call with a single crackle are both exactly one bad call. Run the same hour of traffic through both shapes:
+
+\`\`\`
+  Two hours, each with 10,000 calls averaging 300 s = 3,000,000 connected seconds.
+
+  Hour A: 90 calls each lose   1 second of audio  ->      90 bad seconds
+  Hour B: 90 calls each lose 200 seconds of audio ->  18,000 bad seconds
+
+  Event-based SLI, good = "call with no dropout", valid = all connected calls:
+    Hour A:  9,910 / 10,000  =  99.10%
+    Hour B:  9,910 / 10,000  =  99.10%      <- identical, and hour B was a disaster
+
+  Time-based SLI, good = seconds of audio delivered, valid = connected seconds:
+    Hour A:  (3,000,000 -     90) / 3,000,000  =  99.997%
+    Hour B:  (3,000,000 - 18,000) / 3,000,000  =  99.400%   <- the damage is now visible
+\`\`\`
+
+The event ratio is not wrong, it is blind: it can say how many sessions were touched and never how much of each was ruined. "Valid" keeps its meaning either way, as seconds you accept being graded on, so seconds after the caller hung up leave the denominator for the same reason health-check pings leave it. And the objective reads exactly as before: 99.9% of good seconds over a rolling 28 days.
+
+The tell for which shape to use is what the user is actually consuming. Discrete short units of work (an API call, an upload) count as events. A session the user sits inside for minutes counts as time.
+
 ## Where you measure changes the number
 
 The same request looks different at three points. At the **load balancer** you capture what most users experience but miss failures that never reached the LB (DNS, a dead region). At the **server** you get clean internal numbers but hide network loss and the LB's own errors, flattering yourself. At the **client** (real-user monitoring) you capture the true end-to-end experience including the last mile, but the data is noisy and attributes the user's flaky wifi to you. Good practice: measure availability at the load balancer (the boundary you own and control) and latency with client RUM plus server-side, and state your measurement point when you quote a number.
@@ -415,7 +440,7 @@ An average hides the tail. If 99 requests take 50 ms and one takes 5 seconds, th
 
 **Interview nuance:** the strongest answers keep the SLO count small and tie each to a user journey. "99.9% of checkout submissions succeed over 28 days" is a good SLO because a human cares about that event. "CPU under 80%" is not an SLO, it is a resource metric with no user in it. Few SLOs, each anchored to a journey, targets set from what users actually expect (nobody notices 200 ms vs 250 ms, everybody notices 3 s).
 
-**Recap:** SLI is good/valid events, SLO adds a target and window (99.9% over 28 days), SLA is the external promise with penalties; the measurement point (LB vs server vs client) changes the number, and latency SLOs use percentiles because averages hide the tail.
+**Recap:** SLI is good over valid, counted in events or in seconds when the harm scales with duration; SLO adds a target and window (99.9% over 28 days); SLA is the external promise with penalties; the measurement point (LB vs server vs client) changes the number, and latency SLOs use percentiles because averages hide the tail.
 
 \`\`\`cswidget
 {
