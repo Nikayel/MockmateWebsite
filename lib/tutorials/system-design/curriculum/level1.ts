@@ -3519,6 +3519,62 @@ data loss.
 }
 \`\`\`
 
+### When rejecting is the wrong answer
+
+\`If-Match\` works by refusing. That is right when conflicts are rare and wrong when they are the
+normal case. Two people typing in the same paragraph mint a new version per keystroke, so a
+whole-document check refuses nearly every save:
+
+\`\`\`
+document v5 = "Hello world"
+A types "," after "Hello"    -> PUT If-Match: v5  -> accepted, the document becomes v6
+B types "!" at the end       -> PUT If-Match: v5  -> 412 Precondition Failed
+# Nothing about B's edit was incompatible with A's. The version check cannot tell.
+\`\`\`
+
+Look at what was thrown away. One insert was at offset 5 and the other at offset 11, so both could
+have survived, but a validator compares whole documents and has no way to see that. Once contention
+is per keystroke, the answer is to stop exchanging documents and start exchanging operations, then
+merge them instead of rejecting them. Two protocol families do this.
+
+**Operational Transformation (OT)** keeps a server that orders operations and rewrites each incoming
+operation against the ones already applied:
+
+\`\`\`
+both clients start from "Hello world"
+A sends  insert(",", pos=5)
+B sends  insert("!", pos=11)       # a position computed against the text B could see
+
+server applies A first:            "Hello, world"   # everything past pos 5 shifted right by one
+server TRANSFORMS B against A:     insert("!", pos=11) becomes insert("!", pos=12)
+server applies the transformed op: "Hello, world!"
+# both edits survive, and every client converges on the same string
+\`\`\`
+
+The transformation step is the whole idea: an operation's position is meaningful only against the
+document state it was written for, so an operation that arrives late gets adjusted for whatever
+landed before it.
+
+**CRDTs** reach the same place without a central sequencer. Each character carries an immutable
+identifier that sorts between its neighbours, so a position never depends on a count some other edit
+can shift:
+
+\`\`\`
+"Hello world" as identified characters:  H(0.1) e(0.2) l(0.3) l(0.4) o(0.5) _(0.6) w(0.7) ...
+A inserts "," with id 0.55    # between "o" and the space
+B inserts "!" with id 0.95    # after the last character
+merge = take the union of both sets, sort by id -> "Hello, world!"
+# the ids decide the order, so the two replicas can merge in either order and still agree
+\`\`\`
+
+Because merging is commutative, replicas that saw the operations in different orders still converge,
+which is what lets a CRDT work offline and peer to peer. The price is metadata: every character
+carries an id, and a deleted character leaves a tombstone so a concurrent insert beside it still
+lands in the right place.
+
+Either way, the unit of exchange is now a keystroke-sized operation rather than a document, so these
+protocols ride a persistent connection (typically a WebSocket) instead of one PUT per save.
+
 Content negotiation completes the picture: honor \`Accept\` and \`Accept-Language\`, and set
 \`Vary: Accept, Accept-Encoding\` on responses so a shared cache does not serve a JSON body to a
 client that asked for XML, or a Brotli body to a client that cannot decode it.
@@ -3528,8 +3584,9 @@ client that asked for XML, or a Brotli body to a client that cannot decode it.
 "return 200 and last-write-wins" is the wrong turn interviewers listen for.
 
 Recap: use safe/idempotent method semantics to drive retry and caching, add Cache-Control plus ETag
-for cheap conditional GETs (304), and use ETag + If-Match -> 412 for optimistic concurrency that
-prevents lost updates.
+for cheap conditional GETs (304), use ETag + If-Match -> 412 for optimistic concurrency that prevents
+lost updates, and know that once contention is per keystroke the merge-based families (OT and CRDTs)
+replace the version check rather than tuning it.
 
 \`\`\`cswidget
 {
