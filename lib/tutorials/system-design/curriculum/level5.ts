@@ -1825,13 +1825,13 @@ choreography only for short, simple, truly decoupled flows.
   "prompt": "An order saga has finished step 1, reserve inventory, and is about to run step 2, charge the card. Right now another request reads that inventory row. What does it see?",
   "options": [
     {
-      "label": "Nothing unusual: the saga's intermediate state stays hidden until the whole saga completes",
-      "feedback": "That is ACID intuition, and it is exactly what sagas give up. Each step is a local transaction that commits immediately, so its effects are visible the moment the step finishes."
+      "label": "Nothing unusual: the saga's state stays hidden until it completes",
+      "feedback": "That is ACID intuition, and it is exactly what sagas give up. Each step is a local transaction that commits immediately, so its effects are visible to everyone the moment the step finishes."
     },
     {
-      "label": "It sees the reservation: each step commits locally, so intermediate state is visible to everyone",
+      "label": "It sees the reservation, already committed",
       "correct": true,
-      "feedback": "Right. 'Reserved but unpaid' is observable, an anomaly a single ACID transaction would never expose. Sagas give atomicity of outcome, not isolation."
+      "feedback": "Right. Step 1 was a local transaction that committed on its own, so 'reserved but unpaid' is observable by any other request. That is an anomaly a single ACID transaction would never expose: sagas buy atomicity of outcome and give up isolation to get it."
     },
     {
       "label": "It blocks until the saga finishes, like waiting on a row lock",
@@ -2791,9 +2791,9 @@ purely to survive lies rather than silence.
   "prompt": "A 4-node BFT cluster (f equal to 1) commits with quorums of 3. Two decisions are approved by two different quorums. What stops them from committing contradictory values?",
   "options": [
     {
-      "label": "Any two quorums of 3 out of 4 overlap in at least 2 nodes, so at least 1 is honest and will not endorse both",
+      "label": "Any two quorums of 3 share an honest node",
       "correct": true,
-      "feedback": "Right. That guaranteed honest overlap is the entire point of the 3f+1 sizing: the liar can never be the only bridge between two quorums."
+      "feedback": "Right. Two quorums of 3 out of 4 must overlap in at least 2 nodes, and at most 1 of those can be the liar, so at least 1 honest node sits in both and refuses to endorse two contradictory values. That guaranteed honest overlap is the entire point of the 3f+1 sizing: the liar can never be the only bridge between two quorums."
     },
     {
       "label": "The primary serializes all decisions, so contradiction is impossible",
