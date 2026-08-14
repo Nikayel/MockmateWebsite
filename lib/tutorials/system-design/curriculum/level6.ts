@@ -201,9 +201,9 @@ SQS adds a visibility timeout so an un-acked message reappears for another worke
   "prompt": "Orders flow through an SQS queue that a worker pool drains. A second team asks to read the same messages for analytics. What do they find?",
   "options": [
     {
-      "label": "Nothing: each message was delivered to one worker and deleted on ack, so there is no second reader and no replay",
+      "label": "Nothing: the messages were deleted on ack",
       "correct": true,
-      "feedback": "Right: consumed-and-gone is the defining property of a point-to-point queue."
+      "feedback": "Right. Each message went to exactly one worker in the pool and vanished the moment that worker acked, so there is no second reader to serve and no cursor to rewind. Consumed-and-gone is the defining property of a point-to-point queue."
     },
     {
       "label": "A full copy, because the broker keeps everything until every team has read it",
@@ -458,9 +458,9 @@ routing, managed services when the team is small, and sometimes no broker at all
   "prompt": "A settings service handles ten writes per second, and users read their setting back immediately after saving. A teammate proposes putting writes behind Kafka for scalability. What is the strongest counter?",
   "options": [
     {
-      "label": "Use no broker at all: a direct synchronous write to the database is correct, since a broker only adds latency and a stale-read window here",
+      "label": "Use no broker at all",
       "correct": true,
-      "feedback": "Right: a strong-consistency read after write plus tiny throughput fails every driver that would justify any broker."
+      "feedback": "Right. A direct synchronous write to the database is the answer here. Ten writes per second fails the throughput driver, nothing asks for replay or fan-out, and the read-after-write requirement means any async hop buys latency plus a stale-read window and nothing else. The cheapest tool that satisfies the drivers is sometimes no broker."
     },
     {
       "label": "Use SQS instead of Kafka, since the team is small",
