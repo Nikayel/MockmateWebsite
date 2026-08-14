@@ -707,17 +707,17 @@ a 3x peak multiplier because of the daily traffic curve" scores; a single unexpl
   "prompt": "You have peak read and write QPS on the board and eight minutes of estimation time left. What do you do with it?",
   "options": [
     {
-      "label": "Derive storage, bandwidth, and memory for every entity to show rigor",
-      "feedback": "Tempting, thoroughness feels safe. But this is analysis paralysis: minutes spent on numbers that move no decision while the design goes untouched."
+      "label": "Derive storage and bandwidth for every entity",
+      "feedback": "Tempting, because thoroughness feels safe. But sizing every entity is analysis paralysis: eight minutes spent on numbers that move no decision, while the design the interviewer is actually grading goes untouched."
     },
     {
-      "label": "Compute a number only if it would change a design decision, then move to the design",
+      "label": "Compute only what changes a decision, then move on",
       "correct": true,
-      "feedback": "Right. Peak write QPS tells you whether to shard; read QPS tells you whether you need a cache tier. If a calculation cannot move the architecture, skip it."
+      "feedback": "Right. Peak write QPS tells you whether to shard, and peak read QPS tells you whether you need a cache tier. If a calculation cannot move the architecture, skip it and spend the eight minutes on the design."
     },
     {
-      "label": "Recompute the QPS with exact seconds per day to tighten the estimate",
-      "feedback": "Precision is not the product: 86,400 versus 10^5 changes nothing you will decide. The interviewer cares about the shape of the calculation, not the third digit."
+      "label": "Recompute the QPS with exact seconds per day",
+      "feedback": "Precision is not the product here. 86,400 versus 10^5 changes nothing you will decide, and the interviewer is grading the shape of the calculation rather than its third digit."
     }
   ]
 }
@@ -750,17 +750,17 @@ with a 2 to 3x multiplier, and compute only the numbers that change the architec
   "prompt": "Your Fermi chain lands on 5,000 average read QPS. The interviewer asks what the system must be built to survive. Your answer?",
   "options": [
     {
-      "label": "5,000 QPS; that is what the arithmetic says",
-      "feedback": "Tempting, it is the number you just derived. But it is a daily average, and real traffic is peaky: a system built to the mean falls over at the evening peak."
+      "label": "5,000 QPS, what the arithmetic says",
+      "feedback": "Tempting, it is the number you just derived. But it is a daily average, and real traffic follows a diurnal curve: a system built to the mean falls over at the evening peak."
     },
     {
-      "label": "About 15,000 QPS, stating a 3x peak multiplier for the diurnal curve",
+      "label": "About 15,000 QPS, at a 3x peak multiplier",
       "correct": true,
-      "feedback": "Right. A stated 2 to 3x peak-to-average multiplier is the defensible move: the interviewer can challenge the multiplier instead of the whole result."
+      "feedback": "Right. A stated 2 to 3x peak-to-average multiplier is the defensible move: 5,000 average becomes roughly 15,000 at the evening peak, and the interviewer can now challenge the multiplier instead of the whole result."
     },
     {
-      "label": "50,000 QPS, just to be safe",
-      "feedback": "An unexplained 10x is just a different unjustified number. What scores is the assumption said out loud, not the padding."
+      "label": "50,000 QPS, to be safe",
+      "feedback": "An unexplained 10x is just a different unjustified number, and it will size you a fleet you do not need. What scores is the assumption said out loud, not the padding."
     }
   ],
   "reveal": "In your design write, run this exact chain: state assumptions, label units, round to powers of ten, convert average to peak out loud, and let each number you compute justify one design decision."
@@ -1006,17 +1006,17 @@ the hot key rather than the average.
   "prompt": "Your estimate says 40:1 read-heavy, and you chose push fan-out with an average of 200 followers per user. Which conclusion is right?",
   "options": [
     {
-      "label": "The write path is safe; put all your effort into the read path",
-      "feedback": "Tempting, 40:1 sounds decisive. But push multiplies every post by 200 followers: 250 QPS of posts becomes 50,000 QPS of feed inserts, and that amplified write load is now your biggest number."
+      "label": "The write path is safe; optimize reads",
+      "feedback": "Tempting, 40:1 sounds decisive. But that ratio counts posts, not the inserts each post causes. Push multiplies every post by 200 followers, and the amplified write load is now your biggest number."
     },
     {
-      "label": "Model the fan-out: effective feed-insert QPS is the post rate times followers, so the write side needs real design work",
+      "label": "Model the fan-out before trusting the ratio",
       "correct": true,
-      "feedback": "Right. The ratio alone is not enough; you must model where the fan-out happens. 250 x 200 is 50k inserts per second, larger than the 10k read QPS."
+      "feedback": "Right. Effective feed-insert QPS is the post rate times the follower count, so 250 posts per second becomes 50,000 inserts per second under push, larger than the 10,000 read QPS the ratio pointed you at. The write side needs real design work."
     },
     {
-      "label": "Switch everything to pull so the write amplification disappears",
-      "feedback": "Pull fixes the celebrity problem but gives every ordinary feed load N fetches and a merge. The senior answer is the hybrid: push for normal users, pull for celebrities."
+      "label": "Switch everything to pull",
+      "feedback": "Pull does remove the write amplification, and it hands every ordinary feed load N fetches plus a merge in exchange. The senior answer is the hybrid: push for normal users, pull for celebrities."
     }
   ],
   "reveal": "In your design write, derive read and write QPS separately, state the ratio, show where fan-out multiplies which path, name your push, pull, or hybrid choice, and say how you survive the hot key rather than the average."
@@ -1050,17 +1050,17 @@ database only needs to hold gigabytes while your object store holds petabytes.
   "prompt": "Your raw math says 12 TB of photos over the retention window, stored in a durable RF=3 object store. What number do you quote as provisioned storage?",
   "options": [
     {
-      "label": "12 TB, the number the formula gave",
-      "feedback": "Tempting because the formula really did produce it, but that is raw payload only. Durable stores keep 3 copies, so quoting 12 TB understates the real footprint by 3x."
+      "label": "About 12 TB, the number the formula gave",
+      "feedback": "Tempting because the formula really did produce it, but that is raw payload only. A durable store keeps 3 copies of every byte, so quoting the raw number understates the footprint you have to pay for by 3x."
     },
     {
-      "label": "About 36 TB, plus a bit more once index overhead is counted",
+      "label": "About 36 TB, once replication is counted",
       "correct": true,
-      "feedback": "Right. RF=3 triples raw storage, and on the database side secondary indexes and overhead add another 20 to 50 percent. Provisioned storage is raw times replication plus overhead."
+      "feedback": "Right. RF=3 triples the raw payload, so 12 TB becomes 36 TB, and on the database side secondary indexes and B-tree overhead add another 20 to 50 percent on top of that. Provisioned storage is raw times replication, plus overhead."
     },
     {
-      "label": "About 120 TB, since replication is usually 10x",
-      "feedback": "Replication is expensive but not that expensive. Standard durable replication is 3 copies, and erasure coding for cold blobs pulls the multiplier down toward 1.3x to 1.5x, not up."
+      "label": "About 120 TB, since replication is 10x",
+      "feedback": "Replication is expensive but not that expensive. Standard durable replication is 3 copies, and erasure coding for cold blobs pulls the multiplier down toward 1.3x to 1.5x rather than up."
     }
   ]
 }
