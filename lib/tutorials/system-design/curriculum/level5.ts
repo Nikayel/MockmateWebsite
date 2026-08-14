@@ -55,6 +55,109 @@ A timeout is not "B failed." It is "I have no idea what B did." If A retries aft
 the side effect twice. If A gives up after case 1 when the write actually needed to happen, data is
 lost.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "The retry that is safe under all four outcomes",
+  "actors": [
+    {
+      "id": "a",
+      "label": "Service A"
+    },
+    {
+      "id": "b",
+      "label": "Service B (charges the card)"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "dropResponse",
+      "label": "Lose the response",
+      "description": "B commits the charge and the reply never reaches A."
+    }
+  ],
+  "steps": [
+    {
+      "from": "a",
+      "to": "b",
+      "label": "charge 20 dollars, key k1",
+      "kind": "request"
+    },
+    {
+      "from": "b",
+      "label": "commits the charge once",
+      "kind": "note",
+      "state": {
+        "charges on B": "1"
+      }
+    },
+    {
+      "from": "b",
+      "to": "a",
+      "label": "200 OK, charge ch_1",
+      "kind": "response",
+      "when": "!dropResponse"
+    },
+    {
+      "from": "a",
+      "label": "done, and A knows it",
+      "kind": "note",
+      "when": "!dropResponse",
+      "state": {
+        "charges on B": "1"
+      }
+    },
+    {
+      "from": "b",
+      "to": "a",
+      "label": "200 OK, charge ch_1",
+      "kind": "response",
+      "status": "lost",
+      "when": "dropResponse"
+    },
+    {
+      "from": "a",
+      "label": "timer expires, A observes silence",
+      "kind": "timer",
+      "status": "late",
+      "when": "dropResponse",
+      "predict": {
+        "question": "A's timer just expired and nothing came back. What has A learned about the charge?",
+        "options": [
+          "B did not charge the card, so it is safe to send it again",
+          "B charged the card, since it returned no error",
+          "Nothing: lost request, lost response, slow peer and dead peer all look like this"
+        ]
+      }
+    },
+    {
+      "from": "a",
+      "to": "b",
+      "label": "retry, same key k1",
+      "kind": "request",
+      "when": "dropResponse"
+    },
+    {
+      "from": "b",
+      "label": "key k1 already seen, returns the stored result",
+      "kind": "note",
+      "when": "dropResponse",
+      "state": {
+        "charges on B": "1"
+      }
+    },
+    {
+      "from": "b",
+      "to": "a",
+      "label": "200 OK, charge ch_1 replayed",
+      "kind": "response",
+      "when": "dropResponse"
+    }
+  ],
+  "caption": "Flip the toggle and B still charges exactly once. The retry is safe not because A worked out which of the four outcomes happened, which it cannot, but because the idempotency key makes the duplicate a no-op."
+}
+\`\`\`
+
 ### The fallacies of distributed computing
 
 The fallacies (Deutsch, Gosling, at Sun) are the false assumptions that make people write code that
