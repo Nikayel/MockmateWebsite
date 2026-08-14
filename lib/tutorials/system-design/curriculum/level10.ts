@@ -5452,6 +5452,89 @@ A metric is a name plus a set of labels plus a timestamped value: \`http_request
 
 **Interview nuance:** when asked "what breaks first," say high-cardinality labels. Interviewers want to hear that you would reject \`user_id\`/\`trace_id\` as labels, cap label sets, and detect cardinality spikes, because unbounded cardinality is what actually takes these systems down.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Cardinality is a product, not a sum",
+  "predictPrompt": {
+    "question": "One metric carries 200 services, 5 regions and 8 status codes. A team adds a user_id label with 10 million values. Roughly how many time series does that one metric become?",
+    "options": [
+      "About 8,000",
+      "About 10 million",
+      "About 200 million",
+      "About 80 billion"
+    ]
+  },
+  "workedExample": "At the initial settings the metric is 200 services times 5 regions times 8 status codes, which is 8,000 series, about 46 million samples a day at a 15 second scrape, and roughly 60 MB a day once compressed to about 1.3 bytes per sample. Leave user_id at 1, which means the label is absent. Slide it to 10 million and the same single metric becomes 80 billion series, because a series is a unique combination of label values and cardinality multiplies rather than adds. None of that growth is text hanging off an existing series: each one carries its own index entry and its own sample stream, and compression only works within a series, where timestamps are regular and adjacent values are similar, so it has nothing to exploit across 80 billion of them.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "services",
+      "label": "service label values",
+      "min": 1,
+      "max": 2000,
+      "initial": 200,
+      "unit": "services"
+    },
+    {
+      "kind": "slider",
+      "id": "regions",
+      "label": "region label values",
+      "min": 1,
+      "max": 40,
+      "initial": 5,
+      "unit": "regions"
+    },
+    {
+      "kind": "slider",
+      "id": "statuses",
+      "label": "status label values",
+      "min": 1,
+      "max": 40,
+      "initial": 8,
+      "unit": "codes"
+    },
+    {
+      "kind": "slider",
+      "id": "user_ids",
+      "label": "user_id label values (1 means the label is not there)",
+      "min": 1,
+      "max": 10000000,
+      "scale": "log",
+      "initial": 1,
+      "unit": "users"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "series",
+      "label": "Time series from this one metric",
+      "expr": "services * regions * statuses * user_ids",
+      "format": "compact",
+      "unit": "series",
+      "sparkline": {
+        "over": "user_ids"
+      }
+    },
+    {
+      "id": "samples_per_day",
+      "label": "Samples per day at a 15 second scrape",
+      "expr": "series * 5760",
+      "format": "compact",
+      "unit": "samples/day"
+    },
+    {
+      "id": "bytes_per_day",
+      "label": "Compressed storage per day at 1.3 bytes per sample",
+      "expr": "samples_per_day * 1.3",
+      "format": "bytes",
+      "unit": "per day"
+    }
+  ],
+  "caption": "This is why user_id, request_id, trace_id and email are rejected as labels. The metric name did not change and the sample rate did not change; the label value count did, and it multiplies."
+}
+\`\`\`
+
 ## Ingestion and storage
 
 Agents on each host batch and push samples (or the platform scrapes \`/metrics\` endpoints on an interval, the Prometheus pull model). A high-throughput front door (a stateless ingestion tier writing to Kafka) buffers the firehose and decouples spiky producers from storage. Batching and compression are essential: time-series data compresses beautifully because timestamps are regular and adjacent values are similar (delta-of-delta timestamp encoding plus XOR float compression, the Gorilla/Facebook technique, gets ~1.3 bytes per sample versus 16 raw).
