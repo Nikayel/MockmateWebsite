@@ -2511,6 +2511,39 @@ majority of *all* six can never be assembled inside one surviving datacenter.
 }
 \`\`\`
 
+### What the second datacenter costs, and what the consistency level does not change
+
+Replication factor is a money decision. Consistency level is a latency decision. Conflating the two
+is the most expensive habit in this lesson, so put numbers on both using the telemetry cluster you
+will design shortly: 500,000 writes a second at roughly 200 bytes a write. Cloud prices are
+approximate and they drift, so treat the figures as orders of magnitude; the ratios are what survive.
+
+\`\`\`
+ 500,000 writes/sec x ~200 B  ->  ~100 MB/sec  ->  ~8 TB/day of new data
+
+ keyspace {dc1: 3}          ->  24 TB/day on disk
+ keyspace {dc1: 3, dc2: 3}  ->  48 TB/day on disk
+
+ replicated SSD storage runs on the order of $100 per TB-month, so the
+ second datacenter adds ~$2,400/month for every single day you retain
+
+ cross-region wire: the coordinator ships each mutation ONCE per remote
+ datacenter and a replica there fans it out locally, so ~8 TB/day crosses
+ at roughly $0.02/GB  ->  ~$160/day  ->  ~$4,800/month, steady state
+\`\`\`
+
+Now the part that surprises people: **switching every query from LOCAL_QUORUM to EACH_QUORUM moves
+neither of those numbers by a cent.** The write is sent to all six replicas either way. The level
+only decides how many acknowledgements the coordinator waits for, so what it buys is a cross-region
+round trip of latency, on the order of 80 ms, and nothing else. Storage and egress are bought at the
+keyspace, in the replication factor. Latency is bought at the call site, in the consistency level.
+
+Two consequences worth saying out loud in an interview. First, if dc2 exists only for disaster
+recovery and never serves a read, ask whether it earns replication factor 3, or whether a lower
+factor, or scheduled snapshot shipping instead of live replication, meets the same recovery objective
+for less. Second, at 8 TB a day of new data, retention dominates every figure above: 90 days at six
+copies is roughly 4 petabytes, so a TTL and a tiering plan are not housekeeping, they are the design.
+
 **Interview nuance, map numbers to intent:** W=N maximizes durability but breaks writes if any
 replica is down. R=1, W=N gives fast reads and slow fragile writes. R=N, W=1 the reverse. W=1, R=1 is
 fastest and weakest (no overlap). Also mention **flexible quorums** (write and read sets defined to
