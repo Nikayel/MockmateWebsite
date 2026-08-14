@@ -4686,7 +4686,7 @@ parallel, retry only failed parts, and finalize with a "complete" call that stit
 server-side. This gives resumability and parallel throughput. Where history matters enable
 **versioning** or write objects **immutably** with a content hash in the key.
 
-### The two cost and latency levers
+### The two cost and latency levers, and which one to pull first
 
 **Lifecycle and tiering**: hot data stays in the standard tier, and a policy automatically moves
 objects to infrequent-access, then cold, then archive (S3 Glacier) as they age, cutting storage cost
@@ -4694,6 +4694,40 @@ by 5 to 20x for data nobody reads. **A CDN in front for reads**: CloudFront or C
 objects at edge PoPs near users, so a popular video is served from an edge 20 ms away instead of a
 single region 150 ms away, and your origin bucket sees a fraction of the traffic. You almost never
 serve public media directly from the bucket at scale.
+
+Both are real, and they are not the same size. Price them, because the ratio is what tells you which
+one to spend a sprint on. The figures below are approximate US-region list prices, good to an order
+of magnitude and no further. They drift year to year; the ratios between them are the durable part.
+
+\`\`\`
+standard object storage        ~23 dollars per TB-month
+infrequent access              ~12 dollars per TB-month
+deep archive                    ~1 dollar  per TB-month
+origin egress to the internet  ~90 dollars per TB transferred
+
+500 TB of uploads, of which the last 30 days (about 40 TB) take essentially every read
+  flat standard     500 x 23                =  ~11,500 dollars a month
+  tiered by age     40 x 23  +  460 x 1     =   ~1,400 dollars a month   (about 8x cheaper)
+
+one 100 MB video, one million views in a month
+  delivery   1,000,000 x 100 MB = 100 TB, x 90    =  ~9,000 dollars
+  storage    the 4 GB source at 23 per TB-month   =     ~0.09 dollars
+\`\`\`
+
+Two decisions fall out of those numbers. **First, the tier boundary is set by read rate, not by
+age.** Deep archive is roughly 20x cheaper per TB-month, but a restore takes minutes to hours and
+bills a separate per-GB retrieval fee, so anything a user can click on and expect immediately stays
+hot no matter how old it is. Tier the raw uploaded source down; keep the thumbnails and the
+segments a player actually fetches in the standard tier.
+
+**Second, on a read-heavy media product the delivery line dwarfs the storage line, so the CDN is the
+cost lever and lifecycle is the second one.** That one video costs about 9,000 dollars to serve and
+9 cents to keep: a ratio of roughly 100,000 to 1. Taking the edge hit rate from zero to 95 percent
+leaves the origin serving 5 TB instead of 100 TB, about 450 dollars, and moves the rest onto
+contracted CDN bandwidth, which at committed volume is negotiated well below origin egress list.
+Tuning lifecycle rules before you have that hit rate is optimizing the smaller line. Run the same two
+sums on your own workload before you pick: a write-heavy archive with almost no reads inverts this,
+and then tiering is the whole game.
 
 **Interview nuance:** If asked "why not just base64 the image into a JSON column," the crisp answer
 is durability, cost, cache pollution, and egress path: object storage is cheaper per GB, more
@@ -6119,7 +6153,7 @@ export const systemDesignLevel2: DesignLevel = {
               "**Upload, direct-to-storage in three steps:** (1) client calls `POST /uploads` with content type and size; the app authorizes, creates a `media` row in state `pending` with a generated object_key like `media/{userId}/{uuid}`, and returns a presigned URL (single presigned PUT for images; multipart upload with presigned per-part URLs, 8-16 MB parts uploaded in parallel with per-part retry, for videos). (2) The client uploads bytes directly to S3, never through the app. (3) On completion, an S3 event notification (S3 -> SQS/Lambda) or a client `complete` call flips the row to `ready` and enqueues async processing (virus scan, thumbnails, transcode to HLS renditions).",
               "**Metadata model:** `media(id, owner_id, object_key, content_type, bytes, width, height, duration, status, created_at)`. The DB stays tiny; every listing/feed query hits only these small rows.",
               "**Serving:** a CDN (CloudFront) in front of the bucket: client -> edge cache -> origin, so popular objects serve from a PoP ~20 ms away and origin sees a fraction of traffic. Private media gets short-lived signed CDN URLs; public media caches with long TTLs and a content-hash in the key so a new upload is a new URL (immutable, cache-friendly).",
-              "**Cost and durability:** S3 gives eleven-nines durability with no disk management. A lifecycle policy moves originals to infrequent-access after 30 days and Glacier after a year while keeping thumbnails hot, cutting storage cost several-fold.",
+              "**Cost and durability:** S3 gives eleven-nines durability with no disk management. A lifecycle policy moves originals to infrequent-access after 30 days and Glacier after a year while keeping thumbnails hot, cutting storage cost several-fold. Rank the two lines rather than assuming tiering is the win: at roughly 90 dollars per TB of origin egress against roughly 23 dollars per TB-month of standard storage, a read-heavy product saves far more from the CDN's edge hit rate than from any lifecycle rule, and tiering is the second lever.",
               "Common wrong turn: storing image or video bytes in a BLOB column or routing every upload/download through the app tier: pollutes the DB cache, balloons backups, and makes the app fleet the transfer bottleneck. Bytes belong in object storage; the DB holds a pointer.",
             ],
           },
