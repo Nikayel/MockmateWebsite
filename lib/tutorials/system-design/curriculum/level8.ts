@@ -794,9 +794,9 @@ The part that separates a strong answer is where real multi-tenant breaches happ
       "feedback": "Tempting because the data really was tenant-scoped when it was written, but ids collide across tenants and cache reads never touch the database, so RLS gets no vote on the way out."
     },
     {
-      "label": "The cache key has no tenant prefix, so tenant A can be served tenant B's cached object",
+      "label": "The cache key carries no tenant prefix",
       "correct": true,
-      "feedback": "Right. A shared cache is a second data path with none of your database's guarantees. Every key needs the tenant id, and the same logic applies to search indexes, job payloads, and logs."
+      "feedback": "Right, so tenant A can be served tenant B's cached object. A shared cache is a second data path with none of your database's guarantees, and ids collide across tenants. Every key needs the tenant id in it, and the same logic applies to search indexes, job payloads, and log fields."
     },
     {
       "label": "Only if the cache is replicated across regions",
@@ -827,9 +827,9 @@ Finally, shared infra creates the **noisy neighbor** problem: one tenant's traff
       "feedback": "Tempting because it is the easiest thing to wire, but the client controls the body, so any caller can claim any tenant, and hand-written WHERE discipline is one forgotten clause away from a cross-tenant breach."
     },
     {
-      "label": "A trusted source (the JWT claim or the subdomain), resolved before any business logic runs, with the database enforcing isolation via RLS",
+      "label": "The JWT claim or the subdomain, enforced by RLS",
       "correct": true,
-      "feedback": "Right. Trusted context is established once per request and propagated into the DB session variable, cache keys, job payloads, and log fields, with the data layer as the backstop when application code forgets."
+      "feedback": "Right. Both are trusted sources the client cannot forge, and context is resolved from them before any business logic runs. It is then propagated into the DB session variable, cache keys, job payloads, and log fields, with row-level security in the data layer as the backstop when application code forgets a filter."
     },
     {
       "label": "The connection string: every tenant has their own database, so context is implicit",
@@ -1074,9 +1074,9 @@ A **KMS** is a managed key service with an API for encrypt/decrypt/sign where ke
       "feedback": "Tempting, but only true if every client re-fetches on failure and does so instantly. In practice connection pools and cached configs keep presenting the dead credential, and errors pile up until every consumer restarts."
     },
     {
-      "label": "An outage window: every consumer still holding the old password fails until it picks up the new one.",
+      "label": "An outage window until every consumer catches up",
       "correct": true,
-      "feedback": "Right. The old credential dies before all clients switch, so rotation becomes a synchronized-restart event. The fix, coming next, is versioned secrets with an overlap window where old and new both work."
+      "feedback": "Right. Every consumer still holding the old password fails, because the old credential dies before all clients switch, so rotation becomes a synchronized-restart event. The fix, coming next, is versioned secrets with an overlap window where old and new both work."
     },
     {
       "label": "The secret store blocks the rotation because consumers are still attached.",
@@ -1156,9 +1156,9 @@ The workload then fetches **dynamic, short-lived secrets**: instead of a shared 
       "feedback": "Tempting, because that is the right playbook for a shared static password. But it throws away exactly what dynamic secrets bought you: per-workload uniqueness and self-expiry."
     },
     {
-      "label": "Bounded and traceable: the credential dies within its 1-hour TTL, it is unique to that one pod, and the per-access audit log pins down exactly what it touched.",
+      "label": "Bounded and traceable: one pod, one hour, one audit trail",
       "correct": true,
-      "feedback": "Right. Short TTL limits the window, per-workload uniqueness limits the scope, and audit logging answers the blast-radius question in minutes. Revoke early and move on."
+      "feedback": "Right. The credential dies within its 1-hour TTL, it is unique to that one pod, and the per-access audit log pins down exactly what it touched. Short TTL limits the window, per-workload uniqueness limits the scope, and audit logging answers the blast-radius question in minutes. Revoke early and move on."
     },
     {
       "label": "Zero impact: dynamic secrets cannot be abused from outside the cluster.",
