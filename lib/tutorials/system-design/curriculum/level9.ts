@@ -3304,18 +3304,85 @@ export const systemDesignLevel9: DesignLevel = {
           practice: {
             id: "sd-l9-decomposition-ddd-practice",
             prompt:
-              "Design the decomposition and 18-month extraction plan for a large monolith like early Uber's, where the rider, driver, trip, pricing, and payments logic all live in one Python service and one Postgres, and the org is about to grow from 3 to 15 teams. Lead with the deliverable.",
+              "Review the proposed service map below and rank the boundaries that will not hold, worst first. For each one, name what stays coupled to what, and give the boundary you would draw in its place.",
             thinkAbout: [
-              "Which context has the sharpest extraction trigger, and why extract it first?",
-              "How does the Inverse Conway Maneuver sequence team and service creation?",
-              "What consistency tradeoff do you accept for real-time matching?",
+              "Which of these services owns its data, and which ones reach into someone else's?",
+              "How many hops does one fare quote take, and what does a slow Tax service do to it?",
+              "What does a single shared model package do to nine independent release schedules?",
             ],
+            supplied: {
+              label: "Proposed service map (internal RFC)",
+              body: `
+Internal RFC: splitting the ride-hailing monolith. One Python service, one Postgres, three engineering teams today, hiring to eight over the next year.
+
+**Cutover.** All nine services below ship on one release weekend. Routing changes once, the on-call rota changes once, and we never run two code paths side by side.
+
+**Services**
+
+- **Driver-Location.** Owns a Redis geospatial index, written from driver pings every 4s. It leaves Postgres because its write rate is roughly 200x anything else in the system.
+- **Dispatch.** Stateless matcher, reads Driver-Location over gRPC.
+- **Trip-Data.** Owns every read and write against the existing \`trips\`, \`riders\` and \`drivers\` tables. Other services call it for that data, so we keep one schema and avoid a migration while the boundaries are still settling.
+- **Base-Fare**, **Surge**, **Promo**, **Tax.** One service each, so a pricing change deploys without touching trip code. A quote calls all four in sequence and then Trip-Data to persist the result; each hop measured 6 to 10 ms in staging.
+- **Payments.** Owns its own Postgres. Ships on the fortnightly compliance cadence rather than the daily one.
+- **Rider-API.** The HTTP entry point for the rider app: request validation, auth and response shaping for every rider feature, calling the services above.
+
+**Shared models.** All nine services import \`platform-models\`, a package published from the monolith's existing SQLAlchemy classes, so a Trip means the same thing everywhere and no team re-declares a schema.
+
+**Reporting.** Dispatch, Surge and Promo also hold read-only credentials on the main Postgres, so their dashboards can join trips against pricing without a new pipeline.
+
+**Teams.** The three existing teams take three services each at cutover, and ownership is redrawn as hiring lands.
+`.trim(),
+            },
             modelAnswerOutline: [
-              "Deliverable: a capability-aligned service map plus a Strangler Fig plan sequenced by org growth and coupling, not a big-bang rewrite.",
-              "**Contexts:** Rider (profiles, requests), Driver (profiles, availability, location), Dispatch/Matching (the real-time matching engine), Trip (trip lifecycle and state), Pricing/Surge (fare and surge computation), Payments (charges, driver payouts), Maps/ETA. Each owns its data. Driver location is high-write and high-read and belongs behind its own service and a specialized store (an in-memory geospatial index, not the shared Postgres), which is itself a strong extraction trigger.",
-              "**Sequence over 18 months, driven by the trigger with the sharpest edge:** (1) extract Dispatch/Matching and Driver-location first, because they have a wildly different scaling and latency profile (real-time, geospatial, huge write volume) that is strangling the shared Postgres; give them their own datastore (Redis or a purpose-built geo index) and a dedicated team. (2) Extract Payments next for fault isolation and compliance cadence. (3) Extract Pricing/Surge, which has its own compute-heavy, independently deployable model and experiment cadence. (4) Leave Rider, Driver profile, and Trip in a shrinking modular core longer, since they are transactional and change together.",
-              "**Mechanics:** a gateway routes by capability; each extraction gets an anti-corruption layer translating the legacy model; events (on Kafka) propagate state like trip-completed to Payments and Pricing so they do not read the trip table directly. Team topology follows the Inverse Conway Maneuver: form the Dispatch team before you extract Dispatch, so ownership and boundary land together.",
-              "Tradeoff: matching now depends on network calls to Driver-location, so you accept eventual consistency on driver position and design the matcher to tolerate slightly stale locations rather than demanding a synchronous strongly-consistent read. That is the correct trade for a system that must stay real-time under load.",
+              "Deliverable: three of the nine boundaries are sound and the rest rebuild the monolith's coupling with a network in the middle. Ranked worst first: Trip-Data, the shared `platform-models` package, the four pricing services, Rider-API, and the one-weekend cutover.",
+              "**Trip-Data is a technical layer, not a bounded context.** Every other service asks it for trips, riders and drivers, so no capability owns that data and the legacy schema stays the shared contract it always was. Trips belong to the context that owns the trip lifecycle, rider records to Rider, driver records to Driver. The reporting credentials say the same thing out loud: Dispatch, Surge and Promo read those Postgres tables directly, so renaming a column in `trips` now needs a coordinated deploy across four services. Reporting reads belong on a copy fed by events, not on the live schema.",
+              "**`platform-models` recouples all nine services at compile time.** A package generated from the monolith's SQLAlchemy classes lets the legacy model dictate every service's shape, and on any breaking change it dictates every service's release date too. Each service declares only the fields it needs, and each seam carries an anti-corruption layer that translates the legacy model into the new one. That translation is most of the value of extracting at all.",
+              "**Base-Fare, Surge, Promo and Tax are nano-services.** They change together (they are all pricing rules), one team owns all four, and a single quote pays five sequential hops at 6 to 10 ms with five independent chances of failure. One Pricing service holding the four as internal modules still delivers the stated benefit, that pricing deploys without touching trip code, at one hop.",
+              "**Rider-API is a split by layer.** Putting validation and response shaping for every rider feature in one service means every feature change touches Rider-API plus its domain service, which is the coordinated deploy the split was supposed to remove. A thin gateway for TLS, auth and routing is worth keeping; per-feature validation belongs in the context that owns the rule.",
+              "**Sequencing and org.** Nine services in one weekend has no incremental rollback: when matching regresses at 02:00 you are reverting a routing change, a schema change and nine deploys together. Strangler Fig instead, a router in front and one capability at a time: Driver-Location and Dispatch first because their scaling trigger is the sharpest, Payments second for cadence and fault isolation, Pricing third, with Rider, Trip and the rest left in a shrinking core. Three teams also cannot own nine services, so team topology leads the extraction (Inverse Conway): form the Dispatch team before Dispatch exists and let hiring pace the seams.",
+              "**What the map already gets right, and worth saying out loud in an interview:** Driver-Location moving off Postgres into a Redis geospatial index is a textbook trigger, a write rate 200x the rest of the system and an access pattern nothing else shares, with its own store. Dispatch sitting beside it as a stateless matcher is the same trigger, one capability with a real-time latency profile. Payments owning its own Postgres on a fortnightly compliance cadence is the cadence and fault-isolation trigger. All three boundaries stay as proposed.",
+            ],
+            rubric: [
+              {
+                name: "Data ownership",
+                weak: "Takes Trip-Data at face value as a service, and never asks what the read-only Postgres credentials held by Dispatch, Surge and Promo cost.",
+                adequate:
+                  "Names the shared Postgres as coupling but does not say which data moves to which context.",
+                strong:
+                  "Calls Trip-Data a layer rather than a capability, places trips, riders and drivers with their owning contexts, and notes a column rename now spans four deploys.",
+              },
+              {
+                name: "Boundary sizing",
+                weak: "Leaves Base-Fare, Surge, Promo and Tax as four services without counting what one fare quote pays for them.",
+                adequate:
+                  "Calls the pricing split too fine without saying what merges into what, or what the merge preserves.",
+                strong:
+                  "Merges the four into one Pricing context on shared change cadence and single-team ownership, and prices the five sequential hops the current split adds per quote.",
+              },
+              {
+                name: "Coupling through shared code",
+                weak: "Never mentions `platform-models` or what importing one legacy model package into nine services does.",
+                adequate:
+                  "Flags the shared model package as a smell without tying it to release schedules or to the legacy model leaking through.",
+                strong:
+                  "Ties `platform-models` to compile-time recoupling and a shared release date, and puts an anti-corruption layer at each seam in place of it.",
+              },
+              {
+                name: "Extraction sequence and ownership",
+                weak: "Accepts the one-weekend cutover of nine services and says nothing about three teams owning them.",
+                adequate:
+                  "Prefers an incremental extraction but does not order the seams or connect the order to hiring.",
+                strong:
+                  "Orders the seams by trigger sharpness, starting with Driver-Location and Dispatch, and forms each owning team before the service it will own.",
+              },
+              {
+                name: "Credit for the sound calls",
+                weak: "Reads as a list of everything wrong, sweeping Driver-Location and Payments in with the rest.",
+                adequate:
+                  "Leaves the two sound extractions alone without saying which trigger justifies either one.",
+                strong:
+                  "Keeps Driver-Location's Redis index and Payments' own Postgres and compliance cadence, naming the scaling trigger behind one and the cadence trigger behind the other.",
+              },
             ],
           },
         },
@@ -3409,18 +3476,84 @@ export const systemDesignLevel9: DesignLevel = {
           practice: {
             id: "sd-l9-containers-k8s-practice",
             prompt:
-              "Design the Kubernetes rollout strategy for Shopify's storefront API during Black Friday, where a bad deploy can lose revenue at 40,000+ RPS and you cannot tolerate a single failed request window. Specify how you keep the rollout zero-downtime and instantly reversible under peak load.",
+              "Review the deployment spec below and rank what it costs in dropped requests and lost carts, worst first. For each item name the object or field you would change, and what the change costs in capacity or latency.",
             thinkAbout: [
-              "Why is a plain rolling update too coarse at this scale?",
-              "How does progressive delivery with automated analysis bound the blast radius?",
-              "What pre-scaling and freeze controls protect the peak window?",
+              "What decides which Pods are in the Service endpoints during a rollout?",
+              "What do all 400 Pods do at the same moment when the payment gateway stalls for 30s?",
+              "Where does a cart live when its Pod is replaced?",
             ],
+            supplied: {
+              label: "Proposed deployment spec",
+              body: `
+Checkout API on Kubernetes, submitted a week before the peak sale. Peak traffic is about 40,000 rps across three zones.
+
+**Image.** Multi-stage build on a distroless base, 60 MB. Config comes from a ConfigMap and secrets from a Secret backed by the external secrets manager, so the same image promotes from staging to production unchanged.
+
+**checkout-api.** A Deployment of 400 replicas with zone anti-affinity, behind a Service and a Gateway listener.
+
+**Session state.** The cart and session live on an \`emptyDir\` volume on each Pod, and the Gateway pins a user to their Pod with a sticky cookie. A cart read is then 1 ms of local disk instead of a Redis round trip.
+
+**Probes.** One \`livenessProbe\` on \`/health\`, which returns 200 only after checking the Postgres pool, the Redis client and the payment gateway. Initial delay 45s, period 10s, failure threshold 3. One endpoint is one thing to keep correct, and a Pod that cannot reach its dependencies is a Pod we want restarted.
+
+**Resources.** No requests or limits on checkout-api, so the scheduler packs Pods wherever there is room and a busy Pod can take idle CPU on its node during the sale.
+
+**Rollout.** \`RollingUpdate\` with \`maxUnavailable: 25%\` and \`maxSurge: 0\`, so a deploy never asks the cluster autoscaler for nodes we have not already paid for.
+
+**postgres-checkout.** A Deployment of 1 replica mounting a 500 GB PersistentVolumeClaim, plus its own Service. Same manifest shape as everything else, so one Helm chart covers the stack.
+
+**Disruption.** No PodDisruptionBudget. Node pool upgrades are scheduled outside the sale window.
+`.trim(),
+            },
             modelAnswerOutline: [
-              "Assumptions: 40k+ RPS across many zones, revenue-critical, deploys frozen at the very peak but still needed for hotfixes. The goal is not just zero-downtime but instant, blameless reversibility.",
-              "**Baseline:** a Deployment with hundreds of replicas, requests/limits tuned so autoscaling headroom exists, zone anti-affinity, and a PodDisruptionBudget that keeps `minAvailable` high enough that node maintenance never dents peak capacity. Readiness probes check real downstream health (DB pool, cache, payment gateway) so a Pod that cannot serve real traffic is pulled from endpoints.",
-              "**Rollout:** a plain rolling update is too coarse at this scale because a bad build reaches many users before you notice. Use **progressive delivery** with Argo Rollouts: a canary that shifts 1 percent, then 5, 25, 50, 100, with a bake time at each step and automated analysis on p99 latency, 5xx rate, and checkout success. If any metric breaches its SLO gate, the rollout **auto-aborts and rolls back** to the previous ReplicaSet in seconds, because the old version is still running. `maxUnavailable: 0` guarantees capacity never dips during the shift.",
-              "**Blast-radius controls:** pre-scale before the traffic wave (scheduled scaling) so the deploy is not competing with an autoscale event, keep `maxSurge` small in absolute Pod count so a bad image does not consume the whole cluster, and gate risky changes behind a feature flag so you can dark-launch and flip off without a redeploy. During the absolute peak, enforce a deploy freeze except for flag flips and validated hotfixes.",
-              "Common wrong turn: a single big-bang rolling update with only a liveness probe, which exposes every user to a regression before you can react, and no automated metric gate, so rollback depends on a human noticing a revenue dip.",
+              "Deliverable: five changes before the sale, ordered by the requests each one costs. Probes first, then the rollout fields, then cart state, then postgres-checkout, then requests and limits.",
+              "**Nothing gates traffic.** With only a `livenessProbe` there is no readiness gate, so a new Pod joins the Service endpoints the moment its container starts and takes checkout traffic while it is still warming. The 45s initial delay postpones the restart decision and holds back no traffic at all. Split the endpoint: a cheap `/livez` that fails only on a wedged process, and a `/readyz` that checks the Postgres pool and Redis. The deeper hazard is the dependency check sitting on liveness: when the payment gateway stalls for 30s, all 400 Pods fail three checks and restart together, turning a partial dependency outage into a cold cluster at 40,000 rps. Readiness pulls a Pod out of endpoints without killing it, which is the behaviour wanted here.",
+              "**Rollout arithmetic.** `maxUnavailable: 25%` with `maxSurge: 0` withdraws 100 of the 400 Pods before a single replacement is ready, so a routine deploy sheds a quarter of capacity by design, at peak. `maxUnavailable: 0` with a small `maxSurge` keeps capacity flat: Kubernetes brings up a ready Pod before it removes an old one. The cost is a few Pods of extra headroom for the length of the rollout, which is far cheaper than the requests the current setting drops.",
+              "**Cart on the Pod.** `emptyDir` plus the sticky cookie means a restart, a reschedule or any rollout loses that user's cart, and sticky routing skews load across the 400 replicas so scaling signals stop reflecting real demand. Cart state moves to Redis, where the read is an in-cluster round trip in the same ballpark as the 1 ms local one, and the replicas go back to interchangeable, which is the thing a Deployment assumes about its Pods.",
+              "**postgres-checkout is in the wrong object.** A Deployment's Pods are interchangeable and carry no stable identity or guaranteed re-attachment of the same PersistentVolumeClaim across a reschedule, which is how a 500 GB volume gets stranded in the wrong zone or written by two Pods during a rollout. A StatefulSet is the minimum correct object. A managed Postgres is the better answer a week before peak, since nobody wants to practise failover and point-in-time restore during the sale.",
+              "**Resources and disruption.** With neither requests nor limits, checkout-api is BestEffort and is evicted first under node pressure, which arrives exactly at peak, and the scheduler packs blind because it reserves the request and reads nothing else. Set requests near observed p95 with limits above them, and requests equal to limits for the tier that must not be evicted. The absent PodDisruptionBudget bounds nothing either: a node pool upgrade is one voluntary drain among several, and cluster autoscaler consolidation moves Pods without asking a human.",
+              "**Sound as written:** the 60 MB multi-stage distroless image, config and secrets kept out of it in a ConfigMap and a Secret so one artifact promotes across environments, and zone anti-affinity spreading 400 replicas over three zones. None of those need changing, and saying so is part of the review.",
+            ],
+            rubric: [
+              {
+                name: "Probe roles",
+                weak: "Takes the single livenessProbe as sufficient and never asks what puts a Pod into the Service endpoints.",
+                adequate:
+                  "Adds a readinessProbe but says nothing about what the dependency check on liveness does to all 400 Pods at once.",
+                strong:
+                  "Separates a cheap liveness check from a readiness check on the Postgres pool and Redis, and traces the simultaneous restart a payment gateway stall triggers.",
+              },
+              {
+                name: "Rollout arithmetic",
+                weak: "Leaves `maxUnavailable: 25%` and `maxSurge: 0` unexamined, or reads them as a cost control that works.",
+                adequate:
+                  "Calls the rollout fields risky without turning 25 percent into Pods or into dropped requests.",
+                strong:
+                  "Turns 25 percent of 400 replicas into 100 Pods withdrawn before any replacement is ready, and prices the surge headroom that replaces the setting.",
+              },
+              {
+                name: "State on the Pod",
+                weak: "Reads the emptyDir cart and the sticky cookie as a latency win and moves on.",
+                adequate:
+                  "Names sticky sessions as a rollout problem without following a Pod replacement through to the lost cart or the skewed load.",
+                strong:
+                  "Follows a Pod replacement to the dropped cart, moves the cart to Redis, and takes the round trip as the price of replicas a Deployment can treat as interchangeable.",
+              },
+              {
+                name: "Workload object for state",
+                weak: "Accepts postgres-checkout in a Deployment because it matches the shape of everything else in the chart.",
+                adequate:
+                  "Swaps Postgres to a StatefulSet without saying what stable identity and stable storage are protecting.",
+                strong:
+                  "Names what a Deployment does not promise the 500 GB volume across a reschedule, moves to a StatefulSet, and argues managed Postgres a week before peak.",
+              },
+              {
+                name: "Credit for the sound choices",
+                weak: "Treats every line of the spec as defective, image build and anti-affinity included.",
+                adequate:
+                  "Leaves the distroless image and the external config unchallenged without saying why they hold up.",
+                strong:
+                  "Keeps the 60 MB distroless image, the ConfigMap and Secret, and the zone anti-affinity, and gives the reason each one is already right.",
+              },
             ],
           },
         },
