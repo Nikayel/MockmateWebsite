@@ -1569,9 +1569,91 @@ The fix maps 2D coordinates to a 1D sortable key so "nearby" becomes a range or 
 
 For writes, the trick is to **not** treat driver locations as durable database rows. Locations are ephemeral: you only ever care about the latest one. Keep the live index in memory (Redis geospatial commands, or a sharded in-memory service) and treat the write as an overwrite, not an append. Shard the index **by geography** (city or region), because a rider in Chicago never needs a driver in Miami. Regional sharding keeps each shard's write volume and index size bounded and lets you scale cities independently.
 
-\`\`\`
-driver app --loc every 4s--> location ingest --> in-memory geo index (Redis/H3), sharded by city
-rider request --> matching engine --> query index (cell + neighbor ring) --> rank candidates --> offer --> trip FSM
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Moving objects: overwrite the index, then match against it",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "driver",
+      "label": "Driver app: a location every 4 to 5 seconds",
+      "kind": "client"
+    },
+    {
+      "id": "ingest",
+      "label": "Location ingest (writes are overwrites, not history)",
+      "kind": "service"
+    },
+    {
+      "id": "index",
+      "label": "In-memory geo index (Redis with H3 or S2 cells), sharded by city",
+      "kind": "cache"
+    },
+    {
+      "id": "rider",
+      "label": "Rider request",
+      "kind": "client"
+    },
+    {
+      "id": "matcher",
+      "label": "Matching engine: query the cell plus its neighbor ring, rank candidates by ETA",
+      "kind": "service"
+    },
+    {
+      "id": "offer",
+      "label": "Offer under an exclusive lock on the driver, expiring in seconds",
+      "kind": "service"
+    },
+    {
+      "id": "trip",
+      "label": "Trip state machine (the one strongly consistent part)",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "driver",
+      "to": "ingest",
+      "kind": "sync"
+    },
+    {
+      "from": "ingest",
+      "to": "index",
+      "kind": "sync",
+      "label": "overwrite the driver's current cell"
+    },
+    {
+      "from": "rider",
+      "to": "matcher",
+      "kind": "sync"
+    },
+    {
+      "from": "index",
+      "to": "matcher",
+      "kind": "sync",
+      "label": "candidates from the cell and its ring"
+    },
+    {
+      "from": "matcher",
+      "to": "offer",
+      "kind": "sync"
+    },
+    {
+      "from": "offer",
+      "to": "trip",
+      "kind": "sync",
+      "label": "accepted"
+    },
+    {
+      "from": "offer",
+      "to": "index",
+      "kind": "feedback",
+      "label": "declined or expired: the driver returns to the pool"
+    }
+  ],
+  "caption": "A hot city concentrates load on one shard, and the graceful answer is to lower update frequency and widen the matching radius rather than drop location updates."
+}
 \`\`\`
 
 ## Dispatch, matching, and the trip FSM
@@ -2537,9 +2619,38 @@ Edits are operations like \`insert(pos=5, "x")\` and \`delete(pos=8)\`. When two
 
 Instead of transforming operations, CRDTs give every character a globally unique, totally-ordered identifier (often a fractional index or a dense position between two neighbors) so that concurrent inserts have a deterministic, commutative merge order with no transformation needed. Sequence CRDTs (RGA, Logoot, YATA as used by Yjs, Automerge) let replicas merge in any order and converge. The advantage is they work **peer-to-peer and offline** without a central sequencer; the cost is metadata overhead (every character carries an id, and deleted characters may linger as tombstones).
 
-\`\`\`
-OT:   op flows to server -> server orders + transforms against concurrent ops -> broadcasts transformed op
-CRDT: each char has a unique id -> ops commute -> any replica merges in any order -> same result
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "The question",
+    "OT (operational transformation)",
+    "CRDT"
+  ],
+  "rows": [
+    [
+      "How does one edit reach the others?",
+      "The op goes to a server, which orders it, transforms it against the concurrent ops, and broadcasts the transformed op",
+      "Every character carries a unique id, so ops commute and any replica can merge them in any order"
+    ],
+    [
+      "What has to be true for the replicas to converge?",
+      "One ordering authority, so every editor of a document is routed to the same server",
+      "Nothing central: the same set of ops produces the same document wherever it is merged"
+    ],
+    [
+      "What does it cost in memory?",
+      "Lean, because a position is just an index",
+      "Higher, because of per-character ids and tombstones for deleted characters"
+    ],
+    [
+      "A laptop edits offline for an hour, then reconnects",
+      "Transform the whole queued batch against the history it missed",
+      "Merge the queued ops, which commute by construction"
+    ]
+  ],
+  "caption": "Both converge. They differ in where the ordering authority sits, which is why the OT design routes all editors of a document to one server and last-write-wins is not an option for either."
+}
 \`\`\`
 
 The tradeoff: **OT** is server-centric, memory-lean, battle-tested, but the transform logic is fragile and hard to extend to rich data. **CRDTs** are decentralization-friendly and offline-first, conceptually cleaner to reason about for convergence, but carry more per-character metadata and need periodic tombstone garbage collection. For a server-backed product like Docs, OT (or a server-ordered CRDT) is pragmatic; for offline-first or P2P (local-first apps, Figma-like tools), CRDTs shine.
@@ -4969,10 +5080,101 @@ Real commerce does not charge instantly, so you need reservation holds. When a b
 
 You cannot let 5 million people hit checkout simultaneously; you would melt the inventory store no matter how atomic it is. Put a virtual waiting room in front: arriving users get a queue token, are shown a "you are number 480,000 in line" page, and are admitted in controlled batches at a rate the backend can absorb (say 5,000 checkouts/sec). This sheds and paces load and provides fairness (FIFO or a randomized lottery to defeat bots). Only admitted users can even attempt a reservation, so the inventory store sees bounded QPS regardless of how many people showed up.
 
-\`\`\`
-5M arrivals -> Waiting Room (token, FIFO/lottery) -> admit 5K/sec
-   -> Reservation (atomic decrement + hold TTL) -> Checkout saga -> Payment -> convert hold to sale
-                                    \\-- TTL expiry --> atomic increment (release) --/
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Pace the crowd, then let one atomic counter do the rest",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "arrivals",
+      "label": "5M arrivals",
+      "kind": "client"
+    },
+    {
+      "id": "room",
+      "label": "Waiting room: a queue token, FIFO or a lottery to defeat bots, admitting about 5,000 per second",
+      "kind": "queue"
+    },
+    {
+      "id": "reservation",
+      "label": "Reservation: one atomic conditional decrement, never read-then-write",
+      "kind": "service"
+    },
+    {
+      "id": "inventory",
+      "label": "Inventory counter (a sold-out item is bounded by this single counter)",
+      "kind": "db"
+    },
+    {
+      "id": "sweeper",
+      "label": "Hold with a TTL, released by a sweeper or a lazy check on the next read",
+      "kind": "service"
+    },
+    {
+      "id": "checkout",
+      "label": "Checkout saga",
+      "kind": "service"
+    },
+    {
+      "id": "payment",
+      "label": "Payment",
+      "kind": "external"
+    },
+    {
+      "id": "sale",
+      "label": "Hold converted to a sale",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "arrivals",
+      "to": "room",
+      "kind": "sync"
+    },
+    {
+      "from": "room",
+      "to": "reservation",
+      "kind": "sync",
+      "label": "only admitted users may attempt one"
+    },
+    {
+      "from": "reservation",
+      "to": "inventory",
+      "kind": "sync",
+      "label": "decrement"
+    },
+    {
+      "from": "reservation",
+      "to": "sweeper",
+      "kind": "async",
+      "label": "the cart window, say 10 minutes"
+    },
+    {
+      "from": "reservation",
+      "to": "checkout",
+      "kind": "sync"
+    },
+    {
+      "from": "checkout",
+      "to": "payment",
+      "kind": "sync"
+    },
+    {
+      "from": "payment",
+      "to": "sale",
+      "kind": "sync"
+    },
+    {
+      "from": "sweeper",
+      "to": "inventory",
+      "kind": "feedback",
+      "label": "TTL expiry: atomic increment releases the seat"
+    }
+  ],
+  "caption": "The waiting room is what keeps the inventory store at bounded QPS however many people showed up, because you cannot shard a single seat."
+}
 \`\`\`
 
 Hot-item sharding has a limit: you cannot shard a single seat, so the truly contended item is serialized. Accept that a sold-out item's throughput is bounded by one atomic counter, and design the waiting room so most users never reach it.

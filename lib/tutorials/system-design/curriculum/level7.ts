@@ -1799,17 +1799,91 @@ Failover has to be *triggered* by something, and that something is health checki
 }
 \`\`\`
 
-\`\`\`
-        clients
-           |
-     [ DNS: 2 providers ]
-           |
-   [ LB pair, active-active ]
-        /        \\
-   web-1       web-2 ... web-N     (N+2, stateless, readiness-gated)
-        \\        /
-   [ DB primary ]==async/sync==>[ replica ]
-     leader elected via quorum; fence old primary on failover
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "The same request path with no single point of failure left in it",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "clients",
+      "label": "Clients",
+      "kind": "client"
+    },
+    {
+      "id": "dns",
+      "label": "DNS (2 providers, or several authoritative servers)",
+      "kind": "external"
+    },
+    {
+      "id": "lb",
+      "label": "LB pair, active-active (or a managed multi-node LB)",
+      "kind": "lb"
+    },
+    {
+      "id": "web1",
+      "label": "web-1 (stateless, readiness-gated)",
+      "kind": "service"
+    },
+    {
+      "id": "web2",
+      "label": "web-2 ... web-N (N+2, so losing two still serves)",
+      "kind": "service"
+    },
+    {
+      "id": "primary",
+      "label": "DB primary (leader elected by quorum; old primary fenced on failover)",
+      "kind": "db"
+    },
+    {
+      "id": "replica",
+      "label": "DB replica (promoted by quorum, never on its own)",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "clients",
+      "to": "dns",
+      "kind": "sync",
+      "label": "resolve the name"
+    },
+    {
+      "from": "dns",
+      "to": "lb",
+      "kind": "sync"
+    },
+    {
+      "from": "lb",
+      "to": "web1",
+      "kind": "sync",
+      "label": "readiness failures leave the pool without being killed"
+    },
+    {
+      "from": "lb",
+      "to": "web2",
+      "kind": "sync"
+    },
+    {
+      "from": "web1",
+      "to": "primary",
+      "kind": "sync",
+      "label": "writes"
+    },
+    {
+      "from": "web2",
+      "to": "primary",
+      "kind": "sync"
+    },
+    {
+      "from": "primary",
+      "to": "replica",
+      "kind": "async",
+      "label": "async or sync replication"
+    }
+  ],
+  "caption": "Audit a design by walking this path and asking at each hop whether traffic stops if that one thing dies. Three redundant web servers count for nothing behind one load balancer, one DNS provider, or one primary."
+}
 \`\`\`
 
 **Recap:** eliminate every SPOF (LB, DB primary, DNS, config) with N+1/N+2 redundancy, pick active-active for instant failover or active-passive for simpler state, gate traffic with liveness/readiness/deep checks, and use quorum election plus fencing and hysteresis to avoid split-brain and flapping.
@@ -2111,13 +2185,85 @@ Redundancy keeps you up when a component dies. Blast-radius reduction limits *ho
 
 Instead of one big shared stack serving all users, you run many independent, isolated **cells**, each a complete stack (LB, app, database, cache) serving a fixed subset of users. Cells share nothing at runtime: a failure, a bad deploy, an overloaded database, or a poison request in cell 7 cannot reach cells 1 through 6. If you have 20 cells and one fails, ~5% of users are affected, not 100%. A thin routing layer maps each user to their cell (by user id hash or tenant id) and is kept deliberately simple so it is not itself a fragile shared brain.
 
-\`\`\`
-        [ thin cell router: user_id -> cell ]
-        /        |          |          \\
-     cell-1    cell-2     cell-3  ...  cell-N     (each: full independent stack)
-     LB/app    LB/app     LB/app       LB/app
-     +DB       +DB        +DB          +DB
-   failure in cell-3 stays in cell-3  ->  ~1/N of users affected
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Cells: one failure reaches 1/N of users, not all of them",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "users",
+      "label": "Users",
+      "kind": "client"
+    },
+    {
+      "id": "router",
+      "label": "Thin cell router (user id hash or tenant id to one cell)",
+      "kind": "lb"
+    },
+    {
+      "id": "cell1",
+      "label": "cell-1: own LB, app, DB, cache",
+      "kind": "zone"
+    },
+    {
+      "id": "cell2",
+      "label": "cell-2: own LB, app, DB, cache",
+      "kind": "zone"
+    },
+    {
+      "id": "cell3",
+      "label": "cell-3: fails, and the failure stops here",
+      "kind": "zone"
+    },
+    {
+      "id": "celln",
+      "label": "cell-N: own LB, app, DB, cache",
+      "kind": "zone"
+    }
+  ],
+  "edges": [
+    {
+      "from": "users",
+      "to": "router",
+      "kind": "sync"
+    },
+    {
+      "from": "router",
+      "to": "cell1",
+      "kind": "sync",
+      "label": "each user is mapped to exactly one cell"
+    },
+    {
+      "from": "router",
+      "to": "cell2",
+      "kind": "sync"
+    },
+    {
+      "from": "router",
+      "to": "cell3",
+      "kind": "sync"
+    },
+    {
+      "from": "router",
+      "to": "celln",
+      "kind": "sync"
+    }
+  ],
+  "groups": [
+    {
+      "id": "cells",
+      "label": "Independent cells: nothing shared at runtime",
+      "nodes": [
+        "cell1",
+        "cell2",
+        "cell3",
+        "celln"
+      ]
+    }
+  ],
+  "caption": "The router is kept deliberately simple so it does not become the shared brain the cells exist to remove. With 20 cells, a bad deploy or a poison request costs about 5 percent of users, which is also why deploys roll cell by cell."
+}
 \`\`\`
 
 Cells also transform deploys: you roll a change **cell by cell** (a form of canary at the cell granularity), watch health, and stop after one cell if it regresses. A bad deploy hits one cell's worth of users, then halts.
