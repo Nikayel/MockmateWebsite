@@ -2201,6 +2201,179 @@ and picks a degradation policy tied to a business risk.
 
 \`\`\`cswidget
 {
+  "type": "steps",
+  "title": "One rate limiter prompt, three target levels",
+  "frames": [
+    {
+      "note": "Junior: a correct path end to end with no holes. Token bucket in one service, Redis holding the shared counter, a clean 429 with Retry-After. Completeness beats depth at this bar.",
+      "rows": [
+        {
+          "label": "On the board",
+          "cells": [
+            {
+              "text": "Client",
+              "state": "new"
+            },
+            {
+              "text": "Load balancer",
+              "state": "new"
+            },
+            {
+              "text": "Limiter service",
+              "state": "new"
+            },
+            {
+              "text": "Redis counter",
+              "state": "new"
+            },
+            {
+              "text": "429 + Retry-After",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "Said out loud",
+          "cells": [
+            {
+              "text": "Token bucket, state in Redis",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "predict": {
+        "question": "The same prompt, answered at the senior bar. What changes?",
+        "options": [
+          "More boxes join the diagram",
+          "A different algorithm replaces the bucket",
+          "The boxes hold still and the talk goes deeper",
+          "A second region appears"
+        ]
+      },
+      "note": "Senior: the same five boxes, untouched. What is added is depth on them, found without being asked: the race when two instances update one counter, the window tradeoff quantified, and a stance on Redis being down.",
+      "rows": [
+        {
+          "label": "On the board",
+          "cells": [
+            {
+              "text": "Client",
+              "state": "dim"
+            },
+            {
+              "text": "Load balancer",
+              "state": "dim"
+            },
+            {
+              "text": "Limiter service",
+              "state": "dim"
+            },
+            {
+              "text": "Redis counter",
+              "state": "dim"
+            },
+            {
+              "text": "429 + Retry-After",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "Unaided depth",
+          "cells": [
+            {
+              "text": "Counter race, atomic INCR",
+              "state": "new"
+            },
+            {
+              "text": "Fixed vs sliding vs bucket",
+              "state": "new"
+            },
+            {
+              "text": "Redis down: fail open or shut",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Staff+: still the same five boxes. The layer on top owns the ambiguity and reaches past the technical into cost, org, and how the limiter looks in two years, including what you deliberately do not build.",
+      "rows": [
+        {
+          "label": "On the board",
+          "cells": [
+            {
+              "text": "Client",
+              "state": "dim"
+            },
+            {
+              "text": "Load balancer",
+              "state": "dim"
+            },
+            {
+              "text": "Limiter service",
+              "state": "dim"
+            },
+            {
+              "text": "Redis counter",
+              "state": "dim"
+            },
+            {
+              "text": "429 + Retry-After",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "Unaided depth",
+          "cells": [
+            {
+              "text": "Counter race, atomic INCR",
+              "state": "dim"
+            },
+            {
+              "text": "Fixed vs sliding vs bucket",
+              "state": "dim"
+            },
+            {
+              "text": "Redis down: fail open or shut",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "Owns the ambiguity",
+          "cells": [
+            {
+              "text": "Whose traffic, which tier",
+              "state": "new"
+            },
+            {
+              "text": "Per user vs per IP, by cost",
+              "state": "new"
+            },
+            {
+              "text": "Degradation tied to risk",
+              "state": "new"
+            },
+            {
+              "text": "What not to build in v1",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "The boxes never change across the three levels. What grows is what you say about them, which is why depth stacked on an unfinished design fails at every level."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "check",
   "kind": "classify",
   "prompt": "Same prompt, 'Design a rate limiter.' Which target level does each answer move signal most strongly?",
