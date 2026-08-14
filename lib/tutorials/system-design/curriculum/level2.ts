@@ -29,13 +29,13 @@ commit together or neither does.
   "prompt": "Your bank schema declares no CHECK constraints and no foreign keys. A transfer transaction runs on a fully ACID database. Does the C in ACID still guarantee that money is never created or destroyed?",
   "options": [
     {
-      "label": "Yes. Consistency is one of the four guarantees, so the database enforces it automatically.",
-      "feedback": "Tempting, because C sits right there in the acronym. But the database can only enforce constraints you declared. With none declared, it has no idea what a valid state even is."
+      "label": "Yes, the database enforces consistency on its own",
+      "feedback": "Tempting, because C sits right there in the acronym alongside three guarantees the engine really does deliver for free. But the engine can only enforce the rules you declared, and here you declared none, so it has no idea what a valid state even is."
     },
     {
-      "label": "No. Consistency means the database upholds the constraints and invariants YOU defined; with none declared, conserving money rests entirely on your transaction logic.",
+      "label": "No, it only upholds the constraints you declared",
       "correct": true,
-      "feedback": "Right. Consistency is the outcome. Atomicity, isolation, and the constraints you write are the mechanism that produces it."
+      "feedback": "Right. Consistency in ACID means the database moves from one valid state to another as YOU defined valid: CHECK constraints, NOT NULL, foreign keys, unique indexes. Declare none and conserving money rests entirely on your transaction logic. Consistency is the outcome; atomicity, isolation, and the constraints you write are the mechanism."
     }
   ]
 }
@@ -239,17 +239,17 @@ Serializable or targeted locking prevents.
   "prompt": "A teammate proposes ending all concurrency bugs by running the whole database at Serializable. What is the sharpest objection?",
   "options": [
     {
-      "label": "Serializable still allows write skew, so it would not even work.",
-      "feedback": "Tempting to overcorrect after learning snapshot isolation's gap, but true Serializable (SSI or strict 2PL) is exactly the level that does forbid write skew."
+      "label": "Serializable still allows write skew, so it would not work",
+      "feedback": "Tempting to overcorrect after learning snapshot isolation's gap, but true Serializable (SSI or strict 2PL) is exactly the level that does forbid write skew. It is the one anomaly claim you can safely make about it."
     },
     {
-      "label": "It works, but every transaction pays abort-and-retry churn or lock waits, when naming the exact anomaly usually yields a surgical fix: a row lock, a version column, or a unique constraint.",
+      "label": "It works, but you pay globally for a local bug",
       "correct": true,
-      "feedback": "Right. Serializable is correct but globally expensive. Diagnose the anomaly first; most bugs fall to a targeted mechanism with far less throughput cost."
+      "feedback": "Right. Serializable is correct, and it really does forbid write skew. But then every transaction in the database pays abort-and-retry churn under SSI or lock waits under 2PL, to fix bugs that live in a handful of code paths. Name the exact anomaly first: a lost update falls to a row lock or a version column, and a one-seat-per-booking invariant falls to a unique constraint, each at a fraction of the throughput cost."
     },
     {
-      "label": "Postgres does not offer a Serializable level, so it is not an option.",
-      "feedback": "Postgres implements true Serializable via SSI. The objection is cost and precision, not availability."
+      "label": "Postgres has no Serializable level, so it is not an option",
+      "feedback": "Postgres implements true Serializable via SSI, so it is available and it is correct. The objection is cost and precision, not availability."
     }
   ],
   "reveal": "In your design write, name the anomaly before naming the fix: 'this is a lost update, so I lock the row' or 'this is write skew, so snapshot isolation is not enough.' Never just 'use transactions.'"
@@ -332,17 +332,17 @@ rule is: **optimistic under low contention, pessimistic under high contention.**
   "prompt": "A viral post's like counter takes thousands of increments per second, all on one row. Contention could not be higher. Applying the rule you just read, is a pessimistic row lock the right design?",
   "options": [
     {
-      "label": "Yes. High contention means pessimistic, so lock the row for each increment.",
-      "feedback": "Tempting, because the rule literally says pessimistic under high contention. But that rule picks between control schemes for a workload you keep as-is. One hot row behind a lock serializes every writer to one-at-a-time."
+      "label": "Yes, high contention is what pessimistic locking is for",
+      "feedback": "Tempting, because the rule literally says pessimistic under high contention. But that rule picks between control schemes for a workload you keep as-is. One hot row behind a lock serializes every writer to one-at-a-time, so throughput caps at whatever a single lock holder can do."
     },
     {
-      "label": "No. When contention concentrates on one row, restructure the write path: shard the counter, batch increments, or use one atomic in-database increment.",
+      "label": "No, restructure the write path instead",
       "correct": true,
-      "feedback": "Right. Heavy locking is the worst possible choice for a hot key. Spreading writes across N shards (sum on read) or batching turns a serialization point into parallel work."
+      "feedback": "Right. Heavy locking is the worst possible choice for a hot key, because it turns thousands of parallel increments into a single-file queue. When contention concentrates on one row, change the shape of the writes: shard the counter into N sub-rows and sum on read, batch increments in memory or Redis and flush periodically, or use one atomic in-database increment so no writer holds a lock across a read-modify-write."
     },
     {
-      "label": "No. Use optimistic version checks instead, since they skip lock overhead.",
-      "feedback": "OCC is even worse on a hot row: nearly every transaction fails its version check and retries, burning CPU in an abort storm."
+      "label": "No, use optimistic version checks to skip lock overhead",
+      "feedback": "OCC is even worse on a hot row: nearly every transaction fails its version check and retries, so you burn CPU in an abort storm instead of waiting politely in a lock queue."
     }
   ]
 }
