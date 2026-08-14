@@ -496,7 +496,7 @@ const parquetPartitionLever: SqlLesson = {
   id: "de-l10-parquet-partition-lever",
   title: "Quantifying the Parquet and Partitioning Lever",
   summary:
-    "Compute, rather than assert, the cost gap between scanning raw CSV and a partitioned Parquet layout, then price the small-files problem that erodes it in dollars per month.",
+    "Compute, rather than assert, the dollar gap between scanning raw CSV and partitioned Parquet, then price the small-files problem that erodes it.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
@@ -831,7 +831,7 @@ const iamLeastPrivilege: SqlLesson = {
   id: "de-l10-iam-least-privilege",
   title: "IAM Least Privilege for a Pipeline, by Audit",
   summary:
-    "Evaluate a policy set the way the platform does (default deny, explicit deny wins), audit granted-but-unused permissions, and explain the canonical Athena Access Denied from policy data alone.",
+    "How IAM actually evaluates a policy set (default deny, explicit deny wins) and why that explains the classic Athena Access Denied error.",
   estimatedMinutes: 28,
   difficulty: "hard",
   skills: [

@@ -200,7 +200,7 @@ const checkSuites: SqlLesson = {
   id: "de-l10-check-suites",
   title: "From One Check to a Severity-Ranked Check Ledger",
   summary:
-    "Run a whole check suite in one script, record every result in an append-only check_results ledger with its severity, and derive the run verdict from severity rather than from a raw failure count.",
+    "Why a quality run's verdict should come from check severity rather than a raw failure count, recorded in an append-only ledger.",
   estimatedMinutes: 28,
   difficulty: "medium",
   skills: [
@@ -711,7 +711,7 @@ const observabilityPillars: SqlLesson = {
   id: "de-l10-observability-pillars",
   title: "The Five Pillars: Freshness and Volume Monitors in SQL",
   summary:
-    "Name the five observability pillars, then implement the freshness, volume, and distribution monitors as ordinary SQL over table metadata rather than over the data itself.",
+    "The five pillars of data observability, and how freshness, volume and distribution monitors are ordinary SQL over table metadata.",
   estimatedMinutes: 28,
   difficulty: "medium",
   skills: [
@@ -1170,7 +1170,7 @@ const schemaDriftLineageTriage: SqlLesson = {
   id: "de-l10-schema-drift-lineage-triage",
   title: "Schema Drift, Lineage, and the Incident Walk",
   summary:
-    "Detect breaking schema drift by diffing two catalog snapshots, then triage a silent-success incident by walking lineage upstream with a recursive CTE until you find the run that succeeded and wrote nothing.",
+    "Catch breaking schema drift by diffing two catalog snapshots, then trace a silent-success incident upstream with a recursive lineage CTE.",
   estimatedMinutes: 30,
   difficulty: "hard",
   skills: [
