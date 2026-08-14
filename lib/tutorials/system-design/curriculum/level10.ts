@@ -4739,7 +4739,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-ride-sharing",
           title: "Design a Ride-Sharing Service (Uber)",
           summary:
-            "Index moving drivers with a space-filling spatial index (H3/S2/geohash) sharded by geography, keep locations in memory as overwrites, and rank matches by ETA under an exclusive-assignment lock, with the trip state machine as the one strongly consistent part.",
+            "Matching moving drivers to riders: a spatial index instead of a scan, locations as in-memory overwrites, and one exclusive assignment.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["ride-sharing", "geospatial", "dispatch"],
@@ -4786,7 +4786,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-file-sync",
           title: "Design a File Sync & Storage Service (Dropbox)",
           summary:
-            "Content-defined chunking plus per-chunk hashing gives dedup and delta sync (upload only changed chunks), a strongly consistent metadata service maps files to chunk manifests and versions, and conflicts are resolved by keeping both copies plus history rather than merging blindly.",
+            "How content-defined chunking turns a one-byte edit in a 2GB file into a 4MB upload, and why a conflict keeps both copies instead of merging.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["file-sync", "chunking", "dedup"],
@@ -4834,7 +4834,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-video-streaming",
           title: "Design Video Streaming / VOD (YouTube/Netflix)",
           summary:
-            "Transcode once, asynchronously, into an ABR ladder of segmented renditions with manifests; let the client adapt bitrate per segment; and serve segments from a CDN (Open Connect-style edge caches) with long TTLs so origin egress stays flat even under viral read spikes.",
+            "Transcoding runs once at upload, so a viral title is a read spike absorbed at the edge rather than a reason to scale the encoder fleet.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["video-streaming", "transcoding", "cdn"],
@@ -4882,7 +4882,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-collaborative-editor",
           title: "Design a Collaborative Editor (Google Docs)",
           summary:
-            "Converge concurrent edits with OT (server-ordered, transform indices, memory-lean, Docs-style) or CRDTs (per-character ids, commutative merge, offline/P2P-friendly), broadcast ephemeral presence over WebSocket, persist an op log plus snapshots for replay and reconnect, and route all editors of a document to one server for coherent ordering.",
+            "OT versus CRDTs for concurrent editing: what a central sequencer buys, what it costs you offline, and why last-write-wins is disqualifying.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["collaborative-editor", "crdt", "ot"],
