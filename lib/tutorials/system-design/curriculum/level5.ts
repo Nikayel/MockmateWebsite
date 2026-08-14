@@ -2912,6 +2912,79 @@ crash between them reopens the double-execution window.
 }
 \`\`\`
 
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Exactly-once effect: at-least-once delivery plus one atomic dedupe record",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "client",
+      "label": "Client (retries with the same Idempotency-Key)",
+      "kind": "client"
+    },
+    {
+      "id": "api",
+      "label": "Payment API (charge handler)",
+      "kind": "service"
+    },
+    {
+      "id": "keys",
+      "label": "Idempotency key record (key, stored result, TTL)",
+      "kind": "db"
+    },
+    {
+      "id": "ledger",
+      "label": "Charge row (the side effect)",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "client",
+      "to": "api",
+      "kind": "sync",
+      "label": "POST /charge, Idempotency-Key: a1b2"
+    },
+    {
+      "from": "api",
+      "to": "keys",
+      "kind": "sync",
+      "label": "insert the key, unique constraint settles the race"
+    },
+    {
+      "from": "api",
+      "to": "ledger",
+      "kind": "sync",
+      "label": "apply the charge"
+    },
+    {
+      "from": "keys",
+      "to": "api",
+      "kind": "feedback",
+      "label": "key already present: return the stored result"
+    },
+    {
+      "from": "api",
+      "to": "client",
+      "kind": "feedback",
+      "label": "ack, which the network may drop"
+    }
+  ],
+  "groups": [
+    {
+      "id": "txn",
+      "label": "One local transaction: both rows or neither",
+      "nodes": [
+        "keys",
+        "ledger"
+      ]
+    }
+  ],
+  "caption": "The dashed lane is the whole trick. Commit the key record and the charge separately and a crash between them reopens the double-charge window, because the retry that follows looks brand new."
+}
+\`\`\`
+
 Distinguish the operation types:
 
 - **Naturally idempotent:** \`SET balance = 5\`, \`PUT user.email = x\`, delete by id. Applying
