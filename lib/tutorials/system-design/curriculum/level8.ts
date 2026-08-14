@@ -2073,6 +2073,49 @@ Secrets (DB passwords, API keys, signing keys, TLS private keys) are the credent
 
 A **KMS** is a managed key service with an API for encrypt/decrypt/sign where keys never leave the service. An **HSM** is the tamper-resistant hardware (often **FIPS 140-2 Level 3** certified) that actually holds the root keys; managed KMS is usually HSM-backed. The pattern is a **key hierarchy** with a hardware-backed **root of trust**: the HSM holds the root KEK, which wraps intermediate keys, which wrap DEKs. Nothing sensitive exists in plaintext outside the hardware boundary, and you get a single audited choke point for every key operation.
 
+## How a root key is operated: split control and the key ceremony
+
+The hierarchy tells you what the root is for. It does not tell you who is allowed to touch it, and that is a separate design decision with a name. Every key below the root is operated by software: a service calls the KMS, policy says yes, and a DEK is wrapped. Nobody would accept that for the root, because the root's authority is total and any single administrator who can invoke it is a single point of compromise. So the root is put under **split control**, enforced as an **M-of-N quorum**: the HSM is configured so a root operation requires authorization from at least M of N designated key officers, each holding their own credential, and no single officer can act alone. Five officers with a quorum of three is a common shape: it survives two people being unreachable and still needs three to collude.
+
+The session in which those officers gather and perform the operation is a **key ceremony**. It is scripted in advance, run in one room, and recorded, because the whole point is that the event is reviewable afterwards.
+
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "One key ceremony: creating a new root under a 3-of-5 quorum",
+  "stages": [
+    {
+      "label": "Script and schedule",
+      "note": "the exact commands are written and reviewed beforehand, because nothing is improvised at the console"
+    },
+    {
+      "label": "Quorum assembles",
+      "note": "3 of the 5 key officers attend in person with their own credentials, plus a witness and a scribe"
+    },
+    {
+      "label": "HSM demands M credentials",
+      "note": "the device refuses the root operation until 3 distinct officer credentials have authorized it"
+    },
+    {
+      "label": "Root generated in hardware",
+      "note": "the new root key material is created inside the HSM and never exists outside it"
+    },
+    {
+      "label": "Root certifies intermediates",
+      "note": "the one thing the root is used for, and the last time it is touched for months"
+    },
+    {
+      "label": "Ceremony record signed",
+      "note": "attendees, commands, and HSM audit output are signed off, which is the artifact an auditor asks for"
+    }
+  ],
+  "highlight": [
+    "HSM demands M credentials"
+  ],
+  "caption": "Contrast this with everything below the root. An intermediate is rotated by a scheduled job and a DEK is wrapped thousands of times a second, both under automated policy with no human in the loop. The root is the one key whose operation is deliberately slow, human, and plural. That is precisely why the hierarchy exists: keep the root cold and quorum-protected, and do the high-volume work with intermediates that are cheap to rotate."
+}
+\`\`\`
+
 \`\`\`cswidget
 {
   "type": "check",

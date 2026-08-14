@@ -669,7 +669,40 @@ the whole game.
   \`UPDATE ... WHERE version = :read_version\`; if 0 rows change, someone beat you, so retry. Cheap
   under low contention.
 - **Unique constraint**: sometimes the cleanest fix. If "one seat per booking" must hold, a unique
-  index enforces it regardless of isolation level.
+  index enforces it regardless of isolation level, and regardless of what any application code does.
+
+**The unique index usually wants a predicate.** Write the plain form and you over-enforce. Take an
+edit lock: at most one person may hold a document open at a time, but locks are released and expire,
+and the next person takes it.
+
+\`\`\`
+CREATE UNIQUE INDEX one_lock_per_doc ON edit_locks (doc_id);
+
+INSERT INTO edit_locks (doc_id, user_id, status) VALUES (42, 'alice', 'released');
+INSERT INTO edit_locks (doc_id, user_id, status) VALUES (42, 'bob',   'active');
+-- ERROR: duplicate key value violates unique constraint "one_lock_per_doc"
+-- Alice let the lock go an hour ago and is still occupying the only slot in the index.
+\`\`\`
+
+The invariant was never "one row per doc," it is "one ACTIVE row per doc." A **partial unique
+index** (also called a predicate or filtered index) carries that WHERE clause into the index itself,
+so only rows matching the predicate are indexed at all, and only those rows can collide:
+
+\`\`\`
+CREATE UNIQUE INDEX one_active_lock_per_doc
+  ON edit_locks (doc_id)
+  WHERE status = 'active';      -- released and expired rows are simply not in the index
+
+INSERT INTO edit_locks (doc_id, user_id, status) VALUES (42, 'alice', 'released');  -- ok
+INSERT INTO edit_locks (doc_id, user_id, status) VALUES (42, 'bob',   'active');    -- ok
+INSERT INTO edit_locks (doc_id, user_id, status) VALUES (42, 'carol', 'active');    -- ERROR
+\`\`\`
+
+Bob and Carol race, exactly one of them commits, and the loser catches a unique violation and turns
+it into "someone else is editing this." Alice's released row sits outside the predicate and blocks
+nobody. Reach for the predicate form whenever the invariant holds over a live subset rather than the
+whole table, which is most of the time. It also keeps the index small, since dead rows never enter
+it.
 
 \`\`\`cswidget
 {
