@@ -4222,9 +4222,69 @@ timestamp preserves history and audit trails and lets you undo, at the cost of e
 record. Pick soft delete when history or recovery matters, hard delete for high-churn or
 privacy-mandated erasure.
 
+### One table shape where neither delete is right: the ledger
+
+Soft versus hard delete is a real choice on most tables and a trap on one shape. The ACID lesson at
+the start of this level made ledger entries the source of truth and the balance a projection of
+them. Add one more rule and you get the **double-entry** shape that accounting has used for
+centuries: every movement of money is recorded twice, once as a debit and once as a credit, and the
+entries belonging to a single transaction sum to zero.
+
+\`\`\`
+CREATE TABLE ledger_entries (
+  id             UUID        PRIMARY KEY,          -- UUIDv7: time-ordered, append-friendly
+  transaction_id UUID        NOT NULL,             -- groups the entries that must balance
+  account_id     BIGINT      NOT NULL REFERENCES accounts(id),
+  amount_minor   BIGINT      NOT NULL CHECK (amount_minor <> 0),  -- signed integer cents
+  currency       CHAR(3)     NOT NULL,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- A 25.00 transfer is two rows, and they cancel.
+INSERT INTO ledger_entries (id, transaction_id, account_id, amount_minor, currency)
+VALUES (uuidv7(), :txn, :payer_account, -2500, 'USD'),   -- debit
+       (uuidv7(), :txn, :payee_account, +2500, 'USD');   -- credit
+\`\`\`
+
+The invariant is "every \`transaction_id\` sums to zero," and a plain \`CHECK\` cannot express it,
+because a CHECK sees one row and this rule spans several. It needs a **deferred constraint trigger**
+that fires at COMMIT, once all of the transaction's entries exist:
+
+\`\`\`
+CREATE CONSTRAINT TRIGGER entries_must_balance
+  AFTER INSERT ON ledger_entries
+  DEFERRABLE INITIALLY DEFERRED             -- checked at COMMIT, not after each row
+  FOR EACH ROW EXECUTE FUNCTION assert_transaction_sums_to_zero();
+
+-- assert_transaction_sums_to_zero() raises unless this returns 0:
+--   SELECT SUM(amount_minor) FROM ledger_entries WHERE transaction_id = NEW.transaction_id;
+\`\`\`
+
+Deferred matters: check it per row and the very first INSERT fails, because a lone debit never sums
+to zero on its own.
+
+Now the delete question answers itself. A wrong entry is never softened and never removed. It is
+**reversed**, by appending the opposite entry under a new transaction that points back at the
+original:
+
+\`\`\`
+INSERT INTO ledger_entries (id, transaction_id, account_id, amount_minor, currency)
+VALUES (uuidv7(), :reversal_txn, :payer_account, +2500, 'USD'),
+       (uuidv7(), :reversal_txn, :payee_account, -2500, 'USD');
+-- balances are back where they started, and BOTH the error and the correction are on the record
+\`\`\`
+
+A \`deleted_at\` column is wrong here for a specific reason: it makes the balance depend on a WHERE
+clause, so any reader that forgets the filter reports a different number, and it erases the evidence
+that a mistake was made and fixed, which is the thing an auditor came to see. A hard delete is worse
+still. On a ledger, append-only is absolute, and the reversing entry is how you say "this was wrong"
+without unsaying it.
+
 Recap: avoid monotonic keys for hotspots and random UUIDv4 for fragmentation, default to ULID/UUIDv7
 (or Snowflake) for time-ordered distributed IDs, use surrogate keys with natural attributes as unique
-constraints, enforce invariants with DB constraints, and pick types that encode correctness.
+constraints, enforce invariants with DB constraints, and pick types that encode correctness. On a
+ledger, add the double-entry rule (paired entries summing to zero, corrections as reversing entries)
+and drop the soft-delete option entirely.
 
 \`\`\`cswidget
 {

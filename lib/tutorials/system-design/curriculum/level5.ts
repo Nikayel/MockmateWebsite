@@ -1630,6 +1630,118 @@ compaction)**: periodically serialize the full state machine to disk, record the
 covers, and truncate everything at or below. A recovering or newly added replica installs the latest
 snapshot and replays only the tail. Raft, Kafka, and etcd all do exactly this.
 
+### The same log at Kafka scale: offsets, the ISR, and the high-water mark
+
+Kafka is the version of this machine you are most likely to be handed in an interview, so it is
+worth seeing its parts named. A partition **is** the replicated log. The leader assigns each record
+the next **offset**, which is the log index. Followers fetch from the leader in offset order and
+append, and the followers currently caught up form the **in-sync replica (ISR)** set: a moving
+membership, not the static replica list. A follower that stops fetching for longer than
+\`replica.lag.time.max.ms\` is evicted from the ISR and rejoins once it has caught up again.
+
+The commit point has a name too. The **high-water mark** is the highest offset that *every* current
+ISR member holds, and a consumer may read up to it and no further. Walk one partition at RF=3 as
+follower b2 stalls and recovers:
+
+\`\`\`
+ RF=3: leader b1, followers b2 and b3. A consumer may read up to the HWM.
+
+      b1 (leader)   b2            b3            ISR           HWM
+ t0   0,1,2,3       0,1,2,3       0,1,2,3       {b1,b2,b3}      3
+ t1   0,1,2,3,4,5   0,1,2,3       0,1,2,3,4,5   {b1,b2,b3}      3
+ t2   0,1,2,3,4,5   0,1,2,3       0,1,2,3,4,5   {b1,b3}         5
+ t3   0,1,2,3,4,5   0,1,2,3,4,5   0,1,2,3,4,5   {b1,b2,b3}      5
+\`\`\`
+
+At t1 the leader has appended 4 and 5 and b3 has fetched them, but b2 has not, so the high-water
+mark stays at 3 and no consumer can see records that two of three brokers already hold. At t2 b2
+misses its lag deadline and is evicted, the ISR becomes \`{b1,b3}\`, and the mark advances to 5
+because every *remaining* ISR member holds 5. At t3 b2 refetches from offset 4, catches up, and is
+added back. Appended-but-below-the-mark is Kafka's word for Raft's appended-but-not-committed: the
+record exists, and nobody is allowed to depend on it yet.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A partition at RF=3 has ISR {b1,b2,b3} and a high-water mark of 3. The leader appends offsets 4 and 5 and b3 fetches both; b2 is mid-GC and has fetched neither. A consumer polls right now. Which offsets can it read?",
+  "options": [
+    {
+      "label": "0 through 5: two of the three replicas already hold offsets 4 and 5, which is a majority",
+      "feedback": "Kafka's commit point is not a majority. The mark advances to the highest offset EVERY current ISR member holds, and b2 is still in the ISR sitting at 3, so 4 and 5 stay invisible until b2 catches up or is evicted."
+    },
+    {
+      "label": "0 through 3, because b2 has not fetched 4 and 5 yet",
+      "correct": true,
+      "feedback": "Right. The high-water mark is pinned at 3 by the slowest ISR member. Records 4 and 5 are on two brokers' disks and still uncommitted, which is exactly the appended-versus-committed line Raft draws."
+    },
+    {
+      "label": "Nothing until the ISR is complete again",
+      "feedback": "Reads never stop for a lagging follower. Everything at or below the high-water mark is committed and readable; only the tail above it waits."
+    }
+  ]
+}
+\`\`\`
+
+### The knobs that decide what an acknowledgement means
+
+Kafka does not run a majority quorum on the data path, so durability is configured rather than
+structural. The producer's \`acks\` setting says who must hold the record before the write is
+acknowledged: \`acks=1\` is the leader alone, \`acks=all\` is every member of the **current** ISR.
+That word "all" does less work than it looks, because the ISR shrinks. Two more settings decide
+whether it is safe: \`min.insync.replicas\` is the smallest ISR an \`acks=all\` write will be
+accepted into, and \`unclean.leader.election.enable\` decides whether a replica that is **not** in
+the ISR may be promoted to leader. Run the same acknowledged write under both configurations:
+
+\`\`\`
+ A) RF=3, acks=all, min.insync.replicas=1, unclean election ENABLED
+ t0  ISR {b1,b2,b3}, HWM 41
+ t1  b2 and b3 stall, ISR shrinks to {b1}
+ t2  write of offset 42 arrives; "all of the ISR" is b1 alone; b1 acks   <- producer sees success
+ t3  b1's disk fails permanently
+ t4  b2 is out of sync, log ends at 41, but unclean election promotes it
+ t5  b2 leads at offset 41; offset 42 is truncated                       <- acked record is gone
+
+ B) RF=3, acks=all, min.insync.replicas=2, unclean election DISABLED
+ t0  ISR {b1,b2,b3}, HWM 41
+ t1  b2 and b3 stall, ISR shrinks to {b1}
+ t2  write of offset 42 arrives; ISR size 1 < 2, broker returns
+     NOT_ENOUGH_REPLICAS                                                 <- write refused, producer retries
+ t3  b1's disk fails permanently
+ t4  no in-sync replica exists, so the partition goes offline until one
+     returns; nothing that was acknowledged was lost
+\`\`\`
+
+Trace A is not a bug report, it is a configuration doing what it was told. Trace B restores the
+overlap Raft gets by construction: an acknowledged record is on at least two of three brokers, so
+whichever one survives a single loss still holds it. Read the price off the trace as well as the
+benefit. B refuses writes while the ISR is short and stays unavailable rather than promoting a
+replica that would truncate, which is the same availability-for-durability trade a stalled Raft
+minority makes, only here it is a setting rather than a property.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A topic runs RF=3 with acks=all and min.insync.replicas=1. Two followers stall, the ISR shrinks to the leader alone, and the producer's next write is acknowledged. Is that record safe from losing one broker?",
+  "options": [
+    {
+      "label": "Yes: acks=all waits for every replica in the replication factor before acknowledging",
+      "feedback": "It waits for every replica in the ISR, which is not the same set. The ISR had shrunk to one, so 'all' meant one broker and the record has a single copy."
+    },
+    {
+      "label": "No: all of the ISR was one broker, so the ack covered one copy",
+      "correct": true,
+      "feedback": "Right. min.insync.replicas is what makes acks=all mean anything: at 1 it permits an ack from a lone leader, and RF=3 tells you how many replicas exist, not how many held the record."
+    },
+    {
+      "label": "Only if unclean leader election is disabled",
+      "feedback": "Disabling unclean election stops a lagging replica from truncating, but here the only copy died with the leader, so there is nothing left to preserve. The ISR size at ack time is the fact that settles it."
+    }
+  ]
+}
+\`\`\`
+
 **Interview nuance:** if asked "how do you keep replicas consistent," do not jump to gossip or
 last-write-wins. Say "I model each replica as a deterministic state machine and feed them one agreed
 ordered log via a consensus protocol; consistency then falls out for free," then mention snapshots
@@ -1637,7 +1749,10 @@ for log growth. That framing signals you understand the primitive rather than a 
 
 Recap: identical replicas come from applying the same deterministic commands in the same order,
 achieving that order is total-order broadcast which is equivalent to consensus, nondeterministic
-apply is the classic silent-divergence bug, and snapshots bound otherwise-unbounded log growth.
+apply is the classic silent-divergence bug, and snapshots bound otherwise-unbounded log growth. In
+Kafka's vocabulary the log index is the offset, the commit point is the high-water mark over the
+in-sync replica set, and \`acks\`, \`min.insync.replicas\` and unclean leader election are the
+settings that decide what an acknowledgement is worth.
 
 \`\`\`cswidget
 {
