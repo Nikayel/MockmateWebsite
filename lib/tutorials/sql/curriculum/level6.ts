@@ -1273,7 +1273,7 @@ const compressionEncoding: SqlLesson = {
   id: "sql-l6-compression-encoding",
   title: "Compression and Encoding: Why Columnar Shrinks So Much",
   summary:
-    "Dictionary, run-length, delta, and bit-packing encodings plus a codec (Snappy, Zstd, Gzip) shrink a column far more than a row-interleaved CSV, and you can measure the ratio in SQL.",
+    "Why a column of repeated values compresses far harder than a row-interleaved CSV: dictionary, run-length, delta and bit-packing encodings.",
   estimatedMinutes: 24,
   difficulty: "medium",
   skills: [
@@ -1507,9 +1507,9 @@ ORDER BY ratio DESC, data_type;`,
 
 const rowGroupsPushdown: SqlLesson = {
   id: "sql-l6-row-groups-pushdown",
-  title: "Row Groups and Predicate Pushdown, plus Parquet vs ORC vs Avro",
+  title: "Row Groups, Predicate Pushdown, and Parquet vs ORC vs Avro",
   summary:
-    "Inside a Parquet file: row groups, the footer, and the min/max stats that let a filter skip whole row groups without reading them. Then when a row format (Avro) is the right call.",
+    "How the min/max stats in a Parquet footer let a filter skip whole row groups unread, and when a row format like Avro is still right.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
@@ -1794,7 +1794,7 @@ const whatIsAPartition: SqlLesson = {
   id: "sql-l6-what-is-a-partition",
   title: "What a Partition Is, and Why Pruning Makes a Big Table Cheap",
   summary:
-    "Hive-style dt=value folders put the partition key in the path, so a filter on it reads only the matching folders (pruning) and scans a fraction of the bytes, which on a pay-per-scan engine is directly cheaper.",
+    "Why a filter on a Hive-style dt= folder reads only the matching folders, and how that pruning turns a huge table into a cheap scan.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
@@ -2025,7 +2025,7 @@ const choosingPartitionKey: SqlLesson = {
   id: "sql-l6-choosing-partition-key",
   title: "Choosing a Partition Key, and the Small-Files Problem",
   summary:
-    "Partition on the low-cardinality column you filter on (usually date). Partition on a high-cardinality key and you shred the table into millions of tiny files, where per-file overhead dominates.",
+    "Partition on the low-cardinality column you filter on, because a high-cardinality key shreds the table into millions of tiny files.",
   estimatedMinutes: 25,
   difficulty: "medium",
   skills: [
@@ -2237,7 +2237,7 @@ const bucketingAndFullScanTrap: SqlLesson = {
   id: "sql-l6-bucketing-and-the-full-scan-trap",
   title: "Bucketing vs Partitioning, and the Full-Scan Trap",
   summary:
-    "Bucket (or cluster) a high-cardinality join column into a fixed number of files instead of partitioning it, and keep the partition key bare in a filter so the engine can actually prune.",
+    "Bucket a high-cardinality join column instead of partitioning it, and keep the partition key bare in the filter or the engine scans it all.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
