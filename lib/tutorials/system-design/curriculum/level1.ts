@@ -382,14 +382,48 @@ about a 5-layer stack, and the only two layers you will argue about in interview
 }
 \`\`\`
 
-Bottom to top, the practical stack:
+Top to bottom, the practical stack:
 
-\`\`\`
-  L7  HTTP / gRPC / app semantics   (methods, headers, paths, request bodies)
-  L6  TLS                            (encryption, identity, SNI)   <- sits between
-  L4  TCP / UDP                      (ports, connections, reliability)
-  L3  IP                             (addresses, routing, MTU)
-  L2  Link                           (Ethernet, MAC, the wire)
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Layer",
+    "Protocol",
+    "What that layer knows about"
+  ],
+  "rows": [
+    [
+      "L7",
+      "HTTP / gRPC",
+      "app semantics: methods, headers, paths, request bodies"
+    ],
+    [
+      "L6",
+      "TLS",
+      "encryption, identity, SNI; it sits between the app and transport"
+    ],
+    [
+      "L4",
+      "TCP / UDP",
+      "ports, connections, reliability"
+    ],
+    [
+      "L3",
+      "IP",
+      "addresses, routing, MTU"
+    ],
+    [
+      "L2",
+      "Link",
+      "Ethernet, MAC, the wire"
+    ]
+  ],
+  "highlightCols": [
+    "Layer"
+  ],
+  "caption": "Read the right-hand column as a hard limit rather than a summary. IP has no idea a request exists and TCP has no idea what a path is, which is the entire reason a balancer that routes on /checkout has to be an L7 device."
+}
 \`\`\`
 
 Each layer has one job. IP (L3) moves packets between hosts by address and decides routing hop by
