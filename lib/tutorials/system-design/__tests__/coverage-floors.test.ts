@@ -31,8 +31,11 @@ import { buildSystemDesignCoverage, isBareLesson } from "../coverage"
  *
  * - `bareLessons`: no check, no diagram, no simulation. Nothing to answer, nothing to see.
  * - `lessonsWithoutChecks`: every lesson now asks the learner at least one question.
- * - `lessonsWithoutDiagramOrSim`: the visual gap, which is corpus-wide and not only in the tail.
- *   This is the one still open, and SD-W6 is what lowers it.
+ * - `lessonsWithoutDiagramOrSim`: the visual gap. Was 105 when this file landed; the CUR-07
+ *   conversion sweep and CUR-08 widget deployment took it to 17, with seven of the twelve levels
+ *   now at zero. The remainder are lessons where the two deliberately-unconverted shapes live
+ *   (decision branches, and nodes whose content is an ordered list), so this is close to its floor
+ *   rather than merely improved.
  *
  * The first two reached zero on 2026-08-13, so they are no longer ratchets but floors: there is
  * nowhere left to descend, and any movement at all is a regression.
@@ -40,7 +43,7 @@ import { buildSystemDesignCoverage, isBareLesson } from "../coverage"
 const PINS = {
   bareLessons: 0,
   lessonsWithoutChecks: 0,
-  lessonsWithoutDiagramOrSim: 105,
+  lessonsWithoutDiagramOrSim: 17,
 } as const
 
 /**
