@@ -18,17 +18,46 @@
  *    line boundaries and keep every line), which the tests assert.
  */
 
-/** Teaches at or under this word count render unsegmented. */
-const WORD_THRESHOLD = 500
+/**
+ * Every threshold below is measured in PROSE words, with fenced blocks removed.
+ *
+ * ## Why, and the bug that proves it
+ *
+ * This module used to weigh raw markdown, fence bodies included. A `csdiagram` or `cswidget` spec
+ * is JSON, and a single topology spec runs to several hundred "words" of it, so a lesson's pacing
+ * was driven by how much machine-readable data sat in it rather than by how much there was to read.
+ *
+ * That stayed invisible until the diagram sweep converted the ASCII drawings. On
+ * `sd-l0-functional-requirements` the chunks weighed 99, 87 and 843 words, the last one being
+ * almost entirely a diagram spec. The proportional packer needs to close a segment once it carries
+ * its share, and with 82 percent of the mass in the final chunk there was no split that worked, so
+ * the lesson silently stopped being paced at all. 126 lessons went the same way at once, and
+ * NOTHING about the rendered page looked wrong: the learner just got the whole teach in one wall.
+ *
+ * This is the identical mistake the depth metric made and had corrected in `coverage.ts` (a widget
+ * spec counted as teaching, so adding checks made a level look deeper). Two modules made it
+ * independently, which is the argument for stating the rule here rather than in a comment: a fence
+ * is ONE thing the learner meets, whatever its JSON weighs.
+ */
+
+/** Teaches at or under this many PROSE words render unsegmented. */
+const WORD_THRESHOLD = 420
 const MAX_SEGMENTS = 4
 const MIN_SEGMENTS = 2
-/** Aim for segments of very roughly this many words when choosing the segment count. */
-const TARGET_SEGMENT_WORDS = 400
-/** A final segment under this many words merges back into its predecessor. */
-const MIN_TAIL_WORDS = 120
+/** Aim for segments of very roughly this many PROSE words when choosing the segment count. */
+const TARGET_SEGMENT_WORDS = 260
+/** A final segment under this many PROSE words merges back into its predecessor. */
+const MIN_TAIL_WORDS = 70
 
+/**
+ * Words with every fenced block removed.
+ *
+ * A fence is replaced by a single space rather than deleted, so two paragraphs either side of a
+ * diagram do not weld into one word at the seam.
+ */
 function wordCount(text: string): number {
-  const words = text.trim().split(/\s+/)
+  const prose = text.replace(/```[^\n]*\n[\s\S]*?```/g, " ")
+  const words = prose.trim().split(/\s+/)
   return words[0] === "" ? 0 : words.length
 }
 

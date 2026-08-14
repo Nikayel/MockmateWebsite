@@ -98,6 +98,54 @@ describe("segmentTeachMarkdown", () => {
     expect(segmented).toBeGreaterThan(100)
   })
 
+  it("paces on prose, so a diagram-heavy lesson is not silently unsegmented", () => {
+    // The regression this pins actually shipped. Weighing raw markdown counted a csdiagram spec's
+    // JSON as words, so when the diagram sweep converted the ASCII drawings the mass moved into
+    // whichever chunk held the spec: sd-l0-functional-requirements chunked as 99 / 87 / 843 words
+    // with the last being almost all JSON, the proportional packer could find no split that
+    // carried its share, and the lesson quietly stopped being paced. 126 lessons went at once and
+    // the page looked completely normal, because an unsegmented teach is just a longer page.
+    const proseHeavy = teachWith([
+      { heading: "Alpha", words: 300 },
+      { heading: "Beta", words: 300 },
+    ])
+    // Same prose, plus a fat fence. Pacing must not change: a fence is ONE thing the learner
+    // meets, whatever its JSON weighs.
+    const fenceHeavy =
+      proseHeavy +
+      "\n\n```csdiagram\n" +
+      JSON.stringify(
+        {
+          type: "table",
+          columns: ["a"],
+          rows: Array.from({ length: 40 }, (_, i) => [`row ${i} of padding`]),
+        },
+        null,
+        2
+      ) +
+      "\n```\n"
+
+    expect(segmentTeachMarkdown(fenceHeavy).length).toBe(segmentTeachMarkdown(proseHeavy).length)
+    // And it still reassembles exactly, fence included.
+    expect(segmentTeachMarkdown(fenceHeavy).join("\n")).toBe(fenceHeavy)
+  })
+
+  it("keeps the real corpus overwhelmingly paced, not merely above the floor", () => {
+    // The floor above is >100 of 208, which the broken version cleared at 82 only by luck of
+    // where the specs landed. This asserts the shape the feature is supposed to have.
+    let segmented = 0
+    let total = 0
+    for (const level of SYSTEM_DESIGN_LEVELS) {
+      for (const mod of level.modules) {
+        for (const lesson of mod.lessons) {
+          total += 1
+          if (segmentTeachMarkdown(lesson.teach.markdown).length > 1) segmented += 1
+        }
+      }
+    }
+    expect(segmented / total).toBeGreaterThan(0.7)
+  })
+
   it("segments the exit-criteria lesson sd-l2-keys-ids-constraints into multiple parts", () => {
     const lesson = SYSTEM_DESIGN_LEVELS.flatMap((l) => l.modules)
       .flatMap((m) => m.lessons)
