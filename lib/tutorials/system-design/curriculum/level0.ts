@@ -1282,9 +1282,37 @@ worse price than the one before it.
 ties cache size to a target hit rate and to the read load removed from the origin, not to a fraction of
 total storage pulled from thin air.
 
-\`\`\`
-raw payload -> x replication -> + index/overhead = provisioned storage
-hot 20% of reads -> cache size -> target hit rate -> read load removed
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Chain",
+    "Start from",
+    "Then",
+    "Then",
+    "What you can quote"
+  ],
+  "rows": [
+    [
+      "Storage",
+      "Raw payload",
+      "Times the replication factor",
+      "Plus index and B-tree overhead",
+      "Provisioned storage"
+    ],
+    [
+      "Cache",
+      "Hot ~20% of the actively read window",
+      "Gives the cache size",
+      "Against a target hit rate",
+      "Read load removed from the datastore"
+    ]
+  ],
+  "highlightCols": [
+    "What you can quote"
+  ],
+  "caption": "Two chains that get collapsed into one. Retention belongs to the storage line only: the cache line starts from the recency window, which is why extending retention must not grow the cache."
+}
 \`\`\`
 
 Recap: size storage as objects x size x retention with metadata and blobs kept separate, multiply by
