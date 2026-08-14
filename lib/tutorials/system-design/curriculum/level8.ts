@@ -2194,12 +2194,41 @@ const complianceFrameworksTeach = `
 
 Compliance frameworks feel like legal noise until you realize each one is really a list of architectural constraints. The senior move is to map every framework to the concrete controls it forces, then notice how much they overlap so you build one control set that satisfies several regimes.
 
-\`\`\`
-Framework   Protects              Core demand on architecture
-GDPR/CCPA   EU/CA personal data   Data-subject rights (access, erasure), lawful basis, residency
-SOC 2       customer trust        Trust Services Criteria, controls that operate over time, evidence
-HIPAA       US health PHI         Safeguards for PHI, BAAs with every processor, audit controls
-PCI-DSS     cardholder data       Isolate/encrypt PAN, network segmentation, scope reduction
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Framework",
+    "What it protects",
+    "Core demand on your architecture"
+  ],
+  "rows": [
+    [
+      "GDPR and CCPA",
+      "EU and California personal data",
+      "Data-subject rights (access, erasure, portability), a lawful basis, and residency"
+    ],
+    [
+      "SOC 2",
+      "Customer trust",
+      "Trust Services Criteria, with controls that demonstrably operate over a period and leave evidence"
+    ],
+    [
+      "HIPAA",
+      "US health data (PHI)",
+      "Safeguards for PHI, a signed BAA with every processor that touches it, and audit controls"
+    ],
+    [
+      "PCI-DSS",
+      "Cardholder data",
+      "Isolate and encrypt the PAN, segment the network, and reduce scope"
+    ]
+  ],
+  "highlightCols": [
+    "Core demand on your architecture"
+  ],
+  "caption": "Read the third column as a build list. The shared baseline (TLS, KMS-managed encryption at rest, least-privilege access, central logging, tested backups, vendor and change management) satisfies most of all four, and then each framework layers one non-negotiable on top."
+}
 \`\`\`
 
 ## The shared baseline
@@ -2350,14 +2379,128 @@ A single user lives in the primary DB, read replicas, Redis caches, an Elasticse
 
 Backups are the killer. You cannot surgically edit a Postgres snapshot from three weeks ago, and you should not (immutable backups are a ransomware defense). The answer is **crypto-shredding**: encrypt each user's data with a per-user data key, store those keys in a KMS, and to "erase" the user, destroy their key. The ciphertext still sits in old backups but is now unrecoverable noise, which regulators accept as effective erasure. This is the single most important pattern in this lesson.
 
-\`\`\`
-Erasure request(user_id)
-   -> live DBs / replicas: DELETE rows
-   -> caches (Redis): evict keys
-   -> search (OpenSearch): delete by query
-   -> lake (S3/Parquet): tombstone + compaction rewrite
-   -> third parties: call deletion API, store receipt
-   -> backups: DESTROY per-user KMS key (crypto-shred)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Where one erasure request has to reach",
+  "nodes": [
+    {
+      "id": "request",
+      "label": "Erasure request, keyed on a stable user_id",
+      "kind": "client"
+    },
+    {
+      "id": "orchestrator",
+      "label": "Rights orchestrator: a queue that fans out and tracks completion",
+      "kind": "service"
+    },
+    {
+      "id": "live",
+      "label": "Primary DB and read replicas",
+      "kind": "db"
+    },
+    {
+      "id": "cache",
+      "label": "Redis caches",
+      "kind": "cache"
+    },
+    {
+      "id": "search",
+      "label": "OpenSearch index",
+      "kind": "db"
+    },
+    {
+      "id": "lake",
+      "label": "Analytics lake (S3, Parquet)",
+      "kind": "db"
+    },
+    {
+      "id": "vendors",
+      "label": "Third-party processors (Stripe, Segment, email)",
+      "kind": "external"
+    },
+    {
+      "id": "backups",
+      "label": "Immutable, object-locked backups",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "request",
+      "to": "orchestrator",
+      "kind": "sync",
+      "label": "the 30-day clock starts here"
+    },
+    {
+      "from": "orchestrator",
+      "to": "live",
+      "kind": "async",
+      "label": "DELETE the rows"
+    },
+    {
+      "from": "orchestrator",
+      "to": "cache",
+      "kind": "async",
+      "label": "evict the keys"
+    },
+    {
+      "from": "orchestrator",
+      "to": "search",
+      "kind": "async",
+      "label": "delete by query, or re-index"
+    },
+    {
+      "from": "orchestrator",
+      "to": "lake",
+      "kind": "async",
+      "label": "tombstone, then a compaction rewrite"
+    },
+    {
+      "from": "orchestrator",
+      "to": "vendors",
+      "kind": "async",
+      "label": "call their deletion API, store the receipt"
+    },
+    {
+      "from": "orchestrator",
+      "to": "backups",
+      "kind": "async",
+      "label": "destroy the per-user KMS key: crypto-shred"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "request",
+        "orchestrator"
+      ],
+      "note": "A 30-day legal deadline needs a status you can audit, not an email thread. So the request is keyed on a stable user_id and fanned out by a workflow that tracks per-store completion."
+    },
+    {
+      "adds": [
+        "live",
+        "cache",
+        "search"
+      ],
+      "note": "The easy half: stores you own and can write to. This is where teams stop, and it is exactly why the user survives the ticket being closed."
+    },
+    {
+      "adds": [
+        "lake",
+        "vendors"
+      ],
+      "note": "Copies you do not fully control. Columnar lake files are immutable, so erasure means a tombstone plus a compaction rewrite, and a processor needs its deletion API called and the confirmation kept as evidence."
+    },
+    {
+      "adds": [
+        "backups"
+      ],
+      "note": "The killer, and the requirement that decides your key design. An immutable snapshot is a ransomware defense you must not edit, so the only workable erasure is destroying that user's key and letting every frozen copy become noise."
+    }
+  ],
+  "caption": "PII is never in one place, so erasure is an orchestration problem across every copy. Retention conflicts are settled per field: erase the marketing profile, keep the legally mandated financial record, and document the lawful basis for what stays."
+}
 \`\`\`
 
 **Retention conflicts** are real: tax law may require keeping transaction records for 7 years even after an erasure request. You cannot honor both blindly, so policy is per-field. You erase the marketing profile and contact info while retaining the legally-mandated financial record (often pseudonymized), and you document the lawful basis for what you keep.
