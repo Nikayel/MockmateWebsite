@@ -1539,17 +1539,17 @@ round to a complete design.
   "prompt": "Minute 25: your simple design satisfies every functional requirement, and you just spotted a clever caching optimization. What does the prime directive say to do?",
   "options": [
     {
-      "label": "Add the optimization now while it is fresh",
-      "feedback": "Tempting, but bolting on complexity before declaring completeness is how elaborate half-designs happen. The optimization is only worth considering once the plain version works end to end."
+      "label": "Add the optimization while it is fresh",
+      "feedback": "Tempting, but bolting complexity onto a design you have not yet declared complete is how elaborate half-designs happen. The prime directive says the plain version works end to end first, and only then is an optimization worth considering."
     },
     {
-      "label": "Narrate the transition, lock the complete design, then dive where the tightest NFR points",
+      "label": "Lock the complete design, then dive deep",
       "correct": true,
-      "feedback": "Right. A complete working design comes first. Then you say the phase change out loud and spend the depth budget where the NFRs point, which may or may not be that cache."
+      "feedback": "Right. A complete working design comes first. Narrate the phase change out loud so the interviewer follows the transition, then spend the depth budget where the tightest NFR points, which may or may not be that cache."
     },
     {
-      "label": "Go back and re-check the estimation numbers",
-      "feedback": "Estimation ended the moment you had a read/write QPS and a storage number. Re-refining numbers at minute 25 is drift, exactly what exit criteria exist to prevent."
+      "label": "Go back and re-check the estimates",
+      "feedback": "Estimation ended the moment you had a read/write QPS and a storage number, which is its exit criterion. Re-refining those numbers at minute 25 is exactly the drift that exit criteria exist to prevent."
     }
   ],
   "reveal": "In the design write, budget the six phases before you start, name each exit criterion as you hit it, and narrate every transition so you visibly lead the round to a complete design plus one committed deep dive."
@@ -1742,17 +1742,17 @@ one concrete request through both its write and its read or delivery path.
   "prompt": "Your diagram has 12 labeled boxes and covers every requirement on paper. What proves the design actually works before you move to deep dives?",
   "options": [
     {
-      "label": "Add one more layer of detail inside each box",
-      "feedback": "Tempting because detail feels like rigor, but 15 detailed boxes with no flow shown is the classic failure: nobody knows whether a single request survives the trip."
+      "label": "Add another layer of detail inside each box",
+      "feedback": "Tempting because detail feels like rigor, but a dozen detailed boxes with no flow shown is the classic failure of this phase: nobody in the room knows whether a single request survives the trip."
     },
     {
-      "label": "Trace one concrete request end to end through the write path and the read or delivery path",
+      "label": "Trace one concrete request end to end",
       "correct": true,
-      "feedback": "Right. Walking a real operation box by box exposes the gaps: where data waits, what happens when the recipient is offline, how the sender gets an ack. Then point at where each functional requirement is satisfied."
+      "feedback": "Right. Walk a real operation box by box, down the write path and back up the read or delivery path, and the gaps surface: where the data waits, what happens when the recipient is offline, how the sender gets an ack. Then point at where each functional requirement is satisfied."
     },
     {
-      "label": "List the specific technologies you would use for each box",
-      "feedback": "Naming Kafka and Redis proves nothing by itself. A box or a brand name without a traced flow and a requirement-tied justification reads as pattern-matching."
+      "label": "List the technologies for each box",
+      "feedback": "Naming Kafka and Redis proves nothing by itself. A brand name without a traced flow and a requirement-tied justification reads as pattern-matching rather than designing."
     }
   ],
   "reveal": "In the design write, start from the client-LB-app-DB-cache skeleton, justify every added box against a requirement, label arrows with what flows and how, then walk one request end to end before you claim the design is complete."
@@ -1847,16 +1847,16 @@ bottleneck, failure mode, monitoring, and cost driver.
   "options": [
     {
       "label": "Add a cache in front of the primary",
-      "feedback": "Tempting reflex, but caches absorb reads and this load is writes. Every one of the 1M writes still lands on the primary."
+      "feedback": "Tempting reflex, but caches absorb reads and this load is writes. Every one of the 1M writes per second still lands on the primary, and the lesson already told you reads are light."
     },
     {
-      "label": "Add read replicas",
-      "feedback": "Replicas scale reads and availability, but all writes still funnel through one primary. The write ceiling is untouched."
+      "label": "Add read replicas of the primary",
+      "feedback": "Replicas scale reads and availability, and every write still funnels through the one primary that accepts them. The write ceiling you were asked about is untouched."
     },
     {
-      "label": "Shard the datastore, defend the partition key, compare one alternative, and commit",
+      "label": "Shard the datastore and defend the key",
       "correct": true,
-      "feedback": "Right. Write-heavy load past one node's capacity is the sharding branch, roughly 200 shards at these numbers. Compare two viable options, commit with a quantified reason, and keep 2 to 3 minutes for the operational wrap-up."
+      "feedback": "Right. Write-heavy load past one node's capacity is the sharding branch, roughly 200 shards at 1M writes per second against a few thousand per node. Then compare one viable alternative, commit with a quantified reason, and keep 2 to 3 minutes for the operational wrap-up."
     }
   ],
   "reveal": "In the design write, let the NFRs and traffic model pick the bottleneck, compare two options and commit with a number, then close on where it breaks at 10x, the main failure mode, what you would monitor, and the dominant cost driver, naming any gap you did not cover."
