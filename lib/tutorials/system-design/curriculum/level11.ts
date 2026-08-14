@@ -1164,10 +1164,82 @@ Offline sets never cover real traffic, so you also evaluate in production. Canar
 
 ## Guardrails (the runtime filters)
 
-\`\`\`
-input  -> [PII redaction] [prompt-injection / jailbreak detection] -> model
-model  -> [schema validation] [toxicity / moderation] [PII scan] [groundedness check] -> user
-         (fail -> block, redact, or safe fallback; never ship the raw bad output)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Guardrails run in both directions",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "input",
+      "label": "User input",
+      "kind": "client"
+    },
+    {
+      "id": "inguard",
+      "label": "Input guardrails: PII redaction, prompt-injection and jailbreak detection",
+      "kind": "service"
+    },
+    {
+      "id": "model",
+      "label": "Model (often a third party)",
+      "kind": "external"
+    },
+    {
+      "id": "outguard",
+      "label": "Output guardrails: schema validation, toxicity and moderation, PII scan, groundedness and citation check",
+      "kind": "service"
+    },
+    {
+      "id": "user",
+      "label": "Answer shown to the user",
+      "kind": "client"
+    },
+    {
+      "id": "fallback",
+      "label": "Block, redact, or safe fallback",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "input",
+      "to": "inguard",
+      "kind": "sync"
+    },
+    {
+      "from": "inguard",
+      "to": "model",
+      "kind": "sync",
+      "label": "redacted prompt"
+    },
+    {
+      "from": "model",
+      "to": "outguard",
+      "kind": "sync",
+      "label": "raw completion, seen by nobody yet"
+    },
+    {
+      "from": "outguard",
+      "to": "user",
+      "kind": "sync",
+      "label": "passes every check"
+    },
+    {
+      "from": "inguard",
+      "to": "fallback",
+      "kind": "sync",
+      "label": "injection or jailbreak detected"
+    },
+    {
+      "from": "outguard",
+      "to": "fallback",
+      "kind": "sync",
+      "label": "invalid schema, toxic, leaks PII, or ungrounded"
+    }
+  ],
+  "caption": "Every request crosses two filters, and a failure on either side becomes a block, a redaction, or a safe fallback. The raw bad output never reaches the user."
+}
 \`\`\`
 
 Input guardrails redact PII before it hits a third-party model and detect prompt-injection and jailbreak attempts. Output guardrails validate structure (the response must be valid JSON matching a schema, else reject and retry), run moderation for toxicity, scan for leaked PII, and for RAG verify groundedness. On failure you block, redact, or return a safe fallback, never the raw bad output. For RAG, score groundedness (is each claim supported by the retrieved context) and verify every citation resolves to a real retrieved chunk. An unsupported claim or a fabricated citation fails the guardrail.
