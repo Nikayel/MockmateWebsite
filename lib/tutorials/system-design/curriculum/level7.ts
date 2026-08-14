@@ -1226,9 +1226,9 @@ The exponential part (\`base * 2^attempt\`) spaces retries further apart as fail
       "feedback": "Backoff and jitter protect the downstream from a synchronized wave of retries. They say nothing about whether the charge already happened."
     },
     {
-      "label": "No, not unless the charge carries an idempotency key the server dedupes on, because a timeout does not tell you whether the card was charged",
+      "label": "No, not unless the charge carries an idempotency key",
       "correct": true,
-      "feedback": "Right. A timeout is ambiguous: the request may have been lost, the response may have been lost, or the downstream may be slow and still processing. The key is what makes a second attempt safe."
+      "feedback": "Right. A timeout is ambiguous: the request may have been lost, the response may have been lost, or the downstream may be slow and still processing, so it never tells you whether the card was charged. An idempotency key the server dedupes on is what makes a second attempt safe, because the duplicate returns the original result instead of charging again."
     },
     {
       "label": "Yes, because a timeout means the request never arrived",
@@ -1553,9 +1553,9 @@ A metastable failure is one that *sustains itself after the original trigger is 
       "feedback": "The demand is no longer the original spike, it is the retry loop, and retries expand to consume whatever capacity you add."
     },
     {
-      "label": "It usually does not break the loop: retries scale up to fill the new capacity, and if the bottleneck is a shared database, more app servers make it worse",
+      "label": "It usually does not break the loop",
       "correct": true,
-      "feedback": "Right. You have to attack the feedback loop itself by shedding load until demand falls below capacity and by making clients back off with jitter."
+      "feedback": "Right. The demand is no longer the original spike, it is the retry loop, and retries expand to fill whatever capacity you add. If the bottleneck is a shared database, more app servers make it actively worse. You have to attack the feedback loop itself: shed load until demand falls below capacity, and make clients back off with jitter so the wave dissipates."
     },
     {
       "label": "The system recovers, but only once the autoscaler finishes a few seconds later",
@@ -1587,9 +1587,9 @@ Adding capacity often does not break the loop, because the retries scale up to c
       "feedback": "A deeper queue buys latency and eventually an out-of-memory kill. Requests sit until the client has already given up, so the work is wasted before it finishes."
     },
     {
-      "label": "Reject roughly half the arriving requests at the edge with 503 and a Retry-After header, killing prefetch and batch traffic before checkout",
+      "label": "Reject about half of them at the edge with a 503",
       "correct": true,
-      "feedback": "Right. Discarding doomed work early is what converts throughput into goodput, and prioritizing by request class decides who survives the cut."
+      "feedback": "Right. Discarding doomed work early is what converts throughput into goodput: the machine's capacity goes to requests that can still finish instead of to context switches, garbage collection, and work the client already abandoned. Send a Retry-After header so the rejected clients back off, and prioritize by request class so prefetch and batch traffic die before checkout does."
     },
     {
       "label": "Serve everything and let the clients retry whatever fails",
