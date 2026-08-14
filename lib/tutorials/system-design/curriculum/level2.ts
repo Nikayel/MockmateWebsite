@@ -3581,6 +3581,90 @@ partition key and, for known-heavy keys, **write sharding**: append a suffix
 (\`THREAD#123#<0..9>\`) to fan one logical partition across ten physical ones, then scatter-read the
 ten on the way out.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "The hot partition ceiling, and what write sharding buys",
+  "predictPrompt": {
+    "question": "Your table is provisioned for 100,000 writes per second, and one celebrity thread takes 4,000 of them. A single DynamoDB partition caps out near 1,000 writes per second. What happens?",
+    "options": [
+      "Nothing: the table has 25 times the capacity it needs",
+      "That one key throttles near 1,000 writes per second while the rest of the table idles",
+      "DynamoDB splits the key across partitions on its own",
+      "The excess writes queue and drain within the second"
+    ]
+  },
+  "workedExample": "At the initial 20,000 writes per second with 20 percent of them landing on one celebrity thread, that single partition key takes 4,000 writes per second against a ceiling near 1,000. It is four times over and throttled, no matter that the table as a whole is provisioned far above its total load. Drag suffixes to 4 and the write-sharded key spreads to 1,000 per shard, exactly at the ceiling. Take it to 10 for margin, then remember what you just bought: every read of that key now fans out to 10 partitions and merges the results.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "total_writes",
+      "label": "Writes per second across the table",
+      "min": 100,
+      "max": 500000,
+      "scale": "log",
+      "initial": 20000,
+      "unit": "per second"
+    },
+    {
+      "kind": "slider",
+      "id": "hot_share",
+      "label": "Share of them landing on the hottest key",
+      "min": 1,
+      "max": 60,
+      "scale": "linear",
+      "step": 1,
+      "initial": 20,
+      "unit": "percent"
+    },
+    {
+      "kind": "slider",
+      "id": "shards",
+      "label": "Write-sharding suffixes on that key",
+      "min": 1,
+      "max": 50,
+      "scale": "linear",
+      "step": 1,
+      "initial": 1,
+      "unit": "suffixes"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "hot_writes",
+      "label": "Writes aimed at the hottest key",
+      "expr": "total_writes * hot_share / 100",
+      "format": "compact",
+      "unit": "per second"
+    },
+    {
+      "id": "per_partition",
+      "label": "Writes per physical partition after sharding",
+      "expr": "hot_writes / shards",
+      "format": "compact",
+      "unit": "per second",
+      "sparkline": {
+        "over": "shards"
+      }
+    },
+    {
+      "id": "ceiling_use",
+      "label": "Load against the 1,000 per second partition ceiling",
+      "expr": "per_partition / 1000",
+      "format": "percent"
+    },
+    {
+      "id": "shards_needed",
+      "label": "Suffixes needed to clear the ceiling",
+      "expr": "ceil(hot_writes / 1000)",
+      "format": "number",
+      "unit": "suffixes"
+    }
+  ],
+  "caption": "Total provisioned capacity is not the constraint; one key's share of it is. Sharding trades a write bottleneck for a read fan-out, so the cost lands on the way out."
+}
+\`\`\`
+
 **Secondary indexes** buy additional access patterns without a second table. A **global secondary
 index (GSI)** has its own partition and sort key over the same items, so you can query by a different
 attribute. GSIs are eventually consistent and cost extra write capacity (every base write replicates
