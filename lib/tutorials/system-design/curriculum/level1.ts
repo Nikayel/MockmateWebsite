@@ -2374,11 +2374,41 @@ Pair webhooks with retries, HMAC signing, and idempotency, because they will be 
 }
 \`\`\`
 
-\`\`\`
-one-way, low urgency ....... short-poll
-one-way, near-real-time .... long-poll (fallback) / SSE (preferred)
-two-way, low latency ....... WebSocket
-server-to-server async ..... webhooks
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "What the flow looks like",
+    "Cheapest mechanism that fits",
+    "What it costs you"
+  ],
+  "rows": [
+    [
+      "One way, low urgency",
+      "Short-polling",
+      "latency is capped at the poll interval, but every request is stateless and trivially balanced"
+    ],
+    [
+      "One way, near real time",
+      "SSE preferred, long-polling as the fallback",
+      "one held HTTP response per client; long-polling exists for proxies that break streaming"
+    ],
+    [
+      "Two way, low latency",
+      "WebSocket",
+      "a stateful duplex connection, so sticky sessions or a pub/sub backbone, plus heartbeats and reconnect logic you own"
+    ],
+    [
+      "Server to server, async",
+      "Webhooks",
+      "retries, HMAC signing and idempotency, because they will be redelivered"
+    ]
+  ],
+  "highlightCols": [
+    "What the flow looks like"
+  ],
+  "caption": "Pick the row by direction and latency first, then read the cost column before you commit. Reaching for WebSocket on a one-directional feed buys the duplex tax and none of the benefit."
+}
 \`\`\`
 
 **Interview nuance:** the classic trap is reaching for WebSocket for everything. If the data flow is
