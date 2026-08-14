@@ -2381,11 +2381,50 @@ only with a reason tied to a requirement:
 - An **object store** (S3) for large blobs (images, video, files) that do not belong in a row.
 - A **search index** (Elasticsearch) when you need full-text or faceted queries the primary store
   cannot serve.
+- A **geospatial index** (Redis geo commands, or an in-memory QuadTree) when the query is "what is
+  near this point" and it is asked at a rate the primary store cannot serve.
 
 The discipline is that you say why each box exists. "I am adding Redis here because reads are 10x
 writes and the same hot keys repeat, so caching cuts p99 and datastore QPS." A box without a
 justification is the single most common wrong turn: adding Kafka or sharding you cannot yet defend
 makes you look like you are pattern-matching, not designing.
+
+### The palette entry most people have to invent on the spot
+
+Five of those six boxes are familiar. The proximity store usually is not, so here is what earns it a
+place. Take a scooter-share fleet: every scooter reports its position every few seconds, and riders
+ask "what is within 500 metres of me". A relational store can express that query:
+
+\`\`\`
+-- on the primary database, with the PostGIS extension
+UPDATE scooters SET loc = POINT(-122.41, 37.77) WHERE id = 42;   -- one durable row write per ping
+SELECT id FROM scooters
+ WHERE status = 'available'
+   AND ST_DWithin(loc, POINT(-122.41, 37.77), 500);
+\`\`\`
+
+It fails on rate, not on syntax. Every ping is a durable write to a single primary with an on-disk
+index update, and the fleet pings whether or not anyone is searching, so the write load is set by the
+fleet size rather than by demand.
+
+An in-memory geospatial index answers the same question out of RAM, and the position update is a
+single in-memory write:
+
+\`\`\`
+GEOADD   scooters:sf -122.41 37.77 scooter:42
+GEOSEARCH scooters:sf FROMLONLAT -122.41 37.77 BYRADIUS 500 m ASC COUNT 20
+  -> scooter:42, scooter:88, scooter:17     (nearest first)
+\`\`\`
+
+The key name is half the design. The index is partitioned into a grid of geographic cells (a geohash
+or S2 grid, one key per cell), so a search reads the caller's cell plus its neighbours instead of
+scanning the whole fleet, and each shard owns a region. Partitioning by scooter id would not work,
+because "near this point" does not follow id ranges. An in-memory QuadTree sharded by region is the
+other common shape of the same box.
+
+Like every other box, it enters with a requirement behind it: a proximity query at a rate the primary
+store cannot absorb. It is not free either, because nothing in RAM is durable, so the thing that must
+survive a restart lives somewhere else.
 
 \`\`\`cswidget
 {

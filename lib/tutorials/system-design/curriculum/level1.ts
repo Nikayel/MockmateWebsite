@@ -1754,6 +1754,48 @@ distinction between caching a public marketing page and a logged-in dashboard.
 }
 \`\`\`
 
+### One hot key, one expiry, a thousand misses
+
+Step 9 hides a failure mode that only shows up under load. Cache-aside says: on a miss, read the
+database, then populate the cache. That is fine while misses are spread out. It stops being fine the
+moment a large share of live traffic wants the same key and that key expires at once.
+
+\`\`\`
+# One product page, 10,000 req/s all reading product:42. The rebuild query takes 300ms.
+t=0.000   product:42 TTL expires
+t=0.000   request 1 misses  -> starts the 300ms rebuild
+t=0.001   requests 2..11 miss as well (nothing has repopulated yet) -> 10 more rebuilds
+t=0.002   requests 12..21 miss  -> 10 more
+  ...
+t=0.300   ~3,000 concurrent copies of the SAME query are in the database
+t=0.300   rebuild 1 finishes and writes the key; the other 2,999 finish and write it again
+\`\`\`
+
+No individual request did anything wrong. The cache simply stopped answering for 300ms, and 300ms of
+undiluted traffic reached a database that was sized for the miss rate rather than the request rate.
+That is a **cache stampede**, also called a thundering herd, and it compounds: the pile-on slows the
+database, the slower rebuild widens the window, and the window admits more of the pile-on.
+
+**Request coalescing, also called single flight**, is the direct fix. Let exactly one caller per key
+perform the rebuild and make the rest wait on its result, so concurrent misses collapse into one
+query:
+
+\`\`\`
+t=0.000  request 1 misses, takes the lock on product:42, starts the rebuild
+t=0.001  requests 2..3000 miss, find the lock already held, wait
+t=0.300  request 1 writes the key and releases the lock; the other 2,999 read the fresh value
+# database queries for this key across the window: 1, not 3,000
+\`\`\`
+
+**Jittered TTLs** stop keys from dying in lockstep. A batch warmed together with an identical TTL
+expires together, so write \`TTL = 300s + random(0..60s)\` instead and the expiries smear over a
+minute rather than landing on one tick. This is the same trick as jitter on retries, applied to
+expiry instead of to backoff.
+
+**Stale-while-revalidate** removes the miss entirely for a bounded window: keep serving the expired
+value while one background rebuild runs, and swap it when the rebuild lands. Readers see a fast
+answer that is a few seconds old, which is a staleness you chose rather than a stall you did not.
+
 Failure points and timeouts, per hop: DNS resolution timeout, TCP connect timeout, TLS handshake
 failure (expired cert), LB/gateway 502/503/504 when a backend is down or slow, app-to-DB query
 timeout, and downstream-service timeouts that need circuit breakers so one slow dependency does not
@@ -1762,8 +1804,9 @@ whole request.
 
 Recap: a request walks browser cache -> DNS -> TCP -> TLS -> CDN/WAF/LB/gateway -> app -> auth -> app
 cache -> DB/downstream and back through serialize/compress/cache-header/render, where each layer adds
-an RTT and offers a cache that can short-circuit the rest, and every hop needs its own timeout so one
-slow dependency cannot stall the whole path.
+an RTT and offers a cache that can short-circuit the rest, every hop needs its own timeout so one
+slow dependency cannot stall the whole path, and a hot key needs single flight, jittered TTLs, or
+stale-while-revalidate so its expiry does not deliver full traffic to the database.
 
 \`\`\`cswidget
 {
