@@ -2890,7 +2890,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-partial-failure",
           title: "Partial Failure & the Fallacies of Distributed Computing",
           summary:
-            "A timeout is fundamentally ambiguous across four physical outcomes, so every call must be designed for retries, reordering, duplication, and stale reads via idempotency.",
+            "Why a timeout tells you nothing about what the other service actually did, and why idempotent retry is the only safe reaction.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["fallacies", "partial-failure"],
@@ -2939,7 +2939,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-cap-correct",
           title: "CAP Theorem (Correct Framing)",
           summary:
-            "CAP forces a choice only during a partition: linearizability or availability. P is non-negotiable, CA is not real, and production systems tune the choice per operation.",
+            "CAP is a forced choice only during a partition, which is why CA is not a real operating point for anything that spans a network.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["cap", "consistency", "partition"],
@@ -2986,7 +2986,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-pacelc",
           title: "PACELC & the Steady-State Tradeoff",
           summary:
-            "The else-case tax: linearizable reads and writes cost leader or quorum round trips on every request, so place stores on PA/EL vs PC/EC and tie the choice to a latency SLO.",
+            "PACELC's else-case: what a linearizable read really costs per request when the network is perfectly healthy and no partition is in sight.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["pacelc", "consistency", "latency"],
@@ -3044,7 +3044,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-consistency-spectrum",
           title: "Consistency Models Spectrum",
           summary:
-            "Linearizable, sequential, causal, eventual: name the exact model and its coordination cost, and always pick the weakest model that is still correct for the data.",
+            "Linearizable, sequential, causal, eventual: what each model costs in coordination, and how to pick the weakest one that is still correct.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["consistency-models", "linearizability"],
@@ -3093,7 +3093,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-session-guarantees",
           title: "Client-Centric Session Guarantees",
           summary:
-            "Fix per-client staleness bugs with the four Bayou session guarantees, implemented via sticky routing or version tokens, with tokens required for cross-device correctness.",
+            "Why a sticky session cannot deliver read-your-writes across two devices, and what a logical version token buys you instead.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["session-guarantees", "consistency"],
@@ -3141,7 +3141,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-logical-clocks",
           title: "Logical Time: Lamport & Vector Clocks",
           summary:
-            "Lamport clocks give a causality-respecting total order but cannot detect concurrency; vector clocks detect it and surface siblings, at O(N) size with a GC problem.",
+            "Lamport clocks order events but cannot spot concurrency, which is exactly why leaderless stores reach for vector clocks and pay O(N) for them.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["logical-clocks", "vector-clocks", "causality"],
@@ -3190,7 +3190,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-physical-time-hlc",
           title: "Physical Time, Clock Uncertainty, HLC & TrueTime",
           summary:
-            "Wall-clock LWW silently drops writes under NTP skew; HLC gives causal, monotonic timestamps on commodity hardware, TrueTime's bounded interval plus commit-wait buys external consistency.",
+            "Why last-writer-wins on wall-clock time silently eats writes under clock skew, and what HLC and TrueTime each do about it.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["hlc", "truetime", "clocks"],

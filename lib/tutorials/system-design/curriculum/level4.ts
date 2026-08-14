@@ -1481,9 +1481,9 @@ policy.
       "feedback": "Tempting for its simplicity, but fixed window has the boundary spike, and failing closed turns a limiter-store outage into a full API outage."
     },
     {
-      "label": "Token bucket with a 429 plus Retry-After contract, failing open with downstream load shedding as the backstop",
+      "label": "Token bucket with a 429 contract, failing open",
       "correct": true,
-      "feedback": "Right. Token bucket allows natural bursts while capping the sustained rate, the response contract lets well-behaved clients back off, and failing open keeps the limiter itself from becoming the outage."
+      "feedback": "Right. Token bucket allows the natural bursts while capping the sustained rate, and because it has no aligned window there is no boundary edge to double at. The 429 plus Retry-After and the RateLimit headers let well-behaved clients back off, and failing open keeps a limiter-store outage from becoming an API outage, with downstream load shedding as the real backstop."
     },
     {
       "label": "Sliding-window log for exactness, failing open",
@@ -1922,9 +1922,9 @@ hide that lag with warm pools, scheduled pre-scaling, and standing headroom.
       "feedback": "Tempting, but CPU is a lagging signal and reactive scaling still pays the full 2 to 5 minute pipeline. Aggressive settings mostly add flapping, not speed."
     },
     {
-      "label": "Scheduled pre-scaling before 9am, queue-depth or RPS signals for the gradual ramps, and standing headroom for the surprises",
+      "label": "Scheduled pre-scaling, leading signals, and headroom",
       "correct": true,
-      "feedback": "Right. Predictable load gets capacity raised ahead of time, leading signals cut reaction lag on gradual changes, and headroom absorbs the bursts nothing can predict."
+      "feedback": "Right. The 9am spike is predictable, so a scheduled scaler raises the floor at 8:50 and the capacity is warm before the first user arrives. Queue depth or RPS cuts reaction lag on the gradual ramps, and standing headroom is the only thing that absorbs a burst nothing could predict while new capacity boots."
     },
     {
       "label": "VPA, so every pod gets more CPU when the spike hits",
@@ -2105,9 +2105,9 @@ the resulting capacity across reserved/on-demand/spot by peak-to-average ratio.
       "feedback": "The Little's Law step is right, but this sizes to 100% utilization with zero failover margin. The first burst pushes utilization toward 1 and the 1/(1-rho) blow-up wrecks p99, and an AZ loss is fatal."
     },
     {
-      "label": "About 35: 4500 in flight / 300 = 15, then / 0.65 for utilization = 23, then x 1.5 for N+1 across 3 AZs",
+      "label": "About 35 instances: 15, then utilization, then AZs",
       "correct": true,
-      "feedback": "Right. Concurrency first, then the utilization target with a reason (queues explode near 100%), then the AZ factor so losing a zone still covers peak. That is the defensible chain."
+      "feedback": "Right. Little's Law first: 30000 x 0.15 = 4500 in flight, and 4500 / 300 = 15 instances. Divide by the 0.65 utilization target because queues explode near 100%, which gives 23. Then multiply by 1.5 so the two surviving AZs still cover peak, which gives about 35. Concurrency, then a utilization target with a reason, then the AZ factor: that is the defensible chain."
     }
   ],
   "reveal": "In the design exercise, say the chain out loud: RPS x latency = concurrency, divide by per-instance concurrency, divide by a 50 to 70% utilization target, multiply by the N+1 AZ factor, then split the result across reserved, on-demand, and spot using the peak-to-average ratio. Interviewers grade the method, not the exact number."
@@ -2253,9 +2253,9 @@ error. This is exactly how AWS Route 53 isolates customers.
       "feedback": "Tempting, because the dead hardware is identical. But blast radius is about who depends on exactly that pair: in Plan A it is every tenant on the shard, in Plan B it is almost nobody."
     },
     {
-      "label": "Plan A: everyone on that shard, a full quarter of tenants. Plan B: only the roughly 1-in-28 tenants holding the exact same pair",
+      "label": "Plan A takes down a quarter of tenants; Plan B almost none",
       "correct": true,
-      "feedback": "Right. Fixed shards make shard-mates share total fate. With random pairs, a tenant who overlaps on just one worker still has a healthy worker and survives with a retry; only an identical pair means full loss."
+      "feedback": "Right. In Plan A every tenant on that fixed shard depends on exactly those 2 workers, so shard-mates share total fate and a full quarter goes down. In Plan B only the roughly 1-in-28 tenants holding the identical pair lose both of theirs; a tenant who overlaps on just one worker still has a healthy worker and survives with a retry."
     },
     {
       "label": "Plan B is worse: random pairs spread the flood across more tenants",
