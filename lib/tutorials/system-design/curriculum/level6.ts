@@ -1405,6 +1405,106 @@ moves assignment computation to the broker-side coordinator and makes rebalances
 removing the stop-the-world join barrier. Tuning \`session.timeout.ms\`/\`heartbeat.interval.ms\`
 sensibly (e.g., 45s/3s) avoids spurious rebalances from a GC pause.
 
+### Stateful consumers, and what a handoff costs them
+
+Plenty of consumers are stateless: read an event, write a row, done. The interesting ones are
+**stateful**. A sessionizer holds an open session per user, a counter holds a running total per key,
+a geo-index holds the last known position per driver. Kafka does not hold that state for you, so it
+lives on the consumer pod itself, normally in an embedded key-value store on local disk. **RocksDB**
+is the usual choice: it is the same LSM engine Level 2 covered, embedded in the consumer process so
+every read and write stays on the machine running the handler.
+
+Local state and rebalancing collide. Partitions move between pods, and the state belonging to a
+moved partition is on the wrong machine. The fix is to stop treating the local store as the only
+copy and make it a materialization of a Kafka topic. Every time the handler updates a key it also
+produces the new value to a **changelog topic**: same key, same partition count as the source, and
+\`cleanup.policy=compact\`, which keeps at least the latest value per key instead of deleting by age.
+The local store becomes a cache the log can rebuild.
+
+Walk one partition through a handoff:
+
+1. Pod A owns \`page_views\` p3 and holds 4M open sessions for that partition's users in its local
+   store. Every update also appends the new session value to \`sessions-changelog\` p3, keyed by
+   \`user_id\`.
+2. Pod A dies. The coordinator reassigns p3 to pod B, whose local store knows nothing about those
+   users.
+3. Before processing anything new, pod B reads \`sessions-changelog\` p3 from offset 0. Because that
+   topic is compacted, the read is roughly one record per live key, about 4M records, not the entire
+   edit history that produced them.
+4. Store rebuilt, pod B resumes \`page_views\` p3 from the group's committed offset.
+
+Read step 3 against the alternative. With no changelog, the only way to rebuild is to replay
+\`page_views\` p3 itself: 30 days of raw events kept for everyone else's benefit, orders of magnitude
+more records than there are keys, and possible at all only while the source retention still reaches
+back far enough. The changelog is the difference between a handoff measured in seconds and one
+measured in hours.
+
+Two consequences follow, and both are worth saying out loud in an interview. A stateful group pays a
+restore cost at **every** handoff, so static membership and cooperative rebalancing are worth far
+more here than to a stateless group. And raising the partition count of a stateful topic is not a
+config change: the key-to-partition mapping moves, so pods end up holding state for keys they no
+longer own and the whole group rebuilds from its changelog before it processes again.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Where state lives",
+    "Rebuild source after a handoff",
+    "Records read to restore 4M sessions",
+    "Works if the source aged out?"
+  ],
+  "rows": [
+    [
+      "Local RocksDB only",
+      "Nothing to rebuild from; the state died with the pod",
+      "n/a, the sessions are gone",
+      "no"
+    ],
+    [
+      "Local RocksDB + source replay",
+      "page_views p3 from offset 0",
+      "every raw event in the retention window",
+      "no"
+    ],
+    [
+      "Local RocksDB + compacted changelog",
+      "sessions-changelog p3 from offset 0",
+      "~4M, one per live key",
+      "yes"
+    ]
+  ],
+  "highlightCols": [
+    "Records read to restore 4M sessions"
+  ],
+  "caption": "Same handler, three storage plans. Compaction is what turns the restore from the size of the history into the size of the state, which is why a stateful consumer backs its local store with a compacted changelog keyed and partitioned exactly like its source."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A stateful consumer keeps per-user session state in a local RocksDB store backed by a compacted changelog topic. Its pod dies and the partition is reassigned. What does the new owner read before it resumes processing?",
+  "options": [
+    {
+      "label": "The changelog partition from offset 0, one record per live key",
+      "correct": true,
+      "feedback": "Right. Compaction keeps at least the latest value per key, so the restore is the size of the state rather than the size of the history, and it does not depend on the source topic still retaining old events."
+    },
+    {
+      "label": "Nothing: the coordinator moves the store with the partition",
+      "feedback": "Kafka reassigns partitions, not local disks. The coordinator has no idea the consumer keeps state, which is exactly why the state needs its own topic."
+    },
+    {
+      "label": "The source topic from offset 0, replaying every raw event still inside the retention window",
+      "feedback": "That is the fallback when there is no changelog, and it is the expensive one: orders of magnitude more records than keys, and it fails outright once the source has aged past the state it needs."
+    }
+  ],
+  "reveal": "Local state plus rebalancing means state has to be rebuildable. A compacted changelog, keyed and partitioned like the source, makes restore cost proportional to the number of keys instead of the number of events."
+}
+\`\`\`
+
 **Interview nuance:** the health/scaling signal is **consumer lag** (latest offset minus committed
 offset). Rising lag means you are falling behind; autoscale consumers on lag, but only up to the
 partition count, and alert on it. Do not scale on CPU alone.
@@ -1412,8 +1512,9 @@ partition count, and alert on it. Do not scale on CPU alone.
 Recap: a consumer group splits partitions one-per-consumer so group size is capped by partition
 count; offset-commit timing sets the delivery guarantee, and commit-after-process gives at-least-once
 so handlers must be idempotent; rebalancing is stop-the-world in the eager protocol but made
-incremental by cooperative rebalancing, static membership, and KIP-848; and consumer lag is the
-metric you scale and alert on.
+incremental by cooperative rebalancing, static membership, and KIP-848; a stateful consumer keeps its
+state locally and backs it with a compacted changelog so a reassigned partition restores from the
+changelog instead of replaying the source; and consumer lag is the metric you scale and alert on.
 
 \`\`\`cswidget
 {
