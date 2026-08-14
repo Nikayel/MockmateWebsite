@@ -598,9 +598,10 @@ magnitude and redo the division with today's rates.
 At the small end, a three-broker managed cluster sized for a few thousand messages a second runs on
 the order of 1,000 dollars a month. The same three brokers on plain VMs with disks are roughly half
 that, so self-hosting saves about 500 dollars a month. A fully loaded senior engineer in a high-cost
-market is on the order of 20,000 dollars a month, which makes that saving about two hours of one.
-Version upgrades, a disk filling at 3am, one broker replacement, and a rebalance that goes sideways
-will cost more than two hours a month, every month.
+market is on the order of 20,000 dollars a month, which is about 125 dollars an hour across a roughly
+160-hour month, so that saving buys about four hours of one. Version upgrades, a disk filling at 3am,
+one broker replacement, and a rebalance that goes sideways will cost more than four hours a month,
+every month.
 
 At the large end the same division points the other way. Usage-priced managed streaming runs on the
 order of a few cents per GB in and out, and 1 GB/s sustained is about 2.6 PB a month of ingest before
@@ -609,10 +610,12 @@ traffic, against a platform team that does not.
 
 \`\`\`
 a few thousand msg/s   managed ~$1,000/mo, self-hosted ~$500/mo plus the ops
-                       premium ~$500/mo  =  ~2 hours of one engineer's month
+                       premium ~$500/mo  =  ~4 hours of one engineer's month
+                       ($20,000/mo over a ~160-hour month is ~$125/hour)
 
 1 GB/s sustained       managed at ~$0.03/GB x 2.6 PB/mo  =  ~$78,000/mo, ingest alone
-                       a 4-person platform team          =  ~$70,000/mo, flat in traffic
+                       one consumer reading all of it    =  ~$156,000/mo, in and out
+                       a 4-person platform team          =  ~$80,000/mo, flat in traffic
 \`\`\`
 
 So the driver is not "small team, use managed." It is: take managed while the premium is smaller than
@@ -627,12 +630,12 @@ magnitude. The crossover, not the team size, is the thing to say out loud.
   "options": [
     {
       "label": "Agree: cutting infrastructure spend is the first lever a small team should pull",
-      "feedback": "Cut the line that is large. This one is not: 500 dollars a month against an engineer at roughly 20,000 means the saving is worth about two hours, and upgrades, disks, and on-call spend more than two hours a month before anything goes wrong."
+      "feedback": "Cut the line that is large. This one is not: 500 dollars a month against an engineer at roughly 20,000, or about 125 an hour, means the saving is worth about four hours, and upgrades, disks, and on-call spend more than four hours a month before anything goes wrong."
     },
     {
-      "label": "That premium is about 500 dollars a month, or roughly two hours of an engineer",
+      "label": "That premium is about 500 dollars a month, or roughly four hours of an engineer",
       "correct": true,
-      "feedback": "Right, and stating the ratio is the whole move. A fully loaded senior engineer runs on the order of 20,000 dollars a month, so the entire saving buys back two hours, and running brokers costs more than that every month in upgrades, disk pressure, broker replacement, and on-call. The premium is not a premium at this size, it is a discount."
+      "feedback": "Right, and stating the ratio is the whole move. A fully loaded senior engineer runs on the order of 20,000 dollars a month, about 125 an hour across a 160-hour month, so the entire saving buys back four hours, and running brokers costs more than that every month in upgrades, disk pressure, broker replacement, and on-call. The premium is not a premium at this size, it is a discount."
     },
     {
       "label": "Disagree, because a self-hosted cluster cannot reach the same durability guarantees",
@@ -643,7 +646,7 @@ magnitude. The crossover, not the team size, is the thing to say out loud.
       "feedback": "They are not, and that is exactly why the answer flips. Usage-priced managed streaming charges per GB, so at 1 GB/s it is a six-figure monthly bill while a platform team is flat in traffic. The premium is small here because the traffic is."
     }
   ],
-  "reveal": "Compare the managed premium against a loaded engineer-month, then re-run it whenever throughput moves an order of magnitude. At a few thousand messages a second the premium is two hours of an engineer; at 1 GB/s it is a platform team."
+  "reveal": "Compare the managed premium against a loaded engineer-month, then re-run it whenever throughput moves an order of magnitude. At a few thousand messages a second the premium is four hours of an engineer; at 1 GB/s it is a platform team."
 }
 \`\`\`
 
@@ -4308,7 +4311,7 @@ export const systemDesignLevel6: DesignLevel = {
               "**Image-resize task queue: SQS (standard).** A textbook competing-consumers workload: each upload produces one resize job that exactly one worker performs, then acks and deletes. The drivers are work distribution and simple retry/DLQ, not ordering or replay. SQS gives a visibility timeout (a crashed worker's job reappears), a native DLQ after N receives, and zero ops. Kafka would be overkill: no retention or fan-out needed, so I would be running a log to do a queue's job.",
               "**30-day-replayable analytics stream: Kafka (or Kinesis/MSK).** The requirement literally names replay and implies multiple independent consumers over the same data. Only a log satisfies retention plus multi-consumer-group replay. Use Kafka with 30-day retention (as MSK, or Kinesis if fully serverless and the throughput fits its shard model). Each analytics job is its own consumer group and can rewind to reprocess. A queue is disqualified because it deletes on consume.",
               "**Decoupled microservice notifications: SNS (with SNS-to-SQS fan-out).** Several services react to an event and I want fan-out without running a broker. SNS publishes a copy to each subscriber; wiring SNS-to-SQS gives each subscriber a durable queue so a down service does not miss messages: the lowest-ops fan-out on AWS. Reach for Kafka only if these notifications later needed replay or high-throughput streaming.",
-              "**Why managed everywhere here, priced rather than preferred:** at thousands of messages a second the premium over self-hosting the same brokers is on the order of 500 dollars a month, and a fully loaded senior engineer is on the order of 20,000, so the whole saving is worth about two hours of one person's month. Upgrades, a full disk, and on-call spend more than that before anything goes wrong. I would re-run that division if this traffic grew a hundredfold, because usage-priced managed streaming scales with bytes while a platform team does not.",
+              "**Why managed everywhere here, priced rather than preferred:** at thousands of messages a second the premium over self-hosting the same brokers is on the order of 500 dollars a month, and a fully loaded senior engineer is on the order of 20,000, or about 125 an hour, so the whole saving is worth about four hours of one person's month. Upgrades, a full disk, and on-call spend more than that before anything goes wrong. I would re-run that division if this traffic grew a hundredfold, because usage-priced managed streaming scales with bytes while a platform team does not.",
               "**The through-line:** match each workload to the cheapest tool that meets its drivers, and explicitly refuse to use Kafka for the two workloads that do not need a log. Common wrong turn: one Kafka cluster for all three, paying streaming ops for a simple resize queue and a fan-out notification.",
             ],
           },
@@ -4322,7 +4325,7 @@ export const systemDesignLevel6: DesignLevel = {
               "Where does a plain queue still fit inside a Pulsar shop?",
             ],
             modelAnswerOutline: [
-              "Assumptions: many tenants sharing infrastructure, tens of thousands of events/sec aggregate, regulatory pressure for tenant isolation and cross-region durability, and a platform team large enough to run real infrastructure. That last assumption is where the ops-budget division has flipped: a usage-priced managed platform charges a few cents per GB and grows with traffic forever, while a four-person platform team costs roughly 70,000 dollars a month and stays flat, so self-running is defensible at this volume in a way it is not at a few thousand messages a second.",
+              "Assumptions: many tenants sharing infrastructure, tens of thousands of events/sec aggregate, regulatory pressure for tenant isolation and cross-region durability, and a platform team large enough to run real infrastructure. That last assumption is where the ops-budget division has flipped: a usage-priced managed platform charges a few cents per GB and grows with traffic forever, while a four-person platform team costs roughly 80,000 dollars a month and stays flat, so self-running is defensible at this volume in a way it is not at a few thousand messages a second.",
               "**Choose Apache Pulsar as the backbone.** The requirements line up with what Pulsar adds over Kafka. (1) Compute/storage separation (stateless brokers over BookKeeper) scales serving capacity and storage independently, so one noisy tenant spiking traffic does not force more retention. (2) Multi-tenancy is first-class: tenants, namespaces, and per-namespace policies (quotas, retention, isolation) make per-tenant isolation a configuration, not a fleet of clusters. (3) Geo-replication across regions is built in at the namespace level, satisfying DR without bolting on MirrorMaker. 90-day replay is native via retention plus tiered storage (cold segments to S3), so you avoid broker disk for three months of history.",
               "**Why not Kafka:** it can hit the throughput and, with tiered storage plus MirrorMaker 2, approximate retention and geo-replication. But multi-tenant isolation and independent compute/storage scaling are things you engineer around in Kafka (separate clusters per tenant tier, careful quotas) rather than get natively. For a platform whose core requirement is per-tenant isolation, Pulsar's model is a better fit; acknowledge Kafka's larger ecosystem as the real tradeoff.",
               "**Why not a managed queue:** SQS/SNS cannot do 90-day multi-consumer replay at all, so it is disqualified as the backbone.",
