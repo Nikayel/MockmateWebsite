@@ -2529,9 +2529,9 @@ INSERT INTO staged_events (event_id, user_id, amount, country) VALUES
 
 const distributedExecution: SqlLesson = {
   id: "sql-l6-distributed-execution",
-  title: "How a Distributed Engine Splits Work, and Why the Shuffle Is Expensive",
+  title: "Why the Shuffle Is Expensive: Partitions, Stages, and Tasks",
   summary:
-    "Data splits into partitions, a job into stages, a stage into one task per partition. Narrow steps stay put; wide steps (group-by, join) force a shuffle across the network, the dominant cost of a big job.",
+    "Narrow steps stay on one machine, but a group-by or a join forces a shuffle across the network, and that shuffle dominates the cost of a big job.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
@@ -2770,7 +2770,7 @@ const skewAndJoins: SqlLesson = {
   id: "sql-l6-skew-and-joins",
   title: "Data Skew, Stragglers, and Broadcast vs Shuffle Joins",
   summary:
-    "One hot key overloads one task and the whole stage waits on that straggler. For a huge-to-tiny join, broadcast the small side so the big table never shuffles (Spark auto-broadcasts under 10 MB).",
+    "One hot key overloads one task and the whole stage waits on that straggler, and broadcasting the small side of a join stops the big table shuffling.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
@@ -3000,7 +3000,7 @@ const pipelinesOrchestration: SqlLesson = {
   id: "sql-l6-pipelines-orchestration",
   title: "Pipelines, Orchestration, and Idempotency",
   summary:
-    "A DAG of scheduled jobs moves data raw to useful (medallion Bronze/Silver/Gold, ELT). The reliability ideas that matter: idempotent re-runs, backfills, and freshness SLAs, all queryable from a run log.",
+    "Why a scheduled DAG has to be idempotent: a re-run or a backfill must land the same rows again without doubling them, Bronze through Gold.",
   estimatedMinutes: 28,
   difficulty: "medium",
   skills: [
@@ -3231,7 +3231,7 @@ const dataQualityChecks: SqlLesson = {
   id: "sql-l6-data-quality-checks",
   title: "Data Quality Checks and Quality Gates",
   summary:
-    "A pipeline can succeed and still write garbage. The check families a junior is expected to name (uniqueness, completeness, validity, volume, referential integrity) and the quality gate that stops bad data, all written as plain SQL.",
+    "A pipeline can succeed and still write garbage, so a quality gate blocks the bad load: uniqueness, completeness, validity, volume, referential integrity.",
   estimatedMinutes: 24,
   difficulty: "medium",
   skills: [
