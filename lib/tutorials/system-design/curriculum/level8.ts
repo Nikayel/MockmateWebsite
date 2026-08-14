@@ -687,11 +687,37 @@ Refresh-token rotation with reuse detection is the key mechanism. Each time a re
 }
 \`\`\`
 
-\`\`\`
-login -> RT1
-use RT1 -> AT + RT2   (RT1 now invalid)
-use RT2 -> AT + RT3   (RT2 now invalid)
-attacker replays stolen RT2  -> reuse detected -> kill whole family
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "Refresh-token rotation with reuse detection",
+  "stages": [
+    {
+      "label": "Login issues RT1",
+      "note": "the root of one token family"
+    },
+    {
+      "label": "RT1 spent",
+      "note": "server returns a fresh access token plus RT2, and RT1 is now invalid"
+    },
+    {
+      "label": "RT2 spent",
+      "note": "same again: a new access token plus RT3, and RT2 is now invalid"
+    },
+    {
+      "label": "Stolen RT2 replayed",
+      "note": "a token that was already spent is presented a second time"
+    },
+    {
+      "label": "Whole family killed",
+      "note": "reuse is treated as proof of theft, so RT3 dies too and the real user signs in again"
+    }
+  ],
+  "highlight": [
+    "Whole family killed"
+  ],
+  "caption": "Two parties cannot both keep rotating one family, so the second use of a spent token is the alarm. Rejecting only the stale token would leave the attacker holding a live RT3."
+}
 \`\`\`
 
 **Interview nuance:** "JWTs everywhere with no revocation story" is the classic wrong turn. If the interviewer asks "a token just leaked, how do you kill it right now," pure long-lived JWTs have no good answer. The strong answer is short access-token TTL plus a stateful refresh token you can revoke, or a denylist keyed by token ID checked at the edge.
@@ -816,10 +842,61 @@ A Zanzibar-style system answers two query shapes: **Check** ("can alice view doc
 
 Whatever model you pick, separate the **Policy Decision Point (PDP)** from the **Policy Enforcement Point (PEP)**. The PEP lives in each service or gateway and asks the PDP "allowed?"; the PDP (OPA, Cedar, OpenFGA) owns the policy logic. Externalizing authz means one place to audit and change rules instead of \`if user.isAdmin\` scattered across 50 services.
 
-\`\`\`
-  request -> PEP (in service/gateway) --check(user, action, object)--> PDP (OpenFGA/OPA/Cedar)
-                                                                         |
-                                       relation tuples / policy + graph -+
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Externalized authorization: the PEP asks, the PDP decides",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "request",
+      "label": "Incoming request",
+      "kind": "client"
+    },
+    {
+      "id": "pep",
+      "label": "PEP: policy enforcement point (in the service or gateway)",
+      "kind": "service"
+    },
+    {
+      "id": "pdp",
+      "label": "PDP: policy decision point (OpenFGA, OPA, or Cedar)",
+      "kind": "service"
+    },
+    {
+      "id": "tuples",
+      "label": "Relation tuples and policy graph",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "request",
+      "to": "pep",
+      "kind": "sync",
+      "label": "every trust boundary, every object, not once at the front door"
+    },
+    {
+      "from": "pep",
+      "to": "pdp",
+      "kind": "sync",
+      "label": "check(user, action, object)"
+    },
+    {
+      "from": "pdp",
+      "to": "tuples",
+      "kind": "sync",
+      "label": "walk the relationship graph, or evaluate the policy"
+    },
+    {
+      "from": "pdp",
+      "to": "pep",
+      "kind": "feedback",
+      "label": "allow or deny, and unreachable means deny (fail closed)"
+    }
+  ],
+  "caption": "Policy logic lives in one auditable place instead of an isAdmin check scattered across fifty services, and the per-object check on the way in is what makes IDOR structurally impossible."
+}
 \`\`\`
 
 Non-negotiable enforcement principles: **deny by default**, **least privilege**, **fail closed** (if the PDP is unreachable, reject, do not wave the request through). And enforce at **every trust boundary and every object**, not once at the front door.
