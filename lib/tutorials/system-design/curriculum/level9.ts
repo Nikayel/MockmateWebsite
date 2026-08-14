@@ -734,20 +734,24 @@ The win is fewer proxies, lower per-Pod memory, and lower latency for the common
 {
   "type": "check",
   "kind": "predict",
-  "prompt": "Cilium removes the per-Pod proxy entirely. So how does it end up with authenticated, encrypted traffic between workloads?",
+  "prompt": "An auditor asks you to demonstrate that every individual service-to-service connection is separately authenticated. Your cluster runs Cilium with eBPF policy and WireGuard encryption. What do you tell them?",
   "options": [
     {
-      "label": "eBPF performs the TLS handshake in the kernel for every connection",
-      "feedback": "This is the common mental model and it is wrong. eBPF does not perform a TLS handshake; it enforces identity-based L3 and L4 policy in the kernel, and the handshake work happens somewhere else."
+      "label": "Yes, eBPF terminates a TLS handshake per connection",
+      "feedback": "This is the common mental model and it is wrong. eBPF does not perform a TLS handshake at all; it enforces identity-based L3 and L4 policy in the kernel, and the handshake work happens elsewhere."
     },
     {
-      "label": "The agent mutually authenticates workloads using SPIFFE identities, and WireGuard or IPsec encrypts node to node",
+      "label": "No, the unit of authentication is the workload",
       "correct": true,
-      "feedback": "Right. Authentication happens in the agent, off the datapath, and confidentiality comes from transparent node-to-node encryption. The traffic is authenticated and encrypted, but it is not per-connection mTLS."
+      "feedback": "Right. The agent mutually authenticates workloads with SPIFFE identities, off the datapath, and WireGuard or IPsec encrypts node to node, so the traffic genuinely is authenticated and encrypted. But the auditor asked about connections, and a requirement written that way needs ambient or sidecar mTLS instead."
     },
     {
-      "label": "It does not encrypt at all: you get policy only, and encryption needs a sidecar mesh layered on top",
-      "feedback": "Encryption is available with no per-Pod proxy through WireGuard or IPsec. What you give up is per-connection mTLS, not confidentiality."
+      "label": "Yes, because WireGuard negotiates a fresh session key for the traffic",
+      "feedback": "WireGuard gives you confidentiality between nodes, which is a different property from proving who is on each end of a connection. Encryption is not authentication."
+    },
+    {
+      "label": "No, and nothing is authenticated: Cilium enforces policy but never proves identity",
+      "feedback": "Too strong in the other direction. Identity is proved, just not where you expect: mutual authentication happens in the agent using SPIFFE workload identities."
     }
   ]
 }
@@ -1698,34 +1702,34 @@ Three patterns. **ETL** (extract, transform, then load) transforms before loadin
   ],
   "items": [
     {
-      "label": "Normalized schema to avoid update anomalies",
+      "label": "Fetch one order by its id and return all of its fields",
       "bucket": "OLTP row store",
-      "feedback": "Writes are the hot path, so you normalize to keep each fact in exactly one place."
+      "feedback": "The whole record is contiguous, so a single page read has everything. The layout is chosen precisely to make this the cheap case."
     },
     {
-      "label": "Denormalized star schema of facts and dimensions",
+      "label": "Sum one column across two billion rows, grouped by another",
       "bucket": "OLAP column store",
-      "feedback": "Joins are the expensive part of a huge scan, so the model is flattened deliberately to do fewer of them."
+      "feedback": "Two of the forty-odd columns are touched. Only a layout that stores each column separately can read those two without dragging the other thirty-eight off disk with them."
     },
     {
-      "label": "Thousands of concurrent small transactions by primary key",
+      "label": "Whether a query needs one field or forty, roughly the same bytes come off disk",
       "bucket": "OLTP row store",
-      "feedback": "Many small point operations under strong isolation is the transactional access pattern."
+      "feedback": "A row's fields sit next to each other, so reading the row is all or nothing. That is a bargain when you wanted the record and a tax when you wanted one field of a million records."
     },
     {
-      "label": "Data compresses 5x to 20x because each stored run holds one type",
+      "label": "Adding a 41st column leaves existing aggregate queries untouched",
       "bucket": "OLAP column store",
-      "feedback": "Storing a column contiguously is what makes run-length and dictionary encoding effective, and that compression is what cuts the I/O for a scan."
+      "feedback": "Each column lives in its own contiguous run, so a query that never names the new one never reads it. The same addition in a row store widens every record and therefore every page read."
     },
     {
-      "label": "Vectorized execution over batches of values",
-      "bucket": "OLAP column store",
-      "feedback": "Processing a batch of values per instruction only pays off when the values you need are already adjacent in memory."
-    },
-    {
-      "label": "Fetching one whole record is a single page read",
+      "label": "Ten thousand connections each holding a short write transaction",
       "bucket": "OLTP row store",
-      "feedback": "Contiguous rows are the entire point of the layout: one read gets the whole record."
+      "feedback": "Many small point operations under strong isolation, each in and out in single-digit milliseconds, is the transactional access pattern, and it is what the buffer pool and the locking are tuned for."
+    },
+    {
+      "label": "Encoding a long run of repeated values as one count plus one value pays off",
+      "bucket": "OLAP column store",
+      "feedback": "Run-length encoding needs the repeats to be adjacent, which only happens when a single column is stored contiguously. That is where the 5x to 20x compression, and the I/O it saves on a scan, comes from."
     }
   ],
   "reveal": "Two workloads that want opposite physical layouts. Keep them on separate engines, never run analytics on the transactional primary, and remember that a read replica moves the scan without changing the layout it scans. Move data across with ETL, ELT, or CDC, trading freshness against operational complexity."
