@@ -162,10 +162,6 @@ export function CareersPageClient({ roles }: CareersPageClientProps) {
                 LinkedIn
               </a>
             </div>
-
-            <p className="text-muted-foreground mt-8 text-sm">
-              Sacramento State senior · Building this because I needed it myself
-            </p>
           </motion.div>
         </div>
       </section>
