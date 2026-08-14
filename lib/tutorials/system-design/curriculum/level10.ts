@@ -5596,6 +5596,59 @@ So the frontier is not a single FIFO. It must do two jobs at once: prioritize (c
 
 **Interview nuance:** politeness is the single most common thing juniors omit and the first thing interviewers probe. Say explicitly: fetch robots.txt per host (and cache it), enforce a per-host rate limit / min delay, identify with a real User-Agent, and back off on 429/503. A crawler without politeness gets banned and is useless.
 
+### Two inbound edges into the frontier
+
+Link extraction is one way URLs enter the frontier, and it is the slow one. A URL only enters after some page that links to it has been fetched, so the time from publication to discovery is bounded by how often you happen to recrawl the referring page. Your fetchers are not the term that matters:
+
+\`\`\`
+09:00:00  publisher posts /2026/quake; the homepage now links to it
+          (you last fetched that homepage at 08:47, on its change-rate schedule)
+09:02:00  homepage recrawled
+09:02:04  link extractor emits /2026/quake, dedup says new, frontier accepts it
+09:02:06  host is due, fetcher pulls the article
+
+          discovery latency 2m 04s     fetch latency 2s
+\`\`\`
+
+So publishers declare their own new URLs, and a crawler that wants a sub-minute SLA reads those declarations as a **second inbound edge into the frontier** that never waits on a referring page.
+
+**Sitemaps.** \`robots.txt\` points at a sitemap: a list of the site's URLs, each with a \`lastmod\` timestamp. Poll it and diff it against your seen-set:
+
+\`\`\`
+GET https://news.example.com/robots.txt
+  Sitemap: https://news.example.com/sitemap-news.xml
+
+GET https://news.example.com/sitemap-news.xml          <- polled every 30s
+  <url><loc>.../2026/quake</loc><lastmod>2026-08-14T09:00:11Z</lastmod></url>
+  <url><loc>.../2026/budget</loc><lastmod>2026-08-13T18:02:00Z</lastmod></url>
+
+  /2026/quake   unseen loc                          -> inject into the frontier
+  /2026/budget  known, lastmod > our last fetch     -> inject as a recrawl
+  everything else: lastmod unchanged                -> skip, no fetch
+
+09:00:30  /2026/quake is in the frontier, 19s after publication
+\`\`\`
+
+One small polled document discovered it, and no referring page was fetched at all. The poll interval, not the recrawl schedule of some other page, is now the discovery-latency term, and you set it per source.
+
+**WebSub (formerly PubSubHubbub)** removes the poll. The publisher's feed names a hub; you subscribe once, and the hub calls you on publish:
+
+\`\`\`
+once, at subscribe time:
+  POST https://hub.example.com/
+    hub.mode=subscribe
+    hub.topic=https://news.example.com/feed.atom
+    hub.callback=https://crawler.example.com/websub
+
+on every publish, the hub POSTs you (you are polling nothing):
+  POST https://crawler.example.com/websub
+    <entry><link href=".../2026/quake"/><updated>2026-08-14T09:00:11Z</updated></entry>
+
+09:00:12  /2026/quake is in the frontier, ~1s after publication
+\`\`\`
+
+RSS and Atom feeds sit between the two: polled like a sitemap, but small and ordered newest-first, so a tight loop over an active source is cheap. All three routes drop a URL into the same frontier and out through the same per-host back queue, so politeness is unchanged: you are buying discovery speed from the publisher's own announcement, not from fetching anyone harder. That is what makes discovery latency and fetch latency separate tunable terms rather than one number.
+
 ## Dedup at two levels
 
 URL dedup: before adding a URL to the frontier, check whether you have seen it, using a normalized URL (canonicalize scheme/host/case, strip tracking params, resolve relative links). At billions of URLs a hash set in memory is too big, so use a bloom filter (or scalable variant) for a fast "definitely new / probably seen" check backed by a durable seen-set store; a bloom filter's false positives cost you a few dropped new URLs, which is acceptable. Content dedup: many URLs return identical or near-identical content (mirrors, session-id URLs, print pages). Hash the content (or use MinHash/simhash shingling for near-duplicate detection) so you do not index the same page a million times. This also helps with crawler traps (infinite calendars, faceted-search URL explosions) which you additionally bound with max-depth and per-host URL caps.
@@ -5613,6 +5666,11 @@ Fetching is distributed and I/O-bound. Run many fetcher workers pulling due URLs
       "id": "frontier",
       "label": "Frontier (front: priority, back: per-host politeness)",
       "kind": "queue"
+    },
+    {
+      "id": "discovery",
+      "label": "Publisher-declared discovery (sitemap lastmod polls, RSS/Atom, WebSub push)",
+      "kind": "service"
     },
     {
       "id": "fetchers",
@@ -5646,6 +5704,12 @@ Fetching is distributed and I/O-bound. Run many fetcher workers pulling due URLs
     }
   ],
   "edges": [
+    {
+      "from": "discovery",
+      "to": "frontier",
+      "kind": "async",
+      "label": "URLs the publisher announced, no referring page needed"
+    },
     {
       "from": "frontier",
       "to": "fetchers",
@@ -5691,9 +5755,10 @@ Fetching is distributed and I/O-bound. Run many fetcher workers pulling due URLs
     {
       "adds": [
         "frontier",
+        "discovery",
         "fetchers"
       ],
-      "note": "The heart is the frontier: front queues assign priority, each back queue holds one host, and a next-fetch-time heap enforces the per-host delay so you never hammer one small site. Distributed fetchers pull only the hosts that are due."
+      "note": "The heart is the frontier: front queues assign priority, each back queue holds one host, and a next-fetch-time heap enforces the per-host delay so you never hammer one small site. Distributed fetchers pull only the hosts that are due. Note the two inbound edges: publisher-declared discovery (sitemap lastmod, feeds, WebSub push) enters here directly, while link extraction closes the loop from the other side."
     },
     {
       "adds": [
@@ -5745,7 +5810,7 @@ Fetching is distributed and I/O-bound. Run many fetcher workers pulling due URLs
 
 Freshness needs incremental recrawl, not one-shot. Estimate change rates per page (news changes hourly, an archive never does) and schedule recrawls adaptively, using HTTP conditional GETs (If-Modified-Since / ETag) so unchanged pages cost a cheap 304 instead of a full refetch.
 
-**Recap:** a two-layer frontier balances priority and per-host politeness, bloom-filter URL dedup plus simhash content dedup avoid redundant work and traps, distributed async fetchers with DNS caching do the I/O, and adaptive incremental recrawl with conditional GETs keeps the corpus fresh.
+**Recap:** a two-layer frontier balances priority and per-host politeness, bloom-filter URL dedup plus simhash content dedup avoid redundant work and traps, distributed async fetchers with DNS caching do the I/O, and adaptive incremental recrawl with conditional GETs keeps the corpus fresh. Discovery is its own term with its own inbound edge: sitemap \`lastmod\` polls, feeds, and WebSub pushes put a URL in the frontier without waiting for a referring page to be recrawled.
 
 \`\`\`cswidget
 {
