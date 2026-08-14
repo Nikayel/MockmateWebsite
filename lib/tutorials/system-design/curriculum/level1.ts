@@ -6305,19 +6305,75 @@ export const systemDesignLevel1: DesignLevel = {
           practice: {
             id: "sd-l1-latency-percentiles-practice",
             prompt:
-              "Design the latency SLOs and capacity model for Amazon's product-page assembly service during a Prime Day peak, where a single page renders by fanning out to about 100 backend services (recommendations, pricing, reviews, inventory, ads) and must return in 300ms at p99. Quantify why the tail dominates and how you size for it.",
+              "Read the incident timeline below and say what is happening to the Storefront product page: name what is actually limiting it, show the Little's Law arithmetic behind that answer, and say which suspects in the timeline the evidence rules out.",
             thinkAbout: [
-              "At fan-out 100, what fraction of pages hit at least one backend's p99?",
-              "Which techniques collapse the tail: hedged requests, per-backend deadlines, degradation?",
-              "What utilization headroom does the latency-vs-utilization curve force you to keep?",
+              "At 4,000 pages/sec and PricingSvc's new mean, how many concurrent PricingSvc calls does Little's Law demand, and how many can exist at once?",
+              "Turn the law around: what throughput ceiling does a fixed pool impose once latency changes?",
+              "Which signals stayed flat, and what does each flat signal eliminate?",
+              "Why would a probe that sends one request at a time and waits for it report a different number from production traffic?",
             ],
             modelAnswerOutline: [
-              "Assumptions: peak of 500,000 page assemblies per second, a strict 300ms p99 page budget, fan-out to ~100 independent backends where the page needs most of them to render.",
-              "**Tail amplification quantified:** if each backend hit its own p99 independently, the chance a page dodges every tail is 0.99^100, about 37%, meaning 63% of pages would hit at least one slow backend. A per-backend p99 is nowhere near good enough; each backend needs roughly p99.99 to keep the page's p99 in budget. Push per-backend budgets down to single-digit milliseconds and treat the tail, not the mean, as the design target.",
-              "**Techniques:** hedged requests (after a backend passes its p95, fire a duplicate to a second replica and take the first answer, collapsing the tail for a few percent extra load); hard per-backend deadlines with graceful degradation (if reviews or ads miss their budget, render the page without them rather than blowing the whole SLO); and a skeleton with critical blocks (price, buy button) prioritized over optional blocks.",
-              "**Capacity by Little's Law:** at 500k pages/sec and a 300ms budget, in-flight pages average 500000 x 0.3 = 150000, and each page holds up to 100 downstream calls, so downstream connection pools and thread/async budgets must be sized against the fan-out, not the page count.",
-              "**Headroom:** provision to keep every tier well under ~70% utilization at peak, because latency explodes as utilization approaches 100%.",
-              "Common wrong turn: setting a single p99 SLO on the page and assuming healthy per-backend p99s will deliver it, when fan-out math says they will not.",
+              "What the evidence points at: the page is spending its time waiting to start the PricingSvc call, not waiting on PricingSvc. The 09:47 trace splits a 3.4s page into 2.4s inside the Storefront handler before the request left the box and 180ms of actual PricingSvc time, so the seconds are being added before the network is touched.",
+              "**Little's Law on the fleet:** one blocking PricingSvc call per page at 4,000 pages/sec and a 96ms mean gives L = 4000 x 0.096 = 384 calls in flight on average. The fleet holds 25 x 12 = 300 pooled connections to PricingSvc, so demand of 384 sits above a hard supply of 300. Run the same law on the old numbers and 4000 x 0.014 = 56 against 300 is why the pool was invisible before 09:20.",
+              "**Turn it around for the ceiling:** 300 connections / 0.096s is about 3,125 pages/sec of PricingSvc work against 4,000 arriving. Roughly 875 pages/sec more arrive than can hold a connection, the surplus waits for one to free up, and the wait compounds through the peak window. That queue is the 3.1s p99 and the 610ms p50, not PricingSvc's own 210ms.",
+              "**Ruled out by the flat signals:** Storefront CPU flat at 28% and GC pause p99 flat at 4ms say the process is waiting rather than working, which also accounts for the silent autoscaler, since it scales on CPU and CPU is not the exhausted resource. PricingSvc's error rate flat at 0.02% says it is slower, not failing. RecsSvc and ReviewsSvc p99 unchanged rule out a host-wide or network-wide degradation.",
+              "**Ruled out by experiment:** the 09:12 template deploy was rolled back at 09:41 and the p99 stayed at 3.0 to 3.2s, so it is not what is sustaining this. AdsSvc errors at 6.2% are real but sit off the blocking path behind a 30ms deadline the page renders without, so they cannot contribute seconds.",
+              "**Why the canary is green:** it sends one request at a time against an instance carrying no production traffic, so it never competes for a pooled connection and measures service time only. Its 240ms is roughly the honest new service time; the missing 2.4s is queueing that a closed-loop single-request probe is structurally unable to see, the same blind spot as coordinated omission in a load test.",
+              "Where this goes next: size the pool against 384 plus headroom, or hold each connection for less time with a tighter PricingSvc deadline, and alarm on connection-pool wait rather than CPU. Both moves fall straight out of L = arrival rate x latency.",
+            ],
+            supplied: {
+              label: "Incident timeline: Storefront p99",
+              body: `**The service.** Storefront renders the product page. Each page makes one blocking call to PricingSvc for the price block, plus non-blocking calls to RecsSvc, ReviewsSvc and AdsSvc. Page SLO is p99 under 300ms.
+
+**The fleet during the window.** 25 Storefront instances, each holding a fixed pool of 12 HTTP connections to PricingSvc, so 300 across the fleet. Peak traffic 4,000 pages/sec. AdsSvc is called with a 30ms deadline and the page renders without it when it misses.
+
+**Timeline, all times UTC:**
+
+- 09:12 A Storefront deploy ships a product-image template change.
+- 09:20 PricingSvc mean response time moves from 14ms to 96ms and its p99 from 38ms to 210ms. PricingSvc error rate stays at 0.02%.
+- 09:26 Page p99 alert fires. Page p99 240ms to 3.1s, page p50 95ms to 610ms.
+- 09:28 AdsSvc error rate rises from 0.4% to 6.2%.
+- 09:31 Storefront host CPU flat at 28%, unchanged since 08:00. GC pause p99 flat at 4ms. No instance restarts and no OOM kills.
+- 09:33 RecsSvc and ReviewsSvc p99 unchanged at 45ms and 60ms.
+- 09:35 The autoscaler has added no instances. It is configured to scale on CPU.
+- 09:41 The 09:12 deploy is rolled back. Page p99 stays between 3.0s and 3.2s.
+- 09:47 A sampled trace of a 3.4s page shows 2.4s elapsed inside the Storefront handler before the PricingSvc request left the box, then 180ms of PricingSvc time.
+- 09:52 The synthetic canary, which sends one page request at a time and waits for each response before sending the next, runs against a dedicated Storefront instance that takes no production traffic. It reports p99 240ms and mean 210ms for the same window, and its dashboard is green.
+`,
+            },
+            rubric: [
+              {
+                name: "What is actually limiting the page",
+                weak: "Stops at PricingSvc having slowed down and treats a 3.1s page as the direct consequence of a 96ms downstream mean.",
+                adequate:
+                  "Names the PricingSvc connection pool as the limit but never ties 300 connections to an arrival rate or a latency figure.",
+                strong:
+                  "Names the 300-connection PricingSvc pool as the exhausted resource and uses the 09:47 trace, 2.4s before the call left the box, to place the wait inside Storefront.",
+              },
+              {
+                name: "Little's Law arithmetic",
+                weak: "Quotes L = arrival rate x latency as a formula without putting the timeline's 4,000 pages/sec or 96ms mean into it.",
+                adequate:
+                  "Computes a concurrency demand near 384 but never sets it against the 300 connections the fleet actually holds.",
+                strong:
+                  "Computes 4000 x 0.096 = 384 demanded against 300 available, then turns the law around to a ceiling near 3,125 pages/sec against 4,000 arriving.",
+              },
+              {
+                name: "Hypotheses eliminated",
+                weak: "Leaves the 09:12 deploy and the AdsSvc errors standing as live possibilities beside whatever answer it settles on.",
+                adequate:
+                  "Drops the deploy because it was rolled back, but makes no use of the flat CPU, GC or RecsSvc readings to eliminate anything else.",
+                strong:
+                  "Eliminates the rolled-back deploy, the non-blocking AdsSvc path behind its 30ms deadline, and CPU or GC exhaustion on the flat 28% and 4ms readings, citing the evidence for each.",
+              },
+              {
+                name: "Reading the green canary",
+                weak: "Treats the canary's 240ms as noise to ignore, or as proof that the production page metric is broken.",
+                adequate:
+                  "Notes that the canary disagrees with production traffic without saying what about how it sends requests makes it disagree.",
+                strong:
+                  "Ties the green canary to sending one request at a time against an instance with no production traffic, so it measures service time and cannot observe the queueing worth 2.4s.",
+              },
             ],
           },
         },
@@ -6354,20 +6410,86 @@ export const systemDesignLevel1: DesignLevel = {
           practice: {
             id: "sd-l1-resilience-primitives-practice",
             prompt:
-              "Design the resilience policy for Stripe's payment-charge path when its downstream fraud-scoring service degrades under a traffic spike, where charges must not be double-executed and the fraud check is on the critical path. Specify exactly how retries, deadlines, and the breaker behave for a money-moving, non-idempotent operation.",
+              "Read the incident timeline below and say what is keeping LedgerSvc degraded. The trigger cleared inside a minute and the incident ran for 47 more, so account for that gap, explain why the breaker never opened, and say which suspects in the timeline the evidence rules out.",
             thinkAbout: [
-              "What must be in place before any retry of a money-moving operation is safe?",
-              "On a fraud-check timeout, is failing open or failing closed the expensive error?",
-              "When the breaker opens, who decides the fallback: the code or the business?",
+              "1,400 authorizations/sec were arriving and RiskSvc saw 4,200 requests/sec. What multiplies one number into the other?",
+              "RiskSvc stopped returning 503s at 14:03:05. What is generating load after that moment?",
+              "The breaker reports 0 opens. What does its failure predicate count, and what is LedgerSvc receiving after 14:03:05?",
+              "Adding LedgerSvc pods made it worse and draining traffic fixed it. Which hypotheses do those two results eliminate?",
             ],
             modelAnswerOutline: [
-              "Assumptions: the charge operation moves money and is not naturally idempotent, fraud scoring is on the critical path, and correctness (never double-charge, never approve fraud incorrectly) outranks latency.",
-              "**Idempotency first, non-negotiable:** every charge carries a client-supplied idempotency key, and the charge service dedupes on it, so a retry arriving after a first attempt already succeeded returns the original result instead of charging twice. This is what makes retrying safe at all here.",
-              "**Deadlines with fail-closed:** the fraud call gets a tight, propagated deadline (say 200ms of the charge's budget). On timeout, do NOT silently approve; for a money path the fraud check fails closed (decline or queue for manual review), because approving an unscored charge is the expensive error.",
-              "**Retries, tightly bounded:** the fraud call is retried at most once, with jittered backoff, only on clearly transient errors, under a retry budget so a spike cannot amplify load into the already-struggling fraud service.",
-              "**Circuit breaker with a business-decision fallback:** when the breaker opens because fraud scoring is broadly down, failing fast is correct, but the fallback is a policy choice: decline (safest, hurts conversion), route to a cheaper cached/heuristic model, or approve-and-async-review small low-risk charges under a strict cap. Degrade to the heuristic model for low-risk charges and fail closed above a risk/amount threshold.",
-              "**Bulkhead:** fraud scoring gets its own bounded pool so its stall never drains the charge service's threads.",
-              "Common wrong turn: retrying the non-idempotent charge itself (not just the fraud read) without an idempotency key, or failing OPEN on a fraud timeout and letting unscored charges through under load.",
+              "What the evidence points at: a retry storm that now feeds itself. The 40 seconds of 503s from the two bad RiskSvc pods was the trigger and it cleared at 14:03:05. What runs for the next 47 minutes is LedgerSvc's own retry traffic, so the incident no longer needs the thing that started it.",
+              "**The amplification arithmetic:** 1,400 authorizations/sec at up to 3 attempts each is 4,200 requests/sec, which is exactly the offered load the timeline reports from 14:03 onward, against RiskSvc's sustainable 2,000 requests/sec. Load above capacity holds queue wait above LedgerSvc's 2.5s per-attempt timeout, every attempt times out, every timeout is retried, and the retries are the load. The system has settled into a second, degraded equilibrium at the same real arrival rate.",
+              "**Why the policy makes that equilibrium stable:** a fixed 100ms delay with no jitter keeps retries synchronized into waves rather than spreading them, and with no cap on the share of traffic that may be retried there is nothing bounding amplification below 3x, so offered load never decays on its own.",
+              "**Why the breaker never fired:** its predicate counts an HTTP 5xx as a failure, and RiskSvc returns zero 5xx from 14:03:05 onward. LedgerSvc is failing on timeouts, which that predicate does not count, so the failure counter stays clean, the 0 opens on the dashboard is truthful, and the one mechanism that would have failed fast and shed the retry load never engages.",
+              "**Ruled out:** the 14:05 ADD COLUMN, since ledger query p99 is flat at 12ms and the migration finished in 0.4s; the network, on 0% loss and RTT flat at 0.9ms; LedgerSvc capacity, on CPU flat at 24% plus the 14:09 scale-up that moved success from 61% to 52%, which is backwards for an under-provisioned caller and forwards for one whose extra pods add offered load; a double-charge or dedupe defect, since dedupe hits at 3.4x normal with no double charges are the idempotency keys working, and are also direct confirmation that retries are firing; and the RiskSvc deploy as an ongoing cause, since its 503s stopped at 14:03:05.",
+              "**Why the drain worked where pods did not:** 9 RiskSvc pods carry roughly 3,000 requests/sec, still under 4,200, which is why success stalls at 74%. Cutting LedgerSvc traffic to 20% for 90 seconds put offered load under capacity once, the queue emptied, attempts stopped timing out, the multiplier collapsed back toward 1x, and 1,400 requests/sec fits in 6 pods again. Leaving this state needs load below capacity, not more capacity.",
+              "Where this goes next: exponential backoff with full jitter in place of the fixed 100ms, a retry budget capping retries near 10% of request volume, a breaker predicate that counts timeouts as failures, and a propagated deadline so an authorization with no budget left never launches attempt 3.",
+            ],
+            supplied: {
+              label: "Incident timeline: LedgerSvc authorizations",
+              body: `**The services.** LedgerSvc authorizes card charges. Every authorization makes one blocking call to RiskSvc for a risk score. Charges carry client-supplied idempotency keys and LedgerSvc dedupes on them.
+
+**LedgerSvc client policy for RiskSvc during the window.** Per-attempt timeout 2.5s. Up to 3 attempts per authorization. Fixed 100ms delay between attempts, no jitter. No cap on the share of traffic that may be retried. An attempt is made again on both 5xx responses and timeouts. The circuit breaker trips at 50% failures over the last 20 calls and counts an HTTP 5xx as a failure.
+
+**Capacity.** RiskSvc sustains about 2,000 requests/sec across its 6 pods. Normal offered load is 1,400 requests/sec.
+
+**Timeline, all times UTC:**
+
+- 14:02:10 A RiskSvc deploy rolls out. Two of the 6 pods start with a bad config and return 503 to every request.
+- 14:02:50 The two pods are replaced. RiskSvc returns zero 503s from 14:03:05 onward and keeps returning zero for the rest of the incident.
+- 14:03 Offered load at RiskSvc reaches 4,200 requests/sec and stays between 4,100 and 4,300 for the next 47 minutes.
+- 14:04 RiskSvc queue wait p99 passes 2.5s. LedgerSvc authorization success rate falls from 99.4% to 61%, and LedgerSvc p99 pins at 2.5s.
+- 14:05 A DBA runs a schema migration on the ledger database. It is an ADD COLUMN and completes in 0.4s.
+- 14:06 Ledger database query p99 flat at 12ms, connection count unchanged. Inter-AZ packet loss 0%, network RTT flat at 0.9ms.
+- 14:07 LedgerSvc host CPU flat at 24%. Idempotency-key dedupe hits run at 3.4x their normal rate. No double charges are recorded.
+- 14:09 The autoscaler adds 40% more LedgerSvc pods. Success rate falls from 61% to 52%.
+- 14:22 RiskSvc pod count is raised from 6 to 9. Success rate recovers to 74% and stops there.
+- 14:38 The RiskSvc breaker inside LedgerSvc is reported closed for the whole incident, with 0 opens on its dashboard.
+- 14:51 Operators drain LedgerSvc traffic to 20% for 90 seconds, then restore it. Success rate returns to 99.3% and holds, with RiskSvc back at 6 pods.
+`,
+            },
+            rubric: [
+              {
+                name: "Trigger versus sustaining load",
+                weak: "Attributes all 47 minutes to the bad RiskSvc deploy, with no account of why the incident outlived the 503s that stopped at 14:03:05.",
+                adequate:
+                  "Separates the trigger from what followed but characterises the aftermath only as overload, without naming what generates it.",
+                strong:
+                  "States that the two bad pods were only the trigger and that LedgerSvc's own retry traffic holds the degraded state once RiskSvc stops returning 503s.",
+              },
+              {
+                name: "Amplification arithmetic",
+                weak: "Never reconciles the 1,400 authorizations/sec arriving with the 4,200 requests/sec RiskSvc is receiving.",
+                adequate:
+                  "Notes that retries add load without deriving 3x from the 3-attempt policy or setting it against the 2,000 requests/sec capacity.",
+                strong:
+                  "Derives 1,400 x 3 attempts = 4,200 requests/sec against 2,000 requests/sec of capacity, and closes the loop from queue wait past the 2.5s timeout back into more attempts.",
+              },
+              {
+                name: "Why the breaker stayed closed",
+                weak: "Says nothing about the breaker, or reads the reported 0 opens as a monitoring defect rather than a policy outcome.",
+                adequate:
+                  "Observes that the breaker never opened but does not connect that to what its failure predicate is counting.",
+                strong:
+                  "Ties the 0 opens to a predicate counting only HTTP 5xx while every failure after 14:03:05 is a timeout, so no fail-fast path ever engages.",
+              },
+              {
+                name: "Hypotheses eliminated",
+                weak: "Leaves the 14:05 schema migration or the network standing as untested possibilities beside its own answer.",
+                adequate:
+                  "Dismisses the migration and the network but never turns the 14:09 scale-up result against the under-provisioned-caller hypothesis.",
+                strong:
+                  "Eliminates the ADD COLUMN on its flat 12ms query p99, the network on 0% loss, and caller capacity on 24% CPU plus a scale-up that moved success from 61% to 52%.",
+              },
+              {
+                name: "How the system leaves the bad state",
+                weak: "Offers only more capacity, the move the 14:22 increase to 9 pods already made before success stalled at 74%.",
+                adequate:
+                  "Notes that the 14:51 drain restored service without saying why removing load succeeded where three extra RiskSvc pods did not.",
+                strong:
+                  "Reads the drain as forcing load under capacity long enough to empty the queue and collapse the retry multiplier, and names jitter and a retry budget as what prevents a repeat.",
+              },
             ],
           },
         },
