@@ -3055,6 +3055,47 @@ tradeoff, and what happens when Redis is down (fail-open vs fail-closed). A staf
 additionally frames whose traffic and which tier, argues the cost of per-user vs per-IP granularity,
 and picks a degradation policy tied to a business risk.
 
+### What the three limiter algorithms actually count
+
+The senior move in that list is comparing the algorithms with numbers rather than naming them, so
+here is what each one keeps in memory and what it lets through. The limit throughout is 100 requests
+per minute for one key.
+
+\`\`\`
+Fixed window: one counter per key per clock minute.
+  12:00:00   INCR rl:k:1200 -> 1                 allowed
+  12:00:59   the 100th request lands             allowed, counter now full
+  12:00:59.5 the 101st                           429
+  12:01:00   the key rolls to rl:k:1201, counter resets to 0
+  12:01:01   100 more requests land              all allowed
+  cost: 200 requests inside about two seconds across the boundary, a 2x burst against a
+        "100 per minute" promise. State: one integer per key, and it expires itself.
+\`\`\`
+
+\`\`\`
+Sliding-window log: keep a timestamp per request and drop the ones that aged out.
+  ZADD             rl:k <now> <request-id>     one entry per request
+  ZREMRANGEBYSCORE rl:k 0 <now - 60s>          evict everything older than the window
+  ZCARD            rl:k -> 87                  87 in the last 60s, so admit and repeat
+  cost: exact, with no boundary burst, because the window moves with the clock instead of
+        jumping. State: up to 100 entries per key instead of one integer, so memory scales
+        with the limit times the number of live keys.
+\`\`\`
+
+\`\`\`
+Token bucket: capacity 100, refilling at 100 tokens per 60s (1.67 per second).
+  bucket full at 100, each request takes one token, empty bucket -> 429
+  drained to 0, then idle 30s   -> about 50 tokens back, so a 50-request burst is admitted
+  sustained load settles at the refill rate, 1.67 requests per second
+  cost: two numbers per key, tokens and last-refill time, computed lazily on the next request.
+        Smooths the long-run rate to the refill while still allowing a burst up to capacity,
+        which is the knob the other two do not offer.
+\`\`\`
+
+Three different answers to the same "100 per minute", and the difference is the shape of what they
+admit at the edges plus what they cost to store. Which of those costs your system can pay is the part
+you commit to out loud.
+
 \`\`\`cswidget
 {
   "type": "steps",
