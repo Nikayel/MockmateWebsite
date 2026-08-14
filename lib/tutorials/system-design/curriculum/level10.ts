@@ -2357,6 +2357,42 @@ A raw upload lands in object storage (S3). You never serve that file. Instead a 
 
 The player, not the server, drives quality. It downloads the manifest, measures throughput and buffer level, and requests the next 4-second segment at whatever bitrate it can sustain. Bandwidth drops on a train, the player steps down to 480p mid-stream and steps back up later, all by choosing different segment URLs from the same manifest. This is why segmentation and per-bitrate manifests exist: they make quality a client-side, per-segment choice with no server session state.
 
+### Segment duration is a latency floor
+
+For a file uploaded last week nobody cares how long a segment is. The moment the source is live, segment duration stops being a packaging detail and becomes the dominant term in latency, because a segment is published as a unit: the encoder cannot list a segment's URL in the manifest until its last frame has been encoded, and a player cannot start decoding frame 1 until it can fetch the object. Walk one 4-second segment of a live feed:
+
+\`\`\`
+t=0.0s  camera captures the first frame of segment 12
+        ... encoder is still filling segment 12, nothing is publishable ...
+t=4.0s  last frame encoded, segment12.m4s finalized and written
+t=4.1s  rolling manifest rewritten to list segment12.m4s
+t=4.4s  player's next manifest poll sees it, issues GET segment12.m4s
+t=4.7s  bytes arrive, player decodes frame 1 of segment 12
+
+        frame 1 was captured at t=0.0 and displayed at t=4.7
+        glass-to-glass floor ~= one full segment, before CDN hops or player buffer
+\`\`\`
+
+That floor is why segment duration is a latency knob at all: 2s segments roughly halve it and roughly double the request and manifest-poll rate. But the floor is still a whole segment, so chasing seconds this way runs out of road fast.
+
+**Low-latency HLS and low-latency DASH break the coupling by publishing a segment before it is finished.** The encoder emits each segment as a sequence of **partial segments**, also called **CMAF chunks**: independently decodable pieces of roughly 200 to 500ms that are announced and served the instant they exist, while the rest of the segment is still being encoded. LL-HLS lists each one in the manifest as its own addressable resource; LL-DASH flushes them down a single response with **chunked transfer encoding**, so the response for segment 12 starts before segment 12 exists. Same segment, delivered in pieces:
+
+\`\`\`
+segment 12 (4s) as 200ms CMAF chunks:
+
+t=0.2s  chunk 12.1 encoded -> announced/flushed -> player fetches and decodes it
+t=0.4s  chunk 12.2 encoded -> flushed; player is decoding 12.1 as 12.3 is being encoded
+t=0.6s  chunk 12.3 ...
+        ...
+t=4.0s  segment 12 completes and stays addressable as one 4s object, which is what
+        late joiners, the DVR window and the normal CDN cache path fetch
+
+        frame 1 captured t=0.0, displayed at ~t=0.2 plus network
+        glass-to-glass ~= one chunk, not one segment: seconds, not tens of seconds
+\`\`\`
+
+Segment duration still sets cache granularity, manifest size and DVR seek points. It no longer sets latency. The bill arrives on the request path: announcements and fetches now happen per chunk rather than per segment, so request volume goes up by the chunk-per-segment ratio, and an edge holding an open response for media that has not been encoded yet coalesces less cleanly than an edge serving a finished immutable object. That is the trade a low-latency live design is actually making.
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -2388,7 +2424,7 @@ The vast majority of the catalog is watched rarely. Keep hot content on fast sto
 
 **Interview nuance:** interviewers love "what happens the instant a video goes viral." The right answer names CDN request coalescing and edge caching absorbing the read fan-out, plus the fact that transcoding already happened once at upload so the spike is pure cached reads, not compute. If you find yourself scaling transcoding for a viral watch spike, you have conflated the write and read paths.
 
-**Recap:** transcode once, asynchronously, into an ABR ladder of segmented renditions with manifests; let the client adapt bitrate per segment; and serve segments from a CDN (Open Connect-style edge caches) with long TTLs so origin egress stays flat even under viral read spikes.
+**Recap:** transcode once, asynchronously, into an ABR ladder of segmented renditions with manifests; let the client adapt bitrate per segment; and serve segments from a CDN (Open Connect-style edge caches) with long TTLs so origin egress stays flat even under viral read spikes. Publication granularity is what bounds latency, so a live design pushes below the segment floor by publishing partial segments as they encode.
 
 \`\`\`cswidget
 {
