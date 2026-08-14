@@ -1315,7 +1315,6 @@ The path, hop by hop. Each stage below adds the next hop and says what it buys y
 {
   "type": "topology",
   "title": "One signed-in request, browser to database",
-  "layout": "lr",
   "nodes": [
     { "id": "browser", "label": "Browser cache / service worker", "kind": "client" },
     { "id": "dns", "label": "DNS resolver", "kind": "external" },

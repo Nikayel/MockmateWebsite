@@ -2227,7 +2227,6 @@ The write side, on committing a command, emits an event ("ProductPublished"). Pr
 {
   "type": "topology",
   "title": "CQRS: one write model, many read models",
-  "layout": "lr",
   "nodes": [
     {
       "id": "writer",

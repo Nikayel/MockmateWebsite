@@ -136,7 +136,6 @@ You rarely rewrite. The standard extraction pattern is the Strangler Fig. You pu
 {
   "type": "topology",
   "title": "Strangler Fig extraction, stage by stage",
-  "layout": "lr",
   "nodes": [
     {
       "id": "clients",
@@ -616,7 +615,6 @@ The win is fewer proxies, lower per-Pod memory, and lower latency for the common
 {
   "type": "topology",
   "title": "Sidecar vs ambient data paths",
-  "layout": "lr",
   "nodes": [
     {
       "id": "a_sidecar",

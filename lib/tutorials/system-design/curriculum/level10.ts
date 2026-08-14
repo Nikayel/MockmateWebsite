@@ -3503,7 +3503,6 @@ Fetching is distributed and I/O-bound. Run many fetcher workers pulling due URLs
 {
   "type": "topology",
   "title": "The crawl loop",
-  "layout": "lr",
   "nodes": [
     {
       "id": "frontier",

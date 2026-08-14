@@ -1586,7 +1586,6 @@ interviewers listen for.
 {
   "type": "topology",
   "title": "L1 near cache, sharded L2, and the disposable-cache principle",
-  "layout": "lr",
   "nodes": [
     {
       "id": "app",
@@ -1734,7 +1733,6 @@ stale object while one background fetch refreshes it.
 {
   "type": "topology",
   "title": "Pull CDN hierarchy with an origin shield",
-  "layout": "lr",
   "nodes": [
     {
       "id": "users",
@@ -1918,7 +1916,6 @@ distance) or n-gram indexing, so "hedphones" still finds "headphones".
 {
   "type": "topology",
   "title": "From documents to a queryable inverted index",
-  "layout": "lr",
   "nodes": [
     {
       "id": "docs",

@@ -186,7 +186,6 @@ L4 layer gives you cheap, protocol-agnostic scale and DDoS surface; the L7 layer
 {
   "type": "topology",
   "title": "Stacked L4 edge in front of an L7 fleet",
-  "layout": "lr",
   "nodes": [
     {
       "id": "client",
@@ -1020,7 +1019,6 @@ many hand-written BFFs, at the cost of its own query-cost and caching complexity
 {
   "type": "topology",
   "title": "BFFs, the gateway, and the north-south / east-west boundary",
-  "layout": "lr",
   "nodes": [
     {
       "id": "web",

@@ -481,7 +481,6 @@ this tradeoff signals you have actually operated one.
 {
   "type": "topology",
   "title": "The LSM write path",
-  "layout": "lr",
   "nodes": [
     {
       "id": "writer",

@@ -1536,7 +1536,6 @@ Concretely for microservices: give every workload a cryptographic **identity** (
 {
   "type": "topology",
   "title": "Zero-trust redesign: verify every hop, contain the blast radius",
-  "layout": "lr",
   "nodes": [
     {
       "id": "laptop",
