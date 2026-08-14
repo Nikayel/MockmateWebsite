@@ -2461,6 +2461,107 @@ you compensate *semantically* (issue a recall, send an apology, restock on retur
 that fail: retries with backoff, a dead-letter queue, and ultimately operator escalation. This
 durability and retry machinery is exactly what Temporal / Step Functions give you for free.
 
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "An order saga: forward steps, then compensations in reverse",
+  "nodes": [
+    {
+      "id": "orch",
+      "label": "Saga orchestrator (Temporal workflow)",
+      "kind": "service"
+    },
+    {
+      "id": "order",
+      "label": "Order service (status PENDING, the semantic lock)",
+      "kind": "service"
+    },
+    {
+      "id": "inv",
+      "label": "Inventory service (reserve stock)",
+      "kind": "service"
+    },
+    {
+      "id": "pay",
+      "label": "Payment service (charge the card)",
+      "kind": "service"
+    },
+    {
+      "id": "dlq",
+      "label": "Compensation DLQ, then operator escalation",
+      "kind": "queue"
+    }
+  ],
+  "edges": [
+    {
+      "from": "orch",
+      "to": "order",
+      "kind": "sync",
+      "label": "step 1, commits on its own"
+    },
+    {
+      "from": "orch",
+      "to": "inv",
+      "kind": "sync",
+      "label": "step 2, commits on its own"
+    },
+    {
+      "from": "orch",
+      "to": "pay",
+      "kind": "sync",
+      "label": "step 3, card declined"
+    },
+    {
+      "from": "pay",
+      "to": "orch",
+      "kind": "feedback",
+      "label": "failure, so unwind"
+    },
+    {
+      "from": "orch",
+      "to": "inv",
+      "kind": "feedback",
+      "label": "compensate: release the stock"
+    },
+    {
+      "from": "orch",
+      "to": "order",
+      "kind": "feedback",
+      "label": "compensate: cancel the order"
+    },
+    {
+      "from": "orch",
+      "to": "dlq",
+      "kind": "async",
+      "label": "compensation still failing"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "orch",
+        "order"
+      ],
+      "note": "On-call has to be able to answer 'where is this order stuck?', which is the requirement that buys a central workflow instead of implicit event chains. Step 1 is a local transaction and commits by itself."
+    },
+    {
+      "adds": [
+        "inv",
+        "pay"
+      ],
+      "note": "Every later step commits on its own too, which is exactly what makes 'reserved but unpaid' visible to other requests. The saga bought atomicity of outcome by giving up isolation."
+    },
+    {
+      "adds": [
+        "dlq"
+      ],
+      "note": "A compensation is a call like any other and can fail, and stock and money still have to reconcile, so the reversals need retries with backoff, a dead-letter queue, and finally a human."
+    }
+  ],
+  "caption": "The three return arcs are the compensations, and they run in reverse order of the forward steps. Nothing is rolled back: each reversal is a new local transaction that semantically undoes the one before it."
+}
+\`\`\`
+
 **Interview nuance:** the two things interviewers probe are (1) "sagas give atomicity but not
 isolation, what anomaly does that allow and how do you contain it?" and (2) "what happens when a
 compensation fails?" Concrete answers to both put you ahead of most candidates.
