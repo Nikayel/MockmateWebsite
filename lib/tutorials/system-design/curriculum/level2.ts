@@ -2902,17 +2902,17 @@ achieved by replicating each object across multiple facilities.
   "prompt": "A user uploads a 200 MB video. Which path should the bytes take?",
   "options": [
     {
-      "label": "Client to your app server, which checks permissions and then writes the file to the bucket.",
+      "label": "Client to your app server, which then writes it to the bucket",
       "feedback": "Tempting because the server does need to authorize the upload, but streaming file bodies through the app tier makes your small server fleet the bottleneck for all transfer. Authorize the request, not the bytes."
     },
     {
-      "label": "Base64 the file into a JSON column so everything lives in one database.",
+      "label": "Base64 into a JSON column so everything lives in one database",
       "feedback": "Tempting for simplicity, but blobs bloat the table, wreck the buffer cache, and stretch backups and replication. Databases are tuned for small, structured, frequently-queried rows."
     },
     {
-      "label": "Client asks your server for permission, receives a short-lived signed URL, and sends the bytes directly to object storage.",
+      "label": "Client to the bucket, on a short-lived URL your server signs",
       "correct": true,
-      "feedback": "Right. Your app only mints a capability token; the bytes never touch it. That split is what lets a tiny fleet of app servers support petabytes of transfer."
+      "feedback": "Right. The client asks your server for permission first, and the server authorizes the user and hands back a signed URL good for a PUT to one specific key for a few minutes. The 200 MB body then travels client-to-bucket and never enters your app tier at all. Your app mints capability tokens rather than moving bytes, and that split is what lets a tiny fleet of app servers support petabytes of transfer."
     }
   ]
 }
@@ -3012,16 +3012,16 @@ from **decision drivers** to a **storage family**, then defend against the runne
   "prompt": "Asked where to store orders for a new marketplace, a candidate opens with: 'NoSQL, because we need scale.' What is the interviewer listening for instead?",
   "options": [
     {
-      "label": "Numbers and access patterns first: QPS now and in two years, query shape, consistency needs. Only then a family.",
+      "label": "Numbers and access patterns first, then a family",
       "correct": true,
-      "feedback": "Right. 'Scale' without a number is not a driver. A single well-indexed relational box serves tens of thousands of QPS, so the burden of proof is on leaving it."
+      "feedback": "Right. 'Scale' with no number attached is not a decision driver. What the interviewer wants named is QPS now and in two years, the query shapes you actually run and by what key, the p99 latency budget, and whether a stale read causes a real bug or a cosmetic one. A single well-indexed relational box comfortably serves tens of thousands of QPS, so the burden of proof sits on whoever wants to leave it."
     },
     {
-      "label": "Which NoSQL product to name: MongoDB versus DynamoDB is the real decision.",
+      "label": "Which NoSQL product: MongoDB versus DynamoDB is the decision",
       "feedback": "Tempting because product names sound concrete, but picking within a family before establishing the drivers is the same mistake one level down."
     },
     {
-      "label": "Nothing is missing: relational databases do not scale, so the instinct is correct.",
+      "label": "Nothing; relational databases do not scale, so the instinct is right",
       "feedback": "This is the exact myth. Tens of thousands of QPS on one well-indexed Postgres box is routine, which is why relational is the correct default for most features."
     }
   ]
@@ -3128,16 +3128,16 @@ stores, not a collection.
   "prompt": "You close your storage defense with: 'CAP says pick two; we picked availability, done.' Why does that under-answer the question?",
   "options": [
     {
-      "label": "It does not: CAP fully describes a distributed store's trade space.",
+      "label": "It does not; CAP fully describes the trade space",
       "feedback": "Tempting because CAP is the famous acronym, but CAP only describes behavior during a partition, which is rare. It says nothing about the trade you make the rest of the time."
     },
     {
-      "label": "CAP covers only partition behavior. PACELC adds that even with no partition you trade latency against consistency, and that is the trade you live with every day.",
+      "label": "CAP only speaks about partitions, which are the rare case",
       "correct": true,
-      "feedback": "Right. Spanner pays latency for consistency; Dynamo-style stores pay consistency for latency and availability. Naming the everyday else-case is what defending against the runner-up sounds like."
+      "feedback": "Right. PACELC adds the else-case CAP leaves out: even when there is no partition, you still trade Latency against Consistency, and that is the trade your system lives with every single day. Spanner chooses consistency and pays the latency; Dynamo-style stores choose availability and latency and hand you eventual consistency. Naming the everyday else-case is what defending against the runner-up sounds like."
     },
     {
-      "label": "The problem is choosing availability; correct systems always choose consistency.",
+      "label": "The problem is choosing availability; correct systems choose consistency",
       "feedback": "Tempting as a safety instinct, but plenty of features tolerate staleness happily. The flaw in the answer is the missing else-case reasoning, not the letter chosen."
     }
   ],
