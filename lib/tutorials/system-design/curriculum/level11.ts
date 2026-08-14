@@ -18,6 +18,42 @@ An ML system design interview is almost never about the model. It is about the p
 
 There is a business metric (revenue, engagement), an ML objective that is a proxy for it (predicted click-through rate), and a training label that is a proxy for that (did the user click within a 30-minute attribution window). These are never identical, and the gap is where products die. Offline metrics (AUC, log-loss on a holdout) tell you the model learned something; online metrics (actual CTR, revenue per session in an A/B test) tell you it helped. Optimizing offline AUC while online engagement drops is the classic trap.
 
+## The loss function is part of that hierarchy
+
+One rung of the hierarchy gets skipped in almost every interview: the objective the model is actually trained against. Offline metrics score a finished model. The loss function is what gradient descent minimizes while the model is being built, and it is a design decision you own. Regression defaults to squared error, and squared error is symmetric: it charges the same for a miss in either direction.
+
+Take a delivery estimate where the trip actually took 40 minutes.
+
+\`\`\`
+actual              40 min
+
+prediction A        20 min   (20 minutes short: the customer is told 20 and waits 40)
+prediction B        60 min   (20 minutes long: the food shows up early)
+
+squared error       A: (40 - 20)^2 = 400        B: (60 - 40)^2 = 400        identical
+\`\`\`
+
+Nothing in that number knows that A costs a refund and B costs a shrug. Minimizing squared error puts the prediction at the conditional mean, which sits between the two failure modes by construction.
+
+The standard asymmetric alternative is quantile loss, also called pinball loss. It prices the two directions differently, using a chosen quantile \`q\` between 0 and 1 as the price ratio.
+
+\`\`\`
+pinball loss at quantile q, for actual y and prediction p:
+
+  p < y  (under-predicted)         q  x (y - p)
+  p > y  (over-predicted)     (1 - q) x (p - y)
+
+at q = 0.8:
+  prediction A (20 short)     0.8 x 20 = 16.0
+  prediction B (20 long)      0.2 x 20 =  4.0     padding costs a quarter of running late
+
+at q = 0.5 the two arms are equal and you are back to a symmetric loss, on the median
+\`\`\`
+
+Minimizing pinball loss at \`q\` puts the prediction on the conditional \`q\`-th quantile rather than the mean, so \`q = 0.8\` trains a model that deliberately over-predicts: roughly 80 percent of actual delivery times land at or under its estimate. The asymmetry is entirely in how far \`q\` sits from 0.5, and you pick it from the cost ratio rather than from taste. If a minute late costs about four times a minute early, \`q = 4 / (4 + 1) = 0.8\`.
+
+**Interview nuance:** whenever the two error directions cost differently (an ETA, a capacity forecast, an inventory buy, a fraud threshold), say so out loud and name the loss. A candidate who only ever says "minimize error" has not noticed that the product has an opinion about which way to be wrong.
+
 ## Two planes plus a loop
 
 \`\`\`csdiagram
@@ -221,6 +257,27 @@ There is a business metric (revenue, engagement), an ML objective that is a prox
 
 The offline plane is throughput-oriented and runs on a schedule: batch ETL over the warehouse, feature computation, training, evaluation, and a push to a model registry. The online plane is latency-oriented and runs per request: fetch precomputed features, generate candidates, rank, return. They must share one feature definition or you get training/serving skew. The feedback log is the piece juniors forget: every prediction and its eventual outcome must be written back, because without it you cannot build tomorrow's training set or detect drift.
 
+"Batch ETL builds training rows" hides the question that decides whether the model works at all: which moment in time each feature value is read from. A row is anchored to one labeled event, and every feature in it has to be the value that was true immediately before that event, not the value that is true now, at the moment the job runs.
+
+\`\`\`
+label event      impression on item 991, user 77, at 09:15:00
+                 clicked = 1 (the click landed at 09:31, inside the 30-minute window)
+
+feature history in the warehouse, as of the nightly job that runs at 02:00 the next day
+
+  user_ctr_7d              08:00   0.031
+                           09:00   0.034   <- last value strictly before 09:15, take this one
+                           10:00   0.058
+                           23:00   0.061   <- what "the current value" would have handed you
+
+  item_impressions_1h      09:12   1180    <- last value strictly before 09:15
+                           09:20   1340
+
+training row     user_ctr_7d = 0.034, item_impressions_1h = 1180, label = 1
+\`\`\`
+
+Taking each feature's last value strictly before the label's event time is called point-in-time correctness, and the join that does it is an as-of join. Look at what the lazy alternative would have picked up: 0.061 is a click-through rate partly produced by the very click this row is trying to predict, so the model would learn to read the answer off the feature. That is why the offline plane stores a timestamped history per feature while the online plane stores only the latest value: they are answering different questions, "what was it at 09:15" versus "what is it now". The next lesson builds the store that keeps both answers consistent and covers what that leak looks like from the inside.
+
 ## The latency and cost funnel
 
 You do not run a heavy model on millions of items per request. You cascade: candidate generation cheaply narrows millions to hundreds (embedding retrieval or a simple filter), ranking runs the expensive model on those hundreds, and re-ranking applies business rules and diversity on the top dozen. Each stage is cheaper per item and touches fewer items, so total cost stays bounded.
@@ -231,7 +288,7 @@ You do not run a heavy model on millions of items per request. You cascade: cand
 
 Watch data drift (input feature distributions shift), concept drift (the label relationship changes, for example fraud tactics evolve), prediction drift (output distribution moves), plus operational alarms on feature nulls and ground-truth label delay. Daily retraining only helps if these signals decide when a retrain or rollback is warranted.
 
-**Recap:** frame business metric to ML objective to label, split an offline training plane from an online serving plane, cascade candidate generation to ranking to re-ranking to hit latency, and close a feedback log so you can retrain and detect drift.
+**Recap:** frame business metric to ML objective to label and pick a loss that matches how the two error directions actually cost, split an offline training plane from an online serving plane and build the training rows point-in-time correct, cascade candidate generation to ranking to re-ranking to hit latency, and close a feedback log so you can retrain and detect drift.
 
 \`\`\`cswidget
 {
