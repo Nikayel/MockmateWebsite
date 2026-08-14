@@ -46,11 +46,33 @@ export const SIMULATION_WIDGET_FAMILIES = new Set([
 ])
 
 /**
- * Diagram types that animate. They carry the same attention cost as a simulation, so they share its
- * budget. The remaining types (`table`, `er`, `pipeline`, and friends) render statically and are
- * exempt.
+ * Diagram types that animate BY DEFAULT. They carry the same attention cost as a simulation, so
+ * they share its budget. The remaining types (`table`, `er`, `pipeline`, and friends) render
+ * statically and are exempt.
+ *
+ * Prefer {@link isHeavyDiagram} over reading this set directly: a topology authored with
+ * `reveal: "all"` renders as a still picture with no controls and no motion, so type alone no
+ * longer answers the question.
  */
 export const ANIMATED_DIAGRAM_TYPES = new Set(["topology", "ladder"])
+
+/**
+ * Does this diagram INSTANCE count against the one-per-lesson density cap?
+ *
+ * The cap exists to limit attention cost, not to ban a type. `er` has always been an exempt
+ * boxes-and-edges diagram purely because it is static, and a topology with `reveal: "all"` is the
+ * same object: no `StepControls`, no `useStepPlayer`, no motion. Keeping the cap keyed on type
+ * meant a lesson that already carried a simulation could take no architecture drawing at all,
+ * which described 43 percent of the conversion candidates.
+ *
+ * The tempting alternative was to relax `sim-density.test.ts`. That would have converted the cap
+ * from a rule into a suggestion and forfeited the staged reveal everywhere it is earning its keep.
+ * This makes the cap a per-instance property instead, which is the honest version of the same rule.
+ */
+export function isHeavyDiagram(spec: { type: string; reveal?: string }): boolean {
+  if (!ANIMATED_DIAGRAM_TYPES.has(spec.type)) return false
+  return spec.reveal !== "all"
+}
 
 /** One lesson, measured. */
 export interface LessonCoverage {
@@ -178,7 +200,7 @@ function measureLesson(
   for (const source of extractCsDiagramSources(markdown)) {
     const parsed = parseDiagramSpec(source)
     if (!parsed.ok) continue
-    if (ANIMATED_DIAGRAM_TYPES.has(parsed.spec.type)) heavy.push(parsed.spec.type)
+    if (isHeavyDiagram(parsed.spec)) heavy.push(parsed.spec.type)
     else staticDiagrams.push(parsed.spec.type)
   }
 

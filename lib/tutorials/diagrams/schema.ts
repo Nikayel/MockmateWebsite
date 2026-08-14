@@ -236,10 +236,52 @@ const topologyNodeSchema = z.object({
   kind: z.enum(["client", "lb", "service", "db", "cache", "queue", "cdn", "zone", "external"]),
 })
 
+/**
+ * A swimlane: the dashed container drawn behind a set of nodes.
+ *
+ * Eight of the corpus's ASCII drawings are structurally two lanes and cannot be drawn at
+ * all without one: offline training plane against online serving plane, speed against
+ * batch layer, hot against cold path, EU against US region, write against read path. This
+ * is C4's container level, and it is also why the existing `zone` NODE kind reads oddly —
+ * a zone is a container, not a box.
+ */
+const topologyGroupSchema = z.object({
+  id: z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_-]*$/),
+  label: z.string().min(1),
+  nodes: z.array(z.string().min(1)).min(1),
+})
+
 export const topologySpecSchema = z.object({
   type: z.literal("topology"),
   title: z.string().optional(),
-  layout: z.enum(["lr", "tb"]).default("lr"),
+  /**
+   * Flow direction, and `tb` is the default for a measured reason.
+   *
+   * Wrapped labels are wider than truncated ones, so a left-to-right chain of them runs
+   * off a phone. Measured over the authored corpus after the wrap fix landed: with `lr`,
+   * 10 of 14 diagrams exceeded 720px and the worst was 1,549px; with `tb`, none did. A
+   * lesson page is read on a phone more often than not, and horizontal scrolling inside a
+   * diagram is the interaction nobody discovers.
+   *
+   * An author who genuinely wants a left-to-right pipeline still writes `"lr"`, which is
+   * why this is a default and not a removal.
+   */
+  layout: z.enum(["lr", "tb"]).default("tb"),
+  /**
+   * Staged (the default) drives the reveal through `useStepPlayer`, which is where the
+   * segmenting benefit and the WCAG 2.3.3 user-trigger contract live. `"all"` draws the
+   * whole architecture at once with no controls and no motion, which makes the diagram
+   * STATIC and therefore exempt from the one-per-lesson density cap the same way `er` and
+   * `table` already are. That matters because the cap exists to limit attention cost, and
+   * a still picture costs what a still picture costs: without this, a lesson that already
+   * carries a simulation could take no architecture drawing at all, which is 43 percent of
+   * the conversion candidates.
+   *
+   * Note this is a per-INSTANCE property, not a per-type one. Relaxing `sim-density.test.ts`
+   * instead would have been the one-line shortcut and would have forfeited the staged
+   * reveal everywhere it is earning its keep.
+   */
+  reveal: z.enum(["staged", "all"]).default("staged"),
   /** Hard 16-node cap: the guard against the banned free-form graph re-entering. */
   nodes: z.array(topologyNodeSchema).min(2).max(16),
   edges: z
@@ -247,14 +289,23 @@ export const topologySpecSchema = z.object({
       z.object({
         from: z.string().min(1),
         to: z.string().min(1),
-        kind: z.enum(["sync", "async", "replication"]).default("sync"),
+        /**
+         * `feedback` is the edge that closes a loop: outcomes back to training, a retry
+         * back to the queue, a compensating reversal back to the ledger. It is excluded
+         * from layering exactly as `replication` already is, so the cycle it names cannot
+         * push its own members rightward forever, and it is drawn as a deliberate return
+         * arc. Rejecting cycles outright would have been wrong: in six of the drawings
+         * queued for conversion, the back edge IS the lesson.
+         */
+        kind: z.enum(["sync", "async", "replication", "feedback"]).default("sync"),
         label: z.string().optional(),
       })
     )
     .min(1)
     .max(24),
   /** Staged reveal: every node appears in exactly one stage, with the justification
-   *  note that ties it to a requirement (the L0 dataflow discipline). */
+   *  note that ties it to a requirement (the L0 dataflow discipline). Optional under
+   *  `reveal: "all"`, where there is no sequence to justify. */
   stages: z
     .array(
       z.object({
@@ -263,7 +314,10 @@ export const topologySpecSchema = z.object({
       })
     )
     .min(1)
-    .max(8),
+    .max(8)
+    .optional(),
+  /** Optional swimlanes, drawn as dashed containers behind their members. */
+  groups: z.array(topologyGroupSchema).max(4).optional(),
   caption: captionField,
 })
 
@@ -355,26 +409,71 @@ export const diagramSpecSchema = diagramSpecUnion.superRefine((spec, ctx) => {
           message: `unknown node "${edge.to}"`,
         })
     })
-    const staged = new Map<string, number>()
-    spec.stages.forEach((stage, i) => {
-      for (const id of stage.adds) {
-        if (!nodeIds.has(id))
-          ctx.addIssue({
-            code: custom,
-            path: ["stages", i, "adds"],
-            message: `unknown node "${id}"`,
-          })
-        staged.set(id, (staged.get(id) ?? 0) + 1)
-      }
-    })
-    for (const node of spec.nodes) {
-      const count = staged.get(node.id) ?? 0
-      if (count !== 1)
+    // `reveal: "all"` draws everything at once, so there is no sequence to justify and
+    // `stages` is meaningless. Staged is still the default, so an author who omits both
+    // fields gets the clear error rather than a silently unstaged diagram.
+    if (spec.reveal === "all") {
+      if (spec.stages)
         ctx.addIssue({
           code: custom,
           path: ["stages"],
-          message: `node "${node.id}" must appear in exactly one stage (found ${count})`,
+          message: 'a topology with reveal: "all" draws at once and must not define stages',
         })
+    } else if (!spec.stages) {
+      ctx.addIssue({
+        code: custom,
+        path: ["stages"],
+        message: 'staged topologies require stages (or set reveal: "all")',
+      })
+    } else {
+      const staged = new Map<string, number>()
+      spec.stages.forEach((stage, i) => {
+        for (const id of stage.adds) {
+          if (!nodeIds.has(id))
+            ctx.addIssue({
+              code: custom,
+              path: ["stages", i, "adds"],
+              message: `unknown node "${id}"`,
+            })
+          staged.set(id, (staged.get(id) ?? 0) + 1)
+        }
+      })
+      for (const node of spec.nodes) {
+        const count = staged.get(node.id) ?? 0
+        if (count !== 1)
+          ctx.addIssue({
+            code: custom,
+            path: ["stages"],
+            message: `node "${node.id}" must appear in exactly one stage (found ${count})`,
+          })
+      }
+    }
+
+    if (spec.groups) {
+      const groupIds = new Set(spec.groups.map((g) => g.id))
+      if (groupIds.size !== spec.groups.length)
+        ctx.addIssue({ code: custom, path: ["groups"], message: "group ids must be unique" })
+      // A node in two lanes has no bounding box to draw, so this is a render crash rather
+      // than a taste question.
+      const membership = new Map<string, string>()
+      spec.groups.forEach((group, i) => {
+        group.nodes.forEach((id, j) => {
+          if (!nodeIds.has(id))
+            ctx.addIssue({
+              code: custom,
+              path: ["groups", i, "nodes", j],
+              message: `unknown node "${id}"`,
+            })
+          const owner = membership.get(id)
+          if (owner)
+            ctx.addIssue({
+              code: custom,
+              path: ["groups", i, "nodes", j],
+              message: `node "${id}" is already in group "${owner}"`,
+            })
+          else membership.set(id, group.id)
+        })
+      })
     }
   }
   if (spec.type === "python-memory") {

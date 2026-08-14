@@ -13,7 +13,7 @@ import { parseDiagramSpec } from "@/lib/tutorials/diagrams/schema"
 // Which families count as heavy is the density rule itself, so it has exactly one definition. The
 // coverage module owns it because the audit script and any interactivity sweep need the same answer.
 import {
-  ANIMATED_DIAGRAM_TYPES,
+  isHeavyDiagram,
   SIMULATION_WIDGET_FAMILIES as SIM_TYPES,
 } from "@/lib/tutorials/system-design/coverage"
 
@@ -37,8 +37,11 @@ function collectLoads(): LessonLoad[] {
           if (parsed.spec.type === "check") checks += 1
         }
         for (const source of extractCsDiagramSources(lesson.teach.markdown)) {
+          // Per-instance, not per-type: a topology authored `reveal: "all"` is a still
+          // picture and costs what `er` and `table` cost, which is nothing against a cap
+          // that exists to bound attention.
           const parsed = parseDiagramSpec(source)
-          if (parsed.ok && ANIMATED_DIAGRAM_TYPES.has(parsed.spec.type)) {
+          if (parsed.ok && isHeavyDiagram(parsed.spec)) {
             heavy.push(parsed.spec.type)
           }
         }
