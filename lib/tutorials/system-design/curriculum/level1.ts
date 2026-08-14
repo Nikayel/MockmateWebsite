@@ -2044,6 +2044,39 @@ Deprecate (announce, document the replacement), warn (return \`Deprecation\` and
 log usage, email the top callers), then remove only after telemetry shows traffic has drained. A hard
 cutover with no warning is how you generate an angry customer incident.
 
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "Retiring /v1 after a genuine break",
+  "stages": [
+    {
+      "label": "Ship /v2",
+      "note": "it runs beside /v1, so nothing breaks on the day it lands"
+    },
+    {
+      "label": "Deprecate",
+      "note": "announce it and document what replaces each changed field"
+    },
+    {
+      "label": "Warn",
+      "note": "return the Deprecation and Sunset headers on /v1, log callers, email the top ones"
+    },
+    {
+      "label": "Watch traffic",
+      "note": "the gate: remove nothing while telemetry still shows real /v1 callers"
+    },
+    {
+      "label": "Remove /v1",
+      "note": "the drained traffic graph decides this, not the calendar"
+    }
+  ],
+  "highlight": [
+    "Watch traffic"
+  ],
+  "caption": "The step teams skip is the fourth one. Announcing a removal date and cutting over on it is the same migration with the evidence removed, and it is how a version retirement turns into a customer incident."
+}
+\`\`\`
+
 **Interview nuance:** the strongest signal is saying "I would design so most changes are additive and
 never bump the version, and only cut /v2 for a true break," then describing the deprecate-warn-remove
 sequence. Jumping straight to "put v1 in the URL" misses that versioning is a last resort.
