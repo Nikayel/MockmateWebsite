@@ -2145,8 +2145,54 @@ for a product page and unacceptable for an account balance.
 }
 \`\`\`
 
+### Two holes the read and write policies do not close
+
+Cache-aside plus invalidate-on-write is the right default and it leaves two gaps. The next lesson
+takes both apart properly; you need their names and their shape now, because a cache design that
+omits them is not finished.
+
+**The cache stampede, and the coalescing guard.** When a popular key expires, every concurrent
+request for it misses in the same instant and each one independently rebuilds it, so the database
+receives thousands of copies of one slow query at once. The guard is **request coalescing** (Go's
+\`singleflight\` is the canonical implementation): a per-key lock lets exactly one requester rebuild
+while every other waits on that single in-flight rebuild and shares its result.
+
+\`\`\`
+product:42 expires at t=0, 3000 concurrent readers
+
+  without coalescing:
+    3000 misses -> 3000 identical 300ms DB queries -> DB CPU pinned, and each
+    rebuild now takes longer, so more readers pile up behind it
+
+  with coalescing:
+    reader 1        takes the lock on "rebuild:product:42", queries the DB once
+    readers 2..3000 block ~300ms, then read the freshly populated entry
+    DB queries: 1
+
+  a process-local lock protects one app node; a short-lived Redis SET NX key
+  makes it exactly one rebuild across the whole fleet
+\`\`\`
+
+**The hot key, and the in-process L1 cache.** The second gap is volume rather than expiry. Every
+request for one key hashes to one Redis shard, so a single viral SKU can saturate that shard while
+the value is present the entire time. Coalescing does nothing here, because nothing is missing. The
+standard answer is an **in-process near cache (L1)** on each app server: a small map holding the few
+hottest keys with a sub-second TTL, so most reads for a hot key never leave the process.
+
+\`\`\`
+500,000 reads/sec for product:42, spread over 100 app servers
+
+  no L1:        500,000 ops/sec all land on the one shard that owns product:42
+  L1 at 1s TTL: each server refreshes once per second -> 100 ops/sec at that
+                shard, and 499,900 reads/sec served from local memory
+
+  the price is a staleness window equal to the L1 TTL, and it is per server, so
+  two app servers can show different values for the same key inside that window
+\`\`\`
+
 Recap: default to cache-aside reads plus invalidate-on-write, pick a write policy by its durability
-and latency tradeoff, and always attach a TTL-with-jitter and a stated consistency window so the
+and latency tradeoff, guard the rebuild with request coalescing and put an in-process L1 in front of
+any genuinely hot key, and always attach a TTL-with-jitter and a stated consistency window so the
 cache is defensible, not just present.
 
 \`\`\`cswidget
