@@ -2071,9 +2071,123 @@ Video is two very different problems bolted together: an **asynchronous ingest/t
 
 A raw upload lands in object storage (S3). You never serve that file. Instead a job is enqueued (SQS/Kafka) and a fleet of transcoding workers produces an **ABR ladder**: the same content re-encoded at multiple resolutions and bitrates (for example 240p at 400kbps, 480p, 720p, 1080p, 4K), each in modern codecs (H.264 for compatibility, plus H.265/VP9/AV1 for efficiency). Transcoding is embarrassingly parallel: split the video into segments, transcode segments across many workers, then assemble. Each rendition is cut into short **segments** (2 to 10 seconds) and described by a **manifest** (an HLS \`.m3u8\` or DASH \`.mpd\`) that lists the available bitrates and segment URLs.
 
-\`\`\`
-upload --> S3 (raw) --> transcode queue --> worker pool (segment-parallel)
-   --> renditions [240p 480p 720p 1080p 4K] x segments --> manifest (HLS/DASH) --> object store --> CDN
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Two paths bolted together: transcode once, serve a billion times",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "upload",
+      "label": "Creator upload (one 4K source)",
+      "kind": "client"
+    },
+    {
+      "id": "raw",
+      "label": "S3: the raw upload, never served to a viewer",
+      "kind": "db"
+    },
+    {
+      "id": "queue",
+      "label": "Transcode queue (SQS or Kafka)",
+      "kind": "queue"
+    },
+    {
+      "id": "workers",
+      "label": "Worker pool: segment-parallel transcode",
+      "kind": "service"
+    },
+    {
+      "id": "segments",
+      "label": "ABR ladder as segments: 240p at 400kbps up to 4K, H.264 plus H.265, VP9 or AV1, cut into 2 to 10 second pieces",
+      "kind": "db"
+    },
+    {
+      "id": "manifest",
+      "label": "Manifest (HLS .m3u8 or DASH .mpd): the bitrates and their segment URLs",
+      "kind": "db"
+    },
+    {
+      "id": "cdn",
+      "label": "CDN edge PoPs: immutable segments, long TTLs, request coalescing",
+      "kind": "cdn"
+    },
+    {
+      "id": "player",
+      "label": "Player: measures throughput and buffer, then picks the next segment's bitrate",
+      "kind": "client"
+    }
+  ],
+  "edges": [
+    {
+      "from": "upload",
+      "to": "raw",
+      "kind": "sync"
+    },
+    {
+      "from": "raw",
+      "to": "queue",
+      "kind": "async",
+      "label": "enqueue, minutes of latency are fine"
+    },
+    {
+      "from": "queue",
+      "to": "workers",
+      "kind": "async"
+    },
+    {
+      "from": "workers",
+      "to": "segments",
+      "kind": "sync",
+      "label": "split, transcode in parallel, reassemble"
+    },
+    {
+      "from": "segments",
+      "to": "manifest",
+      "kind": "sync",
+      "label": "one list of every rendition"
+    },
+    {
+      "from": "manifest",
+      "to": "cdn",
+      "kind": "sync"
+    },
+    {
+      "from": "segments",
+      "to": "cdn",
+      "kind": "sync",
+      "label": "cache key is the segment URL"
+    },
+    {
+      "from": "cdn",
+      "to": "player",
+      "kind": "sync",
+      "label": "a million viewers of one segment, one origin fetch"
+    }
+  ],
+  "groups": [
+    {
+      "id": "write",
+      "label": "Write path: once per video, minutes, compute-heavy",
+      "nodes": [
+        "raw",
+        "queue",
+        "workers",
+        "segments",
+        "manifest"
+      ]
+    },
+    {
+      "id": "read",
+      "label": "Read path: a billion times, milliseconds, bandwidth-heavy",
+      "nodes": [
+        "cdn",
+        "player"
+      ]
+    }
+  ],
+  "caption": "Scaling transcoding for a viral watch spike means the two paths have been conflated: the spike is pure cached reads, and the compute already happened once at upload."
+}
 \`\`\`
 
 ## Adaptive bitrate
@@ -2505,10 +2619,92 @@ Scale assumption: tens of millions of POIs, very high read QPS, queries like "co
 
 You still bucket coordinates into cells (geohash, quadtree, or S2), so a radius query hits a cell plus its neighbors. But instead of a bespoke in-memory geo service, the natural home is a **search engine (Elasticsearch/OpenSearch)** with a native \`geo_distance\` filter, because it does spatial filtering, attribute filtering, full-text ("coffee"), and ranking in one query. This is the key architectural difference from Uber: Yelp's index is a search index you can rebuild from source, not a volatile live index.
 
-\`\`\`
-source of truth (Postgres/doc store)  --pipeline-->  denormalized read model in Elasticsearch (geo + attrs + text)
-place edits/new reviews (low rate) --> update pipeline --> reindex
-query --> [ES: geo_distance cell + filters + rank] --> results, with popular (cell,filter) pages cached
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "A read model you can rebuild, in front of a store that rarely changes",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "source",
+      "label": "Source of truth (Postgres or a document store): places, hours, reviews",
+      "kind": "db"
+    },
+    {
+      "id": "pipeline",
+      "label": "Update pipeline (place edits and new reviews, a low rate)",
+      "kind": "service"
+    },
+    {
+      "id": "es",
+      "label": "Elasticsearch read model: geo_distance over cells, attribute filters, text, ranking in one query",
+      "kind": "db"
+    },
+    {
+      "id": "query",
+      "label": "Query: coffee within 2km, open now",
+      "kind": "client"
+    },
+    {
+      "id": "cache",
+      "label": "Result cache: popular (cell, filter) pages on generous TTLs",
+      "kind": "cache"
+    },
+    {
+      "id": "results",
+      "label": "Ranked results: distance, rating, review count, sponsored boost",
+      "kind": "client"
+    },
+    {
+      "id": "detail",
+      "label": "Place detail in Redis, photos and media on a CDN",
+      "kind": "cache"
+    }
+  ],
+  "edges": [
+    {
+      "from": "source",
+      "to": "pipeline",
+      "kind": "async",
+      "label": "on the rare edit"
+    },
+    {
+      "from": "pipeline",
+      "to": "es",
+      "kind": "sync",
+      "label": "denormalized, and rebuildable from source"
+    },
+    {
+      "from": "query",
+      "to": "cache",
+      "kind": "sync"
+    },
+    {
+      "from": "cache",
+      "to": "es",
+      "kind": "sync",
+      "label": "on a miss only"
+    },
+    {
+      "from": "es",
+      "to": "results",
+      "kind": "sync"
+    },
+    {
+      "from": "cache",
+      "to": "results",
+      "kind": "sync",
+      "label": "where the overwhelming majority of reads end"
+    },
+    {
+      "from": "results",
+      "to": "detail",
+      "kind": "sync",
+      "label": "the tapped place"
+    }
+  ],
+  "caption": "Uber's index is volatile because drivers move; this one is a search index you can rebuild, which is what earns the TTLs. The exception is open-now: apply that filter at request time rather than baking it into the cached page."
+}
 \`\`\`
 
 ## Query flow, storage, caching
@@ -5055,9 +5251,119 @@ Clicks arrive late and out of order (a mobile device offline for an hour uploads
 
 Real-time systems are approximate and can have gaps, so the industry pattern is Lambda or Kappa. Lambda runs two paths: a fast streaming path (Flink) that gives immediate, slightly-approximate counts for the advertiser dashboard, and a slow batch path (Spark over the raw event log in S3, run hourly/daily) that recomputes the exact, deduplicated, fraud-filtered numbers that billing uses. The batch layer is the source of truth and corrects any streaming drift. Kappa simplifies to one streaming engine with replay: the same Flink job can reprocess from the Kafka/log retention to recompute, avoiding two codebases.
 
-\`\`\`
-clicks -> Kafka (raw log, retained) --> Flink (windows + watermarks + dedup) --> sharded counters -> dashboard (fast, ~approx)
-                          \\--> S3 raw --> Spark batch (hourly, exact, fraud-filtered) --> billing (truth)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Lambda: a fast approximate path and an exact one",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "clicks",
+      "label": "Click events (at-least-once, out of order, some fraudulent)",
+      "kind": "client"
+    },
+    {
+      "id": "kafka",
+      "label": "Kafka: the raw log, retained so it can be replayed",
+      "kind": "queue"
+    },
+    {
+      "id": "flink",
+      "label": "Flink: event-time windows, watermarks, allowed lateness, dedup on click id",
+      "kind": "service"
+    },
+    {
+      "id": "counters",
+      "label": "Sharded counters (pre-aggregated in the stream, summed on read)",
+      "kind": "db"
+    },
+    {
+      "id": "dash",
+      "label": "Advertiser dashboard (near real time, slightly approximate)",
+      "kind": "client"
+    },
+    {
+      "id": "s3",
+      "label": "S3: the raw events, kept whole",
+      "kind": "db"
+    },
+    {
+      "id": "spark",
+      "label": "Spark batch, hourly: exact, deduplicated, fraud filtered",
+      "kind": "service"
+    },
+    {
+      "id": "billing",
+      "label": "Billing: the number that is charged",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "clicks",
+      "to": "kafka",
+      "kind": "sync"
+    },
+    {
+      "from": "kafka",
+      "to": "flink",
+      "kind": "async"
+    },
+    {
+      "from": "flink",
+      "to": "counters",
+      "kind": "sync"
+    },
+    {
+      "from": "counters",
+      "to": "dash",
+      "kind": "sync"
+    },
+    {
+      "from": "kafka",
+      "to": "s3",
+      "kind": "async",
+      "label": "the same events, archived"
+    },
+    {
+      "from": "s3",
+      "to": "spark",
+      "kind": "async"
+    },
+    {
+      "from": "spark",
+      "to": "billing",
+      "kind": "sync"
+    },
+    {
+      "from": "spark",
+      "to": "counters",
+      "kind": "feedback",
+      "label": "batch corrects streaming drift"
+    }
+  ],
+  "groups": [
+    {
+      "id": "speed",
+      "label": "Speed layer: fast, approximate",
+      "nodes": [
+        "flink",
+        "counters",
+        "dash"
+      ]
+    },
+    {
+      "id": "batch",
+      "label": "Batch layer: slow, exact, the source of truth",
+      "nodes": [
+        "s3",
+        "spark",
+        "billing"
+      ]
+    }
+  ],
+  "caption": "Both layers read the same retained log, which is what makes Kappa possible: one replayable streaming job instead of two codebases."
+}
 \`\`\`
 
 Hot campaigns create counter hotspots; a viral ad might take millions of increments/sec on one key. Shard the counter into N sub-counters updated independently and summed on read, and pre-aggregate within the stream processor before writing. Fraud/bot filtering (dedup, rate anomalies, click-farm patterns) runs in-stream for fast defense and again in batch for the authoritative purge.
