@@ -1964,9 +1964,68 @@ Since delivery itself cannot be exactly-once (the impossibility is stated above 
 
 Kafka's "exactly-once semantics" (EOS) is real but narrowly scoped. It combines an idempotent producer (dedups producer retries into a partition using a producer id and sequence number) with transactions that atomically commit the consumer's read offset and the produced output records together. That gives exactly-once for a **read-process-write loop that stays inside Kafka**. It does **not** extend to external side effects. If your consumer sends an email, calls Stripe, or writes to a non-transactional database, Kafka EOS does nothing for those, and you must add an idempotency key yourself. Claiming Kafka gives you end-to-end exactly-once including third-party charges is the classic wrong turn.
 
+## Pulling exactly one external store inside the guarantee
+
+EOS stops at Kafka's edge because Kafka's transaction coordinator only knows about Kafka partitions. There is one move that pulls a single external database inside the same atomic unit, and it is what Kafka Connect's transactional sinks and Flink's two-phase-commit sinks actually do: **take the read position away from Kafka.**
+
+By default a consumer commits its position into \`__consumer_offsets\`, which is a Kafka topic, so your database write and your offset commit are two commits in two systems with a crash window between them. Store the position in the sink database instead, in the same transaction as the business row:
+
+\`\`\`sql
+BEGIN;
+  INSERT INTO ledger (payout_id, amount_cents) VALUES ('po_1041', 25000);
+
+  INSERT INTO consumer_position (topic, partition, next_offset)
+       VALUES ('payout_due', 3, 8814)
+  ON CONFLICT (topic, partition)
+  DO UPDATE SET next_offset = EXCLUDED.next_offset;
+COMMIT;
+\`\`\`
+
+Then switch Kafka's own commit off (\`enable.auto.commit=false\`, and never call \`commitSync\`), and read the position back out of the database when the partition is assigned to you:
+
+\`\`\`java
+// ConsumerRebalanceListener.onPartitionsAssigned
+for (TopicPartition tp : assigned) {
+    long next = db.queryLong(
+        "SELECT next_offset FROM consumer_position WHERE topic = ? AND partition = ?",
+        tp.topic(), tp.partition());
+    consumer.seek(tp, next);  // the ledger DB, not __consumer_offsets, owns the position
+}
+\`\`\`
+
+Now walk the crash points for the record at offset 8813. Crash **before** \`COMMIT\`: the ledger row and the advanced position roll back together, the consumer resumes at 8813 and reapplies the record, and the ledger ends with one row for it. Crash **after** \`COMMIT\`: the stored position is already 8814, so 8813 is never redelivered, and again the ledger has exactly one row. There is no third case, because there is no longer a second commit to fall between. The ledger row and the read position are atomic by construction: they are literally the same transaction.
+
+The same trick runs in the other direction for output events. Do not produce to Kafka from inside the database transaction, because that is two systems again. Write an **outbox** row in the same transaction as the ledger row, and let a relay tail the outbox and publish to Kafka afterwards, at-least-once, carrying the event id so consumers dedup on it. The database transaction stays the single commit point, and the event cannot exist without the row that caused it.
+
+Say the boundary out loud, because it is narrow. This buys atomicity with **one** external store, the one whose transaction you are borrowing. A second database, a Stripe charge, or an email has no transaction of yours to join, so those stay on at-least-once with their own idempotency key. Two transactional stores in one atomic step means distributed two-phase commit, which nobody wants on a payment hot path.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "A consumer writes a ledger row to Postgres and stores its Kafka read position in the same Postgres transaction, with Kafka's own offset commit disabled. It crashes right after the database COMMIT, before the next poll. What happens on restart?",
+  "options": [
+    {
+      "label": "It resumes past that record, because the position advanced inside the same commit",
+      "correct": true,
+      "feedback": "Right. There is only one commit now, so there is no window where the ledger row exists and the position does not. The consumer seeks to the stored next_offset on assignment and carries on."
+    },
+    {
+      "label": "It reprocesses the record and writes a second ledger row",
+      "feedback": "That is what happens when the offset lives in Kafka and the row lives in Postgres. Once the position is a row in the same transaction, it advanced exactly when the ledger row landed."
+    },
+    {
+      "label": "It resumes at that record, because __consumer_offsets never saw a commit and still points at it",
+      "feedback": "Kafka's copy of the position is deliberately dead here: auto-commit is off and the consumer seeks to the position it read out of the database, so what __consumer_offsets holds is irrelevant."
+    }
+  ],
+  "reveal": "Atomicity across two systems comes from removing one of the commits, not from coordinating both. Move the read position into the sink transaction and the external row and the offset become one commit; anything that has no transaction to join (a charge, an email, a second database) stays at-least-once with its own idempotency key."
+}
+\`\`\`
+
 Where the ack sits is the whole game: commit-before-process is at-most-once, process-before-commit is at-least-once. Pick at-least-once plus idempotency for anything with real-world consequences.
 
-**Recap:** three guarantees (lose / duplicate / neither), exactly-once delivery over a network is impossible so you get exactly-once *processing* via idempotency or transactions, Kafka EOS is scoped to read-process-write inside Kafka only, and ack timing decides which guarantee you actually have.
+**Recap:** three guarantees (lose / duplicate / neither), exactly-once delivery over a network is impossible so you get exactly-once *processing* via idempotency or transactions, Kafka EOS is scoped to read-process-write inside Kafka only but one external store can join by holding the read position in its own transaction (with an outbox for the events it emits), and ack timing decides which guarantee you actually have.
 
 \`\`\`cswidget
 {
