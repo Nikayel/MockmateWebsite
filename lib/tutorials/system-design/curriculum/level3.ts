@@ -3095,7 +3095,7 @@ export const systemDesignLevel3: DesignLevel = {
           id: "sd-l3-cache-stampede-hotkey",
           title: "Cache Stampede, Thundering Herd & Hot Keys",
           summary:
-            "Layer the defenses: singleflight coalescing with a distributed lock, jittered TTLs and probabilistic early refresh, plus L1 caches and key replication for genuinely hot keys.",
+            "Why one expiring key can take down the database behind it, and how singleflight coalescing, jittered TTLs and early refresh stop the stampede.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["cache-stampede", "hot-key", "singleflight"],
@@ -3144,7 +3144,7 @@ export const systemDesignLevel3: DesignLevel = {
           id: "sd-l3-distributed-cache-arch",
           title: "Distributed Cache Architecture",
           summary:
-            "Shard by hash slots, replicate each shard with failover, tier L1-near plus L2-remote, treat the cache as disposable, and never bring a cold cache online under load.",
+            "How to shard, replicate and tier a Redis cluster, and why bringing a cold cache online under full traffic is the failure nobody plans for.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["distributed-cache", "redis", "ha"],
@@ -3203,7 +3203,7 @@ export const systemDesignLevel3: DesignLevel = {
           id: "sd-l3-cdn-scale",
           title: "CDN & Edge Caching at Scale",
           summary:
-            "An L1/L2/origin-shield hierarchy coalesces misses to ~1 fetch per object; version URLs instead of purging, normalize cache keys, and never cache authenticated bodies.",
+            "How an origin shield collapses thousands of CDN misses into about one origin fetch per object, and why you version URLs instead of purging them.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["cdn", "edge", "origin-shield"],
@@ -3253,7 +3253,7 @@ export const systemDesignLevel3: DesignLevel = {
           id: "sd-l3-search-inverted-index",
           title: "Full-Text Search & the Inverted Index",
           summary:
-            "A dedicated search tier: inverted index plus analysis pipeline, BM25 with boosting, cached filters, shards and replicas, CDC-fed eventual consistency, search_after pagination.",
+            "How an inverted index and BM25 ranking actually work, and why paginating deep with a large offset gets more expensive on every shard.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["search", "inverted-index", "elasticsearch"],
