@@ -5,6 +5,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { LessonUnlockCard } from "./LessonUnlockCard"
+import { ExerciseWorkspaceCue } from "./ExerciseWorkspaceCue"
 import { BreadcrumbJsonLd } from "@/components/seo/JsonLd"
 import { LessonJsonLd } from "@/components/seo/LessonJsonLd"
 import { truncateForDescription } from "@/lib/seo/learn-metadata"
@@ -17,6 +18,7 @@ import {
 } from "@/lib/tutorials/lesson-routes"
 import { levelLabel } from "@/lib/tutorials/level-title"
 import type { PublicExercisePreview, PublicLessonPreview } from "@/lib/tutorials/public-preview"
+import type { CourseId } from "@/lib/tutorials/types"
 import type { DifficultyLevel } from "@/lib/scenarios/types"
 
 /**
@@ -103,11 +105,17 @@ function ExerciseSection({
   heading,
   blurb,
   exercise,
+  courseId,
+  levelSlug,
+  lessonId,
 }: {
   eyebrow: string
   heading: string
   blurb: string
   exercise: PublicExercisePreview
+  courseId: CourseId
+  levelSlug: string
+  lessonId: string
 }) {
   const contents = workspaceContentsLine(exercise)
 
@@ -155,6 +163,17 @@ function ExerciseSection({
       )}
 
       {contents && <p className="text-muted-foreground mt-4 text-sm">{contents}</p>}
+
+      {/* The route into the editor, stated where the intent forms. Without it the page describes a
+          task, mentions a workspace, and then offers no way in until the sign-in card far below, so
+          the reasonable inference from a problem with no editor beside it is that you are meant to
+          go open your own. */}
+      <ExerciseWorkspaceCue
+        courseId={courseId}
+        levelSlug={levelSlug}
+        lessonId={lessonId}
+        phaseLabel={eyebrow}
+      />
     </section>
   )
 }
@@ -320,6 +339,9 @@ export function PublicLessonArticle({
             heading="Your turn"
             blurb="The task this lesson builds to."
             exercise={preview.apply}
+            courseId={preview.courseId}
+            levelSlug={preview.levelSlug}
+            lessonId={preview.id}
           />
 
           <ExerciseSection
@@ -331,6 +353,9 @@ export function PublicLessonArticle({
                 : "A second problem on the same idea, so it survives past today."
             }
             exercise={preview.practice}
+            courseId={preview.courseId}
+            levelSlug={preview.levelSlug}
+            lessonId={preview.id}
           />
 
           <LessonUnlockCard
