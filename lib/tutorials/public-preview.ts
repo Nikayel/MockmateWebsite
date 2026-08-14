@@ -221,6 +221,9 @@ export const GATED_FIELD_NAMES = [
   "workspace",
   "singleFile",
   "modelAnswerOutline",
+  // A rubric's "strong" band states the bar an answer has to clear, which is answer content wearing
+  // a different noun. It is gated for exactly the reason `modelAnswerOutline` is.
+  "rubric",
   "starterAnswer",
   "starterCode",
   "hints",

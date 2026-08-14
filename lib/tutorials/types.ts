@@ -326,6 +326,42 @@ export interface DesignExercise {
     /** Markdown. Rendered read-only; never seeded into the editor. */
     body: string
   }
+  /**
+   * Self-scoring dimensions revealed alongside the model answer.
+   *
+   * A bullet list says what a good answer CONTAINS. It does not say how to tell whether yours did,
+   * and there is no point in 208 System Design lessons where a learner gets feedback on their own
+   * writing, so "reveal the bullets and self-compare" is the entire feedback loop. Learners reliably
+   * read a model answer, recognise every idea in it, and conclude they knew it.
+   *
+   * A rubric changes the question from "did I recognise this?" to "which of these three paragraphs
+   * describes what I actually wrote?", which is answerable against their own text. Named dimensions
+   * also localise the gap: "weak on failure modes, strong on the data model" is actionable in a way
+   * that "I missed a few bullets" is not.
+   *
+   * This is NOT an autograder and must not become one. The learner scores themselves; nothing is
+   * sent anywhere and nothing gates on it.
+   */
+  rubric?: RubricDimension[]
+}
+
+/**
+ * One axis a design answer is judged on, with the three bands written as descriptions of an ANSWER
+ * rather than as advice.
+ *
+ * "Weak: does not mention replication lag" is checkable against the learner's own text. "Weak: should
+ * consider consistency" is advice, and the learner cannot tell which band they are in from it. The
+ * distinction matters enough that `rubric-dimensions.test.ts` enforces it.
+ */
+export interface RubricDimension {
+  /** The axis, as a noun phrase: "Consistency contract", "Failure modes", "Cost per request". */
+  name: string
+  /** What an answer that misses this axis looks like. */
+  weak: string
+  /** What a serviceable answer on this axis looks like. */
+  adequate: string
+  /** What a strong answer looks like, i.e. the bar an interviewer is actually applying. */
+  strong: string
 }
 
 /** The twelve System-Design level slugs (L0–L11), verbatim from `CURRICULUM-MAP.md`. */

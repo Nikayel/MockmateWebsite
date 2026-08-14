@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { ExerciseBrief, type ExerciseBriefMeta } from "./ExerciseBrief"
 import { ExerciseLayout } from "./ExerciseLayout"
+import { RubricSelfScore } from "./RubricSelfScore"
 import type { DesignExercise } from "@/lib/tutorials/types"
 
 /**
@@ -214,6 +215,14 @@ export function DesignAnswerPanel({
         <p className="text-muted-foreground text-xs">
           Save your answer to unlock the model answer, then mark the section done.
         </p>
+      )}
+
+      {/* The rubric comes FIRST inside the reveal, deliberately. Read the model answer and you have
+          already been told what a good answer looks like, which makes an honest self-score much
+          harder — you score the answer you now wish you had written. Grading against the bands
+          first, then reading the outline, keeps the two judgements separate. */}
+      {showModel && hasSaved && exercise.rubric && exercise.rubric.length > 0 && (
+        <RubricSelfScore exerciseId={exercise.id} dimensions={exercise.rubric} />
       )}
 
       {showModel && hasSaved && (
