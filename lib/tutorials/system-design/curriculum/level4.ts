@@ -2391,7 +2391,7 @@ export const systemDesignLevel4: DesignLevel = {
           id: "sd-l4-lb-l4-l7",
           title: "Load Balancer Fundamentals: L4 vs L7",
           summary:
-            "L4 is fast, protocol-agnostic, and content-blind; L7 routes on content and terminates TLS at a CPU cost; production stacks L4 at the edge in front of an L7 fleet, all made HA.",
+            "Why production stacks a content-blind L4 balancer at the edge in front of an L7 fleet that routes on path and terminates TLS.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["load-balancing", "l4-l7"],
@@ -2440,7 +2440,7 @@ export const systemDesignLevel4: DesignLevel = {
           id: "sd-l4-lb-algorithms",
           title: "Load-Balancing Algorithms & Session Affinity",
           summary:
-            "Least-connections for variable durations, power-of-two-choices for large pools, consistent hashing for cache-warm stickiness, and affinity used deliberately, not by default.",
+            "Why least-connections beats round robin when request durations vary, and when to reach for power-of-two-choices or consistent hashing instead.",
           estimatedMinutes: 25,
           difficulty: "medium",
           skills: ["lb-algorithms", "affinity"],
@@ -2489,7 +2489,7 @@ export const systemDesignLevel4: DesignLevel = {
           id: "sd-l4-health-checks",
           title: "Health Checks, Draining & Graceful Rollout",
           summary:
-            "Separate liveness (restart) from readiness (pull from pool), drain in-flight work before terminating, slow-start cold nodes, and keep deep checks from failing the whole fleet.",
+            "Why conflating liveness with readiness crash-loops a warming node, and how draining and slow-start keep a rolling deploy from dropping requests.",
           estimatedMinutes: 25,
           difficulty: "medium",
           skills: ["health-checks", "draining", "deploy"],
@@ -2537,7 +2537,7 @@ export const systemDesignLevel4: DesignLevel = {
           id: "sd-l4-service-discovery",
           title: "Service Discovery & Client vs Server-Side Load Balancing",
           summary:
-            "A registry (heartbeats or k8s readiness-driven Endpoints) keeps healthy addresses current within seconds; choose server-side simplicity or client-side/mesh locality deliberately.",
+            "How callers find healthy instances when IPs change every minute, and whether the balancing decision belongs in a central LB or in each client.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["service-discovery", "load-balancing", "microservices"],
