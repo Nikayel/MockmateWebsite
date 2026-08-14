@@ -1222,6 +1222,29 @@ Laid out side by side, the choice is really one question, and it is a budget que
 }
 \`\`\`
 
+## How an IVF query finds its partitions
+
+"Probes only the \`nprobe\` nearest partitions" skips over the interesting part: how does the query know which partitions are nearest? Each partition is represented by its centroid, one vector, so choosing the \`nprobe\` nearest partitions is itself a nearest-neighbor search, run over \`nlist\` centroids instead of over N data vectors. The structure that answers it is the **coarse quantizer**, and it is a separate index sitting in front of the real one. Walk a single query through it.
+
+\`\`\`
+1B vectors, 768 dims, nlist = 65,536 partitions, nprobe = 32
+
+step 1  coarse quantizer: find the 32 centroids nearest the query vector
+        flat scan   compare against all 65,536 centroids, roughly 0.1 to 0.5 ms on a core
+        HNSW        a graph walk over those same 65,536 centroids, a few hundred
+                    distance computations, tens of microseconds
+
+step 2  scan the 32 chosen partitions
+        1B / 65,536 = ~15,300 vectors per partition
+        32 x 15,300 = ~490,000 candidates, PQ-compressed so each comparison is cheap
+
+step 3  rerank the best few hundred with exact distances on the full vectors
+\`\`\`
+
+Two consequences fall out of that shape. Step 1 is a fixed cost paid on every query no matter how low you set \`nprobe\`, so as \`nlist\` grows the flat scan over centroids turns into a visible slice of the latency budget, and swapping it for an HNSW index over the centroids buys that slice back. And because step 1 decides which partitions step 2 is ever allowed to look at, a coarse quantizer that chooses badly caps your recall outright: a true neighbor living in the 33rd-nearest partition is unreachable however long you scan the 32 you picked.
+
+That is why "IVF-PQ with an HNSW coarse quantizer" is a recall and latency decision rather than a spelling of the product name. You raise \`nlist\` so each partition stays small and \`nprobe\` touches less data, then put a graph over the centroids so the extra centroids cost nothing at query time.
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -1256,7 +1279,7 @@ Vectors stream in and get deleted. HNSW handles inserts but deletes leave tombst
 
 For under a few million vectors with existing Postgres, \`pgvector\` is genuinely enough and saves a system. Dedicated stores (Pinecone, Weaviate, Qdrant, Milvus) earn their keep at scale, with filtered search, hybrid, and sharding built in. OpenSearch adds vectors to an existing search cluster.
 
-**Recap:** ANN trades recall for speed via HNSW (RAM, high recall), IVF-PQ (quantized, memory-cheap), or DiskANN (SSD-scale); tune \`ef_search\` / \`nprobe\`; handle filtered search as a pre-filter pushed into the index; and plan for rebuilds and re-embedding migrations.
+**Recap:** ANN trades recall for speed via HNSW (RAM, high recall), IVF-PQ (quantized, memory-cheap), or DiskANN (SSD-scale); tune \`ef_search\` / \`nprobe\`, and remember that IVF's partition choice is its own nearest-neighbor problem, so the coarse quantizer in front of it is a recall knob too; handle filtered search as a pre-filter pushed into the index; and plan for rebuilds and re-embedding migrations.
 
 \`\`\`cswidget
 {
