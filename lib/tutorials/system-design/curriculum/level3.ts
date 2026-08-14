@@ -3310,6 +3310,81 @@ is on the hot path and a write is not.
 - **Feed fan-out:** the canonical denormalization problem. A user opens their home timeline and wants
   the merged, time-sorted posts of everyone they follow, in under ~100 ms.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Exact unique counts versus a HyperLogLog sketch",
+  "predictPrompt": {
+    "question": "You count unique monthly visitors. Traffic grows from 1 million uniques to 100 million. What happens to the memory a HyperLogLog counter needs?",
+    "options": [
+      "It grows 100x, the same as the exact set of ids",
+      "It stays at about 12 KB",
+      "It grows, but only with the square root of the count"
+    ]
+  },
+  "workedExample": "Start at 1 million unique visitors, 16 bytes per visitor id, and 30 daily counters. Storing every id exactly costs 1,000,000 times 16 times 30, which is 480 million bytes, roughly 480 MB. A HyperLogLog counter is fixed at about 12 KB (12,288 bytes) no matter what it counts, so 30 of them come to about 369 KB: roughly 1,300 times less. Now drag the unique count up to 100 million and watch only one of the two numbers move. The exact set climbs into tens of gigabytes while the sketch stays exactly where it was, because its cost is a constant you chose and its error is about 0.8 percent of the answer rather than a function of the input size.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "uniques",
+      "label": "Unique visitors in the counting window",
+      "min": 10000,
+      "max": 1000000000,
+      "scale": "log",
+      "initial": 1000000,
+      "unit": "uniques"
+    },
+    {
+      "kind": "slider",
+      "id": "idBytes",
+      "label": "Bytes per stored visitor id",
+      "min": 8,
+      "max": 36,
+      "scale": "linear",
+      "step": 4,
+      "initial": 16,
+      "unit": "bytes"
+    },
+    {
+      "kind": "slider",
+      "id": "counters",
+      "label": "Separate counters kept (one per day, per region, per campaign)",
+      "min": 1,
+      "max": 400,
+      "scale": "linear",
+      "step": 1,
+      "initial": 30,
+      "unit": "counters"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "exactBytes",
+      "label": "Exact set of ids, all counters",
+      "expr": "uniques * idBytes * counters",
+      "format": "bytes"
+    },
+    {
+      "id": "sketchBytes",
+      "label": "HyperLogLog, all counters",
+      "expr": "12288 * counters",
+      "format": "bytes"
+    },
+    {
+      "id": "ratio",
+      "label": "Exact versus sketch",
+      "expr": "exactBytes / sketchBytes",
+      "format": "compact",
+      "unit": "x",
+      "sparkline": {
+        "over": "uniques"
+      }
+    }
+  ],
+  "caption": "The sketch's memory is a constant you pick; the exact set's is a function of the answer. Pay for exactness only where the product actually needs it, and say the error bar out loud when you do not."
+}
+\`\`\`
+
 ### The two feed strategies
 
 - **Fan-out-on-write (push):** when Alice posts, immediately write that post id into the precomputed
