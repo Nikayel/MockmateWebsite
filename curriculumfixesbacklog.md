@@ -450,6 +450,37 @@ repair rule.
 **Accept.** A written list of closure gaps per lesson. No ticket in this repo any longer expresses a
 content target as a word count.
 
+### CUR-16 — Close the 50 blocking closure gaps CUR-09 found
+
+**Effort:** 3 agent-days, one agent per level file. **Depends on:** CUR-09, which is the written list
+this runs against.
+
+**Evidence.** `docs/SD-CLOSURE-AUDIT-2026-08-14.md`: 83 gaps across 208 lessons, 50 of them blocking.
+A blocking gap means a learner who read the teach carefully still cannot produce a clause the model
+answer treats as known, because the concept is absent from the lesson. That is the same defect class
+as the 2026-08-12 finding where definitions had migrated into opt-in hints and six graded exercises
+became unsolvable: nothing throws, no test goes red, and the only symptom is a learner who cannot
+start.
+
+**Do.** One agent per level file, against the written list, repairing only the lessons named for that
+file. The distribution matters for how the work is done:
+
+- **L0 and L1 (15 of 50) are mostly ORDERING.** The fact is taught, one to three lessons later.
+  Prefer moving a definition earlier over writing new prose. Introducing vocabulary before the check
+  that leans on it is already the rule; these are its violations.
+- **L8 (8 of 50) is mostly ABSENCE.** Security answers name mechanisms the teach never shows. These
+  need a worked demonstration, not a definition.
+- **L3 is unaudited, not clean.** Re-run the audit on it first; its zero was disproved by the first
+  spot check.
+
+Answer "this is too hard" by teaching the missing fact, never by filling in the starter: every FACT
+must be recoverable, every DECISION stays the learner's. A definition may not live only in a hint,
+because hints are opt-in and a definition that lives there is unreachable for the learner who needs
+it most.
+
+**Accept.** Zero blocking gaps on a re-run of the CUR-09 audit. Exercise ids unchanged, corpus still
+416 exercises, and the retrieval-check count does not fall.
+
 ### CUR-10 — The AI-resistant exercise genres (council SD-W7)
 
 **Effort:** 5 agent-days. This is the ticket the owner actually asked the council about.
