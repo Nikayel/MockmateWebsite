@@ -3591,11 +3591,115 @@ A stateless API accepts submissions and immediately enqueues them onto a durable
 
 Users want to see output as it runs, so stream stdout, stderr, and per-test progress back over SSE or WebSocket, store the final verdict durably, and cap output size so a submission that prints forever cannot exhaust memory or the client. Per-user rate limits and concurrency quotas so one user cannot monopolize the pool, and treat the sandbox host itself as potentially compromised by running the whole fleet in an isolated network segment with no access to production.
 
-\`\`\`
-POST /submit -> API (stateless) -> durable queue (SQS/Kafka) -> job id
-warm pool of microVMs -> worker pulls job -> fresh Firecracker VM
-   cgroups (cpu/mem), timeout, pids limit, no network, disk quota
-   stream stdout/stderr/test-progress (SSE) -> store verdict -> destroy VM
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "A submission's path through the sandbox fleet",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "client",
+      "label": "Client (POST /submit)",
+      "kind": "client"
+    },
+    {
+      "id": "api",
+      "label": "API (stateless): auth, per-user rate limit and concurrency quota",
+      "kind": "service"
+    },
+    {
+      "id": "queue",
+      "label": "Durable queue (SQS or Kafka): returns a job id",
+      "kind": "queue"
+    },
+    {
+      "id": "pool",
+      "label": "Warm pool of pre-booted microVMs (hides the 100ms cold start)",
+      "kind": "service"
+    },
+    {
+      "id": "worker",
+      "label": "Worker pool (autoscales on queue depth)",
+      "kind": "service"
+    },
+    {
+      "id": "vm",
+      "label": "Fresh Firecracker microVM: cgroups for CPU and memory, wall clock and CPU timeout, pids limit, disk quota, no network",
+      "kind": "service"
+    },
+    {
+      "id": "stream",
+      "label": "SSE stream: stdout, stderr, per-test progress (output size capped)",
+      "kind": "service"
+    },
+    {
+      "id": "verdict",
+      "label": "Verdict store (durable), then the VM is destroyed",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "client",
+      "to": "api",
+      "kind": "sync"
+    },
+    {
+      "from": "api",
+      "to": "queue",
+      "kind": "async",
+      "label": "enqueue and return a job id"
+    },
+    {
+      "from": "queue",
+      "to": "worker",
+      "kind": "async",
+      "label": "a contest spike buffers here"
+    },
+    {
+      "from": "pool",
+      "to": "worker",
+      "kind": "sync",
+      "label": "hand over a pre-booted sandbox"
+    },
+    {
+      "from": "worker",
+      "to": "vm",
+      "kind": "sync",
+      "label": "one submission per fresh VM"
+    },
+    {
+      "from": "vm",
+      "to": "stream",
+      "kind": "async",
+      "label": "while it runs"
+    },
+    {
+      "from": "vm",
+      "to": "verdict",
+      "kind": "sync",
+      "label": "final result"
+    },
+    {
+      "from": "stream",
+      "to": "client",
+      "kind": "feedback",
+      "label": "progress back to the browser"
+    }
+  ],
+  "groups": [
+    {
+      "id": "sandbox_segment",
+      "label": "Isolated network segment: no access to production",
+      "nodes": [
+        "pool",
+        "worker",
+        "vm"
+      ]
+    }
+  ],
+  "caption": "The queue decouples submission rate from execution capacity, and every submission gets its own throwaway guest kernel so no state leaks between users."
+}
 \`\`\`
 
 **Recap:** pick the isolation boundary deliberately (microVM/Firecracker as the strong default, hardened seccomp container as the middle ground, never a bare container for hostile code), bound every resource with cgroups plus timeouts plus a pids limit plus no network, run each submission in a fresh throwaway sandbox behind a queue and autoscaling worker pool with a warm pool for latency, and stream results while enforcing per-user fairness.
@@ -3675,12 +3779,143 @@ Default to no strict global order because it is simpler and lets you deliver in 
 
 After the max attempts, move the event to a dead-letter store, alert, and expose a manual replay or redrive API. Fairness is critical because endpoints vary wildly: isolate delivery per tenant with per-tenant queues (or a fair scheduler), per-tenant concurrency limits and rate limits, per-endpoint timeouts, and circuit breakers that stop hammering an endpoint that has been failing, so one slow or dead customer cannot consume all workers and starve everyone else.
 
-\`\`\`
-event -> persist -> enqueue delivery task (per-tenant)
-worker: POST endpoint (HMAC-signed, timeout)
-   2xx -> mark delivered ; non-2xx/timeout -> backoff+jitter retry (cap N)
-   exhausted -> dead-letter + alert + manual redrive
-circuit breaker + per-tenant concurrency -> one bad tenant cannot starve others
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Delivering to an endpoint you do not control",
+  "nodes": [
+    {
+      "id": "event",
+      "label": "Event (payment.succeeded)",
+      "kind": "external"
+    },
+    {
+      "id": "store",
+      "label": "Event store: persisted first, with a stable event id",
+      "kind": "db"
+    },
+    {
+      "id": "queue",
+      "label": "Per-tenant delivery queue",
+      "kind": "queue"
+    },
+    {
+      "id": "worker",
+      "label": "Delivery worker (per-attempt timeout of a few seconds)",
+      "kind": "service"
+    },
+    {
+      "id": "breaker",
+      "label": "Circuit breaker and per-tenant concurrency limit",
+      "kind": "service"
+    },
+    {
+      "id": "endpoint",
+      "label": "Customer endpoint (slow, flaky, sometimes down for hours)",
+      "kind": "external"
+    },
+    {
+      "id": "retry",
+      "label": "Backoff and jitter retry (seconds, then minutes, then hours, capped attempts)",
+      "kind": "queue"
+    },
+    {
+      "id": "dlq",
+      "label": "Dead-letter store: alert and manual redrive",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "event",
+      "to": "store",
+      "kind": "sync",
+      "label": "persist before anything else"
+    },
+    {
+      "from": "store",
+      "to": "queue",
+      "kind": "async",
+      "label": "enqueue a delivery task"
+    },
+    {
+      "from": "queue",
+      "to": "worker",
+      "kind": "async"
+    },
+    {
+      "from": "worker",
+      "to": "breaker",
+      "kind": "sync"
+    },
+    {
+      "from": "breaker",
+      "to": "endpoint",
+      "kind": "sync",
+      "label": "POST, HMAC-SHA256 over the raw body plus a timestamp"
+    },
+    {
+      "from": "endpoint",
+      "to": "store",
+      "kind": "feedback",
+      "label": "2xx: mark delivered"
+    },
+    {
+      "from": "endpoint",
+      "to": "retry",
+      "kind": "async",
+      "label": "non-2xx, timeout or connection error"
+    },
+    {
+      "from": "retry",
+      "to": "worker",
+      "kind": "feedback",
+      "label": "re-attempt after backoff plus jitter"
+    },
+    {
+      "from": "retry",
+      "to": "dlq",
+      "kind": "async",
+      "label": "attempts exhausted"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "event",
+        "store",
+        "queue"
+      ],
+      "note": "One customer endpoint hanging for 30 seconds must not become your outage, so the producer persists the event and hands delivery to a separate queue-driven service instead of calling inline."
+    },
+    {
+      "adds": [
+        "worker",
+        "endpoint"
+      ],
+      "note": "The receiver is outside your control, so every attempt carries a short per-attempt timeout, and the payload is signed with HMAC-SHA256 over the raw body plus a timestamp so the consumer can verify it and reject replays."
+    },
+    {
+      "adds": [
+        "retry"
+      ],
+      "note": "A down endpoint has to be able to come back without every pending event arriving at once, so failures retry with exponential backoff plus jitter over hours rather than in lockstep."
+    },
+    {
+      "adds": [
+        "dlq"
+      ],
+      "note": "An event that exhausts its attempts must stay visible rather than disappear, so it lands in a dead-letter store with an alert and a redrive path."
+    },
+    {
+      "adds": [
+        "breaker"
+      ],
+      "note": "Workers are shared and endpoints vary wildly, so per-tenant concurrency limits and a breaker that stops hammering a failing endpoint are what keep one bad customer from starving everyone else."
+    }
+  ],
+  "caption": "Delivery is at-least-once by construction: the mark-delivered arc only closes on a 2xx, so a crash before it is recorded means the consumer sees the event id twice."
+}
 \`\`\`
 
 **Recap:** guarantee at-least-once (persist, enqueue, ack on 2xx) with a stable event id so consumers dedupe, deliver from a separate queue-driven service (never inline), retry with exponential backoff plus jitter over a long window, sign payloads with HMAC-SHA256 plus timestamp and rotate secrets, make ordering opt-in per resource key, and protect everyone with dead-letters plus per-tenant isolation and circuit breakers.
