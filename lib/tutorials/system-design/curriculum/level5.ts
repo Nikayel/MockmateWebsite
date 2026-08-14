@@ -533,6 +533,97 @@ answers from the nearest replica immediately and risks a stale read. A system th
 pays the coordination round trip on every strongly-consistent operation. A real, measurable
 tail-latency cost, not a philosophical one.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "The ELC tax, priced against a read SLO",
+  "predictPrompt": {
+    "question": "Your read p99 budget is 20 ms and the second-nearest region is an 80 ms round trip away. How much of that budget can a quorum read use?",
+    "options": [
+      "Most of it, as long as the replicas themselves are fast",
+      "All of it four times over: geography alone blows the budget",
+      "None of it, because quorum reads stay inside one region"
+    ]
+  },
+  "workedExample": "The starting values are the ones from the lesson: a 4 ms read from the nearest replica, an 80 ms round trip to the second-nearest region, and a 20 ms p99 budget. On the EL posture the read costs 4 ms and uses a fifth of the budget. Switch the posture to EC and the same read costs 84 ms, which is 420 percent of the budget, and the headroom goes sharply negative. Then try to rescue it with the sliders you actually control: no local-replica speedup closes an 80 ms gap.",
+  "inputs": [
+    {
+      "kind": "select",
+      "id": "posture",
+      "label": "Read posture in the else case",
+      "options": [
+        {
+          "label": "EL: nearest replica, may be stale",
+          "value": 0
+        },
+        {
+          "label": "EC: leader or quorum read, cross-region",
+          "value": 1
+        }
+      ],
+      "initial": 0
+    },
+    {
+      "kind": "slider",
+      "id": "local",
+      "label": "Read from the nearest replica",
+      "min": 1,
+      "max": 30,
+      "scale": "linear",
+      "step": 1,
+      "initial": 4,
+      "unit": "ms"
+    },
+    {
+      "kind": "slider",
+      "id": "cross",
+      "label": "Round trip to the second-nearest region",
+      "min": 5,
+      "max": 250,
+      "scale": "linear",
+      "step": 5,
+      "initial": 80,
+      "unit": "ms"
+    },
+    {
+      "kind": "slider",
+      "id": "slo",
+      "label": "Read p99 budget",
+      "min": 5,
+      "max": 300,
+      "scale": "linear",
+      "step": 5,
+      "initial": 20,
+      "unit": "ms"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "read",
+      "label": "Estimated read p99",
+      "expr": "(local + posture * cross) / 1000",
+      "format": "duration"
+    },
+    {
+      "id": "share",
+      "label": "Share of the budget consumed",
+      "expr": "(local + posture * cross) / slo",
+      "format": "percent"
+    },
+    {
+      "id": "headroom",
+      "label": "Headroom left in the budget (negative misses the SLO)",
+      "expr": "(slo - local - posture * cross) / 1000",
+      "format": "duration",
+      "sparkline": {
+        "over": "cross"
+      }
+    }
+  ],
+  "caption": "The term that decides this is the one you cannot tune. Consistency in the else case is bought with a round trip whose length is set by the distance between regions, so the L-versus-C choice is settled by an SLO number rather than by preference, and the cure for the staleness users actually notice is a targeted session guarantee."
+}
+\`\`\`
+
 ### The major stores on the spectrum
 
 - **DynamoDB: PA/EL.** Available under partition; normally favors latency, serving
