@@ -3114,7 +3114,7 @@ export const systemDesignLevel6: DesignLevel = {
           id: "sd-l6-stream-processing",
           title: "Stream Processing: Windowing, Watermarks & State",
           summary:
-            "Aggregate by event time (not processing time), use watermarks to bound lateness and fire windows, keep local state fault-tolerant via RocksDB plus checkpoints/changelogs for exactly-once state, and never drop late data silently.",
+            "Event time versus processing time, the watermark that decides when a window fires, and what to do with data that arrives late.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["stream-processing", "windowing", "flink"],
@@ -3162,7 +3162,7 @@ export const systemDesignLevel6: DesignLevel = {
           id: "sd-l6-event-sourcing",
           title: "Event Sourcing",
           summary:
-            "Store immutable events as truth and fold them to derive state, bound replay with snapshots, guard writes with expected-version optimistic concurrency, correct by appending a compensating event (never editing), and use it only where audit/temporal value justifies the complexity.",
+            "Store events and derive state: how a ledger answers 'what was the balance last Tuesday' and why you never edit history.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["event-sourcing", "ledger"],
@@ -3212,7 +3212,7 @@ export const systemDesignLevel6: DesignLevel = {
           id: "sd-l6-cqrs",
           title: "CQRS & Read Models",
           summary:
-            "Split commands (validated write model) from queries (denormalized projections built by idempotent event handlers), accept eventual consistency and handle read-your-writes explicitly, rebuild read models by replay, and do not drag in event sourcing unless you separately need it.",
+            "Split the write model from denormalized read models, and stop assuming CQRS has to drag event sourcing along with it.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["cqrs", "read-models", "projections"],
@@ -3270,7 +3270,7 @@ export const systemDesignLevel6: DesignLevel = {
           id: "sd-l6-schema-evolution",
           title: "Schema Management & Evolution",
           summary:
-            "An event schema is a versioned public contract enforced at produce time by a registry; evolve additively with defaults under a stated compatibility mode (which dictates deploy order), and make true breaks with upcasting, tolerant readers, or a new topic, never an in-place mutation.",
+            "An event schema is a public contract: the compatibility mode dictates your deploy order, and a genuine break needs a new topic.",
           estimatedMinutes: 25,
           difficulty: "medium",
           skills: ["schema-registry", "evolution", "avro"],
@@ -3318,7 +3318,7 @@ export const systemDesignLevel6: DesignLevel = {
           id: "sd-l6-streaming-observability",
           title: "Streaming Durability, HA & Observability",
           summary:
-            "Prevent acknowledged loss with rack-aware RF3 plus acks=all plus min.insync.replicas=2 and clean leader election; make consumer lag the primary SLO alongside under-replicated partitions, DLQ depth, and end-to-end tracing; size partitions from throughput and storage from rate times size times retention times replication.",
+            "A messaging tier makes two promises: no acknowledged loss, and no silent failure. Consumer lag is the SLO that catches the second.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["streaming-ops", "ha", "observability"],
