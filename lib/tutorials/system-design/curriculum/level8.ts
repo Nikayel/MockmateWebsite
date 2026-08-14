@@ -937,10 +937,40 @@ Multi-tenancy is running many customers (tenants) on one platform. The whole gam
 
 **Silo** gives each tenant dedicated infrastructure: their own database, sometimes their own cluster or even their own cloud account. Strongest isolation, easiest compliance story ("your data is in your own database"), simplest blast radius, but expensive and operationally heavy (you now patch and migrate N databases). **Pool** shares everything: one database, one schema, rows from all tenants in the same tables distinguished by a \`tenant_id\` column. Cheapest and most scalable, but isolation now depends entirely on your code and query discipline, one missing \`WHERE tenant_id = ?\` leaks everyone. **Bridge** is the middle: shared database, separate schema (or separate table set) per tenant. More isolation than pool, cheaper than silo, but schema-per-tenant stops scaling past a few thousand tenants (migrations across 5,000 schemas hurt).
 
-\`\`\`
-  SILO   dedicated DB/cluster per tenant   strongest isolation, highest cost
-  BRIDGE shared DB, schema-per-tenant       middle ground
-  POOL   shared schema, tenant_id column    cheapest, isolation is code-enforced
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Model",
+    "Infrastructure",
+    "Isolation",
+    "Cost and operational load"
+  ],
+  "rows": [
+    [
+      "Silo",
+      "Dedicated database, cluster, sometimes a whole cloud account, per tenant",
+      "Strongest: separation is physical, and the compliance story writes itself",
+      "Highest cost, and you now patch and migrate N databases"
+    ],
+    [
+      "Bridge",
+      "Shared database, one schema (or table set) per tenant",
+      "Middle ground: a query cannot reach across schemas by accident",
+      "Cheaper than silo, but migrations across 5,000 schemas stop scaling"
+    ],
+    [
+      "Pool",
+      "Shared schema, every tenant's rows in the same tables behind a tenant_id column",
+      "Code-enforced only: one missing WHERE tenant_id leaks everyone",
+      "Cheapest and most scalable"
+    ]
+  ],
+  "highlightCols": [
+    "Isolation"
+  ],
+  "caption": "Tiered isolation is the senior move: pool the thousands of self-serve SMB tenants for cost, silo the regulated enterprise tenants, and sell the second posture as a premium tier."
+}
 \`\`\`
 
 The senior move is **tiered isolation**: pool your thousands of small self-serve SMB customers for cost efficiency, and silo your regulated enterprise customers (health, finance, government, data-residency requirements) into dedicated databases or accounts. One product, two isolation postures, sold as a premium tier.
@@ -1092,12 +1122,73 @@ On top of the protocol you need cert hygiene. Serve a modern cipher suite only (
 
 For **service-to-service** calls, ordinary TLS only proves the server's identity to the client. **Mutual TLS (mTLS)** makes both sides present certificates, so each workload cryptographically proves who it is. That cert becomes a portable **workload identity**: instead of "requests from inside the VPC are trusted," you get "this call came from the \`payments\` service, signed by our CA, cert not expired." A service mesh (Istio, Linkerd) typically issues short-lived certs (often 24 hours or less via SPIFFE/SVID) and rotates them automatically through the proxy it puts beside each workload, so revocation is rarely needed because certs expire faster than you would notice a compromise.
 
-\`\`\`
-  north-south (edge)              east-west (internal)
-  client --TLS1.3--> [LB/CDN]     svcA <==mTLS==> svcB
-     terminate here?                 both present certs,
-        |                            both verify against CA,
-   re-encrypt to origin             short-lived, auto-rotated
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Two traffic planes, two TLS jobs",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "client",
+      "label": "Browser or mobile client",
+      "kind": "client"
+    },
+    {
+      "id": "edge",
+      "label": "Edge LB or CDN (TLS terminates here)",
+      "kind": "lb"
+    },
+    {
+      "id": "svc_a",
+      "label": "Service A, the origin (presents its own cert)",
+      "kind": "service"
+    },
+    {
+      "id": "svc_b",
+      "label": "Service B (verifies A against the CA)",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "client",
+      "to": "edge",
+      "kind": "sync",
+      "label": "TLS 1.3: forward secrecy, downgrade protection, HSTS"
+    },
+    {
+      "from": "edge",
+      "to": "svc_a",
+      "kind": "sync",
+      "label": "re-encrypt on a new connection, so plaintext never crosses an untrusted segment"
+    },
+    {
+      "from": "svc_a",
+      "to": "svc_b",
+      "kind": "sync",
+      "label": "mTLS: both present short-lived certs, both verify against the CA"
+    }
+  ],
+  "groups": [
+    {
+      "id": "ns",
+      "label": "North-south: client to edge",
+      "nodes": [
+        "client",
+        "edge"
+      ]
+    },
+    {
+      "id": "ew",
+      "label": "East-west: service to service",
+      "nodes": [
+        "svc_a",
+        "svc_b"
+      ]
+    }
+  ],
+  "caption": "Terminating at the edge buys inspection, routing, and caching; the price is that the hop to the origin is in the clear unless you re-encrypt. Inside the mesh every hop is mTLS, so identity replaces network location."
+}
 \`\`\`
 
 ## Termination vs re-encryption
