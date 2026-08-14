@@ -2179,6 +2179,27 @@ Secrets (DB passwords, API keys, signing keys, TLS private keys) are the credent
 
 A **KMS** is a managed key service with an API for encrypt/decrypt/sign where keys never leave the service. An **HSM** is the tamper-resistant hardware (often **FIPS 140-2 Level 3** certified) that actually holds the root keys; managed KMS is usually HSM-backed. The pattern is a **key hierarchy** with a hardware-backed **root of trust**: the HSM holds the root KEK, which wraps intermediate keys, which wrap DEKs. Nothing sensitive exists in plaintext outside the hardware boundary, and you get a single audited choke point for every key operation.
 
+## Rent or meter: what the dedicated hardware actually costs
+
+"HSM-backed" and "your own HSM" are different purchases, and which one you should want is settled by numbers rather than by how serious the requirement sounds. A dedicated single-tenant HSM rents for roughly 1.50 dollars an hour, and one device is not a deployment: losing the only HSM loses the keys, so availability means at least two per region. A shared managed KMS charges roughly 1 dollar per key-month plus a per-operation fee, on the order of 10 cents per 10,000 asymmetric sign or verify requests. Both figures are approximate and both will drift, so carry the shape rather than the digits: one price is rent, the other is a meter.
+
+\`\`\`
+Dedicated HSMs, 2 per region for availability, across 3 regions:
+  6 x 1.50 USD/hr x 730 hr          = about 6,600 USD per month, flat
+                                      whether you sign once that month or a billion times
+
+Managed KMS asymmetric signing, at 50M signatures per day:
+  50M x 30                          = 1.5B signatures per month
+  1.5B / 10,000 x 0.10 USD          = about 15,000 USD per month, and every new signature adds to it
+
+Where rent and meter cross:
+  6,600 USD / (0.10 USD / 10,000)   = 660M signatures per month, roughly 22M per day
+\`\`\`
+
+The crossover is the decision. Below a few million signatures a day the meter is cheaper than the rent, and it also saves you the key ceremony, the officer quorum, the spare device, and the on-call rotation that owns them, which is headcount rather than a line item. Past roughly twenty million a day the rent wins and keeps winning, because rent is flat and a meter is not, so at fifty million signatures a day the dedicated cluster costs under half of the metered one.
+
+Cost is the second reason to own the hardware, though, and it only gets a vote when the first one is silent. A managed KMS is usually HSM-backed and FIPS-validated too, so what a dedicated cluster really buys is **single tenancy and custody**: no other customer's workload shares the device, and nobody operates your root without your officers. When a regulator or a contract names that, the arithmetic above never runs, and you pay the flat rent even in the regions whose volume would never have justified it.
+
 ## How a root key is operated: split control and the key ceremony
 
 The hierarchy tells you what the root is for. It does not tell you who is allowed to touch it, and that is a separate design decision with a name. Every key below the root is operated by software: a service calls the KMS, policy says yes, and a DEK is wrapped. Nobody would accept that for the root, because the root's authority is total and any single administrator who can invoke it is a single point of compromise. So the root is put under **split control**, enforced as an **M-of-N quorum**: the HSM is configured so a root operation requires authorization from at least M of N designated key officers, each holding their own credential, and no single officer can act alone. Five officers with a quorum of three is a common shape: it survives two people being unreachable and still needs three to collude.
