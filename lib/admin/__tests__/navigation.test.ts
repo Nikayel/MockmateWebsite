@@ -146,6 +146,7 @@ describe("nav permissions match the routes they open", () => {
     "/admin/errors": "analytics",
     "/admin/research": null,
     "/admin/learn-research": "learn-research",
+    "/admin/learn-usage": "learn-usage",
     "/admin/bugfix-quality": "bugfix-quality",
     "/admin/announcements": "announcements",
     "/admin/feature-flags": "feature-flags",
