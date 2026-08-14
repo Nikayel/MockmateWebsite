@@ -4671,6 +4671,35 @@ almost vertical:
 That shape is why an SLO is written against a percentile and a threshold together ("p99 under 300 ms")
 rather than against an average. An average can improve while the tail gets worse.
 
+### The signal, the target, and the budget
+
+Three terms get used interchangeably in conversation and mean different things on a design.
+
+An **SLI**, a service level indicator, is something you measure: a ratio of good events to valid
+events that your telemetry already produces. An **SLO**, a service level objective, is a target
+written against an SLI over a stated window. An **error budget** is what falls out of the SLO by
+subtraction, the failure the target explicitly permits.
+
+\`\`\`
+SLI:            share of /orders requests that return non-5xx AND finish within 300ms,
+                measured over a rolling 28-day window
+
+SLO:            that SLI >= 99.9%
+
+error budget:   100% - 99.9% = 0.1% of requests in the window may miss
+                at 3,000 QPS the window holds 3,000 x 86,400 x 28 = 7,257,600,000 requests
+                0.1% of that is 7,257,600 requests you are allowed to fail or run slow
+\`\`\`
+
+The budget is what turns a target into something you can act on. Spending it evenly across 28 days is
+the system behaving as designed. Spending a third of it in one afternoon is an incident whether or
+not a human noticed, and that is what deserves a page. An exhausted budget is a planning input too: it
+is the argument for spending the next sprint on reliability rather than features.
+
+Note the shape of the SLI: good events over valid events, both of them counts of requests. That is
+what makes 99.9% subtractable into a budget at all, and it is why "uptime" and "average latency" make
+poor SLIs.
+
 ### Fan-out makes the tail common
 
 Tail latency gets worse, not better, as you scale, because of **fan-out**. If one API request fans
@@ -4749,6 +4778,28 @@ pools and how you spot that rising latency is silently capping throughput.
 out loud. \`concurrency = QPS x latency\` is a one-line answer that signals you can size a system
 rather than guess.
 
+### Utilization is bought with latency
+
+Little's Law says how much concurrency the work demands. It does not say what happens when requests
+arrive faster than servers free up, and that is where most of the tail actually comes from. Queueing
+theory supplies the shape: as utilization (rho, the fraction of capacity in use) approaches 1, average
+time in the system scales like \`1 / (1 - rho)\`.
+
+\`\`\`
+service time is 50ms in every row; only the utilization changes
+rho = 0.50   ->  1 / (1 - 0.50) =   2x  ->  ~100ms
+rho = 0.70   ->  1 / (1 - 0.70) = 3.3x  ->  ~165ms
+rho = 0.90   ->  1 / (1 - 0.90) =  10x  ->  ~500ms
+rho = 0.95   ->  1 / (1 - 0.95) =  20x  ->  ~1.0s
+rho = 0.99   ->  1 / (1 - 0.99) = 100x  ->  ~5.0s
+\`\`\`
+
+Nothing in that table got slower at doing the work. The box answering in 5s at 99% utilization is the
+same box that answered in 100ms at 50%, and the entire difference is time spent queueing. Two things
+follow. The last few points of utilization are the most expensive capacity you will ever buy. And a
+fleet provisioned to run near 70% is not wasting the other 30%, it is buying the headroom that keeps
+p99 off the cliff when a burst arrives.
+
 ### The measurement trap: coordinated omission
 
 Many load testers send the next request only after the previous one returns. When the server stalls,
@@ -4758,9 +4809,10 @@ time (record when a request *should* have started), or use tools like \`wrk2\` o
 correct for it. Always aggregate with histograms, not by averaging per-node p99s, because you cannot
 average percentiles.
 
-Recap: Averages hide the tail, p99 is the number users feel and fan-out makes it common, and Little's
-Law (L = arrival_rate x latency) sizes your concurrency and exposes when latency is capping
-throughput.
+Recap: Averages hide the tail, p99 is the number users feel and fan-out makes it common, an SLO is a
+target written against a measured SLI and its leftover is your error budget, and Little's Law
+(L = arrival_rate x latency) sizes your concurrency while 1/(1 - rho) says why you leave headroom
+instead of running the fleet hot.
 
 \`\`\`cswidget
 {
