@@ -332,11 +332,11 @@ rule is: **optimistic under low contention, pessimistic under high contention.**
   "prompt": "A viral post's like counter takes thousands of increments per second, all on one row. Contention could not be higher. Applying the rule you just read, is a pessimistic row lock the right design?",
   "options": [
     {
-      "label": "Yes, high contention is what pessimistic locking is for",
+      "label": "Yes, high contention is exactly what pessimistic locks are for",
       "feedback": "Tempting, because the rule literally says pessimistic under high contention. But that rule picks between control schemes for a workload you keep as-is. One hot row behind a lock serializes every writer to one-at-a-time, so throughput caps at whatever a single lock holder can do."
     },
     {
-      "label": "No, restructure the write path instead",
+      "label": "No, restructure the write path instead of serializing it",
       "correct": true,
       "feedback": "Right. Heavy locking is the worst possible choice for a hot key, because it turns thousands of parallel increments into a single-file queue. When contention concentrates on one row, change the shape of the writes: shard the counter into N sub-rows and sum on read, batch increments in memory or Redis and flush periodically, or use one atomic in-database increment so no writer holds a lock across a read-modify-write."
     },
@@ -626,7 +626,7 @@ secondary index match still needs a second read to fetch the row from the heap.
       "feedback": "Tempting, and it is the most common indexing mistake in practice. Being present in the index is not the same as being seekable in it, because an index is one sorted list, not three."
     },
     {
-      "label": "No, b is only ordered inside each a group",
+      "label": "No, b is only sorted inside each group of equal a",
       "correct": true,
       "feedback": "Right. The index on (a, b, c) is sorted by a first, then by b within equal a, then by c within equal (a, b). So it serves prefixes: a alone, a and b, or all three. With a unpinned, the entries for b = 5 are scattered across every a group and there is no single place to start the seek."
     },
@@ -2165,7 +2165,7 @@ co-locate or denormalize.
       "feedback": "Tempting because reads often do dominate, but indexed, bounded joins already run in single-digit milliseconds. Blanket denormalization buys an unmeasured read win while making every write a fan-out with anomaly risk."
     },
     {
-      "label": "Which query is hot, and what is its read/write ratio?",
+      "label": "Which query is hot, and what is its measured read/write ratio?",
       "correct": true,
       "feedback": "Right. An indexed, bounded join is already a handful of B-tree seeks in single-digit milliseconds, so denormalizing the whole schema pays guaranteed write-time costs for a read win nobody measured. Denormalization is a targeted trade: name the specific query, its read/write ratio, and the scale trigger, such as a join that would otherwise scatter-gather across shards. Copy the fact for that one path, not for the whole schema."
     },
@@ -2464,7 +2464,7 @@ table** (single-table design), keyed so each access pattern hits one partition.
   "prompt": "A tasks table uses partition key 'status'. Every new task is written with status ACTIVE. Writes start throttling, so you provision 10x more total table capacity. What happens?",
   "options": [
     {
-      "label": "Throttling stops; capacity was the ceiling and you raised it",
+      "label": "Throttling stops; you just raised the ceiling",
       "feedback": "Tempting because provisioned capacity sounds like one global pool, but the ceiling that matters is per partition. Total table capacity does nothing for a single overloaded key."
     },
     {
@@ -2555,7 +2555,7 @@ across multiple write nodes that would collide on the next value.
       "feedback": "This is exactly the tempting logic, and the spreading is real. The catch is what spreading costs once the table no longer fits in memory: you stopped concentrating the load and started scattering it."
     },
     {
-      "label": "It often gets worse: now every page is hot",
+      "label": "It often gets worse: the whole index becomes the working set",
       "correct": true,
       "feedback": "Right. You traded one hot page for touching all of them. Each insert lands on a random page, so pages split constantly, the index fragments, and the working set you must keep cached becomes the whole index instead of its right edge. On a large table that can multiply write cost and index size several-fold, which is why random UUIDv4 as a clustered primary key is such a common and expensive mistake."
     },
@@ -3012,7 +3012,7 @@ from **decision drivers** to a **storage family**, then defend against the runne
   "prompt": "Asked where to store orders for a new marketplace, a candidate opens with: 'NoSQL, because we need scale.' What is the interviewer listening for instead?",
   "options": [
     {
-      "label": "Numbers and access patterns first, then a family",
+      "label": "Numbers and access patterns first, and only then a storage family",
       "correct": true,
       "feedback": "Right. 'Scale' with no number attached is not a decision driver. What the interviewer wants named is QPS now and in two years, the query shapes you actually run and by what key, the p99 latency budget, and whether a stale read causes a real bug or a cosmetic one. A single well-indexed relational box comfortably serves tens of thousands of QPS, so the burden of proof sits on whoever wants to leave it."
     },
