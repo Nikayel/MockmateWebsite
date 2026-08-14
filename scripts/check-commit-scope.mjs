@@ -21,6 +21,19 @@
  *
  * ## Opt-in by design
  *
+ * ## Why the hook runs this twice
+ *
+ * Running it only BEFORE `lint-staged` is not enough, which we learned the same day it shipped. An
+ * agent staged exactly one path, this check passed correctly because at that moment the index held
+ * exactly one path, and the commit still went out carrying a sibling's file (`e0a592ce`).
+ * `lint-staged` stashes and restores around the commit, and a sibling's in-flight staging was
+ * captured by that stash and restored into the index AFTER this ran and BEFORE the commit object was
+ * written. A guard positioned before the sweep cannot see what the sweep does, so `.husky/pre-commit`
+ * calls this again afterwards.
+ *
+ * The complete fix is upstream of both runs: commit a PATHSPEC (`git commit -- path`), which bypasses
+ * the shared index entirely. This guard is the backstop for when someone forgets.
+ *
  * This is INERT unless `CS_COMMIT_SCOPE` is set, so an ordinary human commit is untouched and no
  * existing workflow changes. An agent given a file partition exports the scope it was assigned:
  *

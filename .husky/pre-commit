@@ -1,9 +1,20 @@
 #!/bin/sh
 
-# Runs BEFORE lint-staged on purpose. lint-staged wraps the commit in `git stash`, which is hostile
-# to concurrent agents, so a commit that is going to be refused must be refused before anything is
-# stashed. Inert unless CS_COMMIT_SCOPE is set, so ordinary commits are unaffected.
+# Checked TWICE, before and after lint-staged, and both runs are load-bearing.
+#
+# The first run refuses a bad commit before lint-staged has stashed anything, so the common case
+# fails fast and cheap.
+#
+# The second run exists because the first one cannot see the hole. lint-staged wraps the commit in
+# `git stash`, and on 2026-08-14 an agent that staged exactly one path, and whose FIRST check passed
+# correctly, still shipped a sibling's file: the sibling's in-flight staging was captured by the
+# stash and restored into the index after the check ran and before the commit object was written
+# (commit e0a592ce). A guard that only runs before the sweep cannot catch what the sweep does.
+#
+# Inert unless CS_COMMIT_SCOPE is set, so ordinary commits are unaffected by either run.
 node scripts/check-commit-scope.mjs || exit 1
 
 # Use npx with full path (works with npm instead of pnpm)
-/usr/local/bin/npx lint-staged
+/usr/local/bin/npx lint-staged || exit 1
+
+node scripts/check-commit-scope.mjs || exit 1
