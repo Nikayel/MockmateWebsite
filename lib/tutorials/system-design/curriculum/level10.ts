@@ -1684,9 +1684,9 @@ The player, not the server, drives quality. It downloads the manifest, measures 
   "prompt": "A title goes viral: a million people start watching it within a minute. What has to scale?",
   "options": [
     {
-      "label": "Nothing on the transcode path. It ran once at upload, so the spike is cached segment reads absorbed by edge caches and request coalescing",
+      "label": "Nothing on the transcode path: this is a read spike, not compute",
       "correct": true,
-      "feedback": "Right. Every viewer is reading the same immutable segments, so a viral spike is a pure read event on the delivery path, not a compute event."
+      "feedback": "Right. Transcoding ran once at upload, and every one of those viewers is reading the same immutable segments, so the spike lands entirely on the delivery path. Edge caches plus request coalescing absorb it, which is why origin egress barely moves."
     },
     {
       "label": "The transcoding fleet, since a million concurrent viewers need a million streams encoded",
@@ -1717,9 +1717,9 @@ The vast majority of the catalog is watched rarely. Keep hot content on fast sto
   "prompt": "Bandwidth collapses mid stream on a train. Who decides to drop to 480p, and how?",
   "options": [
     {
-      "label": "The player: it measures throughput and buffer level and fetches the next segment from a lower bitrate rendition listed in the same manifest",
+      "label": "The player, from its own throughput and buffer measurements",
       "correct": true,
-      "feedback": "Right. Quality is a client side choice of which segment URL to request, which is exactly why it works over plain cached objects with no server session state."
+      "feedback": "Right. It measures throughput and buffer level, then simply fetches the next segment from a lower bitrate rendition listed in the same manifest. Quality is a client side choice of which URL to request, which is exactly why it works over plain cached objects with no server session state."
     },
     {
       "label": "The server, which detects the slow client and re-encodes the stream at a lower bitrate on the fly",
@@ -2000,9 +2000,9 @@ Edits are operations like \`insert(pos=5, "x")\` and \`delete(pos=8)\`. When two
   "prompt": "Classic OT depends on a central server to impose one canonical order on operations. What does that dependency cost?",
   "options": [
     {
-      "label": "Offline and peer to peer editing get hard, because there is no sequencer to order operations while a replica is disconnected",
+      "label": "Offline and peer to peer editing get hard without a sequencer",
       "correct": true,
-      "feedback": "Right, and that is the gap CRDTs fill: give every character a unique, totally ordered id and concurrent inserts commute, so replicas merge in any order with no sequencer."
+      "feedback": "Right. There is nothing to impose the canonical order while a replica is disconnected, and that is the gap CRDTs fill: give every character a unique, totally ordered id and concurrent inserts commute, so replicas merge in any order with no sequencer at all."
     },
     {
       "label": "Nothing real: the server is an optimization, and OT converges without it",
@@ -2073,9 +2073,9 @@ All editors of one document must reach the same collaboration server (or a consi
   "prompt": "A laptop edits offline for an hour and then reconnects. What has to happen?",
   "options": [
     {
-      "label": "Its queued operations are merged or transformed against everything that happened meanwhile, which a CRDT gets from commutative merge and OT gets by transforming the whole batch against the missed history",
+      "label": "Its queued operations merge against the hour it missed",
       "correct": true,
-      "feedback": "Right. This is the killer follow-up, and both families answer it, just at different cost: CRDT merge is natural, OT has to transform the queued batch against an hour of history."
+      "feedback": "Right, this is the killer follow-up, and both families answer it at different cost. A CRDT merge is commutative, so the queued ops merge in whatever order they arrive. OT has to transform the whole queued batch against an hour of history it never saw."
     },
     {
       "label": "The server's version wins, since the server is the ordering authority",
