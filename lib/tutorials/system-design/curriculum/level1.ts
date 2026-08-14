@@ -4074,11 +4074,75 @@ deadline while queued, discard it instead of processing it, because the caller h
 }
 \`\`\`
 
-\`\`\`
-arrivals --> [admission control] --accept--> [bounded queue] --> workers
-                    |                              |
-                  reject                       drop if stale/
-                429/503                        past deadline
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "The two places overload is shed",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "arrivals",
+      "label": "Arrivals",
+      "kind": "client"
+    },
+    {
+      "id": "admit",
+      "label": "Admission control (in-flight cap, token bucket)",
+      "kind": "lb"
+    },
+    {
+      "id": "rejected",
+      "label": "Rejected at the door: 429 / 503 with a retry hint",
+      "kind": "external"
+    },
+    {
+      "id": "queue",
+      "label": "Bounded queue",
+      "kind": "queue"
+    },
+    {
+      "id": "dropped",
+      "label": "Dropped from the queue: stale or past its deadline",
+      "kind": "external"
+    },
+    {
+      "id": "workers",
+      "label": "Workers",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "arrivals",
+      "to": "admit",
+      "kind": "sync"
+    },
+    {
+      "from": "admit",
+      "to": "queue",
+      "kind": "sync",
+      "label": "accept"
+    },
+    {
+      "from": "admit",
+      "to": "rejected",
+      "kind": "sync",
+      "label": "reject"
+    },
+    {
+      "from": "queue",
+      "to": "workers",
+      "kind": "sync"
+    },
+    {
+      "from": "queue",
+      "to": "dropped",
+      "kind": "sync",
+      "label": "deadline expired"
+    }
+  ],
+  "caption": "Both discards are deliberate. A request rejected at admission costs one cheap response and no capacity, and a queued request whose caller has already given up is dropped rather than served, because processing it burns goodput while throughput still looks busy. Remove the bound on the queue and neither control fires: the overload hides in the buffer until latency and heap collapse together."
+}
 \`\`\`
 
 Recap: Bound every queue and let backpressure propagate, run below saturation because latency
