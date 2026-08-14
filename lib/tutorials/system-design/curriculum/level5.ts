@@ -1171,14 +1171,99 @@ wearing different clothes.
 }
 \`\`\`
 
-\`\`\`
-  clients ->  [ append ]  ->  replicated ordered log
-                              idx:  1     2     3     4
-                              cmd: SET   INCR  DEL   SET
-                                    |     |     |     |
-              replica A  apply ---> same order ---> state S
-              replica B  apply ---> same order ---> state S
-              replica C  apply ---> same order ---> state S
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "State-machine replication: one ordered log, identical replicas",
+  "nodes": [
+    {
+      "id": "clients",
+      "label": "Clients",
+      "kind": "client"
+    },
+    {
+      "id": "append",
+      "label": "Leader append point",
+      "kind": "service"
+    },
+    {
+      "id": "log",
+      "label": "Replicated ordered log (idx 1 SET, 2 INCR, 3 DEL, 4 SET)",
+      "kind": "queue"
+    },
+    {
+      "id": "ra",
+      "label": "Replica A (state S)",
+      "kind": "db"
+    },
+    {
+      "id": "rb",
+      "label": "Replica B (state S)",
+      "kind": "db"
+    },
+    {
+      "id": "rc",
+      "label": "Replica C (state S)",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "clients",
+      "to": "append",
+      "kind": "sync",
+      "label": "commands"
+    },
+    {
+      "from": "append",
+      "to": "log",
+      "kind": "sync",
+      "label": "one agreed order"
+    },
+    {
+      "from": "log",
+      "to": "ra",
+      "kind": "sync",
+      "label": "apply in index order"
+    },
+    {
+      "from": "log",
+      "to": "rb",
+      "kind": "sync",
+      "label": "apply in index order"
+    },
+    {
+      "from": "log",
+      "to": "rc",
+      "kind": "sync",
+      "label": "apply in index order"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "clients",
+        "append"
+      ],
+      "note": "The requirement is that every replica ends in the same state, and commands arrive from many clients at once, so something has to decide a single order before anything is applied."
+    },
+    {
+      "adds": [
+        "log"
+      ],
+      "note": "The log is that order: index 1 SET, 2 INCR, 3 DEL, 4 SET, identical on every replica. Getting all nodes to agree on this sequence is total-order broadcast, which is equivalent to consensus."
+    },
+    {
+      "adds": [
+        "ra",
+        "rb",
+        "rc"
+      ],
+      "note": "Because apply is deterministic, feeding all three the same entries in index order lands them in the same state S with no further coordination. A command that reads the local clock breaks this while the log still looks healthy."
+    }
+  ],
+  "caption": "Consistency falls out of the ordered log: same commands, same order, deterministic apply, identical state. Snapshots truncate the log once a replica has persisted the state it covers."
+}
 \`\`\`
 
 ### The two non-negotiable preconditions
