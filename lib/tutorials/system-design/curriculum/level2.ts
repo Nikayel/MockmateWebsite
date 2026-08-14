@@ -2321,6 +2321,34 @@ session as fields you can update individually), streams (append-only log with co
 pub/sub, HyperLogLog (cardinality estimation), and vector similarity. Reaching for these instead of
 raw string blobs is often the difference between a clean design and a clumsy one.
 
+**Worth seeing one of them work.** A sorted set stores members each carrying a numeric **score**, and
+keeps them ordered by it, so you can add, trim, and count by score range. Make the score a timestamp
+and a true sliding window falls out in three commands:
+
+\`\`\`
+# Limit: 100 requests per user in the trailing 60 seconds. Say now = 1723600000 (epoch seconds).
+
+ZADD             ratelimit:u42  1723600000  "1723600000:9f2c"   # 1. record this request:
+                                                                #    score = now, member unique
+ZREMRANGEBYSCORE ratelimit:u42  -inf  (1723599940               # 2. drop everything older than
+                                                                #    now - 60. The window slides.
+ZCARD            ratelimit:u42                                  # 3. what remains IS the count
+                                                                #    -> 87 (this request included)
+EXPIRE           ratelimit:u42  60                              # idle key cleans itself up
+\`\`\`
+
+Compare 87 against the limit and allow or reject. Two details make it correct rather than nearly
+correct. The member must be unique per request (timestamp plus a random suffix), because a sorted
+set is a *set*: two requests sharing a member collapse into one entry and undercount. And the three
+commands belong in a MULTI/EXEC or a Lua script, so no concurrent request can interleave between the
+trim and the count.
+
+The reason to pay for this over the bucketed counter (\`INCR\` on a key named for the current minute)
+is the boundary. A fixed window admits two full quotas back to back, 100 requests at 11:59:59 and
+100 more at 12:00:00, because those are two different keys. The sorted set has no boundary to
+exploit, since the window is measured backward from now on every single request. It pays for that in
+memory: one member per request in the window instead of one integer per minute.
+
 Choose the engine to the job: **Memcached** for a dumb, multi-threaded, memory-only cache; **Redis**
 for a single-threaded rich-data-structure store that can also persist; **DynamoDB** for a managed,
 durable, auto-sharded KV/document store with predictable single-digit-ms latency at any scale.
