@@ -2620,9 +2620,51 @@ job, and let your app handle multiple shapes during the transition.
 }
 \`\`\`
 
+### Ordering referenced children without renumbering all of them
+
+The moment children become their own documents instead of an embedded array, you lose the one thing
+the array gave you for free: order. The obvious replacement is an integer \`order\` field, and it
+turns one drag-and-drop into a write per sibling:
+
+\`\`\`
+Move D above B, integer positions:
+  before   A:1   B:2   C:3   D:4   E:5
+  after    A:1   D:2   B:3   C:4   E:5
+                 ^^^   ^^^   ^^^   ^^^
+  Four documents rewritten to move one. On a page with 800 siblings that is 800 writes,
+  and two people reordering at once collide on every single one.
+\`\`\`
+
+The fix is to stop numbering positions and start choosing values that always leave room between
+them. A **fractional order key** does that: to place a document between two others, give it a value
+strictly between theirs.
+
+\`\`\`
+Move D above B, fractional keys:
+  before   A:1.0   B:2.0   C:3.0   D:4.0   E:5.0
+
+  D's new key = midpoint(A.order, B.order) = (1.0 + 2.0) / 2 = 1.5
+
+  after    A:1.0   D:1.5   B:2.0   C:3.0   E:5.0
+                   ^^^^^
+  One document rewritten. Sorting by \`order\` still yields A D B C E.
+\`\`\`
+
+That reorder is a single-document update, so per-document atomicity covers it and two users moving
+different blocks never contend.
+
+The cost shows up later, and you should name it before an interviewer does. Inserting into the same
+gap over and over halves it every time (1.5, 1.25, 1.125, ...), and a 64-bit float runs out of
+mantissa after roughly 50 such inserts, at which point two siblings compare equal and the order is
+undefined. Two standard answers. Use a **string key over an ordered alphabet** ("a", "an", "ao"),
+which grows a character instead of running out of precision. And run a periodic **rebalance** that
+rewrites a sibling list back to evenly spaced values. The rebalance is exactly the O(n) write you
+were avoiding, except it now happens on a schedule you chose rather than on every user's drag.
+
 Recap: Model to the access pattern, embed bounded read-together data and reference large or unbounded
 entities, respect the 16MB document cap, and treat per-document atomicity as a design constraint
-rather than assuming relational multi-row transactions.
+rather than assuming relational multi-row transactions. Order referenced children with fractional
+keys so a reorder is one write, and rebalance them on a schedule.
 
 \`\`\`cswidget
 {
