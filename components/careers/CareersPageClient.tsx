@@ -33,7 +33,14 @@ export function CareersPageClient({ roles }: CareersPageClientProps) {
           animate="animate"
         >
           <div className="mx-auto max-w-2xl text-center">
-            <motion.p variants={staggerItem} className="text-accent mb-4 text-sm font-medium">
+            {/* accent-strong, not accent, wherever clay carries TEXT: at these sizes WCAG
+                asks for 4.5:1 and --accent measures 3.74:1 in light mode. Card surfaces are
+                bg-card for the same reason — bg-secondary/50 resolved to ~1.02:1 against the
+                light page and the cards disappeared. */}
+            <motion.p
+              variants={staggerItem}
+              className="text-accent-strong mb-4 text-sm font-medium"
+            >
               We're building something cool
             </motion.p>
 
@@ -55,7 +62,7 @@ export function CareersPageClient({ roles }: CareersPageClientProps) {
               variants={staggerItem}
               className="bg-accent/5 border-accent/10 text-muted-foreground inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm"
             >
-              <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+              <span className="bg-neural h-2 w-2 animate-pulse rounded-full" />
               <span>Actively hiring</span>
             </motion.div>
           </div>
@@ -83,14 +90,14 @@ export function CareersPageClient({ roles }: CareersPageClientProps) {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.1 }}
-                  className="group bg-secondary/50 border-border hover:border-accent/40 hover:bg-secondary cursor-pointer rounded-2xl border p-6 transition-all"
+                  className="group bg-card border-border hover:border-accent/40 cursor-pointer rounded-2xl border p-6 shadow-sm transition-all hover:shadow-md"
                 >
                   <div className="mb-3 flex items-start justify-between">
                     <div>
                       <h3 className="text-foreground mb-1 text-xl font-semibold">{role.title}</h3>
                       <p className="text-muted-foreground text-sm">{role.type} · Equity</p>
                     </div>
-                    <ArrowRight className="text-muted-foreground/60 group-hover:text-accent h-5 w-5 transition-all group-hover:translate-x-1" />
+                    <ArrowRight className="text-muted-foreground group-hover:text-accent-strong h-5 w-5 transition-all group-hover:translate-x-1" />
                   </div>
 
                   <p className="text-muted-foreground mb-4">{role.description}</p>
@@ -128,7 +135,10 @@ export function CareersPageClient({ roles }: CareersPageClientProps) {
             <p className="text-muted-foreground mb-8 text-sm">
               If you do not get a response, reach out on LinkedIn (Nikayel Ali) or at my personal
               email:{" "}
-              <a href="mailto:alinikayeljamal@gmail.com" className="text-accent hover:underline">
+              <a
+                href="mailto:alinikayeljamal@gmail.com"
+                className="text-accent-strong hover:underline"
+              >
                 alinikayeljamal@gmail.com
               </a>
               .

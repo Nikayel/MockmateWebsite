@@ -1,14 +1,7 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
 import { ScrollReveal } from "@/lib/motion"
-import {
-  Brain,
-  RefreshCw,
-  BrainCircuit,
-  Layers,
-  TrendingUp,
-} from "lucide-react"
+import { Brain, RefreshCw, BrainCircuit, Layers, TrendingUp } from "lucide-react"
 
 // Icon mapping for dynamic icons
 const iconMap: { [key: string]: React.ComponentType<{ className?: string }> } = {
@@ -23,8 +16,6 @@ interface SciencePrinciple {
   title: string
   improvement: string
   description: string
-  color: string
-  visual: string
   citation: string
   source: string
 }
@@ -33,78 +24,70 @@ interface ScienceSectionProps {
   sciencePrinciples: SciencePrinciple[]
 }
 
+/**
+ * ScienceSection — the four learning principles, on the landing design system.
+ *
+ * The per-card hues are gone. They used to run clay / green / purple-400 / amber-400,
+ * two of which are not in the palette at all, and the hue encoded nothing: all four
+ * cards report the same quantity (retention lift), so the color was decoration wearing
+ * the costume of data. The landing sections commit to one clay accent for exactly this
+ * reason, and the icon plus the figure already tell the cards apart.
+ */
 export function ScienceSection({ sciencePrinciples }: ScienceSectionProps) {
   return (
-    <section className="py-24 bg-gradient-to-b from-black via-gray-950 to-black relative overflow-hidden">
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute top-0 left-0 w-full h-full" style={{
-          backgroundImage: `radial-gradient(circle at 25% 25%, #c4703f 1px, transparent 1px),
-                           radial-gradient(circle at 75% 75%, #3fb883 1px, transparent 1px)`,
-          backgroundSize: '60px 60px'
-        }} />
-      </div>
+    <section className="bg-background relative overflow-hidden py-24">
+      {/* One soft clay wash, matching the landing sections. */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(196,112,63,0.06),transparent_65%)]" />
 
-      <div className="container mx-auto px-4 relative z-10">
+      <div className="relative z-10 container mx-auto px-4">
         <ScrollReveal>
-          <div className="max-w-3xl mx-auto text-center mb-16">
-            <Badge className="bg-neural/20 text-neural border-neural/30 mb-6">
-              <Brain className="w-4 h-4 mr-2 inline" />
-              Research-Backed
-            </Badge>
-            <h2 className="text-4xl md:text-5xl font-heading font-bold text-white mb-6">
-              Built on 40 Years of <span className="text-neural">Cognitive Science</span>
+          <div className="mx-auto mb-16 max-w-3xl text-center">
+            <div className="border-border bg-muted mb-6 inline-flex items-center gap-2 rounded-full border px-3 py-1">
+              <Brain className="text-accent h-3.5 w-3.5" />
+              <span className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+                Research-Backed
+              </span>
+            </div>
+            <h2 className="font-heading text-foreground text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-bold tracking-[-0.03em]">
+              Built on 40 years of <span className="text-accent">cognitive science</span>
             </h2>
-            <p className="text-xl text-gray-400">
+            <p className="text-muted-foreground mx-auto mt-6 max-w-xl text-lg leading-relaxed">
               Four proven learning principles, applied to your interview prep.
             </p>
           </div>
         </ScrollReveal>
 
-        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        <div className="mx-auto grid max-w-4xl gap-4 md:grid-cols-2">
           {sciencePrinciples.map((principle, i) => {
             const IconComponent = iconMap[principle.icon] || Brain
             return (
               <ScrollReveal key={principle.title} delay={i * 0.1}>
-                <div className="group relative">
-                  <div className="absolute inset-0 bg-gradient-to-br from-gray-900/90 to-gray-900/50 rounded-3xl transform group-hover:scale-[1.02] transition-transform duration-300" />
-                  <div className={`absolute -inset-px rounded-3xl bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
-                    principle.color === 'accent' ? 'from-accent/20 to-transparent' :
-                    principle.color === 'neural' ? 'from-neural/20 to-transparent' :
-                    principle.color === 'purple' ? 'from-purple-400/20 to-transparent' :
-                    'from-amber-400/20 to-transparent'
-                  }`} />
-
-                  <div className="relative p-8 rounded-3xl border border-gray-800/50 group-hover:border-gray-700/50 transition-colors">
-                    <div className="flex items-start gap-4">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-                        principle.color === 'accent' ? 'bg-accent/10' :
-                        principle.color === 'neural' ? 'bg-neural/10' :
-                        principle.color === 'purple' ? 'bg-purple-400/10' :
-                        'bg-amber-400/10'
-                      }`}>
-                        <IconComponent className={`w-7 h-7 ${
-                          principle.color === 'accent' ? 'text-accent' :
-                          principle.color === 'neural' ? 'text-neural' :
-                          principle.color === 'purple' ? 'text-purple-400' :
-                          'text-amber-400'
-                        }`} />
+                <div className="border-border bg-card hover:border-accent/30 h-full rounded-2xl border p-8 transition-colors">
+                  <div className="flex items-start gap-4">
+                    <span className="bg-accent/10 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
+                      <IconComponent className="text-accent h-6 w-6" />
+                    </span>
+                    <div className="flex-1">
+                      <div className="text-accent-strong text-2xl font-bold">
+                        {principle.improvement}
                       </div>
-                      <div className="flex-1">
-                        <div className={`text-2xl font-bold mb-1 ${
-                          principle.color === 'accent' ? 'text-accent' :
-                          principle.color === 'neural' ? 'text-neural' :
-                          principle.color === 'purple' ? 'text-purple-400' :
-                          'text-amber-400'
-                        }`}>{principle.improvement}</div>
-                        <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Better Retention</div>
+                      <div className="text-muted-foreground text-xs tracking-wider uppercase">
+                        Better retention
                       </div>
                     </div>
-                    <h3 className="text-xl font-bold text-white mt-4 mb-2">{principle.title}</h3>
-                    <p className="text-gray-400 leading-relaxed mb-3">{principle.description}</p>
-                    <p className="text-xs text-gray-600 italic">
-                      {principle.citation} — <span className="text-gray-700">{principle.source}</span>
-                    </p>
                   </div>
+
+                  <h3 className="font-heading text-foreground mt-5 mb-2 text-xl font-bold tracking-tight">
+                    {principle.title}
+                  </h3>
+                  <p className="text-muted-foreground mb-3 leading-relaxed">
+                    {principle.description}
+                  </p>
+                  {/* Full muted-foreground, not /70: at 12px the faded variant lands at
+                      2.99:1 in light mode. Size carries the hierarchy instead. */}
+                  <p className="text-muted-foreground text-xs">
+                    {principle.citation} · {principle.source}
+                  </p>
                 </div>
               </ScrollReveal>
             )

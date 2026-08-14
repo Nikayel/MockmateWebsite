@@ -14,8 +14,6 @@ interface WhyCodesparringPageClientProps {
     title: string
     improvement: string
     description: string
-    color: string
-    visual: string
     citation: string
     source: string
   }[]

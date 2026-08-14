@@ -3,65 +3,94 @@
 import { motion } from "framer-motion"
 import { ScrollReveal } from "@/lib/motion"
 
+/**
+ * ProblemSection — the forgetting-curve beat, on the landing design system.
+ *
+ * Was a hardcoded `bg-black` slab with `text-white` / `text-gray-*` copy, which
+ * stranded a black band between a token-driven hero and the rest of the page and
+ * went unreadable in light mode. Now: `bg-background`, Work Sans headings, Open Sans
+ * body, and clay/green as the only two hues — the same contract the landing sections
+ * follow (see comparison-section.tsx).
+ *
+ * The SVG resolves its colors through the CSS custom properties rather than literal
+ * hexes, so the chart crossfades with the theme instead of staying pinned to dark.
+ */
 export function ProblemSection() {
   return (
-    <section className="py-24 bg-black relative overflow-hidden">
-      <div className="container mx-auto px-4">
+    <section className="bg-background relative overflow-hidden py-24">
+      <div className="relative z-10 container mx-auto px-4">
         <ScrollReveal>
-          <div className="max-w-3xl mx-auto text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-heading font-bold text-white mb-6">
-              The Problem with Traditional Practice
+          <div className="mx-auto mb-16 max-w-3xl text-center">
+            <span className="text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase">
+              The problem
+            </span>
+            <h2 className="font-heading text-foreground mt-5 text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-bold tracking-[-0.03em]">
+              The problem with traditional practice
             </h2>
-            <p className="text-xl text-gray-400 leading-relaxed">
-              Without a system, you <span className="text-red-400 font-medium">forget 80%</span> of what you learn within a week.
-              Random problem selection leaves weak patterns untouched.
+            <p className="text-muted-foreground mx-auto mt-6 max-w-xl text-lg leading-relaxed">
+              Without a system, you{" "}
+              <span className="text-accent-strong font-semibold">forget 80%</span> of what you learn
+              within a week. Random problem selection leaves weak patterns untouched.
             </p>
-            <p className="text-sm text-gray-600 mt-4 italic">
-              Based on Ebbinghaus's forgetting curve research (1885)
+            <p className="text-muted-foreground mt-4 text-sm">
+              Based on Ebbinghaus&apos;s forgetting curve research (1885)
             </p>
           </div>
         </ScrollReveal>
 
         {/* Visual representation - Animated Forgetting curve */}
         <ScrollReveal>
-          <div className="max-w-3xl mx-auto">
-            <div className="absolute inset-0 bg-gradient-to-r from-accent/5 via-transparent to-neural/5 rounded-2xl blur-2xl" />
-
-            <div className="relative bg-gray-950/60 backdrop-blur-sm rounded-2xl border border-gray-800/40 p-6 md:p-8">
+          <div className="mx-auto max-w-3xl">
+            <div className="border-border bg-card relative rounded-2xl border p-6 md:p-8">
               <svg
                 viewBox="0 0 400 160"
-                className="w-full h-32 md:h-40 lg:h-48"
+                className="h-32 w-full md:h-40 lg:h-48"
                 aria-label="Forgetting curve comparison"
               >
                 <defs>
                   <linearGradient id="forgetGradientWhy" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#c4703f" stopOpacity="0.8" />
-                    <stop offset="100%" stopColor="#ff6b6b" stopOpacity="0.6" />
+                    <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.9" />
+                    <stop offset="100%" stopColor="var(--destructive)" stopOpacity="0.7" />
                   </linearGradient>
                   <linearGradient id="retainGradientWhy" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#3fb883" />
-                    <stop offset="100%" stopColor="#3fb883" />
+                    <stop offset="0%" stopColor="var(--neural)" />
+                    <stop offset="100%" stopColor="var(--neural)" />
                   </linearGradient>
                   <filter id="glowWhy">
-                    <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                    <feGaussianBlur stdDeviation="2" result="coloredBlur" />
                     <feMerge>
-                      <feMergeNode in="coloredBlur"/>
-                      <feMergeNode in="SourceGraphic"/>
+                      <feMergeNode in="coloredBlur" />
+                      <feMergeNode in="SourceGraphic" />
                     </feMerge>
                   </filter>
                 </defs>
 
-                <line x1="40" y1="130" x2="380" y2="130" stroke="#333" strokeWidth="1" opacity="0.5" />
-                <line x1="40" y1="20" x2="40" y2="130" stroke="#333" strokeWidth="1" opacity="0.5" />
+                <line x1="40" y1="130" x2="380" y2="130" stroke="var(--border)" strokeWidth="1" />
+                <line x1="40" y1="20" x2="40" y2="130" stroke="var(--border)" strokeWidth="1" />
 
-                <text x="20" y="75" fill="#666" fontSize="10" textAnchor="middle" transform="rotate(-90, 20, 75)">
+                <text
+                  x="20"
+                  y="75"
+                  fill="var(--muted-foreground)"
+                  fontSize="10"
+                  textAnchor="middle"
+                  transform="rotate(-90, 20, 75)"
+                >
                   Memory
                 </text>
 
-                <text x="40" y="145" fill="#666" fontSize="9">Day 1</text>
-                <text x="150" y="145" fill="#666" fontSize="9">Day 3</text>
-                <text x="260" y="145" fill="#666" fontSize="9">Day 7</text>
-                <text x="360" y="145" fill="#666" fontSize="9">Day 30</text>
+                <text x="40" y="145" fill="var(--muted-foreground)" fontSize="9">
+                  Day 1
+                </text>
+                <text x="150" y="145" fill="var(--muted-foreground)" fontSize="9">
+                  Day 3
+                </text>
+                <text x="260" y="145" fill="var(--muted-foreground)" fontSize="9">
+                  Day 7
+                </text>
+                <text x="360" y="145" fill="var(--muted-foreground)" fontSize="9">
+                  Day 30
+                </text>
 
                 <motion.path
                   d="M 40 25 Q 80 35, 120 70 T 200 105 T 300 120 T 380 125"
@@ -101,7 +130,7 @@ export function ProblemSection() {
                     cx={point.cx}
                     cy={point.cy}
                     r="4"
-                    fill="#3fb883"
+                    fill="var(--neural)"
                     initial={{ scale: 0, opacity: 0 }}
                     whileInView={{ scale: 1, opacity: 1 }}
                     viewport={{ once: true }}
@@ -112,7 +141,7 @@ export function ProblemSection() {
                 <motion.text
                   x="385"
                   y="125"
-                  fill="#ff6b6b"
+                  fill="var(--destructive)"
                   fontSize="11"
                   fontWeight="600"
                   initial={{ opacity: 0 }}
@@ -126,7 +155,7 @@ export function ProblemSection() {
                 <motion.text
                   x="385"
                   y="50"
-                  fill="#3fb883"
+                  fill="var(--neural-strong)"
                   fontSize="11"
                   fontWeight="600"
                   initial={{ opacity: 0 }}
@@ -138,14 +167,14 @@ export function ProblemSection() {
                 </motion.text>
               </svg>
 
-              <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-8 mt-4 text-xs">
+              <div className="mt-4 flex flex-col justify-center gap-4 text-xs sm:flex-row sm:gap-8">
                 <div className="flex items-center justify-center gap-2">
-                  <div className="w-6 h-0.5 bg-gradient-to-r from-accent to-red-400 rounded-full" />
-                  <span className="text-gray-500">Random practice</span>
+                  <div className="from-accent to-destructive h-0.5 w-6 rounded-full bg-gradient-to-r" />
+                  <span className="text-muted-foreground">Random practice</span>
                 </div>
                 <div className="flex items-center justify-center gap-2">
-                  <div className="w-6 h-0.5 bg-neural rounded-full" />
-                  <span className="text-gray-500">With CodeSparring</span>
+                  <div className="bg-neural h-0.5 w-6 rounded-full" />
+                  <span className="text-muted-foreground">With CodeSparring</span>
                 </div>
               </div>
             </div>
