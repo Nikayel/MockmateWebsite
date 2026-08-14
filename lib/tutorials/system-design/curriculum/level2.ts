@@ -2556,6 +2556,115 @@ outage.
 
 \`\`\`cswidget
 {
+  "type": "calc",
+  "title": "Series count is a product, not a sum",
+  "predictPrompt": {
+    "question": "Your metric already carries 50,000 active series. Product asks for a 'user_id' label with 2 million distinct values. How many series do you end up with?",
+    "options": [
+      "About 50,000: labels describe points, not series",
+      "About 2 million: one series per user",
+      "About 2,050,000: the label adds its values on top",
+      "About 100 billion: the label multiplies every series you already had"
+    ]
+  },
+  "workedExample": "The initial 500 hosts, 20 endpoint templates and 5 status codes multiply out to 500 x 20 x 5 = 50,000 active series, and at roughly 3 KB of index and head-chunk memory each that is about 150 MB. Every label multiplies the ones before it, it never adds. Switch the extra label from none to user_id and those 50,000 become 100 billion, which is also why a shorter retention would not save you: retention bounds how long a point lives, not how many series are active.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "hosts",
+      "label": "Distinct hosts",
+      "min": 10,
+      "max": 100000,
+      "scale": "log",
+      "initial": 500,
+      "unit": "hosts"
+    },
+    {
+      "kind": "slider",
+      "id": "endpoints",
+      "label": "Endpoint templates",
+      "min": 1,
+      "max": 200,
+      "scale": "linear",
+      "step": 1,
+      "initial": 20,
+      "unit": "routes"
+    },
+    {
+      "kind": "slider",
+      "id": "statuses",
+      "label": "Status codes emitted",
+      "min": 1,
+      "max": 25,
+      "scale": "linear",
+      "step": 1,
+      "initial": 5,
+      "unit": "codes"
+    },
+    {
+      "kind": "select",
+      "id": "extra_label",
+      "label": "One more label, as requested by product",
+      "initial": 0,
+      "options": [
+        {
+          "label": "none",
+          "value": 1
+        },
+        {
+          "label": "region (5 values)",
+          "value": 5
+        },
+        {
+          "label": "customer_id (50k values)",
+          "value": 50000
+        },
+        {
+          "label": "user_id (2M values)",
+          "value": 2000000
+        }
+      ]
+    },
+    {
+      "kind": "slider",
+      "id": "bytes_per_series",
+      "label": "Index and head-chunk memory per active series",
+      "min": 500,
+      "max": 5000,
+      "scale": "linear",
+      "step": 100,
+      "initial": 3000,
+      "unit": "bytes"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "base_series",
+      "label": "Series before the new label",
+      "expr": "hosts * endpoints * statuses",
+      "format": "compact",
+      "unit": "series"
+    },
+    {
+      "id": "series",
+      "label": "Active series after it",
+      "expr": "base_series * extra_label",
+      "format": "compact",
+      "unit": "series"
+    },
+    {
+      "id": "index_memory",
+      "label": "Memory the index must hold",
+      "expr": "series * bytes_per_series",
+      "format": "bytes"
+    }
+  ],
+  "caption": "The index holds one entry per ACTIVE series, so the memory arrives on day one, before a single point has aged out. That is why the fix is bounding labels, not shortening retention."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "check",
   "kind": "classify",
   "prompt": "You are labeling the metric 'http_requests'. Sort each candidate label before the pager does it for you.",
