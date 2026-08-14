@@ -1190,16 +1190,16 @@ Pick a consistency level per workload: strong (balances, must be exact), bounded
   "prompt": "The interviewer asks for a globally available account ledger with strong consistency and single-digit-ms writes for every user on every continent. What is the strongest response?",
   "options": [
     {
-      "label": "Deploy a Spanner style database with replicas in every region, so TrueTime gives the consistency and the replicas give the locality",
+      "label": "Deploy a Spanner style database with replicas everywhere",
       "feedback": "Replicas everywhere widen the quorum a write has to reach, which makes writes slower rather than faster. TrueTime orders transactions correctly, it does not repeal the forty milliseconds it takes light to cross an ocean."
     },
     {
-      "label": "Say the requirement as stated is not purchasable, then geo-partition: home each account in one region so its writes serialize through a local leader, and pay cross-region cost only for genuinely cross-region transfers",
+      "label": "Say the requirement is not purchasable, then single-home each account",
       "correct": true,
-      "feedback": "Right, and naming the impossibility first is the senior move. Once accounts are single homed, the correctness requirement is a per account ordering constraint, which one leader satisfies at local quorum latency."
+      "feedback": "Right, and naming the impossibility first is the senior move. Once an account is homed in one region its writes serialize through a local leader at single-region quorum latency, which is all the correctness requirement actually needs, and only genuinely cross-region transfers pay the ocean crossing."
     },
     {
-      "label": "Run active-active with CRDT counters so every region writes locally and the balances converge",
+      "label": "Run active-active with CRDT counters so the balances converge",
       "feedback": "CRDT counters merge beautifully for likes, presence, and view counts. A balance carries a constraint, never below zero, and a merge function cannot enforce a constraint. That is a spend rule, not a merge rule."
     }
   ],
@@ -1225,16 +1225,16 @@ Push work to the edge when it cuts bandwidth or when latency matters for control
   "prompt": "A region loses connectivity for 20 minutes. Devices hold their readings locally and replay everything the moment they reconnect. What must the cloud side already be built to handle?",
   "options": [
     {
-      "label": "Nothing special. The readings arrive a little late and get appended in the order they were recorded",
+      "label": "Nothing special, the readings just arrive a little late",
       "feedback": "Tempting because each device does replay its own buffer in order. The problem is what happens when that buffer meets live traffic in a shared pipeline."
     },
     {
-      "label": "Late and out of order events, plus dedupe on a device supplied event id, because a replay can repeat readings the cloud already stored",
+      "label": "Late and out of order events, plus dedupe on an event id",
       "correct": true,
-      "feedback": "Right. Without the first you corrupt every time keyed aggregate by treating 20 minute old readings as current; without the second you double count whatever the device sent before the connection actually dropped."
+      "feedback": "Right. Without the first you corrupt every time keyed aggregate by treating 20 minute old readings as current; without the second you double count whatever the device sent before the connection actually dropped, because a replay repeats readings the cloud already stored."
     },
     {
-      "label": "Only dedupe, since ordering takes care of itself when each device replays its own buffer in sequence",
+      "label": "Only dedupe, each device replays its buffer in order",
       "feedback": "A subtle trap. Each device is internally ordered, but its old readings now arrive after newer readings from every device that stayed online, so the merged stream is out of order even though no single device is."
     }
   ]
