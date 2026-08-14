@@ -2694,7 +2694,7 @@ a dashboard scanning one 20 TB unpartitioned table, refreshed hourly
 
 **"Costs more than a server" is literal, not rhetorical.** At roughly 33 dollars a vCPU-month, that one unpartitioned dashboard is spending what about 2,600 vCPUs would cost, and partitioning takes it down roughly a hundredfold. It is also the cheapest fix on this page to execute, because it is a schema decision rather than a purchasing negotiation.
 
-**Idle is priced by what is idle.** A vCPU-hour and a high-end GPU-hour differ by roughly two orders of magnitude, so an hour of idle GPU costs what a small fleet of idle CPU costs all month. That is why the first question on an AI bill is utilization while the first question on a web bill is rightsizing: the same 35 percent utilization is a rounding error on one and the whole invoice on the other.
+**Idle is priced by what is idle.** A vCPU-hour and a high-end GPU-hour differ by roughly two orders of magnitude, so one GPU left idle for a single day burns 48 to 240 dollars against the 33 dollars a vCPU costs for the entire month, and a GPU idle all month costs what a fleet of roughly a hundred idle vCPUs costs. That is why the first question on an AI bill is utilization while the first question on a web bill is rightsizing: the same 35 percent utilization is a rounding error on one and the whole invoice on the other.
 
 **Interview nuance:** never cut cost by cutting reliability blindly. Deleting a standby replica or a multi-AZ setup saves money until the outage costs 10x the savings. Frame every cut as "reduce waste (idle, over-provisioned, untiered) while preserving the reliability the SLO requires."
 
