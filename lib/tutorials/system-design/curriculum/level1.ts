@@ -1012,6 +1012,123 @@ rotation (ACME/Let's Encrypt, AWS ACM) as part of a TLS design.
 - **Connection reuse**: the cheapest handshake is the one you do not do. Keep connections warm so you
   handshake once and reuse.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "Counting round trips before the first byte",
+  "actors": [
+    {
+      "id": "client",
+      "label": "Browser"
+    },
+    {
+      "id": "server",
+      "label": "Origin or edge"
+    },
+    {
+      "id": "attacker",
+      "label": "Attacker on the path"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "resume",
+      "label": "Returning client with a session ticket",
+      "description": "0-RTT early data is allowed"
+    }
+  ],
+  "steps": [
+    {
+      "from": "client",
+      "to": "server",
+      "kind": "request",
+      "label": "ClientHello + key share",
+      "when": "!resume",
+      "state": {
+        "round trips so far": "0",
+        "app data sent": "no"
+      }
+    },
+    {
+      "from": "server",
+      "to": "client",
+      "kind": "response",
+      "label": "ServerHello, cert, Finished",
+      "when": "!resume",
+      "state": {
+        "round trips so far": "1",
+        "app data sent": "no"
+      }
+    },
+    {
+      "from": "client",
+      "to": "server",
+      "kind": "request",
+      "label": "Finished, then GET /orders",
+      "when": "!resume",
+      "state": {
+        "round trips so far": "1",
+        "app data sent": "yes"
+      },
+      "predict": {
+        "question": "The server has just sent its key share, certificate and Finished. When may the client send the actual GET?",
+        "options": [
+          "Only after one more round trip confirms the cipher, as in TLS 1.2",
+          "In its very next flight: TLS 1.3 is a 1-RTT handshake",
+          "It cannot until the CA is contacted to check the certificate"
+        ]
+      }
+    },
+    {
+      "from": "server",
+      "to": "client",
+      "kind": "response",
+      "label": "200, encrypted",
+      "when": "!resume"
+    },
+    {
+      "from": "client",
+      "to": "server",
+      "kind": "request",
+      "label": "ClientHello + ticket + GET",
+      "when": "resume",
+      "state": {
+        "round trips so far": "0",
+        "app data sent": "yes, as early data"
+      }
+    },
+    {
+      "from": "server",
+      "to": "client",
+      "kind": "response",
+      "label": "200, encrypted",
+      "when": "resume"
+    },
+    {
+      "from": "attacker",
+      "to": "server",
+      "kind": "request",
+      "label": "replays the captured bytes",
+      "when": "resume",
+      "status": "error"
+    },
+    {
+      "from": "server",
+      "to": "attacker",
+      "kind": "response",
+      "label": "200: the request ran twice",
+      "when": "resume",
+      "status": "error",
+      "state": {
+        "round trips so far": "0",
+        "app data sent": "twice"
+      }
+    }
+  ],
+  "caption": "Count the arrows before the first application byte: one round trip on a fresh connection, zero when a ticket carries early data. The last two steps are the price of that zero. Early data is replayable, so 0-RTT is only safe for a GET or for a write already guarded by an idempotency key."
+}
+\`\`\`
+
 ### Where do you terminate TLS?
 
 Three common choices; the tradeoff is latency/operational-simplicity versus how far encryption
@@ -4197,10 +4314,40 @@ default, or a partial response rather than an error.
 }
 \`\`\`
 
-\`\`\`
-Closed --failures over threshold--> Open --cool-down--> Half-open --trial ok--> Closed
-   ^                                                         |
-   +---------------- trial fails ----------------------------+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Breaker state",
+    "What a call does",
+    "It leaves for",
+    "When"
+  ],
+  "rows": [
+    [
+      "Closed",
+      "passes straight through to the dependency",
+      "Open",
+      "failures cross the threshold, say 50 percent of the last 20 calls"
+    ],
+    [
+      "Open",
+      "fails fast without touching the network, so no thread waits",
+      "Half-open",
+      "the cool-down timer expires"
+    ],
+    [
+      "Half-open",
+      "lets a trickle of trial calls through, everything else still fails fast",
+      "Closed on a successful trial, back to Open on a failed one",
+      "the trial call returns"
+    ]
+  ],
+  "highlightCols": [
+    "It leaves for"
+  ],
+  "caption": "Half-open is a probe, not a recovery. One good trial closes the breaker and one bad trial sends it straight back to Open for another cool-down, so a dependency that is still broken never gets full traffic handed back to it."
+}
 \`\`\`
 
 Recap: Give every call a propagated deadline, retry only idempotent errors with backoff, jitter, and
