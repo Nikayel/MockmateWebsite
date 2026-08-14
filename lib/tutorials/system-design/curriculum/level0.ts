@@ -2946,7 +2946,7 @@ export const systemDesignLevel0: DesignLevel = {
           id: "sd-l0-deep-dives-wrapup",
           title: "Deep Dives & the Operational Wrap-Up",
           summary:
-            "Let the tightest NFR pick the bottleneck, compare two options and commit with a quantified reason, then close on break point, failure mode, monitoring, and cost.",
+            "Let the tightest NFR pick the bottleneck to dive on, then compare two options and commit with a quantified reason instead of listing them.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["deep-dive", "operations", "cost"],
@@ -3056,7 +3056,7 @@ export const systemDesignLevel0: DesignLevel = {
           id: "sd-l0-level-calibration",
           title: "Level Calibration: Junior vs Senior vs Staff",
           summary:
-            "Know the four rubric axes and aim your depth at the target level: complete design (junior), unaided deep dives (senior), ambiguity plus org/cost/evolution (staff).",
+            "Aim your depth at the target level: junior wants a complete design, senior wants unaided deep dives, staff wants ambiguity, cost, and evolution.",
           estimatedMinutes: 25,
           difficulty: "medium",
           skills: ["calibration", "rubric"],

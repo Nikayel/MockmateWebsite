@@ -909,16 +909,16 @@ reads to touch one shard and treat scatter-gather as the rare, budgeted case.
   "prompt": "You must atomically debit an account on shard A and credit an account on shard B. Two-phase commit gives exactly the atomicity you need. Should it be your default for this hot path?",
   "options": [
     {
-      "label": "Yes: 2PC exists precisely for atomic cross-node writes",
+      "label": "Yes, 2PC is exactly the tool for atomic cross-node writes",
       "feedback": "Tempting, and it is the textbook answer. But 2PC holds locks across network round trips and blocks indefinitely if the coordinator dies after prepare, which is fatal on a high-volume path."
     },
     {
-      "label": "No: use a saga of local transactions with compensations, and keep 2PC for rare must-be-atomic operations",
+      "label": "No, use a saga of local transactions with compensations",
       "correct": true,
-      "feedback": "Right. The next sections show how a saga trades isolation for the absence of distributed locks, and what machinery (idempotency keys, the outbox) keeps it correct under failures."
+      "feedback": "Right, and keep 2PC for the rare operations that genuinely must be atomic. The next sections show how a saga trades isolation for the absence of distributed locks, and what machinery, idempotency keys and the outbox, keeps it correct under failures."
     },
     {
-      "label": "No: just do the two writes independently and retry whichever one fails",
+      "label": "No, do the two writes independently and retry either failure",
       "feedback": "Tempting because it avoids locks, but with no compensations and no dedup, a crash between the writes strands money and a retry can double-apply a step."
     }
   ]
@@ -2025,17 +2025,17 @@ and switching an **alias** over atomically, with zero downtime.
   "prompt": "A crawler requests results 100,000 through 100,010 using a large 'from' offset. Compared to page one, what does this cost the cluster?",
   "options": [
     {
-      "label": "About the same: the index is sorted, so each shard seeks straight to the offset",
-      "feedback": "Tempting B-tree intuition, but relevance order is computed fresh per query. There is no precomputed position 100,000 to seek to."
+      "label": "About the same, since the index seeks straight to the offset",
+      "feedback": "Tempting B-tree intuition, but relevance order is computed fresh per query against the terms you searched for. There is no precomputed position 100,000 on disk to seek to."
     },
     {
-      "label": "Far more: every shard must rank its full 100,010-document prefix, so cost grows with the offset",
+      "label": "Far more, every shard ranks 100,010 documents first",
       "correct": true,
-      "feedback": "Right. No shard can know which of its documents land in the global top 100,010, so each ranks and returns that many, and the coordinator merges them all. Use 'search_after' cursors and cap the page depth."
+      "feedback": "Right, and the cost grows with the offset rather than the page size. No shard can know which of its documents land in the global top 100,010, so each one ranks and ships that many and the coordinator merges the lot. Use 'search_after' cursors and cap the page depth."
     },
     {
-      "label": "Slightly more: only the coordinating node pays, discarding rows after one merge",
-      "feedback": "Tempting, but the coordinator can only discard what the shards have already ranked and shipped. The work proportional to the offset happens on every shard first."
+      "label": "Slightly more, and only the coordinating node pays",
+      "feedback": "Tempting, but the coordinator can only discard what the shards have already ranked and shipped to it. The work proportional to the offset happens on every shard first."
     }
   ]
 }
