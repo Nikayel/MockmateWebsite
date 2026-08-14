@@ -138,9 +138,9 @@ Common wrong turn: chasing five nines everywhere. If your database ceiling is 99
       "feedback": "You cannot be more available than the product of everything you synchronously depend on. Signing this promise signs you up for service credits you can never avoid paying."
     },
     {
-      "label": "Add a second independent copy of the shaky dependency or take it off the synchronous path first, and keep the SLA looser than the internal SLO",
+      "label": "Add an independent second copy of the dependency first",
       "correct": true,
-      "feedback": "Right on both halves. Redundancy combines as 1 minus (1 minus a) to the power n, so an independent second copy raises the ceiling, and the external SLA sits looser than the internal SLO so your own alerting fires before you owe anyone money."
+      "feedback": "Right. Redundancy combines as 1 minus (1 minus a) to the power n, so a second independent copy of a 99.9 percent dependency lifts that hop to about 99.9999 percent and moves the ceiling off it. Taking the dependency off the synchronous path does the same job another way. Only then is there a number worth promising, and the external SLA still sits looser than the internal SLO so your own alerting fires before you owe anyone money."
     },
     {
       "label": "Set the internal SLO at 99.99 percent and the SLA at 99.999 percent",
@@ -183,9 +183,9 @@ The same request looks different at three points. At the **load balancer** you c
       "feedback": "This is exactly how a green dashboard hides an angry tail. Ninety-nine requests at 50 ms and one at 5 seconds average to about 100 ms while one user in a hundred waits 5 seconds."
     },
     {
-      "label": "Nothing useful: the mean averages the 5 second requests away, so 1 percent of users sit far outside the objective and the number cannot show it",
+      "label": "Nothing useful, because the mean averages them away",
       "correct": true,
-      "feedback": "Right, and that is why latency objectives are set on p95, p99, or p99.9. A percentile reports the tail instead of dissolving it."
+      "feedback": "Right. Ninety-nine requests at 50 ms and one at 5 seconds average to about 100 ms, so a green dashboard and an angry tail are the same number here. One user in a hundred sits far outside the 300 ms objective and the mean has no way to show it. That is why latency objectives are set on p95, p99, or p99.9: a percentile reports the tail instead of dissolving it."
     },
     {
       "label": "The objective is too loose and should be tightened to 100 ms",
@@ -325,9 +325,9 @@ Track burn over a rolling window and remember that **one bad incident can consum
       "feedback": "Perfect reliability means you shipped too slowly. Ninety-five percent of the budget left unspent every month is reliability the users never asked for, bought with features they did."
     },
     {
-      "label": "The team is over-investing in reliability and under-shipping, because the budget is permission to fail that much and it exists to be spent",
+      "label": "They are over-investing in reliability and under-shipping",
       "correct": true,
-      "feedback": "Right. A permanently full budget is a signal to ship faster, or to re-examine whether the target matches what users actually expect."
+      "feedback": "Right. The budget is permission to fail that much and it exists to be spent, so 95 percent of it left over every single month is reliability the users never asked for, bought with features they did. A permanently full budget is a signal to ship faster, or to re-examine whether the target matches what users actually expect."
     },
     {
       "label": "Loosen the objective to 99 percent so the dashboard looks busier",
