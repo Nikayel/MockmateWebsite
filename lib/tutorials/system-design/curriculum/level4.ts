@@ -4108,7 +4108,7 @@ driven by the largest guilds.
           id: "sd-l4-load-shedding-backpressure",
           title: "Congestion Collapse & Adaptive Concurrency",
           summary:
-            "Why an unbounded queue turns 150 percent load into zero throughput, and what adaptive concurrency limits and brownout do instead.",
+            "Why an unbounded queue turns 150 percent load into zero throughput, and what adaptive concurrency limits, priority load shedding and brownout do instead.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["load-shedding", "backpressure", "concurrency"],
