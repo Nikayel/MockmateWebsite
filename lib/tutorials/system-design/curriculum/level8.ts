@@ -2066,6 +2066,27 @@ You do not encrypt terabytes directly with a master key. Instead a **Data Encryp
 }
 \`\`\`
 
+## Why not just call the KMS on every row
+
+"You do not encrypt terabytes directly with a master key" is the sentence everyone repeats, and it is worth an interview point only if you can say what the alternative costs. Two approximate figures decide it: a cloud KMS charges on the order of 3 cents per 10,000 requests, and a region's KMS request quota is measured in tens of thousands of operations a second shared across every service you run. Treat both as magnitudes rather than quotes, because the digits drift and the ratio does not.
+
+\`\`\`
+Direct KMS call per row, at 20,000 reads/sec:
+  20,000 x 86,400              = 1.73B KMS requests per day
+  1.73B / 10,000 x 0.03 USD    = about 5,200 USD per day, roughly 155,000 USD per month
+  20,000 ops/sec               = most of a region's shared KMS budget, spent by one read path
+  plus one network round trip on the critical path of every single row read
+
+Envelope, one DEK per tenant, unwrapped once and cached in memory for 5 minutes:
+  5,000 tenants every 5 min    = about 1.4M unwraps per day
+  1.4M / 10,000 x 0.03 USD     = about 4 USD per day
+  the AES-256-GCM itself       = local CPU with AES-NI, gigabytes per second per core, unmetered
+\`\`\`
+
+That is more than a thousandfold on the bill, and the bill is the less interesting half. The direct design also puts a network round trip in front of every row and eats a region's key-operation budget for one workload, so it does not merely cost more, it stops working first. That is what the envelope buys: KMS calls scale with the number of *keys* you touch rather than the number of *rows*.
+
+Read the same arithmetic downward and it flips. A service encrypting a few thousand records a day pays cents either way, so it should call the KMS per record and skip the DEK cache entirely, because holding plaintext DEKs in process memory is a genuine exposure (a heap dump, a core file, a debug endpoint) and you should not buy that exposure without a bill that justifies it. The cache TTL is the dial: shorter means more unwraps and a narrower window in which stolen memory is useful.
+
 ## The granularity ladder
 
 - **Full-disk / volume encryption** (LUKS, cloud EBS encryption). Protects a physically stolen disk. But a running app and anyone with DB access see full plaintext, so it does nothing against a compromised app or a leaked query result. Zero searchability cost.
