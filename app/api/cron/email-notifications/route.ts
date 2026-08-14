@@ -29,6 +29,8 @@ import {
   sendInterviewCountdownEmail,
   sendBehindScheduleEmail,
   sendWelcomeEmail,
+  sendActivationNudgeEmail,
+  sendFirstSessionFeedbackEmail,
   canSendEmail,
   isReasonableHourForUser,
   isInQuietHours,
@@ -150,6 +152,8 @@ export async function GET(request: NextRequest) {
 
     const results = {
       welcomeEmails: { sent: 0, skipped: 0, failed: 0, skippedTimezone: 0 },
+      activationNudges: { sent: 0, skipped: 0, failed: 0, skippedTimezone: 0 },
+      firstSessionFeedback: { sent: 0, skipped: 0, failed: 0, skippedTimezone: 0 },
       inactivityEmails: { sent: 0, skipped: 0, failed: 0, skippedTimezone: 0 },
       spacedRepetitionEmails: { sent: 0, skipped: 0, failed: 0, skippedTimezone: 0 },
       roadmapEmails: { sent: 0, skipped: 0, failed: 0, skippedTimezone: 0 },
@@ -170,9 +174,19 @@ export async function GET(request: NextRequest) {
     await processWelcomeEmails(now, results)
 
     // ============================================
+    // 1b. ACTIVATION NUDGES (signed up 2-4 days ago, never ran a session)
+    // ============================================
+    await processActivationNudges(now, results)
+
+    // ============================================
     // 2. INACTIVITY REMINDERS
     // ============================================
     await processInactivityReminders(now, results)
+
+    // ============================================
+    // 2b. FIRST-SESSION FEEDBACK ASK (one lifetime send after the first session)
+    // ============================================
+    await processFirstSessionFeedback(now, results)
 
     // ============================================
     // 3. SPACED REPETITION REMINDERS
@@ -324,6 +338,223 @@ async function processWelcomeEmails(now: Date, results: any): Promise<void> {
   } catch (error: any) {
     logger.error("[Cron Email] Error processing welcome emails", { error })
     results.errors.push(`Welcome email processing failed: ${error.message}`)
+  }
+}
+
+/**
+ * Activation nudge: one lifetime email to users who signed up 2-4 days ago and
+ * never ran a session. The current inactivity reminder only reaches users who
+ * HAVE practiced (it scans user_learning_state, which a first session creates),
+ * so the signed-up-then-bounced cohort previously heard nothing after welcome.
+ *
+ * Candidates come from the welcome-send log, whose (email_type, created_at)
+ * composite index this query uses. Rides the inactivity preference toggle and
+ * unsubscribe category: one "occasional nudges" switch, not a taxonomy.
+ */
+async function processActivationNudges(now: Date, results: any): Promise<void> {
+  const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000)
+  const ninetySixHoursAgo = new Date(now.getTime() - 96 * 60 * 60 * 1000)
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+  try {
+    const welcomeLogsSnap = await db
+      .collection("email_notifications")
+      .where("email_type", "==", "welcome")
+      .where("created_at", ">=", ninetySixHoursAgo.toISOString())
+      .where("created_at", "<=", fortyEightHoursAgo.toISOString())
+      .limit(200)
+      .get()
+
+    const candidateIds = new Set<string>()
+    for (const doc of welcomeLogsSnap.docs) {
+      const log = doc.data()
+      if (log.status === "sent" && typeof log.user_id === "string") {
+        candidateIds.add(log.user_id)
+      }
+    }
+    if (candidateIds.size === 0) return
+
+    // Lifetime-once dedup. Any nudge for a still-in-window candidate is at most
+    // ~48h old, so a bounded 7-day lookback (same composite index) covers it.
+    let alreadyNudged = new Set<string>()
+    try {
+      const nudgeLogsSnap = await db
+        .collection("email_notifications")
+        .where("email_type", "==", "activation_nudge")
+        .where("created_at", ">=", sevenDaysAgo.toISOString())
+        .get()
+      alreadyNudged = new Set(nudgeLogsSnap.docs.map((doc) => doc.data().user_id))
+    } catch (indexError) {
+      reportDedupFailure("Activation nudge", indexError, results)
+    }
+
+    for (const userId of candidateIds) {
+      if (alreadyNudged.has(userId)) {
+        results.activationNudges.skipped++
+        continue
+      }
+
+      try {
+        // Ran a session already? A first session creates this doc.
+        const learningStateSnap = await db.collection("user_learning_state").doc(userId).get()
+        if (learningStateSnap.exists) {
+          results.activationNudges.skipped++
+          continue
+        }
+
+        const profileSnap = await db.collection("profiles").doc(userId).get()
+        if (!profileSnap.exists) continue
+        const profile = profileSnap.data() as Profile
+        if (!profile.email) continue
+
+        if (!(profile.notification_preferences?.inactivity_reminders ?? true)) {
+          results.activationNudges.skipped++
+          continue
+        }
+        if (!(profile.notification_preferences?.email_notifications_enabled ?? true)) {
+          results.activationNudges.skipped++
+          continue
+        }
+
+        const timezoneCheck = canSendToUserTimezone(profile)
+        if (!timezoneCheck.canSend) {
+          results.activationNudges.skippedTimezone++
+          continue
+        }
+
+        const userTimezone = profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
+        const rateCheck = canSendEmail(
+          profile.last_email_sent_at,
+          profile.emails_sent_today,
+          userTimezone
+        )
+        if (!rateCheck.allowed) {
+          results.activationNudges.skipped++
+          continue
+        }
+
+        const result = await sendActivationNudgeEmail(userId, profile.email, {
+          userName: profile.full_name || "",
+          userEmail: profile.email,
+        })
+
+        if (result.success) {
+          results.activationNudges.sent++
+          await updateEmailTracking(userId, profile, now)
+          await logEmailNotification(userId, "activation_nudge", now)
+        } else {
+          results.activationNudges.failed++
+          reportSendFailure("Activation nudge", userId, result.error, results)
+        }
+      } catch (error) {
+        results.activationNudges.failed++
+        reportSendFailure("Activation nudge", userId, error, results)
+      }
+    }
+  } catch (error: any) {
+    logger.error("[Cron Email] Error processing activation nudges", { error })
+    results.errors.push(`Activation nudge processing failed: ${error.message}`)
+  }
+}
+
+/**
+ * First-session feedback ask: one lifetime reply-fishing email within a day of
+ * a user's first completed session. total_sessions is written on every session
+ * (lib/session-metrics.ts), so the trigger is exactly total_sessions == 1 with
+ * a fresh last_session_at.
+ */
+async function processFirstSessionFeedback(now: Date, results: any): Promise<void> {
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+  try {
+    // Lifetime-once dedup: a candidate's only session is <24h old, so any prior
+    // feedback send for them is inside this bounded lookback.
+    let alreadyAsked = new Set<string>()
+    try {
+      const feedbackLogsSnap = await db
+        .collection("email_notifications")
+        .where("email_type", "==", "first_session_feedback")
+        .where("created_at", ">=", sevenDaysAgo.toISOString())
+        .get()
+      alreadyAsked = new Set(feedbackLogsSnap.docs.map((doc) => doc.data().user_id))
+    } catch (indexError) {
+      reportDedupFailure("First-session feedback", indexError, results)
+    }
+
+    const statesSnap = await db
+      .collection("user_learning_state")
+      .where("total_sessions", "==", 1)
+      .limit(100)
+      .get()
+
+    for (const stateDoc of statesSnap.docs) {
+      const userId = stateDoc.id
+      const state = stateDoc.data()
+
+      // Only within a day of that first session; the moment matters for a
+      // "how was it?" email, and the filter also bounds re-scans naturally.
+      const lastSessionAt = typeof state.last_session_at === "string" ? state.last_session_at : ""
+      if (!lastSessionAt || lastSessionAt < twentyFourHoursAgo.toISOString()) continue
+
+      if (alreadyAsked.has(userId)) {
+        results.firstSessionFeedback.skipped++
+        continue
+      }
+
+      try {
+        const profileSnap = await db.collection("profiles").doc(userId).get()
+        if (!profileSnap.exists) continue
+        const profile = profileSnap.data() as Profile
+        if (!profile.email) continue
+
+        if (!(profile.notification_preferences?.inactivity_reminders ?? true)) {
+          results.firstSessionFeedback.skipped++
+          continue
+        }
+        if (!(profile.notification_preferences?.email_notifications_enabled ?? true)) {
+          results.firstSessionFeedback.skipped++
+          continue
+        }
+
+        const timezoneCheck = canSendToUserTimezone(profile)
+        if (!timezoneCheck.canSend) {
+          results.firstSessionFeedback.skippedTimezone++
+          continue
+        }
+
+        const userTimezone = profile.notification_preferences?.timezone || DEFAULT_TIMEZONE
+        const rateCheck = canSendEmail(
+          profile.last_email_sent_at,
+          profile.emails_sent_today,
+          userTimezone
+        )
+        if (!rateCheck.allowed) {
+          results.firstSessionFeedback.skipped++
+          continue
+        }
+
+        const result = await sendFirstSessionFeedbackEmail(userId, profile.email, {
+          userName: profile.full_name || "",
+          userEmail: profile.email,
+        })
+
+        if (result.success) {
+          results.firstSessionFeedback.sent++
+          await updateEmailTracking(userId, profile, now)
+          await logEmailNotification(userId, "first_session_feedback", now)
+        } else {
+          results.firstSessionFeedback.failed++
+          reportSendFailure("First-session feedback", userId, result.error, results)
+        }
+      } catch (error) {
+        results.firstSessionFeedback.failed++
+        reportSendFailure("First-session feedback", userId, error, results)
+      }
+    }
+  } catch (error: any) {
+    logger.error("[Cron Email] Error processing first-session feedback", { error })
+    results.errors.push(`First-session feedback processing failed: ${error.message}`)
   }
 }
 
