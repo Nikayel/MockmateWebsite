@@ -100,9 +100,19 @@ describe("topology", () => {
     expect(html).toContain("Feed skeleton")
     expect(html).toContain("Stage 1 of 3")
     expect(html).toContain("stateless API behind a balancer")
-    // Stage-1 nodes render; later-stage nodes do not (staged reveal).
+    // EVERY node is in the server HTML, including the ones a later stage reveals. This
+    // assertion is the exact inverse of what it used to be, and the inversion is the
+    // point: it previously read `expect(html).not.toContain("Postgres")`, which pinned
+    // the SSR bug as if it were the contract. Because `useStepPlayer` starts at index 0
+    // and the renderer filtered on it, the server HTML held stage 1 of N and nothing
+    // else, so Googlebot indexed a fraction of every architecture on the site's main
+    // organic-traffic surface. The staged reveal is now a client enhancement that DIMS
+    // later stages after mount rather than one that adds them.
     expect(html).toContain("Load balancer")
-    expect(html).not.toContain("Postgres")
+    expect(html).toContain("Postgres")
+    expect(html).toContain("Redis")
+    // Dimmed, not absent: this is what keeps the reveal a reveal for a reader with JS.
+    expect(html).toContain('opacity="0.16"')
     expect(html).not.toContain("language-csdiagram")
   })
 
