@@ -2054,6 +2054,185 @@ makes you sound like someone who has run systems in production, not just drawn t
 not address abuse or rate limiting; at this scale I would put that behind the gateway as the next
 step." Naming your own gaps is a seniority signal, not a weakness.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "One deep dive, chosen rather than volunteered",
+  "frames": [
+    {
+      "note": "The design is complete and nothing in it is wrong yet. You have about ten minutes of depth budget and no reason yet to spend it in one place rather than another.",
+      "rows": [
+        {
+          "label": "Tightest NFRs",
+          "cells": [
+            {
+              "text": "99.99% redirect availability"
+            },
+            {
+              "text": "p99 redirect under 100ms"
+            },
+            {
+              "text": "Reads outnumber writes 10 to 1"
+            }
+          ]
+        },
+        {
+          "label": "The design",
+          "cells": [
+            {
+              "text": "Client"
+            },
+            {
+              "text": "Load balancer"
+            },
+            {
+              "text": "API"
+            },
+            {
+              "text": "Cache"
+            },
+            {
+              "text": "Single DB primary"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "predict": {
+        "question": "Depth budget in hand. What picks where the dive goes?",
+        "options": [
+          "The topic you know best",
+          "Whichever component sounds most advanced",
+          "Where the tightest NFR meets a weak spot",
+          "The newest box on the diagram"
+        ]
+      },
+      "note": "Step one. The requirements pick the target, not your comfort zone. A 99.99% availability promise sitting on a single primary is a requirement meeting a single point of failure, so name that pairing out loud before you dive.",
+      "rows": [
+        {
+          "label": "Tightest NFRs",
+          "cells": [
+            {
+              "text": "99.99% redirect availability",
+              "state": "active"
+            },
+            {
+              "text": "p99 redirect under 100ms",
+              "state": "dim"
+            },
+            {
+              "text": "Reads outnumber writes 10 to 1",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "The design",
+          "cells": [
+            {
+              "text": "Client",
+              "state": "dim"
+            },
+            {
+              "text": "Load balancer",
+              "state": "dim"
+            },
+            {
+              "text": "API",
+              "state": "dim"
+            },
+            {
+              "text": "Cache",
+              "state": "dim"
+            },
+            {
+              "text": "Single DB primary",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Steps two and three. Reach for the lever the bottleneck asks for, compare exactly two viable options, and commit with a number attached. Listing options without a stance is the classic miss at this exact moment.",
+      "rows": [
+        {
+          "label": "Tightest NFRs",
+          "cells": [
+            {
+              "text": "99.99% redirect availability",
+              "state": "active"
+            },
+            {
+              "text": "p99 redirect under 100ms",
+              "state": "dim"
+            },
+            {
+              "text": "Reads outnumber writes 10 to 1",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "Two viable options",
+          "cells": [
+            {
+              "text": "Sync replica, automatic failover",
+              "state": "active"
+            },
+            {
+              "text": "Async replica, manual promotion",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "Committed, with a number",
+          "cells": [
+            {
+              "text": "Failover in seconds, writes pay 1 RTT",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Step four, and the phase most often skipped because the clock ran out inside step three. Reserve two to three minutes for these five, and volunteer the gap you knowingly left rather than hoping nobody asks.",
+      "rows": [
+        {
+          "label": "Wrap-up, last 3 minutes",
+          "cells": [
+            {
+              "text": "Breaks first at 10x: cache size",
+              "state": "new"
+            },
+            {
+              "text": "Failure mode: split brain",
+              "state": "new"
+            },
+            {
+              "text": "Monitor: replica lag and 5xx rate",
+              "state": "new"
+            },
+            {
+              "text": "Cost driver: egress bandwidth",
+              "state": "new"
+            },
+            {
+              "text": "Gap left: no abuse rate limiting",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Four steps, and the first one is the one candidates skip: the NFRs choose the dive. Depth you volunteered because you knew it well reads as a data dump no matter how good the content is."
+}
+\`\`\`
+
 Recap: let the NFRs and traffic model pick the bottleneck, dive with the right lever, compare two
 options and commit with a quantified reason, then close in 2 to 3 minutes on the top remaining
 bottleneck, failure mode, monitoring, and cost driver.
