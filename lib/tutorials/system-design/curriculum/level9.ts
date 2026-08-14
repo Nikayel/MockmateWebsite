@@ -1068,13 +1068,125 @@ The win is fewer proxies, lower per-Pod memory, and lower latency for the common
 }
 \`\`\`
 
+## Crossing a cluster boundary
+
+Everything above is one cluster. Run one cluster per region and the call graph does not stop at the cluster edge: a workload in eu-west still has to call one in us-east. Two things change there.
+
+The first is plumbing. Pod IPs are not routable between clusters, so a caller cannot dial the far cluster's pod network at all. Mesh traffic crosses through an **east-west gateway**: one per cluster, published on an address the peer clusters can reach, whose only job is carrying service-to-service traffic in and out. It is a different object from the north-south ingress gateway, which admits external client traffic and terminates that client's TLS. Each control plane also needs read access to the peer's endpoints (in Istio, a remote secret pointing at the other API server), and once it has them a remote service looks like an ordinary set of endpoints that happen to live behind the peer's east-west gateway address.
+
+The second is the part a compliance answer turns on: **the east-west gateway must not terminate the mesh's mTLS.** If it does, the certificate the callee authenticates is the gateway's, so every cross-region call arrives as one shared regional identity. Per-service authorization policy on the far side can no longer tell checkout from reporting, and the audit log records the gateway as the caller on every entry. So the gateway forwards the session instead of opening it: in sidecar mode it routes on the **SNI** value in the TLS handshake, which names the destination service and is readable without a key that decrypts the payload, and under ambient it forwards the HBONE tunnel, which was already built to keep each workload's own identity on the connection. Either way the caller's certificate arrives intact at the callee.
+
+That only holds if both clusters chain to the **same root of trust**: one root CA issuing a per-cluster intermediate, so a certificate minted in eu-west validates in us-east. Two independently self-signed cluster roots is the usual first-attempt failure, and it fails closed, as every cross-cluster call rejected at the handshake.
+
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "One call, two clusters, one identity",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "ca",
+      "label": "Shared root CA, one intermediate per cluster",
+      "kind": "external"
+    },
+    {
+      "id": "checkout",
+      "label": "checkout workload (eu-west)",
+      "kind": "service"
+    },
+    {
+      "id": "proxy_eu",
+      "label": "Local mesh proxy (sidecar or ztunnel)",
+      "kind": "service"
+    },
+    {
+      "id": "ewgw_eu",
+      "label": "eu-west east-west gateway",
+      "kind": "lb"
+    },
+    {
+      "id": "ewgw_us",
+      "label": "us-east east-west gateway",
+      "kind": "lb"
+    },
+    {
+      "id": "proxy_us",
+      "label": "Local mesh proxy (sidecar or ztunnel)",
+      "kind": "service"
+    },
+    {
+      "id": "ledger",
+      "label": "ledger workload (us-east)",
+      "kind": "service"
+    }
+  ],
+  "groups": [
+    {
+      "id": "eu",
+      "label": "Cluster eu-west",
+      "nodes": ["checkout", "proxy_eu", "ewgw_eu"]
+    },
+    {
+      "id": "us",
+      "label": "Cluster us-east",
+      "nodes": ["ewgw_us", "proxy_us", "ledger"]
+    }
+  ],
+  "edges": [
+    {
+      "from": "ca",
+      "to": "proxy_eu",
+      "kind": "sync",
+      "label": "issues cert: identity checkout"
+    },
+    {
+      "from": "ca",
+      "to": "proxy_us",
+      "kind": "sync",
+      "label": "issues cert: identity ledger"
+    },
+    {
+      "from": "checkout",
+      "to": "proxy_eu",
+      "kind": "sync",
+      "label": "plaintext, inside the pod"
+    },
+    {
+      "from": "proxy_eu",
+      "to": "ewgw_eu",
+      "kind": "sync",
+      "label": "mTLS opens here"
+    },
+    {
+      "from": "ewgw_eu",
+      "to": "ewgw_us",
+      "kind": "sync",
+      "label": "forwarded on SNI, not decrypted"
+    },
+    {
+      "from": "ewgw_us",
+      "to": "proxy_us",
+      "kind": "sync",
+      "label": "same session, still not decrypted"
+    },
+    {
+      "from": "proxy_us",
+      "to": "ledger",
+      "kind": "sync",
+      "label": "mTLS closes here: peer is checkout"
+    }
+  ],
+  "caption": "The mTLS session opens at the calling workload's proxy and closes at the called workload's proxy, with both gateways in between forwarding it unopened. That is what lets the authz policy and the access log in us-east name checkout as the caller instead of naming a gateway."
+}
+\`\`\`
+
 ## A mesh is not always warranted
 
 For a handful of services, you can get mTLS from the platform, retries and timeouts from a shared client library, and metrics from your framework, without operating a mesh. Mesh adoption has actually declined for small fleets precisely because the operational cost outweighs the benefit until you have dozens of services in multiple languages where per-language libraries stop being viable.
 
 **Interview nuance:** the strong answer is not "add Istio." It is "at 40 services in mixed languages, a mesh is justified because you cannot keep mTLS and retry logic consistent across five client libraries, and I would choose ambient/eBPF to avoid the per-Pod sidecar tax." The weak answer adds a mesh reflexively for three services.
 
-**Recap:** a mesh moves mTLS, retries/timeouts, traffic shifting, and L7 telemetry out of app code; sidecars cost memory per Pod and latency per proxy traversal, two of them on every hop; Istio Ambient cuts that tax while keeping per-connection mTLS (GA in 1.24), and Cilium cuts it further by putting eBPF policy in the kernel with SPIFFE mutual authentication and WireGuard or IPsec encryption instead of mTLS (still beta); and for a small fleet, a mesh is often not worth it.
+**Recap:** a mesh moves mTLS, retries/timeouts, traffic shifting, and L7 telemetry out of app code; sidecars cost memory per Pod and latency per proxy traversal, two of them on every hop; Istio Ambient cuts that tax while keeping per-connection mTLS (GA in 1.24), and Cilium cuts it further by putting eBPF policy in the kernel with SPIFFE mutual authentication and WireGuard or IPsec encryption instead of mTLS (still beta); across clusters, an east-west gateway per cluster forwards the session rather than terminating it, over a shared root of trust, so the caller's identity survives the region hop; and for a small fleet, a mesh is often not worth it.
 
 \`\`\`cswidget
 {
