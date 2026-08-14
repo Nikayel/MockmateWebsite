@@ -2612,7 +2612,7 @@ export const systemDesignLevel6: DesignLevel = {
           id: "sd-l6-sync-vs-async",
           title: "Sync vs Async & When to Go Event-Driven",
           summary:
-            "Async decouples in time, space, and synchronization at the cost of eventual consistency; keep the result-bearing or consistency-sensitive steps synchronous and make independent side effects events.",
+            "Async decoupling buys throughput and availability but opens a stale-read window, so some checkout steps must stay synchronous.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["async", "event-driven", "checkout"],
@@ -2659,7 +2659,7 @@ export const systemDesignLevel6: DesignLevel = {
           id: "sd-l6-queue-pubsub-log",
           title: "Queue vs Pub/Sub vs Log/Streaming",
           summary:
-            "A queue distributes work and deletes on ack (no replay); pub/sub fans a copy to every subscriber; a log retains an ordered stream that many consumer groups read at their own offset and can replay.",
+            "Queue, pub/sub or log: two axes decide it, whether consuming deletes the message and who owns the read position.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["messaging-models", "kafka", "queue"],
@@ -2707,7 +2707,7 @@ export const systemDesignLevel6: DesignLevel = {
           id: "sd-l6-broker-selection",
           title: "Broker Technology Selection",
           summary:
-            "Match the broker to the drivers (throughput, ordering, retention/replay, delivery, routing, ops budget); a log only when replay/throughput justify its ops, and sometimes no broker at all.",
+            "How to choose SQS, RabbitMQ, Kafka, Pulsar or no broker at all by naming the drivers instead of reaching for Kafka by reflex.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["broker-selection", "kafka", "rabbitmq"],
@@ -2762,7 +2762,7 @@ export const systemDesignLevel6: DesignLevel = {
           id: "sd-l6-kafka-internals",
           title: "Kafka Architecture Internals",
           summary:
-            "Sequential writes, page cache, and zero-copy give throughput; durability is leader/follower ISR replication where durable means acks=all + min.insync.replicas>=2 + RF3.",
+            "Why Kafka is fast (sequential appends, page cache, zero-copy) and why acks=all on its own is still not durable.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["kafka", "isr", "durability"],
@@ -2811,7 +2811,7 @@ export const systemDesignLevel6: DesignLevel = {
           id: "sd-l6-partitioning-ordering",
           title: "Partitioning, Ordering & Keys",
           summary:
-            "Kafka orders within a partition only, chosen by hash(key) mod N, so causally related events share a key; partition count is fixed up front, and a hot key trades ordering scope for throughput.",
+            "Kafka orders within a partition and nowhere else, which makes the message key a correctness decision rather than a tuning knob.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["partitioning", "ordering", "keys"],
