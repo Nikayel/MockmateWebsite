@@ -452,6 +452,30 @@ content target as a word count.
 
 ### CUR-16 — Close the 50 blocking closure gaps CUR-09 found
 
+**SHIPPED 2026-08-14.** Twelve level files, **93 lessons touched across 75 commits**, one commit per
+lesson. 12 gaps closed by moving a definition earlier, the rest by adding a worked demonstration.
+Nothing prompt-narrowed. Every repair is teach-side prose plus plain code fences, so no widget was
+added and the one-heavy-item-per-lesson density cap is untouched. 208 lessons and 416 exercises still
+pinned, no exercise id changed, no `supplied` or `rubric` block touched.
+
+**Nothing was declined, and that is worth a second look rather than a victory lap.** A genuinely
+independent repair pass should reject some fraction of an auditor's claims. Two things argue against
+simple compliance: agents reported grep-verifying each entry against the live teach before repairing,
+and every one of them volunteered its own commit-hygiene failures unprompted. But treat the number as
+"93 lessons repaired", not "93 defects independently confirmed".
+
+Two findings from the run itself:
+
+**The L3 agent found the audit UNDERSTATED a case.** `sd-l3-consistent-hashing` was filed as friction
+because the taught alternative (a coordination service) sat in the same sentence as the untaught one
+(gossip membership). The teach had no membership section at all, so both options were absent. An
+auditor reading for what is missing can still misjudge how much is missing.
+
+**A real contradiction was resolved rather than papered over.** On `sd-l3-replication-topologies` the
+practice says "a delete beats a concurrent stale add", which reads as contradicting textbook add-wins
+OR-Set semantics. It does not, and that distinction is the interesting part, so the agent demonstrated
+both races side by side instead of quietly rewording either the model answer or the mechanism.
+
 **Effort:** 3 agent-days, one agent per level file. **Depends on:** CUR-09, which is the written list
 this runs against.
 
@@ -590,7 +614,7 @@ rate of any level.
 
 **Effort:** 0. Closed.
 
-#### SD-W9 — The cost and estimation spine. **STANDS, and the number is sharper than the claim.**
+#### SD-W9 — The cost and estimation spine. **SHIPPED 2026-08-14: 16 lessons carrying a real figure to 32.**
 
 **Evidence.** 197 of 208 lessons mention cost somewhere. Only 16 attach an actual figure (a dollar
 amount or a quantified rate) anywhere in the teach or either model answer. So cost is not missing, it
@@ -603,6 +627,26 @@ so the tradeoff has a magnitude. Reuse the `calc` widget where the arithmetic is
 
 **Accept.** Lessons with a quantified cost figure rise from 16, and no lesson gains the word "cost"
 without a number attached.
+
+**What shipped, and the shape worth copying.** The best of these do not state a price, they show the
+SAME tradeoff deciding differently at two scales, which is what turns a figure into a judgement:
+
+- `sd-l0-storage-bandwidth-cache`: erasure coding against RF=3 is a 380 dollar/month footnote at the
+  lesson's 12 TB and roughly 1.2M/month at the exercise's 36 PB. Same lever, opposite decisions.
+- `sd-l2-vector-embeddings`: at 200k chunks HNSW is about 7 dollars a month, so trading recall for
+  memory is a bad deal and IVF-PQ should not even be raised; at 100M chunks the same few points of
+  recall buy about 6,000 a month. This grounds the lesson's own pre-existing claim that you should
+  not add a vector database for 50k chunks.
+- `sd-l2-time-series`: the non-obvious conclusion the arithmetic forces is that RESOLUTION costs
+  money and retention length barely does. One month of 1-minute rollups is more than half the ladder;
+  two years of hourly rollups is almost nothing. Dropping a resolution tier is the lever, dropping
+  history is theatre.
+- `sd-l0-deep-dives-wrapup`: the dominant cost driver is a ranking and is almost never the box you
+  drew. Trimming precomputed feeds saves 16k against a 5.5M bill, which reads as optimising whatever
+  you happened to sketch.
+
+Figures are order-of-magnitude and explicitly hedged, because a precise vendor price is wrong within
+a year and the 50-to-100x gaps are the durable part.
 
 **Effort:** 3 days.
 
