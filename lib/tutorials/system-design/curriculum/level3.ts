@@ -108,11 +108,113 @@ Replicas also do not remove the leader as a single point of failure for writes: 
 failover (Patroni, Orchestrator, or a managed service) to promote a follower, and that introduces its
 own split-brain and lost-write risks.
 
-\`\`\`
-        writes            +--> follower 1 --\\
-client --------> LEADER --+--> follower 2 ---+--> read LB --> reads
-                          +--> follower 3 --/
-   writes bottleneck at leader; reads scale with follower count
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Single-leader replication: reads scale with followers, writes do not",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "write_traffic",
+      "label": "Write traffic",
+      "kind": "client"
+    },
+    {
+      "id": "leader",
+      "label": "Leader (the write ceiling: every follower replays every write)",
+      "kind": "db"
+    },
+    {
+      "id": "f1",
+      "label": "Follower 1 (full copy, applies the whole write stream)",
+      "kind": "db"
+    },
+    {
+      "id": "f2",
+      "label": "Follower 2 (full copy, applies the whole write stream)",
+      "kind": "db"
+    },
+    {
+      "id": "f3",
+      "label": "Follower 3 (full copy, applies the whole write stream)",
+      "kind": "db"
+    },
+    {
+      "id": "read_lb",
+      "label": "Read load balancer (pool members whose lag is near zero)",
+      "kind": "lb"
+    },
+    {
+      "id": "read_traffic",
+      "label": "Read traffic",
+      "kind": "client"
+    }
+  ],
+  "edges": [
+    {
+      "from": "write_traffic",
+      "to": "leader",
+      "kind": "sync",
+      "label": "every write goes to the one leader"
+    },
+    {
+      "from": "leader",
+      "to": "f1",
+      "kind": "replication",
+      "label": "streams the change log"
+    },
+    {
+      "from": "leader",
+      "to": "f2",
+      "kind": "replication"
+    },
+    {
+      "from": "leader",
+      "to": "f3",
+      "kind": "replication"
+    },
+    {
+      "from": "read_traffic",
+      "to": "read_lb",
+      "kind": "sync"
+    },
+    {
+      "from": "read_lb",
+      "to": "f2",
+      "kind": "sync",
+      "label": "reads fan out across the follower pool"
+    },
+    {
+      "from": "read_lb",
+      "to": "f1",
+      "kind": "sync"
+    },
+    {
+      "from": "read_lb",
+      "to": "f3",
+      "kind": "sync"
+    }
+  ],
+  "groups": [
+    {
+      "id": "write_path",
+      "label": "Write path: bounded by one leader",
+      "nodes": [
+        "write_traffic",
+        "leader"
+      ]
+    },
+    {
+      "id": "read_path",
+      "label": "Read path: scales linearly with follower count",
+      "nodes": [
+        "read_traffic",
+        "read_lb"
+      ]
+    }
+  ],
+  "caption": "Adding a follower buys read capacity and read-path fault tolerance, nothing else. Provision it, let it catch up, and add it to the pool once its lag is near zero."
+}
 \`\`\`
 
 Recap: single-leader replication scales reads by fanning them across followers but never scales
@@ -279,11 +381,141 @@ is a **P**artition, choose **A**vailability or **C**onsistency; **E**lse (normal
 name the **concrete anomaly** a user sees ("two edits from two regions, one silently overwrites the
 other under LWW"), which shows you reason about data, not letters.
 
-\`\`\`
-SINGLE-LEADER          MULTI-LEADER              LEADERLESS (quorum)
- all writes -> L         L(us) <--> L(eu)          client -> W of N replicas
- no conflicts            local writes, but         reads <- R of N
- leader = write SPOF     concurrent conflicts      R + W > N => overlap
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "The three replication topologies, and the anomaly each one exposes",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "sl_client",
+      "label": "Client: every write, from every region",
+      "kind": "client"
+    },
+    {
+      "id": "sl_leader",
+      "label": "Leader: serializes every write, so no write-write conflicts exist",
+      "kind": "db"
+    },
+    {
+      "id": "sl_follower",
+      "label": "Follower: reads only, promoted by risky failover",
+      "kind": "db"
+    },
+    {
+      "id": "ml_client",
+      "label": "Client in the EU",
+      "kind": "client"
+    },
+    {
+      "id": "ml_leader_eu",
+      "label": "Leader EU: accepts local writes",
+      "kind": "db"
+    },
+    {
+      "id": "ml_leader_us",
+      "label": "Leader US: accepts local writes",
+      "kind": "db"
+    },
+    {
+      "id": "ll_client",
+      "label": "Client or coordinator",
+      "kind": "client"
+    },
+    {
+      "id": "ll_r1",
+      "label": "Replica 1",
+      "kind": "db"
+    },
+    {
+      "id": "ll_r2",
+      "label": "Replica 2",
+      "kind": "db"
+    },
+    {
+      "id": "ll_r3",
+      "label": "Replica 3",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "sl_client",
+      "to": "sl_leader",
+      "kind": "sync",
+      "label": "all writes reach one region"
+    },
+    {
+      "from": "sl_leader",
+      "to": "sl_follower",
+      "kind": "replication"
+    },
+    {
+      "from": "ml_client",
+      "to": "ml_leader_eu",
+      "kind": "sync",
+      "label": "writes stay local, so latency stays low"
+    },
+    {
+      "from": "ml_leader_eu",
+      "to": "ml_leader_us",
+      "kind": "replication"
+    },
+    {
+      "from": "ml_leader_us",
+      "to": "ml_leader_eu",
+      "kind": "replication",
+      "label": "two leaders can accept clashing writes to one key, and you must define the merge"
+    },
+    {
+      "from": "ll_client",
+      "to": "ll_r1",
+      "kind": "sync"
+    },
+    {
+      "from": "ll_client",
+      "to": "ll_r2",
+      "kind": "sync",
+      "label": "W of N replicas ack a write, R of N answer a read; R + W > N forces the sets to overlap"
+    },
+    {
+      "from": "ll_client",
+      "to": "ll_r3",
+      "kind": "sync"
+    }
+  ],
+  "groups": [
+    {
+      "id": "single_leader",
+      "label": "Single leader: no conflicts, but the leader is a write SPOF",
+      "nodes": [
+        "sl_client",
+        "sl_leader",
+        "sl_follower"
+      ]
+    },
+    {
+      "id": "multi_leader",
+      "label": "Multi leader: local writes everywhere, at the price of write-write conflicts",
+      "nodes": [
+        "ml_client",
+        "ml_leader_eu",
+        "ml_leader_us"
+      ]
+    },
+    {
+      "id": "leaderless",
+      "label": "Leaderless quorum: any replica accepts a write, staleness tuned by R and W",
+      "nodes": [
+        "ll_client",
+        "ll_r1",
+        "ll_r2",
+        "ll_r3"
+      ]
+    }
+  ],
+  "caption": "Each topology buys its capability by exposing one anomaly. Name the anomaly you accepted, then the conflict resolution or quorum setting that contains it."
+}
 \`\`\`
 
 Recap: single-leader avoids conflicts but has a write SPOF; multi-leader enables multi-region writes
