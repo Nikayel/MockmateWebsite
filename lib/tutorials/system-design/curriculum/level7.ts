@@ -1443,14 +1443,6 @@ The key insight is that failing fast is a feature. A breaker in Open state gives
 }
 \`\`\`
 
-## Bulkhead
-
-A bulkhead isolates resources per dependency, named after ship compartments that stop one flooded section from sinking the vessel. If your service calls Dependencies A, B, and C from a single shared thread pool of 200 threads, and C gets slow, requests to C hold threads until they time out. Enough slow C calls and all 200 threads are stuck in C, so calls to A and B, which are perfectly healthy, get no threads and fail too. One sick dependency starved the others. The fix is to give each dependency its own bounded pool (for example 60 threads for A, 60 for B, 40 for C). Now a C brownout can consume at most C's 40 threads; A and B keep serving. Bulkheads convert a total outage into a partial one.
-
-## Fallbacks
-
-Fallbacks answer "what do we serve when the dependency is unavailable?" Options, in order of preference: return cached or slightly stale data; return a sensible default; or gracefully omit the feature. The rule is that **only non-critical dependencies should be fallback-able**. You cannot fall back on the payment authorization, but you absolutely can fall back on the "customers also bought" recommendations by rendering the page without them. The product still sells.
-
 \`\`\`cswidget
 {
   "type": "check",
@@ -1463,21 +1455,29 @@ Fallbacks answer "what do we serve when the dependency is unavailable?" Options,
       "feedback": "Success is not the same as cheap. Each slow call holds a thread for 900 ms, and threads are the scarce resource here."
     },
     {
-      "label": "Calls to C fill the shared pool, so the healthy dependencies A and B get no threads and start failing too",
+      "label": "Calls to C fill the shared pool, so A and B get no threads",
       "correct": true,
-      "feedback": "Right, and this is exactly the gap a bulkhead closes: give each dependency its own bounded pool so a sick one can consume at most its own share."
+      "feedback": "Right. A, B, and C draw from the same 200 threads, and each 900 ms call to C parks one of them. Enough slow C calls and every thread is stuck waiting on C, so requests to A and B, which are perfectly healthy, find no thread and fail too. One sick dependency starved the others, and the breaker saw nothing because nothing errored."
     },
     {
       "label": "The breaker trips anyway, because latency always counts as a failure",
       "feedback": "Only if you configured it to. Hardened breakers pair the error-rate threshold with a slow-call-rate threshold for this very case, but an error-rate-only breaker sees nothing wrong."
     },
     {
-      "label": "The fallback for C fires and the pool drains",
-      "feedback": "A fallback fires when the call fails or the breaker is open. Here every call succeeds, slowly, so nothing triggers it."
+      "label": "The 900 ms calls time out, and the breaker trips on the timeouts",
+      "feedback": "Only if the request timeout is under 900 ms. Here the call completes and returns a 200, so nothing lands in the breaker's failure window and it stays Closed."
     }
   ]
 }
 \`\`\`
+
+## Bulkhead
+
+A bulkhead isolates resources per dependency, named after ship compartments that stop one flooded section from sinking the vessel. If your service calls Dependencies A, B, and C from a single shared thread pool of 200 threads, and C gets slow, requests to C hold threads until they time out. Enough slow C calls and all 200 threads are stuck in C, so calls to A and B, which are perfectly healthy, get no threads and fail too. One sick dependency starved the others. The fix is to give each dependency its own bounded pool (for example 60 threads for A, 60 for B, 40 for C). Now a C brownout can consume at most C's 40 threads; A and B keep serving. Bulkheads convert a total outage into a partial one.
+
+## Fallbacks
+
+Fallbacks answer "what do we serve when the dependency is unavailable?" Options, in order of preference: return cached or slightly stale data; return a sensible default; or gracefully omit the feature. The rule is that **only non-critical dependencies should be fallback-able**. You cannot fall back on the payment authorization, but you absolutely can fall back on the "customers also bought" recommendations by rendering the page without them. The product still sells.
 
 **Interview nuance:** breakers and bulkheads solve different halves of the same problem, and strong answers use both. The breaker decides *whether* to call a dependency based on its recent health; the bulkhead bounds *how much of your resources* any one dependency can ever consume, even before the breaker trips. Without the bulkhead, a dependency that is slow but not yet failing enough to trip the breaker can still exhaust your shared pool. Envoy and service meshes provide both as config (outlier detection for breaking, circuit-breaker connection/request limits for bulkheading).
 
@@ -1536,7 +1536,7 @@ Levels 1 and 4 own the how, so this is only the recap. Shed at the edge with \`4
               the trigger is GONE but the system stays down
 \`\`\`
 
-A metastable failure is one that *sustains itself after the original trigger is gone*. A traffic spike pushes the system into overload; the overload causes timeouts; the timeouts cause client retries; the retries add more load than the original spike; and now even after the spike passes, the retry-driven load keeps the system saturated. Adding capacity often does not break the loop, because the retries scale up to consume it. The way out is to attack the feedback loop directly: shed load aggressively to drop goodput demand below capacity, and combine it with backoff and jitter on the clients so the retry wave dissipates. Sometimes you must shed almost everything briefly to let the queues drain, then ramp back.
+A metastable failure is one that *sustains itself after the original trigger is gone*. A traffic spike pushes the system into overload; the overload causes timeouts; the timeouts cause client retries; the retries add more load than the original spike; and now even after the spike passes, the retry-driven load keeps the system saturated.
 
 \`\`\`cswidget
 {
@@ -1565,6 +1565,8 @@ A metastable failure is one that *sustains itself after the original trigger is 
   ]
 }
 \`\`\`
+
+Adding capacity often does not break the loop, because the retries scale up to consume it, and if the bottleneck is a shared database then more app servers make it worse. The way out is to attack the feedback loop directly: shed load aggressively to drop goodput demand below capacity, and combine it with backoff and jitter on the clients so the retry wave dissipates. Sometimes you must shed almost everything briefly to let the queues drain, then ramp back.
 
 **Interview nuance:** the wrong turn is "we will autoscale." Autoscaling is minutes-slow and cannot outrun a retry storm that doubles load in seconds, and if the bottleneck is a shared database, more app servers make it worse. Load shedding acts in milliseconds at the edge and is the only thing that reliably breaks a metastable collapse.
 
@@ -1866,7 +1868,7 @@ const multiRegionTeach = `
 
 Multi-AZ and multi-region are not the same tool, and conflating them is a common tell. Know exactly what each buys and what it costs.
 
-**Multi-AZ** spreads a system across Availability Zones: physically separate data centers within one region, tens of km apart, connected by fast, low-latency (single-digit ms) links. Because latency between AZs is tiny, you can replicate **synchronously** across them cheaply, so multi-AZ is the default for HA. It protects against a data-center failure (power, cooling, a fire in one building) but *not* against a whole-region outage, and not against region-wide control-plane failures.
+**Multi-AZ** spreads a system across Availability Zones: physically separate data centers within one region, tens of km apart, connected by fast, low-latency (single-digit ms) links. Because latency between AZs is tiny, you can replicate **synchronously** across them cheaply, so multi-AZ is the default for HA.
 
 \`\`\`cswidget
 {
@@ -1895,6 +1897,8 @@ Multi-AZ and multi-region are not the same tool, and conflating them is a common
   ]
 }
 \`\`\`
+
+So multi-AZ protects against a data-center failure (power, cooling, a fire in one building) but *not* against a whole-region outage, and not against region-wide control-plane failures. The closeness that makes synchronous replication cheap is exactly what gives all three zones a shared regional fate.
 
 **Multi-region** spreads across regions hundreds or thousands of km apart, with 50-150+ ms of round-trip latency between them. It protects against losing an entire region (natural disaster, region-wide provider outage, regulatory blackout). But that latency changes everything about data: synchronous replication across regions would add 100+ ms to every write, so you almost always replicate **asynchronously**, which means the remote copy lags and a region loss can lose the un-replicated tail. Multi-region is expensive (full or partial stacks in each region, cross-region data transfer, more operational surface) and it makes consistency genuinely hard.
 
