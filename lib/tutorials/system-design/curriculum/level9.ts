@@ -2459,10 +2459,36 @@ Databricks, or a warehouse engine reading open tables on S3. The synthesis: **la
 
 ## The medallion pattern
 
-\`\`\`
-  bronze  raw, append-only, exactly as ingested (audit + replay source)
-  silver  cleaned, deduped, conformed, joined; schema enforced
-  gold    business-level aggregates / marts, serving BI and ML features
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Layer",
+    "What it holds",
+    "Who reads it"
+  ],
+  "highlightCols": [
+    "Layer"
+  ],
+  "rows": [
+    [
+      "Bronze",
+      "Raw and append-only, exactly as ingested",
+      "Nobody downstream: it is the audit trail and the replay source"
+    ],
+    [
+      "Silver",
+      "Cleaned, deduped, conformed, joined, schema enforced",
+      "Data engineers, who own the promotion to gold"
+    ],
+    [
+      "Gold",
+      "Business-level aggregates and marts",
+      "BI dashboards and ML feature consumers"
+    ]
+  ],
+  "caption": "What makes this governance rather than folder naming is that every layer has an owner and a contract: consumers read gold, and the promotion between layers is somebody's job."
+}
 \`\`\`
 
 Each layer has an owner and a contract; downstream consumers read gold, data engineers own the promotion between layers. This is governance you can actually enforce.
