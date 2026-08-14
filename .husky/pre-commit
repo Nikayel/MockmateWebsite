@@ -1,4 +1,9 @@
 #!/bin/sh
 
+# Runs BEFORE lint-staged on purpose. lint-staged wraps the commit in `git stash`, which is hostile
+# to concurrent agents, so a commit that is going to be refused must be refused before anything is
+# stashed. Inert unless CS_COMMIT_SCOPE is set, so ordinary commits are unaffected.
+node scripts/check-commit-scope.mjs || exit 1
+
 # Use npx with full path (works with npm instead of pnpm)
 /usr/local/bin/npx lint-staged
