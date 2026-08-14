@@ -4059,6 +4059,58 @@ A distributed job scheduler fires jobs at their scheduled time (one-off or recur
 
 Jobs have a next-run timestamp, and the scheduler must efficiently find all jobs due in the current window without scanning everything. Index by run time: a database index on \`next_run_at\`, or time-bucketed storage where each bucket is a minute or second and workers poll the current bucket. A poller wakes every second, queries \`WHERE next_run_at <= now AND status = 'pending'\`, and dispatches those jobs. At large scale you shard jobs across many buckets or partitions so no single poller is a bottleneck.
 
+### The poll interval is the precision floor, so stop polling harder
+
+A poller's firing precision can never be better than its own interval. Whatever a job's timestamp says, it fires when the next poll happens to notice it:
+
+\`\`\`
+job due 19:00:00.000, poller ticks every 1s
+  19:00:00.000  due
+  19:00:00.640  poller wakes, runs the due-window query, dispatches
+                fired 640ms late, and that lateness is uniform over the tick
+
+want 100ms precision? tick 10x faster:
+  10 queries/sec/shard instead of 1, against the same index, forever,
+  and the tail of a slow query now eats a whole tick
+\`\`\`
+
+Polling harder buys precision with query load you pay every second of every day, most of it returning nothing. The way out is to split the two jobs the poller was doing at once: **finding** what is due, and **firing** it. Query on a coarse schedule, fire from memory.
+
+Each scheduler shard keeps a **timer wheel**: an array of slots, one per tick, each holding the jobs due in that tick, with a cursor that advances one slot per tick and fires whatever it lands on. A loader query runs once per window and drops each row into the slot for its firing time.
+
+\`\`\`
+loading (once a minute, one query per shard):
+  SELECT * FROM jobs
+   WHERE next_run_at >= '19:00:00' AND next_run_at < '19:01:00'
+     AND status = 'pending' AND shard_id = :me
+  place each row in slot = second-of-minute(next_run_at)     <- O(1) per job
+
+the wheel, 60 slots of 1s (cursor advances once per second):
+
+  slot   00      01      02      03     ...    59
+       [ j17 ] [     ] [ j4  ] [ j88 ]       [ j9  ]
+       [ j92 ]         [ j8  ]
+          ^
+       19:00:00: cursor fires j17 and j92 straight from memory, no query
+
+firing cost per tick = the jobs in THAT slot, not the millions still pending
+\`\`\`
+
+Precision is now the slot width, which is free to shrink: 100ms slots means 600 slots and 100ms firing precision while the loader still runs one query a minute. That is the trade the poller could not make.
+
+The wheel is a cache of the job store, never the record of it. A job is durably written before it is ever loaded into a wheel, so a shard that dies loses its wheel and no jobs:
+
+\`\`\`
+19:00:20  shard 7 dies mid-minute, its in-memory wheel is gone
+19:00:23  its buckets are reassigned to shard 3
+19:00:23  shard 3 rebuilds the wheel from the durable store:
+            WHERE next_run_at < '19:01:00' AND status = 'pending' AND shard_id = 7
+          note the open lower bound: rows already past due (19:00:20 to 19:00:23)
+          come back too and fire immediately, late rather than never
+\`\`\`
+
+Firing from memory does not replace any of the correctness machinery below it. The shard fires by dispatching, and the dispatch still goes through the lease acquisition in the next section, which is what keeps a brief double-ownership of a bucket during failover from becoming a double-run.
+
 ## Leasing with a visibility timeout
 
 When a worker picks up a job it does not just mark it running; it acquires a lease: it atomically sets \`status = running, locked_by = worker, lease_expires_at = now + T\` in a single conditional update (compare-and-set on status). Only one worker wins the CAS, so only one runs the job. If that worker crashes, its lease expires and the job becomes eligible again, so another worker retries it. Crucially the job is retried, not duplicated, because a live worker holds the lease and a dead one's lease simply expires. This is the same visibility-timeout pattern SQS uses.
@@ -4106,7 +4158,7 @@ For a cron job, on completion compute the next run and reschedule. Clock skew ac
     },
     {
       "id": "poller",
-      "label": "Poller (every second: next_run_at <= now AND status pending)",
+      "label": "Loader plus timer wheel (window query, then fires from memory on its tick)",
       "kind": "service"
     },
     {
@@ -4202,7 +4254,7 @@ For a cron job, on completion compute the next run and reschedule. Clock skew ac
         "jobs",
         "poller"
       ],
-      "note": "Finding what is due cannot mean scanning every job, so jobs are indexed by run time and the poller reads only the current window."
+      "note": "Finding what is due cannot mean scanning every job, so jobs are indexed by run time and one coarse query loads the next window into an in-memory timer wheel, which fires on its own tick and is rebuilt from the store on failover."
     },
     {
       "adds": [
@@ -4235,7 +4287,7 @@ For a cron job, on completion compute the next run and reschedule. Clock skew ac
 }
 \`\`\`
 
-**Recap:** index jobs by run time and poll the due window, make a single worker win via a compare-and-set lease with a visibility timeout so crashes retry rather than duplicate, add fencing tokens to defeat the paused-worker double-run, achieve effectively-once with idempotency keys, and handle clock skew and missed windows with an explicit misfire policy.
+**Recap:** index jobs by run time and load the due window on a coarse query, fire from an in-memory timer wheel so precision is a tick rather than a poll interval and rebuild that wheel from the durable store on failover, make a single worker win via a compare-and-set lease with a visibility timeout so crashes retry rather than duplicate, add fencing tokens to defeat the paused-worker double-run, achieve effectively-once with idempotency keys, and handle clock skew and missed windows with an explicit misfire policy.
 
 \`\`\`cswidget
 {
