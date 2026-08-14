@@ -2822,6 +2822,46 @@ string, so \`?utm_source=twitter\` and \`?utm_source=email\` are two cache entri
 Strip tracking params, normalize casing, and only \`Vary\` on headers that actually change the body
 (like \`Accept-Encoding\`). Vary on \`Cookie\` and your hit rate collapses to near zero.
 
+### Video is not one file, it is thousands of cacheable objects
+
+A CDN caches objects, and a two-hour film as one 4 GB object is nearly useless to it: a single miss
+transfers gigabytes, and there is no way to react when a viewer's bandwidth changes mid-playback. So
+streaming formats **segment** the video: cut it into 2 to 10 second chunks, encode each chunk at
+several bitrates (the **bitrate ladder**), and publish a small text **manifest** listing them.
+**HLS** (Apple's format, an \`.m3u8\` manifest over \`.ts\` or fragmented-MP4 segments) and **DASH**
+(the ISO standard, an \`.mpd\` manifest) are the two you will be asked about; they differ in container
+and syntax, not in this idea.
+
+\`\`\`
+master.m3u8                            the ladder, one entry per rendition
+  #EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360     360p/index.m3u8
+  #EXT-X-STREAM-INF:BANDWIDTH=3000000,RESOLUTION=1280x720   720p/index.m3u8
+  #EXT-X-STREAM-INF:BANDWIDTH=8000000,RESOLUTION=1920x1080  1080p/index.m3u8
+
+720p/index.m3u8                        the media playlist for one rendition
+  #EXT-X-TARGETDURATION:2
+  #EXTINF:2.0,  seg_1048.ts
+  #EXTINF:2.0,  seg_1049.ts
+  #EXTINF:2.0,  seg_1050.ts
+
+what segmenting buys the edge:
+  every seg_NNNN.ts is immutable the moment it is written, so it caches forever,
+  exactly like a content-hashed asset. The manifest is the only object that
+  changes, so it is the only object needing a short TTL. Segments and manifest
+  get opposite cache-control headers despite living in the same directory.
+
+what segmenting buys the player: adaptive bitrate. The player times how fast the
+  last segment arrived and picks the next segment's rung accordingly, so a
+  viewer whose bandwidth collapses steps down to 360p at the next segment
+  boundary instead of stalling mid-frame.
+\`\`\`
+
+Segment length is the knob, and it cuts both ways. At 2-second segments each viewer fetches one
+object every 2 seconds and the encoder publishes one new object per rung every 2 seconds, while a
+player buffering roughly three segments sits about 6 seconds behind live. Halve the segment length
+and live latency roughly halves too, but the request rate against every tier doubles and so does the
+number of distinct objects the shield must coalesce on.
+
 **Interview nuance:** the sharpest question is "what can you cache and what must you never cache?"
 Static assets and public semi-dynamic HTML: yes, with **micro-caching** (a 1 to 5 second TTL on the
 homepage still collapses a 100k-QPS spike to ~20 origin fetches/sec). Personalized or authenticated
@@ -2831,7 +2871,8 @@ per-user fragment.
 
 Recap: use a pull CDN with an L1/L2/shield hierarchy so the shield coalesces misses down to ~1 fetch
 per object, prefer versioned URLs over purging, normalize cache keys, micro-cache semi-dynamic HTML
-with stale-while-revalidate, and never cache authenticated bodies at a shared edge.
+with stale-while-revalidate, deliver video as immutable HLS/DASH segments behind one short-TTL
+manifest, and never cache authenticated bodies at a shared edge.
 
 \`\`\`cswidget
 {
