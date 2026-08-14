@@ -2169,9 +2169,9 @@ Canary:    v2 gets 1% -> analyze -> 5% -> analyze -> 25% -> ... auto-abort if SL
       "feedback": "A rolling deploy in reverse is still a rolling deploy: build, drain, replace, batch by batch, with both versions live throughout."
     },
     {
-      "label": "Minutes at best, on a path you have never rehearsed under pressure, whereas blue-green or a flag turns rollback into a routing change",
+      "label": "Minutes at best, on a path you have never rehearsed",
       "correct": true,
-      "feedback": "Right. If the old version is still running or the new behavior sits behind a flag, reversing it is a routing decision measured in seconds rather than a rebuild."
+      "feedback": "Right. A rolling deploy in reverse is still a rolling deploy: build, drain, replace, batch by batch, with both versions live throughout, and you are running it for the first time during a SEV1. Blue-green or a feature flag turns rollback into a routing change instead, measured in seconds, because the old version is still running or the new behavior is still gated."
     },
     {
       "label": "Instant, because the old container image is still cached on the nodes",
@@ -2359,9 +2359,9 @@ Blast radius is the safety discipline that separates engineering from sabotage. 
       "feedback": "Blast radius is the thing you deliberately keep small. You run in production narrowly and with guardrails, not to make the damage larger."
     },
     {
-      "label": "Staging never reproduces real traffic patterns, data volumes, cache-hit ratios, dependency graphs, or autoscaler behavior, and a failover that passes in an empty environment routinely fails under production load",
+      "label": "Staging never reproduces the real conditions under test",
       "correct": true,
-      "feedback": "Right, and that class of bug only exists where the risk lives, which is why you eventually have to test there, carefully and with an auto-abort."
+      "feedback": "Right. Real traffic patterns, real data volumes, real cache-hit ratios, real cross-service dependency graphs, and real autoscaler behavior exist only in production, and a failover that passes in an empty environment routinely fails under production load. That class of bug lives only where the risk lives, which is why you eventually have to test there, narrowly and with an auto-abort."
     },
     {
       "label": "Staging environments are usually broken anyway",
@@ -2481,9 +2481,9 @@ The blameless postmortem is the compounding step. Blameless means it assumes eve
       "feedback": "Reassigning blame is still blame, and it still ends the investigation. Blamelessness assumes everyone acted reasonably with the information and tools they had."
     },
     {
-      "label": "Because it stops exactly where the useful questions start: why could one command take production down, why was there no confirmation or dry run, why did no guardrail catch it",
+      "label": "Because it stops exactly where the useful questions start",
       "correct": true,
-      "feedback": "Right. Asking why the system allowed this is the point, and it usually surfaces several contributing causes rather than one."
+      "feedback": "Right. The questions it forecloses are the ones worth asking: why could one command take production down, why was there no confirmation or dry run, why did no guardrail catch it. Asking why the system allowed this usually surfaces several contributing causes rather than one, and each of them is something you can actually go and fix."
     },
     {
       "label": "Because human error is rare enough to ignore",
