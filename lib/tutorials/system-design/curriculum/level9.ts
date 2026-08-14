@@ -1151,14 +1151,98 @@ An **IDP** is the interface over that machinery. Over raw Kubernetes it adds thr
 
 GitOps is the delivery control plane underneath. The principle: **Git is the single source of truth for desired state**, everything is declarative (Kubernetes manifests, Helm/Kustomize, Terraform), and an in-cluster **reconciler** (Argo CD or Flux) continuously compares desired state in Git to actual state in the cluster and converges them. You never \`kubectl apply\` from a laptop. To ship, you open a pull request that changes the manifest; merge triggers the agent to roll it out.
 
-\`\`\`
-  developer --> PR to config repo --> merge
-                                        |
-                          Argo CD / Flux (in cluster)
-                                        |  reconcile loop
-                          diff(desired in Git, actual)
-                                        |
-                                   apply / self-heal --> cluster
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "The GitOps reconcile loop",
+  "nodes": [
+    {
+      "id": "dev",
+      "label": "Developer",
+      "kind": "client"
+    },
+    {
+      "id": "repo",
+      "label": "Config repo in Git (declared desired state)",
+      "kind": "db"
+    },
+    {
+      "id": "argo",
+      "label": "Argo CD or Flux (in-cluster reconciler)",
+      "kind": "service"
+    },
+    {
+      "id": "admission",
+      "label": "Admission policy (OPA or Kyverno, cosign, SLSA)",
+      "kind": "service"
+    },
+    {
+      "id": "cluster",
+      "label": "Cluster (actual state)",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "dev",
+      "to": "repo",
+      "kind": "sync",
+      "label": "reviewed pull request"
+    },
+    {
+      "from": "repo",
+      "to": "argo",
+      "kind": "sync",
+      "label": "pull desired state"
+    },
+    {
+      "from": "argo",
+      "to": "admission",
+      "kind": "sync",
+      "label": "apply"
+    },
+    {
+      "from": "admission",
+      "to": "cluster",
+      "kind": "sync",
+      "label": "admit or reject"
+    },
+    {
+      "from": "cluster",
+      "to": "argo",
+      "kind": "feedback",
+      "label": "actual state, diffed every loop"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "dev",
+        "repo"
+      ],
+      "note": "The requirement is an auditable record of every production change, so desired state lives in Git and the only way to ship is a reviewed pull request. Nobody applies from a laptop."
+    },
+    {
+      "adds": [
+        "argo"
+      ],
+      "note": "The reconciler runs inside the cluster and pulls, which is why no external CI system needs to hold cluster-admin credentials."
+    },
+    {
+      "adds": [
+        "admission"
+      ],
+      "note": "Git records what you asked for, not what a tag points at today, so the check that an image came from your pipeline has to happen here rather than in review."
+    },
+    {
+      "adds": [
+        "cluster"
+      ],
+      "note": "Actual state is read back on every loop, and that returning arrow is what turns a hand-made 2am edit into drift the reconciler quietly undoes."
+    }
+  ],
+  "caption": "Deployment and self-healing are the same loop: the reconciler compares what Git declares against what the cluster is running, and converges the cluster either way."
+}
 \`\`\`
 
 \`\`\`cswidget
@@ -1979,13 +2063,99 @@ The trap: your service writes to Postgres and then also writes to Kafka (or dire
 
 You cannot fix this with retries because you do not know which write succeeded. The fix is the **transactional outbox**: within the same DB transaction that writes the order, insert a row into an \`outbox\` table. The business write and the event are now atomic (one transaction). CDC then tails the WAL, sees the outbox insert, and publishes it to Kafka. There is exactly one source of truth (the DB log) and no distributed transaction.
 
-\`\`\`
-  service --tx--> [orders row + outbox row]  (one Postgres commit)
-                          |
-                   Debezium reads WAL
-                          v
-                        Kafka --> search index (Elasticsearch)
-                              --> lakehouse sink (Iceberg via Flink)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Transactional outbox into log-based CDC",
+  "nodes": [
+    {
+      "id": "service",
+      "label": "Service",
+      "kind": "service"
+    },
+    {
+      "id": "pg",
+      "label": "Postgres (orders row and outbox row, one commit)",
+      "kind": "db"
+    },
+    {
+      "id": "dbz",
+      "label": "Debezium (reads the WAL)",
+      "kind": "service"
+    },
+    {
+      "id": "kafka",
+      "label": "Kafka",
+      "kind": "queue"
+    },
+    {
+      "id": "search",
+      "label": "Search index (Elasticsearch, upsert by key)",
+      "kind": "db"
+    },
+    {
+      "id": "lake",
+      "label": "Lakehouse table (Iceberg via Flink)",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "service",
+      "to": "pg",
+      "kind": "sync",
+      "label": "one transaction"
+    },
+    {
+      "from": "pg",
+      "to": "dbz",
+      "kind": "async",
+      "label": "replication log"
+    },
+    {
+      "from": "dbz",
+      "to": "kafka",
+      "kind": "async",
+      "label": "one event per change"
+    },
+    {
+      "from": "kafka",
+      "to": "search",
+      "kind": "async",
+      "label": "at-least-once"
+    },
+    {
+      "from": "kafka",
+      "to": "lake",
+      "kind": "async",
+      "label": "at-least-once"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "service",
+        "pg"
+      ],
+      "note": "The requirement is that an order and its event can never disagree, so both rows commit in one transaction and the dual write the service could not repair after a crash is gone."
+    },
+    {
+      "adds": [
+        "dbz",
+        "kafka"
+      ],
+      "note": "Publishing has to catch deletes and preserve commit order, which polling for changed rows cannot do, so the replication log becomes the single publisher."
+    },
+    {
+      "adds": [
+        "search",
+        "lake"
+      ],
+      "note": "A connector can replay after a crash, so each consumer upserts by primary key and a redelivered event changes nothing."
+    }
+  ],
+  "caption": "One commit writes the order and its event, the WAL is the only publisher, and idempotent consumers turn at-least-once delivery into an effectively exactly-once result."
+}
 \`\`\`
 
 Because delivery is **at-least-once** (a connector can replay after a crash), downstream consumers must be **idempotent**: upsert by primary key into the search index and the Iceberg table so a redelivered event does not duplicate. Iceberg/Hudi upserts (merge-on-read or copy-on-write) handle this on the lake side.
