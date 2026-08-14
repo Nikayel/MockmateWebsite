@@ -1306,13 +1306,16 @@ raw/day    = 5 x 10^7 x 10^3 B  = 5 x 10^10 B  = 50 GB/day
 raw over a 90-day retention     = 50 GB x 90   ~= 4.5 TB
 
 provisioned = raw x replication factor
-RF = 3, because a durable store keeps three copies of every byte
+RF = 3, because a replicated database rents you a disk per copy
 provisioned = 4.5 TB x 3        ~= 13.5 TB
 \`\`\`
 
 The replication factor is not a rounding error. Quote the raw 4.5 TB and you have understated what you
 actually pay for and provision by 3x, so say "4.5 TB raw, about 13.5 TB at RF=3" and the interviewer
-can challenge the RF instead of the whole line.
+can challenge the RF instead of the whole line. Check that the multiplier belongs before you apply it,
+because it does not always: a database or a block-storage volume bills you once per replica, while an
+S3-class object store replicates internally and bills for one logical copy, so multiplying a blob
+estimate by 3 overstates that line rather than correcting it.
 
 Cache is sized off a different corpus, and this is where the common error lives. You do not cache what
 you retain, you cache what is still being read, and then only the hot fraction of that. The Pareto
@@ -1396,8 +1399,9 @@ storage to three significant figures while the design goes untouched. Estimate o
 the next decision, then move.
 
 Recap: decompose into stated assumptions, label units, round to powers of ten, convert average to peak
-with a 2 to 3x multiplier, take storage from raw times the replication factor and cache from the hot
-fraction of the actively-read window, and compute only the numbers that change the architecture.
+with a 2 to 3x multiplier, take storage from raw times the replication factor you actually pay for and
+cache from the hot fraction of the actively-read window, and compute only the numbers that change the
+architecture.
 
 \`\`\`cswidget
 {
@@ -1703,33 +1707,36 @@ database only needs to hold gigabytes while your object store holds petabytes.
 {
   "type": "check",
   "kind": "predict",
-  "prompt": "Your raw math says 12 TB of photos over the retention window, stored in a durable RF=3 object store. What number do you quote as provisioned storage?",
+  "prompt": "Your raw math says 12 TB of photos over the retention window, which you will keep in an S3-class object store. What storage number do you quote?",
   "options": [
     {
-      "label": "About 12 TB, the number the formula gave",
-      "feedback": "Tempting because the formula really did produce it, but that is raw payload only. A durable store keeps 3 copies of every byte, so quoting the raw number understates the footprint you have to pay for by 3x."
+      "label": "About 36 TB, since durable stores keep 3 copies",
+      "feedback": "This is the multiplier most candidates reach for, and it is the right one for a replicated database or a block-storage volume, where you rent a disk per replica. An object store is not that. It replicates internally and bills you for one logical copy, so RF=3 here triple-counts the bill."
     },
     {
-      "label": "About 36 TB, once replication is counted",
+      "label": "About 12 TB, the raw number the formula gave",
       "correct": true,
-      "feedback": "Right. RF=3 triples the raw payload, so 12 TB becomes 36 TB, and on the database side secondary indexes and B-tree overhead add another 20 to 50 percent on top of that. Provisioned storage is raw times replication, plus overhead."
+      "feedback": "Right, and this is the case where the raw number is the answer. The provider handles redundancy inside the service and charges you per logical byte stored, so the ~20 dollars per TB-month already has the durability in it. Keep the multiplier for the metadata database, where 3 replicas really are 3 disks you pay for."
     },
     {
-      "label": "About 120 TB, since replication is 10x",
-      "feedback": "Replication is expensive but not that expensive. Standard durable replication is 3 copies, and erasure coding for cold blobs pulls the multiplier down toward 1.3x to 1.5x rather than up."
+      "label": "About 17 TB, raw plus erasure overhead",
+      "feedback": "Erasure coding is genuinely how an object store reaches eleven nines cheaply, but it happens inside the service and its overhead is already inside the per-TB rate. What you choose as a customer is the storage class, not the coding scheme."
     }
   ]
 }
 \`\`\`
 
-Two multipliers people forget, both of which change the answer materially:
+Two multipliers people get wrong, and they get them wrong in opposite directions:
 
-- **Replication factor.** Durable stores keep 3 copies (RF=3), so multiply raw storage by 3. Erasure
-  coding can bring this down to ~1.3x to 1.5x for cold blobs, a real cost lever worth naming.
+- **Replication factor, but only where you pay per replica.** A replicated database or a block-storage
+  volume costs you once per copy, so RF=3 triples that line: 4.5 TB of metadata rows becomes about
+  13.5 TB provisioned. Object storage is the exception that catches people out. S3-class services
+  replicate and erasure-code internally and bill for one logical copy, so multiplying a blob estimate
+  by 3 overstates the bill by 3x.
 - **Index and overhead.** Secondary indexes, B-tree overhead, and free space commonly add 20 to 50% on
   top of raw row size for databases.
 
-### Price the multiplier, because the price is what decides
+### Price the lever, because the price is what decides
 
 "Consider tiering" is not a judgement, it is a gesture at one. The judgement needs a number, so carry
 three approximate storage prices and say out loud that they are approximate: standard cloud object
@@ -1738,37 +1745,41 @@ in-memory cache roughly 5 dollars per GB-month, which is 5,000 dollars per TB-mo
 figures drift year to year and large customers negotiate them down, so hedge them. The ratios survive:
 memory is over 200x the price of object storage per byte, and archive is another 10x below standard.
 
-Run the replication lever on the 12 TB above:
+Every one of those prices is per logical TB stored rather than per copy, which is why the lever on
+blobs is the storage class and not the replication factor. Run it on the 12 TB above, assuming reads
+land on the newest 5 percent of the corpus and the rest can age onto an archive tier:
 
 \`\`\`
-raw payload                     12 TB
-RF=3, standard object store     36 TB x ~20 USD/TB-month  ~=   720 USD a month
-erasure coded at ~1.4x          17 TB x ~20 USD/TB-month  ~=   340 USD a month
-saving                                                    ~=   380 USD a month
+raw payload, billed once             12 TB
+all on standard object storage       12 TB x ~20 USD/TB-month     ~=   240 USD a month
+newest 5% standard, the rest archive 0.6 x ~20 + 11.4 x ~2        ~=    35 USD a month
+saving                                                            ~=   205 USD a month
 \`\`\`
 
 Now run the identical lever on the media service in the exercise below, 20 TB of new blobs a day held
 for five years:
 
 \`\`\`
-raw payload                    ~36 PB  (36,500 TB)
-RF=3, standard object store    ~110 PB x ~20 USD/TB-month ~=  2.2M USD a month
-erasure coded at ~1.4x          ~51 PB x ~20 USD/TB-month ~=  1.0M USD a month
-saving                                                    ~=  1.2M USD a month
+raw payload, billed once            ~36.5 PB  (36,500 TB)
+all on standard object storage       36,500 x ~20 USD/TB-month    ~=  730k USD a month
+newest 5% standard, the rest archive 1,825 x ~20 + 34,675 x ~2    ~=  106k USD a month
+saving                                                            ~=  624k USD a month
 \`\`\`
 
-Same lever, same percentage saved, opposite decisions. At 12 TB the whole argument is worth 380
+Same lever, the same 85 percent saved, opposite decisions. At 12 TB the whole argument is worth 205
 dollars a month, less than an afternoon of your time, so tiering is a footnote and spending three
-interview minutes on it is a mistake. At 36 PB it is over a million dollars a month, which is a
-headcount, and a candidate who never raises it has walked past the dominant line item in their own
+interview minutes on it is a mistake. At 36.5 PB it is over 600,000 dollars a month, about 7.5 million
+a year, and a candidate who never raises it has walked past the dominant line item in their own
 design. Magnitude, not principle, decides whether a cost lever is worth naming.
 
-Name the catch beside the saving, or the number is only half an argument. Erasure coding rebuilds a
-lost shard by reading the surviving shards, so a failure costs read bandwidth and CPU instead of a
-straight copy, which suits cold blobs that are rarely read and suits a hot tier badly. Archive tiers
-cut the bill by that further 10x and charge for it in restore time of minutes to hours, per-GB
-retrieval fees, and a minimum storage duration. That is why the answer is tier by age rather than move
-everything: the bytes you are still reading stay where reads are cheap.
+Name the catch beside the saving, or the number is only half an argument. Archive tiers buy that 10x
+and charge for it in restore time of minutes to hours, per-GB retrieval fees, and a minimum storage
+duration that makes an early delete cost about what keeping the bytes would have. That is why the
+answer is tier by age rather than move everything: the bytes you are still reading stay where reads
+are cheap. The durability half of the trade has already been made for you here. Inside the object
+store the provider is erasure coding, storing parity shards instead of whole copies, which is how
+eleven nines arrives at the price of one logical copy; replication factor becomes your lever again the
+moment you run the storage yourself, on block storage or in a database.
 
 ### Bandwidth: ingress and egress separately
 
@@ -1930,7 +1941,7 @@ total storage pulled from thin air.
     [
       "Storage",
       "Raw payload",
-      "Times the replication factor",
+      "Times RF where you pay per replica",
       "Plus index and B-tree overhead",
       "Provisioned storage"
     ],
@@ -1949,12 +1960,13 @@ total storage pulled from thin air.
 }
 \`\`\`
 
-Recap: size storage as objects x size x retention with metadata and blobs kept separate, multiply by
-replication factor and add index overhead, compute ingress and egress bandwidth separately (egress
-drives CDN), and size the cache from the hot ~20% of the actively read window against a target hit
-rate. Then price it at roughly 20 dollars per TB-month for object storage and 5 dollars per GB-month
-for cache memory, because the same tiering lever is a footnote at 12 TB and over a million dollars a
-month at 36 PB.
+Recap: size storage as objects x size x retention with metadata and blobs kept separate, multiply the
+database line by replication factor and add index overhead while leaving the object-store line at one
+logical copy, compute ingress and egress bandwidth separately (egress drives CDN), and size the cache
+from the hot ~20% of the actively read window against a target hit rate. Then price it at roughly 20
+dollars per TB-month for standard object storage, 1 to 4 for an archive tier, and 5 dollars per
+GB-month for cache memory, because the same tiering lever is a footnote at 12 TB and over 600,000
+dollars a month at 36.5 PB.
 
 \`\`\`cswidget
 {
@@ -1990,10 +2002,10 @@ month at 36 PB.
     {
       "label": "Five-year-old blobs almost nobody opens",
       "bucket": "Object store",
-      "feedback": "Cold blobs stay in the object store, ideally erasure coded at roughly 1.4x instead of RF=3, a real cost lever worth naming."
+      "feedback": "Cold blobs stay in the object store, and the lever on them is the storage class: age them onto an archive tier at roughly a tenth the standard price. Replication factor is not the lever here, because the object store bills one logical copy either way."
     }
   ],
-  "reveal": "In the design write, run the whole chain: objects x size x retention with metadata and blobs kept separate, multiply by replication and add index overhead, compute ingress and egress separately (egress is the CDN signal), then size the cache from the hot fraction against a target hit rate."
+  "reveal": "In the design write, run the whole chain: objects x size x retention with metadata and blobs kept separate, multiply the metadata line by replication and add index overhead while the blob line stays at one logical copy, compute ingress and egress separately (egress is the CDN signal), then size the cache from the hot fraction against a target hit rate."
 }
 \`\`\`
 `.trim()
@@ -2735,9 +2747,10 @@ makes you sound like someone who has run systems in production, not just drawn t
 
 "Cost driver" means the line item that dominates the bill, so the answer is a ranking with a winner,
 not a list of things that cost money. Three candidates take that top spot almost every time: bytes
-that leave your network (egress), bytes you keep forever (raw x retention x replication factor), and
-memory or GPUs held hot so a request can be answered fast. Application compute is rarely the winner,
-and neither is the component you were proudest of drawing.
+that leave your network (egress), bytes you keep forever (raw x retention, times a replication factor
+only on the stores you provision per replica), and memory or GPUs held hot so a request can be
+answered fast. Application compute is rarely the winner, and neither is the component you were
+proudest of drawing.
 
 Rank the photo feed from the exercise below, using the approximate prices from the storage lesson and
 saying out loud that they are approximate: about 20 dollars per TB-month for standard object storage,
@@ -2745,8 +2758,8 @@ about 2 for an archive tier, about 5 dollars per GB-month for cache memory, and 
 TB of CDN egress at negotiated volume.
 
 \`\`\`
-blob storage  100M new photos/day x 2 MB      = 200 TB/day, ~73 PB raw after a year
-              at RF=3, ~20 USD/TB-month       = ~4.4M USD a month, +360k each further month
+blob storage  100M new photos/day x 2 MB      = 200 TB/day, ~73 PB after a year
+              billed once, ~20 USD/TB-month   = ~1.5M USD a month, +120k each further month
 CDN egress    500M users x 50 views/day x 150 KB
               = ~110 PB/month, ~10 USD/TB     = ~1.1M USD a month
 feed cache    500M feeds x 200 entries x ~64 B
@@ -2755,16 +2768,18 @@ feed cache    500M feeds x 200 entries x ~64 B
 
 That ranking changes what you say in the last two minutes. Trimming precomputed feeds from 200 posts
 to 100, the change you can actually see on your own diagram, saves about 16,000 dollars a month
-against a bill near 5.5 million: a rounding error, and proposing it signals you optimized whatever you
+against a bill near 2.6 million: a rounding error, and proposing it signals you optimized whatever you
 happened to draw. Ageing blobs past 90 days onto an archive tier attacks the top line instead, and
 since about three quarters of a year-old corpus is already older than 90 days, it moves most of that
-4.4 million into a tier costing roughly a tenth as much, paid for in restore latency on the rare old
+1.5 million into a tier costing roughly a tenth as much, paid for in restore latency on the rare old
 photo. Name the line you are attacking and roughly what it is worth, and the cost item stops being a
 checklist word.
 
+Notice how close the top two are: storage leads egress by only about a third here, so this is a
+ranking you state rather than assume, and a year of different traffic assumptions would reorder it.
 The storage line is also the only one of the three that grows while traffic is flat, which is what
 makes retention a design decision rather than an ops setting. Nobody has to use the product any more
-than they already do for that extra 360,000 dollars a month to arrive.
+than they already do for that extra 120,000 dollars a month to arrive.
 
 **Interview nuance:** the wrap-up is where you volunteer what you did not have time to cover. "I did
 not address abuse or rate limiting; at this scale I would put that behind the gateway as the next
@@ -4107,9 +4122,9 @@ export const systemDesignLevel0: DesignLevel = {
               "Where do thumbnails and metadata live, and how much smaller is metadata than the blobs?",
             ],
             modelAnswerOutline: [
-              "Assumptions: 500M DAU, 2 uploads/day and 50 views/day per user, 2 MB per stored photo (post-compression, before thumbnails), 3x peak multiplier, replication factor 3.",
+              "Assumptions: 500M DAU, 2 uploads/day and 50 views/day per user, 2 MB per stored photo (post-compression, before thumbnails), 3x peak multiplier, and blobs in an S3-class object store, which bills one logical copy.",
               "**QPS.** Uploads/day = 500M x 2 = 10^9; views/day = 2.5 x 10^10. Dividing by ~10^5 s/day: avg upload QPS ~10,000 and avg view QPS ~250,000; with a 3x peak, ~30k peak upload QPS and ~750k peak view QPS. The 25:1 read:write skew screams CDN plus object store, not database-served images.",
-              "**Storage.** New photos/day = 10^9 at 2 MB each = 2 PB/day of raw blobs; with RF=3 about 6 PB/day provisioned, plus 10 to 20% for thumbnails. Over a year the blob footprint is on the order of an exabyte.",
+              "**Storage.** New photos/day = 10^9 at 2 MB each = 2 PB/day of blobs, plus 10 to 20% for thumbnails, so call it 2.2 to 2.4 PB/day. No replication multiplier belongs on this line: the object store replicates internally and charges for one logical copy, which is the opposite of the metadata database, where 3 replicas are 3 disks you rent. Over a year the blob footprint is on the order of an exabyte.",
               "That single number forces the storage choice: photos must live in an object store (S3-class) fronted by a CDN, with only compact metadata (photo id, owner, S3 key, timestamps, ~1 KB/photo, so ~1 TB/day) in a sharded database. You cannot put multi-petabyte-per-day blobs in Postgres.",
               "**Serving implications:** 750k peak view QPS is served almost entirely from the CDN edge, so origin QPS is a small fraction. 30k peak upload QPS goes through an ingest tier that writes blobs to the object store and enqueues thumbnail generation (Kafka or SQS plus workers). Metadata writes at 30k QPS need sharding by photo id or user id.",
               "Common wrong turn: sizing a database to hold the images themselves, or forgetting that egress at this view volume is a CDN and bandwidth-cost problem, not a database problem.",
@@ -4170,7 +4185,7 @@ export const systemDesignLevel0: DesignLevel = {
           id: "sd-l0-storage-bandwidth-cache",
           title: "Storage, Bandwidth & Cache Sizing",
           summary:
-            "Size storage with replication and overhead multipliers, compute ingress and egress separately, and size the cache from the hot working set.",
+            "Size storage with the multipliers that actually apply, compute ingress and egress separately, and size the cache from the hot working set.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["estimation", "storage", "cache"],
@@ -4185,15 +4200,15 @@ export const systemDesignLevel0: DesignLevel = {
             thinkAbout: [
               "How do you separate metadata size from blob size in the storage estimate?",
               "What working-set fraction belongs in the hot cache tier?",
-              "How does replication factor multiply your storage number?",
+              "Which of your two stores pays a replication multiplier, and which is billed for one logical copy?",
             ],
             modelAnswerOutline: [
-              "Assumptions: 10M new media objects/day, average blob 2 MB, metadata ~1 KB/object, 5-year retention (~1,825 days), replication factor 3 for blobs, and RF 3 plus ~30% index overhead for metadata.",
-              "**Blob storage.** 10^7 objects/day x 2 MB = 20 TB/day of raw blobs. Over 5 years: ~36.5 PB raw; with RF=3 about 110 PB provisioned. Tier it: recent data on RF=3, archival on erasure coding (~1.4x instead of 3x) to cut the older tail's cost. Blobs live in an object store (S3-class), never in the database.",
-              "**Metadata storage.** 10^7 objects/day x 1 KB = 10 GB/day. Over 5 years: ~18 TB raw; with RF=3 and ~30% index overhead about 70 TB, in a sharded database (DynamoDB or sharded Postgres/Cassandra) sharded by object id. Note the 1000x gap between blobs (110 PB) and metadata (70 TB): keeping them separate is what keeps the database tractable.",
-              "**Cache tier.** Cache the hot working set, not 36 PB. The hot set is dominated by recency and virality: the last few days of uploads plus trending older items. Put a modest hot tier (a few hundred GB to a few TB of the hottest objects plus all hot metadata) in Redis, and rely primarily on a CDN for blob egress. The CDN edge cache, sized to the hot ~20% by request volume, is what actually absorbs read traffic; the origin cache handles metadata and cache-miss coalescing.",
-              "**What lives where:** hot metadata and hottest blobs in cache; recent blobs on RF=3 object store behind a CDN; archival blobs on erasure-coded cold storage; all metadata in the sharded DB.",
-              "Common wrong turn: forgetting the RF=3 multiplier (understating storage 3x), lumping blobs into the database, or sizing the cache as a fixed fraction of 36 PB rather than from the hot request distribution.",
+              "Assumptions: 10M new media objects/day, average blob 2 MB, metadata ~1 KB/object, 5-year retention (~1,825 days), blobs in an S3-class object store that bills one logical copy, and RF 3 plus ~30% index overhead for the metadata database.",
+              "**Blob storage.** 10^7 objects/day x 2 MB = 20 TB/day of blobs. Over 5 years: ~36.5 PB, and that is also the number you pay for, because the object store replicates and erasure-codes internally and charges per logical byte. Tier by age rather than by replication factor: the newest ~5% on standard at ~20 dollars per TB-month and the older tail on an archive class at ~2 takes the line from ~730k to ~106k a month. Blobs live in an object store (S3-class), never in the database.",
+              "**Metadata storage.** 10^7 objects/day x 1 KB = 10 GB/day. Over 5 years: ~18 TB raw; here the multiplier is real, so with RF 3 and ~30% index overhead about 70 TB provisioned, in a sharded database (DynamoDB or sharded Postgres/Cassandra) sharded by object id. Note the roughly 500x gap between blobs (36.5 PB) and metadata (70 TB), and note that the multiplier sits on the small line and not the big one: keeping the two separate is what keeps the database tractable.",
+              "**Cache tier.** Cache the hot working set, not 36.5 PB. The hot set is dominated by recency and virality: the last few days of uploads plus trending older items. Put a modest hot tier (a few hundred GB to a few TB of the hottest objects plus all hot metadata) in Redis, and rely primarily on a CDN for blob egress. The CDN edge cache, sized to the hot ~20% by request volume, is what actually absorbs read traffic; the origin cache handles metadata and cache-miss coalescing.",
+              "**What lives where:** hot metadata and hottest blobs in cache; recent blobs on standard object storage behind a CDN; the older tail on an archive class of the same object store; all metadata in the sharded DB at RF 3.",
+              "Common wrong turn: applying RF=3 to the object-store line (overstating that bill 3x) or dropping it from the metadata line, lumping blobs into the database, or sizing the cache as a fixed fraction of 36.5 PB rather than from the hot request distribution.",
             ],
           },
           practice: {
@@ -4207,7 +4222,7 @@ export const systemDesignLevel0: DesignLevel = {
             ],
             modelAnswerOutline: [
               "Assumptions: 250M subscribers, 2 hours/day each, 5 Mbps average delivered bitrate, catalog 100k titles x 15 GB/title across encodings, and a ~1.2x peak multiplier on concurrent viewing, below the usual 2x to 3x band because the subscriber base spans time zones and flattens the global concurrency curve.",
-              "**Catalog storage.** 100k x 15 GB = 1.5 PB raw; with RF=3 plus geo-distribution a few PB. A fixed, modest number: the catalog is small and mostly static. Storage is not the hard problem.",
+              "**Catalog storage.** 100k x 15 GB = 1.5 PB, billed once in the object store rather than multiplied by a replication factor. The multiplier that is real here is geo-distribution: every regional cache or edge appliance that holds a copy pays for that copy again, which is what takes the served footprint to a few PB. Either way it is a fixed, modest number: the catalog is small and mostly static. Storage is not the hard problem.",
               "**Egress bandwidth is the real problem.** Bandwidth is about concurrency, not daily totals: 250M x 2 h / 24 h = ~21M average concurrent streams, about 8% of subscribers. Applying the 1.2x peak multiplier gives ~25M concurrent streams at peak, roughly 10% of subscribers, x 5 Mbps = 125 Tbps of peak egress. That number is the entire design constraint. You cannot serve 125 Tbps from central origins; it must come from a CDN deployed deep into ISP networks (Netflix's Open Connect model), caching popular titles inside or adjacent to ISPs.",
               "**Cache/CDN tier.** Apply the 80/20 rule hard: a small fraction of titles (new releases, trending shows) drives the overwhelming majority of streams. Each edge appliance caches the hot terabytes (a few thousand popular titles) and serves them locally; misses fall back to regional caches then origin. Because the catalog is only ~1.5 PB, a full copy fits in a regional cache. Fill happens off-peak overnight.",
               "**Verdict:** not storage (1.5 PB is small), not control-plane QPS (playback starts are modest), but sustained peak egress at 125 Tbps, which forces a purpose-built edge CDN rather than a centralized serving tier.",
