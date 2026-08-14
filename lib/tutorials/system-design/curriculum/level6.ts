@@ -3129,6 +3129,113 @@ The primary health signal for a stream is **consumer lag**: the gap between the 
 
 Two formulas earn the offer. Partitions come from throughput: \`partitions ~= target throughput / per-partition throughput\`. If a partition sustains about 10 MB/s and you need 1M msg/s at 1 KB each (1 GB/s), that is roughly 100 partitions before you add headroom for consumer parallelism and skew (call it 150 to 200). Storage is \`rate x message size x retention x replication factor\`. At 1 GB/s, 7-day retention, replication 3: 1 GB/s x 604,800 s x 3 is on the order of 1.8 PB, so retention and replication, not raw ingest, dominate the disk bill. Network egress multiplies by fan-out: every consumer group re-reads the stream.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Partitions from throughput, storage from retention",
+  "predictPrompt": {
+    "question": "You ingest 1 GB/s, keep it 7 days, and replicate it 3 times. Which term dominates the disk bill?",
+    "options": [
+      "The raw ingest rate",
+      "Retention multiplied by replication factor",
+      "The partition count"
+    ]
+  },
+  "workedExample": "Read the initial values before you move anything. One million messages per second at 1 KB each is 1,000 MB/s, which is the 1 GB/s the lesson quotes. At 10 MB/s per partition that is 100 partitions, which is the floor before you add headroom for consumer parallelism and skew, so you would provision 150 to 200. A single day of that ingest is 86.4 TB. Now read the last two lines together: holding those 86.4 TB per day for 7 days and storing every byte 3 times is about 1.8 PB, a 21x multiplier on one day of raw ingest. The ingest slider moves both numbers together; retention and replication move only the bill. That is why retention and replication, not raw ingest, dominate the disk cost, and why raising replication factor to 5 for comfort is a 67 percent storage increase you should say out loud.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "msgs_per_sec",
+      "label": "Messages per second",
+      "min": 10000,
+      "max": 10000000,
+      "scale": "log",
+      "initial": 1000000,
+      "unit": "msg/s"
+    },
+    {
+      "kind": "slider",
+      "id": "msg_kb",
+      "label": "Average message size",
+      "min": 0.1,
+      "max": 10,
+      "step": 0.1,
+      "initial": 1,
+      "unit": "KB"
+    },
+    {
+      "kind": "slider",
+      "id": "partition_mbs",
+      "label": "Per-partition throughput",
+      "min": 2,
+      "max": 40,
+      "step": 1,
+      "initial": 10,
+      "unit": "MB/s"
+    },
+    {
+      "kind": "slider",
+      "id": "retention_days",
+      "label": "Retention",
+      "min": 1,
+      "max": 30,
+      "step": 1,
+      "initial": 7,
+      "unit": "days"
+    },
+    {
+      "kind": "slider",
+      "id": "rf",
+      "label": "Replication factor",
+      "min": 1,
+      "max": 5,
+      "step": 1,
+      "initial": 3,
+      "unit": "copies"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "throughput_mb",
+      "label": "Ingest throughput",
+      "expr": "msgs_per_sec * msg_kb / 1000",
+      "format": "number",
+      "unit": "MB/s"
+    },
+    {
+      "id": "partitions",
+      "label": "Partitions before headroom",
+      "expr": "ceil(throughput_mb / partition_mbs)",
+      "format": "number",
+      "unit": "partitions"
+    },
+    {
+      "id": "ingest_per_day",
+      "label": "One day of raw ingest",
+      "expr": "throughput_mb * 1000000 * 86400",
+      "format": "bytes"
+    },
+    {
+      "id": "storage_total",
+      "label": "Stored bytes on disk",
+      "expr": "ingest_per_day * retention_days * rf",
+      "format": "bytes",
+      "sparkline": {
+        "over": "retention_days"
+      }
+    },
+    {
+      "id": "multiplier",
+      "label": "Disk bill over one day of ingest",
+      "expr": "retention_days * rf",
+      "format": "number",
+      "unit": "x"
+    }
+  ],
+  "caption": "Two formulas that earn the offer. Partitions come from throughput divided by per-partition throughput; storage is rate times size times retention times replication factor. Watch the last line: the ingest slider is not what makes the number large."
+}
+\`\`\`
+
 **Interview nuance:** the wrong turn is claiming durability from replication alone while leaving \`acks=1\` or unclean election on, or having no lag metric and no trace across the async boundary so failures are invisible. Name the three durability knobs together, name lag as the SLO, and show the two capacity formulas.
 
 **Recap:** prevent acknowledged loss with rack-aware RF3 plus \`acks=all\` plus \`min.insync.replicas=2\` and clean leader election; make consumer lag the primary SLO alongside under-replicated partitions, DLQ depth, and end-to-end tracing; size partitions from throughput and storage from rate times size times retention times replication.
