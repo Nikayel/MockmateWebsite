@@ -30,7 +30,7 @@ shows it working, so the learner recognises the word without being able to use i
 | L0 | Interview method | 15 | 6 | 2 |
 | L1 | Foundations | 21 | 9 | 5 |
 | L2 | Data & storage | 17 | 4 | 10 |
-| L3 | Scaling data | 16 | 0 (unaudited, see below) | 0 |
+| L3 | Scaling data | 16 | 6 (re-audited) | 8 (re-audited) |
 | L4 | Scaling compute | 14 | 2 | 1 |
 | L5 | Distributed core | 18 | 4 | 2 |
 | L6 | Event driven | 15 | 4 | 4 |
@@ -41,15 +41,34 @@ shows it working, so the learner recognises the word without being able to use i
 | L11 | Specialized systems | 15 | 5 | 1 |
 | | **Total** | **208** | **50** | **33** |
 
-Level 3 returned zero gaps, and **that number is wrong**. Spot-checking it found a gap on the first
-lesson tried: `sd-l3-geospatial-indexing`'s model answer ends with "an exact haversine distance
-filter and sort on the candidates", and `haversine` appears exactly once in the entire 4,900-line
-level file, in that sentence. The teach demonstrates geohash thoroughly (17 mentions) and quadtrees
-(8), then reaches for a named formula it never introduces. Friction at least.
+Level 3 originally returned zero gaps, and **that number was wrong**. Spot-checking it found a gap on
+the first lesson tried: `sd-l3-geospatial-indexing`'s model answer ends with "an exact haversine
+distance filter and sort on the candidates", and `haversine` appears exactly once in the entire
+4,900-line level file, in that sentence.
 
-So treat L3 as **unaudited**, not clean, and re-run it before the repair pass. This is the reason
-CLAUDE.md says to verify agent reports rather than relay them: a confidently empty result reads
-exactly like a clean one.
+**A full re-audit then found 14 gaps across 10 of the 16 lessons, 6 blocking and 8 friction.** Zero
+was not a near miss. Among them: `sd-l3-cdc-dual-write` routes poison events to a dead-letter queue in
+BOTH its apply and practice answers while the teach never mentions a permanently-failing event or
+head-of-line blocking; `sd-l3-vector-hybrid-search` instructs the learner to "chunk articles into
+passages" while the teach operates entirely at document granularity and never uses the word;
+`sd-l3-replication-topologies` requires OR-Set merge semantics whose entire treatment in the teach is
+one prose bullet with no merge shown.
+
+The re-audit also did something the first pass did not, and it is the more useful half: it separated
+**sequencing defects** from absences. Three L3 lessons reach for a concept taught two lessons later in
+the same module (stampede guards, hot-key shard saturation, sub-partitioning with a bucket suffix).
+Those reorder rather than rewrite. It also listed what it CLEARED and why, so the negative results are
+checkable: Snowflake IDs, LSM tombstones, Zipfian working sets and hot/warm/cold tiering are all
+taught in earlier levels, and "through-line" and "audit-grade" are English rather than terms.
+
+One nuance it added that corrects the spot check above: on haversine, the SUBSTANCE is reachable. The
+teach says "distance on a sphere is not Euclidean" and twice says "a final exact-distance filter and
+sort on the small candidate set". Only the named formula is missing, so the repair is to name it where
+the teach already describes it, not to write the concept from scratch.
+
+The lesson for the method: **a confidently empty agent result reads exactly like a clean one.** This
+is why CLAUDE.md says to verify agent reports rather than relay them. A zero from one reader in a
+fleet of twelve deserves a second reader before it is believed.
 
 Three other findings were spot-checked and held. `sd-l0-nonfunctional-requirements` needing
 idempotency keys: confirmed, `nonfunctionalRequirementsTeach` spans lines 495 to 741 and the first
