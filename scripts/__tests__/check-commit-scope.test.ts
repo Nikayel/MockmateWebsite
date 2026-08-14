@@ -120,6 +120,28 @@ describe("commit scope guard", () => {
     expect(runHook("lib/level7.ts:docs/").code).toBe(0)
   })
 
+  it("catches a file RENAMED out of a scope you do not own", () => {
+    // The hole an audit found: `--name-only` prints only the DESTINATION of a rename, so `git mv`
+    // from a sibling's path into your own passed the guard while deleting their file. Moving a file
+    // out of a path you do not own is exactly as destructive as editing it.
+    write("lib/theirs.ts", "not mine\n")
+    git("add lib/theirs.ts")
+    git("-c commit.gpgsign=false commit -q -m base")
+    git("mv lib/theirs.ts lib/mine.ts")
+    const { code, stderr } = runHook("lib/mine.ts")
+    expect(code).toBe(1)
+    expect(stderr).toContain("lib/theirs.ts")
+  })
+
+  it("allows a rename entirely inside the declared scope", () => {
+    // The other half: a directory scope owns both sides, so moving within it is legitimate.
+    write("lib/mine/a.ts", "mine\n")
+    git("add lib/mine/a.ts")
+    git("-c commit.gpgsign=false commit -q -m base")
+    git("mv lib/mine/a.ts lib/mine/b.ts")
+    expect(runHook("lib/mine/").code).toBe(0)
+  })
+
   it("catches a deletion outside the scope, not only an edit", () => {
     // `git add -A` sweeps deletions too, and a swept deletion is the most destructive version.
     write("lib/level5.ts", "mine\n")

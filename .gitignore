@@ -91,3 +91,7 @@ eslint-results.json
 # them before the fixes land. They are meant to be read by whoever is doing the work, on
 # the machine doing the work, and nowhere else. Keep them local.
 /NAIVETY-AUDIT-FIXES.md
+
+# Scratch pairing file kept locally. Untracked and NOT ignored until now, which with the
+# demonstrated git-add contamination made it one stray `git add -A` from being committed.
+learning.html

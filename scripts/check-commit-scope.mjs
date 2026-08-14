@@ -19,8 +19,6 @@
  * A rule in a prompt is a rule that drifts. This repo's own guidance is to enforce a convention with
  * a check that fails the build rather than a paragraph asking nicely.
  *
- * ## Opt-in by design
- *
  * ## Why the hook runs this twice
  *
  * Running it only BEFORE `lint-staged` is not enough, which we learned the same day it shipped. An
@@ -33,6 +31,8 @@
  *
  * The complete fix is upstream of both runs: commit a PATHSPEC (`git commit -- path`), which bypasses
  * the shared index entirely. This guard is the backstop for when someone forgets.
+ *
+ * ## Opt-in by design
  *
  * This is INERT unless `CS_COMMIT_SCOPE` is set, so an ordinary human commit is untouched and no
  * existing workflow changes. An agent given a file partition exports the scope it was assigned:
@@ -58,12 +58,26 @@ const patterns = scope
   .map((entry) => entry.trim())
   .filter(Boolean)
 
-/** Paths git is about to commit. Renames report both sides, which is what we want to check. */
+/**
+ * Every path git is about to commit, INCLUDING both sides of a rename.
+ *
+ * `--name-only` prints only the DESTINATION of an `R` entry, so `git mv` out of a sibling's
+ * directory into your own scope passed this guard while deleting their file. `--name-status` gives
+ * `R100\told\tnew`, and both sides have to be in scope for the commit to be honest: moving a file
+ * out of a path you do not own is exactly as destructive as editing it.
+ */
 function stagedPaths() {
-  const out = execSync("git diff --cached --name-only --diff-filter=ACMRTD", {
+  const out = execSync("git diff --cached --name-status --diff-filter=ACMRTD", {
     encoding: "utf8",
   })
-  return out.split("\n").map((line) => line.trim()).filter(Boolean)
+  const paths = []
+  for (const line of out.split("\n")) {
+    if (!line.trim()) continue
+    // "M\tpath" or "R100\told\tnew". Take every field after the status.
+    const [, ...rest] = line.split("\t")
+    for (const path of rest) if (path.trim()) paths.push(path.trim())
+  }
+  return paths
 }
 
 /** A directory pattern ends in "/" and matches anything beneath it; otherwise match exactly. */

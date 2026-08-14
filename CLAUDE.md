@@ -129,9 +129,11 @@ and declare the scope so the pre-commit guard can refuse a stray path:
     CS_COMMIT_SCOPE="lib/tutorials/system-design/curriculum/level7.ts" git -c commit.gpgsign=false commit ...
 
 `scripts/check-commit-scope.mjs` is that guard. It is inert unless `CS_COMMIT_SCOPE` is set, so human
-commits are unaffected, and it runs BEFORE `lint-staged` because `lint-staged` wraps the commit in
-`git stash`, which is itself hostile to concurrency and can restore a sibling's staging into the
-wrong commit.
+commits are unaffected, and it runs TWICE, before and after `lint-staged`. Both runs are needed: the
+first fails fast and cheap, and the second exists because `lint-staged` wraps the commit in
+`git stash` and can restore a sibling's in-flight staging into the index AFTER the first check has
+already passed. That happened the day the guard shipped (`e0a592ce`), to an agent that had staged
+exactly one path.
 
 When it fires, `git restore --staged <path>` the strays. Never `git checkout` them: that destroys a
 sibling's uncommitted work, which is unrecoverable. Content has survived every one of these
