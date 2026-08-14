@@ -1712,6 +1712,60 @@ and the resolver layer invites N+1 database calls unless you add DataLoader-styl
 }
 \`\`\`
 
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "What you are deciding",
+    "REST",
+    "gRPC",
+    "GraphQL"
+  ],
+  "rows": [
+    [
+      "The bet about the consumer",
+      "you do not control the clients",
+      "you own both ends of the call",
+      "many screens, one flexible backend"
+    ],
+    [
+      "On the wire",
+      "JSON over HTTP",
+      "Protobuf binary frames over HTTP/2, multiplexed",
+      "JSON, usually one POST to /graphql"
+    ],
+    [
+      "HTTP caching",
+      "free: Cache-Control, ETag, proxies, CDNs",
+      "none: a cache cannot see inside a binary POST",
+      "mostly lost: everything is a POST to one URL"
+    ],
+    [
+      "Debugging by hand",
+      "curl, a browser address bar, an OpenAPI doc",
+      "needs a generated stub or grpcurl",
+      "one endpoint, but you must write a query"
+    ],
+    [
+      "How much data comes back",
+      "the whole resource: over-fetch or under-fetch",
+      "exactly the declared message",
+      "exactly the fields the client asked for"
+    ],
+    [
+      "What it costs you",
+      "chattiness: three round trips for one mobile screen",
+      "browser support: grpc-web plus a proxy",
+      "query-cost and depth limits, and N+1 resolvers without batching"
+    ]
+  ],
+  "highlightCols": [
+    "What you are deciding"
+  ],
+  "caption": "Read the last row first. Naming what a paradigm costs is the senior answer; naming what it optimizes is the junior one. The first row is what actually decides it, which is why the same system usually runs REST or GraphQL at the edge and gRPC between its own services."
+}
+\`\`\`
+
 ### The real answer is usually hybrid
 
 Put REST or GraphQL at the edge where public or client-facing consumers live, and use gRPC between
