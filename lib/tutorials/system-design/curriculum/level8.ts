@@ -2152,7 +2152,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-auth-credentials",
           title: "Authentication Fundamentals & Credential Handling",
           summary:
-            "Hash passwords with a memory-hard KDF plus per-user salt (and a KMS pepper) so a DB dump is useless, layer MFA with SMS as the weak factor, harden account recovery because it is the real attack surface, and stop credential stuffing with breach checks and throttling while never revealing whether an account exists.",
+            "Why only a memory-hard KDF with a per-user salt survives a stolen user table, and why account recovery is the weaker door attackers actually use.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["authentication", "password-hashing", "mfa"],
@@ -2200,7 +2200,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-passkeys-webauthn",
           title: "Passwordless, Passkeys & WebAuthn/FIDO2",
           summary:
-            "Passkeys replace shared secrets with a device-held private key so the server stores only a useless-to-steal public key, origin binding makes them phishing-resistant where OTP and SMS are not, synced passkeys solve device loss for consumers while device-bound plus attestation suits enterprise, and you roll them out via progressive enrollment alongside passwords.",
+            "How passkeys end phishing by binding a device-held private key to one origin, and how to migrate password users across without locking anyone out.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["passkeys", "webauthn", "fido2"],
@@ -2248,7 +2248,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-oauth-oidc",
           title: "OAuth 2.1 & OpenID Connect",
           summary:
-            "OAuth authorizes and OIDC (ID token) authenticates, OAuth 2.1 makes Authorization Code + PKCE mandatory and deletes implicit and password grants, you pick auth-code+PKCE for user apps, client-credentials for M2M, and device flow for TVs/CLIs, and you harden tokens with scopes, audience, state/nonce, and optionally DPoP/mTLS.",
+            "OAuth authorizes, OIDC authenticates: how to pick the right OAuth 2.1 grant for web, mobile, machine-to-machine and input-constrained device clients.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["oauth", "oidc", "sso"],
@@ -2296,7 +2296,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-sessions-tokens",
           title: "Sessions, Tokens & Token Lifecycle",
           summary:
-            "Pick opaque sessions when instant revocation matters and stateless JWTs when cross-service scale matters, then use the hybrid (short JWT + revocable refresh token) with rotation and reuse detection to kill stolen tokens, keep tokens in HttpOnly/Secure/SameSite cookies or a BFF (never localStorage), and validate JWTs strictly.",
+            "Why a stateless JWT cannot be un-issued, and how a short access token plus a rotating refresh token with reuse detection buys revocation back.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["sessions", "jwt", "tokens"],
@@ -2353,7 +2353,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-authz-rbac-rebac",
           title: "Authorization Models: RBAC, ABAC & ReBAC",
           summary:
-            "Use RBAC for coarse org roles, ReBAC/Zanzibar (relation tuples, graph checks, reverse indexes via OpenFGA/SpiceDB) when permissions are per-object with sharing and nesting; split PDP from PEP, deny by default and fail closed, and enforce a per-object check on every request to kill IDOR.",
+            "When RBAC hits role explosion and Zanzibar-style relation tuples take over, and why a per-object check on every request is what actually kills IDOR.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["authz", "rebac", "zanzibar"],
@@ -2402,7 +2402,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-multi-tenancy",
           title: "Multi-Tenancy Isolation Models",
           summary:
-            "Choose silo/pool/bridge per the cost-versus-isolation tradeoff (tier it: pool SMB, silo regulated); resolve tenant context from a trusted source on every request and propagate tenant_id everywhere; enforce at the data layer with Postgres RLS or per-tenant keys/routing; add per-tenant quotas for noisy neighbors; and hunt the non-obvious leaks in caches, search indexes, async jobs, ids, and logs.",
+            "Silo, pool or bridge: what tenant isolation really costs, and why cross-tenant leaks hide in cache keys, search indexes and background job payloads.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["multi-tenancy", "isolation", "rls"],
