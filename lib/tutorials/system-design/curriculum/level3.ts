@@ -3980,19 +3980,70 @@ export const systemDesignLevel3: DesignLevel = {
           practice: {
             id: "sd-l3-replication-lag-session-practice",
             prompt:
-              "Design the session-consistency layer for Twitter/X-style posting and timeline reads at 400k read QPS off async replicas, where a user posts from their phone and immediately opens the same account on their laptop, and neither device may ever show the tweet as missing.",
+              "Review the proposed session-consistency design below, written for Twitter/X-style posting and timeline reads at 400k read QPS off async replicas. The team's stated requirement is that a user who posts from their phone and immediately opens the same account on their laptop never sees the post as missing. Name every user-visible guarantee this design fails to deliver, say which session guarantee each one violates and which line of the design admits it, and finish by saying which of its decisions you would keep.",
             thinkAbout: [
-              "Why does sticky-to-primary routing fail the phone-then-laptop case?",
-              "Where must the version token live so any device can honor it?",
-              "What fraction of reads actually pay a wait, and why is that fraction small?",
+              "Where does the version token live, and which of the two devices in the user story can read it?",
+              "The stored token only advances when the user writes. What happens to a session that spends an hour only reading?",
+              "Every shard has its own leader and its own LSN sequence. What does one scalar token mean to a replica of a different shard?",
+              "Which parts of this are load-bearing and correct, and what do they cost the leader at peak?",
             ],
+            supplied: {
+              label: "Proposed session-consistency design",
+              body: `Timeline service, revision 3. Single-leader Postgres per shard, 24 async replicas per shard serving 400k timeline read QPS.
+
+**Write path.** A post commits on its shard leader. The leader returns the commit LSN, and the API stores that LSN in the caller's session record in Redis, keyed by the session cookie issued at sign-in.
+
+**Read path.** Every timeline read carries the session cookie. The router reads the session's stored LSN and serves the read from any replica whose reported applied LSN is at or past it. Replicas heartbeat their applied LSN to the router every 200ms. If no replica qualifies within 50ms, the read falls back to the shard leader.
+
+**Replica selection.** Among the replicas that qualify, the router picks round-robin so load stays even across the fleet.
+
+**Sticky window.** For 15 seconds after a post, that session's reads skip the replica pool entirely and go to the leader, so the author sees their own post while the LSN propagates.
+
+**Lag control.** A replica whose applied LSN falls more than 10 seconds behind its leader is ejected from the pool and rejoins once it catches up. Measured lag on healthy replicas during the evening write peak is 400ms at p50 and 9s at p99.
+
+**Explicitly not doing.** No consensus reads and no synchronous replication. The timeline does not need a global real-time order, and paying a leader round trip on 400k QPS was costed and rejected.`,
+            },
             modelAnswerOutline: [
-              "Assumptions: single-leader-per-shard writes with a large async replica fleet serving 400k timeline QPS. The hard requirement is cross-device read-your-writes: post on phone, open laptop (different session, likely different replica), and the tweet must be present. Sticky-to-primary routing fails because the laptop is a different session, and pinning 400k QPS to primaries would collapse the read tier.",
-              "**Design: account-scoped version tokens.** On a successful post, the write path returns a version token (the shard's commit LSN or a global logical timestamp from an HLC-style clock). Persist the token against the user account, not the browser session, in a fast store (Redis keyed by user id, or the auth/session record). Any device for that user fetches the latest token on its next timeline read and includes it.",
-              "**The read router** selects a replica whose applied position is >= the token, or briefly waits for one, or falls back to the primary only for that specific user's request. Because the token is account-scoped, the laptop honors the phone's write, delivering cross-device read-your-writes without pinning the fleet.",
-              "**Scaling it:** the token check is a cheap comparison against replica-reported LSNs (replicas heartbeat their applied position to the router). The vast majority of the 400k QPS carry a token already satisfied by most replicas (lag is normally sub-second), so they route normally with no wait; only reads whose token is newer than a candidate replica pay a small wait or a primary fallback: a tiny fraction. Keep the user's high-water token advancing for monotonic reads so the timeline never regresses across refreshes.",
-              "**The tradeoff:** one small per-user token write on the hot post path and a token comparison on reads buys cross-device correctness, instead of buying it with primary reads (does not scale) or global linearizability (unnecessary).",
-              "Common wrong turn: relying on sticky sessions, which silently works in single-device testing and then shows the missing-tweet bug the instant the user switches devices.",
+              "**Start with what is right, because it is load-bearing.** Refusing consensus reads and synchronous replication is the correct call: the requirement is that each user sees their own post, which is read-your-writes, strictly weaker and far cheaper than a global real-time order. Having the leader return its commit LSN, ejecting a replica once it drifts 10 seconds behind, and the 50ms wait with a leader fallback are all worth keeping.",
+              "**Read-your-writes here is single-device only, which is the one case the requirement names.** The commit LSN goes into the session record in Redis keyed by the session cookie issued at sign-in. The phone and the laptop are two cookies and therefore two session records, so the laptop's read carries no token, qualifies against every replica in the pool, and can be served by one sitting 9s behind at p99. Key the token by user id so it travels with the account, and have each device fetch the account's newest token on its next timeline read.",
+              "**Nothing in the design delivers monotonic reads.** The stored LSN advances only on a write, so a session that is only reading holds a token every replica already satisfies. Round-robin among qualifying replicas then moves that user between a replica at 400ms and one at 9s from one refresh to the next, and the timeline goes backwards: a post appears, vanishes, reappears. Advance the token to the newest position the user has actually been served and refuse any replica behind that high-water mark, or pin the session to one replica by hashing the user id.",
+              "**One scalar LSN cannot cover a fan-out read.** Leaders are per shard in this Postgres topology, so a commit position from the author's shard is not comparable to the applied LSN of a replica on any other shard. As written the router either compares positions from different sequences or applies the author's token to shards the user never wrote to. Carry a per-shard map of tokens, or move to a global logical clock (an HLC-style timestamp) so one value is comparable everywhere.",
+              "**The 15-second sticky window buys less than it costs.** Once the token is account-scoped it already guarantees read-your-writes, so the window is a second mechanism for the same guarantee that routes a poster's reads to the leader whether or not a replica has caught up. Heavy posters are exactly the users generating the most reads, so at 400k QPS this is avoidable leader load. The token comparison plus the existing leader fallback pays the leader only when no replica qualifies.",
+              "**The summary an interviewer wants:** the design bought the right guarantee with the right primitive and then scoped it to the wrong key. Account-scope the token, add a high-water mark for monotonic reads, make the token per shard, and the sticky window can go.",
+            ],
+            rubric: [
+              {
+                name: "Cross-device read-your-writes",
+                weak: "Reads the session cookie as if it identified the user, so the laptop's read is never traced through the router.",
+                adequate:
+                  "Notes that the token lives in the session record and that a second device will not have it, without saying what to key it by instead.",
+                strong:
+                  "Traces the phone post and the laptop read through the Redis session record and re-keys the token to the user account so any device honours it.",
+              },
+              {
+                name: "Monotonic reads",
+                weak: "Never raises the flicker, and treats round-robin selection as a load-balancing detail with no correctness content.",
+                adequate:
+                  "Says round-robin can move a user between replicas of different lag, but leaves the token advancing only on writes.",
+                strong:
+                  "Connects the write-only token advance to the 400ms and 9s replica spread, then adds a high-water mark or pins the session to one replica.",
+              },
+              {
+                name: "Grounding in the supplied design",
+                weak: "Argues about session guarantees in the abstract without citing a line, number or component from the design under review.",
+                adequate:
+                  "Cites one or two elements, usually the 15-second sticky window, and leaves the rest of the write and read paths unexamined.",
+                strong:
+                  "Walks both paths as written, naming the Redis session record, the 200ms heartbeat, the 50ms wait and the 10-second ejection threshold.",
+              },
+              {
+                name: "What is kept, and what it costs",
+                weak: "Reads as a list of faults, with nothing in the design marked as correct and nothing priced.",
+                adequate:
+                  "Agrees the design was right to skip synchronous replication, but attaches no cost to anything it keeps or removes.",
+                strong:
+                  "Keeps the refusal of consensus reads and the lag-based ejection, and prices the extra leader load the sticky window adds at peak.",
+              },
             ],
           },
         },
@@ -4242,19 +4293,70 @@ export const systemDesignLevel3: DesignLevel = {
           practice: {
             id: "sd-l3-caching-patterns-practice",
             prompt:
-              "Design the caching strategy for Amazon's product detail page during a Prime Day spike where a small set of doorbuster SKUs draws 500K reads/sec while their price and inventory change every few seconds. Explain how you keep the displayed price correct while surviving the read volume, and lead with the concrete cache topology.",
+              "Review the caching design below, written for a Prime-Day-style product detail page where a few hundred doorbuster SKUs draw 500K reads/sec while their price changes every few seconds. Name the write policy each part of it is actually using, say what each one costs when a Redis node dies four seconds into a flush interval, and finish by naming the choices you would keep unchanged.",
             thinkAbout: [
-              "Why does the hottest tier of the cache need to live in-process rather than in Redis?",
-              "Where is the authoritative price actually enforced, and why is display staleness acceptable?",
-              "What stops each 1-second expiry from stampeding the pricing service?",
+              "Which write policy is the price path using, and what class of data is that policy meant for?",
+              "A Redis node dies four seconds into a flush interval. What does checkout bind its prices to afterwards?",
+              "Two price changes for one SKU reach two app servers in opposite orders. What is on the page until the TTL turns over?",
+              "The static fragments use a different write policy from the price path. Which of the two suits a price?",
             ],
+            supplied: {
+              label: "Proposed caching design",
+              body: `Product detail page, sale build. About 200 doorbuster SKUs draw 500K reads/sec for the length of the event. Their price changes every few seconds while the pricing team cuts prices in bulk.
+
+**Tier 1.** An in-process near cache on every app server holds the doorbuster set. Entries are seeded at sale start and given a flat 1s TTL. Roughly 95 percent of page reads are served from here with no network hop.
+
+**Tier 2.** A shared Redis cluster behind L1 holds the rest of the catalog. Static fragments (title, description, images) get a 6 hour TTL and are deleted from Redis whenever a merchant edits them, so the next read repopulates from the catalog DB.
+
+**Price writes.** The pricing service writes each new price into Redis and returns immediately. A background flusher batches the accumulated price changes into the pricing DB every 5 seconds. This keeps the pricing team's bulk edits off the sale path.
+
+**Price reads.** On a price change, the pricing service also pushes the new value into the L1 entry on every app server, overwriting whatever is there, so the page shows the new price on the very next render rather than waiting out the TTL.
+
+**Checkout.** Add-to-cart and order placement both re-read the price from the pricing DB and bind that value. The cached price is a display value only.
+
+**Misses.** A miss at either tier reads the catalog DB. Unknown SKU ids are negative-cached for 30s so scanner traffic never reaches the DB.`,
+            },
             modelAnswerOutline: [
-              "**Topology: a two-tier cache**, an in-process L1 near cache on each app server plus a shared Redis L2, in front of the product/pricing services. The doorbuster SKUs are a tiny hot set, so an L1 with a 1-2 second TTL absorbs the bulk of 500K reads/sec without crossing the network: essential because no single Redis shard wants half a million ops/sec for one key.",
-              "**Split the page into fragments by volatility.** Static fragments (title, description, images) cache long with invalidate-on-write.",
-              "**Price is the sensitive field:** a very short L1 TTL (1 second) bounds worst-case display staleness at one second, legally and commercially acceptable, and the checkout path re-validates the price against the pricing service at add-to-cart and order time, so the authoritative price is always confirmed before money moves. The cached price is a display optimization, never the source of truth.",
-              "**Inventory** gets the same 1-second treatment plus a fail-safe 'low stock' signal ('limited availability' rather than a precise flickering count).",
-              "**Stampede protection:** request coalescing at both tiers so only one refresh per key per node hits the origin, jittered L1 TTLs across nodes, and pricing changes pushed as invalidations (or a versioned price key) so a price cut propagates within a second or two rather than waiting on TTL.",
-              "**The committed tradeoff:** up to ~1 second of price/inventory display staleness in exchange for serving 500K reads/sec from L1, with all correctness-critical price checks moved to the low-volume checkout path. Common wrong turn: keeping the displayed price perfectly live by reading the pricing service on every page view, which collapses under the read volume for no real benefit, since the binding price is the one confirmed at checkout.",
+              "**Name the three policies before arguing about any of them.** The static fragments are cache-aside plus invalidate-on-write, which is the right default: a merchant edit deletes the Redis key rather than updating it, so the next read repopulates from the catalog DB. The price path is write-back at tier 2 (ack now, flush to the pricing DB every 5 seconds) and update-on-write at tier 1 (push the new value into every app server's L1). Neither of those matches what a price is.",
+              "**Write-back on a price is a durability trade this data cannot afford.** The pricing service acks before the pricing DB holds the value, so a Redis node lost mid-sale takes up to 5 seconds of committed price changes with it. Write-back is for data where loss is tolerable, view counts and metrics, not for the field money is bound to. The checkout re-read does not rescue it either: checkout binds against the pricing DB, which is precisely the store that lost the update, so the site keeps charging the pre-cut price and every dashboard looks healthy. Write price through to the pricing DB synchronously and let the caches follow.",
+              "**Pushing the new price into L1 is update-on-write, and it carries the two-writer race.** Two price changes for one SKU can reach a given app server in the opposite order to their commit order, and the late arrival overwrites the newer value and stays. The flat 1s TTL bounds the damage to about a second, which is the design's saving grace, but inside that second different app servers show different prices for the same SKU. Deleting the L1 entry on a price change costs one miss and removes the race entirely, which is exactly what the fragment path already does.",
+              "**The flat 1s TTL is seeded at sale start, so the whole doorbuster set expires in lockstep.** All 200 keys on every app server turn over on the same boundary, so the fleet misses together once a second instead of spreading its misses across the interval. Jitter the TTL per key and per server, one second plus or minus a couple hundred ms, and stagger the seeding rather than filling every entry at the same instant.",
+              "**Keep:** the two-tier split (200 hot SKUs at 500K reads/sec is the case where an in-process L1 earns its keep, because no single Redis shard wants half a million ops/sec for one key), delete-on-write for the static fragments, the 30s negative cache, and binding the sale price at checkout instead of from the display cache.",
+              "**The consistency window the design never states:** with the flusher at 5 seconds and L1 at 1s, the promise to a shopper is a display price up to a second old and a source of truth up to five seconds behind the pricing service. Saying that number out loud is what turns this from a cache into a defensible cache.",
+            ],
+            rubric: [
+              {
+                name: "Naming the write policies",
+                weak: "Talks about caching in general without saying which policy the price path or the fragment path is running.",
+                adequate:
+                  "Names write-back on the price path but reads the L1 push as an optimisation rather than as update-on-write.",
+                strong:
+                  "Labels all three policies in play, cache-aside with invalidation, write-back and update-on-write, and says which data each one suits.",
+              },
+              {
+                name: "Durability of a price change",
+                weak: "Treats the 5 second flush as a latency detail and never asks what a dead Redis node takes with it.",
+                adequate:
+                  "Says price writes can be lost before the flush, but stops there and does not follow the loss out to what checkout binds.",
+                strong:
+                  "Follows a lost flush into the pricing DB and out to checkout, showing the sale charging the pre-cut price with nothing appearing broken.",
+              },
+              {
+                name: "Staleness window and expiry",
+                weak: "Accepts the flat 1s TTL as given, with no mention of jitter, of lockstep expiry, or of any stated consistency window.",
+                adequate:
+                  "Notes the missing jitter but frames it as tidiness rather than as the whole fleet missing on the same one-second boundary.",
+                strong:
+                  "Names the lockstep turnover across app servers, staggers both the TTL and the seeding, and states the window the design promises a shopper.",
+              },
+              {
+                name: "What survives review",
+                weak: "Rejects the design wholesale, including the two-tier topology and the fragment invalidation that are already right.",
+                adequate:
+                  "Approves the L1 plus Redis split without saying what makes 200 hot SKUs at 500K reads/sec the case for it.",
+                strong:
+                  "Keeps the two-tier split, the delete-on-write fragments and the checkout binding, and says why each one fits the data it covers.",
+              },
             ],
           },
         },
