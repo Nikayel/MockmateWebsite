@@ -752,11 +752,50 @@ drops out**, turning a minor blip into a total outage. The mature answer: deep e
 truly broken node, with hysteresis, and not so coupled that a shared-dependency blip fails the entire
 fleet simultaneously.
 
-\`\`\`
-  drain sequence on node removal / deploy:
-  mark NOT-READY -> LB stops NEW traffic -> in-flight finishes (<= drain deadline) -> terminate
-  join sequence:
-  start -> READINESS gates traffic until warm -> slow-start ramps share up
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "A node joining and leaving the pool",
+  "stages": [
+    {
+      "label": "Start",
+      "note": "process up, cache cold, pools empty"
+    },
+    {
+      "label": "READINESS gates traffic",
+      "note": "alive but not ready, so no traffic yet"
+    },
+    {
+      "label": "Slow start ramps the share",
+      "note": "traffic climbs over seconds"
+    },
+    {
+      "label": "Serving a full 1/N share",
+      "note": "warm cache, warm connection pools"
+    },
+    {
+      "label": "Mark NOT-READY",
+      "note": "deploy or scale-in begins here"
+    },
+    {
+      "label": "LB stops NEW traffic",
+      "note": "in-flight requests keep going"
+    },
+    {
+      "label": "In-flight finishes",
+      "note": "or the drain deadline expires"
+    },
+    {
+      "label": "Terminate",
+      "note": "process exits, nothing dropped"
+    }
+  ],
+  "highlight": [
+    "READINESS gates traffic",
+    "Mark NOT-READY"
+  ],
+  "caption": "A liveness failure is a different path entirely: it restarts or replaces the node rather than draining it, which is why answering both questions with one endpoint crash-loops a node that is merely still warming up."
+}
 \`\`\`
 
 Recap: use active probes plus passive outlier ejection; keep liveness (restart) separate from
@@ -904,11 +943,108 @@ complexity and propagation risk in every caller. A strong concrete answer: Kuber
 a polyglot fleet, or gRPC client-side LB backed by etcd for a gRPC-heavy one, with short health-check
 intervals so bad instances leave rotation within seconds.
 
-\`\`\`
-  registry (Consul/etcd/Eureka  |  k8s Endpoints via readiness)
-       ^ register/heartbeat            ^ controller keeps in sync
-  server-side:  client -> [ VIP/LB ] -> backend        (1 extra hop, central control)
-  client-side:  client (has list) ---> backend         (no hop, smart local policy)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "One registry, two places the balancing decision can live",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "registry",
+      "label": "Service registry (Consul, etcd, Eureka, or k8s Endpoints)",
+      "kind": "db"
+    },
+    {
+      "id": "client_srv",
+      "label": "Client (dumb: one stable VIP or name)",
+      "kind": "client"
+    },
+    {
+      "id": "client_cli",
+      "label": "Client holding the instance list",
+      "kind": "client"
+    },
+    {
+      "id": "vip",
+      "label": "VIP or LB (ALB, NLB, Envoy, Nginx)",
+      "kind": "lb"
+    },
+    {
+      "id": "backend_srv",
+      "label": "Backend instances behind the VIP",
+      "kind": "service"
+    },
+    {
+      "id": "backend_cli",
+      "label": "Backend instances dialed directly",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "registry",
+      "to": "vip",
+      "kind": "sync",
+      "label": "readiness keeps the set in sync"
+    },
+    {
+      "from": "client_srv",
+      "to": "vip",
+      "kind": "sync",
+      "label": "one stable name"
+    },
+    {
+      "from": "vip",
+      "to": "backend_srv",
+      "kind": "sync",
+      "label": "1 extra hop, central control"
+    },
+    {
+      "from": "registry",
+      "to": "client_cli",
+      "kind": "sync",
+      "label": "watch or push the healthy list"
+    },
+    {
+      "from": "client_cli",
+      "to": "backend_cli",
+      "kind": "sync",
+      "label": "no hop, locality aware policy"
+    },
+    {
+      "from": "backend_srv",
+      "to": "registry",
+      "kind": "feedback",
+      "label": "register and heartbeat"
+    },
+    {
+      "from": "backend_cli",
+      "to": "registry",
+      "kind": "feedback",
+      "label": "register and heartbeat"
+    }
+  ],
+  "groups": [
+    {
+      "id": "server_side",
+      "label": "Server side: a dedicated balancer decides",
+      "nodes": [
+        "client_srv",
+        "vip",
+        "backend_srv"
+      ]
+    },
+    {
+      "id": "client_side",
+      "label": "Client side or mesh: the caller decides",
+      "nodes": [
+        "client_cli",
+        "backend_cli"
+      ]
+    }
+  ],
+  "caption": "Both lanes read the same registry, and the return arcs are what keep it honest: an instance that stops heartbeating, or fails readiness, leaves the advertised set. The number to quote is propagation speed, seconds with registry watch or push, minutes when a DNS TTL is the only mechanism."
+}
 \`\`\`
 
 Recap: callers learn healthy addresses from a service registry (self-registration with heartbeats, or
