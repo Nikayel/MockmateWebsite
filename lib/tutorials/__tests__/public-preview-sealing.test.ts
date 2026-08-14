@@ -68,7 +68,17 @@ const ALLOWED_TEACH_KEYS = [
   "showDemoInput",
 ]
 
-const ALLOWED_EXERCISE_KEYS = ["gradedCheckCount", "hintCount", "prompt", "thinkAbout"]
+/**
+ * `supplied` is on this list for the same reason `prompt` and `thinkAbout` are: it is QUESTION
+ * material. A critique exercise reads "Review the proposed design below", and a signed-out reader who
+ * gets the sentence without the design is reading broken copy on the page Google indexes.
+ *
+ * It was added to `toPublicExercisePreview` when the field shipped, and NOT added here, which stayed
+ * invisible for exactly as long as no lesson authored one. The first artifact to land tripped it. A
+ * field allowlist that is only exercised by content is a latent failure until the content arrives, so
+ * the next person adding a published exercise field should update both sides in the same commit.
+ */
+const ALLOWED_EXERCISE_KEYS = ["gradedCheckCount", "hintCount", "prompt", "supplied", "thinkAbout"]
 
 /**
  * Strings shorter than this are not checked for containment. A 12-character expected value such as
