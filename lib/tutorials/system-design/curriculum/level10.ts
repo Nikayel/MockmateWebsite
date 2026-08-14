@@ -4554,8 +4554,8 @@ From weakest and cheapest to strongest and heaviest: a plain OS process with rli
     {
       "label": "microVM (Firecracker) / Kata",
       "value": 5,
-      "display": "own guest kernel, boots ~100ms",
-      "note": "Hardware-virtualization isolation with its own guest kernel: near-VM strength that still boots in about 100ms, the strong default for untrusted code."
+      "display": "own guest kernel, boots ~100ms, snapshots",
+      "note": "Hardware-virtualization isolation with its own guest kernel: near-VM strength that still boots in about 100ms, the strong default for untrusted code. It can also be snapshotted: pause the guest, persist its memory and disk state, resume it in a few hundred ms."
     }
   ],
   "caption": "Each rung up buys isolation and pays startup and performance cost. Name the spectrum and commit: Firecracker microVMs as the strong default, a hardened seccomp container as the fallback."
@@ -4563,6 +4563,31 @@ From weakest and cheapest to strongest and heaviest: a plain OS process with rli
 \`\`\`
 
 **Interview nuance:** the senior move is to name the spectrum and commit: "I would use Firecracker microVMs for true kernel isolation with fast startup, falling back to a hardened seccomp container if microVMs are not available." Saying "run it in a Docker container" and stopping there fails the security bar, because a container shares the host kernel.
+
+### A microVM can be paused, not only booted
+
+The ~100ms boot is the half of Firecracker that gets quoted. The other half matters as soon as a sandbox is something a user comes back to. A microVM's entire state is a memory file plus its disk image, so the VMM can **snapshot** it: pause the guest, write its memory and device state out, and destroy the running VM. **Restoring** maps that memory file back and resumes the guest exactly where it stopped, in a few hundred milliseconds, with the process tree, the loaded interpreter, the warm page cache and whatever was installed still in place. Open TCP connections do not survive the pause, so whatever fronts the VM re-establishes them on wake.
+
+That is a different economic object from a booted VM. A running VM holds host RAM and a scheduled vCPU whether or not anyone is using it; a snapshot holds bytes on disk:
+
+\`\`\`
+one 2 vCPU / 4 GB workspace, used ~2 hours a day:
+
+  kept booted        4 GB host RAM and a vCPU slot reserved all 24h
+                     ~$0.05/hour of compute x 24h  = ~$1.20/day
+                                                     ~92% of it burned idle
+
+  snapshotted        pause after 60s idle, persist a ~4 GB memory file plus the
+                     disk delta, release the host slot to another workspace
+                     storage: ~4 GB at ~$0.10/GB-month  = ~$0.01/day
+                     compute: billed for the 2 active hours = ~$0.10/day
+                                                     ~$0.11/day, roughly 10x cheaper
+
+  waking it          map the memory file and resume: a few hundred ms,
+                     versus tens of seconds to boot and reinstall from scratch
+\`\`\`
+
+A warm pool and a snapshot look similar and solve opposite problems, which is worth keeping straight. A warm pool holds **generic, empty, pre-booted** sandboxes so the next arriving job does not pay the boot; any VM in the pool will do, because a one-shot judge run brings nothing with it. A snapshot restores **one specific VM's state**, which is the only thing that helps when the user's packages, files and running server are what make the environment theirs. Neither substitutes for the other: a pooled VM does not have your state, and there is nothing to snapshot before a workspace has run once.
 
 \`\`\`cswidget
 {
@@ -4706,7 +4731,7 @@ Users want to see output as it runs, so stream stdout, stderr, and per-test prog
 }
 \`\`\`
 
-**Recap:** pick the isolation boundary deliberately (microVM/Firecracker as the strong default, hardened seccomp container as the middle ground, never a bare container for hostile code), bound every resource with cgroups plus timeouts plus a pids limit plus no network, run each submission in a fresh throwaway sandbox behind a queue and autoscaling worker pool with a warm pool for latency, and stream results while enforcing per-user fairness.
+**Recap:** pick the isolation boundary deliberately (microVM/Firecracker as the strong default, hardened seccomp container as the middle ground, never a bare container for hostile code), bound every resource with cgroups plus timeouts plus a pids limit plus no network, run each submission in a fresh throwaway sandbox behind a queue and autoscaling worker pool with a warm pool for latency, and stream results while enforcing per-user fairness. A warm pool hides the boot for a stateless run; snapshot and restore is the separate lever for a sandbox whose state someone comes back to.
 
 \`\`\`cswidget
 {
