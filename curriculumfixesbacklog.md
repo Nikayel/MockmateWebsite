@@ -419,6 +419,18 @@ unbroken. No new widget family added under this ticket.
 
 ### CUR-09 — Re-scope or delete SD-W5
 
+**SHIPPED 2026-08-14** as `docs/SD-CLOSURE-AUDIT-2026-08-14.md`. Twelve read-only agents, one per
+level file, 208 lessons: **83 gaps, 50 blocking and 33 friction**, each with the exact clause from the
+model answer that needs the missing fact. No finding is expressed as a word count.
+
+Two things the run itself taught. **L0 and L1 hold 15 of the 50 blocking gaps and most are ORDERING,
+not absence**: a Level 0 practice needs idempotency keys, which Level 0 does teach, one lesson later.
+Several close by moving a definition earlier rather than writing anything. **L3 reported zero gaps
+and that number is wrong**: spot-checking found one on the first lesson tried, so L3 is recorded as
+unaudited rather than clean. A confidently empty agent result reads exactly like a clean one.
+
+Repair is deliberately NOT in this ticket, per the separate-diagnosis-from-repair rule.
+
 **Effort:** 0.5 agent-days to re-scope, then unknown.
 
 The council's SD-W5 "Depth promotion" was premised on L7, L9, L10 and L11 being thin, measured by
