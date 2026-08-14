@@ -3103,6 +3103,63 @@ search a few clusters, lower memory, tunable recall). ANN trades a little **reca
 latency win; you tune parameters (\`efSearch\`, \`nprobe\`) to sit where you want on the
 recall/latency/memory curve.
 
+### The thing you embed is a passage, not a document
+
+An embedding is one fixed-size vector no matter how much text you feed it, so the model has to
+average everything it read down to a single point. Hand it a four-thousand-word runbook and you get
+the centroid of nine unrelated sections, which is close to nothing in particular. That is why
+retrieval systems **chunk**: split each document into **passages** of a few hundred tokens, embed
+each passage on its own, and make the passage the retrievable unit with a pointer back to its parent
+document.
+
+\`\`\`
+document: "Payments Runbook", 4000 words, 9 sections
+
+embedding the whole document:
+  embed(entire runbook) -> one point averaging refunds, chargebacks, retries,
+  PCI scope and the on-call rota. The query "how do I retry a failed capture"
+  sits near the retry section's meaning, but the document vector was dragged
+  away by the other eight sections, so nothing retrieves.
+
+chunked into ~300-token passages with ~50 tokens of overlap:
+  chunk 12  tokens 3300-3600  "...retry the capture with the idempotency key..."  <- the hit
+  chunk 13  tokens 3550-3850  "...if the retry also fails, open a chargeback..."
+  chunk 14  tokens 3800-4100  "...PCI scope for stored card data..."
+
+  now the query embedding lands next to chunk 12 and only chunk 12, and what
+  comes back is a passage precise enough to answer with and to cite.
+\`\`\`
+
+The overlap is not decoration. A hard cut at token 3600 can leave "retry the capture" in one chunk
+and "with the idempotency key" in the next, after which neither chunk answers the question.
+Overlapping the window by 10 to 20 percent means every sentence survives whole in at least one chunk.
+The costs are duplicated text (so dedupe by parent document when you assemble the answer) and index
+size, since chunking multiplies your vector count by roughly words-per-document over chunk size.
+
+Cut on the document's own structure wherever it has one: headings and paragraph breaks for prose,
+function and class boundaries for code, so a chunk is a whole unit rather than half a thought. For
+code, a **symbol-aware parser** gives you those boundaries for free. **tree-sitter** (an incremental
+parser with grammars for most languages), **ctags**, or a **language server (LSP)** each expose the
+definition ranges in a file, and one pass over the file feeds both the chunker and an exact-lookup
+symbol index:
+
+\`\`\`
+src/auth/refresh.py, chunked on tree-sitter definition ranges:
+
+  chunk  symbol                          lines    contains
+    1    module docstring + imports       1-18    whole
+    2    class AuthTokenRefresher        20-24    class header and docstring
+    3    AuthTokenRefresher.refresh      26-61    one entire function
+    4    AuthTokenRefresher._backoff     63-78    one entire function
+
+the same parse populates the symbol index:
+  AuthTokenRefresher.refresh  definition -> src/auth/refresh.py:26
+                              references -> src/billing/charge.py:140, ...
+
+so an exact-symbol query is an index lookup, rather than a hope that cosine
+similarity happens to rank the right function first.
+\`\`\`
+
 ### Hybrid search: because vectors are bad at exact tokens
 
 Error code \`E-4021\`, SKU \`SKU-99183\`, version \`v2.14.0\`, a person's exact name: these are
@@ -3248,10 +3305,10 @@ naive **post-filtering** can return too few results after ANN. **Re-embedding co
 the embedding model, every vector must be recomputed and reindexed, which for hundreds of millions of
 docs is a real migration, so you version embeddings and roll over like a search alias.
 
-Recap: use embeddings + an ANN index (HNSW/IVF) for semantic recall, run it alongside BM25 for exact
-tokens like codes and IDs, fuse the two by rank with RRF (never by raw score), add a cross-encoder
-reranker over the top-k for precision, and plan for metadata filtering and the migration cost of
-re-embedding.
+Recap: chunk documents into overlapping passages so each vector means one thing, use embeddings + an
+ANN index (HNSW/IVF) over those passages for semantic recall, run it alongside BM25 for exact tokens
+like codes and IDs, fuse the two by rank with RRF (never by raw score), add a cross-encoder reranker
+over the top-k for precision, and plan for metadata filtering and the migration cost of re-embedding.
 
 \`\`\`cswidget
 {
