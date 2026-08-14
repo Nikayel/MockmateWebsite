@@ -3777,6 +3777,52 @@ is on the hot path and a write is not.
 }
 \`\`\`
 
+### What maintaining these actually looks like
+
+Redis exposes the HyperLogLog through three commands, and the third one is the reason to know them by
+name, because it is what makes sketches composable across time windows:
+
+\`\`\`
+> PFADD viewers:s42:2026-08-14 u_9931 u_4410 u_9931    add ids; duplicates are free
+(integer) 1                                            1 means the sketch changed
+> PFCOUNT viewers:s42:2026-08-14                       estimate the cardinality
+(integer) 2
+
+> PFADD viewers:s42:2026-08-15 u_4410 u_7702
+> PFMERGE viewers:s42:week viewers:s42:2026-08-14 viewers:s42:2026-08-15
+> PFCOUNT viewers:s42:week
+(integer) 3        u_4410 was on both days and is counted once, not twice
+
+  PFADD is O(1) and the key stays around 12 KB whether it has absorbed 3 ids or
+  300 million. PFMERGE is why you keep one sketch per day rather than one per
+  question: any window you are asked for later (a week, a month, a campaign) is
+  a merge of the days it spans, with no re-reading of raw events. Summing daily
+  exact counts would double-count returning viewers; merging sketches does not.
+\`\`\`
+
+Rollup tables are maintained the same way when the product wants the number to be seconds old rather
+than a nightly batch: a stream processor, **Kafka Streams** or **Flink**, keeps a windowed aggregation
+over the event stream and writes only the small result.
+
+\`\`\`
+-- Flink SQL: joins per stream over a 60-second window, advancing every 5 seconds
+SELECT stream_id, window_start, COUNT(*) AS joins_60s
+FROM TABLE(
+  HOP(TABLE viewer_events, DESCRIPTOR(event_time),
+      INTERVAL '5' SECOND,        -- slide: how often a new window closes
+      INTERVAL '60' SECOND))      -- size:  how much history each window covers
+WHERE event_type = 'join'
+GROUP BY stream_id, window_start, window_end
+
+  HOP is the sliding (hopping) window: 60 seconds wide, advancing 5 at a time, so
+  each event lands in 12 overlapping windows and a board can refresh every 5
+  seconds without rescanning a minute of history per refresh. TUMBLE is the
+  non-overlapping variant when you want clean hourly or daily buckets instead.
+
+  the job writes the top rows into a Redis sorted set or a small serving table,
+  so the read path is one lookup and never an aggregation.
+\`\`\`
+
 ### The two feed strategies
 
 - **Fan-out-on-write (push):** when Alice posts, immediately write that post id into the precomputed
