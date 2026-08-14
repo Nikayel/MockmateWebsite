@@ -922,6 +922,137 @@ any endpoint returning a list needs cursor-based pagination (\`?cursor=...&limit
 private read needs an auth token at the boundary. Mentioning where these live shows you have designed
 real APIs, not just toy ones.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "A timed-out create, with and without an idempotency key",
+  "actors": [
+    {
+      "id": "client",
+      "label": "Client"
+    },
+    {
+      "id": "api",
+      "label": "Link service"
+    },
+    {
+      "id": "store",
+      "label": "Link store"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "idemKey",
+      "label": "Client sends an idempotency key",
+      "description": "the same key rides the first request and the retry"
+    }
+  ],
+  "steps": [
+    {
+      "from": "client",
+      "to": "api",
+      "kind": "request",
+      "label": "POST /links, no key",
+      "when": "!idemKey"
+    },
+    {
+      "from": "client",
+      "to": "api",
+      "kind": "request",
+      "label": "POST /links, key k-42",
+      "when": "idemKey"
+    },
+    {
+      "from": "api",
+      "to": "store",
+      "kind": "request",
+      "label": "insert code aZ3xK",
+      "state": {
+        "codes for this URL": "aZ3xK"
+      }
+    },
+    {
+      "from": "api",
+      "to": "client",
+      "kind": "response",
+      "label": "201 aZ3xK, response lost",
+      "status": "lost"
+    },
+    {
+      "from": "client",
+      "kind": "timer",
+      "label": "Timeout. Committed or not?",
+      "predict": {
+        "question": "The response never arrived. What does the client now know about what the server did?",
+        "options": [
+          "It failed, so a retry is safe",
+          "Nothing certain, it may have committed",
+          "It succeeded, only the reply was lost"
+        ]
+      }
+    },
+    {
+      "from": "client",
+      "to": "api",
+      "kind": "request",
+      "label": "Retry, still no key",
+      "when": "!idemKey"
+    },
+    {
+      "from": "api",
+      "to": "store",
+      "kind": "request",
+      "label": "insert code bQ7mn",
+      "status": "error",
+      "when": "!idemKey",
+      "state": {
+        "codes for this URL": "aZ3xK and bQ7mn"
+      }
+    },
+    {
+      "from": "api",
+      "to": "client",
+      "kind": "response",
+      "label": "201 bQ7mn, a duplicate",
+      "status": "error",
+      "when": "!idemKey"
+    },
+    {
+      "from": "client",
+      "to": "api",
+      "kind": "request",
+      "label": "Retry with key k-42",
+      "when": "idemKey"
+    },
+    {
+      "from": "api",
+      "to": "store",
+      "kind": "request",
+      "label": "look up key k-42",
+      "when": "idemKey"
+    },
+    {
+      "from": "store",
+      "to": "api",
+      "kind": "response",
+      "label": "k-42 already used: aZ3xK",
+      "when": "idemKey"
+    },
+    {
+      "from": "api",
+      "to": "client",
+      "kind": "response",
+      "label": "201 aZ3xK, the same code",
+      "when": "idemKey",
+      "state": {
+        "codes for this URL": "aZ3xK"
+      }
+    }
+  ],
+  "caption": "Toggle the key on and off. Without it the retry is a brand new logical request and one URL ends up with two codes. With it the service recognizes k-42 and returns the code it already minted. The timeout itself never tells the client which side of that line it is on, which is why the key belongs in the API sketch rather than in the implementation."
+}
+\`\`\`
+
 Recap: Turn requirement nouns into entities with only the design-relevant fields, define one endpoint
 per requirement with concrete request/response shapes, choose REST vs gRPC vs streaming deliberately,
 and place idempotency, pagination, and auth at the boundary.
