@@ -3463,9 +3463,9 @@ Hot-item sharding has a limit: you cannot shard a single seat, so the truly cont
   "prompt": "Why can you not scale the hot item the way you scale everything else, by sharding its counter?",
   "options": [
     {
-      "label": "A single seat cannot be split, so the contended item is serialized by nature and the design's answer is to bound how many requests ever reach it",
+      "label": "A single seat cannot be split, so it is serialized by nature",
       "correct": true,
-      "feedback": "Right. Accepting that a sold out item's throughput is capped by one atomic counter is what makes the waiting room a requirement rather than a nicety."
+      "feedback": "Right. A sold out item's throughput is capped by one atomic counter no matter how many machines you own, so the only lever left is how many requests ever reach it. That is what makes the waiting room a requirement rather than a nicety."
     },
     {
       "label": "You can: split 10,000 seats into ten counters of 1,000 and decrement a random one",
@@ -3648,9 +3648,9 @@ Fetching is distributed and I/O-bound. Run many fetcher workers pulling due URLs
   "prompt": "You have crawled a billion pages once. How do you keep the corpus fresh?",
   "options": [
     {
-      "label": "Estimate each page's change rate and recrawl adaptively, using conditional GETs so an unchanged page costs a cheap 304 instead of a full fetch",
+      "label": "Adaptive recrawl by estimated change rate, with conditional GETs",
       "correct": true,
-      "feedback": "Right. News changes hourly and an archive page never does, so the recrawl budget follows the change rate, and If-Modified-Since or ETag makes checking almost free."
+      "feedback": "Right. News changes hourly and an archive page never does, so the recrawl budget follows the change rate rather than the calendar. An If-Modified-Since or ETag request then makes the check almost free: an unchanged page costs a 304 instead of a full fetch."
     },
     {
       "label": "Recrawl everything on a fixed cycle, so no page is ever staler than the cycle length",
@@ -3705,9 +3705,9 @@ A metrics platform ingests a firehose of numbers over time (millions of data poi
   "prompt": "A team adds a user_id label to http_requests_total so they can slice by customer. You have ten million users. What does that cost?",
   "options": [
     {
-      "label": "Ten million time series from one metric, because a series is a unique combination of label values, and each carries its own index entry and sample stream",
+      "label": "Ten million separate time series from that one metric",
       "correct": true,
-      "feedback": "Right. Cardinality is the product of label value counts, and unbounded fields like user id, request id or email are what actually take these systems down."
+      "feedback": "Right. A series is a unique combination of label values, so every user id becomes its own series with its own index entry and its own sample stream. Cardinality is the product of the label value counts, and unbounded fields like user id, request id or email are what actually take these systems down."
     },
     {
       "label": "Nothing at storage time: labels are just strings attached to the same series, so only queries get more complex",
@@ -3757,9 +3757,9 @@ Alerting is periodic rule evaluation. A rule engine runs queries on a schedule (
   "prompt": "A dashboard charts error rate across the last quarter. Which data does it read?",
   "options": [
     {
-      "label": "Downsampled rollups, because raw resolution is retained only for a short window and a quarter long chart cannot render per second detail anyway",
+      "label": "Downsampled rollups, because the raw data has aged out",
       "correct": true,
-      "feedback": "Right. Retention tiers plus rollups are the cost lever that sits alongside cardinality control, and rollups keep min, max, avg and count so spikes still show."
+      "feedback": "Right. Raw resolution is kept for a short window only, then pre-aggregated into 5 minute and hourly rollups that carry min, max, avg and count, so a spike still shows. A quarter long chart could not render per second detail anyway. Retention tiers plus rollups are the cost lever alongside cardinality control."
     },
     {
       "label": "Raw samples, because rollups would smooth away the spikes that matter",
