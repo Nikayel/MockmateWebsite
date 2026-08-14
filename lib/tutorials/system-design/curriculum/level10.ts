@@ -1189,13 +1189,94 @@ Chat is a real-time delivery problem at massive concurrency. WhatsApp famously r
 
 Messaging needs the server to push to the client the instant a message arrives, so you hold persistent connections, WebSocket (or MQTT, which Facebook Messenger adopted for battery efficiency on mobile; WhatsApp itself ran a customized binary variant of XMPP, an XML-based messaging protocol). A tier of connection servers each hold hundreds of thousands to millions of open sockets. A user is connected to exactly one connection server at a time; a routing layer (a session registry in Redis mapping \`user_id -> connection_server\`) knows where each user is. When Alice sends to Bob, the system looks up Bob's connection server and forwards the message there over an internal pub/sub backplane (Kafka or a Redis pub/sub / a dedicated message bus).
 
-\`\`\`
-Alice ==WS== connSrv-A          connSrv-B ==WS== Bob
-                |                     ^
-                v                     |
-        session registry: Bob -> connSrv-B
-                |                     |
-                +---- pub/sub backplane (routes msg)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Routing a message to whichever server holds the recipient",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "alice",
+      "label": "Alice's device",
+      "kind": "client"
+    },
+    {
+      "id": "srv_a",
+      "label": "Connection server A (hundreds of thousands of open WebSockets)",
+      "kind": "service"
+    },
+    {
+      "id": "registry",
+      "label": "Session registry (Redis): user_id to connection server",
+      "kind": "cache"
+    },
+    {
+      "id": "backplane",
+      "label": "Pub/sub backplane (Kafka, or a dedicated message bus)",
+      "kind": "queue"
+    },
+    {
+      "id": "srv_b",
+      "label": "Connection server B",
+      "kind": "service"
+    },
+    {
+      "id": "bob",
+      "label": "Bob's device: connected to exactly one server at a time",
+      "kind": "client"
+    },
+    {
+      "id": "inbox",
+      "label": "Per-user inbox (Cassandra or HBase, partitioned by conversation or recipient)",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "alice",
+      "to": "srv_a",
+      "kind": "sync",
+      "label": "WebSocket, with a client-generated message id"
+    },
+    {
+      "from": "srv_a",
+      "to": "inbox",
+      "kind": "sync",
+      "label": "persisted before the sent acknowledgement"
+    },
+    {
+      "from": "srv_a",
+      "to": "registry",
+      "kind": "sync",
+      "label": "where is Bob?"
+    },
+    {
+      "from": "registry",
+      "to": "backplane",
+      "kind": "sync",
+      "label": "Bob is on server B"
+    },
+    {
+      "from": "backplane",
+      "to": "srv_b",
+      "kind": "async",
+      "label": "route the message"
+    },
+    {
+      "from": "srv_b",
+      "to": "bob",
+      "kind": "sync",
+      "label": "push, if he is online"
+    },
+    {
+      "from": "inbox",
+      "to": "bob",
+      "kind": "async",
+      "label": "on reconnect: everything since his last acknowledged sequence number"
+    }
+  ],
+  "caption": "The registry is what makes a push possible at all, because a user is on exactly one connection server and the sender is almost never on the same one. When Bob is offline there is nothing to push to, so the inbox is the delivery path."
+}
 \`\`\`
 
 ## Ordering and dedup
