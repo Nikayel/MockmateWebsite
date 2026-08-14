@@ -2590,11 +2590,98 @@ which ignores raw scores and fuses by **rank**: each result gets \`1 / (k + rank
 (k ~ 60) and the sums are combined. A document ranked high by either method surfaces, and the
 incompatible score scales never touch.
 
-\`\`\`
-  query --> [ BM25 exact match ]     --> ranked list A
-        \\-> [ embed -> ANN vectors ] --> ranked list B
-                          \\-> RRF fuse by rank -> top-k
-                                        \\-> cross-encoder rerank -> top-n
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Hybrid retrieval: two recall-oriented retrievers, fused by rank, then one precision stage",
+  "nodes": [
+    {
+      "id": "query",
+      "label": "User query",
+      "kind": "client"
+    },
+    {
+      "id": "bm25",
+      "label": "BM25 lexical index (exact tokens: error codes, SKUs, versions)",
+      "kind": "service"
+    },
+    {
+      "id": "ann",
+      "label": "Embedding model plus ANN index (HNSW or IVF, tuned by efSearch or nprobe)",
+      "kind": "service"
+    },
+    {
+      "id": "rrf",
+      "label": "Reciprocal Rank Fusion: 1 / (k + rank) from each list, k about 60",
+      "kind": "service"
+    },
+    {
+      "id": "rerank",
+      "label": "Cross-encoder reranker: reads the query and each candidate together",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "query",
+      "to": "bm25",
+      "kind": "sync",
+      "label": "matches the literal token"
+    },
+    {
+      "from": "query",
+      "to": "ann",
+      "kind": "sync",
+      "label": "embed, then find nearest vectors by cosine similarity"
+    },
+    {
+      "from": "bm25",
+      "to": "rrf",
+      "kind": "sync",
+      "label": "ranked list A"
+    },
+    {
+      "from": "ann",
+      "to": "rrf",
+      "kind": "sync",
+      "label": "ranked list B"
+    },
+    {
+      "from": "rrf",
+      "to": "rerank",
+      "kind": "sync",
+      "label": "top-k candidates, about 100"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "query",
+        "bm25"
+      ],
+      "note": "Start with the keyword index, because the requirement includes exact strings: an error code or a SKU is precisely where an embedding blurs the token."
+    },
+    {
+      "adds": [
+        "ann"
+      ],
+      "note": "The same index answers 'my card was declined' with nothing, because it shares no token with 'payment authorization failed'. Semantic recall is a second retriever, run in parallel rather than instead."
+    },
+    {
+      "adds": [
+        "rrf"
+      ],
+      "note": "BM25 scores are unbounded and dataset dependent while cosine sits in 0 to 1, so the two lists cannot be summed. Fusing by rank position is what lets a document surface when either retriever ranks it high."
+    },
+    {
+      "adds": [
+        "rerank"
+      ],
+      "note": "First-stage retrieval is tuned for recall, not precision, so the requirement of a trustworthy top 5 needs one expensive model over the small candidate set rather than over the whole corpus."
+    }
+  ],
+  "caption": "Each stage exists because the previous one fails a stated requirement: exact tokens, paraphrase recall, incompatible score scales, and precision at the top."
+}
 \`\`\`
 
 ### Retrieve, then rerank
@@ -2930,14 +3017,115 @@ is on the hot path and a write is not.
 }
 \`\`\`
 
-\`\`\`
- fan-out-on-write            fan-out-on-read
- Alice posts                 Bob opens feed
-   |                           |
-   +-> write to each of        +-> query recent posts of
-       Alice's followers'          each account Bob follows,
-       precomputed feed            then merge-sort at read time
- cheap reads, costly writes  cheap writes, costly reads
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Fan-out on write versus fan-out on read",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "push_post",
+      "label": "Alice posts",
+      "kind": "client"
+    },
+    {
+      "id": "push_worker",
+      "label": "Fan-out worker: one timeline write per follower",
+      "kind": "service"
+    },
+    {
+      "id": "push_feeds",
+      "label": "Precomputed timeline list per follower (often Redis)",
+      "kind": "db"
+    },
+    {
+      "id": "push_read",
+      "label": "Bob opens his feed",
+      "kind": "client"
+    },
+    {
+      "id": "pull_post",
+      "label": "Alice posts",
+      "kind": "client"
+    },
+    {
+      "id": "pull_store",
+      "label": "Posts table: each post stored exactly once",
+      "kind": "db"
+    },
+    {
+      "id": "pull_read",
+      "label": "Bob opens his feed",
+      "kind": "client"
+    },
+    {
+      "id": "pull_merge",
+      "label": "Read-time scatter-gather: recent posts of every account Bob follows, merge-sorted",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "push_post",
+      "to": "push_worker",
+      "kind": "async",
+      "label": "one logical write"
+    },
+    {
+      "from": "push_worker",
+      "to": "push_feeds",
+      "kind": "sync",
+      "label": "write amplification is O(followers): a 50M-follower post is 50M writes"
+    },
+    {
+      "from": "push_read",
+      "to": "push_feeds",
+      "kind": "sync",
+      "label": "the read is a single list lookup"
+    },
+    {
+      "from": "pull_post",
+      "to": "pull_store",
+      "kind": "sync",
+      "label": "writes stay O(1)"
+    },
+    {
+      "from": "pull_read",
+      "to": "pull_merge",
+      "kind": "sync",
+      "label": "the cost lands on the hot read path"
+    },
+    {
+      "from": "pull_merge",
+      "to": "pull_store",
+      "kind": "sync",
+      "label": "a reader following 5,000 accounts fans out across all of them"
+    }
+  ],
+  "groups": [
+    {
+      "id": "push",
+      "label": "Fan-out on write (push): cheap reads, costly writes",
+      "nodes": [
+        "push_post",
+        "push_worker",
+        "push_feeds",
+        "push_read"
+      ]
+    },
+    {
+      "id": "pull",
+      "label": "Fan-out on read (pull): cheap writes, costly reads",
+      "nodes": [
+        "pull_post",
+        "pull_store",
+        "pull_read",
+        "pull_merge"
+      ]
+    }
+  ],
+  "caption": "Neither pure form survives power-law follower counts. The production hybrid pushes normal accounts and pulls the handful of celebrity streams at read time."
+}
 \`\`\`
 
 Neither pure form survives real distributions, because follower counts are power-law. The production
