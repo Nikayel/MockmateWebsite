@@ -330,6 +330,235 @@ detects dangerous read-write dependency cycles and aborts one transaction) or by
 locking (2PL). Serializable costs throughput: SSI adds abort-and-retry churn under contention, 2PL
 adds lock waits.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Write skew: two correct transactions, one broken invariant",
+  "frames": [
+    {
+      "note": "Two doctors are on call, and the invariant is that at least one always is. Both transactions are about to start under snapshot isolation, which is what Postgres calls Repeatable Read.",
+      "rows": [
+        {
+          "label": "Committed state",
+          "cells": [
+            {
+              "text": "Ana: on call"
+            },
+            {
+              "text": "Ben: on call"
+            }
+          ]
+        },
+        {
+          "label": "Invariant",
+          "cells": [
+            {
+              "text": "at least one on call: HELD"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "T1 and T2 both begin. Each takes its own consistent snapshot of the committed state, and neither snapshot will ever show the other transaction's uncommitted work.",
+      "rows": [
+        {
+          "label": "Committed state",
+          "cells": [
+            {
+              "text": "Ana: on call"
+            },
+            {
+              "text": "Ben: on call"
+            }
+          ]
+        },
+        {
+          "label": "T1 snapshot",
+          "cells": [
+            {
+              "text": "Ana: on call",
+              "state": "new"
+            },
+            {
+              "text": "Ben: on call",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "T2 snapshot",
+          "cells": [
+            {
+              "text": "Ana: on call",
+              "state": "new"
+            },
+            {
+              "text": "Ben: on call",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "T1 validates the invariant against its snapshot: Ben is still on call, so taking Ana off shift is safe. It writes Ana off. The write is uncommitted, so only T1 can see it.",
+      "rows": [
+        {
+          "label": "Committed state",
+          "cells": [
+            {
+              "text": "Ana: on call"
+            },
+            {
+              "text": "Ben: on call"
+            }
+          ]
+        },
+        {
+          "label": "T1 snapshot",
+          "cells": [
+            {
+              "text": "Ana: off shift",
+              "state": "active"
+            },
+            {
+              "text": "Ben: on call",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "T2 snapshot",
+          "cells": [
+            {
+              "text": "Ana: on call",
+              "state": "dim"
+            },
+            {
+              "text": "Ben: on call",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "predict": {
+        "question": "T2 started before T1 committed. What does T2's snapshot show for Ana?",
+        "options": [
+          "Ana off shift: each read refreshes the snapshot",
+          "Ana still on call: the snapshot predates T1's write",
+          "Nothing yet: T2 blocks until T1 commits"
+        ]
+      },
+      "note": "T2 validates the same invariant against its own snapshot, where Ana is still on call. That check passes too, so T2 writes Ben off shift. Each transaction is individually correct.",
+      "rows": [
+        {
+          "label": "Committed state",
+          "cells": [
+            {
+              "text": "Ana: on call"
+            },
+            {
+              "text": "Ben: on call"
+            }
+          ]
+        },
+        {
+          "label": "T1 snapshot",
+          "cells": [
+            {
+              "text": "Ana: off shift",
+              "state": "dim"
+            },
+            {
+              "text": "Ben: on call",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "T2 snapshot",
+          "cells": [
+            {
+              "text": "Ana: on call",
+              "state": "active"
+            },
+            {
+              "text": "Ben: off shift",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Both commit. Neither transaction wrote a row the other one wrote, so snapshot isolation sees no conflict worth reporting. Their combined effect leaves zero doctors on call.",
+      "rows": [
+        {
+          "label": "Committed state",
+          "cells": [
+            {
+              "text": "Ana: off shift",
+              "state": "dropped"
+            },
+            {
+              "text": "Ben: off shift",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "Invariant",
+          "cells": [
+            {
+              "text": "at least one on call: VIOLATED",
+              "state": "dropped"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The same interleaving under true Serializable. SSI tracks the read-write dependency each transaction created, spots the dangerous cycle at commit time, and aborts one. The retry reads Ana already off shift and refuses to take Ben off too.",
+      "rows": [
+        {
+          "label": "Committed state",
+          "cells": [
+            {
+              "text": "Ana: off shift"
+            },
+            {
+              "text": "Ben: on call",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "T2 under Serializable",
+          "cells": [
+            {
+              "text": "aborted, retried, refused",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "Invariant",
+          "cells": [
+            {
+              "text": "at least one on call: HELD"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Snapshot isolation checked each transaction against a snapshot. Nothing ever checked the two of them against each other, and that gap is the whole anomaly."
+}
+\`\`\`
+
 **Interview nuance:** If you claim "Repeatable Read fixes it," the interviewer will ask "which
 anomaly, and are you sure Repeatable Read covers it?" If the bug is write skew, Repeatable Read
 (snapshot) does not fix it and you need Serializable or an explicit lock. Naming the exact anomaly is
