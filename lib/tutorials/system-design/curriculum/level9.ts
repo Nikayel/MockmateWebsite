@@ -573,7 +573,7 @@ A service mesh manages **east-west** traffic: service-to-service calls inside th
 
 ## The sidecar model and its tax
 
-The classic implementation is the **sidecar** model: a proxy (Envoy) is injected into every Pod, and all traffic goes app -> local sidecar -> remote sidecar -> app. This is powerful but not free. Every Pod now runs an extra container, so a 40-service fleet with hundreds of Pods pays real memory and CPU per Pod (tens of MB each, adding up to GBs cluster-wide), and every hop adds mTLS and proxy latency (often 1 to several ms per call, which compounds across a deep call graph). Operationally you now run and upgrade a fleet of proxies, which is real "proxy sprawl."
+The classic implementation is the **sidecar** model: a proxy (Envoy) is injected into every Pod, and all traffic goes app -> local sidecar -> remote sidecar -> app. This is powerful but not free. Every Pod now runs an extra container, so a 40-service fleet with hundreds of Pods pays real memory and CPU per Pod (tens of MB each, adding up to GBs cluster-wide). The latency tax is charged **per proxy traversal**, not per call: each traversal costs roughly a millisecond for mTLS termination, policy, and re-origination, and the count of traversals is what the call graph decides. Operationally you now run and upgrade a fleet of proxies, which is real "proxy sprawl."
 
 \`\`\`cswidget
 {
@@ -709,7 +709,7 @@ The win is fewer proxies, lower per-Pod memory, and lower latency for the common
         "envoy_b",
         "b_sidecar"
       ],
-      "note": "The classic sidecar model: an Envoy proxy injected into every Pod, all traffic app to local sidecar to remote sidecar to app. Every Pod pays memory (tens of MB each, GBs cluster-wide) and every hop adds 1 to several ms of proxy latency."
+      "note": "The classic sidecar model: an Envoy proxy injected into every Pod, all traffic app to local sidecar to remote sidecar to app. Every Pod pays memory (tens of MB each, GBs cluster-wide), and every hop crosses two proxies, so the latency tax is charged twice per hop rather than once per call."
     },
     {
       "adds": [
@@ -726,7 +726,7 @@ The win is fewer proxies, lower per-Pod memory, and lower latency for the common
       "note": "An optional per-namespace waypoint proxy adds L7 features (retries, traffic splitting) only where you need them, instead of taxing every Pod in the fleet."
     }
   ],
-  "caption": "Different data paths for the same east-west problem: the sidecar tax is per Pod and per hop, while ambient pays per node and adds L7 only where needed. Cilium is a third path not drawn here, with policy in the kernel and no per-Pod proxy, though it authenticates in its agent rather than per connection."
+  "caption": "Different data paths for the same east-west problem: the sidecar tax is per Pod in memory and per proxy traversal in latency, while ambient pays per node and adds L7 only where needed. Cilium is a third path not drawn here, with policy in the kernel and no per-Pod proxy, though it authenticates in its agent rather than per connection."
 }
 \`\`\`
 
@@ -759,7 +759,7 @@ For a handful of services, you can get mTLS from the platform, retries and timeo
 
 **Interview nuance:** the strong answer is not "add Istio." It is "at 40 services in mixed languages, a mesh is justified because you cannot keep mTLS and retry logic consistent across five client libraries, and I would choose ambient/eBPF to avoid the per-Pod sidecar tax." The weak answer adds a mesh reflexively for three services.
 
-**Recap:** a mesh moves mTLS, retries/timeouts, traffic shifting, and L7 telemetry out of app code; sidecars cost memory and latency per Pod; Istio Ambient cuts that tax while keeping per-connection mTLS (GA in 1.24), and Cilium cuts it further by putting eBPF policy in the kernel with SPIFFE mutual authentication and WireGuard or IPsec encryption instead of mTLS (still beta); and for a small fleet, a mesh is often not worth it.
+**Recap:** a mesh moves mTLS, retries/timeouts, traffic shifting, and L7 telemetry out of app code; sidecars cost memory per Pod and latency per proxy traversal, two of them on every hop; Istio Ambient cuts that tax while keeping per-connection mTLS (GA in 1.24), and Cilium cuts it further by putting eBPF policy in the kernel with SPIFFE mutual authentication and WireGuard or IPsec encryption instead of mTLS (still beta); and for a small fleet, a mesh is often not worth it.
 
 \`\`\`cswidget
 {
