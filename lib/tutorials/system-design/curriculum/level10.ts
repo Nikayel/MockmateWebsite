@@ -2939,9 +2939,9 @@ From weakest and cheapest to strongest and heaviest: a plain OS process with rli
   "prompt": "You run each submission in a Firecracker microVM with a CPU cap, a memory cap and a wall clock timeout. A submission forks in an infinite loop. What happens?",
   "options": [
     {
-      "label": "It exhausts the process table inside the sandbox unless a pids limit caps process count, so that limit belongs alongside the CPU and memory caps",
+      "label": "It exhausts the process table, unless a pids limit caps it",
       "correct": true,
-      "feedback": "Right. A fork bomb is cheap in memory and expensive in process slots, which is why the pids limit is called out as its own control."
+      "feedback": "Right. A fork bomb is cheap in memory and expensive in process slots, so it saturates the process table long before either of the caps you set fires. That is why the pids limit belongs alongside the CPU and memory caps rather than being assumed to fall out of them."
     },
     {
       "label": "The memory cap stops it, since every process consumes memory",
@@ -2979,9 +2979,9 @@ warm pool of microVMs -> worker pulls job -> fresh Firecracker VM
   "prompt": "A contest starts and submissions arrive at twenty times the normal rate. What absorbs it?",
   "options": [
     {
-      "label": "A durable queue in front of a sandbox worker pool that autoscales on queue depth, with a warm pool of pre-booted sandboxes hiding cold start",
+      "label": "A durable queue in front of an autoscaling worker pool",
       "correct": true,
-      "feedback": "Right. The queue decouples submission rate from execution capacity so the spike becomes a backlog, and the warm pool keeps the latency acceptable while it drains."
+      "feedback": "Right. The queue decouples submission rate from execution capacity, so the spike becomes a backlog rather than an overload, and the pool scales on queue depth. A warm pool of pre-booted sandboxes hides the microVM cold start while it drains."
     },
     {
       "label": "Reusing each sandbox for several submissions so the boot cost is amortized",
@@ -3179,9 +3179,9 @@ Providers confirm asynchronously via webhooks, which are themselves at-least-onc
   "prompt": "A charge touches your ledger, an external provider, and the orders service. How do you keep them consistent?",
   "options": [
     {
-      "label": "A saga: local transactions in sequence, pending entry, provider call with an idempotency key, settle entries and mark the order paid, with compensating reversals on failure, all held in a durable workflow",
+      "label": "A saga of local transactions, with compensating reversals",
       "correct": true,
-      "feedback": "Right. The durable workflow is the part people skip: a crash mid saga has to resume rather than orphan money."
+      "feedback": "Right, and name the steps: a pending ledger entry, the provider call carrying an idempotency key, then the settled entries and the order marked paid, with a compensating reversal if any step fails. The part people skip is holding it in a durable workflow, so a crash mid saga resumes rather than orphaning money."
     },
     {
       "label": "A distributed two phase commit across the ledger, the provider and the orders service",
@@ -3426,9 +3426,9 @@ Real commerce does not charge instantly, so you need reservation holds. When a b
   "prompt": "Five million people arrive in the same second. Your decrement is a single atomic operation, so oversell is impossible. Is the design done?",
   "options": [
     {
-      "label": "No: every request still has to reach that counter, so a waiting room admits users in controlled batches at a rate the backend can absorb",
+      "label": "No: a waiting room has to bound what reaches the counter",
       "correct": true,
-      "feedback": "Right. Correctness and capacity are separate problems, and the waiting room is what makes the inventory store see bounded QPS no matter how many people showed up."
+      "feedback": "Right. Correctness and capacity are separate problems. Every one of those requests still has to reach the single counter, so the waiting room admits users in controlled batches at a rate the backend can absorb, and the inventory store sees bounded QPS no matter how many people showed up."
     },
     {
       "label": "Yes: correctness holds, and the excess requests simply fail fast on a sold out check",
