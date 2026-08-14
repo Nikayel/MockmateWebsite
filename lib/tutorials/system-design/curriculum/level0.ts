@@ -716,8 +716,33 @@ source of truth is what a strong-consistency promise is built on. You pay for it
 promoting the standby takes seconds to minutes during which writes fail, and any replication lag at
 the moment of failure is data somebody has to reconcile by hand.
 
+**The extra nine has a price, and the price is the decision.** Going from 99.9% to 99.99% buys back
+about eight hours a year, from roughly 8.8 hours of downtime down to roughly 53 minutes. Active-passive
+is usually what you buy it with, and a warm standby is a second copy of the serving tier, plus its
+share of storage, plus the cross-region replication traffic, so budget roughly 1.6x to 2x the
+single-region bill with the replication leg priced near 20 dollars per TB moved between regions. Say
+out loud that those figures are approximate: the invoice drifts, the ratio does not.
+
+\`\`\`
+single-region footprint           ~30,000 USD a month  (approximate, ratio is the point)
+active-passive with a standby     ~55,000 USD a month  (~1.8x)
+cost of the extra nine            ~25,000 USD a month  = ~300,000 USD a year
+downtime it buys back             ~8.8 h -> ~53 min    = ~8 hours a year
+break-even cost of an hour down   300,000 / 8          = ~37,000 USD an hour
+\`\`\`
+
+So 99.99% is defensible exactly when an hour down costs more than about 37,000 dollars, and saying
+which side of that line you are on is the senior version of the requirement. A checkout flow taking a
+million dollars a day loses roughly 42,000 dollars an hour, so the nine pays for itself and you should
+say so in the same breath you write it. An internal analytics dashboard loses close to nothing per
+hour, so 99.99% there spends 300,000 dollars a year protecting a page people reload: write 99.9% and
+put the money on the read path. Two refinements an interviewer will respect: the hours are not equal,
+because an outage at peak costs several times one at 3 a.m., and the storage half of the standby is
+often already paid for, since you wanted an off-region replica for durability regardless.
+
 So an availability NFR does not automatically mean "more regions accepting traffic". Ask what a
-partition is allowed to do to a write, and let that answer pick the topology.
+partition is allowed to do to a write, ask what an hour of downtime is worth, and let those two
+answers pick the topology.
 
 \`\`\`csdiagram
 {
@@ -761,6 +786,9 @@ drive architecture. If an NFR does not force a lever, it is filler and you shoul
 
 Recap: Write NFRs as quantified, testable numbers (percentiles, nines, QPS), take an explicit
 consistency stance, split read and write SLAs, and tie each NFR to the specific design lever it forces.
+When that lever is a second region, price it: the fourth nine costs on the order of 1.8x your footprint
+to buy back about eight hours a year, so it is worth it only above roughly 37,000 dollars an hour of
+downtime.
 
 \`\`\`cswidget
 {
