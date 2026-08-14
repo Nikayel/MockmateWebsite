@@ -2205,6 +2205,9 @@ of your evolution costs zero version bumps.
 - **Header or media-type versioning** (\`Accept: application/vnd.acme.v2+json\`). Purer from a REST
   standpoint because the resource URL is stable, but it is invisible in a browser address bar, harder
   to test casually, and easy for a proxy to strip or ignore.
+- **Caller-pinned versioning**, where the version is a value stored against the account rather than
+  written into the request at all, usually a date, with a header that overrides it for one call. The
+  next section works this one, because its consequences are less obvious than the first two.
 
 Per-paradigm nuance: GraphQL avoids URL versions entirely and evolves field by field, marking old
 fields \`@deprecated\` with a reason and adding new ones. gRPC follows Protobuf's field-number rules:
@@ -2215,6 +2218,56 @@ Compatibility runs two directions. **Backward** compatibility: a new server can 
 clients. **Forward** compatibility: an old client can tolerate data from a new server (this is
 exactly what the tolerant-reader pattern buys you). You want both, because in a distributed deploy
 the two sides are never upgraded at the same instant.
+
+### One endpoint, two response shapes
+
+Nothing requires the version to live in the path or in the request. It can be a property of the
+caller: each account carries a dated version, set when it integrated, and every request runs against
+that date unless a header says otherwise. Same URL, same deployment, two answers:
+
+\`\`\`
+# Account A integrated in 2016, so its stored version is 2016-07-06.
+GET /v1/charges/ch_123
+-> { "id": "ch_123", "amount": 2000, "refunded": true }
+
+# Account B integrated last year, so its stored version is 2024-04-10.
+GET /v1/charges/ch_123          # byte-for-byte the same request
+-> { "id": "ch_123", "amount": 2000, "refunds": { "total_count": 1, "data": [ ... ] } }
+
+# Either account can override for a single call without changing what it is pinned to:
+GET /v1/charges/ch_123
+Stripe-Version: 2024-04-10      # a per-request override header
+-> the 2024 shape, this once
+\`\`\`
+
+The server does not hold two implementations. It holds one current model, plus a translation applied
+on the way in and on the way out. Each dated version contributes one small shim, written on the day
+of the break:
+
+\`\`\`
+# The 2017-08-15 release replaced a boolean with a list. Its shim is this, and nothing else.
+down_convert_2016_07_06(charge):        # current internal model -> the older response shape
+    charge.refunded = charge.refunds.total_count > 0
+    remove charge.refunds
+
+up_convert_2016_07_06(request):         # an older request shape -> current internal model
+    if request has refund_amount:
+        request.refunds = [{ amount: request.refund_amount }]
+\`\`\`
+
+Chain them and one implementation serves a decade. A caller pinned three breaks back is handled by
+three functions, applied newest to oldest on the way out:
+
+\`\`\`
+request from a 2016-pinned account
+  -> up_convert 2016_07_06 -> up_convert 2017_08_15 -> up_convert 2021_02_01   # now current model
+  -> business logic runs ONCE, only ever against the current model
+  -> down_convert 2021_02_01 -> down_convert 2017_08_15 -> down_convert 2016_07_06
+  -> the exact response shape that account was coded against in 2016
+\`\`\`
+
+The bill is real: every dated version is a shim you keep and test forever, and the count only grows.
+What you buy is that an old caller costs a function rather than a fork or a forced migration.
 
 ### Retiring a version is a sequenced migration
 
@@ -2260,8 +2313,9 @@ never bump the version, and only cut /v2 for a true break," then describing the 
 sequence. Jumping straight to "put v1 in the URL" misses that versioning is a last resort.
 
 Recap: prefer additive change with tolerant readers so you rarely version, use visible /v1 path
-versioning for true public breaks, and retire old versions with a deprecate then warn then remove
-sequence.
+versioning for true public breaks, know that a version can instead be pinned to the caller and served
+by a chain of transformers over one current model, and retire old versions with a deprecate then warn
+then remove sequence.
 
 \`\`\`cswidget
 {
