@@ -485,6 +485,64 @@ who spends five minutes on third-normal-form column design as someone who cannot
 decisions from the details. Name the entity, list the three or four fields that drive the design (the
 ones that get indexed, sharded, or looked up), and move on.
 
+\`\`\`csdiagram
+{
+  "type": "er",
+  "tables": [
+    {
+      "name": "ShortLink",
+      "columns": [
+        {
+          "name": "code",
+          "key": "pk",
+          "type": "string, the short slug"
+        },
+        {
+          "name": "long_url",
+          "type": "string"
+        },
+        {
+          "name": "owner_id",
+          "key": "fk",
+          "type": "nullable"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp, nullable"
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "columns": [
+        {
+          "name": "id",
+          "key": "pk",
+          "type": "string"
+        },
+        {
+          "name": "email",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "ShortLink",
+      "to": "User",
+      "kind": "n-1",
+      "label": "owned by"
+    }
+  ],
+  "caption": "The whole entity sketch for a URL shortener. Five fields on ShortLink, not a normalized schema: the slug you look up by, the target, the owner you might shard or filter on, and the two timestamps. Anything else is a column you can add during implementation."
+}
+\`\`\`
+
 ### The API sketch: one endpoint per requirement
 
 The API sketch is one endpoint per functional requirement, with request and response shapes concrete
