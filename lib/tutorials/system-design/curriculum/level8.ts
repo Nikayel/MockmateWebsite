@@ -3904,6 +3904,33 @@ What to capture per event: actor (user or service identity), action, resource, t
 }
 \`\`\`
 
+## Seven years of trail, priced
+
+"Retained for years" is where audit logging stops being a mechanism question and becomes a budget one, and the budget then picks the architecture. Take an EHR-scale platform emitting 2,000 auditable events a second, each about 500 bytes once you have kept the identifiers and left out the record contents, under the six-to-seven-year retention these regimes tend to land on. The figures below are approximate and it is the ratio between the tiers that stays true: a hot, indexed, replicated search tier runs on the order of 250 dollars per TB-month once the index and the replica are counted, plain object storage is nearer 23, and an Object-Locked archive tier is around 1.
+
+\`\`\`
+Volume:
+  2,000 events/sec x 86,400     = 173M events per day
+  173M x 500 B                  = about 86 GB per day, about 31 TB per year
+  x 7 years                     = about 220 TB you are required to still have
+
+Keep all of it hot and searchable:
+  220 TB x 250 USD/TB-month     = about 55,000 USD per month
+
+Keep 90 days hot, seal the rest into Object-Locked archive:
+  7.8 TB x 250 USD/TB-month     = about 1,950 USD per month (hot)
+  212 TB x 1 USD/TB-month       = about 210 USD per month (archive, restore in hours)
+                                = about 2,200 USD per month, roughly 25x cheaper
+\`\`\`
+
+Notice what did not change: Object Lock is itself the WORM tier, so the cold half is if anything harder to alter than the hot half. What changed is which questions you can ask and how fast, and that forces three decisions.
+
+First, the hot window is a requirement rather than a budget line. It is set by how far back an investigation or an anomaly detector must run in seconds, so ask for that number and size the hot tier from it, instead of picking 90 days because it sounds like a quarter.
+
+Second, the chain has to stay verifiable without restoring the archive. Seal it into segments (an hour or a day each), keep every segment's head hash in the hot tier, and chain the heads to each other. A hash is 32 bytes, so seven years of hourly segments is a couple of megabytes: you verify the whole trail end to end by reading megabytes, and restore only the segment whose head does not match.
+
+Third, bytes per event multiply through everything above. Going from 500 bytes to 1 KB doubles both columns, so "log that user 123 viewed record 456, not the record's contents" is the cheap answer as well as the safe one, and a debug field someone quietly added to the audit event gets paid for once per event for seven years.
+
 ## OWASP application defenses at the gateway
 
 The OWASP API Security Top 10 is the standard checklist. The one interviewers hammer is **BOLA (Broken Object Level Authorization)**, also called IDOR: the server returns object 456 because the URL asked for it, without checking that this caller owns 456. The fix is an authorization check on every object access, \`caller owns resource\`, never trusting an ID from the client. Others: input validation and parameterized queries (SQL injection), blocking **SSRF** (validate and allowlist any URL the server fetches, or an attacker pivots to your cloud metadata endpoint), and **mass assignment** (never bind a request body straight onto a model, or a user sets \`isAdmin=true\`). Centralize what you can at the API gateway (schema validation, rate limits, auth) but object-level authorization has to live in the service that knows ownership.
