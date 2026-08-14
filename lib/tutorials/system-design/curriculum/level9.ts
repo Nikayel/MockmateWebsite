@@ -564,9 +564,9 @@ Kubernetes schedules those images onto nodes and keeps the declared state true:
 
 - **Pod:** the smallest unit, one or more co-located containers sharing a network namespace. You rarely create Pods directly.
 - **Deployment:** manages a ReplicaSet of identical, interchangeable stateless Pods. The default for a web API.
-- **StatefulSet:** stable network identity and stable per-Pod storage for stateful workloads (each Pod gets \`pod-0\`, \`pod-1\` and keeps its own PersistentVolume across restarts).
+- **StatefulSet:** stable network identity and stable per-Pod storage for stateful workloads (each Pod gets \`pod-0\`, \`pod-1\` and keeps its own PersistentVolume across restarts). The identity half of that promise is not delivered by the StatefulSet itself: it comes from the headless Service below, which is why a StatefulSet is always declared alongside one.
 - **DaemonSet:** one Pod per node, for agents like log shippers or a CNI.
-- **Service:** a stable virtual IP and DNS name load-balancing across a set of Pods.
+- **Service:** a stable virtual IP and DNS name load-balancing across a set of Pods. Set \`clusterIP: None\` and you get a **headless Service** instead, which is the opposite behaviour: no virtual IP and no load balancing, and a DNS lookup returns one address record per ready Pod plus an individually addressable name for each, \`pg-0.pg.default.svc.cluster.local\`, \`pg-1.pg...\`, and so on. That per-Pod name is the "stable network identity" a StatefulSet advertises. A replica that has to stream from the primary specifically, or a broker that has to be reachable as broker 2 and not as "one of the brokers", cannot use a VIP that deliberately hides which Pod answered.
 - **Ingress / Gateway API:** L7 north-south routing into the cluster.
 - **ConfigMap / Secret:** non-secret and secret config injected as env vars or files, kept out of the image.
 
@@ -687,9 +687,35 @@ Every container should set resource **requests** (what the scheduler reserves) a
 
 A rolling update stays zero-downtime because new Pods must pass readiness before old Pods are terminated. Set \`maxUnavailable: 0\` and \`maxSurge: 1\` and Kubernetes brings up a new ready Pod before removing an old one, so capacity never dips.
 
+## Terminating a Pod is a race you have to pad
+
+Readiness handles the Pod arriving. The Pod leaving needs two more fields, because termination is not one ordered event. The instant a Pod is marked for deletion, two things start in parallel and nothing sequences them: the kubelet begins shutting the container down, and the endpoints controller removes the Pod from the Service. That removal then has to propagate outward, to every kube-proxy rule on every node and to every Ingress, Gateway, or mesh proxy holding its own copy of the endpoint list. Propagation takes a second or two. For that whole window, proxies that have not caught up are still sending live requests to a Pod that has already been told to die, so a process that exits promptly on SIGTERM drops every request in that window and every request still in flight.
+
+The two fields that pad the race sit in the same Pod spec as the probes:
+
+\`\`\`yaml
+spec:
+  # Budget for the WHOLE shutdown, hook plus drain. Countdown starts when the Pod is
+  # marked terminating, and SIGKILL lands when it expires. Default is 30.
+  terminationGracePeriodSeconds: 45
+  containers:
+    - name: api
+      readinessProbe:
+        httpGet: { path: /readyz, port: 8080 }
+        periodSeconds: 2
+      lifecycle:
+        preStop:
+          exec:
+            # Runs BEFORE SIGTERM, and the kubelet blocks on it. Ten seconds of staying
+            # healthy and serving while the endpoint deletion reaches every proxy.
+            command: ["sleep", "10"]
+\`\`\`
+
+Walk the resulting order once, because the useful part is that \`preStop\` runs first. Second 0: the Pod is marked terminating, endpoint removal starts propagating, and the kubelet runs the hook. Seconds 0 to 10: the container is untouched and still answering, so the stragglers arriving from proxies that have not caught up are served normally. Second 10: the hook returns, the container gets SIGTERM, and the app stops accepting new connections and finishes what it is holding. Second 45: SIGKILL, and anything unfinished is lost. So the grace period has to exceed the hook plus your longest request, which is why 45 is written here rather than the default 30: a 10 second hook plus a request that can legitimately take 30 seconds does not fit in 30.
+
 **Interview nuance:** the tell of a weak answer is treating K8s as "a magic scaling button." The strong answer says the app must be stateless (no local session, no local disk) for a Deployment to work, and that readiness probes, not liveness probes, are what make a rollout safe.
 
-**Recap:** build small immutable images, use Deployments for stateless and StatefulSets for stateful, set requests/limits and a PodDisruptionBudget, and let readiness probes gate a \`maxUnavailable: 0\` rolling update to stay zero-downtime.
+**Recap:** build small immutable images, use Deployments for stateless and StatefulSets for stateful (paired with a headless Service for per-Pod DNS names), set requests/limits and a PodDisruptionBudget, let readiness probes gate a \`maxUnavailable: 0\` rolling update, and pad the teardown with a \`preStop\` hook plus a \`terminationGracePeriodSeconds\` big enough for the hook and the drain, so the departing Pod is zero-downtime too.
 
 \`\`\`cswidget
 {
