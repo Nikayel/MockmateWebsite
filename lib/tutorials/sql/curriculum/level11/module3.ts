@@ -133,7 +133,7 @@ const exactDedup: SqlLesson = {
   id: "de-l11-exact-dedup",
   title: "Deduplicating a Training Corpus with Hashes",
   summary:
-    "Dedup a crawled corpus by exact content hash with ROW_NUMBER and a composite tiebreaker, materialize the result idempotently, and place fuzzy and semantic dedup as the same idea at higher cost.",
+    "Exact-hash dedup strips 20 to 30 percent of a crawled corpus, and the ROW_NUMBER keep rule is only safe once its tiebreaker is deterministic.",
   estimatedMinutes: 28,
   difficulty: "medium",
   skills: [
@@ -505,7 +505,7 @@ const piiScrubbing: SqlLesson = {
   id: "de-l11-pii-scrubbing",
   title: "PII Scrubbing Funnels Before Training",
   summary:
-    "Drive a redact-or-drop decision from a two-detector PII scan table, find the entities one detector misses, and place benchmark decontamination as the stage that runs right after.",
+    "Why a PII scrubbing stage runs regex and NER in series, and how to drive the redact-or-drop call from severity rather than from volume.",
   estimatedMinutes: 27,
   difficulty: "medium",
   skills: [
@@ -775,7 +775,7 @@ const curationFunnel: SqlLesson = {
   id: "de-l11-curation-funnel",
   title: "The Curation Funnel and Acceptance-Rate Monitoring",
   summary:
-    "Read the seven-stage curation funnel as acceptance rates, then catch the run where one stage silently started eating the corpus while every job still reported success.",
+    "Read a seven-stage curation funnel as acceptance rates and catch the stage that silently ate the corpus while every job still reported success.",
   estimatedMinutes: 30,
   difficulty: "hard",
   skills: [

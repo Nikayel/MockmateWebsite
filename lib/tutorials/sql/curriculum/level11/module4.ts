@@ -171,7 +171,7 @@ const semanticModels: SqlLesson = {
   id: "de-l11-semantic-models",
   title: "Semantic Models: the Text-to-SQL Accuracy Lever",
   summary:
-    "The governed metric contract is the single biggest accuracy lever on AI-written SQL, and reading one and implementing it exactly is the data engineer's half of the job.",
+    "A governed semantic layer, not a bigger model, is the largest accuracy lever on AI-written SQL, and the data engineer is who authors that contract.",
   estimatedMinutes: 29,
   difficulty: "medium",
   skills: [
@@ -387,7 +387,7 @@ const reviewingAiSql: SqlLesson = {
   id: "de-l11-reviewing-ai-sql",
   title: "Reviewing AI-Written SQL, and What Appreciates in the AI Era",
   summary:
-    "A generated query can parse perfectly and still be wrong in three ways at once, so the closing skill of the course is reviewing one against its contract and proving the divergence in SQL.",
+    "A generated query can parse perfectly and still be wrong, so review every one for grain, filters, join fan-out and contract match before trusting it.",
   estimatedMinutes: 31,
   difficulty: "hard",
   skills: [
