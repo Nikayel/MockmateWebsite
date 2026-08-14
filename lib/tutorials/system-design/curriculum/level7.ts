@@ -16,12 +16,46 @@ Availability is the fraction of time (or of valid requests) a service is up and 
 
 The math: allowed downtime = (1 - availability) x window. For a 30-day month (43,200 minutes):
 
-\`\`\`
-Nines     Availability   Downtime / month   Downtime / year
-two        99%            ~7.2 hours          ~3.65 days
-three      99.9%          ~43.2 minutes       ~8.76 hours
-four       99.99%         ~4.3 minutes        ~52.6 minutes
-five       99.999%        ~26 seconds         ~5.26 minutes
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Nines",
+    "Availability",
+    "Downtime / month",
+    "Downtime / year"
+  ],
+  "rows": [
+    [
+      "two",
+      "99%",
+      "~7.2 hours",
+      "~3.65 days"
+    ],
+    [
+      "three",
+      "99.9%",
+      "~43.2 minutes",
+      "~8.76 hours"
+    ],
+    [
+      "four",
+      "99.99%",
+      "~4.3 minutes",
+      "~52.6 minutes"
+    ],
+    [
+      "five",
+      "99.999%",
+      "~26 seconds",
+      "~5.26 minutes"
+    ]
+  ],
+  "highlightCols": [
+    "Downtime / month"
+  ],
+  "caption": "Read the highlighted column, because that is the one an on-call rotation feels. Each added nine divides it by ten, which is why each one costs roughly ten times more than the last."
+}
 \`\`\`
 
 \`\`\`cswidget
@@ -266,13 +300,32 @@ Why spent, not hoarded? A team sitting at 100% budget remaining all quarter is n
 
 A pre-agreed, written set of consequences that trigger automatically as the budget drains, so the ship-versus-stabilize decision is made in advance and does not become a political fight during a crisis. A typical policy:
 
-\`\`\`
-Budget remaining   Consequence
-100% - 50%         Normal operation. Ship features at full speed.
-50% - 10%          Caution. Extra review on risky changes; start
-                   burning down reliability debt in parallel.
-0% (exhausted)     Feature freeze. All release capacity redirects to
-                   reliability until the budget recovers.
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Budget remaining",
+    "Consequence, agreed in advance"
+  ],
+  "rows": [
+    [
+      "100% to 50%",
+      "Normal operation. Ship features at full speed."
+    ],
+    [
+      "50% to 10%",
+      "Caution. Extra review on risky changes, and start burning down reliability debt in parallel."
+    ],
+    [
+      "0% (exhausted)",
+      "Feature freeze. All release capacity redirects to reliability until the budget recovers."
+    ]
+  ],
+  "highlightCols": [
+    "Consequence, agreed in advance"
+  ],
+  "caption": "The freeze is the teeth. Because the whole column is signed before the incident, nobody has to win the ship-versus-stabilize argument in the moment: the number already decided."
+}
 \`\`\`
 
 The freeze is the teeth. When the budget hits zero, feature launches stop and the team works reliability until the rolling window recovers the budget. This is what makes the SLO enforceable rather than aspirational.
