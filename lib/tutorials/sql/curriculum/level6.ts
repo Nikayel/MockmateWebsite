@@ -91,7 +91,7 @@ const cloudAndTheDeStack: SqlLesson = {
   id: "sql-l6-cloud-and-the-de-stack",
   title: "What the Cloud Is, and the Shape of a Data Platform",
   summary:
-    "Regions, availability zones, and managed services, then the five decoupled layers every data platform is built from: storage, catalog, compute, orchestration, serving.",
+    "Regions, availability zones, and the five decoupled layers every cloud data platform is built from: storage, catalog, compute, orchestration, serving.",
   estimatedMinutes: 24,
   difficulty: "easy",
   skills: [
@@ -317,9 +317,9 @@ ORDER BY cost DESC, layer;`,
 
 const objectVsBlockStorage: SqlLesson = {
   id: "sql-l6-object-vs-block-storage",
-  title: "Object vs Block vs File Storage, and Why the Lake Lives on S3",
+  title: "Object vs Block vs File Storage: Why the Lake Lives on S3",
   summary:
-    "The three storage shapes every cloud offers (S3, EBS, EFS), the immutable-blob-over-HTTP object model, eleven-nines durability, and why a data lake is files in a bucket.",
+    "Why a data lake is files in a bucket and not a disk: S3's immutable-blob-over-HTTP model versus the block (EBS) and file (EFS) shapes.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
@@ -561,7 +561,7 @@ const storageClassesLifecycle: SqlLesson = {
   id: "sql-l6-storage-classes-lifecycle",
   title: "Storage Classes and Lifecycle: Paying Less for Colder Data",
   summary:
-    "Hot, warm, cold, and archive tiers, the retrieval-latency and minimum-duration trade, lifecycle policies, and computing the bill (and the saving from a transition) with a join.",
+    "What moving cold data to a cheaper storage tier actually saves, and the retrieval latency and minimum-duration charges you pay for it.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
@@ -792,9 +792,9 @@ ORDER BY cost DESC, prefix;`,
 
 const lakeWarehouseCatalog: SqlLesson = {
   id: "sql-l6-lake-warehouse-catalog",
-  title: "Files Plus a Catalog Equals a Table: Lake, Warehouse, Lakehouse",
+  title: "Lake vs Warehouse vs Lakehouse: Files Plus a Catalog",
   summary:
-    "How a pile of files in a bucket becomes a queryable table (the Hive metastore / Glue catalog), the lake vs warehouse vs lakehouse split, and auditing the catalog with SQL.",
+    "How a pile of files in a bucket becomes a queryable table, and what a lakehouse adds that a plain lake and a warehouse each miss.",
   estimatedMinutes: 24,
   difficulty: "easy",
   skills: [
@@ -1063,7 +1063,7 @@ const rowsVsColumns: SqlLesson = {
   id: "sql-l6-rows-vs-columns",
   title: "Rows vs Columns on Disk, and Column Projection",
   summary:
-    "Why a CSV is row-oriented and Parquet is column-oriented, and the first thing columnar buys you: a query reads only the columns it selects, not every byte of every row.",
+    "Why Parquet reads only the columns your query selects while a CSV reads every byte of every row, and what that does to scan cost.",
   estimatedMinutes: 24,
   difficulty: "medium",
   skills: [

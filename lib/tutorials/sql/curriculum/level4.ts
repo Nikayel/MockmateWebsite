@@ -3737,7 +3737,7 @@ const factTypes: SqlLevel["modules"][number]["lessons"][number] = {
   id: "sql-l4-fact-types",
   title: "Fact Table Types and Measure Additivity",
   summary:
-    "Classify fact tables by grain and use measure additivity to decide which sums are valid: correctly roll up a semi-additive balance and recompute a non-additive ratio from additive parts.",
+    "Why summing a bank balance across days invents money, and how measure additivity decides which fact table roll-ups are legal.",
   estimatedMinutes: 20,
   difficulty: "medium",
   skills: [
@@ -3947,7 +3947,7 @@ CREATE TABLE sales_report (
 
 const dimensionPatterns: SqlLevel["modules"][number]["lessons"][number] = {
   id: "sql-l4-dimension-patterns",
-  title: "Dimension Patterns: Conformed, Role-Playing, Degenerate, Junk",
+  title: "Conformed, Role-Playing, Degenerate and Junk Dimensions",
   summary:
     "Model conformed, role-playing, degenerate, and junk dimensions, plus factless facts, the way data-engineering interviewers ask about them.",
   estimatedMinutes: 22,
