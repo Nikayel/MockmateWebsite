@@ -5748,9 +5748,9 @@ A metrics platform ingests a firehose of numbers over time (millions of data poi
   "prompt": "A team adds a user_id label to http_requests_total so they can slice by customer. You have ten million users. What does that cost?",
   "options": [
     {
-      "label": "Ten million separate time series from that one metric",
+      "label": "Every series it already had, multiplied by ten million",
       "correct": true,
-      "feedback": "Right. A series is a unique combination of label values, so every user id becomes its own series with its own index entry and its own sample stream. Cardinality is the product of the label value counts, and unbounded fields like user id, request id or email are what actually take these systems down."
+      "feedback": "Right, and the multiplication is the part that surprises people. A series is a unique combination of label values, so the new label does not add ten million series, it multiplies the series you already had by ten million. A metric already split by 200 services, 5 regions and 8 status codes is 8,000 series; add the user id and it is 80 billion. Unbounded fields like user id, request id or email are what actually take these systems down."
     },
     {
       "label": "Nothing at storage time: labels are just strings attached to the same series, so only queries get more complex",
@@ -5766,7 +5766,7 @@ A metrics platform ingests a firehose of numbers over time (millions of data poi
 
 ## The cardinality trap
 
-A metric is a name plus a set of labels plus a timestamped value: \`http_requests_total{service="checkout", region="us-east", status="200"} = 4823 @ t\`. The unique combination of label values is a time series. Here is the trap that dominates this problem: cardinality is the product of all label value counts. Add a \`user_id\` label with 10M values and one metric becomes 10M time series, and your storage and query cost explode. Controlling cardinality (never put unbounded-cardinality fields like user id, request id, or email in labels) is the single most important design discipline.
+A metric is a name plus a set of labels plus a timestamped value: \`http_requests_total{service="checkout", region="us-east", status="200"} = 4823 @ t\`. The unique combination of label values is a time series. Here is the trap that dominates this problem: cardinality is the product of all label value counts, so a new label MULTIPLIES rather than adds. The metric above, split by 200 services, 5 regions and 8 status codes, is 8,000 series. Add a \`user_id\` label with 10M values and it is not 10M series, it is 8,000 times 10M, which is 80 billion, and your storage and query cost explode. Controlling cardinality (never put unbounded-cardinality fields like user id, request id, or email in labels) is the single most important design discipline.
 
 **Interview nuance:** when asked "what breaks first," say high-cardinality labels. Interviewers want to hear that you would reject \`user_id\`/\`trace_id\` as labels, cap label sets, and detect cardinality spikes, because unbounded cardinality is what actually takes these systems down.
 

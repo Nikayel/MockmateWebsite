@@ -2715,7 +2715,7 @@ durability and retry machinery is exactly what Temporal / Step Functions give yo
       "note": "A compensation is a call like any other and can fail, and stock and money still have to reconcile, so the reversals need retries with backoff, a dead-letter queue, and finally a human."
     }
   ],
-  "caption": "The three return arcs are the compensations, and they run in reverse order of the forward steps. Nothing is rolled back: each reversal is a new local transaction that semantically undoes the one before it."
+  "caption": "Three return arcs, and they are not the same thing: the first carries the failure back to the orchestrator, and the other two are the compensations it then issues, in reverse order of the forward steps. Nothing is rolled back. Each compensation is a new local transaction that semantically undoes the one before it."
 }
 \`\`\`
 
