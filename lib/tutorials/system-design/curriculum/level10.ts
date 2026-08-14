@@ -4930,7 +4930,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-yelp-nearby",
           title: "Design Yelp / Nearby Places (Proximity Search)",
           summary:
-            "Nearby-places is read-heavy over a near-static POI set, so serve it from a search engine (geo_distance plus attribute filters plus ranking) fed by a denormalized read model, cache popular result pages and detail pages with generous TTLs invalidated on rare edits, and do not over-build the low-rate write path.",
+            "Nearby-places is Uber inverted: the points barely move, so you build a rebuildable search index and cache hard instead of chasing writes.",
           estimatedMinutes: 40,
           difficulty: "medium",
           skills: ["geospatial", "search", "caching", "case-study"],
@@ -4986,7 +4986,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-distributed-cache",
           title: "Design a Distributed Cache (Redis-like)",
           summary:
-            "Place keys with consistent hashing plus virtual nodes (never hash mod N), evict with LRU or LFU plus TTL, choose cache-aside by default, and defend hot keys with replication and stampedes with coalescing plus TTL jitter.",
+            "Consistent hashing with virtual nodes solves placement, and a hot key and a cache stampede each need a fix that placement cannot give.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["distributed-cache", "consistent-hashing", "eviction"],
@@ -5031,7 +5031,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-key-value-store",
           title: "Design a Key-Value Store (DynamoDB/Cassandra)",
           summary:
-            "Partition with consistent hashing and replication factor N, tune consistency with R + W > N (which is freshness, not linearizability), resolve conflicts with vector clocks or LWW plus read-repair and Merkle anti-entropy, and store writes in an LSM (commit log, memtable, SSTable, compaction).",
+            "Why R plus W greater than N buys freshness and not linearizability, and where an LSM tree charges you back for its very fast writes.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["key-value-store", "quorum", "lsm"],
@@ -5077,7 +5077,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-object-store-s3",
           title: "Design an Object Store (Amazon S3)",
           summary:
-            "Hit 11 nines with erasure coding (k + m Reed-Solomon, roughly 1.4x overhead) instead of 3x replication, scale the metadata index by partitioning bucket+key across a KV store, give strong read-after-write via a durable metadata commit, support multipart upload and range GET, and maintain durability with checksums, scrubbing, and reconstruction.",
+            "How erasure coding reaches eleven nines at 1.4x overhead instead of 3x, and why the metadata index is where read-after-write comes from.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["object-store", "erasure-coding", "durability"],
