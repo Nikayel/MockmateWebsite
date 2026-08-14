@@ -1136,27 +1136,27 @@ CAP says under a network partition you choose consistency or availability. PACEL
 
 ## How you still get strong consistency
 
-Replicate each data shard across regions with a consensus protocol (Paxos or Raft): a write commits when a majority of replicas acknowledge. Place replicas so the quorum is reachable quickly. Google Spanner adds **TrueTime**, an API that returns time as an interval \`[earliest, latest]\` bounded by GPS and atomic clocks (uncertainty typically a few ms). To commit at timestamp T, Spanner waits out the uncertainty (commit-wait) so that no later reader can observe an earlier timestamp. This gives **external consistency**: if transaction A commits before B starts, A's timestamp is smaller, globally. Without special clocks you approximate ordering with Hybrid Logical Clocks (HLC), which combine physical time with a logical counter to preserve causality (CockroachDB, YugabyteDB use this).
+Replicate each data shard across regions with a consensus protocol (Paxos or Raft): a write commits when a majority of replicas acknowledge. Place replicas so the quorum is reachable quickly. Google Spanner adds **TrueTime**, an API that returns time as an interval \`[earliest, latest]\` bounded by GPS and atomic clocks (uncertainty typically a few ms). To commit at timestamp T, Spanner waits out the uncertainty (commit-wait) so that no later reader can observe an earlier timestamp. This gives **external consistency**: if transaction A commits before B starts, A's timestamp is smaller, globally. Without special clocks you approximate ordering with Hybrid Logical Clocks (HLC), which combine physical time with a logical counter to preserve causality (CockroachDB, YugabyteDB use this). Be precise about what that buys: HLC preserves causality but does not by itself give external consistency, because with no bounded clock uncertainty there is nothing to wait out, so a commit cannot promise that every later reader will see a larger timestamp. Bounded uncertainty is exactly what TrueTime sells you, and Level 5's Physical Time, Clock Uncertainty, HLC & TrueTime lesson works through the distinction.
 
 \`\`\`cswidget
 {
   "type": "check",
   "kind": "predict",
-  "id": "hlc-versus-truetime",
-  "prompt": "CockroachDB uses Hybrid Logical Clocks rather than GPS receivers and atomic clocks. Read that paragraph again carefully: what does HLC buy, and what does it not?",
+  "id": "what-truetime-actually-returns",
+  "prompt": "TrueTime is the piece that turns correct ordering into external consistency. What does it hand the commit path?",
   "options": [
     {
-      "label": "It gives the same external consistency as TrueTime, without the special hardware",
-      "feedback": "The appealing reading, and the one that costs candidates the question. HLC alone does not provide external consistency. With no bounded clock uncertainty there is nothing to wait out, so a commit cannot promise that every later reader sees a later timestamp."
+      "label": "Clocks synchronized tightly enough that two regions read the same instant",
+      "feedback": "This is the popular reading of TrueTime and the one to unlearn. GPS receivers and atomic clocks narrow the disagreement between nodes, they do not abolish it, and the API is honest about that: it hands back a range rather than a point."
     },
     {
-      "label": "It preserves causality without special hardware, but external consistency needs a bounded clock uncertainty to wait out, which is what TrueTime provides",
+      "label": "An uncertainty interval the commit deliberately waits out",
       "correct": true,
-      "feedback": "Right. The logical counter carries causal order between events that are actually related. Spanner's commit-wait is the extra step that ties timestamps to real time, and it only exists because TrueTime bounds the uncertainty."
+      "feedback": "Right. TrueTime returns earliest and latest, and commit-wait sits idle until the chosen timestamp is safely in the past for every reader. External consistency is bought with a few milliseconds of deliberate delay, which is also why HLC cannot buy it: with no bound, there is nothing to wait out."
     },
     {
-      "label": "It removes the need for consensus, since a logical counter already orders every write",
-      "feedback": "Ordering is not agreement. Each shard is still replicated with Paxos or Raft and still commits on a majority. The clock decides what timestamp a committed write carries, not which writes commit."
+      "label": "A global counter issuing strictly increasing timestamps",
+      "feedback": "A global sequencer would be one box every write on the planet has to visit, which is the coordination TrueTime exists to avoid. Each node reads its own clock and only needs to know how wrong that clock might be."
     }
   ]
 }
