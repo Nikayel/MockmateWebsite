@@ -920,12 +920,93 @@ Multi-step logic does not belong inside one giant function. Orchestrate it with 
 
 **Interview nuance:** the cost model inverts at high steady load. FaaS is priced for bursty utilization; if a function runs flat-out 24/7, per-invocation billing costs several times what an equivalently sized, well-utilized container or reserved instance would. The crossover is roughly when sustained utilization passes ~40 to 60 percent. Saying "serverless is cheaper" without "for spiky load" is the tell of someone who has not seen the bill.
 
-\`\`\`
-UPLOAD --> S3 event --> Lambda (per-file, stateless, auto-scale)
-                              |  cold start 100ms-1s+
-                              |  15-min cap, concurrency cap
-                       write result --> S3 / DynamoDB
-   multi-step? --> Step Functions orchestrates N small functions
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "An upload through a function, and what the model forces",
+  "nodes": [
+    {
+      "id": "upload",
+      "label": "Client uploads a file",
+      "kind": "client"
+    },
+    {
+      "id": "bucket",
+      "label": "S3 bucket",
+      "kind": "db"
+    },
+    {
+      "id": "fn",
+      "label": "Lambda (stateless, cold start 100 ms to 1 s, 15 min cap, concurrency cap)",
+      "kind": "service"
+    },
+    {
+      "id": "store",
+      "label": "S3 or DynamoDB (durable result)",
+      "kind": "db"
+    },
+    {
+      "id": "sfn",
+      "label": "Step Functions (one function per step, retries declared)",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "upload",
+      "to": "bucket",
+      "kind": "sync",
+      "label": "put object"
+    },
+    {
+      "from": "bucket",
+      "to": "fn",
+      "kind": "async",
+      "label": "object-created event"
+    },
+    {
+      "from": "fn",
+      "to": "store",
+      "kind": "sync",
+      "label": "write result"
+    },
+    {
+      "from": "bucket",
+      "to": "sfn",
+      "kind": "async",
+      "label": "multi-step work"
+    },
+    {
+      "from": "sfn",
+      "to": "store",
+      "kind": "sync",
+      "label": "per-step output"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "upload",
+        "bucket",
+        "fn"
+      ],
+      "note": "The requirement is bursty, unpredictable per-file work, so an event triggers one function instance per concurrent file and there is no fleet to size. That is the whole pitch, and the price is a cold start on every instance the platform has to provision."
+    },
+    {
+      "adds": [
+        "store"
+      ],
+      "note": "Nothing on the instance survives the invocation, so any result a later request needs has to leave the function for a store that outlives it."
+    },
+    {
+      "adds": [
+        "sfn"
+      ],
+      "note": "A five-step job in one function hits the 15 minute cap and retries all five steps whenever one fails, so multi-step work moves to an orchestrator where each step retries alone."
+    }
+  ],
+  "caption": "Cold starts land on the p99 tail, nothing local survives an invocation, and the 15 minute cap plus the account concurrency limit are why long work becomes several small functions rather than one big one."
+}
 \`\`\`
 
 **Recap:** FaaS trades capacity management for per-invocation billing and instant scale, which wins for spiky event-driven glue but loses on cold-start latency, hard execution limits, statelessness, and a cost model that inverts against containers under high steady load.
