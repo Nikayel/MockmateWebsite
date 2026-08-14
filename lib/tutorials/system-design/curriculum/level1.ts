@@ -3035,16 +3035,98 @@ per-endpoint special cases, at which point it is a distributed monolith that eve
 coordinate on and a single bottleneck all traffic squeezes through. Keep the gateway thin and
 generic; push business logic down into services.
 
-\`\`\`
-Internet
-  |
-[ WAF / DDoS ]            <- filter junk before it costs you
-  |
-[ API Gateway ]           <- TLS, authn, rate limit, routing (north-south)
-  |     |     |
- svcA  svcB  svcC         <- business logic + fine-grained authz
-   \\____|____/
-    service mesh sidecars <- mTLS, retries, timeouts (east-west)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Where each edge concern lives",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "internet",
+      "label": "Internet (all client traffic)",
+      "kind": "client"
+    },
+    {
+      "id": "waf",
+      "label": "WAF / DDoS (filter junk before it costs you)",
+      "kind": "lb"
+    },
+    {
+      "id": "gateway",
+      "label": "API gateway (TLS, authn, rate limit, routing)",
+      "kind": "lb"
+    },
+    {
+      "id": "svcA",
+      "label": "svcA (business logic, fine-grained authz)",
+      "kind": "service"
+    },
+    {
+      "id": "svcB",
+      "label": "svcB (business logic, fine-grained authz)",
+      "kind": "service"
+    },
+    {
+      "id": "svcC",
+      "label": "svcC (business logic, fine-grained authz)",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "internet",
+      "to": "waf",
+      "kind": "sync"
+    },
+    {
+      "from": "waf",
+      "to": "gateway",
+      "kind": "sync",
+      "label": "filtered traffic only"
+    },
+    {
+      "from": "gateway",
+      "to": "svcA",
+      "kind": "sync"
+    },
+    {
+      "from": "gateway",
+      "to": "svcB",
+      "kind": "sync"
+    },
+    {
+      "from": "gateway",
+      "to": "svcC",
+      "kind": "sync"
+    },
+    {
+      "from": "svcB",
+      "to": "svcC",
+      "kind": "sync",
+      "label": "sidecar mTLS, retries, timeouts"
+    }
+  ],
+  "groups": [
+    {
+      "id": "northsouth",
+      "label": "North-south: client to system",
+      "nodes": [
+        "waf",
+        "gateway"
+      ]
+    },
+    {
+      "id": "eastwest",
+      "label": "East-west: service mesh sidecars",
+      "nodes": [
+        "svcA",
+        "svcB",
+        "svcC"
+      ]
+    }
+  ],
+  "caption": "Every request is authenticated, rate-limited and routed once at the door, so services stay focused on business logic. Push a pricing rule into the gateway and you have started building the distributed monolith every team must coordinate on."
+}
 \`\`\`
 
 Recap: Push TLS, authn, rate limiting, and routing to a thin API gateway (north-south), handle
