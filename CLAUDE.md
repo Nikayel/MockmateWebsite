@@ -112,10 +112,33 @@ rather than manufacturing work to justify the run.
 shared barrel or index is the usual casualty. Give each agent a disjoint set of paths and say so in
 the prompt.
 
-**Concurrent agents must `git add` explicit paths.** Never `git add -A` or `git add .` while a
-sibling agent is working: it sweeps their half-finished edits into your commit. `lint-staged` also
-runs `git stash` on commit, which is hostile to concurrency, so keep commits small and staged
-precisely. Commit with `git -c commit.gpgsign=false` on this volume.
+**Concurrent agents must commit an explicit pathspec.** Staging explicitly is necessary and NOT
+sufficient, which took five waves to learn. `git add -A` is the obvious hazard, but the one that
+actually kept biting is subtler: **the index is shared, and a bare `git commit` commits all of it.**
+An agent that runs `git add its-own-file.ts` and then `git commit -m ...` still ships whatever a
+sibling staged in the gap between those two commands, having done nothing wrong by the old rule. That
+is how, on 2026-08-14, an L0 commit came to carry L1's and L2's work, and how one agent's own repair
+ended up inside another's commit while its own `git commit` reported "no changes added".
+
+So commit the pathspec, which bypasses the shared index entirely:
+
+    git -c commit.gpgsign=false commit -m "..." -- lib/tutorials/system-design/curriculum/level7.ts
+
+and declare the scope so the pre-commit guard can refuse a stray path:
+
+    CS_COMMIT_SCOPE="lib/tutorials/system-design/curriculum/level7.ts" git -c commit.gpgsign=false commit ...
+
+`scripts/check-commit-scope.mjs` is that guard. It is inert unless `CS_COMMIT_SCOPE` is set, so human
+commits are unaffected, and it runs BEFORE `lint-staged` because `lint-staged` wraps the commit in
+`git stash`, which is itself hostile to concurrency and can restore a sibling's staging into the
+wrong commit.
+
+When it fires, `git restore --staged <path>` the strays. Never `git checkout` them: that destroys a
+sibling's uncommitted work, which is unrecoverable. Content has survived every one of these
+incidents; what does not survive is `git log` telling the truth about which change is where, and that
+is what you need on the day something has to be bisected or reverted.
+
+Commit with `git -c commit.gpgsign=false` on this volume.
 
 **Verify agent reports yourself.** Agents report success they did not achieve. Before relaying a
 result, check `git log` for the commits, run the suite, and read a sample of the diff. Silent commit
