@@ -125,6 +125,22 @@ function ExerciseSection({
         <MarkdownRenderer content={exercise.prompt} />
       </div>
 
+      {/* Read-only material the exercise supplies: the flawed design a critique exercise asks the
+          learner to review, or the symptom timeline an incident-diagnosis exercise starts from.
+          Published for the same reason the prompt is, because it is question material. A prompt
+          that referred to an artifact a signed-out reader could not see would be broken copy. */}
+      {exercise.supplied && (
+        <div className="border-border bg-card/60 mt-5 rounded-xl border p-4">
+          <h3 className="text-foreground text-sm font-semibold">
+            {exercise.supplied.label}{" "}
+            <span className="text-muted-foreground font-normal">(read only)</span>
+          </h3>
+          <div className="prose prose-sm dark:prose-invert mt-2 max-w-none">
+            <MarkdownRenderer content={exercise.supplied.body} />
+          </div>
+        </div>
+      )}
+
       {exercise.thinkAbout && exercise.thinkAbout.length > 0 && (
         <div className="border-border bg-muted/30 mt-5 rounded-xl border p-4">
           <h3 className="text-foreground text-sm font-semibold">Think about</h3>

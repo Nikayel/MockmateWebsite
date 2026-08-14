@@ -68,6 +68,17 @@ export interface PublicExercisePreview {
   prompt: string
   /** System Design only: ordered guiding questions. Absent for code exercises. */
   thinkAbout?: string[]
+  /**
+   * System Design only: read-only material the exercise hands the learner, such as the flawed
+   * design a critique exercise asks them to review or the symptom timeline an incident-diagnosis
+   * exercise starts from.
+   *
+   * PUBLISHED, and the reasoning is the same one that publishes `prompt` and `thinkAbout`: this is
+   * QUESTION material, not answer material. A critique exercise whose flawed design were gated
+   * would show a signed-out reader a prompt referring to an artifact they cannot see. The model
+   * answer stays gated, which is the line that matters.
+   */
+  supplied?: { label: string; body: string }
   /** How many hints exist. The hint TEXT is gated; the count is a difficulty signal. */
   hintCount: number
   /**
@@ -146,6 +157,12 @@ function toPublicExercisePreview(exercise: AuthoredExercise): PublicExercisePrev
   }
   if ("thinkAbout" in exercise && Array.isArray(exercise.thinkAbout)) {
     preview.thinkAbout = exercise.thinkAbout
+  }
+  // Copied field by field rather than by reference, so a future field added to the authored
+  // `supplied` object is invisible here until someone deliberately adds it. Same allowlist
+  // direction as the rest of this module.
+  if ("supplied" in exercise && exercise.supplied) {
+    preview.supplied = { label: exercise.supplied.label, body: exercise.supplied.body }
   }
   return preview
 }

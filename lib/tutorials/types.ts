@@ -298,6 +298,34 @@ export interface DesignExercise {
   modelAnswerOutline: string[]
   /** Optional seed text for the answer editor (e.g. a scaffold the learner fills in). */
   starterAnswer?: string
+  /**
+   * Read-only material the exercise gives the learner to work ON, as opposed to work FROM.
+   *
+   * ## Why this cannot be `starterAnswer`
+   *
+   * All 416 System Design exercises are generation tasks and 303 of them open with the word
+   * "Design", which is the single thing a language model already does perfectly and therefore the
+   * weakest discriminator a 2026 interview has. The genres that DO discriminate are the ones a
+   * model is measurably bad at: critique (here is a flawed design, find what is wrong), incident
+   * diagnosis (here are the symptoms and the graphs, what is happening), and defending a position
+   * under informed pushback.
+   *
+   * Every one of those needs to hand the learner an artifact. `starterAnswer` cannot carry it,
+   * because it is editable SEED TEXT: a flawed design placed there lands inside the learner's own
+   * saved answer, so their critique and the thing being critiqued become one buffer, and the saved
+   * record of their work is mostly someone else's prose. Reset would also silently restore the
+   * flawed design over whatever they wrote.
+   *
+   * `supplied` renders beside the editor and never enters the answer buffer.
+   * `design-exercise-supplied.test.ts` pins that separation, because the failure mode is quiet:
+   * nothing throws, the learner just ends up grading text they did not write.
+   */
+  supplied?: {
+    /** What this artifact is, e.g. "Proposed design" or "Incident timeline". */
+    label: string
+    /** Markdown. Rendered read-only; never seeded into the editor. */
+    body: string
+  }
 }
 
 /** The twelve System-Design level slugs (L0–L11), verbatim from `CURRICULUM-MAP.md`. */

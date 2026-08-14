@@ -91,29 +91,52 @@ export function DesignAnswerPanel({
           prompt={exercise.prompt}
           goal="Sketch your design in the editor, Save it, then reveal the model answer to self-compare. There is no auto-grading: the learning is in attempting, then comparing."
           data={
-            exercise.thinkAbout.length > 0 ? (
-              <div className="border-border bg-muted/20 flex flex-col gap-2 rounded-xl border p-3">
-                <p className="text-foreground inline-flex items-center gap-1.5 text-xs font-semibold">
-                  <ListChecks className="text-accent h-3.5 w-3.5" aria-hidden="true" />
-                  Think about
-                </p>
-                <ul className="flex flex-col gap-1.5">
-                  {exercise.thinkAbout.map((item, i) => (
-                    <li key={i}>
-                      <label className="text-muted-foreground flex cursor-pointer items-start gap-2 text-xs leading-relaxed">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(checked[i])}
-                          onChange={() => setChecked((prev) => ({ ...prev, [i]: !prev[i] }))}
-                          className="accent-accent mt-0.5 h-3.5 w-3.5 shrink-0"
-                        />
-                        <span className={checked[i] ? "line-through opacity-70" : undefined}>
-                          {item}
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
+            exercise.supplied || exercise.thinkAbout.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {/* Material the learner works ON, never FROM. It is deliberately outside the
+                    editor: a flawed design seeded into `starterAnswer` would land inside the
+                    learner's own saved answer, so their critique and the thing being critiqued
+                    would share one buffer and Reset would restore the flaw over their work. */}
+                {exercise.supplied && (
+                  <section
+                    aria-label={exercise.supplied.label}
+                    className="border-border bg-card/60 flex flex-col gap-2 rounded-xl border p-3"
+                  >
+                    <p className="text-foreground inline-flex items-center gap-1.5 text-xs font-semibold">
+                      <FileText className="text-accent h-3.5 w-3.5" aria-hidden="true" />
+                      {exercise.supplied.label}
+                      <span className="text-muted-foreground font-normal">(read only)</span>
+                    </p>
+                    <div className="prose prose-sm dark:prose-invert max-w-none text-xs">
+                      <MarkdownRenderer content={exercise.supplied.body} />
+                    </div>
+                  </section>
+                )}
+                {exercise.thinkAbout.length > 0 && (
+                  <div className="border-border bg-muted/20 flex flex-col gap-2 rounded-xl border p-3">
+                    <p className="text-foreground inline-flex items-center gap-1.5 text-xs font-semibold">
+                      <ListChecks className="text-accent h-3.5 w-3.5" aria-hidden="true" />
+                      Think about
+                    </p>
+                    <ul className="flex flex-col gap-1.5">
+                      {exercise.thinkAbout.map((item, i) => (
+                        <li key={i}>
+                          <label className="text-muted-foreground flex cursor-pointer items-start gap-2 text-xs leading-relaxed">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(checked[i])}
+                              onChange={() => setChecked((prev) => ({ ...prev, [i]: !prev[i] }))}
+                              className="accent-accent mt-0.5 h-3.5 w-3.5 shrink-0"
+                            />
+                            <span className={checked[i] ? "line-through opacity-70" : undefined}>
+                              {item}
+                            </span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             ) : undefined
           }
