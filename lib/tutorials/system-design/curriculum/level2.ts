@@ -3213,7 +3213,7 @@ export const systemDesignLevel2: DesignLevel = {
           id: "sd-l2-isolation-levels",
           title: "Isolation Levels & Read Anomalies",
           summary:
-            "Diagnose the exact anomaly (dirty read, lost update, write skew) and fix it surgically; snapshot isolation still allows write skew, which only Serializable or a lock prevents.",
+            "Why snapshot isolation still allows write skew, and how naming the exact anomaly gets you a surgical fix instead of Serializable.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["isolation", "concurrency", "transactions"],
@@ -3263,7 +3263,7 @@ export const systemDesignLevel2: DesignLevel = {
           id: "sd-l2-mvcc-locking",
           title: "Concurrency Control: MVCC, Locking, OCC",
           summary:
-            "MVCC versions rows so readers and writers never block each other (at vacuum/bloat cost); go optimistic under low contention, pessimistic under high, and shard hot counters.",
+            "MVCC versions rows so readers and writers never block each other, and one forgotten long transaction bloats the table by pinning vacuum.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["mvcc", "locking", "concurrency"],
@@ -3321,7 +3321,7 @@ export const systemDesignLevel2: DesignLevel = {
           id: "sd-l2-btree-vs-lsm",
           title: "B-Tree vs LSM-Tree",
           summary:
-            "B-trees update pages in place for fast reads and range scans; LSM-trees append and compact for write throughput, paying read amplification and compaction stalls.",
+            "B-trees update pages in place for fast reads and range scans; LSM-trees append and compact to buy write throughput instead.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["storage-engine", "lsm", "btree"],
@@ -3575,7 +3575,7 @@ export const systemDesignLevel2: DesignLevel = {
           id: "sd-l2-wide-column",
           title: "Wide-Column / Column-Family Stores",
           summary:
-            "Model one denormalized table per query: a partition key that spreads load and co-locates the read, clustering for the sort, time-bucketed bounded partitions, tunable quorum.",
+            "Why Cassandra wants one denormalized table per query, and how a partition key spreads load without growing unbounded.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["wide-column", "cassandra", "modeling"],
@@ -3675,7 +3675,7 @@ export const systemDesignLevel2: DesignLevel = {
           id: "sd-l2-time-series",
           title: "Time-Series Databases",
           summary:
-            "Exploit append-only time-ordered data with columnar compression, time-partitioning, and downsampling tiers, and design against cardinality explosion from unbounded tags.",
+            "How a time-series database earns 10x compression and cheap rollups, and why one unbounded label can OOM Prometheus.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["time-series", "metrics", "cardinality"],
@@ -3725,7 +3725,7 @@ export const systemDesignLevel2: DesignLevel = {
           id: "sd-l2-vector-embeddings",
           title: "Vector Databases & Embeddings",
           summary:
-            "ANN search trades recall for latency and memory: HNSW for recall in RAM, IVF-PQ at billion scale, plus filtered ANN, hybrid BM25 fusion, and re-embedding plans.",
+            "ANN search trades recall for latency and memory: HNSW when RAM is affordable, IVF-PQ at billion scale, hybrid BM25 for exact tokens.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["vector-db", "embeddings", "ann"],
@@ -3783,7 +3783,7 @@ export const systemDesignLevel2: DesignLevel = {
           id: "sd-l2-normalization-denorm",
           title: "Normalization vs Denormalization",
           summary:
-            "Normalize by default for write integrity; denormalize only a named hot read path with a real read/write ratio, and use materialized views as the managed middle ground.",
+            "Normalize by default for write integrity, and denormalize only a named hot read path with a read/write ratio you can quote.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["normalization", "denormalization", "modeling"],
@@ -3833,7 +3833,7 @@ export const systemDesignLevel2: DesignLevel = {
           id: "sd-l2-access-pattern-modeling",
           title: "Query-First Data Modeling",
           summary:
-            "Enumerate access patterns first, then design composite keys so each pattern is a single-partition lookup, with write sharding for hot partitions and GSIs added per named pattern.",
+            "List every access pattern first, then shape DynamoDB keys so each one is a single-partition lookup instead of a scan.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["access-patterns", "modeling", "nosql"],
@@ -3883,7 +3883,7 @@ export const systemDesignLevel2: DesignLevel = {
           id: "sd-l2-keys-ids-constraints",
           title: "Keys, IDs & Constraints",
           summary:
-            "Avoid monotonic-key hotspots and UUIDv4 fragmentation with ULID/UUIDv7, use surrogate keys with unique natural attributes, and let DB constraints and types carry correctness.",
+            "Why auto-increment keys create a write hotspot and random UUIDv4 fragments the index, and what ULID and UUIDv7 fix about both.",
           estimatedMinutes: 25,
           difficulty: "medium",
           skills: ["ids", "keys", "sharding"],
@@ -3943,7 +3943,7 @@ export const systemDesignLevel2: DesignLevel = {
           id: "sd-l2-blob-object-storage",
           title: "Blob / Object Storage",
           summary:
-            "Bytes go to object storage with only the key and metadata in the DB, moved via presigned URLs and multipart upload, with lifecycle tiering and a CDN for cost and latency.",
+            "Keep the bytes in object storage and only the key in the database, and let presigned URLs move files past your app servers.",
           estimatedMinutes: 25,
           difficulty: "easy",
           skills: ["object-storage", "blob", "cdn"],
@@ -3994,7 +3994,7 @@ export const systemDesignLevel2: DesignLevel = {
           id: "sd-l2-choosing-db-polyglot",
           title: "Choosing a Database & Polyglot Persistence",
           summary:
-            "Reason from decision drivers to a storage family, default to boring relational, adopt NewSQL only past one node when SQL+ACID still matter, and justify every polyglot store.",
+            "Reason from access patterns and real numbers to a storage family, and know when NewSQL beats hand-rolled application sharding.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["database-selection", "newsql", "polyglot"],
