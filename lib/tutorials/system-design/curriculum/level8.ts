@@ -2769,7 +2769,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-compliance-frameworks",
           title: "Compliance Frameworks & Regulatory Design",
           summary:
-            "Build the shared baseline (encryption, access control, logging, backups) once, layer framework-specific non-negotiables on top, treat data residency as a regional-sharding driver rather than a checkbox, and use tokenization to pull whole systems out of PCI/PHI scope.",
+            "GDPR, SOC 2, HIPAA and PCI as architecture: the control baseline you build once, and why data residency is a sharding decision, not a checkbox.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["compliance", "gdpr", "pci"],
@@ -2818,7 +2818,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-pii-dsar-privacy",
           title: "PII Governance, DSAR/Erasure & Privacy Engineering",
           summary:
-            "Catalog every copy first, orchestrate rights on a stable user_id, delete across all live stores plus third parties, crypto-shred to handle backups, resolve retention conflicts per-field, and pick anonymization vs pseudonymization deliberately with k-anonymity or differential privacy for shared analytics.",
+            "Why one DELETE statement is not GDPR erasure, and how crypto-shredding a per-user key erases the copies frozen inside immutable backups.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["pii", "dsar", "privacy-engineering"],
@@ -2867,7 +2867,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-audit-supplychain",
           title: "Audit Logging, OWASP & Supply-Chain Security",
           summary:
-            "Make audit logs separate, append-only, hash-chained and WORM-stored with actor/action/resource but no PII; defend BOLA/injection/SSRF/mass-assignment (BOLA first); and secure the supply chain with SBOM, SCA, signing, SLSA provenance, and workload identity for short-lived creds.",
+            "What makes an audit log tamper-evident, why BOLA tops the OWASP API list, and how SBOMs and signed builds secure the code you did not write.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["audit-logging", "owasp", "supply-chain"],
@@ -2915,7 +2915,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-incident-breach-response",
           title: "Security Incident & Breach Response, Key Compromise",
           summary:
-            "Run detection, containment, eradication, recovery, lessons in order; rotate the compromised key via overlapping JWKS validity plus shortened TTLs so nobody is logged out; preserve evidence before cleanup with chain of custody; and start the GDPR 72-hour notification clock the moment you become aware.",
+            "How to rotate a compromised signing key without logging every user out, and why containment has to come before you wipe a single host.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["security", "incident-response", "compliance"],
