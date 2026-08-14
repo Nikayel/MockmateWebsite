@@ -5203,6 +5203,100 @@ plus tuned OS limits:
   thousands of threads reserve tens of GB. That is a real cost, though blocking IO is what actually
   caps thread-per-request; event loops sidestep both by not having a thread per connection.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "What 10,000 connections cost each model",
+  "predictPrompt": {
+    "question": "A thread-per-request server holds 10,000 concurrent connections, and 90 percent of each request is spent waiting on a slow database. At the glibc default 8 MB stack, how much address space do those thread stacks reserve?",
+    "options": [
+      "About 80 MB",
+      "About 800 MB",
+      "About 8 GB",
+      "About 78 GB"
+    ]
+  },
+  "workedExample": "At the initial values, 10,000 concurrent connections on a glibc default 8 MB stack, thread-per-request reserves about 78 GB of address space before a single query runs. Because 90 percent of each request is spent waiting on IO, only about 1,000 of those threads have CPU work to do at any moment: the other 9,000 are parked doing nothing and still holding a stack. The same 10,000 sockets cost an event loop about 98 MB, because there an idle connection is a file descriptor and a small buffer rather than a thread. Now drag the IO wait down toward 0 and watch the parked threads vanish: that is the CPU-bound case, where one busy worker per core beats an event loop and this comparison stops mattering.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "connections",
+      "label": "Concurrent connections",
+      "min": 100,
+      "max": 500000,
+      "scale": "log",
+      "initial": 10000,
+      "unit": "connections"
+    },
+    {
+      "kind": "select",
+      "id": "stack_mb",
+      "label": "Stack reserved per thread",
+      "options": [
+        {
+          "label": "glibc default, follows RLIMIT_STACK (8 MB)",
+          "value": 8
+        },
+        {
+          "label": "JVM default (1 MB via -Xss)",
+          "value": 1
+        },
+        {
+          "label": "Tuned down deliberately (0.5 MB)",
+          "value": 0.5
+        }
+      ],
+      "initial": 0
+    },
+    {
+      "kind": "slider",
+      "id": "io_wait_pct",
+      "label": "Share of each request spent waiting on IO",
+      "min": 0,
+      "max": 99,
+      "scale": "linear",
+      "step": 1,
+      "initial": 90,
+      "unit": "percent"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "thread_stacks_gb",
+      "label": "Address space reserved for thread stacks",
+      "expr": "connections * stack_mb / 1024",
+      "format": "number",
+      "unit": "GB",
+      "sparkline": {
+        "over": "connections"
+      }
+    },
+    {
+      "id": "cpu_busy_threads",
+      "label": "Threads with CPU work to do right now",
+      "expr": "connections * (100 - io_wait_pct) / 100",
+      "format": "number",
+      "unit": "threads"
+    },
+    {
+      "id": "parked_threads",
+      "label": "Threads parked on IO, holding a stack, doing nothing",
+      "expr": "connections - cpu_busy_threads",
+      "format": "number",
+      "unit": "threads"
+    },
+    {
+      "id": "eventloop_mb",
+      "label": "What the same sockets cost an event loop (about 10 KB each)",
+      "expr": "connections * 10 / 1024",
+      "format": "number",
+      "unit": "MB"
+    }
+  ],
+  "caption": "The parked column is the whole argument. Those threads are not slow, they are asleep, and they are why a thread-per-request box falls over at a few thousand connections while the CPU graph reads 10 percent. Nothing here helps a CPU-bound workload: with the IO wait at 0 the parked column empties and you are back to wanting one busy worker per core."
+}
+\`\`\`
+
 \`\`\`csdiagram
 {
   "type": "table",
