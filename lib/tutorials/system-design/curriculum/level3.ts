@@ -1373,16 +1373,16 @@ and kick off one async refresh.
   "prompt": "A flash-sale SKU is read 500K times per second. The value is sitting in cache, nowhere near expiry, but the one Redis shard that owns the key is at 100% CPU. Does singleflight coalescing fix this?",
   "options": [
     {
-      "label": "Yes: it collapses the 500K reads into one",
+      "label": "Yes, it collapses the 500K reads into one",
       "feedback": "Tempting, but coalescing dedups rebuilds on a miss. These requests are hits: there is nothing to rebuild, just one shard drowning in reads for one key."
     },
     {
-      "label": "No: the value is present, so there is no rebuild to coalesce; the shard itself is saturated",
+      "label": "No, a value that is present has no rebuild to coalesce",
       "correct": true,
-      "feedback": "Right. Expiry misses and raw volume are different failures. A genuinely hot key needs its reads spread out or absorbed before they ever reach the shard."
+      "feedback": "Right, and the shard itself is what is saturated. Expiry misses and raw volume are different failures with different cures. A genuinely hot key needs its reads spread out or absorbed before they ever reach the shard."
     },
     {
-      "label": "Yes, if you upgrade the process-local lock to a distributed lock",
+      "label": "Yes, if the lock becomes distributed across the fleet",
       "feedback": "Tempting: a distributed lock widens coalescing to the whole fleet, but it still only governs rebuild-on-miss. It does nothing for hit traffic on a value that is already there."
     }
   ]
