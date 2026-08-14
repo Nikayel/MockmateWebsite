@@ -1749,14 +1749,160 @@ Push work to the edge when it cuts bandwidth or when latency matters for control
 
 Devices talk over lightweight protocols, not HTTP-per-reading. **MQTT** (a pub/sub broker protocol over a persistent TCP connection) dominates: one long-lived connection, tiny headers, QoS levels (0 fire-and-forget, 1 at-least-once, 2 exactly-once), and a "last will" message the broker publishes when a device drops. **CoAP** (UDP, REST-like) is used on the most constrained/low-power links. Crucially, devices **buffer offline**: when connectivity drops, the edge does **store-and-forward**, persisting readings locally and replaying them on reconnect. That means the cloud must accept **late and out-of-order** data and dedupe on a device-supplied event id.
 
-\`\`\`
-devices --MQTT/CoAP--> edge gateway (filter, aggregate, buffer, local inference)
-                                     |
-                          MQTT broker cluster (auth, backpressure)
-                                     |
-                             ingest gateway --> Kafka (durable buffer)
-                                    /                        \\
-                        hot path: stream alerting        cold path: batch -> lake/TSDB
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Write fan-in from a fleet you cannot trust to be online",
+  "nodes": [
+    {
+      "id": "devices",
+      "label": "Devices (10M, store-and-forward buffer)",
+      "kind": "client"
+    },
+    {
+      "id": "gateway",
+      "label": "Edge gateway (filter, aggregate, buffer, local inference)",
+      "kind": "service"
+    },
+    {
+      "id": "broker",
+      "label": "MQTT broker cluster (auth, connection-rate limiting)",
+      "kind": "queue"
+    },
+    {
+      "id": "ingest",
+      "label": "Ingest gateway (per-device X.509 certs, backpressure)",
+      "kind": "service"
+    },
+    {
+      "id": "kafka",
+      "label": "Kafka (durable buffer)",
+      "kind": "queue"
+    },
+    {
+      "id": "hot",
+      "label": "Hot path: stream alerting in seconds (Flink)",
+      "kind": "service"
+    },
+    {
+      "id": "cold",
+      "label": "Cold path: batch into the lake and a TSDB",
+      "kind": "db"
+    },
+    {
+      "id": "shadow",
+      "label": "Device shadow (desired and reported state)",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "devices",
+      "to": "gateway",
+      "kind": "sync",
+      "label": "MQTT or CoAP, one long-lived connection"
+    },
+    {
+      "from": "gateway",
+      "to": "broker",
+      "kind": "sync",
+      "label": "the 1-minute average plus anything out of band"
+    },
+    {
+      "from": "broker",
+      "to": "ingest",
+      "kind": "sync"
+    },
+    {
+      "from": "ingest",
+      "to": "kafka",
+      "kind": "sync",
+      "label": "so a slow consumer never blocks ingestion"
+    },
+    {
+      "from": "kafka",
+      "to": "hot",
+      "kind": "sync",
+      "label": "alerting and anomaly rules"
+    },
+    {
+      "from": "kafka",
+      "to": "cold",
+      "kind": "async",
+      "label": "raw data for analytics and training"
+    },
+    {
+      "from": "ingest",
+      "to": "shadow",
+      "kind": "async",
+      "label": "reported state"
+    },
+    {
+      "from": "shadow",
+      "to": "devices",
+      "kind": "feedback",
+      "label": "desired state, reconciled on reconnect"
+    }
+  ],
+  "groups": [
+    {
+      "id": "edge",
+      "label": "Edge or device",
+      "nodes": [
+        "devices",
+        "gateway"
+      ]
+    },
+    {
+      "id": "cloud",
+      "label": "Cloud",
+      "nodes": [
+        "broker",
+        "ingest",
+        "kafka",
+        "hot",
+        "cold",
+        "shadow"
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "devices",
+        "gateway"
+      ],
+      "note": "Streaming raw 50Hz readings would spend the bandwidth before anyone reads them, and a safety cutoff cannot wait for a round trip, so filtering, aggregation and local inference happen at the edge. The same box buffers readings when the link drops."
+    },
+    {
+      "adds": [
+        "broker",
+        "ingest"
+      ],
+      "note": "Ten million devices cannot each open an HTTP call per reading, so they hold one long-lived pub/sub connection. The ingest gateway gives every device its own certificate, so one compromised device is revoked instead of re-keying the fleet."
+    },
+    {
+      "adds": [
+        "kafka"
+      ],
+      "note": "A whole region reconnecting after an outage is several times average load, and that burst has to land somewhere durable rather than in a consumer's memory. The log also gives you replay when a downstream job was wrong."
+    },
+    {
+      "adds": [
+        "hot",
+        "cold"
+      ],
+      "note": "Alerting needs an answer in seconds and model training needs years of history. Those are different storage engines, so the stream forks instead of forcing one store to serve both."
+    },
+    {
+      "adds": [
+        "shadow"
+      ],
+      "note": "A device that is offline right now still has to be controlled, so desired state lives in the cloud and the device reconciles when it next connects. That is also how a firmware rollout canaries to 1 percent instead of bricking 10M devices at once."
+    }
+  ],
+  "caption": "Every arrow into the cloud assumes the device was recently offline: late, out of order, and possibly replaying what it already sent. The one arrow pointing back is how you control a device that is not connected yet."
+}
 \`\`\`
 
 ## Ingestion, hot/cold split, and control
