@@ -2971,6 +2971,154 @@ returns \`412 Precondition Failed\`. B is forced to re-read and merge instead of
 A's change. This is far cheaper than pessimistic locking and is exactly how you avoid last-write-wins
 data loss.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "Two editors, one document: ETag and If-Match",
+  "actors": [
+    {
+      "id": "a",
+      "label": "Editor A"
+    },
+    {
+      "id": "api",
+      "label": "Document API"
+    },
+    {
+      "id": "b",
+      "label": "Editor B"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "noPrecondition",
+      "label": "Editor B omits If-Match",
+      "description": "B saves with no precondition, so the server has nothing to check."
+    }
+  ],
+  "steps": [
+    {
+      "from": "a",
+      "to": "api",
+      "label": "GET /doc",
+      "kind": "request",
+      "status": "ok",
+      "state": {
+        "stored version": "v5"
+      }
+    },
+    {
+      "from": "api",
+      "to": "a",
+      "label": "200 OK, ETag v5",
+      "kind": "response",
+      "status": "ok"
+    },
+    {
+      "from": "b",
+      "to": "api",
+      "label": "GET /doc",
+      "kind": "request",
+      "status": "ok"
+    },
+    {
+      "from": "api",
+      "to": "b",
+      "label": "200 OK, ETag v5",
+      "kind": "response",
+      "status": "ok",
+      "state": {
+        "stored version": "v5",
+        "A holds": "v5",
+        "B holds": "v5"
+      }
+    },
+    {
+      "from": "a",
+      "to": "api",
+      "label": "PUT If-Match v5",
+      "kind": "request",
+      "status": "ok"
+    },
+    {
+      "from": "api",
+      "to": "a",
+      "label": "200 OK, now at v6",
+      "kind": "response",
+      "status": "ok",
+      "state": {
+        "stored version": "v6",
+        "B holds": "v5"
+      }
+    },
+    {
+      "from": "b",
+      "to": "api",
+      "label": "PUT If-Match v5",
+      "kind": "request",
+      "status": "ok",
+      "when": "!noPrecondition"
+    },
+    {
+      "from": "api",
+      "to": "b",
+      "label": "412 Precondition Failed",
+      "kind": "response",
+      "status": "error",
+      "when": "!noPrecondition",
+      "state": {
+        "stored version": "v6",
+        "A's edit": "intact"
+      },
+      "predict": {
+        "question": "B's write carries 'If-Match: v5', but the stored version moved to v6 a moment ago. What does the server send back?",
+        "options": [
+          "200 OK, and the server merges the two edits",
+          "412 Precondition Failed, so B must re-read and merge",
+          "409 Conflict, carrying A's version in the body",
+          "204 No Content, because there is nothing new to store"
+        ]
+      }
+    },
+    {
+      "from": "api",
+      "label": "B re-reads v6 and merges",
+      "kind": "note",
+      "status": "ok",
+      "when": "!noPrecondition"
+    },
+    {
+      "from": "b",
+      "to": "api",
+      "label": "PUT with no If-Match",
+      "kind": "request",
+      "status": "ok",
+      "when": "noPrecondition"
+    },
+    {
+      "from": "api",
+      "to": "b",
+      "label": "200 OK, now at v7",
+      "kind": "response",
+      "status": "ok",
+      "when": "noPrecondition",
+      "state": {
+        "stored version": "v7",
+        "A's edit": "overwritten"
+      }
+    },
+    {
+      "from": "api",
+      "label": "A's edit is gone, no error anywhere",
+      "kind": "note",
+      "status": "error",
+      "when": "noPrecondition"
+    }
+  ],
+  "caption": "Version checking is opt-in. Flip the toggle and every status code still reads 200, which is exactly what makes a lost update so expensive: nothing in the logs, the dashboards, or either editor's screen says a change was destroyed."
+}
+\`\`\`
+
 Content negotiation completes the picture: honor \`Accept\` and \`Accept-Language\`, and set
 \`Vary: Accept, Accept-Encoding\` on responses so a shared cache does not serve a JSON body to a
 client that asked for XML, or a Brotli body to a client that cannot decode it.
