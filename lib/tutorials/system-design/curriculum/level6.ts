@@ -125,15 +125,144 @@ read right after the write. If a user saves a setting and immediately reads it b
 behind a queue gives them a stale read and a support ticket. Async pays off when the follow-up work
 is genuinely independent of the response.
 
-\`\`\`
-Sync:   client -> [payment] -> [inventory] -> [email] -> [analytics] -> 200
-        latency = sum of all; one down = request fails
-
-Async:  client -> [payment] -> 200
-                       |
-                   OrderPlaced --> broker --> [inventory]
-                                          --> [email]
-                                          --> [analytics]
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Synchronous chain versus event fan-out",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "s_client",
+      "label": "Client (blocked)",
+      "kind": "client"
+    },
+    {
+      "id": "s_payment",
+      "label": "Payment",
+      "kind": "service"
+    },
+    {
+      "id": "s_inventory",
+      "label": "Inventory",
+      "kind": "service"
+    },
+    {
+      "id": "s_email",
+      "label": "Email",
+      "kind": "service"
+    },
+    {
+      "id": "s_analytics",
+      "label": "Analytics, then 200",
+      "kind": "service"
+    },
+    {
+      "id": "a_client",
+      "label": "Client (unblocked)",
+      "kind": "client"
+    },
+    {
+      "id": "a_payment",
+      "label": "Payment, returns 200",
+      "kind": "service"
+    },
+    {
+      "id": "broker",
+      "label": "Broker (OrderPlaced topic)",
+      "kind": "queue"
+    },
+    {
+      "id": "a_inventory",
+      "label": "Inventory consumer",
+      "kind": "service"
+    },
+    {
+      "id": "a_email",
+      "label": "Email consumer",
+      "kind": "service"
+    },
+    {
+      "id": "a_analytics",
+      "label": "Analytics consumer",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "s_client",
+      "to": "s_payment",
+      "kind": "sync"
+    },
+    {
+      "from": "s_payment",
+      "to": "s_inventory",
+      "kind": "sync"
+    },
+    {
+      "from": "s_inventory",
+      "to": "s_email",
+      "kind": "sync"
+    },
+    {
+      "from": "s_email",
+      "to": "s_analytics",
+      "kind": "sync",
+      "label": "sum of every hop"
+    },
+    {
+      "from": "a_client",
+      "to": "a_payment",
+      "kind": "sync"
+    },
+    {
+      "from": "a_payment",
+      "to": "broker",
+      "kind": "async",
+      "label": "OrderPlaced"
+    },
+    {
+      "from": "broker",
+      "to": "a_inventory",
+      "kind": "async"
+    },
+    {
+      "from": "broker",
+      "to": "a_email",
+      "kind": "async"
+    },
+    {
+      "from": "broker",
+      "to": "a_analytics",
+      "kind": "async"
+    }
+  ],
+  "groups": [
+    {
+      "id": "sync_lane",
+      "label": "Synchronous chain",
+      "nodes": [
+        "s_client",
+        "s_payment",
+        "s_inventory",
+        "s_email",
+        "s_analytics"
+      ]
+    },
+    {
+      "id": "async_lane",
+      "label": "Async fan-out",
+      "nodes": [
+        "a_client",
+        "a_payment",
+        "broker",
+        "a_inventory",
+        "a_email",
+        "a_analytics"
+      ]
+    }
+  ],
+  "caption": "Same five steps, two shapes. Synchronously the caller's latency is the sum of every hop and any one service being down fails the whole request. Behind a broker the response returns as soon as the payment write is acked, and OrderPlaced fans out to three consumers the payment service does not know about."
+}
 \`\`\`
 
 Recap: async decouples in time, space, and synchronization, trading immediate consistency for
