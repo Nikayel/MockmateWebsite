@@ -225,9 +225,105 @@ BEGIN
 COMMIT   -- atomic: both or neither; durable: fsync'd WAL before ack
 \`\`\`
 
+### The balance column is a projection, not the record
+
+That fence is atomic and durable and it still throws away the thing an auditor asks for. After the
+commit, the only evidence the transfer happened is that two numbers are different from what they
+were. There is nothing to recompute from and nothing to reconcile against, so a bug in one release
+quietly becomes the new truth.
+
+The pattern that fixes it makes the movement itself a row. Every movement of money is an
+**immutable append-only entry**, and \`balance\` demotes to a cached projection of those entries that
+the same transaction keeps in step.
+
+\`\`\`
+CREATE TABLE ledger_entries (
+  id           BIGSERIAL   PRIMARY KEY,
+  transfer_id  UUID        NOT NULL,
+  account_id   BIGINT      NOT NULL REFERENCES accounts(id),
+  amount_minor BIGINT      NOT NULL,   -- signed: debits negative, credits positive
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+BEGIN
+  INSERT INTO ledger_entries (transfer_id, account_id, amount_minor)
+  VALUES (:tid, :from_id, -100),        -- the debit, as a fact
+         (:tid, :to_id,   +100);        -- the credit, as a fact
+
+  UPDATE accounts SET balance = balance - 100 WHERE id = :from_id AND balance >= 100;
+  UPDATE accounts SET balance = balance + 100 WHERE id = :to_id;
+COMMIT
+\`\`\`
+
+Append-only means exactly that: no statement anywhere in the system UPDATEs or DELETEs a row in
+\`ledger_entries\`. A mistake is corrected by inserting the opposite entry, which leaves both the
+error and the correction visible.
+
+Because the entries are the record and the balance is derived from them, the projection is
+checkable at any moment:
+
+\`\`\`
+-- Every account's cached balance must equal the sum of its own entries.
+SELECT a.id, a.balance, COALESCE(SUM(e.amount_minor), 0) AS from_entries
+FROM accounts a
+LEFT JOIN ledger_entries e ON e.account_id = a.id
+GROUP BY a.id, a.balance
+HAVING a.balance <> COALESCE(SUM(e.amount_minor), 0);
+\`\`\`
+
+Every row that query returns is a bug you can see and repair from source data. Run the same query
+against the balance-only design and there is nothing to compare, because the number is its own only
+witness. That reconciliation is what the extra table buys: keep \`balance\` for the fast read, keep
+the entries for the truth.
+
+### When the effect lives outside the database: the outbox
+
+Atomicity covers writes to this database and nothing else. A charge on an external card processor,
+an email, a call to another service: none of them roll back when your transaction does. Placing the
+external call inside the transaction is the reflex, and it fails twice. It holds the transaction
+(and its locks) open for the hundreds of milliseconds the processor takes, and a crash after the
+call but before the COMMIT leaves the money moved with no record that it moved.
+
+The **outbox** is a table in your own database holding the side effects you still owe the outside
+world, written in the same transaction as the state change:
+
+\`\`\`
+BEGIN
+  INSERT INTO payment_intents (id, status, amount_minor)
+  VALUES (:id, 'processing', 2500);
+
+  INSERT INTO outbox (id, topic, payload)          -- the promise to act, committed with the intent
+  VALUES (gen_random_uuid(), 'charge.requested',
+          jsonb_build_object('intent_id', :id, 'amount_minor', 2500));
+COMMIT
+\`\`\`
+
+Both rows commit or neither does, so the state change and the promise to act on it can never
+disagree. A separate worker then drains the table and performs the real call:
+
+\`\`\`
+-- worker loop, one batch at a time
+BEGIN
+  SELECT id, topic, payload FROM outbox
+   WHERE published_at IS NULL
+   ORDER BY id
+   FOR UPDATE SKIP LOCKED     -- several workers drain the same table, never the same row
+   LIMIT 100;
+  -- ... call the processor for each row ...
+  UPDATE outbox SET published_at = now() WHERE id = ANY(:ids);
+COMMIT
+\`\`\`
+
+Be precise about what this buys. The outbox converts "the write and the side effect might disagree"
+into "the side effect happens at least once," because the worker can crash after the external call
+and before the \`UPDATE\`, and then the row is picked up and the call repeats. It does not make the
+effect exactly-once. That last step is the receiver's job: the external call carries an idempotency
+key so the repeat is recognized and ignored.
+
 Recap: ACID is four concrete guarantees; atomicity makes debit+credit all-or-nothing, durability
 means fsync'd to the WAL not just memory, and consistency is your invariant enforced by constraints
-plus isolation, not a free lunch.
+plus isolation, not a free lunch. Atomicity stops at the edge of the database, so immutable entries
+give you something to reconcile against and an outbox row carries a promise across that edge.
 
 \`\`\`cswidget
 {
