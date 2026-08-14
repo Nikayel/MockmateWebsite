@@ -992,6 +992,71 @@ handshake would double the cost), and high-volume telemetry where losing a few s
 (HTTP/3) is built on UDP precisely to escape TCP's handshake and head-of-line-blocking constraints
 while rebuilding reliability itself.
 
+### What you rebuild once you drop TCP
+
+Dropping retransmission does not mean tolerating holes. It means paying for loss in advance instead
+of after the fact, because a fix that costs a round trip is a fix that arrives too late. Three
+mechanisms take over the job TCP was doing.
+
+**Forward error correction (FEC)** ships redundant parity alongside the data so the receiver
+reconstructs a missing packet from what already arrived:
+
+\`\`\`
+# 4 media packets plus 1 parity packet, where PARITY = P1 XOR P2 XOR P3 XOR P4
+send:     P1  P2  P3  P4  PARITY
+arrive:   P1  ..  P3  P4  PARITY               # P2 was dropped somewhere in the network
+recover:  P2 = PARITY XOR P1 XOR P3 XOR P4     # rebuilt locally, zero round trips
+\`\`\`
+
+The bill is bandwidth: that group costs 25% more to carry and survives exactly one loss in five.
+More parity per group buys tolerance of more loss for more bytes, so it is a dial you turn from the
+loss rate you actually measure.
+
+**Packet loss concealment (PLC)** covers what FEC could not. When a 20ms audio frame is simply gone,
+the decoder synthesizes a replacement from the pitch and energy of its neighbours and plays that. It
+is wrong, but it is wrong for 20ms and nobody hears a click. Video's equivalent is holding the last
+good frame until the next keyframe lands.
+
+**Congestion control moves into the application.** TCP would have backed off for you. UDP will
+cheerfully let you keep pushing 3 Mbps into a 1 Mbps path and drown yourself, so the media stack runs
+its own bandwidth estimator (WebRTC calls it GCC, google congestion control) over one-way delay
+trends and loss reports, and hands the estimate to the encoder:
+
+\`\`\`
+receiver report: loss 0.4%, delay trend flat     -> estimate 2.5 Mbps -> encode 720p30
+receiver report: loss 6.0%, delay trend rising   -> estimate 0.6 Mbps -> encode 360p15
+\`\`\`
+
+Adapting the bitrate is the only backpressure a UDP media path has. Without it, the response to
+congestion is to send exactly as much as before, which is how a call collapses instead of degrading.
+
+### One upload each, not N-1: the media relay
+
+The other thing UDP hands you is a bare socket and no topology. Connect every participant directly to
+every other participant, a full mesh, and each client uploads its own stream once per peer:
+
+\`\`\`
+mesh, N participants:   uploads per client = N - 1,   streams in flight = N * (N - 1)
+  N = 3    ->  2 uploads per client,     6 streams
+  N = 8    ->  7 uploads per client,    56 streams     # 7 x 1.5 Mbps = 10.5 Mbps up, from a laptop
+  N = 50   -> 49 uploads per client,  2450 streams     # not a network problem any more, an encoder one
+\`\`\`
+
+Uplink is the scarce direction on nearly every consumer connection, so a mesh dies at single-digit N.
+The fix is a relay in the middle. A **Selective Forwarding Unit (SFU)** is a server in a POP that each
+client sends ONE stream to, and which forwards copies to everyone else:
+
+\`\`\`
+SFU, N participants:    uploads per client = 1,       server forwards N * (N - 1) copies
+  N = 8    ->  1 upload per client (1.5 Mbps up),   SFU fans out   56 copies
+  N = 50   ->  1 upload per client (1.5 Mbps up),   SFU fans out 2450 copies
+\`\`\`
+
+The cost did not vanish, it moved to a machine provisioned for it that you can scale horizontally. An
+SFU forwards packets without decoding them, unlike an MCU which re-encodes everything into one
+composite stream and adds latency doing it, so the extra hop stays cheap: client to nearest POP is a
+short RTT, and POP to POP rides a backbone.
+
 **Interview nuance:** at scale, watch **TIME_WAIT** and ephemeral-port exhaustion. A client that
 opens and closes connections rapidly leaves each in TIME_WAIT (about 60s) holding an ephemeral port;
 a single source IP has ~28k usable ports, so a busy proxy talking to one backend IP can run out and
@@ -1000,7 +1065,8 @@ optional at scale.
 
 Recap: the TCP handshake costs a round trip (plus TLS) before data and starts slow in congestion
 control, so reuse connections (keep-alive, pooling, HTTP/2) and move endpoints closer to cut RTTs;
-reach for UDP when late data is worthless and watch TIME_WAIT/port exhaustion under churn.
+reach for UDP when late data is worthless, budget for rebuilding loss handling (FEC, concealment) and
+congestion control yourself, and watch TIME_WAIT/port exhaustion under churn.
 
 \`\`\`cswidget
 {
