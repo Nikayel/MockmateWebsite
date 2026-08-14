@@ -457,12 +457,34 @@ const realtimeRecommendationTeach = `
 
 A recommender is a latency-constrained funnel that turns a catalog of millions into an ordered list of a dozen, personalized to what the user did seconds ago, in under 100ms. You cannot run a heavy ranking model over millions of items per request, so the entire design is about narrowing the set cheaply before spending compute where it matters.
 
-\`\`\`
-millions of items
-   -> candidate generation   (two-tower + ANN, ~5ms)      -> ~1000 candidates
-   -> ranking                (deep model on candidates)    -> ~100 scored
-   -> re-ranking             (diversity, freshness)        -> ~20
-   -> business rules         (dedup, blocklist, ads)       -> final feed
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "The recommendation funnel",
+  "stages": [
+    {
+      "label": "Millions of items",
+      "note": "the whole catalog"
+    },
+    {
+      "label": "Candidate generation",
+      "note": "two-tower plus ANN, about 5ms, down to ~1000"
+    },
+    {
+      "label": "Ranking",
+      "note": "deep multi-task model on those candidates, ~100 scored"
+    },
+    {
+      "label": "Re-ranking",
+      "note": "diversity and freshness, ~20"
+    },
+    {
+      "label": "Business rules",
+      "note": "dedup, blocklist, ads, then the final feed"
+    }
+  ],
+  "caption": "Each stage is cheaper per item and touches fewer items than the last, which is the only reason the expensive model never meets the full catalog."
+}
 \`\`\`
 
 ## Candidate generation with two-tower + ANN
@@ -848,10 +870,34 @@ The gateway exposes one API (usually OpenAI-compatible so SDKs just work) and tr
 
 ## Caching is the biggest cost lever
 
-\`\`\`
-request -> exact-match cache?  hit -> return (0 tokens, ~1ms)
-        -> semantic cache?     (embed prompt, ANN lookup, similarity > 0.95) hit -> return
-        -> miss -> route to provider -> stream response -> write both caches
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "The gateway cache ladder",
+  "stages": [
+    {
+      "label": "Exact-match cache",
+      "note": "normalized prompt plus params; a hit returns in about 1ms for 0 tokens"
+    },
+    {
+      "label": "Semantic cache",
+      "note": "embed the prompt, ANN lookup, hit above about 0.95 similarity"
+    },
+    {
+      "label": "Route to a provider",
+      "note": "only a miss ever pays for tokens"
+    },
+    {
+      "label": "Stream the response",
+      "note": "tokens passed through as they arrive, never buffered"
+    },
+    {
+      "label": "Write both caches",
+      "note": "so the next identical or paraphrased prompt stops earlier"
+    }
+  ],
+  "caption": "Each rung is tried in order and only a miss falls through, which is why the cheapest lookup sits first and the provider call sits last."
+}
 \`\`\`
 
 \`\`\`cswidget
@@ -859,7 +905,7 @@ request -> exact-match cache?  hit -> return (0 tokens, ~1ms)
   "type": "check",
   "kind": "predict",
   "id": "semantic-cache-threshold",
-  "prompt": "The second row of that flow returns a stored answer when a new prompt is near enough in meaning to an old one. What is the failure this design has to be tuned against?",
+  "prompt": "The second rung of that ladder returns a stored answer when a new prompt is near enough in meaning to an old one. What is the failure this design has to be tuned against?",
   "options": [
     {
       "label": "Misses, which waste an embedding call and an index lookup",
