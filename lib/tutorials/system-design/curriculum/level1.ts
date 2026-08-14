@@ -4211,7 +4211,7 @@ export const systemDesignLevel1: DesignLevel = {
           id: "sd-l1-tcp-udp",
           title: "TCP & UDP Fundamentals",
           summary:
-            "The TCP handshake and slow start make new connections expensive; reuse connections, multiplex, move endpoints closer, and reach for UDP when late data is worthless.",
+            "Why a new TCP connection costs a round trip before any data moves, and how keep-alive, multiplexing and closer endpoints buy those round trips back.",
           estimatedMinutes: 25,
           difficulty: "medium",
           skills: ["tcp", "udp", "latency"],
@@ -4313,7 +4313,7 @@ export const systemDesignLevel1: DesignLevel = {
           id: "sd-l1-http-versions",
           title: "HTTP/1.1 vs 2 vs 3 (QUIC)",
           summary:
-            "Locate head-of-line blocking in each version: H1 blocks per request, H2 still stalls on TCP loss, H3/QUIC removes it, so H3 belongs at the mobile edge and H2/gRPC internally.",
+            "Where head-of-line blocking actually lives in HTTP/1.1, HTTP/2 and HTTP/3, and why H3 belongs at the mobile edge while H2 and gRPC stay internal.",
           estimatedMinutes: 25,
           difficulty: "medium",
           skills: ["http", "quic", "protocols"],
@@ -4525,7 +4525,7 @@ export const systemDesignLevel1: DesignLevel = {
           id: "sd-l1-versioning",
           title: "Versioning & Backward Compatibility",
           summary:
-            "Prefer additive change with tolerant readers so you rarely version, use visible /v1 path versioning for true breaks, and retire versions with deprecate-warn-remove.",
+            "Why the best API versioning strategy is rarely needing one, and how to retire a version with deprecate, warn, remove when you truly must break it.",
           estimatedMinutes: 25,
           difficulty: "medium",
           skills: ["versioning", "compatibility"],
@@ -4575,7 +4575,7 @@ export const systemDesignLevel1: DesignLevel = {
           id: "sd-l1-idempotency-retries",
           title: "Idempotency & Safe Retries",
           summary:
-            "Give mutations a client-generated idempotency key, store the full response behind a unique-constraint insert, and turn at-least-once delivery into effectively-once.",
+            "Why exactly-once delivery is a lie over a network, and what a client-generated idempotency key buys you instead when a retry lands twice.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["idempotency", "retries", "payments"],
@@ -4628,7 +4628,7 @@ export const systemDesignLevel1: DesignLevel = {
           id: "sd-l1-pagination-errors",
           title: "Pagination & Error Modeling",
           summary:
-            "Use opaque cursor/keyset pagination for O(1) stable paging, and RFC 9457 structured errors with precise status codes so clients retry 5xx/429 but never other 4xx.",
+            "Why a deep 'offset=100000' query gets slower every page, and what cursor pagination and RFC 9457 errors give a client that has to retry safely.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["pagination", "errors", "api-design"],
@@ -4780,7 +4780,7 @@ export const systemDesignLevel1: DesignLevel = {
           id: "sd-l1-serialization-compression",
           title: "Serialization, Content Negotiation & Compression",
           summary:
-            "Choose format and codec by bottleneck (JSON+Brotli public, Protobuf+zstd internal), skip compressing tiny payloads, and keep schemas evolvable with field-tag discipline.",
+            "How to pick a wire format and a compression codec from your actual bottleneck, and why gzipping a 200-byte health check costs more than it saves.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["serialization", "api-design", "performance", "schema-evolution"],
@@ -4939,7 +4939,7 @@ export const systemDesignLevel1: DesignLevel = {
           id: "sd-l1-cdn-caching-foundations",
           title: "CDN & Caching Across Layers",
           summary:
-            "Cache as high up the browser-CDN-app-Redis stack as possible, default to cache-aside, mix TTL/purge/event invalidation, and never let a shared cache hold user data.",
+            "How high up the browser, CDN, app and Redis stack a cache should sit, and why a shared CDN cache must never hold one signed-in user's page.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["cdn", "caching", "invalidation"],

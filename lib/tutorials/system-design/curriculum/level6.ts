@@ -1433,9 +1433,9 @@ Since delivery itself cannot be exactly-once (the impossibility is stated above 
   "prompt": "A streaming vendor advertises exactly-once. Given that exactly-once delivery over a network is impossible, what are they actually selling?",
   "options": [
     {
-      "label": "Exactly-once processing: at-least-once delivery whose duplicates are neutralized by idempotent or transactional effects at the consumer",
+      "label": "Exactly-once processing, not exactly-once delivery",
       "correct": true,
-      "feedback": "Right: the guarantee is converted from delivery to processing at the consumer; the network still duplicates."
+      "feedback": "Right. They ship at-least-once delivery and then make the effect idempotent or transactional at the consumer, so a duplicate arrival does not change the outcome. The guarantee moved off the transport and onto the effect; the network still duplicates exactly as before."
     },
     {
       "label": "A broker that solved the Two Generals problem with a better ack protocol",
@@ -1472,9 +1472,9 @@ Where the ack sits is the whole game: commit-before-process is at-most-once, pro
   "prompt": "A consumer with Kafka EOS enabled reads an event, calls Stripe to charge the card, and writes a result record, all inside a Kafka transaction. A rebalance causes redelivery. Is the customer charged exactly once?",
   "options": [
     {
-      "label": "Not guaranteed: EOS atomically commits the offset and the output records inside Kafka, but the Stripe call is an external side effect that needs its own idempotency key",
+      "label": "Not guaranteed: the Stripe call sits outside the transaction",
       "correct": true,
-      "feedback": "Right: EOS covers only the read-process-write loop inside Kafka, so the external call still rides at-least-once and must be deduped yourself."
+      "feedback": "Right. EOS atomically commits the consumer's read offset together with the produced records, and both of those live inside Kafka. The charge left Kafka, so it rides plain at-least-once and needs an idempotency key you attach to the Stripe request yourself."
     },
     {
       "label": "Yes: the transaction rolls the Stripe charge back along with the offsets",
@@ -1580,9 +1580,9 @@ The dedup store is the general fallback, but two cheaper flavors come first when
   "prompt": "A 3-day replay hits two consumers. Consumer A runs SET status = shipped keyed by order id. Consumer B runs INCR balance guarded by a dedup store with a 1-hour TTL. Which one corrupts state, and why?",
   "options": [
     {
-      "label": "B: the increment is not naturally idempotent, and its dedup keys expired long before the replay window, so it re-applies",
+      "label": "B: an increment is not naturally idempotent",
       "correct": true,
-      "feedback": "Right: this combines both hazards; INCR needs explicit protection and the TTL must cover the replay horizon, while A's SET lands in the same state every time."
+      "feedback": "Right, and both hazards land on B at once. INCR corrupts state every time it repeats, so it needs explicit protection, and the protection it has expired two days before the replay reached it. A is safe with no store at all, because SET status = shipped keyed by a stable order id lands in the same state however many times it runs."
     },
     {
       "label": "A: repeated SETs push the order through its lifecycle again",
@@ -1721,9 +1721,9 @@ When a consumer is slower than the producer, something has to give. With a **pul
   "prompt": "Lag is climbing on exactly one partition while its siblings drain fine, and the consumer log shows the same offset failing over and over. Why will adding more consumers not fix this?",
   "options": [
     {
-      "label": "The partition is head-of-line blocked by a poison message; only moving it to a retry topic or DLQ unblocks the flow, and no extra consumer can take over an in-order partition",
+      "label": "The partition is head-of-line blocked by a poison message",
       "correct": true,
-      "feedback": "Right: this is the bad-message failure mode, not the slow-consumer one, so the autoscale-on-lag playbook does not apply."
+      "feedback": "Right. A partition is assigned to at most one consumer in the group, so no extra worker can take it over, and the offset that keeps failing holds every message behind it. Only moving that message to a retry topic or the DLQ lets the flow resume. This is the bad-message failure mode, not the slow-consumer one, so the autoscale-on-lag playbook does not apply."
     },
     {
       "label": "Autoscaling only helps once lag exceeds the broker's retention window",
