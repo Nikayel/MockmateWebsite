@@ -3806,6 +3806,59 @@ The OWASP API Security Top 10 is the standard checklist. The one interviewers ha
 }
 \`\`\`
 
+## When denial is the wrong answer: break-the-glass
+
+The BOLA fix above expresses complete mediation as a hard denial: if the caller does not own the resource, refuse. That is correct for an invoice. It is dangerous in a domain where the person being refused might be trying to keep someone alive. An emergency-room clinician meets an unconscious patient whose chart belongs to another hospital's care team. No care relationship exists in the system, so \`caller owns resource\` says deny, and deny is the outcome nobody actually wants.
+
+The pattern for that case is **break-the-glass**: an access the policy is willing to permit, but only down a separate and deliberately conspicuous path. The control moves from prevention to accountability. Compare the two designs on the same request.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Design question",
+    "Hard denial, the BOLA default",
+    "Break-the-glass path"
+  ],
+  "rows": [
+    [
+      "What the policy engine returns",
+      "403, and the chart is unreachable from inside the product",
+      "Permit, tagged emergency_override, which is a different event type from a routine read"
+    ],
+    [
+      "What the clinician sees",
+      "Access denied, with no way forward",
+      "An interstitial naming the patient, requiring a typed reason and a declared relationship, and stating that this access will be reviewed by name"
+    ],
+    [
+      "What lands in the audit log",
+      "A denial event. If the clinician then phones a colleague with wider access and has the chart read aloud, nothing lands at all",
+      "Actor, patient, timestamp, typed reason, and the override flag, appended to the same WORM hash-chained store as every other access"
+    ],
+    [
+      "Who reads it afterwards",
+      "Nobody, because there is nothing to read",
+      "A named reviewer against an SLA, and the review outcome is itself an audit event"
+    ],
+    [
+      "How the curious insider is caught",
+      "They are not: they use whichever path is not blocked",
+      "Overrides are rare by construction, so 40 in a month from one clinician, or a burst against one VIP chart, stands out against a near-zero baseline"
+    ],
+    [
+      "What it costs you",
+      "Denied care in exactly the situation the ownership rule failed to anticipate",
+      "A real accepted risk: the access does happen, and the deterrent is worth nothing if the reviews do not actually get done"
+    ]
+  ],
+  "highlightCols": [
+    "Break-the-glass path"
+  ],
+  "caption": "Read the left column's third row first, because it is why this pattern exists. A hard denial in an emergency does not prevent the access, it relocates it to a path with no record: a shared login, a borrowed badge, a colleague reading the chart down the phone. Break-the-glass keeps the access inside the system where it can be attributed to one person and one stated reason. It only counts as a control while the reviews are real, and rare-by-construction is what keeps reviewing them affordable."
+}
+\`\`\`
+
 ## Supply-chain security
 
 Most of your running code is dependencies, so you must secure what you did not write. **SBOM** (Software Bill of Materials, SPDX or CycloneDX) inventories every component so when the next Log4Shell drops you can answer "are we affected?" in minutes. **SCA scanning** flags known-vulnerable dependencies in CI. **Artifact/image signing** with Sigstore/cosign lets deploys verify an image was built by your pipeline, not swapped by an attacker, and **SLSA provenance** attests how and from what source an artifact was built.
