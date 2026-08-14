@@ -1115,6 +1115,226 @@ Config and secrets live outside the image, in env vars, a ConfigMap, or a secret
 
 A process must hold no state that another instance would need. No in-memory session that only lives on one box, no user files written to local disk. Move session to **Redis**, files to **object storage (S3)**. Then any instance can serve any request, and the platform can start a new instance or kill an old one at any moment. "Disposable" also means **fast startup** and **graceful shutdown**: on **SIGTERM** the process stops taking new work, drains in-flight requests, and exits, so a scale-down or node drain loses nothing.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "What SIGTERM has to do before the process exits",
+  "frames": [
+    {
+      "note": "Steady state. The Service lists pod-c as an endpoint, pod-c reports Ready, and four requests are in flight inside it.",
+      "rows": [
+        {
+          "label": "Service endpoints",
+          "cells": [
+            {
+              "text": "pod-a"
+            },
+            {
+              "text": "pod-b"
+            },
+            {
+              "text": "pod-c",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "pod-c",
+          "cells": [
+            {
+              "text": "Ready",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "in flight",
+          "cells": [
+            {
+              "text": "req 1"
+            },
+            {
+              "text": "req 2"
+            },
+            {
+              "text": "req 3"
+            },
+            {
+              "text": "req 4"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "predict": {
+        "question": "A node drain sends SIGTERM to pod-c and the process exits immediately. What happens to the four in-flight requests, and to traffic the Service is still routing?",
+        "options": [
+          "Both are safe: the endpoint is always removed before SIGTERM is sent",
+          "The four in-flight requests fail, and new requests keep arriving for a moment because endpoint removal propagates separately",
+          "Only the in-flight requests fail, because new traffic stops the instant the process exits"
+        ]
+      },
+      "note": "Exiting on SIGTERM kills the four in-flight requests, and endpoint removal propagates on its own schedule, so the Service keeps routing new requests to an address that has already gone.",
+      "rows": [
+        {
+          "label": "Service endpoints",
+          "cells": [
+            {
+              "text": "pod-a"
+            },
+            {
+              "text": "pod-b"
+            },
+            {
+              "text": "pod-c still listed",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "pod-c",
+          "cells": [
+            {
+              "text": "exited on SIGTERM",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "in flight",
+          "cells": [
+            {
+              "text": "req 1 502",
+              "state": "dropped"
+            },
+            {
+              "text": "req 2 502",
+              "state": "dropped"
+            },
+            {
+              "text": "req 3 502",
+              "state": "dropped"
+            },
+            {
+              "text": "req 4 502",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "new requests",
+          "cells": [
+            {
+              "text": "still routed here",
+              "state": "dropped"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Graceful shutdown starts at the other end. On SIGTERM the process fails its readiness probe first, so the Service drops the endpoint and new traffic stops arriving while the four in-flight requests keep running.",
+      "rows": [
+        {
+          "label": "Service endpoints",
+          "cells": [
+            {
+              "text": "pod-a"
+            },
+            {
+              "text": "pod-b"
+            },
+            {
+              "text": "pod-c removed",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "pod-c",
+          "cells": [
+            {
+              "text": "draining, not Ready",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "in flight",
+          "cells": [
+            {
+              "text": "req 1"
+            },
+            {
+              "text": "req 2"
+            },
+            {
+              "text": "req 3"
+            },
+            {
+              "text": "req 4"
+            }
+          ]
+        },
+        {
+          "label": "new requests",
+          "cells": [
+            {
+              "text": "go to pod-a and pod-b",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Only once the in-flight work has finished does the process exit, and nothing was lost. That is what disposable means: the platform can reclaim the instance at any moment because shutdown is a protocol rather than a kill.",
+      "rows": [
+        {
+          "label": "Service endpoints",
+          "cells": [
+            {
+              "text": "pod-a"
+            },
+            {
+              "text": "pod-b"
+            }
+          ]
+        },
+        {
+          "label": "pod-c",
+          "cells": [
+            {
+              "text": "exited cleanly",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "in flight",
+          "cells": [
+            {
+              "text": "none left",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "new requests",
+          "cells": [
+            {
+              "text": "go to pod-a and pod-b"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Disposability is not the platform being gentle, it is the process cooperating: fail readiness first so traffic stops arriving, drain what is already inside, then exit. A process that treats SIGTERM as exit now makes every scale-in and every node drain a small outage."
+}
+\`\`\`
+
 ## Backing services as attached resources
 
 Databases, caches, queues, and blob stores are attached by **URL and credentials**, not compiled in. A local Postgres and a managed Aurora are the same "attached resource" to the app, so you can swap one for the other by changing config, with no code change. This is what makes an instance truly interchangeable across environments.
