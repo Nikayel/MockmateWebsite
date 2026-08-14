@@ -20,14 +20,179 @@ There is a business metric (revenue, engagement), an ML objective that is a prox
 
 ## Two planes plus a loop
 
-\`\`\`
-OFFLINE (training plane)                 ONLINE (serving plane)
-raw logs -> ETL -> feature pipeline      request -> feature fetch (online store)
-   -> training data -> train             -> candidate gen -> ranking -> response
-   -> eval -> model registry  --push-->  -> model service loads artifact
-        ^                                        |
-        |                                        v
-        +---------- feedback log <--------- impressions + outcomes (clicks)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Two planes and the loop that joins them",
+  "nodes": [
+    {
+      "id": "logs",
+      "label": "Raw event logs",
+      "kind": "queue"
+    },
+    {
+      "id": "etl",
+      "label": "Batch ETL and feature pipeline (one shared definition)",
+      "kind": "service"
+    },
+    {
+      "id": "train",
+      "label": "Training and offline eval on a holdout",
+      "kind": "service"
+    },
+    {
+      "id": "registry",
+      "label": "Model registry (versioned artifact)",
+      "kind": "db"
+    },
+    {
+      "id": "feedbacklog",
+      "label": "Feedback log (prediction paired with outcome)",
+      "kind": "queue"
+    },
+    {
+      "id": "request",
+      "label": "User request",
+      "kind": "client"
+    },
+    {
+      "id": "onlinestore",
+      "label": "Online feature store (point lookup by entity key)",
+      "kind": "cache"
+    },
+    {
+      "id": "candgen",
+      "label": "Candidate generation (millions to a few hundred)",
+      "kind": "service"
+    },
+    {
+      "id": "rank",
+      "label": "Ranking model (heavy, on candidates only)",
+      "kind": "service"
+    },
+    {
+      "id": "response",
+      "label": "Ranked response",
+      "kind": "client"
+    }
+  ],
+  "edges": [
+    {
+      "from": "logs",
+      "to": "etl",
+      "kind": "sync"
+    },
+    {
+      "from": "etl",
+      "to": "train",
+      "kind": "sync",
+      "label": "training rows"
+    },
+    {
+      "from": "train",
+      "to": "registry",
+      "kind": "sync",
+      "label": "publish if it beats the champion"
+    },
+    {
+      "from": "registry",
+      "to": "rank",
+      "kind": "replication",
+      "label": "serving loads the published artifact"
+    },
+    {
+      "from": "request",
+      "to": "onlinestore",
+      "kind": "sync",
+      "label": "fetch features by entity key"
+    },
+    {
+      "from": "onlinestore",
+      "to": "candgen",
+      "kind": "sync"
+    },
+    {
+      "from": "candgen",
+      "to": "rank",
+      "kind": "sync",
+      "label": "a few hundred candidates"
+    },
+    {
+      "from": "rank",
+      "to": "feedbacklog",
+      "kind": "async",
+      "label": "impressions and outcomes"
+    },
+    {
+      "from": "rank",
+      "to": "response",
+      "kind": "sync"
+    },
+    {
+      "from": "feedbacklog",
+      "to": "etl",
+      "kind": "feedback",
+      "label": "tomorrow's training rows"
+    }
+  ],
+  "groups": [
+    {
+      "id": "offline",
+      "label": "Offline training plane (throughput, on a schedule)",
+      "nodes": [
+        "logs",
+        "etl",
+        "train",
+        "registry",
+        "feedbacklog"
+      ]
+    },
+    {
+      "id": "online",
+      "label": "Online serving plane (latency, per request)",
+      "nodes": [
+        "request",
+        "onlinestore",
+        "candgen",
+        "rank",
+        "response"
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "logs",
+        "etl",
+        "train"
+      ],
+      "note": "The offline plane is judged on throughput and runs on a schedule, so raw events become features under one definition and a candidate model is scored on a holdout rather than on live traffic."
+    },
+    {
+      "adds": [
+        "registry"
+      ],
+      "note": "A model deploy has to be reversible, so training ends at a versioned artifact rather than at a running server. Serving loads whatever the registry marks current, which is what turns a rollback into a pointer change."
+    },
+    {
+      "adds": [
+        "request",
+        "onlinestore",
+        "candgen",
+        "rank",
+        "response"
+      ],
+      "note": "The serving plane has a latency budget instead of a throughput one, so it reads precomputed features by key and cascades candidate generation into ranking, which is what keeps the expensive model off millions of items."
+    },
+    {
+      "adds": [
+        "feedbacklog"
+      ],
+      "note": "Nothing so far records what the model predicted next to what the user actually did, so there is no training set for tomorrow and no signal that the model is rotting. This is the arrow juniors leave off the whiteboard."
+    }
+  ],
+  "caption": "One artifact push joins the planes going forward and one feedback log joins them going back. Delete the log and you can still serve, but you can never retrain or detect drift."
+}
 \`\`\`
 
 \`\`\`cswidget

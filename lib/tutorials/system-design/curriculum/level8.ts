@@ -1701,10 +1701,40 @@ The sneaky ones: valid-looking HTTP requests that each cost you a database query
 
 ## Rate-limiting algorithms
 
-\`\`\`
-  token bucket    : refill R tokens/sec, capacity B; allows bursts up to B, smooths to R
-  sliding window  : count requests in the trailing T seconds; accurate, more memory
-  fixed window    : count per calendar minute; cheap but allows 2x burst at the boundary
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Algorithm",
+    "How it counts",
+    "What it does with a burst",
+    "Cost"
+  ],
+  "rows": [
+    [
+      "Token bucket",
+      "Refills R tokens per second into a bucket of capacity B",
+      "Allows a burst up to B, then smooths to R",
+      "One counter per identity; the usual default"
+    ],
+    [
+      "Sliding window",
+      "Counts the requests in the trailing T seconds",
+      "Holds the cap exactly, wherever the burst lands",
+      "Accurate, but more memory per identity"
+    ],
+    [
+      "Fixed window",
+      "Counts per calendar minute",
+      "Admits about 2x the limit across a window boundary",
+      "Cheapest"
+    ]
+  ],
+  "highlightCols": [
+    "What it does with a burst"
+  ],
+  "caption": "Counters live in Redis behind atomic Lua scripts, so a check is one round trip. The fixed-window boundary leak in the third row is what the simulation below makes visible."
+}
 \`\`\`
 
 Token bucket is the usual default (bursty but bounded). Apply limits on multiple **dimensions**: per API key, per user, per IP, per endpoint, and offer **tiered quotas** (free 100 req/min, pro 10k req/min). Store counters in Redis with atomic Lua scripts so the check is one round trip.
@@ -1897,13 +1927,51 @@ The two skills here are complementary: **threat modeling** is how you reason abo
 
 You draw a **data-flow diagram** with **trust boundaries** (where data crosses from less-trusted to more-trusted, for example browser to API, API to database, your service to a third-party processor), then walk each element and each boundary crossing against the STRIDE categories:
 
-\`\`\`
-  S  Spoofing               pretending to be another identity        -> authentication
-  T  Tampering              modifying data or code in transit/rest    -> integrity (signing, hashes, TLS)
-  R  Repudiation            denying an action you took                -> audit logging, non-repudiation
-  I  Information disclosure  leaking data                             -> encryption, access control
-  D  Denial of service      degrading availability                    -> rate limits, quotas, redundancy
-  E  Elevation of privilege gaining rights you should not have        -> authorization, least privilege
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "STRIDE category",
+    "The threat",
+    "The defense property it demands"
+  ],
+  "rows": [
+    [
+      "S: Spoofing",
+      "Pretending to be another identity",
+      "Authentication, and binding the token to its holder"
+    ],
+    [
+      "T: Tampering",
+      "Modifying data or code, in transit or at rest",
+      "Integrity: signing, hashes, TLS"
+    ],
+    [
+      "R: Repudiation",
+      "Denying an action you took",
+      "Audit logging and non-repudiation"
+    ],
+    [
+      "I: Information disclosure",
+      "Leaking data to someone who should not see it",
+      "Encryption and access control"
+    ],
+    [
+      "D: Denial of service",
+      "Degrading availability",
+      "Rate limits, quotas, redundancy"
+    ],
+    [
+      "E: Elevation of privilege",
+      "Gaining rights you should not have",
+      "Authorization and least privilege"
+    ]
+  ],
+  "highlightCols": [
+    "The defense property it demands"
+  ],
+  "caption": "Walk every element and every trust-boundary crossing of the data-flow diagram against all six. The third column is why the exercise surfaces gaps systematically instead of relying on whoever remembers to think about security."
+}
 \`\`\`
 
 Each STRIDE category maps to a defense property, so the exercise systematically surfaces gaps instead of relying on whoever remembers to think about security. You prioritize the resulting threats (likelihood x impact, or DREAD) and only mitigate what matters.
