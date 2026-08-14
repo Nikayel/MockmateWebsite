@@ -5,21 +5,15 @@
  * POST /api/notifications - Trigger notification evaluation for user
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { verifyAuth } from '@/lib/auth-helpers'
+import { NextRequest, NextResponse } from "next/server"
+import { verifyAuth } from "@/lib/auth-helpers"
 import {
   getInAppNotificationsServer,
   getUnreadInAppNotificationsServer,
   markInAppNotificationReadServer,
   markAllInAppNotificationsReadServer,
   getNotificationAnalyticsServer,
-} from '@/lib/notification-helpers-server'
-import {
-  processUserNotifications,
-  sendNotification,
-} from '@/lib/services/notification-service'
-import type { NotificationType } from '@/lib/rag/knowledge-base/notification-knowledge'
-import type { NotificationTriggerContext } from '@/lib/types/notifications'
+} from "@/lib/notification-helpers-server"
 
 /**
  * GET /api/notifications
@@ -31,13 +25,13 @@ export async function GET(request: NextRequest) {
   try {
     const authResult = await verifyAuth(request)
     if (!authResult.authenticated || !authResult.userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const userId = authResult.userId
     const { searchParams } = new URL(request.url)
-    const unreadOnly = searchParams.get('unread') === 'true'
-    const limitParam = parseInt(searchParams.get('limit') || '20', 10)
+    const unreadOnly = searchParams.get("unread") === "true"
+    const limitParam = parseInt(searchParams.get("limit") || "20", 10)
 
     const notifications = unreadOnly
       ? await getUnreadInAppNotificationsServer(userId, limitParam)
@@ -60,89 +54,45 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error('Error fetching notifications:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch notifications' },
-      { status: 500 }
-    )
+    console.error("Error fetching notifications:", error)
+    return NextResponse.json({ error: "Failed to fetch notifications" }, { status: 500 })
   }
 }
 
 /**
  * POST /api/notifications
  * Body options:
- *   1. { action: 'evaluate', context: NotificationTriggerContext }
- *      - Evaluate triggers and send applicable notifications
- *
- *   2. { action: 'send', type: NotificationType, variables: Record<string, any> }
- *      - Send a specific notification
- *
- *   3. { action: 'read', notificationId: string }
+ *   1. { action: 'read', notificationId: string }
  *      - Mark a notification as read
  *
- *   4. { action: 'readAll' }
+ *   2. { action: 'readAll' }
  *      - Mark all notifications as read
+ *
+ * The former 'evaluate' and 'send' actions were removed 2026-08-14: no client
+ * called them, and they let any signed-in user fire arbitrary notification
+ * sends outside every rate limit the real triggers enforce.
  */
 export async function POST(request: NextRequest) {
   try {
     const authResult = await verifyAuth(request)
     if (!authResult.authenticated || !authResult.userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const userId = authResult.userId
     const body = await request.json()
 
     switch (body.action) {
-      case 'evaluate': {
-        // Spread the client context FIRST so the verified userId always wins and
-        // a body.context.userId cannot retarget another account.
-        const context: NotificationTriggerContext = {
-          ...body.context,
-          userId,
-        }
-
-        const result = await processUserNotifications(userId, context)
-
-        return NextResponse.json({
-          success: true,
-          processed: result.processed,
-          sent: result.sent,
-          errors: result.errors,
-        })
-      }
-
-      case 'send': {
-        if (!body.type) {
-          return NextResponse.json(
-            { error: 'Notification type required' },
-            { status: 400 }
-          )
-        }
-
-        const result = await sendNotification(
-          userId,
-          body.type as NotificationType,
-          body.variables || {},
-          body.priority || 'medium'
-        )
-
-        return NextResponse.json(result)
-      }
-
-      case 'read': {
+      case "read": {
         if (!body.notificationId) {
-          return NextResponse.json(
-            { error: 'Notification ID required' },
-            { status: 400 }
-          )
+          return NextResponse.json({ error: "Notification ID required" }, { status: 400 })
         }
 
         // Verify user owns the notification before marking as read
         const marked = await markInAppNotificationReadServer(body.notificationId, userId)
         if (!marked) {
           return NextResponse.json(
-            { error: 'Notification not found or access denied' },
+            { error: "Notification not found or access denied" },
             { status: 404 }
           )
         }
@@ -150,23 +100,17 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true })
       }
 
-      case 'readAll': {
+      case "readAll": {
         await markAllInAppNotificationsReadServer(userId)
 
         return NextResponse.json({ success: true })
       }
 
       default:
-        return NextResponse.json(
-          { error: 'Invalid action. Use: evaluate, send, read, or readAll' },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: "Invalid action. Use: read or readAll" }, { status: 400 })
     }
   } catch (error: any) {
-    console.error('Error processing notification action:', error)
-    return NextResponse.json(
-      { error: 'Failed to process notification action' },
-      { status: 500 }
-    )
+    console.error("Error processing notification action:", error)
+    return NextResponse.json({ error: "Failed to process notification action" }, { status: 500 })
   }
 }

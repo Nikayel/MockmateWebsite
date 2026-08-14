@@ -7,10 +7,25 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { FieldValue } from "firebase-admin/firestore"
 import { adminDb, adminAuth } from "@/lib/firebase-admin"
 import { sendWelcomeEmail } from "@/lib/email"
 
 const db = adminDb
+
+/** A send claim older than this is considered crashed and may be retaken. */
+const WELCOME_CLAIM_TTL_MS = 10 * 60 * 1000
+
+/** Validate an IANA timezone string from the client; anything invalid is dropped. */
+function validTimezoneOrNull(value: unknown): string | null {
+  if (typeof value !== "string" || value.length === 0 || value.length > 64) return null
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value })
+    return value
+  } catch {
+    return null
+  }
+}
 
 /**
  * Create an in-app welcome notification for the user
@@ -38,7 +53,7 @@ async function createWelcomeNotification(userId: string, displayName?: string): 
 /**
  * Initialize comprehensive notification preferences for new users
  */
-async function initializeNotificationPreferences(userId: string): Promise<void> {
+async function initializeNotificationPreferences(userId: string, timezone?: string): Promise<void> {
   try {
     const prefsRef = db.collection("notification_preferences").doc(userId)
     const prefsSnap = await prefsRef.get()
@@ -47,7 +62,7 @@ async function initializeNotificationPreferences(userId: string): Promise<void> 
       await prefsRef.set({
         userId,
         enabled: true,
-        timezone: "America/Los_Angeles", // Default to Pacific Time, user can update in settings
+        timezone: timezone || "America/Los_Angeles", // Browser-reported when available
         channels: {
           email: true,
           in_app: true,
@@ -99,6 +114,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { userId, email, displayName } = body
+    const timezone = validTimezoneOrNull(body.timezone)
 
     if (!userId || !email) {
       return NextResponse.json({ error: "userId and email are required" }, { status: 400 })
@@ -112,20 +128,38 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if welcome email already sent
+    // Atomically claim the send. On a first sign-in BOTH the login page and the
+    // auth callback fire this route concurrently; a plain check-then-set let both
+    // pass the check and the user got two welcome emails. The claim has a TTL so
+    // a crashed attempt doesn't block the retry (or the cron fallback) forever.
     const profileRef = db.collection("profiles").doc(userId)
-    const profileSnap = await profileRef.get()
-
-    if (profileSnap.exists) {
-      const profile = profileSnap.data()
-      if (profile?.welcome_email_sent) {
-        console.log("[Welcome Email API] Welcome email already sent for user:", userId)
-        return NextResponse.json({
-          success: true,
-          message: "Welcome email already sent",
-          skipped: true,
-        })
+    const claim = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(profileRef)
+      const profile = snap.exists ? snap.data() : undefined
+      if (profile?.welcome_email_sent) return "already-sent"
+      const pendingAt = profile?.welcome_email_pending_at
+      if (typeof pendingAt === "string") {
+        const age = Date.now() - new Date(pendingAt).getTime()
+        if (age >= 0 && age < WELCOME_CLAIM_TTL_MS) return "in-flight"
       }
+      tx.set(profileRef, { welcome_email_pending_at: new Date().toISOString() }, { merge: true })
+      return "claimed"
+    })
+
+    if (claim !== "claimed") {
+      console.log(`[Welcome Email API] Skipping send (${claim}) for user:`, userId)
+      return NextResponse.json({
+        success: true,
+        message: claim === "already-sent" ? "Welcome email already sent" : "Send already in flight",
+        skipped: true,
+      })
+    }
+
+    // Capture the browser timezone in the store the email cron reads, so quiet
+    // hours and rate limiting use the user's real local time instead of the
+    // hardcoded Pacific default.
+    if (timezone) {
+      await profileRef.set({ notification_preferences: { timezone } }, { merge: true })
     }
 
     // Send welcome email
@@ -136,23 +170,24 @@ export async function POST(request: NextRequest) {
     // Always create in-app notification and initialize preferences, even if email fails
     await Promise.all([
       createWelcomeNotification(userId, displayName),
-      initializeNotificationPreferences(userId),
+      initializeNotificationPreferences(userId, timezone ?? undefined),
     ])
 
     if (result.success) {
-      // Mark welcome email as sent
+      // Mark welcome email as sent. Increment the daily counter rather than
+      // overwriting it: the cron may already have emailed this user today.
       await profileRef.set(
         {
           welcome_email_sent: true,
+          welcome_email_pending_at: FieldValue.delete(),
           welcome_notification_sent: true,
           last_email_sent_at: new Date().toISOString(),
-          emails_sent_today: 1,
+          emails_sent_today: FieldValue.increment(1),
           notification_preferences: {
             email_notifications_enabled: true,
             welcome_email: true,
             inactivity_reminders: true,
             spaced_repetition_reminders: true,
-            milestone_celebrations: true,
             marketing_emails: false,
           },
         },
@@ -191,18 +226,19 @@ export async function POST(request: NextRequest) {
         console.warn("[Welcome API] Failed to update analytics:", analyticsError)
       }
     } else {
-      // Even if email failed, mark that we tried and created in-app notification
+      // Even if email failed, mark that we tried and created in-app notification.
+      // Clearing the claim lets a retry or the cron fallback attempt the send.
       await profileRef.set(
         {
           welcome_notification_sent: true,
           welcome_email_failed: true,
           welcome_email_error: result.error,
+          welcome_email_pending_at: FieldValue.delete(),
           notification_preferences: {
             email_notifications_enabled: true,
             welcome_email: true,
             inactivity_reminders: true,
             spaced_repetition_reminders: true,
-            milestone_celebrations: true,
             marketing_emails: false,
           },
         },

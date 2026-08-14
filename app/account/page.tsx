@@ -522,6 +522,15 @@ export default function AccountPage() {
           updatedAt: new Date().toISOString(),
         })
       }
+
+      // Mirror into the profiles map: the email cron decides quiet hours and
+      // send windows from profiles.notification_preferences.timezone, so a
+      // timezone saved only to the collection above would never take effect.
+      await updateDoc(doc(db, "profiles", firebaseUser.uid), {
+        "notification_preferences.timezone": newTimezone,
+        updated_at: new Date().toISOString(),
+      })
+
       toast.success("Timezone updated")
     } catch (err) {
       console.error("Failed to update timezone:", err)
@@ -897,22 +906,8 @@ export default function AccountPage() {
                       />
                     </div>
 
-                    {/* Milestones */}
-                    <div className="hover:bg-muted/20 flex items-center justify-between rounded-lg px-3 py-3 transition-colors">
-                      <div className="flex-1">
-                        <span className="text-foreground text-sm">Milestone Celebrations</span>
-                        <p className="text-muted-foreground mt-0.5 text-xs">
-                          Celebrate streaks, progress, and achievements
-                        </p>
-                      </div>
-                      <Switch
-                        checked={notificationPrefs.milestone_celebrations}
-                        onCheckedChange={(checked) =>
-                          handleUpdateNotificationPref("milestone_celebrations", checked)
-                        }
-                        disabled={isSavingPrefs}
-                      />
-                    </div>
+                    {/* Milestone emails were removed 2026-08-14; milestone celebrations
+                        are in-app only now, so there is no email toggle for them. */}
 
                     {/* Product Updates - Marketing */}
                     <div className="hover:bg-muted/20 flex items-center justify-between rounded-lg px-3 py-3 transition-colors">

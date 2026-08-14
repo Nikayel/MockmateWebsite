@@ -217,6 +217,7 @@ function LoginPageContent() {
                   userId: firebaseUser.uid,
                   email: firebaseUser.email,
                   displayName: firebaseUser.displayName,
+                  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                 }),
               })
 
