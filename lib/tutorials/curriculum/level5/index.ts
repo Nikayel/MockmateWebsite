@@ -410,7 +410,7 @@ const happyPathLesson: PythonLesson = {
   id: "py-l5-happy-path",
   title: "The happy path is not the test",
   summary:
-    "Generated code is fitted to the example you gave it, so the example proves nothing. Learn the boundary catalogue and write a probe that separates correct candidates from plausible ones.",
+    "Generated code is fitted to the example you gave it, so passing that example proves nothing about the edge cases that decide correctness.",
   estimatedMinutes: 24,
   difficulty: "medium",
   skills: ["edge cases", "test design", "code review", "verification"],
@@ -2409,7 +2409,7 @@ const shrinkLesson: PythonLesson = {
   id: "py-l5-shrink",
   title: "Shrink the failing input",
   summary:
-    "A bug report with a 400 row file is not a diagnosis. Cut the input down until removing anything else makes the failure disappear, and the answer is usually visible.",
+    "A bug report with a 400 row file is not a diagnosis: cut the input down until removing anything else makes the failure disappear.",
   estimatedMinutes: 22,
   difficulty: "medium",
   skills: ["debugging", "minimal reproduction", "bisection", "verification"],
@@ -3413,7 +3413,7 @@ const modelDependencyLesson: PythonLesson = {
   id: "py-l5-model-dependency",
   title: "A model call is a network call",
   summary:
-    "Slow, metered, and allowed to fail. Wrap it the way you would wrap any third party: a timeout, a bounded retry, a budget, and a defined answer for when it does not come back.",
+    "A model call is slow, metered, and allowed to fail, so it needs the same timeout, bounded retry, and fallback answer as any third party.",
   estimatedMinutes: 24,
   difficulty: "medium",
   skills: ["error handling", "retries", "reliability", "api integration"],
@@ -4190,7 +4190,7 @@ def first_invalid_index(responses):
 
 const hallucinatedApiLesson: PythonLesson = {
   id: "py-l5-hallucinated-api",
-  title: "The API that does not exist, and the one that does something else",
+  title: "Hallucinated APIs and methods that mean something else",
   summary:
     "An invented method fails loudly. The dangerous case is the method that is real, spelled right, and does not mean what the name suggests.",
   estimatedMinutes: 24,
