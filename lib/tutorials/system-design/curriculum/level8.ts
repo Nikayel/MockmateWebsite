@@ -159,13 +159,99 @@ During registration (WebAuthn \`navigator.credentials.create\`), the authenticat
 
 The credential is cryptographically tied to the exact origin (say \`accounts.google.com\`). The browser will only offer and use that credential for that origin. If a victim lands on \`accounts-google.evil.com\`, the browser refuses to produce the credential, so there is nothing to phish. Contrast this with a TOTP code or an SMS OTP: those are just numbers the user reads and can be tricked into typing into a fake site, and a real-time phishing proxy relays them to the real site within the 30-second window. Passkeys close that hole because the signed challenge is bound to the origin and cannot be replayed elsewhere.
 
-\`\`\`
-Registration:  device generates keypair (scoped to origin)
-               server stores  PUBLIC key + credential_id
-Login:         server --challenge--> device
-               device signs with PRIVATE key (after Face ID/PIN)
-               device --signature--> server verifies vs public key
-   private key NEVER leaves the device; nothing phishable on the wire
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "A passkey, and what actually crosses the wire",
+  "nodes": [
+    {
+      "id": "authenticator",
+      "label": "Authenticator (secure enclave, TPM, or security key)",
+      "kind": "external"
+    },
+    {
+      "id": "browser",
+      "label": "Browser (WebAuthn API, enforces origin binding)",
+      "kind": "client"
+    },
+    {
+      "id": "rp",
+      "label": "Relying party server",
+      "kind": "service"
+    },
+    {
+      "id": "creds",
+      "label": "Credential store: public key + credential_id",
+      "kind": "db"
+    },
+    {
+      "id": "phish",
+      "label": "Real-time phishing proxy on accounts-google.evil.com",
+      "kind": "external"
+    }
+  ],
+  "edges": [
+    {
+      "from": "authenticator",
+      "to": "browser",
+      "kind": "sync",
+      "label": "registration: keypair scoped to the origin, public key only"
+    },
+    {
+      "from": "browser",
+      "to": "rp",
+      "kind": "sync",
+      "label": "public key + credential_id, then the signed assertion at login"
+    },
+    {
+      "from": "rp",
+      "to": "creds",
+      "kind": "sync",
+      "label": "store the public key, read it back to verify the signature"
+    },
+    {
+      "from": "rp",
+      "to": "browser",
+      "kind": "feedback",
+      "label": "login: a fresh random challenge"
+    },
+    {
+      "from": "browser",
+      "to": "authenticator",
+      "kind": "feedback",
+      "label": "sign the challenge after Face ID, fingerprint, or PIN"
+    },
+    {
+      "from": "phish",
+      "to": "browser",
+      "kind": "sync",
+      "label": "asks for the credential and gets nothing: wrong origin"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "authenticator",
+        "browser"
+      ],
+      "note": "Registration starts on the device. The authenticator generates a keypair scoped to this exact origin, and the browser is the only thing that will ever offer it. The requirement driving this is that the secret must have no existence off the device."
+    },
+    {
+      "adds": [
+        "rp",
+        "creds"
+      ],
+      "note": "The server receives a public key and a credential id, and that is all it ever stores. This is the breach requirement: a dumped credential table holds material that can verify a signature and nothing that can produce one."
+    },
+    {
+      "adds": [
+        "phish"
+      ],
+      "note": "Origin binding is the phishing requirement. A perfect relay proxy defeats any typed code, but the browser refuses to produce this credential on a different origin, so there is never a signature for the proxy to relay."
+    }
+  ],
+  "caption": "The private key never leaves the authenticator and nothing replayable crosses the wire, which is why a server breach yields only public keys."
+}
 \`\`\`
 
 ## Authenticator types, sync, and attestation
@@ -444,13 +530,67 @@ The four roles: the resource owner (the user), the client (the app requesting ac
 }
 \`\`\`
 
-\`\`\`
-Authorization Code + PKCE (SPA/mobile/web):
-  client --(auth request + code_challenge)--> AS
-  user authenticates & consents at AS
-  AS --(authorization code)--> client (via exact redirect_uri)
-  client --(code + code_verifier + [secret])--> AS token endpoint
-  AS --> access_token (+ id_token for OIDC, + refresh_token)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "The four OAuth roles in the Authorization Code + PKCE exchange",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "owner",
+      "label": "Resource owner (the user)",
+      "kind": "client"
+    },
+    {
+      "id": "client",
+      "label": "Client (SPA, mobile, or web app)",
+      "kind": "client"
+    },
+    {
+      "id": "as",
+      "label": "Authorization server (issues the tokens)",
+      "kind": "external"
+    },
+    {
+      "id": "rs",
+      "label": "Resource server (the API that accepts the token)",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "owner",
+      "to": "client",
+      "kind": "sync",
+      "label": "uses the app, and never types a password into it"
+    },
+    {
+      "from": "owner",
+      "to": "as",
+      "kind": "sync",
+      "label": "authenticates and consents at the AS itself"
+    },
+    {
+      "from": "client",
+      "to": "as",
+      "kind": "sync",
+      "label": "auth request + code_challenge, then code + code_verifier at the token endpoint"
+    },
+    {
+      "from": "as",
+      "to": "client",
+      "kind": "feedback",
+      "label": "authorization code via the exact redirect_uri, then access_token (plus id_token for OIDC and refresh_token)"
+    },
+    {
+      "from": "client",
+      "to": "rs",
+      "kind": "sync",
+      "label": "access_token, bounded by scope and audience"
+    }
+  ],
+  "caption": "PKCE is why an intercepted code is worthless: the code_verifier is revealed only at the token exchange. OIDC adds the id_token, which is the part that turns this authorization flow into a login."
+}
 \`\`\`
 
 ## Hardening tokens
