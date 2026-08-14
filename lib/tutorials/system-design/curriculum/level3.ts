@@ -2940,6 +2940,70 @@ binlog, or an application event) onto a stream, and an indexer applies them to E
 Because it is derivable, plan for **full reindexing**: mapping changes require building a fresh index
 and switching an **alias** over atomically, with zero downtime.
 
+### Time-based indices: rollover, force-merge, and searchable snapshots
+
+Everything so far assumed one long-lived index. For time-series data (logs, events, traces) that is
+the wrong shape: retention turns into billions of per-document deletes, and every query scans the
+whole corpus to find the last fifteen minutes. The shape that works is **one index per time or size
+window**, cut automatically by an **index lifecycle policy (ILM)** and addressed through aliases so
+neither writers nor readers ever learn an index name.
+
+\`\`\`
+alias                    resolves to
+  logs-write     ->      logs-000042                       exactly one index, the current one
+  logs-read-*    ->      logs-000001 ... logs-000042       every index still retained
+
+ILM rollover condition on logs-write:   max_age = 1h   OR   max_size = 50gb
+
+  when either trips, ILM creates logs-000043, repoints the logs-write alias at it,
+  and leaves the old index under the read alias. The indexer's target never changes.
+
+  "last 15 minutes"  ->  logs-000042 alone, one small index on fast disk
+  "last 30 days"     ->  fans out over ~720 indices, each pruned by its time range
+  retention expiry   ->  DELETE logs-000001, an index drop, not 4 billion deletes
+\`\`\`
+
+Rollover is also what makes two per-index operations legal, because both of them only make sense on
+an index that has stopped taking writes.
+
+**force-merge.** A Lucene shard is a set of **immutable segments**. Every refresh writes a new one,
+and a delete or update does not remove anything: it marks the document tombstoned inside the segment
+it already lives in. Background merging keeps segment count bounded but never converges while writes
+keep arriving. A rolled-over index is read-only forever, so you can merge it down in one shot:
+
+\`\`\`
+POST /logs-000041/_forcemerge?max_num_segments=1
+
+  before:  180 segments, 62 GB on disk, 9 percent of docs tombstoned but still stored
+  after:     1 segment,  55 GB on disk, the tombstoned space actually reclaimed
+
+  fewer segments also means fewer per-segment seeks per query, so the historical
+  query gets faster as well as smaller. Never aim this at an index still being
+  written to: the merge and the ingest fight each other for the same IO.
+\`\`\`
+
+**searchable snapshots.** Snapshot a rolled-over index into object storage, then **mount** the
+snapshot instead of restoring it. The node keeps the index metadata and a local disk cache, and pulls
+segment blocks from S3 on a cache miss. The point is that the snapshot stays **queryable in place**:
+
+\`\`\`
+PUT  /_snapshot/s3_repo/snap-000041        { "indices": "logs-000041" }   segments -> S3
+POST /_snapshot/s3_repo/snap-000041/_mount { "index":   "logs-000041" }   mounted, searchable
+
+  the node now holds metadata plus a cache, not 55 GB of segments
+  the query returns the same answer, it just pays an object-storage fetch on a miss:
+     local NVMe          tens of ms
+     mounted snapshot    seconds
+
+  replicas go to 0 on these indices, because durability now comes from the snapshot
+  in object storage rather than from a second copy sitting on another node
+\`\`\`
+
+Put together, that is the whole index layout for a log platform: rollover keeps the last few minutes
+in one small index, force-merge shrinks each index the moment it stops taking writes, and searchable
+snapshots keep the thirty-day tail answerable at object-storage prices instead of forcing you to
+choose between paying for hot disk and deleting the data.
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -2971,7 +3035,10 @@ Elasticsearch your primary DB: weaker durability and consistency guarantees, and
 Recap: search runs on a dedicated tier built on an inverted index plus an analysis pipeline, ranks
 with BM25 and boosting, separates scoring queries from cached filters, shards across primaries and
 replicas, stays in sync as an eventually-consistent derived store fed by CDC, and paginates deep sets
-with search_after, never large from offsets.
+with search_after, never large from offsets. For time-series data, cut the corpus into ILM-rolled
+indices behind a write alias and a read pattern, force-merge each one once it stops taking writes,
+and mount older indices as searchable snapshots so the long tail stays queryable at object-storage
+prices.
 
 \`\`\`cswidget
 {
