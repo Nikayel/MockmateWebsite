@@ -1446,13 +1446,6 @@ how CDC pipelines bootstrap read models.
 }
 \`\`\`
 
-\`\`\`
-Compacted topic keyed by user_id, before compaction:
-  (u1,"A") (u2,"X") (u1,"B") (u3,"Q") (u1,"C") (u2,"Y")
-After compaction keeps latest per key:
-  (u3,"Q") (u1,"C") (u2,"Y")   <- current state of every user
-\`\`\`
-
 **Deletes in a compacted topic** use a **tombstone**: a record with the key and a \`null\` value.
 Compaction keeps the tombstone long enough for all consumers to observe the deletion, then removes
 both the tombstone and all prior values for that key.
