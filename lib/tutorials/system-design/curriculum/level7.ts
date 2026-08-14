@@ -1573,12 +1573,81 @@ Levels 1 and 4 own the how, so this is only the recap. Shed at the edge with \`4
 
 ## Metastable failures
 
-\`\`\`
-  normal ---(trigger: traffic spike)---> overloaded
-     ^                                       |
-     |                                       | retries + full queues
-     +------ (does NOT self-recover) --------+
-              the trigger is GONE but the system stays down
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "A metastable failure builds, then outlives its trigger",
+  "nodes": [
+    {
+      "id": "clients",
+      "label": "Clients (retry on timeout)",
+      "kind": "client"
+    },
+    {
+      "id": "service",
+      "label": "Service (ceiling: 10k QPS of goodput)",
+      "kind": "service"
+    },
+    {
+      "id": "spike",
+      "label": "Traffic spike (the trigger)",
+      "kind": "external"
+    },
+    {
+      "id": "queue",
+      "label": "Unbounded request queue (work waits past the client timeout)",
+      "kind": "queue"
+    }
+  ],
+  "edges": [
+    {
+      "from": "clients",
+      "to": "service",
+      "kind": "sync",
+      "label": "steady demand, under the ceiling"
+    },
+    {
+      "from": "spike",
+      "to": "service",
+      "kind": "sync",
+      "label": "arrivals jump to 20k QPS"
+    },
+    {
+      "from": "service",
+      "to": "queue",
+      "kind": "async",
+      "label": "work past capacity queues instead of being refused"
+    },
+    {
+      "from": "queue",
+      "to": "clients",
+      "kind": "feedback",
+      "label": "timeouts, so every client retries the same work"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "clients",
+        "service"
+      ],
+      "note": "Steady demand sits under the 10k QPS goodput ceiling, so every accepted request still finishes inside the client's timeout. Throughput and goodput are the same number here."
+    },
+    {
+      "adds": [
+        "spike"
+      ],
+      "note": "The trigger arrives: 20k QPS against the same 10k ceiling. The requirement that breaks first is timeliness, not capacity, because the service is now accepting work it can never finish in time."
+    },
+    {
+      "adds": [
+        "queue"
+      ],
+      "note": "Nothing bounds the in-flight work, so doomed requests queue, time out, and come back as retries. Once that return arc closes, the load no longer depends on the spike: it can end and the system stays down, which is what makes the failure metastable. Only shedding demand below capacity, plus client backoff with jitter, breaks it."
+    }
+  ],
+  "caption": "The spike starts it and the retry arc sustains it. That is why tripling the fleet does not help: the retries expand to fill whatever capacity you add."
+}
 \`\`\`
 
 A metastable failure is one that *sustains itself after the original trigger is gone*. A traffic spike pushes the system into overload; the overload causes timeouts; the timeouts cause client retries; the retries add more load than the original spike; and now even after the spike passes, the retry-driven load keeps the system saturated.
