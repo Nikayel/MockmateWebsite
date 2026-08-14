@@ -3142,12 +3142,145 @@ You cannot guarantee a side effect runs exactly once across crashes, so combine 
 
 For a cron job, on completion compute the next run and reschedule. Clock skew across machines means you should not rely on any single worker's clock for correctness; use the database's time or a logical ordering, and tolerate a small firing jitter. If the scheduler was down and missed a window, decide policy explicitly: catch up and run the missed occurrences, or skip to the next future one (misfire policy). Shard jobs by id or by time bucket so many pollers and workers run in parallel, add priority queues, and separate the scheduling tier from the execution tier.
 
-\`\`\`
-poller: SELECT jobs WHERE next_run_at<=now AND pending
-worker: CAS status pending->running, lease_expires=now+T, token=n++   (only one wins)
-   crash -> lease expires -> another worker retries (token n+1)
-   downstream write carries token; rejects token < max_seen (fencing)
-   completion: idempotency_key dedupes the side effect
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Firing once despite crashes, one defence at a time",
+  "nodes": [
+    {
+      "id": "jobs",
+      "label": "Job store (indexed on next_run_at, or time bucketed)",
+      "kind": "db"
+    },
+    {
+      "id": "poller",
+      "label": "Poller (every second: next_run_at <= now AND status pending)",
+      "kind": "service"
+    },
+    {
+      "id": "lease",
+      "label": "Lease CAS (status pending to running, lease_expires = now + T, token n++)",
+      "kind": "service"
+    },
+    {
+      "id": "worker_a",
+      "label": "Worker A (wins the CAS, then pauses past its lease)",
+      "kind": "service"
+    },
+    {
+      "id": "worker_b",
+      "label": "Worker B (takes the expired lease, token n+1)",
+      "kind": "service"
+    },
+    {
+      "id": "resource",
+      "label": "Downstream write (rejects any token below max_seen: fencing)",
+      "kind": "service"
+    },
+    {
+      "id": "dedup",
+      "label": "Idempotency key store (dedupes the side effect)",
+      "kind": "cache"
+    },
+    {
+      "id": "effect",
+      "label": "The side effect that must happen once (the charge)",
+      "kind": "external"
+    }
+  ],
+  "edges": [
+    {
+      "from": "jobs",
+      "to": "poller",
+      "kind": "sync",
+      "label": "due window query, not a scan"
+    },
+    {
+      "from": "poller",
+      "to": "lease",
+      "kind": "sync",
+      "label": "dispatch"
+    },
+    {
+      "from": "lease",
+      "to": "worker_a",
+      "kind": "sync",
+      "label": "only one CAS wins"
+    },
+    {
+      "from": "lease",
+      "to": "worker_b",
+      "kind": "sync",
+      "label": "granted again once the lease expires"
+    },
+    {
+      "from": "worker_a",
+      "to": "resource",
+      "kind": "sync",
+      "label": "stale token n, fenced off"
+    },
+    {
+      "from": "worker_b",
+      "to": "resource",
+      "kind": "sync",
+      "label": "token n+1, accepted"
+    },
+    {
+      "from": "resource",
+      "to": "dedup",
+      "kind": "sync",
+      "label": "idempotency key checked"
+    },
+    {
+      "from": "dedup",
+      "to": "effect",
+      "kind": "sync",
+      "label": "applied once"
+    },
+    {
+      "from": "worker_b",
+      "to": "jobs",
+      "kind": "feedback",
+      "label": "completion: compute the next run"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "jobs",
+        "poller"
+      ],
+      "note": "Finding what is due cannot mean scanning every job, so jobs are indexed by run time and the poller reads only the current window."
+    },
+    {
+      "adds": [
+        "lease",
+        "worker_a"
+      ],
+      "note": "Two workers reading the same due row would both run it, so a worker acquires the job with a single conditional update and only one compare-and-set wins."
+    },
+    {
+      "adds": [
+        "worker_b"
+      ],
+      "note": "A crashed holder must not strand the job forever, so its lease simply expires and another worker picks it up, which is a retry rather than a duplicate."
+    },
+    {
+      "adds": [
+        "resource"
+      ],
+      "note": "A worker that merely paused runs no code and makes no checks, so it wakes still believing it holds the lease; only a fencing token at the destination stops its write."
+    },
+    {
+      "adds": [
+        "dedup",
+        "effect"
+      ],
+      "note": "No lease bounds a pause, so the honest target is at-least-once execution plus an idempotency key on the run, which is what makes the charge apply once."
+    }
+  ],
+  "caption": "Each layer closes the hole the one before it leaves open, and the completion arc is what reschedules a recurring job."
+}
 \`\`\`
 
 **Recap:** index jobs by run time and poll the due window, make a single worker win via a compare-and-set lease with a visibility timeout so crashes retry rather than duplicate, add fencing tokens to defeat the paused-worker double-run, achieve effectively-once with idempotency keys, and handle clock skew and missed windows with an explicit misfire policy.
@@ -3225,12 +3358,104 @@ Fencing tokens are what make leasing safe. Each lock grant includes a monotonica
 
 Instead of polling "is the lock free yet," clients register a watch on the lock or leader key and receive a callback when it changes, giving fast failover. Leader election: candidates each create an ordered ephemeral key (a sequence number); the candidate with the lowest number is the leader; each other candidate watches only its immediate predecessor, so when the leader dies exactly one candidate is notified and takes over, avoiding a herd.
 
-\`\`\`
-acquire: create ephemeral seq key under /lock  -> get number
-   lowest number holds the lock; token = key revision
-   others watch predecessor (no polling)
-protected resource: accept write only if token >= max_seen_token   (fencing)
-partition: only majority quorum can grant -> minority is unavailable, not wrong
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "A lock that survives a pause and a partition",
+  "nodes": [
+    {
+      "id": "client_a",
+      "label": "Client A (holds the lock, then pauses past its lease)",
+      "kind": "client"
+    },
+    {
+      "id": "client_b",
+      "label": "Client B (waits by watching its predecessor, never polling)",
+      "kind": "client"
+    },
+    {
+      "id": "lock",
+      "label": "Lock key under /lock: ordered ephemeral sequence, session lease renewed by heartbeat",
+      "kind": "service"
+    },
+    {
+      "id": "consensus",
+      "label": "Consensus store (Raft in etcd and Consul, Zab in ZooKeeper): a write commits only on a majority, so a minority partition is unavailable rather than wrong",
+      "kind": "db"
+    },
+    {
+      "id": "resource",
+      "label": "Protected resource: accept a write only if token >= max_seen_token",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "client_a",
+      "to": "lock",
+      "kind": "sync",
+      "label": "create an ephemeral sequence key; the lowest number holds the lock"
+    },
+    {
+      "from": "client_b",
+      "to": "lock",
+      "kind": "sync",
+      "label": "watch only the predecessor, so a failover wakes one node"
+    },
+    {
+      "from": "lock",
+      "to": "consensus",
+      "kind": "sync",
+      "label": "lock state, linearizable"
+    },
+    {
+      "from": "lock",
+      "to": "resource",
+      "kind": "sync",
+      "label": "every grant carries a monotonic token (etcd key revision, ZooKeeper zxid)"
+    },
+    {
+      "from": "client_a",
+      "to": "resource",
+      "kind": "sync",
+      "label": "wakes up and writes with a stale token: fenced off"
+    },
+    {
+      "from": "client_b",
+      "to": "resource",
+      "kind": "sync",
+      "label": "writes with the higher token: accepted"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "client_a",
+        "lock"
+      ],
+      "note": "A dead holder must not deadlock the cluster, so the lock is held through a session lease the client renews by heartbeat and that releases itself when the heartbeats stop."
+    },
+    {
+      "adds": [
+        "consensus"
+      ],
+      "note": "A single node loses the lock key on failover and can grant it twice, so the state sits behind a consensus protocol where a write commits only on a majority."
+    },
+    {
+      "adds": [
+        "resource"
+      ],
+      "note": "You cannot bound a garbage collection pause, so consensus fixes the lock and fencing has to fix the resource: it remembers the highest token accepted and rejects anything lower."
+    },
+    {
+      "adds": [
+        "client_b"
+      ],
+      "note": "Polling asks the same question forever and a shared watch wakes a herd, so each waiter watches only its immediate predecessor and exactly one is notified when the holder goes."
+    }
+  ],
+  "caption": "The two-part answer: consensus makes the lock state correct, fencing makes the critical section correct."
+}
 \`\`\`
 
 **Recap:** a Redis SETNX-with-TTL lock is unsafe because a single node can fail over and a paused holder can outlive its TTL; build on a consensus-backed store (etcd, ZooKeeper) for linearizable lock state, auto-release via session leases and heartbeats, defeat the stale-holder double-run with monotonic fencing tokens, notify clients with watches instead of polling, and elect leaders with ordered ephemeral keys where each watches its predecessor.
