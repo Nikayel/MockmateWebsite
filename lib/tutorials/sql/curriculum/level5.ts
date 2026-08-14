@@ -997,7 +997,7 @@ INSERT INTO customers (customer_id, total_spend) VALUES
 
 const jsonVariantFlatten: SqlLesson = {
   id: "sql-l5-json-variant-flatten",
-  title: "Semi-Structured Data: JSON/VARIANT Extraction and Array Flattening",
+  title: "JSON/VARIANT Extraction and Array Flattening",
   summary:
     "Shred JSON into typed columns with the path operator, explode nested arrays with json_each, and avoid the double-count trap.",
   estimatedMinutes: 36,
@@ -1468,7 +1468,7 @@ INSERT INTO fact_orders VALUES
 
 const joinFanOutAndSkew: SqlLesson = {
   id: "sql-l5-join-fan-out-and-skew",
-  title: "Join Fan-Out and Data Skew: Diagnose, Fix, and Keep Metrics Consistent",
+  title: "Join Fan-Out: Duplicate Rows and Data Skew",
   summary:
     "A join to the many side inflates a SUM; fix it by aggregating to the fact grain first, define the metric once, and surface hot keys.",
   estimatedMinutes: 28,
@@ -1628,7 +1628,7 @@ INSERT INTO order_items VALUES
 
 const cdcChangelogApply: SqlLesson = {
   id: "sql-l5-cdc-changelog-apply",
-  title: "CDC Changelog Apply: MERGE-Shaped Upsert with Deletes and Version Ordering",
+  title: "CDC Changelog Apply: MERGE Upserts with Deletes",
   summary:
     "Apply an I/U/D change stream to a target: dedup to the latest version per key, upsert inserts and updates, delete tombstones, stay idempotent.",
   estimatedMinutes: 38,
@@ -1968,7 +1968,7 @@ SELECT id FROM (
 
 const dataQualityGates: SqlLesson = {
   id: "sql-l5-data-quality-gates",
-  title: "Write-Audit-Publish: Freshness, Volume, and Null-Rate Blocking Gates",
+  title: "Write-Audit-Publish: Blocking Data Quality Gates",
   summary:
     "Stage a batch to audit, run freshness/volume/null-rate violation checks, and publish to the served table only when every check returns zero.",
   estimatedMinutes: 30,
@@ -2131,7 +2131,7 @@ INSERT INTO incoming_batch VALUES
 
 const systemDesignRoundReasoning: SqlLesson = {
   id: "sql-l5-system-design-round-reasoning",
-  title: "Reasoning Like the System-Design Round: Pruning, Consumer Lag, Windows, DAG Deps",
+  title: "Partition Pruning, Consumer Lag and Tumbling Windows",
   summary:
     "Make the four un-runnable system-design mechanisms concrete: sargable pruning, Kafka consumer lag, event-time tumbling windows, and DAG eligibility.",
   estimatedMinutes: 30,
@@ -2259,7 +2259,7 @@ INSERT INTO events VALUES
 
 const medallionStreamingCapstone: SqlLesson = {
   id: "sql-l5-medallion-streaming-capstone",
-  title: "Capstone: JSON Events to a Sessionized, Incremental, DQ-Gated Medallion Pipeline",
+  title: "Medallion Capstone: JSON Events to Bronze, Silver, Gold",
   summary:
     "The whole level in one build: Bronze JSON to a deduped, sessionized Silver to a reconciling Gold aggregate, idempotent end to end.",
   estimatedMinutes: 44,
