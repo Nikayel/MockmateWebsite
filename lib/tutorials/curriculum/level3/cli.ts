@@ -495,7 +495,7 @@ def run_tests(record):
 
 export const cliLesson: PythonLesson = {
   id: "py-l3-cli",
-  title: "Building a CLI: parse and dispatch argv (argparse/typer preview)",
+  title: "Building a CLI: argparse and dispatching argv",
   summary: "Turn argument lists into commands with a testable dispatcher.",
   estimatedMinutes: 50,
   difficulty: "medium",

@@ -118,7 +118,7 @@ def run_tests(record):
 
 export const sqliteParameterizedLesson: PythonLesson = {
   id: "py-l3-sqlite-parameterized",
-  title: "Talking to a database from Python: sqlite3 and parameterized queries",
+  title: "sqlite3 and parameterized queries from Python",
   summary:
     "Connect, execute, fetch and commit with sqlite3, and keep every value out of the SQL text.",
   estimatedMinutes: 18,
