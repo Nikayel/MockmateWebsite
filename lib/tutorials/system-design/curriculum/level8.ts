@@ -1186,9 +1186,9 @@ The mistake juniors make is treating "DDoS" as one problem with one fix. It is a
       "feedback": "Tempting, but a WAF works on HTTP requests and this flood never becomes HTTP. It saturates your network pipes upstream of anything you run, so your origin defenses never even see it."
     },
     {
-      "label": "No. The flood saturates the pipes before any origin defense runs; you need anycast and upstream scrubbing.",
+      "label": "No. The flood saturates the pipes upstream of your origin.",
       "correct": true,
-      "feedback": "Right. Volumetric L3/L4 attacks are won or lost in the network: spread the load across hundreds of edge PoPs and filter in scrubbing centers before it ever converges on you."
+      "feedback": "Right, so no origin defense ever runs. Volumetric L3/L4 attacks are won or lost in the network, which is why the answer is anycast plus upstream scrubbing: spread the load across hundreds of edge PoPs and filter it in scrubbing centers before it ever converges on you."
     },
     {
       "label": "Yes, as long as autoscaling adds instances fast enough.",
@@ -1308,9 +1308,9 @@ If your Redis limiter store is down, do you allow all traffic (fail-open, availa
       "feedback": "Tempting, because the availability story really is solid. But an attacker who cannot cause an outage can still make you pay for one: drive load, watch you autoscale, and let the invoice do the damage."
     },
     {
-      "label": "No. Uncapped autoscaling turns the attack into denial of wallet; cap scaling, shed load cheaply at the CDN, and set billing alarms.",
+      "label": "No. Uncapped autoscaling turns the attack into denial of wallet.",
       "correct": true,
-      "feedback": "Right. Economic denial of service is the attack that survives good availability engineering. Scaling caps, cheap shedding at the cache, and billing alarms close the loop."
+      "feedback": "Right. Economic denial of service is the attack that survives good availability engineering: they drive load, you scale, and the invoice does the damage. Cap the autoscaler, shed load cheaply at the CDN so a flood hits edge capacity rather than your origin, and set billing alarms."
     },
     {
       "label": "No. You still need to fail-closed everywhere so no attack traffic ever gets through.",
@@ -1398,9 +1398,9 @@ The unifying idea is that every event gets a risk score from a pipeline of **fea
       "feedback": "Tempting, but real users trip risk signals constantly: VPNs, shared devices, travel, privacy browsers. Hard-blocking the ambiguous middle blocks them too."
     },
     {
-      "label": "Team A killed conversion and drowned support in false-positive tickets; Team B caught comparable fraud with a fraction of the damage.",
+      "label": "Team A killed conversion; Team B caught comparable fraud",
       "correct": true,
-      "feedback": "Right. The ambiguous middle is mostly legitimate. Step-up friction lets real users through with one extra step while still stopping automation, which is why the metric is fraud caught per unit of legitimate-user friction."
+      "feedback": "Right. Team A also drowned support in false-positive tickets, and Team B got its result with a fraction of that damage, because the ambiguous middle is mostly legitimate. Step-up friction lets real users through with one extra step while still stopping automation, which is why the metric is fraud caught per unit of legitimate-user friction."
     },
     {
       "label": "Team B gets overrun, because challenged bots simply solve the challenge and continue.",
@@ -1514,7 +1514,7 @@ The principles you apply to the mitigations: **least privilege** (each component
       "feedback": "Tempting, because that is what the model promises on paper. But the perimeter model authenticates once at the edge and then trusts network location, so nothing re-checks the attacker on the inside."
     },
     {
-      "label": "Essentially the whole internal network, moving laterally from the laptop's trusted position.",
+      "label": "Essentially the whole internal network, by moving laterally from the laptop",
       "correct": true,
       "feedback": "Right. Hard perimeter, soft interior: once inside, traffic is implicitly trusted, so one phished laptop becomes a beachhead and the blast radius is the entire flat network."
     },
