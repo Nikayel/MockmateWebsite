@@ -219,9 +219,9 @@ Node A, Node B  ->  Redis (atomic Lua): count = INCR key; if first, EXPIRE 60
   "prompt": "The requirement is an accurate hard cap of 100 requests per minute per API key, enforced across 20 stateless nodes. What do you name?",
   "options": [
     {
-      "label": "Sliding window counter, evaluated in one Lua script against a shared Redis so the check and the increment cannot interleave",
+      "label": "Sliding window counter in one Lua script against a shared Redis",
       "correct": true,
-      "feedback": "Right. Sliding window counter kills the boundary burst at O(1) memory, the shared store removes the per node divergence, and the single script removes the read modify write race."
+      "feedback": "Right, and every clause is load bearing. The sliding window counter kills the boundary burst at O(1) memory, so the cap is accurate. The shared Redis removes the per node divergence that handed one client twenty separate budgets. And evaluating the check and the increment inside one script removes the read modify write race between two nodes."
     },
     {
       "label": "Fixed window counters in Redis, since the shared store already removes the race",
@@ -556,9 +556,9 @@ The core structure is a trie (prefix tree): each node is a character, and a path
   "prompt": "A candidate proposes a SQL table of terms with an index on the term column, queried with a prefix pattern on every keystroke. Why is that rejected?",
   "options": [
     {
-      "label": "Ranking the matches and serving one query per keystroke at real QPS blows the 100ms budget, even with the index doing its job",
+      "label": "Ranking every match, on every keystroke, at real QPS",
       "correct": true,
-      "feedback": "Right. The index makes the prefix match itself cheap; what it cannot make cheap is scoring thousands of matches and doing it again for every character every user types."
+      "feedback": "Right. The index makes the prefix match itself cheap, and the index is not what fails. What it cannot make cheap is scoring thousands of matches inside the request, then doing that again for every character every user types. The 100ms budget is spent on ranking work that should have been paid offline."
     },
     {
       "label": "A B-tree index cannot answer a prefix match at all",
@@ -624,9 +624,9 @@ key "ne" -> trie walk n->e (O(2)) -> node holds cached top-10:
   "prompt": "A breaking news query starts trending at 9am. Your trie is rebuilt nightly from aggregated query logs. What do you add so the term surfaces within minutes?",
   "options": [
     {
-      "label": "An incremental update layer over the nightly rebuild, applying trending terms into the cached top-k of the affected nodes",
+      "label": "An incremental update layer over the nightly rebuild",
       "correct": true,
-      "feedback": "Right. Most systems run both: a nightly full rebuild for a simple, consistent base, plus a fast incremental path so a spiking term does not wait for tomorrow."
+      "feedback": "Right. Most systems run both: the nightly full rebuild gives a simple, consistent base, and the incremental path writes a spiking term into the cached top-k of the affected nodes within minutes rather than tomorrow."
     },
     {
       "label": "Rebuild the whole trie hourly instead of nightly",
