@@ -897,6 +897,47 @@ The four roles: the resource owner (the user), the client (the app requesting ac
 
 Security parameters: \`scope\` limits what the token can do (least privilege: request \`read:contacts\`, not \`full_access\`). \`audience\` names which RS the token is for, so a token minted for API A cannot be replayed at API B. Consent screens make the grant explicit to the user. \`state\` protects the redirect against CSRF, and OIDC's \`nonce\` plus PKCE protect against replay and the confused-deputy problem.
 
+Verifying the ID token: which key, and which algorithm. The ID token is a signed JWT, which raises a question the flow above does not answer. You did not generate the provider's signing key, and the provider rotates it without asking you, so the key cannot be a constant in your config. Every OIDC provider publishes its current public keys at a **JWKS endpoint** (JSON Web Key Set), advertised in its \`/.well-known/openid-configuration\` document. Each key in the set carries a \`kid\`, each JWT header names the \`kid\` it was signed under, and you cache the set and refetch only when an unfamiliar \`kid\` shows up. That indirection is exactly what lets a provider rotate signing keys without a deploy on your side.
+
+The catch is that the JWT header is attacker-supplied input. It rides inside the token you have not verified yet, so any decision you take from it is a decision an attacker made for you. Run the validation in this order.
+
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "Validating a provider-signed ID token",
+  "stages": [
+    {
+      "label": "Read the header",
+      "note": "it carries alg and kid, and both are attacker-controlled at this point"
+    },
+    {
+      "label": "Pin the algorithm",
+      "note": "compare alg against the single value you expect, say RS256, and reject everything else including 'none', before any key is fetched"
+    },
+    {
+      "label": "Resolve the key by kid",
+      "note": "look up kid in the cached JWKS, refetching the set only when the kid is genuinely unknown"
+    },
+    {
+      "label": "Verify the signature",
+      "note": "with that public key. On failure stop: every claim below is unverified text until this passes"
+    },
+    {
+      "label": "Check iss and aud",
+      "note": "iss is the provider you expected, aud is your own client_id, so a token minted for a different app is refused"
+    },
+    {
+      "label": "Check exp and nonce",
+      "note": "exp still in the future, and nonce equal to the one you put in the auth request, which is what makes a replayed id_token fail"
+    }
+  ],
+  "highlight": [
+    "Pin the algorithm"
+  ],
+  "caption": "Two attacks make that second step load-bearing. An 'alg: none' token declares in its own header that it is unsigned, and a verifier that obeys the header will cheerfully check it against nothing, letting anyone mint an id_token for any user. Algorithm confusion swaps RS256 for HS256: the verifier reads HS256 from the header and validates an HMAC keyed by the provider's public key, which the attacker downloaded from the very JWKS endpoint you just fetched. Both attacks die the moment you decide the algorithm yourself rather than reading it out of the token."
+}
+\`\`\`
+
 Bearer vs sender-constrained tokens. A bearer token is like cash: whoever holds it can use it, so a leaked bearer token is fully usable. Sender-constrained tokens bind the token to a client key so a thief cannot use it: DPoP (a per-request proof signed by a key the client holds) or mTLS-bound tokens (bound to the client's TLS certificate). High-value APIs should prefer sender-constrained tokens.
 
 Enterprise SSO: SAML is the older XML-based standard still dominant in enterprise; OIDC is the modern JSON/JWT equivalent and is preferred for new integrations. Pair either with SCIM for automated user provisioning and deprovisioning so that when HR offboards someone, access is revoked everywhere.
