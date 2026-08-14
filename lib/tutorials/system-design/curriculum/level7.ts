@@ -212,7 +212,7 @@ An average hides the tail. If 99 requests take 50 ms and one takes 5 seconds, th
   "type": "check",
   "kind": "classify",
   "id": "sli-slo-sla-sort",
-  "prompt": "Sort each statement into the layer of the reliability hierarchy it belongs to.",
+  "prompt": "Sort each statement by which layer of the reliability hierarchy owns it. The percentages will not sort them for you: what matters is whether the statement measures, targets, or promises.",
   "buckets": [
     "SLI",
     "SLO",
@@ -220,31 +220,34 @@ An average hides the tail. If 99 requests take 50 ms and one takes 5 seconds, th
   ],
   "items": [
     {
-      "label": "Successful requests divided by valid requests",
+      "label": "Non-5xx responses divided by valid requests, read at the load balancer",
       "bucket": "SLI",
-      "feedback": "A measured ratio of good events over valid events, with no target attached to it yet."
+      "feedback": "A measured ratio of good events over valid events, with no target and no window attached to it yet. Naming where you measured it is part of the indicator too, because the load balancer, the server, and the client each report a different number for the same traffic."
     },
     {
-      "label": "Requests served faster than 300 ms divided by valid requests",
-      "bucket": "SLI"
+      "label": "Dropping a request with a malformed body from the denominator",
+      "bucket": "SLI",
+      "feedback": "Deciding what counts as valid is part of defining the indicator, before any target exists. A 400 from a client that sent garbage is the client's fault, so grading yourself on it would measure the wrong thing."
     },
     {
-      "label": "99.9 percent of checkout submissions succeed over a rolling 28 days",
+      "label": "Choosing a rolling 28 days over a calendar month",
       "bucket": "SLO",
-      "feedback": "An indicator plus a target plus a window. The window is what makes it something a dashboard can compute and a policy can act on."
+      "feedback": "The window belongs to the objective. An indicator is a bare ratio; adding a target and a window is what turns it into something a dashboard computes and a policy acts on. Rolling is usually preferred because a calendar reset hands you a free clean slate that hides a chronic problem."
     },
     {
-      "label": "95 percent of search requests return under 300 ms over 28 days",
-      "bucket": "SLO"
+      "label": "99.95 percent, the tighter number the team runs to internally",
+      "bucket": "SLO",
+      "feedback": "Strictness is the tell. The internal target is deliberately set inside the external promise so your own alerting fires before you owe anyone money."
     },
     {
-      "label": "Miss 99.9 percent this month and the customer receives service credits",
+      "label": "99.9 percent, and missing it this month owes the customer service credits",
       "bucket": "SLA",
-      "feedback": "The external promise with financial teeth, which is why the internal target is always set stricter than it."
+      "feedback": "Financial penalties are what separate the agreement from the objective. Same shape, same kind of number, and only this one costs money when it is missed."
     },
     {
-      "label": "The number the legal team negotiated, set looser than what the team runs to",
-      "bucket": "SLA"
+      "label": "Whichever of the three is deliberately the loosest",
+      "bucket": "SLA",
+      "feedback": "The one with the penalties has to be the loosest, otherwise your contract breaches before your own alerting has said anything. Ordering the three by strictness is a faster way to place a number than reading its wording."
     }
   ],
   "reveal": "The indicator measures, the objective adds a target and a window, and the agreement adds money. Keep the objective stricter than the agreement so your own alerting fires before the credits do, say where you measured (load balancer, server, or client) whenever you quote a number, and set latency objectives on percentiles because averages hide the tail."
