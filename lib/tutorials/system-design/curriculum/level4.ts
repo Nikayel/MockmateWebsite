@@ -1929,11 +1929,36 @@ Decide **fail-open vs fail-closed**: if the limiter's state store is unavailable
 traffic (protect availability, risk overload) or block it (protect the backend, risk an outage)?
 Most public APIs fail open on the limiter and rely on downstream load shedding as the real backstop.
 
-\`\`\`
-token bucket (burst-friendly)        fixed window (boundary spike)
-  cap B, refill R/sec                  [--59 reqs--|--59 reqs--]
-  idle -> save up to B tokens                    ^ 118 in ~1s
-  req  -> take 1 or 429                sliding-window counter fixes it
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Algorithm",
+    "How it decides",
+    "What that shape costs you"
+  ],
+  "rows": [
+    [
+      "Token bucket",
+      "Capacity B refilling at R per second. Idle time saves up to B tokens; each request takes one or gets a 429.",
+      "Burst friendly on purpose, so a rested client can fire B at once. No aligned window, so no boundary to double at."
+    ],
+    [
+      "Fixed window",
+      "Counts requests inside an aligned window and resets the count at the boundary.",
+      "59 at the end of one window plus 59 at the start of the next is about 118 in one second, roughly 2x the stated limit."
+    ],
+    [
+      "Sliding window counter",
+      "Weights the previous window by how much it overlaps the current one.",
+      "Fixes the boundary spike at roughly fixed window memory, which is why it is the accuracy default."
+    ]
+  ],
+  "highlightCols": [
+    "What that shape costs you"
+  ],
+  "caption": "The middle row is why raw fixed window is unsafe for anything abuse sensitive: the limit reads 60 per minute and the client gets about 118 of them inside one second."
+}
 \`\`\`
 
 Recap: default to token bucket for burst-friendly per-key limits, use sliding-window counter when you
@@ -2203,15 +2228,81 @@ shed **features**: serve a cached or partial response, skip the personalization 
 recommendation carousel, return the core page. Combine with retry hygiene (exponential backoff plus
 jitter, and **circuit breakers**) and you break the retry storm at both ends.
 
-\`\`\`
-demand ---> [ admission: shed low-priority first if over threshold ]
-             |
-             v
-        [ bounded queue: reject/503 when full, drop past-deadline ]
-             |
-             v
-        [ worker pool: adaptive concurrency = probe via Little's Law ]
-   overload -> brownout: cached/partial responses, drop optional features
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "The admission path that keeps a service up at 150 percent",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "demand",
+      "label": "Demand at 150 percent of capacity",
+      "kind": "client"
+    },
+    {
+      "id": "admission",
+      "label": "Admission: shed low priority first past the threshold",
+      "kind": "service"
+    },
+    {
+      "id": "queue",
+      "label": "Bounded queue: fast 503 when full, drop past deadline",
+      "kind": "queue"
+    },
+    {
+      "id": "workers",
+      "label": "Worker pool: adaptive concurrency probed via Little's Law",
+      "kind": "service"
+    },
+    {
+      "id": "brownout",
+      "label": "Brownout: cached or partial response, optional features dropped",
+      "kind": "service"
+    },
+    {
+      "id": "rejected",
+      "label": "Rejected in about 1ms",
+      "kind": "external"
+    }
+  ],
+  "edges": [
+    {
+      "from": "demand",
+      "to": "admission",
+      "kind": "sync"
+    },
+    {
+      "from": "admission",
+      "to": "queue",
+      "kind": "sync",
+      "label": "accepted work only"
+    },
+    {
+      "from": "queue",
+      "to": "workers",
+      "kind": "sync"
+    },
+    {
+      "from": "workers",
+      "to": "brownout",
+      "kind": "sync",
+      "label": "still over: serve the core page"
+    },
+    {
+      "from": "admission",
+      "to": "rejected",
+      "kind": "sync",
+      "label": "bulk exports and retries go first"
+    },
+    {
+      "from": "queue",
+      "to": "rejected",
+      "kind": "sync",
+      "label": "queue full, or already past its deadline"
+    }
+  ],
+  "caption": "Three layers, one rule: never accept work you cannot finish in time. A request refused in 1ms costs almost nothing, while one accepted, queued for 5s and then failed has spent capacity that good traffic needed. Health checks are the traffic you never shed, because dropping them converts an overload into an outage."
+}
 \`\`\`
 
 Recap: shed early and by priority, replace static thresholds with adaptive concurrency limits derived
