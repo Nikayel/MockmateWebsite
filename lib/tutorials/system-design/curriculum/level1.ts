@@ -1825,9 +1825,9 @@ sequence.
       "feedback": "Tempting because it is simple, but announcements get missed, and a cutover with no telemetry gate is exactly how the incident happens."
     },
     {
-      "label": "Ship /v2, deprecate /v1, warn with 'Deprecation' and 'Sunset' headers plus emails to top callers, and remove only after telemetry shows traffic drained",
+      "label": "Ship /v2, then deprecate, warn, and remove /v1",
       "correct": true,
-      "feedback": "Right. Deprecate, warn, remove, with telemetry as the gate. The old version dies when the data says nobody needs it, not when the calendar says so."
+      "feedback": "Right, and each of the three steps does distinct work. Deprecate announces /v2 and documents the replacement. Warn returns 'Deprecation' and 'Sunset' headers on /v1 and emails the top callers, because headers alone get ignored. Remove waits until telemetry shows /v1 traffic has drained. The old version dies when the data says nobody needs it, not when the calendar says so."
     },
     {
       "label": "Keep both versions forever so nothing ever breaks",
@@ -3062,9 +3062,9 @@ front it all with a WAF, and never let the gateway swell into a business-logic m
       "feedback": "Tempting, the gateway does hold shared concerns, but only cross-cutting, request-shaped ones like TLS, authn, and rate limits. Business rules are not request-shaped."
     },
     {
-      "label": "A distributed monolith: one bottleneck every team must coordinate on and all traffic squeezes through",
+      "label": "A distributed monolith at the gateway",
       "correct": true,
-      "feedback": "Right. Each business rule at the gateway couples another team to its release cycle and widens the blast radius of every gateway deploy. Keep it thin and generic; push domain logic into services."
+      "feedback": "Right. Each business rule parked at the gateway couples another team to the gateway's release cycle, so it turns into one bottleneck every team must coordinate on while all traffic still squeezes through it. Every gateway deploy then carries the blast radius of all of them at once. Keep it thin and generic; push domain logic down into the services that own it."
     },
     {
       "label": "No harm, the service mesh will absorb the extra logic",
@@ -3809,9 +3809,9 @@ so one slow dependency cannot drain the whole caller.
       "feedback": "Tempting, and true for a single transient blip. But under a real slowdown, unguarded retries amplify load onto the struggling service, and retrying a non-idempotent payment can duplicate the charge."
     },
     {
-      "label": "Threads pile up behind the slow calls, retries multiply the load, and some customers get charged twice",
+      "label": "Threads pile up and some customers pay twice",
       "correct": true,
-      "feedback": "Right. Without timeouts the pool drains behind the stalled calls, without backoff and a budget the retries amplify load, and without idempotency keys a retried charge can execute twice. The primitives only work as a set."
+      "feedback": "Right, and each missing primitive causes one part of it. Without timeouts the thread pool drains behind calls that never return. Without backoff, jitter, and a retry budget, the retries pile amplified load onto an already struggling payment service. Without idempotency keys, a retried charge executes a second time. The primitives only work as a set."
     },
     {
       "label": "Nothing changes until the downstream fully crashes",
