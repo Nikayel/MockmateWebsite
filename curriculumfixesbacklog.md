@@ -9,6 +9,12 @@ carries the evidence, the exact scope, the constraints that will otherwise be vi
 acceptance test that can be run. An agent should be able to open a ticket and ship it without asking
 a question or re-deriving a number. If a ticket here is ambiguous, that is a bug in the ticket.
 
+**STATUS 2026-08-14: P0 and the P1 visual workstream are SHIPPED.** CUR-01 through CUR-08 and
+CUR-13/14/15 are closed, along with SEO-01, SEO-03, SEO-35 and SEO-36. CUR-10's blocking schema
+change (`supplied`) is in; its content authoring is not. CUR-09, CUR-11 and CUR-12 are open. See
+the Log at the bottom for what actually moved, including two defects this backlog did not know
+about and one it caused.
+
 **Baseline, measured 2026-08-13 by `pnpm audit:sd`:**
 
 | Metric | Value |
@@ -64,7 +70,7 @@ and they should be paid before any new content lands on top.
 
 ### CUR-01 — 80 percent of predict checks can be answered without reading the question
 
-**Effort:** 3 agent-days, four concurrent agents. **Blocks:** nothing, but every future check batch
+**SHIPPED 2026-08-14.** 309/386 to 142/386. Read the Log before quoting that number: the gate was one-sided and the fix was too. **Effort:** 3 agent-days, four concurrent agents. **Blocks:** nothing, but every future check batch
 inherits the defect until the test lands.
 
 **Evidence.** Measured across the resolved curriculum on 2026-08-13. For each `predict` check, is the
@@ -122,7 +128,7 @@ the correct LABEL and into its FEEDBACK, where it belongs and where it is read a
 
 ### CUR-02 — Roughly fifteen checks are answered by the sentence directly above them
 
-**Effort:** 2 agent-days, four concurrent agents, one per file.
+**SHIPPED 2026-08-14.** Every named site resolved; the corpus now has zero checks sharing an eight-word run with the paragraph above them. **Effort:** 2 agent-days, four concurrent agents, one per file.
 
 **Evidence.** The checker pass reported filler counts of 5 (level10), 6 (level9), 2 (level7), 2
 (level11) and 0 (level6). A filler check asks the learner to recall a phrase they read two lines
@@ -172,7 +178,7 @@ Prefer moving over rewriting: several of these are good questions in the wrong p
 
 ### CUR-03 — Four correctness defects inside checks
 
-**Effort:** 0.5 agent-days. Highest severity per unit of work in this file.
+**SHIPPED 2026-08-14**, and two MORE correctness defects were introduced by the diagram sweep and fixed on the way out (a calc widget asserting 80 billion series while a graded check said 10 million, and a caption claiming three compensations where two existed). **Effort:** 0.5 agent-days. Highest severity per unit of work in this file.
 
 A wrong answer marked correct is worse here than anywhere else in the product, because there is no
 grader: the widget IS the authority, and the learner installs it as truth.
@@ -189,7 +195,7 @@ a second agent rather than by the one that wrote it.
 
 ### CUR-04 — A load-bearing fact lives only in check feedback
 
-**Effort:** 0.25 agent-days. This is a closure-rule violation, which CLAUDE.md treats as a build
+**SHIPPED 2026-08-14.** **Effort:** 0.25 agent-days. This is a closure-rule violation, which CLAUDE.md treats as a build
 failure class rather than a nit.
 
 **Evidence.** `sd-l11-globally-consistent-multiregion`, level11.ts:1141. The teach at :1139 says HLCs
@@ -211,7 +217,7 @@ shows it stated in teach in both L5 and L11, not only in widget strings.
 
 ### CUR-05 — Vocabulary used before it is introduced
 
-**Effort:** 0.25 agent-days.
+**SHIPPED 2026-08-14.** **Effort:** 0.25 agent-days.
 
 **Evidence.** `sd-l10-ride-sharing`, level10.ts:1111. The prompt reads "Geohash, S2 and H3 all attack
 the same problem. What do they do to the coordinates?" None of those three names appears earlier in
@@ -231,7 +237,7 @@ introduced. Worth a test if a second instance turns up.
 
 ### CUR-06 — One stale figure carried into a check
 
-**Effort:** 0.1 agent-days.
+**SHIPPED 2026-08-14.** **Effort:** 0.1 agent-days.
 
 **Evidence.** level9.ts:1041, edge classify feedback: "Edge runtimes budget tens of milliseconds of
 CPU per request", echoing teach at :967. That reflects the Cloudflare Workers free tier; paid Workers
@@ -249,7 +255,7 @@ large working sets belong at origin) rather than on a CPU quota that vendors kee
 
 ### CUR-13 — Topology diagrams server-render only their first stage
 
-**Effort:** 1 agent-day. **Blocks:** CUR-07. **This is an SEO bug on the traffic surface.**
+**SHIPPED 2026-08-14.** 57 of 87 node labels were missing from server HTML; now zero. **Effort:** 1 agent-day. **Blocks:** CUR-07. **This is an SEO bug on the traffic surface.**
 
 **Evidence.** Verified 2026-08-13 by rendering a four-node, three-stage topology through
 `renderToStaticMarkup`:
@@ -280,7 +286,7 @@ Fetch a live lesson with `curl` after deploy and grep for a last-stage node labe
 
 ### CUR-14 — The topology layout explodes on a cycle and draws backwards arrows
 
-**Effort:** 1.5 agent-days. **Blocks:** CUR-07, hard.
+**SHIPPED 2026-08-14.** Max columns across the corpus 36 to 8. `sd-l10-web-crawler` was ALREADY shipping at 36 columns, so this was live, not hypothetical. **Effort:** 1.5 agent-days. **Blocks:** CUR-07, hard.
 
 **Evidence.** Verified by calling `layoutTopology` directly with a six-node feedback loop, which is
 the exact shape of the ML blueprint lesson's own ASCII drawing (raw logs to ETL to training to
@@ -315,7 +321,7 @@ the test fails on today's layout.
 
 ### CUR-15 — Topology SVG content is hidden from screen readers
 
-**Effort:** 0.5 agent-days.
+**SHIPPED 2026-08-14.** **Effort:** 0.5 agent-days.
 
 **Evidence.** `components/tutorials/diagrams/TopologyDiagram.tsx:80` sets `aria-hidden="true"` on
 the `<svg>`, with `focusable="false"`.
@@ -336,7 +342,7 @@ two-dimensional structure reads poorly.
 
 ### CUR-07 — Replace the 42 ASCII architecture drawings
 
-**Effort:** 12 to 16 agent-days. **Depends on:** CUR-13, CUR-14 and CUR-15, all of which must land
+**SHIPPED 2026-08-14.** Architecture drawings 70 to 3; lessons with no diagram or simulation 105 to 3; ten of twelve levels at zero. Checks held at 516 throughout. **Effort:** 12 to 16 agent-days. **Depends on:** CUR-13, CUR-14 and CUR-15, all of which must land
 first. **Decision:** `docs/system-design-curriculum/DIAGRAM-LIBRARY-DECISION-2026-08-13.md`.
 
 **The verdict is KEEP AND EXTEND: adopt no diagram or layout library, at runtime or at build time.**
@@ -391,7 +397,7 @@ accessible name.
 
 ### CUR-08 — Deploy existing widget families where they were never used
 
-**Effort:** 2 agent-days. **Depends on:** CUR-07's decision only for the diagram half; the widget
+**SHIPPED 2026-08-14.** Simulations and animated diagrams 88 to 166. **Effort:** 2 agent-days. **Depends on:** CUR-07's decision only for the diagram half; the widget
 half can start now.
 
 **Evidence.** Eleven simulation families exist and are documented in `docs/cswidget-authoring.md`.
@@ -528,7 +534,33 @@ These live in `seofixesbacklog.md` but are curriculum work and will be executed 
 
 ## Log
 
-| Date | Checks | Checkless lessons | Bare lessons | No diagram or sim | Correct-is-longest |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| 2026-08-13 (before) | 343 | 78 | 44 | 105 | not measured |
-| 2026-08-13 (after) | 516 | 0 | 0 | 105 | 80% |
+| Date | Checks | Checkless | Bare | No diagram or sim | Correct-is-longest | Best blind length strategy | Best blind position strategy |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2026-08-13 (before) | 343 | 78 | 44 | 105 | not measured | not measured | not measured |
+| 2026-08-13 (after checks) | 516 | 0 | 0 | 105 | 80% | 80% | 58% |
+| 2026-08-14 (after CUR-01..08) | 516 | 0 | 0 | 3 | 37% | 41% | 35% |
+
+Two columns were added because the original single column measured the wrong thing, twice.
+
+**"Best blind length strategy" is `max(correct-is-longest, correct-is-shortest)`.** CUR-01's gate
+counted only the longest direction, so twelve agents reduced exactly that: most chopped the correct
+label and left the distractors untouched, which INVERTS a tell rather than flattening it. On L6 the
+agent edited zero distractor labels across nineteen rewritten checks while click-longest fell 87 to
+38 percent and click-shortest rose 8 to 49. A guessing learner picks one strategy and sticks to it,
+so the honest figure is the better of the two, and by that measure the sweep took 80 percent to 41
+against a 33 percent chance floor. Real and large, but not the 37 percent the one-sided column
+implied.
+
+**"Best blind position strategy" was never measured by anyone** and was the larger defect the whole
+time. In authored order the correct option sat at position 1 in ALL 67 L10 checks and position 2 in
+ALL 22 L11 checks, so "always click position N" paid 100 percent on the two levels with the most
+search traffic, 97 on L6, 90 on L7, and 58 corpus-wide. It cost nothing to exploit because it
+needs no reading at all. Found by an adversarial verifier reading a finished level file, not by the
+council audit, this backlog, or the gate written to drive the sweep. Fixed in
+`lib/tutorials/widgets/option-order.ts` by rendering options in a stable order derived from the
+check's own text, which makes the authoring habit behind it (write the true statement first, invent
+distractors after) irrelevant rather than merely corrected.
+
+**The lesson worth carrying:** every metric in the first three columns was a count of things we had
+already decided to look at. Both defects that mattered most were found by pointing a reader at the
+finished work with no metric in hand. Keep the gates, but do not mistake them for coverage.
