@@ -1158,15 +1158,107 @@ DB may only reach the OS buffer, which is exactly why an explicit fsync (not jus
 required for real durability. Also, compression happens at the page level, and column stores compress
 far better because adjacent values share a type and range.
 
-\`\`\`
-INSERT ... COMMIT
-  1. change row in a page inside the BUFFER POOL (RAM) -> page now dirty
-  2. append redo record to WAL buffer
-  3. COMMIT: fsync WAL to disk (sequential, group-committed)  <-- durability point
-  4. return success to client
-  ...later...
-  5. CHECKPOINT: flush dirty data pages to their home (random-ish)
-  crash before 5? replay WAL from last checkpoint to rebuild the page.
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "What a commit actually touches",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "txn",
+      "label": "INSERT then COMMIT",
+      "kind": "client"
+    },
+    {
+      "id": "pool",
+      "label": "Buffer pool (RAM): the row changes in its page, page now dirty",
+      "kind": "cache"
+    },
+    {
+      "id": "walbuf",
+      "label": "WAL buffer (RAM): redo record appended",
+      "kind": "cache"
+    },
+    {
+      "id": "wal",
+      "label": "WAL on disk: sequential fsync, group-committed",
+      "kind": "db"
+    },
+    {
+      "id": "datafiles",
+      "label": "Data files: dirty pages flushed to their home, random-ish",
+      "kind": "db"
+    },
+    {
+      "id": "recovery",
+      "label": "Crash recovery: replay from the last checkpoint",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "txn",
+      "to": "pool",
+      "kind": "sync",
+      "label": "1. change the row in its page"
+    },
+    {
+      "from": "pool",
+      "to": "walbuf",
+      "kind": "sync",
+      "label": "2. append the redo record"
+    },
+    {
+      "from": "walbuf",
+      "to": "wal",
+      "kind": "sync",
+      "label": "3. COMMIT: fsync, and this is the durability point"
+    },
+    {
+      "from": "wal",
+      "to": "txn",
+      "kind": "feedback",
+      "label": "4. success returned to the client"
+    },
+    {
+      "from": "pool",
+      "to": "datafiles",
+      "kind": "async",
+      "label": "5. later: CHECKPOINT flushes dirty pages"
+    },
+    {
+      "from": "wal",
+      "to": "recovery",
+      "kind": "sync",
+      "label": "crash before step 5"
+    },
+    {
+      "from": "recovery",
+      "to": "pool",
+      "kind": "feedback",
+      "label": "replay rebuilds the lost page"
+    }
+  ],
+  "groups": [
+    {
+      "id": "volatile",
+      "label": "Volatile: power loss wipes this",
+      "nodes": [
+        "pool",
+        "walbuf"
+      ]
+    },
+    {
+      "id": "durable",
+      "label": "Durable storage",
+      "nodes": [
+        "wal",
+        "datafiles"
+      ]
+    }
+  ],
+  "caption": "Durability rides on the sequential WAL fsync, never on the data page: the page is still dirty in RAM at the moment the client is told the commit succeeded."
+}
 \`\`\`
 
 Recap: writes land in in-memory pages in the buffer pool and are flushed lazily at checkpoints, while
