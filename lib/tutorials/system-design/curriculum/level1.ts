@@ -432,6 +432,75 @@ frames, the classic 1500-byte Ethernet MTU). TCP and UDP (L4) address a specific
 via a port number and, for TCP, add reliability. TLS secures the byte stream. HTTP (L7) carries the
 application meaning: this is a \`POST /orders\`, this is \`Authorization: Bearer ...\`, this is a 404.
 
+### L3 in practice: one address announced from many sites
+
+IP routing has a property that surprises people the first time they meet it: an address is not a
+place. A network can announce the same prefix from many sites at once, and every router on the
+internet independently installs whichever announcement is closest to it. That is **anycast**, and it
+is how CDNs, public resolvers, and DDoS scrubbers work.
+
+\`\`\`
+# One prefix, 198.51.100.0/24, announced over BGP from three POPs.
+POP Frankfurt   announce 198.51.100.0/24
+POP Ashburn     announce 198.51.100.0/24
+POP Singapore   announce 198.51.100.0/24
+
+# A Berlin ISP's router now holds three routes to the SAME destination and keeps the shortest:
+198.51.100.0/24  via Frankfurt   AS path length 2   <- installed
+198.51.100.0/24  via Ashburn     AS path length 6
+198.51.100.0/24  via Singapore   AS path length 9
+
+# So an identical packet, to an identical IP, lands at a different site per sender:
+Berlin user      -> 198.51.100.10 -> Frankfurt POP
+Sao Paulo user   -> 198.51.100.10 -> Ashburn POP
+Jakarta user     -> 198.51.100.10 -> Singapore POP
+\`\`\`
+
+Two consequences fall straight out of that table. Users reach their nearest site with no DNS trick
+and no client logic, because the routing table did the steering. And traffic aimed at
+\`198.51.100.10\` is spread the same way it was sourced: a 500 Gbps flood from hosts all over the
+world never converges on one building, because each source's packets follow its own local shortest
+path, so a given POP absorbs only the share sourced near it. Anycast divides a volumetric attack by
+the number of sites before any filtering runs.
+
+### L4 in practice: the handshake, and the state it costs
+
+TCP is connection-oriented, which means both ends agree a connection exists before one byte of your
+request moves. The agreement is the 3-way handshake:
+
+\`\`\`
+client -> server   SYN      seq=x               client proposes a starting sequence number
+server -> client   SYN-ACK  seq=y, ack=x+1      server accepts, proposes its own, ALLOCATES STATE
+client -> server   ACK      ack=y+1             established, and only now can the request be sent
+\`\`\`
+
+Notice which side pays first. On line two the server has already committed memory to a connection
+that is only half open, and it holds that entry until the ACK arrives or a timeout of tens of seconds
+expires. An attacker sending SYNs from forged source addresses simply never sends line three, so each
+forged SYN rents a slot in the server's half-open queue for the price of one small packet. Enough of
+them per second and the queue is full, legitimate handshakes are refused, and that is a SYN flood.
+
+The defense is to stop holding the state at all. With **SYN cookies** the server allocates nothing on
+the SYN. It derives the sequence number it sends back from the connection's own 4-tuple plus a secret
+and a coarse clock, then forgets everything:
+
+\`\`\`
+# on SYN, compute rather than store:
+y = hash(secret, src IP, src port, dst IP, dst port, coarse timestamp)
+server -> client   SYN-ACK  seq=y
+# server memory held for that connection: none
+
+# server state after 1,000,000 forged SYNs: still none
+
+# on ACK, recompute and verify:
+client -> server   ACK  ack=y+1
+server recomputes y from the same 4-tuple, sees ack-1 == y, and only now builds the socket
+\`\`\`
+
+A spoofed source never receives the SYN-ACK, so it can never produce \`y+1\`. This is also why a
+completed handshake is worth something as a filter in its own right: finishing it proves the sender
+can actually receive packets at the address it claimed, which no spoofer can fake.
+
 ### L4 versus L7: the decision that matters
 
 An L4 load balancer (AWS NLB, IPVS, a hardware LB) forwards packets or TCP connections. It sees the
