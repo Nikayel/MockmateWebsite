@@ -2892,10 +2892,78 @@ denormalized table, not an index.
 }
 \`\`\`
 
+### Make the bucket computable from the id
+
+Time-bucketing bounds the partition and quietly creates a lookup problem. Given a message id, which
+bucket holds it? If ids are random (a UUIDv4), the answer needs an index or a second table mapping
+id to bucket, so "jump to this message" pays an extra round trip before it can even name the
+partition to read.
+
+The way out is to put the time inside the id. A **Snowflake id** is a 64-bit integer whose high bits
+are a millisecond timestamp, with a machine id and a per-millisecond sequence filling the rest:
+
+\`\`\`
+ 64-bit Snowflake id
+ +--------------------------+-----------+------------+
+ | timestamp (41 bits, ms)  | machine   | sequence   |
+ +--------------------------+-----------+------------+
+  high bits                                low bits
+
+ id = 1502442123456789012
+   timestamp_ms = (id >> 22) + EPOCH        # the time is IN the id: no lookup, no index
+   bucket       = timestamp_ms / TEN_DAYS_MS
+\`\`\`
+
+Two properties fall out of that layout, and this design leans on both:
+
+- **The bucket is computable.** \`bucket = f(id)\` is arithmetic, so a client holding nothing but a
+  message id derives the partition key locally and issues one single-partition read.
+- **Sort order is time order.** The timestamp occupies the high bits, so comparing two ids
+  numerically compares their timestamps. Clustering on the id alone already yields newest-first
+  ordering, with no separate \`created_at\` column to store or sort on.
+
+Any time-prefixed id has these properties. ULID and UUIDv7, which the Keys and IDs lesson covers
+later in this level, do the same thing in 128 bits; Snowflake is the compact 64-bit form.
+
+### Deleting in an append-only store: tombstones
+
+An LSM store cannot remove a row, because SSTables are immutable. So a delete is a **write**.
+Cassandra appends a **tombstone**, a marker saying "this row is dead as of timestamp T," and the
+original row stays on disk beside it:
+
+\`\`\`
+DELETE FROM messages_by_channel WHERE channel_id = 9 AND message_id = 771;
+
+on disk afterwards:
+  SSTable-3   message 771: body='hi',  written_at=T0    <- still there
+  SSTable-7   message 771: TOMBSTONE,  written_at=T1    <- the delete
+\`\`\`
+
+A read merges the two, sees the tombstone is newer, and returns nothing. Correct, and the cost only
+shows up on ranges. A slice must read and merge every tombstone in its range before it can decide
+what to return, so the work is proportional to rows deleted plus rows returned:
+
+\`\`\`
+"latest 50 messages in channel 9", after a moderator deleted 20,000 spam messages:
+  rows scanned and merged   20,050
+  rows returned                 50
+  -> the read touches 400x what it returns, and all of that extra is tombstones
+\`\`\`
+
+Compaction is what finally drops them, but not straight away. A tombstone has to outlive the window
+in which a replica that was down could come back still holding the original row: discard the
+tombstone first and that replica resurrects the deleted row on the next repair. So tombstones are
+retained for **\`gc_grace_seconds\`** (10 days by default) and only then dropped.
+
+That grace window is why bulk deletion is an anti-pattern here, and why time-bucketing pays twice:
+old buckets carry their tombstones out of the hot read path along with their rows, and an expired
+bucket can be dropped whole rather than deleted row by row.
+
 Recap: Wide-column stores are LSM-based write machines; model one denormalized table per query,
 choose a partition key that spreads load and co-locates the query, cluster to serve the sort, always
 bound partitions with time-bucketing, sub-partition hot keys, and tune quorum for the consistency you
-need.
+need. Use a time-ordered id so the bucket and the sort both fall out of the id, and remember a delete
+is an append whose tombstone lingers for \`gc_grace_seconds\`.
 
 \`\`\`cswidget
 {
