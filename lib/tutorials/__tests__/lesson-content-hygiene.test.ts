@@ -16,12 +16,13 @@
  * only numeric assertion is a loose lower bound that exists so a broken registry import cannot make
  * the suite pass vacuously over zero lessons.
  *
- * ## Fail versus report
+ * ## Everything here fails, as of 2026-08-13
  *
- * Assertions that encode a real defect fail the build. Assertions that encode a *preference* (title
- * and summary length, which only affect how a result truncates in a SERP) report to the console and
- * fail only past a generous ceiling, because an authoring loop should not be blocked by a
- * sixty-second copy edit. See {@link TITLE_HARD_CEILING} for the reasoning behind each number.
+ * Title and summary length used to REPORT rather than fail, because 216 of 425 summaries were over
+ * the SERP limit and blocking an authoring loop on a backlog nobody could clear in a sitting is a
+ * bad trade. The debt is now paid (zero summaries over 160), so the reporter is an assertion and
+ * the grandfathering allow-list is empty. Four titles remain over 60 deliberately and are named
+ * individually rather than tolerated as a count. See {@link SUMMARY_ALLOW_LIST}.
  */
 import { describe, expect, it } from "vitest"
 
@@ -67,15 +68,14 @@ const PLACEHOLDER_PATTERNS: ReadonlyArray<{ label: string; pattern: RegExp }> = 
 ]
 
 /**
- * Google truncates a title around 60 characters and a description around 155 to 160, so those are
- * the numbers worth *reporting*. They are not worth *failing* on: a long title still ranks, it just
- * ends in an ellipsis, and blocking the authoring loop on that trade is not a good deal.
+ * Google truncates a title around 60 characters and a description around 155 to 160. Both limits are
+ * now enforced, with a named exception list for titles.
  *
- * The hard ceilings are set clear of the corpus's measured maxima on 2026-08-02: the longest title
- * is 80 characters (`sql-l5-medallion-streaming-capstone`) and the longest summary is 493
- * (`sd-l9-batch-streaming`). System Design summaries are systematically long because they were
- * written as level-index blurbs, before any of this text was public; 183 of 364 lessons exceed the
- * 160-character SERP limit and that is a real backlog, reported below rather than enforced here.
+ * The hard ceilings were set clear of the corpus's maxima as measured on 2026-08-02, when the
+ * longest title was 80 characters and the longest summary was 493 (`sd-l9-batch-streaming`, a
+ * single sentence chain covering Lambda, Kappa, watermarks, exactly-once and Flink-into-Iceberg).
+ * Both of those are gone: the corpus maxima are now 68 and 160. The ceilings stay anyway, because
+ * they catch a different failure from the soft limits.
  *
  * The ceilings exist to catch a REGRESSION in kind, not in degree: an author pasting a paragraph
  * into the title field, or a summary that is actually the lesson body. Roughly 1.4x the current
@@ -86,6 +86,42 @@ const TITLE_SOFT_LIMIT = 60
 const TITLE_HARD_CEILING = 120
 const SUMMARY_SOFT_LIMIT = 160
 const SUMMARY_HARD_CEILING = 700
+
+/**
+ * The reporter above is now an ASSERTION, because the debt it was reporting is paid.
+ *
+ * When this file was written, 216 of 425 summaries exceeded 160 characters and the worst ran 493,
+ * so failing on it would have blocked the authoring loop on a backlog nobody could clear in a
+ * sitting. That is why it printed and passed. CLAUDE.md's rule is that a convention worth keeping
+ * is enforced by a test rather than by a document, and a reporter is enforcement by nobody: the
+ * count sat in the console for eleven days and moved only when someone went looking for it.
+ *
+ * Two sweeps cleared it (SEO-35 in `curriculumfixesbacklog.md`, then the Python and Data
+ * Engineering pass), so on 2026-08-13 the corpus is at ZERO summaries over 160, and the allow-list
+ * below is empty because there is nothing left to grandfather.
+ *
+ * Titles are NOT at zero and are pinned rather than asserted: four remain over 60, all of them
+ * System Design, all naming a genuine list of things a searcher might type ("Short-Poll,
+ * Long-Poll, SSE, WebSocket & Webhooks"). Shortening those means dropping a term someone searches
+ * for, which is a worse trade than an ellipsis. They are named explicitly so the number cannot
+ * drift upward while looking like the same four.
+ */
+const SUMMARY_ALLOW_LIST: ReadonlySet<string> = new Set([])
+
+/**
+ * Lessons whose own title exceeds the 60-character SERP budget, deliberately.
+ *
+ * Each one is a list of searchable terms rather than a title that drifted into describing a
+ * lesson, which is the distinction SEO-010 draws. The metadata layer no longer adds a suffix to
+ * these (`lib/seo/learn-metadata.ts` degrades to `title.absolute`), so what renders is exactly the
+ * string below and nothing more.
+ */
+const TITLE_ALLOW_LIST: ReadonlySet<string> = new Set([
+  "sd-l1-realtime-comms",
+  "sd-l1-concurrency-models",
+  "sd-l7-progressive-delivery-schema",
+  "sd-l10-distributed-lock",
+])
 
 /** A human-readable locator for an offender, since ids alone do not say where to look. */
 function locate(entry: CatalogEntry): string {
@@ -239,19 +275,62 @@ describe("public lesson content hygiene", () => {
     expect(offenders).toEqual([])
   })
 
-  it("reports overlong titles and summaries without blocking the authoring loop", () => {
-    const overSoftLimit = {
-      title: [] as Array<[string, number]>,
-      summary: [] as Array<[string, number]>,
+  it("never publishes a summary over the SERP description budget", () => {
+    // Was a console report while 216 of 425 summaries were over the limit and the worst ran 493.
+    // Two sweeps took that to zero, so this is an assertion now and the allow-list is empty.
+    // A summary over 160 becomes a snippet Google cuts mid-argument, on a page whose only job is
+    // to earn the click.
+    const offenders: string[] = []
+    for (const entry of ENTRIES) {
+      const { summary } = entry.lesson
+      if (summary.length > SUMMARY_SOFT_LIMIT && !SUMMARY_ALLOW_LIST.has(entry.lesson.id)) {
+        offenders.push(
+          `${locate(entry)}: summary is ${summary.length} chars (limit ${SUMMARY_SOFT_LIMIT})`
+        )
+      }
     }
-    const overCeiling: string[] = []
+    expect(offenders).toEqual([])
+  })
 
+  it("never publishes a title over the SERP budget outside the named exceptions", () => {
+    // Pinned by NAME rather than by count. Four titles are deliberately long because each is a
+    // list of terms a searcher actually types, and shortening them means dropping one of those
+    // terms. Naming them stops the number drifting upward while looking like the same four.
+    const offenders: string[] = []
+    for (const entry of ENTRIES) {
+      const { title } = entry.lesson
+      if (title.length > TITLE_SOFT_LIMIT && !TITLE_ALLOW_LIST.has(entry.lesson.id)) {
+        offenders.push(
+          `${locate(entry)}: title is ${title.length} chars (limit ${TITLE_SOFT_LIMIT})`
+        )
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  it("keeps the title allow-list honest, so it cannot outlive its entries", () => {
+    // An allow-list that still names a lesson someone already shortened is a licence nobody
+    // revoked. If an entry no longer needs the exemption, this fails and it gets deleted.
+    const unnecessary: string[] = []
+    for (const id of TITLE_ALLOW_LIST) {
+      const entry = ENTRIES.find((candidate) => candidate.lesson.id === id)
+      if (!entry) {
+        unnecessary.push(`${id} is allow-listed but no longer exists`)
+      } else if (entry.lesson.title.length <= TITLE_SOFT_LIMIT) {
+        unnecessary.push(
+          `${id} is allow-listed but its title now fits (${entry.lesson.title.length})`
+        )
+      }
+    }
+    expect(unnecessary).toEqual([])
+  })
+
+  it("catches a title or summary that is actually a pasted paragraph", () => {
+    // The hard ceilings stay: they catch a regression in KIND (someone pasting the lesson body
+    // into the summary field) rather than in degree, which is what the soft limits above cover.
+    const overCeiling: string[] = []
     for (const entry of ENTRIES) {
       const { title, summary } = entry.lesson
-      if (title.length > TITLE_SOFT_LIMIT) overSoftLimit.title.push([locate(entry), title.length])
-      if (summary.length > SUMMARY_SOFT_LIMIT) {
-        overSoftLimit.summary.push([locate(entry), summary.length])
-      }
       if (title.length > TITLE_HARD_CEILING) {
         overCeiling.push(`${locate(entry)}: title ${title.length} > ${TITLE_HARD_CEILING}`)
       }
@@ -259,25 +338,6 @@ describe("public lesson content hygiene", () => {
         overCeiling.push(`${locate(entry)}: summary ${summary.length} > ${SUMMARY_HARD_CEILING}`)
       }
     }
-
-    // Reporting only, and deliberately summarised: the full list is nearly two hundred lines today
-    // and scrolling it off the top of the run helps nobody. The count is the trend line, the worst
-    // five are where an editor should start.
-    for (const [field, label, limit] of [
-      ["title", "titles", TITLE_SOFT_LIMIT],
-      ["summary", "summaries", SUMMARY_SOFT_LIMIT],
-    ] as const) {
-      const rows = overSoftLimit[field].sort((a, b) => b[1] - a[1])
-      const worst = rows.slice(0, 5).map(([where, length]) => `${where} (${length})`)
-      // `console.info` rather than `warn`: this is a standing measurement of content debt, not a
-      // problem with this run. Promoting it to a warning would train everyone to ignore warnings.
-      // eslint-disable-next-line no-console
-      console.info(
-        `[learn-seo] ${label} over ${limit} chars: ${rows.length}/${ENTRIES.length}` +
-          (worst.length > 0 ? `; longest: ${worst.join(", ")}` : "")
-      )
-    }
-
     expect(overCeiling).toEqual([])
   })
 })
