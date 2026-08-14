@@ -46,7 +46,13 @@ export const markdownComponents = {
     isRenderedFenceChild(children) ? (
       <>{children}</>
     ) : (
-      <pre className="my-3 overflow-x-auto rounded-lg border border-gray-700/50 bg-gray-900/80 p-3 font-mono text-xs leading-relaxed text-gray-200">
+      // Theme tokens, not literal grays. This was `border-gray-700/50 bg-gray-900/80
+      // text-gray-200` with no `dark:` variant, so every ASCII architecture drawing in
+      // the curriculum rendered a dark box on a light page. `preprocessAsciiArt` funnels
+      // every loose drawing through this same element, so one line here covers all of
+      // them, including the ones deliberately never converted to diagrams (decision
+      // branches and list-content nodes, which no diagram type expresses cheaply).
+      <pre className="border-border bg-card/40 text-foreground/90 my-3 overflow-x-auto rounded-lg border p-3 font-mono text-xs leading-relaxed">
         {children}
       </pre>
     ),
