@@ -2556,9 +2556,9 @@ Multipart upload lets a client split a large object into parts, upload them in p
   "prompt": "Every object is checksummed and stored as k data plus m parity shards across racks. Is durability now settled?",
   "options": [
     {
-      "label": "No: disks fail and bits rot over years, so a scrubber must keep detecting bad or missing shards and reconstructing them from the survivors",
+      "label": "No: durability is a maintenance process, not a write property",
       "correct": true,
-      "feedback": "Right. Durability is a maintenance process, not a property of the write. Losses accumulate, and once you drift past m without repairing, the object is gone."
+      "feedback": "Right. Disks fail and bits rot over years, so the surviving shard count only ever falls unless something pushes it back up. A scrubber has to keep detecting bad or missing shards and reconstructing them from the survivors, or the object eventually drifts past m and is gone."
     },
     {
       "label": "Yes: the code tolerates m simultaneous losses, so the object survives",
@@ -2673,9 +2673,9 @@ consumer group G: P0 -> C1, P1 -> C2   (one partition per consumer)
   "prompt": "You need every event for a given user processed in order, and you need to double consumer throughput. What is the constraint?",
   "options": [
     {
-      "label": "Route that user's events to one partition, since ordering is per partition, and add partitions to add parallelism, since each partition goes to exactly one consumer in the group",
+      "label": "One partition per user for order, more partitions for parallelism",
       "correct": true,
-      "feedback": "Right. Partition count is simultaneously the ordering unit and the parallelism ceiling, which is the tension this question is really about."
+      "feedback": "Right, and the tension is that partition count is both things at once. Routing a user's events to one partition is the only way to order them, because ordering is per partition. Adding partitions is the only way to add parallelism, because each partition goes to exactly one consumer in the group."
     },
     {
       "label": "Add consumers to the group, since parallelism grows with consumer count",
@@ -2756,9 +2756,9 @@ worker: CAS status pending->running, lease_expires=now+T, token=n++   (only one 
   "prompt": "Your scheduler fires a job whose action charges a customer. What gets you to effectively-once?",
   "options": [
     {
-      "label": "At-least-once execution from lease expiry retries, plus an idempotency key on the job run so the downstream charge applies only once",
+      "label": "At-least-once execution plus an idempotency key on the job run",
       "correct": true,
-      "feedback": "Right. You cannot make a side effect run exactly once across crashes, so you make the retry safe instead. That is the honest target."
+      "feedback": "Right. You cannot make a side effect run exactly once across crashes, so you make the retry safe instead: lease expiry gives at-least-once execution, and the idempotency key means the downstream charge applies once however many times the job runs. That is the honest target."
     },
     {
       "label": "A lease short enough that a crashed worker's job is retried before its action can complete",
@@ -2839,9 +2839,9 @@ partition: only majority quorum can grant -> minority is unavailable, not wrong
   "prompt": "You move lock state into etcd, and a session lease auto releases it. Is the critical section safe now?",
   "options": [
     {
-      "label": "Not yet: a paused holder can still wake and write, so the protected resource must reject any write whose token is lower than the highest it has accepted",
+      "label": "Not yet: the resource still has to reject a stale token",
       "correct": true,
-      "feedback": "Right. Consensus fixes the lock, fencing fixes the resource, and the two-part answer is what separates a correct design from a plausible one."
+      "feedback": "Right. Consensus fixes the lock, fencing fixes the resource. A paused holder can still wake and write, so the protected resource must remember the highest token it has accepted and reject anything lower. That two-part answer is what separates a correct design from a plausible one."
     },
     {
       "label": "Yes: consensus makes the lock state linearizable, so only one client holds it at a time",
