@@ -420,10 +420,11 @@ unbroken. No new widget family added under this ticket.
 ### CUR-09 — Re-scope or delete SD-W5
 
 **SHIPPED 2026-08-14** as `docs/SD-CLOSURE-AUDIT-2026-08-14.md`. Twelve read-only agents, one per
-level file, 208 lessons: **83 gaps, 50 blocking and 33 friction**, each with the exact clause from the
+level file, 208 lessons: **97 gaps, 56 blocking and 41 friction** (the doc first said 83/50/33; that
+was the pre-re-audit total, left stale when L3's row moved from 0/0 to 6/8), each with the exact clause from the
 model answer that needs the missing fact. No finding is expressed as a word count.
 
-Two things the run itself taught. **L0 and L1 hold 15 of the 50 blocking gaps and most are ORDERING,
+Two things the run itself taught. **L0 and L1 hold 15 of the 56 blocking gaps and most are ORDERING,
 not absence**: a Level 0 practice needs idempotency keys, which Level 0 does teach, one lesson later.
 Several close by moving a definition earlier rather than writing anything. **L3 reported zero gaps
 and that number is wrong**: spot-checking found one on the first lesson tried, so L3 is recorded as
@@ -450,12 +451,22 @@ repair rule.
 **Accept.** A written list of closure gaps per lesson. No ticket in this repo any longer expresses a
 content target as a word count.
 
-### CUR-16 — Close the 50 blocking closure gaps CUR-09 found
+### CUR-16 — Close the blocking closure gaps CUR-09 found
 
-**SHIPPED 2026-08-14.** Twelve level files, **93 lessons touched across 75 commits**, one commit per
-lesson. 12 gaps closed by moving a definition earlier, the rest by adding a worked demonstration.
-Nothing prompt-narrowed. Every repair is teach-side prose plus plain code fences, so no widget was
-added and the one-heavy-item-per-lesson density cap is untouched. 208 lessons and 416 exercises still
+**SHIPPED 2026-08-14.** Twelve level files, **70 commits for CUR-16 itself**, one commit per lesson.
+12 gaps closed by moving a definition earlier, the rest by adding a worked demonstration. Nothing
+prompt-narrowed.
+
+**Two numbers in the first version of this entry were wrong and are corrected here.** "93 lessons
+across 75 commits" fused three workstreams: 93 is the union of CUR-16, SD-W9 and SD-W14, and 75
+undercounts even CUR-16 alone. On its own CUR-16 is 70 commits; today's `L<n>`-prefixed commits total
+95 once SD-W9's 25 are included.
+
+"Every repair is teach-side prose plus plain code fences, so no widget was added" was also false.
+Measured across the repair commits: **28 fences added, 14 `csdiagram` and 14 `cswidget`** (12 check,
+9 table, 3 pipeline, 2 steps, 2 topology), and retrieval checks moved 516 to 528, which matches the
+12 check widgets exactly. The CONCLUSION survives, since `sim-density.test.ts` passes and the cap
+holds, but the stated basis for not re-checking it did not, and the claim was load-bearing. 208 lessons and 416 exercises still
 pinned, no exercise id changed, no `supplied` or `rubric` block touched.
 
 **Nothing was declined, and that is worth a second look rather than a victory lap.** A genuinely
@@ -479,7 +490,7 @@ both races side by side instead of quietly rewording either the model answer or 
 **Effort:** 3 agent-days, one agent per level file. **Depends on:** CUR-09, which is the written list
 this runs against.
 
-**Evidence.** `docs/SD-CLOSURE-AUDIT-2026-08-14.md`: 83 gaps across 208 lessons, 50 of them blocking.
+**Evidence.** `docs/SD-CLOSURE-AUDIT-2026-08-14.md`: 97 gaps across 208 lessons, 56 of them blocking.
 A blocking gap means a learner who read the teach carefully still cannot produce a clause the model
 answer treats as known, because the concept is absent from the lesson. That is the same defect class
 as the 2026-08-12 finding where definitions had migrated into opt-in hints and six graded exercises

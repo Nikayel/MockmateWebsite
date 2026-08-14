@@ -23,7 +23,12 @@ shows it working, so the learner recognises the word without being able to use i
 
 ## Result
 
-12 levels, 208 lessons, **83 gaps: 50 blocking and 33 friction**.
+12 levels, 208 lessons, **97 gaps: 56 blocking and 41 friction**.
+
+The first published version of this document said 83, 50 and 33, and that was the pre-re-audit total
+left stale when L3's row moved from 0/0 to 6/8. The columns below are the authority; the summary line
+was not recomputed when the row changed. Recorded rather than quietly corrected, because CUR-16 was
+scoped and named against the smaller number.
 
 | Level | | Lessons | Blocking | Friction |
 | --- | --- | ---: | ---: | ---: |
@@ -39,7 +44,7 @@ shows it working, so the learner recognises the word without being able to use i
 | L9 | Modern architecture | 16 | 3 | 2 |
 | L10 | Case studies | 28 | 4 | 0 |
 | L11 | Specialized systems | 15 | 5 | 1 |
-| | **Total** | **208** | **50** | **33** |
+| | **Total** | **208** | **56** | **41** |
 
 Level 3 originally returned zero gaps, and **that number was wrong**. Spot-checking it found a gap on
 the first lesson tried: `sd-l3-geospatial-indexing`'s model answer ends with "an exact haversine
@@ -80,15 +85,35 @@ first anycast mention is line 1472, inside `requestLifecycleTeach`.
 
 The blocking gaps cluster at the two ends of the curriculum for opposite reasons.
 
-**L0 and L1 (15 of 50)** lean forward. A Level 0 practice needs idempotency keys, anycast, or a
+**L0 and L1 (15 of 56)** lean forward. A Level 0 practice needs idempotency keys, anycast, or a
 server-assigned sequence number, and each of those is genuinely taught, just one to three lessons
 LATER. These are ordering defects, not missing content, and several are fixed by moving a
 definition earlier rather than writing anything new.
 
-**L8 (8 of 50)** is the densest single level. Security answers name specific mechanisms, and a
+**L8 (8 of 56)** is the densest single level. Security answers name specific mechanisms, and a
 mechanism named but never shown is exactly the friction-to-blocking boundary.
 
 ## Blocking
+
+### L3 — Scaling data (not itemized below)
+
+L3's fourteen findings came from a SECOND, separate re-audit run after this document was first
+written, and they were handed to the repair agent inline rather than being written into the sections
+below. That means for one twelfth of the corpus, diagnosis and repair were fused back together in the
+same document that invokes the rule against it. Recorded as a defect in this audit's own process.
+
+The findings, so the record is complete. **Blocking:** the haversine formula by name
+(`sd-l3-geospatial-indexing` apply, substance taught but not the name); OR-Set / add-wins delete
+semantics (`sd-l3-replication-topologies` practice); hybrid logical clocks
+(`sd-l3-replication-lag-session` practice); dead-letter queues and per-partition head-of-line
+blocking (`sd-l3-cdc-dual-write`, both exercises); searchable snapshots and force-merge
+(`sd-l3-search-inverted-index` practice); passage chunking (`sd-l3-vector-hybrid-search`, both).
+**Friction:** H3 `kRing`; RGA/LSEQ/Yjs/Automerge; `pg_current_wal_lsn()` and
+`pg_last_wal_replay_lsn()`; Kafka Connect / Flink / Parquet / `COPY INTO`; ctags / LSP / tree-sitter;
+gossip membership; Redis `PFADD`/`PFCOUNT` and windowed stream aggregation; HLS/DASH segmenting.
+
+Plus three SEQUENCING defects where the concept is taught two lessons later in the same module:
+`sd-l3-caching-patterns` (twice) and `sd-l3-partitioning-strategies`.
 
 ### L0 — Interview method
 

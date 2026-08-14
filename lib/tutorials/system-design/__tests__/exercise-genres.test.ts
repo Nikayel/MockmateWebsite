@@ -71,6 +71,21 @@ describe("system design exercise genres", () => {
     expect(withSupplied.length).toBeGreaterThanOrEqual(SUPPLIED_FLOOR)
   })
 
+  it("ships supplied and rubric together, never one without the other", () => {
+    // The genre needs both: the artifact is what the learner works ON, the rubric is how they judge
+    // what they wrote about it. Each was pinned separately (a floor on one, an audit on the other)
+    // and nothing asserted they travel together, so an exercise carrying one alone passed every
+    // check. Twenty conversions were authored by ten concurrent agents, which is exactly when a
+    // half-finished pair slips through.
+    const orphans = exercises
+      .filter(({ exercise }) => Boolean(exercise.supplied) !== Boolean(exercise.rubric?.length))
+      .map(
+        ({ lessonId, phase, exercise }) =>
+          `${lessonId} [${phase}]: has ${exercise.supplied ? "supplied without rubric" : "rubric without supplied"}`
+      )
+    expect(orphans).toEqual([])
+  })
+
   it("authors every supplied artifact soundly", () => {
     // The rules and their proof-of-sharpness live in `exercise-genre-rules.ts` and its unit test.
     // This applies them to the real corpus; that one shows they catch anything at all.

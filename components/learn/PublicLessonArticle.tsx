@@ -144,7 +144,9 @@ function ExerciseSection({
             {exercise.supplied.label}{" "}
             <span className="text-muted-foreground font-normal">(read only)</span>
           </h3>
-          <div className="prose prose-sm dark:prose-invert mt-2 max-w-none">
+          {/* Same reason as the workspace panel: several artifacts are tables, and on a phone
+              arriving from search the article column is narrower than any of them. */}
+          <div className="prose prose-sm dark:prose-invert mt-2 max-w-none overflow-x-auto">
             <MarkdownRenderer content={exercise.supplied.body} />
           </div>
         </div>

@@ -119,6 +119,17 @@ function gatedStringsOf(exercise: AuthoredExercise): string[] {
   if ("modelAnswerOutline" in exercise && Array.isArray(exercise.modelAnswerOutline)) {
     exercise.modelAnswerOutline.forEach(push)
   }
+  // A rubric's "strong" band is the model answer restated as a description of a good answer: on
+  // `sd-l1-latency-percentiles` it computes `4000 x 0.096 = 384 against 300` outright. The KEY is in
+  // GATED_FIELD_NAMES so the structural check covers it, but until this walked the bands the
+  // no-gated-VALUE invariant had zero coverage across all 84 of them, which is name-only defence.
+  if ("rubric" in exercise && Array.isArray(exercise.rubric)) {
+    for (const dimension of exercise.rubric as Array<Record<string, unknown>>) {
+      for (const band of ["weak", "adequate", "strong"]) {
+        if (typeof dimension[band] === "string") push(dimension[band] as string)
+      }
+    }
+  }
   if ("testCases" in exercise && exercise.testCases) {
     push(JSON.stringify(exercise.testCases))
   }

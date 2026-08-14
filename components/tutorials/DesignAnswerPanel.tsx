@@ -108,7 +108,12 @@ export function DesignAnswerPanel({
                       {exercise.supplied.label}
                       <span className="text-muted-foreground font-normal">(read only)</span>
                     </p>
-                    <div className="prose prose-sm dark:prose-invert max-w-none text-xs">
+                    {/* Six of the twenty supplied artifacts are markdown tables (incident
+                        dashboards, deployment specs). Without this they render at their natural
+                        width and blow the column out. Scrolling the artifact is the correct
+                        behaviour: shrinking a dashboard table to fit 240px would make the numbers
+                        the exercise turns on unreadable. */}
+                    <div className="prose prose-sm dark:prose-invert max-w-none overflow-x-auto text-xs">
                       <MarkdownRenderer content={exercise.supplied.body} />
                     </div>
                   </section>

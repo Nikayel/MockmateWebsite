@@ -14,7 +14,13 @@ export function ExerciseLayout({ aside, children }: { aside: ReactNode; children
   return (
     <div className="@container">
       <div className="grid grid-cols-1 items-start gap-6 @min-[640px]:[grid-template-columns:minmax(240px,0.72fr)_minmax(320px,1.5fr)] @min-[640px]:gap-8">
-        <aside className="flex flex-col gap-4 @min-[640px]:sticky @min-[640px]:top-0">
+        {/* `min-w-0` is load-bearing, not tidying. A grid item defaults to `min-width: auto`, which
+            means it refuses to shrink below its content, so one wide child (a markdown table in a
+            supplied incident timeline, say) widens this whole column and squeezes the editor beside
+            it instead of scrolling inside itself. The right column has carried `min-w-0` since it
+            was written; this one did not, and nothing noticed until `supplied` artifacts started
+            arriving as tables. */}
+        <aside className="flex min-w-0 flex-col gap-4 @min-[640px]:sticky @min-[640px]:top-0">
           {aside}
         </aside>
         <div className="flex min-w-0 flex-col gap-4">{children}</div>
