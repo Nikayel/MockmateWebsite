@@ -478,9 +478,9 @@ Enterprise SSO: SAML is the older XML-based standard still dominant in enterpris
       "feedback": "Tempting because scope really does bound the blast radius, but the attacker can still do everything the scope allows until expiry. Scope narrows the damage; it does not prevent use."
     },
     {
-      "label": "It works for anyone who presents it until it expires; sender-constrained tokens (DPoP or mTLS-bound) are what make a stolen token useless",
+      "label": "Anyone holding it can use it until it expires",
       "correct": true,
-      "feedback": "Right. Binding the token to a key the client holds means a thief has the token but cannot produce the per-request proof, which is why high-value APIs prefer sender-constrained tokens."
+      "feedback": "Right. Bearer means exactly that, so the leaked token works for whoever presents it until expiry. Sender-constrained tokens, DPoP or mTLS-bound, are what make a stolen token useless: binding it to a key the client holds means a thief has the token but cannot produce the per-request proof, which is why high-value APIs prefer them."
     }
   ],
   "reveal": "In the design write, be the candidate who names things: the four roles, a specific grant per client type (auth code plus PKCE for user apps, client credentials for M2M, device flow for TVs and CLIs), and the hardening set of scope, audience, state and nonce, exact redirect URIs, and DPoP or mTLS for high-value tokens."
@@ -504,9 +504,9 @@ Once a user has authenticated, you need to remember them across requests without
       "feedback": "Tempting because that is exactly how opaque server-side sessions behave, but a stateless JWT is verified by signature alone with no lookup; there is no server-side record for logout to delete."
     },
     {
-      "label": "It keeps working for 45 minutes. A pure stateless JWT cannot be un-issued",
+      "label": "It keeps working until it expires, 45 minutes from now",
       "correct": true,
-      "feedback": "Right. The token stays valid until 'exp' no matter what the server wishes. That is the revocation half of the scale-versus-revocation tradeoff this lesson resolves."
+      "feedback": "Right. A pure stateless JWT cannot be un-issued: it stays valid until 'exp' no matter what the server wishes, because verification is a signature check with no lookup to delete. That is the revocation half of the scale-versus-revocation tradeoff this lesson resolves."
     },
     {
       "label": "It works only from the victim's original IP address",
@@ -539,9 +539,9 @@ Refresh-token rotation with reuse detection is the key mechanism. Each time a re
       "feedback": "Tempting as the minimal response, but the attacker already rotated onward and is holding a live RT3; rejecting one spent token does nothing to that branch."
     },
     {
-      "label": "Treat reuse of a spent token as proof of theft and invalidate the whole family, forcing re-login",
+      "label": "Invalidate the whole token family and re-login",
       "correct": true,
-      "feedback": "Right. Two parties cannot both keep rotating one family, so a second use of a spent token is the alarm. Killing the family cuts off the attacker, and the real user just signs in again."
+      "feedback": "Right. Reuse of a spent token is treated as proof of theft, because two parties cannot both keep rotating one family, so a second use of a spent token is the alarm. Killing the family cuts off the attacker's live RT3 as well, and the real user just signs in again."
     }
   ]
 }
@@ -579,9 +579,9 @@ JWT validation hygiene: verify the signature and pin the algorithm, explicitly r
       "feedback": "Tempting because TLS is necessary, but it only protects the wire; XSS runs inside the page after TLS ends, where localStorage is an open drawer for any injected script."
     },
     {
-      "label": "HttpOnly, Secure, SameSite cookies, or a BFF that keeps tokens out of the browser entirely; never localStorage",
+      "label": "HttpOnly, Secure, SameSite cookies, or a BFF",
       "correct": true,
-      "feedback": "Right. HttpOnly puts the token beyond the reach of injected script, SameSite plus an anti-CSRF token covers cross-site requests, and a BFF removes the question by keeping OAuth tokens server-side."
+      "feedback": "Right, and never localStorage. HttpOnly puts the token beyond the reach of injected script, Secure keeps it on HTTPS, SameSite plus an anti-CSRF token covers cross-site requests, and a BFF removes the question entirely by keeping the OAuth tokens server-side so the browser holds only a session cookie."
     }
   ],
   "reveal": "Your design write should state the hybrid explicitly: 5 to 15 minute JWTs verified statelessly, an opaque rotating refresh token with reuse detection as the kill switch, cookie or BFF storage, and strict validation: pin the algorithm, reject 'alg: none', and check 'aud', 'iss', and 'exp'."
