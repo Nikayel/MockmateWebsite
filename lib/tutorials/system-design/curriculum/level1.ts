@@ -2894,13 +2894,83 @@ Push session state to Redis instead. Second, the load balancer itself is a **sin
 failure**. One LB in front of ten app servers just moves the SPOF up a layer. Run it redundant:
 active-active pairs, or an anycast VIP fronting multiple LBs, with health-checked failover.
 
-\`\`\`
-        anycast VIP (redundant LBs)
-              |
-        [ L7 load balancer ]  <- TLS terminate, path routing, least-conn
-         /        |        \\
-     app-1     app-2     app-3   (stateless; session in Redis)
-       ^ active healthz probes every 3s; drain on deploy
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "A balancer tier with no single point of failure",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "vip",
+      "label": "Anycast VIP fronting redundant LBs",
+      "kind": "lb"
+    },
+    {
+      "id": "lb",
+      "label": "L7 load balancer (TLS terminate, path routing, least-connections)",
+      "kind": "lb"
+    },
+    {
+      "id": "app1",
+      "label": "app-1 (stateless)",
+      "kind": "service"
+    },
+    {
+      "id": "app2",
+      "label": "app-2 (stateless)",
+      "kind": "service"
+    },
+    {
+      "id": "app3",
+      "label": "app-3 (stateless)",
+      "kind": "service"
+    },
+    {
+      "id": "redis",
+      "label": "Redis (session state)",
+      "kind": "cache"
+    }
+  ],
+  "edges": [
+    {
+      "from": "vip",
+      "to": "lb",
+      "kind": "sync",
+      "label": "health-checked failover"
+    },
+    {
+      "from": "lb",
+      "to": "app1",
+      "kind": "sync"
+    },
+    {
+      "from": "lb",
+      "to": "app2",
+      "kind": "sync"
+    },
+    {
+      "from": "lb",
+      "to": "app3",
+      "kind": "sync"
+    },
+    {
+      "from": "app1",
+      "to": "redis",
+      "kind": "sync"
+    },
+    {
+      "from": "app2",
+      "to": "redis",
+      "kind": "sync"
+    },
+    {
+      "from": "app3",
+      "to": "redis",
+      "kind": "sync"
+    }
+  ],
+  "caption": "The balancer probes GET /healthz every 3s and drains connections on deploy, so a dead node leaves rotation without killing in-flight requests. Sessions live in Redis rather than in an app node's memory, which is what lets any node serve any user and makes stickiness unnecessary."
+}
 \`\`\`
 
 Recap: Pick L4 for raw speed or L7 for HTTP-aware routing and TLS, use least-connections when
