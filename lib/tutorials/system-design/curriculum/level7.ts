@@ -2517,7 +2517,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-availability-nines",
           title: "Availability Math & the Nines",
           summary:
-            "Convert nines to downtime minutes, remember serial dependencies multiply (lowering the ceiling) while redundancy combines as 1 - (1-a)^n, each nine costs about 10x more, and keep measured, SLA, and SLO as three separate numbers.",
+            "What 99.9 percent actually costs you in downtime minutes, and why one weak serial dependency caps the number you are allowed to promise.",
           estimatedMinutes: 25,
           difficulty: "medium",
           skills: ["availability", "nines", "slo"],
@@ -2565,7 +2565,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-sli-slo-sla",
           title: "SLI / SLO / SLA Hierarchy",
           summary:
-            "SLI is good/valid events, SLO adds a target and window (99.9% over 28 days), SLA is the external promise with penalties; the measurement point (LB vs server vs client) changes the number, and latency SLOs use percentiles because averages hide the tail.",
+            "The difference between what you measure, what you target, and what you promise a customer, and why averaging latency hides the users who are angry.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["sli", "slo", "sla"],
@@ -2612,7 +2612,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-error-budgets",
           title: "Error Budgets & Policy",
           summary:
-            "Error budget = 1 - SLO and it is permission to fail that you spend, not hoard; the policy pre-agrees consequences (freeze at zero) with security carve-outs and shared accountability so the ship-versus-stabilize call is depoliticized before the incident, not fought during it.",
+            "Why an unspent error budget means you shipped too slowly, and how a written freeze policy settles the ship-versus-stabilize fight before the incident.",
           estimatedMinutes: 25,
           difficulty: "medium",
           skills: ["error-budget", "policy", "sre"],
@@ -2660,7 +2660,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-burn-rate-alerting",
           title: "Burn-Rate Alerting (Multi-Window, Multi-Burn-Rate)",
           summary:
-            "Burn rate is multiples of sustainable spend (1x uses exactly the budget, 14.4x burns ~2% of a month in an hour); require a long window for significance and a short window for fast reset; page on fast burn and ticket on slow burn; and always alert on the SLO-burn symptom, never on causes like CPU.",
+            "Why the pager should watch how fast you are spending the error budget, and what the 14.4x fast-burn rule buys that a fixed error threshold cannot.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["burn-rate", "alerting", "slo"],
@@ -2715,7 +2715,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-golden-signals",
           title: "The Four Golden Signals & RED/USE",
           summary:
-            "Instrument latency, traffic, errors, saturation on every service; use RED for request-driven services and USE for resources; split success vs error latency; treat saturation as your early warning; and guard cardinality by keeping unbounded ids out of metric labels.",
+            "The four numbers worth instrumenting on every service, when RED beats USE, and how one unbounded metric label bankrupts an observability budget.",
           estimatedMinutes: 25,
           difficulty: "medium",
           skills: ["golden-signals", "red-use", "metrics"],
@@ -2764,7 +2764,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-three-pillars-otel",
           title: "Three Pillars & OpenTelemetry",
           summary:
-            "Metrics for cheap aggregates and alerting, logs for structured per-event detail, traces for the causal cross-service path; propagate W3C trace context and share the trace id across all three; standardize on OpenTelemetry SDKs plus a Collector to decouple apps from backends; and control cost with bounded cardinality, trace sampling, and tiered log retention.",
+            "When to reach for a metric, a log, or a trace, and how one propagated trace id turns 'checkout is slow' into 'the fraud hop costs a second'.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["opentelemetry", "tracing", "observability"],
@@ -2818,7 +2818,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-timeouts-retries",
           title: "Timeouts, Retries, Backoff & Jitter",
           summary:
-            "Connect plus request timeouts on every call, propagate a shrinking deadline down the chain, exponential backoff with full jitter, a retry budget capping retries to a small fraction of traffic, retry only idempotent operations, and retry at one layer to avoid multiplicative amplification.",
+            "How a small blip becomes a self-inflicted DDoS, and the four defenses: a real timeout, a propagated deadline, full jitter, and one retrying layer.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["timeouts", "retries", "backoff"],
@@ -2866,7 +2866,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-circuit-breakers",
           title: "Circuit Breakers, Bulkheads & Fallbacks",
           summary:
-            "Circuit breakers move Closed to Open to Half-Open to fail fast and let a sick dependency recover; bulkheads give each dependency a bounded pool so one cannot starve the others; fallbacks serve stale, default, or omitted content, but only for non-critical dependencies.",
+            "Why a circuit breaker alone cannot save you from a dependency that is slow but still returning 200, and what a bulkhead covers that it misses.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["circuit-breaker", "bulkhead", "fallback"],
@@ -2913,7 +2913,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-load-shedding-degradation",
           title: "Load Shedding & Graceful Degradation",
           summary:
-            "Maximize goodput not throughput by discarding doomed work early; shed cheaply at the edge with 429/503 and Retry-After; prioritize by request class; use admission control and bounded concurrency instead of unbounded queues; and break metastable failures with aggressive shedding plus client backoff, because autoscaling is too slow.",
+            "Why serving everyone under overload serves almost nobody, and why autoscaling cannot break a retry loop that has already become self-sustaining.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["load-shedding", "degradation", "goodput"],
@@ -2970,7 +2970,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-redundancy-failover",
           title: "Redundancy, Failover & Health Checking",
           summary:
-            "Eliminate every SPOF (LB, DB primary, DNS, config) with N+1/N+2 redundancy, pick active-active for instant failover or active-passive for simpler state, gate traffic with liveness/readiness/deep checks, and use quorum election plus fencing and hysteresis to avoid split-brain and flapping.",
+            "How to find the single points of failure hiding behind a redundant web tier, and why a lone standby must never be allowed to promote itself.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["redundancy", "failover", "health-checks"],
@@ -3018,7 +3018,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-dr-rto-rpo",
           title: "Disaster Recovery: RTO/RPO & Strategies",
           summary:
-            "RTO is tolerable downtime, RPO is tolerable data loss, both set per tier; pick the cheapest rung on the backup -> pilot-light -> warm-standby -> active/active ladder that meets the tier's numbers; handle corruption and ransomware (not just region loss) with immutable/air-gapped backups; and prove it with restore drills and game-days.",
+            "How to set RTO and RPO per tier and pick a recovery rung that meets them, and why failing over to a second region just replicates the corruption.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["dr", "rto-rpo", "backups"],
@@ -3067,7 +3067,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-multi-region",
           title: "Multi-Region & Multi-AZ Architecture",
           summary:
-            "Multi-AZ is cheap synchronous HA within a region; multi-region is expensive async protection against region loss; sync gives RPO~0 but latency and stall risk while async gives speed but lag/loss; active-active forces a consistency choice (single-writer-region, CRDTs, or a Spanner-class store); steer with health-based failover and actually test region evacuation.",
+            "What multi-AZ protects you from and what it does not, and why active-active across regions cannot be strongly consistent and fast at the same time.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["multi-region", "replication", "failover"],
@@ -3115,7 +3115,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-blast-radius-cells",
           title: "Blast Radius Reduction: Cells & Static Stability",
           summary:
-            "Cells give independent isolated stacks so one failure hits ~1/N of users, shuffle sharding gives each customer a unique worker combination to isolate noisy tenants, apply blast-radius thinking to deploys/data/dependencies, separate control plane from data plane, and use static stability so the data plane keeps serving last-known-good state when the control plane is down.",
+            "How cells and shuffle sharding cap the share of users any one failure reaches, and why the data plane must keep serving when the control plane dies.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["cells", "static-stability", "blast-radius"],
@@ -3171,7 +3171,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-deployment-strategies",
           title: "Deployment Strategies: Blue-Green, Canary, Rolling",
           summary:
-            "Rolling is cheap but slow to reverse, blue-green buys instant rollback for double the fleet, canary gives the smallest blast radius but needs automated analysis and bake time, and every strategy runs two versions at once so never ship a destructive schema change inside a code deploy.",
+            "Rolling, blue-green, and canary compared on rollback speed and blast radius, and why every one of them runs two versions of your code at once.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["deployment", "canary", "blue-green"],
@@ -3218,7 +3218,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-progressive-delivery-schema",
           title: "Progressive Delivery, Feature Flags & Zero-Downtime Schema Changes",
           summary:
-            "Flags decouple release from deploy and give you a per-feature kill switch and targeting, expand/contract migrates schema in individually-safe reversible steps, everything in flight must be backward and forward compatible, and never pair 'add new' with 'drop old' in a single deploy.",
+            "Why renaming a database column is never one step in a live system, and how expand and contract makes every migration step separately reversible.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["feature-flags", "progressive-delivery", "schema-migration"],
@@ -3265,7 +3265,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-chaos-engineering",
           title: "Chaos Engineering & Fault Injection",
           summary:
-            "State a steady-state hypothesis, inject a realistic fault into the smallest blast radius, measure against the hypothesis, always run with an error-budget-tied auto-abort, and test in production with guardrails because staging never reproduces real conditions.",
+            "How to turn 'our failover works' from a guess into evidence: a steady-state hypothesis, a small blast radius, and an abort tied to the error budget.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["chaos", "fault-injection", "resilience"],
@@ -3314,7 +3314,7 @@ export const systemDesignLevel7: DesignLevel = {
           id: "sd-l7-incident-postmortem",
           title: "Incident Management & Blameless Postmortems",
           summary:
-            "Objective severity levels drive the response, separate the Commander from the fixers, mitigate before you diagnose, and run a blameless postmortem that targets the system (never 'human error') with owned action items tracked to completion.",
+            "Why you roll back before you understand, how incident roles keep the coordinator off the keyboard, and where a 'human error' postmortem stops too early.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["incident-management", "postmortem", "oncall"],
