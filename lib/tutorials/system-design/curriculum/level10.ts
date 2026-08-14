@@ -3885,12 +3885,16 @@ A leaderboard looks trivial ("sort players by score") and is a trap, because the
 {
   "type": "check",
   "kind": "predict",
-  "prompt": "Ten million players, constant score updates, and every client wants the top ten plus their own rank. What is wrong with an ORDER BY score DESC LIMIT 10 plus a COUNT of higher scores?",
+  "prompt": "Ten million players, constant score updates, and every client wants the top ten plus their own rank. With an index on score the top ten is a cheap ten row walk. Which half still does not scale?",
   "options": [
     {
-      "label": "Both do a full sort or scan per request over a table being written constantly, so the cost of every read grows with the player count",
+      "label": "The rank query: counting every higher score has no ten row shortcut",
       "correct": true,
-      "feedback": "Right. The rank query is the worse half: counting everyone above you means touching a slice of the table that grows without bound."
+      "feedback": "Right. The top ten is bounded work, walk ten rows down the index and stop. Rank is not: counting every score above yours touches a slice of the table that grows with the player base, and it has to be recomputed on every request while scores keep moving."
+    },
+    {
+      "label": "Both halves, since a table under constant writes cannot use an index",
+      "feedback": "Writes keep an index current at a cost, they do not disable it. The top ten really is cheap here; the rank count is the half whose cost grows."
     },
     {
       "label": "The results would be stale, because the index cannot keep up with the write rate",
@@ -3906,7 +3910,7 @@ A leaderboard looks trivial ("sort players by score") and is a trap, because the
 
 ## The sorted set
 
-The wrong instinct is \`SELECT ... ORDER BY score DESC LIMIT 10\` plus, for a player's rank, \`SELECT COUNT(*) WHERE score > my_score\`. Both do a full sort or scan on every request, and at tens of millions of players and constant score updates they melt. The right primitive is a Redis sorted set (ZSET). A ZSET keeps members ordered by score in a skip list, giving O(log n) inserts/updates (ZADD), O(log n + k) top-K reads (ZREVRANGE 0 k), and O(log n) rank lookup (ZREVRANK). That single structure answers both "top 10" and "my rank" without scanning everyone.
+The wrong instinct is \`SELECT ... ORDER BY score DESC LIMIT 10\` plus, for a player's rank, \`SELECT COUNT(*) WHERE score > my_score\`. Be precise about which half hurts. With an index on score the top ten is cheap: the database walks ten entries down the index and stops. The rank query has no such shortcut, because counting every score above yours touches a slice of the table that grows with the player base, on every request, while ten million scores keep moving under it. The right primitive is a Redis sorted set (ZSET). A ZSET keeps members ordered by score in a skip list, giving O(log n) inserts/updates (ZADD), O(log n + k) top-K reads (ZREVRANGE 0 k), and O(log n) rank lookup (ZREVRANK). That single structure answers both "top 10" and "my rank" without scanning everyone.
 
 **Interview nuance:** the interviewer wants you to reject the SQL-sort-per-request answer and name the sorted set with its complexities. Saying "Redis ZSET, ZREVRANGE for top-K, ZREVRANK for my rank, both O(log n)" is the seniority signal.
 
