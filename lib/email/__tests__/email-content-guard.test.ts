@@ -130,4 +130,155 @@ describe("user-facing message content guard", () => {
       htmlCount
     )
   })
+
+  // Reminder-class senders must carry the unsubscribe delivery (link + headers).
+  it("every reminder sender wires unsubscribe headers", () => {
+    const code = codeWithoutComments("lib/email/notifications.ts")
+    const reminderSends = (code.match(/reminderDelivery\(userId/g) ?? []).length
+    const headerWirings = (code.match(/headers: delivery\.headers/g) ?? []).length
+    expect(reminderSends).toBeGreaterThanOrEqual(7)
+    expect(headerWirings, "a reminderDelivery() without headers wiring").toBe(reminderSends)
+  })
+})
+
+describe("rendered email output", async () => {
+  const t = await import("../templates")
+  const base = {
+    userName: "Jordan Smith",
+    userEmail: "jordan@example.com",
+    appUrl: "https://www.codesparring.dev",
+  }
+
+  const subjects: Array<[string, string]> = [
+    ["welcome", t.getWelcomeEmailSubject()],
+    ["inactivity <48h", t.getInactivityEmailSubject(30)],
+    ["inactivity <72h", t.getInactivityEmailSubject(60)],
+    ["inactivity 72h+ with topic", t.getInactivityEmailSubject(90, "Two Pointers")],
+    ["inactivity 72h+ no topic", t.getInactivityEmailSubject(90)],
+    [
+      "spaced repetition",
+      t.getSpacedRepetitionEmailSubject({ ...base, topic: "Two Pointers", daysSinceReview: 4 }),
+    ],
+    [
+      "daily roadmap",
+      t.getDailyRoadmapEmailSubject({
+        ...base,
+        targetCompany: "Google",
+        daysUntilInterview: 10,
+        todaysQuestions: [],
+        questionsCompleted: 1,
+        totalQuestions: 10,
+        isOnTrack: true,
+      }),
+    ],
+    [
+      "countdown",
+      t.getInterviewCountdownEmailSubject({
+        ...base,
+        targetCompany: "Google",
+        daysUntilInterview: 3,
+        questionsCompleted: 1,
+        totalQuestions: 10,
+        patternsToFocus: [],
+      }),
+    ],
+    [
+      "behind schedule",
+      t.getBehindScheduleEmailSubject({
+        ...base,
+        targetCompany: "Google",
+        daysUntilInterview: 5,
+        questionsBehind: 4,
+        suggestedDailyQuestions: 2,
+      }),
+    ],
+    ["payment failed", t.getPaymentFailedEmailSubject()],
+    ["confirmation", t.getSubscriptionConfirmationEmailSubject()],
+    ["cancellation immediate", t.getSubscriptionCancellationEmailSubject(true)],
+    ["cancellation scheduled", t.getSubscriptionCancellationEmailSubject(false)],
+    ["yearly expired", t.getYearlyExpiredEmailSubject()],
+    [
+      "yearly expiry reminder",
+      t.getYearlyExpiryReminderEmailSubject({ ...base, expiryDate: "2027-08-14T00:00:00.000Z" }),
+    ],
+    [
+      "trial ending",
+      t.getTrialEndingEmailSubject({ ...base, trialEndDate: "2026-09-01T00:00:00.000Z" }),
+    ],
+    ["activation nudge", t.getActivationNudgeEmailSubject()],
+    ["feedback ask", t.getFirstSessionFeedbackEmailSubject()],
+  ]
+
+  it.each(subjects)("subject (%s) does not start lowercase", (_label, subject) => {
+    expect(subject).toBeTruthy()
+    expect(subject, `subject "${subject}" starts with a lowercase letter`).not.toMatch(/^[a-z]/)
+  })
+
+  it("the yearly confirmation says one-time and never promises a renewal", () => {
+    const data = {
+      ...base,
+      planName: "Pro (Yearly)",
+      amount: 225,
+      currency: "USD",
+      nextBillingDate: "2027-08-14T00:00:00.000Z",
+      isOneTime: true,
+    }
+    for (const rendered of [
+      t.getSubscriptionConfirmationEmailHtml(data),
+      t.getSubscriptionConfirmationEmailText(data),
+    ]) {
+      expect(rendered).toContain("one-time")
+      expect(rendered).toContain("Access until")
+      expect(rendered).not.toContain("Renews")
+    }
+  })
+
+  it("the monthly confirmation shows a renewal date", () => {
+    const data = {
+      ...base,
+      planName: "Pro (Monthly)",
+      amount: 25,
+      currency: "USD",
+      nextBillingDate: "2026-09-14T00:00:00.000Z",
+    }
+    expect(t.getSubscriptionConfirmationEmailHtml(data)).toContain("Renews")
+    expect(t.getSubscriptionConfirmationEmailText(data)).toContain("Renews")
+  })
+
+  it("the yearly expiry reminder never says trial", () => {
+    const data = { ...base, expiryDate: "2027-08-14T00:00:00.000Z" }
+    for (const rendered of [
+      t.getYearlyExpiryReminderEmailSubject(data),
+      t.getYearlyExpiryReminderEmailHtml(data),
+      t.getYearlyExpiryReminderEmailText(data),
+    ]) {
+      expect(rendered.toLowerCase()).not.toContain("trial")
+    }
+  })
+
+  it("the welcome email points at the free /learn courses", () => {
+    const data = { ...base }
+    expect(t.getWelcomeEmailHtml(data)).toContain("/learn")
+    expect(t.getWelcomeEmailText(data)).toContain("/learn")
+  })
+
+  it("reminder emails render the tokenized unsubscribe link when provided", () => {
+    const options = {
+      unsubscribeUrl: "https://www.codesparring.dev/api/email/unsubscribe?token=abc",
+    }
+    const data = { ...base, hoursSinceLastSession: 48 }
+    expect(t.getInactivityEmailHtml(data, options)).toContain(options.unsubscribeUrl)
+    expect(t.getInactivityEmailText(data, options)).toContain(options.unsubscribeUrl)
+  })
+
+  it("user-controlled strings are HTML-escaped at the template boundary", () => {
+    const hostile = { ...base, userName: `<script>alert(1)</script>` }
+    expect(t.getWelcomeEmailHtml(hostile)).not.toContain("<script>")
+    const hostileTopic = {
+      ...base,
+      topic: `<img src=x onerror=alert(1)>`,
+      daysSinceReview: 3,
+    }
+    expect(t.getSpacedRepetitionEmailHtml(hostileTopic)).not.toContain("<img")
+  })
 })
