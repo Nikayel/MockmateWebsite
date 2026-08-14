@@ -40,7 +40,7 @@ sliding, a name pointing at an object. They hurt as decoration. Rules of thumb:
 | `comprehension` | static | a comprehension next to its equivalent loop |
 | `table` | static | a highlightable example table (LAG/LEAD, SCD versions, before/after) |
 | `ladder` | **animated** | magnitudes separated by orders of scale, revealed smallest first: the latency ladder (L1 to RAM to SSD to disk to cross-region), cost tiers, storage tiers |
-| `topology` | **animated** | a system drawn as boxes and edges: clients, load balancers, services, stores, caches, queues, CDNs, zones |
+| `topology` | animated by default, **static under `reveal: "all"`** | a system drawn as boxes and edges: clients, load balancers, services, stores, caches, queues, CDNs, zones |
 
 `pipeline` is not SQL-only despite the row above. Any ordered left-to-right sequence renders
 through it, and several System Design lessons use it. Pass `title` when the pipeline is not about
@@ -50,18 +50,27 @@ logical execution order", which is what three System Design lessons shipped befo
 See `lib/tutorials/diagrams/schema.ts` for the exact fields of each — it is the source of
 truth and the error messages point at the offending field.
 
-### The density cap applies to two of these
+### The density cap is per INSTANCE, not per type
 
-`ladder` and `topology` animate, so they cost the same attention as an interactive widget and share
-its budget: **at most one simulation or animated diagram per lesson**, enforced by
-`lib/tutorials/widgets/__tests__/sim-density.test.ts`. The set is exported as
-`ANIMATED_DIAGRAM_TYPES` from `lib/tutorials/system-design/coverage.ts`, which is the single
-definition; do not re-declare it.
+`ladder` and an ordinarily-staged `topology` animate, so they cost the same attention as an
+interactive widget and share its budget: **at most one simulation or animated diagram per lesson**,
+enforced by `lib/tutorials/widgets/__tests__/sim-density.test.ts`.
+
+The predicate is `isHeavyDiagram(spec)` from `lib/tutorials/system-design/coverage.ts`, which is the
+single definition; do not re-declare it and do not read `ANIMATED_DIAGRAM_TYPES` directly. A
+`topology` authored with `reveal: "all"` renders as a still picture with no controls, no
+`useStepPlayer` and no motion, so it is EXEMPT, exactly as `er` and `table` are. The cap exists to
+bound attention, and a still picture costs what a still picture costs.
 
 Every other type on this list is static and uncapped. So a lesson that already carries a `calc`
-widget cannot also take a `topology`, but it can take as many `table` diagrams as the material
-justifies. Check what a lesson already has with `pnpm audit:sd --lessons` before authoring, because
-the cap is a test failure, not a warning.
+widget cannot take a staged `topology`, but it can take a `reveal: "all"` one, and as many `table`
+diagrams as the material justifies. Check what a lesson already has with `pnpm audit:sd --lessons`
+before authoring, because the cap is a test failure, not a warning.
+
+**Choose staged when the ORDER is the lesson** ("we add a cache here, and here is what that costs")
+and `reveal: "all"` when the STRUCTURE is the lesson ("this is what the finished system looks
+like"). Do not reach for `reveal: "all"` merely to dodge the cap: if the build order teaches
+something, staging it is worth displacing a simulation for.
 
 ### Cross-field rules the schema enforces
 
@@ -71,10 +80,29 @@ the cap is a test failure, not a warning.
   `value` must ascend across them.
   `scale: "log"` gives each decade equal travel, which is what makes a latency ladder's cliffs
   visible; `linear` flattens them into one bar and eleven slivers.
-- **`topology`**: 2 to 16 nodes and 1 to 24 edges. Every node must appear in exactly one stage, and
-  every stage requires a non-empty `note` tying what it adds back to a requirement. The 16-node
-  ceiling is deliberate: it is the guard that keeps a free-form graph from re-entering. Past it the
-  material wants splitting, not shrinking.
+- **`topology`**: 2 to 16 nodes and 1 to 24 edges. Under the default `reveal: "staged"`, every node
+  must appear in exactly one stage and every stage requires a non-empty `note` tying what it adds
+  back to a requirement. Under `reveal: "all"` there is no sequence to justify, so `stages` must be
+  OMITTED entirely (supplying both is rejected). The 16-node ceiling is deliberate: it is the guard
+  that keeps a free-form graph from re-entering. Past it the material wants splitting, not shrinking.
+
+  **Layout defaults to `tb` (vertical) and you should almost always leave it there.** Wrapped labels
+  are wider than truncated ones, and measured over the corpus a left-to-right chain of them put 10
+  of 14 diagrams over 720px with a worst case of 1,549px, which is unreadable on a phone. Vertical
+  put 0 of 14 over 720px. Write `"layout": "lr"` only for a genuine left-to-right request flow that
+  you have checked actually fits.
+
+  **`kind: "feedback"` is the edge that closes a loop**: outcomes back to training, a retry back to
+  the queue, a compensating reversal back to the ledger. It is excluded from layering (as
+  `replication` is) and drawn as a curved return arc. Use it rather than a plain `sync` edge
+  whenever the arrow points upstream; the layout will detect the cycle either way, but naming it
+  says the loop is deliberate. Node labels are no longer truncated, so write the qualifier the ASCII
+  carried beside the box ("Redis (atomic Lua)") rather than dropping it.
+
+  **`groups`** draws up to four dashed swimlanes behind their members: offline training plane
+  against online serving plane, speed against batch layer, hot against cold path, EU against US. A
+  node may belong to at most one group. Reach for this instead of the `zone` node kind when what you
+  mean is a container rather than a box.
 
 ## Authoring rules that avoid real bugs
 
