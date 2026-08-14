@@ -5008,11 +5008,13 @@ already charged the card). Use idempotency keys so a retried write dedupes. Seco
 instant a service hiccups, creating a synchronized thundering herd that keeps the service down (a
 "retry storm"). Backoff spreads them out; jitter (randomizing the delay) breaks the synchronization.
 Cap the total with a **retry budget**: allow retries only up to, say, 10% of request volume, so a
-widespread failure cannot multiply your load 3x and turn a partial outage into a total one.
+policy of 3 attempts per request cannot multiply your offered load 3x and turn a partial outage into
+a total one.
 
-**Interview nuance:** "Retries make it more reliable" is only half true. The senior answer names the
-failure mode retries cause (retry amplification) and the three guards: idempotency,
-backoff-with-jitter, and a retry budget.
+That is the whole of what this lesson claims about retries, and it is deliberately the introduction.
+Level 7's "Timeouts, Retries, Backoff & Jitter" owns the depth: connect versus request timeouts set
+from a real p99, the exact full-jitter formula, the budget enforced as a live ratio rather than a rule
+of thumb, and what happens to that 3x when more than one layer in a call chain retries independently.
 
 ### Circuit breaker
 
@@ -5023,6 +5025,12 @@ immediately without touching the network, giving the downstream room to recover 
 threads. After a cool-down it goes **Half-open:** it lets a trickle of trial calls through, and if
 they succeed it closes, if they fail it re-opens. This converts a slow, thread-eating failure into a
 fast, cheap one.
+
+**Interview nuance:** a breaker trips on what its **failure predicate** counts, and that predicate is
+a configuration choice rather than a law. A predicate that counts HTTP 5xx responses is blind to a
+dependency that never answers at all, because a timeout is not a 5xx: the failure counter stays clean,
+the dashboard truthfully reports zero trips, and the one mechanism that would have failed fast never
+engages. Name the conditions your breaker treats as failures, and check that timeouts are among them.
 
 \`\`\`cswidget
 {
@@ -6839,7 +6847,7 @@ export const systemDesignLevel1: DesignLevel = {
         },
         {
           id: "sd-l1-resilience-primitives",
-          title: "Timeouts, Retries, Backoff & Circuit Breakers",
+          title: "Cascading Failure & Resilience Primitives",
           summary:
             "Propagated deadlines on every call, retries gated by idempotency with backoff-jitter-budget, circuit breakers to fail fast, and bulkheads to contain the blast.",
           estimatedMinutes: 30,
