@@ -2459,7 +2459,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-encryption-transit-mtls",
           title: "Encryption in Transit & mTLS",
           summary:
-            "Baseline on TLS 1.3 for forward secrecy and downgrade protection, automate cert issuance and rotation, and use mTLS with short-lived certs to give every service a verifiable identity so you never trust the network alone.",
+            "What TLS 1.3 forward secrecy protects that TLS 1.2 did not, and how mTLS with short-lived certs turns every service into an identity you can authorize.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["tls", "mtls", "pki"],
@@ -2508,7 +2508,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-encryption-rest-field",
           title: "Encryption at Rest, Field-Level & E2E",
           summary:
-            "Use envelope encryption with per-tenant/per-user DEKs wrapped by an HSM-held KEK, pick granularity (disk, TDE, field, E2E) by how much breach exposure and searchability you can trade, and design keys so crypto-shredding gives you instant, backup-proof erasure.",
+            "Envelope encryption explained: why splitting DEK from KEK makes a stolen snapshot useless, and how deleting one key erases a user from backups.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["encryption", "envelope", "crypto-shredding"],
@@ -2557,7 +2557,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-secrets-kms",
           title: "Secrets & Key Management (KMS/HSM, Rotation)",
           summary:
-            "Put secrets in a dedicated store rooted in an HSM-backed KMS, rotate with versioned dual-secret windows so there is no downtime, solve secret zero with platform-issued workload identity that hands out short-lived dynamic secrets, and log every access under least-privilege policies.",
+            "How to rotate a production secret without an outage, and how platform-issued workload identity solves the secret zero problem a static token recreates.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["secrets", "kms", "workload-identity"],
@@ -2614,7 +2614,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-ddos-rate-abuse",
           title: "Rate Limiting, Quotas & DDoS Defense",
           summary:
-            "Split defenses into L3/L4 volumetric (anycast, CDN/scrubbing, SYN cookies, BGP) and L7 application (WAF, behavioral limits, graduated challenges); rate-limit with token bucket on multiple dimensions and tiered quotas in Redis; return 429 with Retry-After; decide fail-open vs fail-closed per endpoint; and cap autoscaling so you do not denial-of-wallet yourself.",
+            "Why a WAF is useless against a 400 Gbps flood, which rate-limiting algorithm to pick, and how uncapped autoscaling turns an attack into denial of wallet.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["ddos", "rate-limiting", "waf"],
@@ -2663,7 +2663,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-bot-fraud-ato",
           title: "Bot Defense, Fraud & Account-Takeover Prevention",
           summary:
-            "Layer breached-password checks, MFA, and velocity/impossible-travel against credential stuffing and ATO; use fingerprinting, behavioral signals, and invisible challenges for bots; raise cost and lower value against Sybil/fake accounts; score every event with features+rules+ML and respond with graduated, auditable, reversible step-up friction instead of blunt blocks.",
+            "What credential stuffing, fake-account farming and card testing look like in your traffic, and why graduated step-up friction beats hard blocking.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["fraud", "bot-defense", "ato"],
@@ -2712,7 +2712,7 @@ export const systemDesignLevel8: DesignLevel = {
           id: "sd-l8-threat-modeling-zerotrust",
           title: "Threat Modeling & Zero-Trust Architecture",
           summary:
-            "STRIDE walks a data-flow diagram's trust boundaries to surface spoofing/tampering/repudiation/info-disclosure/DoS/elevation threats, each mapping to a defense; apply least privilege, defense in depth, fail secure, complete mediation, secure defaults, and assume-breach; and implement zero-trust with workload identity, mTLS via a service mesh, identity-aware proxies replacing VPNs, and micro-segmentation.",
+            "How to walk a data-flow diagram with STRIDE, and what replaces the VPN once you stop trusting network location and verify every internal hop.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["threat-modeling", "zero-trust", "stride"],
