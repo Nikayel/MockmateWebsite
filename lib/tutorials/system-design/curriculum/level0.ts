@@ -2069,17 +2069,17 @@ org/cost/reliability and evolution thinking.
   "prompt": "You are about to write your own rate limiter answer and you do not know the target level. What is the safest way to structure it?",
   "options": [
     {
-      "label": "Open with your deepest material, the distributed-counter race and the degradation policy, since depth impresses at every level",
-      "feedback": "Tempting, because depth is what separates the levels going up. But depth-first risks the classic failure: the clock runs out on deep dives and the design never finishes. Depth only counts on top of a complete backbone."
+      "label": "Open with your deepest material, the distributed-counter race",
+      "feedback": "Tempting, because depth is what separates the levels going up. But depth-first risks the classic failure: the clock runs out inside the deep dive and the design never finishes. Depth only counts on top of a complete backbone, at every level."
     },
     {
-      "label": "Build a complete, correct backbone first, then layer deep dives and ambiguity-framing on top",
+      "label": "Build a complete backbone, then layer depth",
       "correct": true,
-      "feedback": "Right. A finished junior-plus design is the floor every level grades from. From there you add unaided bottleneck dives for senior, and business framing, cost, and evolution for staff."
+      "feedback": "Right. A finished junior-plus design is the floor every level grades from: token bucket in one service with Redis for shared state, drawn end to end. From there you add unaided bottleneck dives for senior, and ambiguity framing, cost, and evolution thinking for staff."
     },
     {
-      "label": "Mirror the interviewer's energy and improvise the structure round by round",
-      "feedback": "Reading the room helps you calibrate, but it is not a structure. Without backbone-first you can still end the round with an unfinished answer, which fails at every level."
+      "label": "Mirror the interviewer's energy and improvise",
+      "feedback": "Reading the room helps you calibrate the depth, but it is not a structure. Without backbone-first you can still end the round with an unfinished answer, and an unfinished answer fails at every level."
     }
   ],
   "reveal": "Backbone first, depth second. In the design exercise coming up, show the complete request path end to end before you spend words on your one or two deep dives, and say out loud which level you are aiming the depth at."
@@ -2101,17 +2101,17 @@ script. The template is a backbone you hang the specific prompt on, not a monolo
   "prompt": "You know your template cold. The interviewer opens with: 'Assume requirements are known, go straight to the storage design.' What do you do?",
   "options": [
     {
-      "label": "Run a quick version of the scoping and estimation phases anyway, since skipping steps looks undisciplined",
-      "feedback": "Tempting, because the phases exist for good reasons. But marching through a memorized order the prompt just waved off reads as not listening, and that is its own red flag."
+      "label": "Run quick scoping and estimation phases anyway first",
+      "feedback": "Tempting, because the phases exist for good reasons and skipping steps can look undisciplined. But marching through a memorized order the prompt just waved off reads as not listening, and that is its own red flag."
     },
     {
-      "label": "Skip the first two phases, say out loud that you are skipping them, and start at storage",
+      "label": "Skip the first two phases, and say so out loud",
       "correct": true,
-      "feedback": "Right. The template is a backbone you hang the prompt on, not a script. Bending it visibly shows the interviewer you own the structure rather than recite it."
+      "feedback": "Right. The template is a backbone you hang the prompt on, not a script, so announce the skip and start at storage. Bending it visibly shows the interviewer you own the structure rather than recite it."
     },
     {
-      "label": "Drop the template for this round, since it clearly does not apply",
-      "feedback": "You still need the later phases: high-level design, the deep dive, the wrap-up. One skipped phase does not invalidate the backbone."
+      "label": "Drop the template for this round entirely",
+      "feedback": "You still need the later phases: high-level design, the deep dive, and the wrap-up. One phase waved off by the prompt does not invalidate the other four."
     }
   ]
 }
@@ -2390,17 +2390,17 @@ proposing and checking rather than steamrolling.
   "prompt": "You are 20 minutes in with a planned outline: data model next, then scaling. The interviewer interjects with a durability question. What move scores best?",
   "options": [
     {
-      "label": "Acknowledge it politely and continue with the data model, since finishing your outline shows structure",
-      "feedback": "Tempting, because structure is real signal. But ignoring a hint to protect an outline is steamrolling, and it tanks the communication axis even when the design underneath is right."
+      "label": "Acknowledge it politely and continue with the data model",
+      "feedback": "Tempting, because finishing an outline is real structure and structure is graded. But ignoring a hint to protect that outline is steamrolling, and it tanks the communication axis even when the design underneath is right."
     },
     {
-      "label": "Confirm the intent out loud, follow the hint now, and re-propose the order afterward",
+      "label": "Confirm the intent, follow the hint now",
       "correct": true,
-      "feedback": "Right. 'Sounds like you want me to go deep on durability, let me do that now' follows the steering and keeps the interviewer inside your head; leading resumes with a new proposal and a check-in."
+      "feedback": "Right. Say it out loud: 'sounds like you want me to go deep on durability, let me do that now.' Following the steering keeps the interviewer inside your head, and you resume leading afterward by re-proposing the order with a check-in."
     },
     {
-      "label": "Write durability in the parking lot next to your other deferred topics",
-      "feedback": "The parking lot is for your own tangents. Parking the interviewer's hint treats their steering as a distraction, which is the exact inversion of the rule."
+      "label": "Write durability in the parking lot for later",
+      "feedback": "The parking lot is for your own tangents, not theirs. Parking the interviewer's hint treats their steering as a distraction, which is the exact inversion of the rule this lesson gives you."
     }
   ],
   "reveal": "Hints from them you follow; tangents from you, you park. In the design exercise, practice the whole loop: narrate assumption, options, choice; keep the board in fixed zones with a parking lot; and close each hint with a check-in before returning to your plan."
