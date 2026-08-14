@@ -762,16 +762,119 @@ Fan-out-on-write for the common case, fan-out-on-read for celebrities. When you 
 }
 \`\`\`
 
-\`\`\`
-Alice posts
-  |
-  +-- Alice is normal?  push post_id -> timeline:<each follower>   (fan-out-on-write)
-  +-- Alice is celeb?   do nothing on write; readers pull her recent posts
-
-Bob loads timeline:
-  precomputed timeline:Bob   (Redis list of post_ids)
-  + merge recent posts of celebs Bob follows (pulled + cached)
-  -> rank -> hydrate post bodies -> return page
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Hybrid fan-out: push for normal authors, pull for celebrities",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "alice",
+      "label": "Alice posts",
+      "kind": "client"
+    },
+    {
+      "id": "posts",
+      "label": "Post store (bodies stored once, partitioned by author)",
+      "kind": "db"
+    },
+    {
+      "id": "fanout",
+      "label": "Fan-out worker (skips authors above the 100K celebrity threshold)",
+      "kind": "service"
+    },
+    {
+      "id": "timelines",
+      "label": "timeline:Bob (Redis list of post ids, capped to a few hundred)",
+      "kind": "cache"
+    },
+    {
+      "id": "celeb",
+      "label": "Celebrity pull (recent posts of the celebs Bob follows, briefly cached)",
+      "kind": "cache"
+    },
+    {
+      "id": "read",
+      "label": "Timeline read: merge, rank, hydrate bodies",
+      "kind": "service"
+    },
+    {
+      "id": "bob",
+      "label": "Bob's timeline page (cursor, not OFFSET)",
+      "kind": "client"
+    }
+  ],
+  "edges": [
+    {
+      "from": "alice",
+      "to": "posts",
+      "kind": "sync",
+      "label": "write the body once"
+    },
+    {
+      "from": "alice",
+      "to": "fanout",
+      "kind": "async",
+      "label": "post event"
+    },
+    {
+      "from": "fanout",
+      "to": "timelines",
+      "kind": "async",
+      "label": "push post id to each normal follower"
+    },
+    {
+      "from": "posts",
+      "to": "celeb",
+      "kind": "sync",
+      "label": "celebrities are never pushed"
+    },
+    {
+      "from": "timelines",
+      "to": "read",
+      "kind": "sync",
+      "label": "precomputed ids"
+    },
+    {
+      "from": "celeb",
+      "to": "read",
+      "kind": "sync",
+      "label": "merged in at read time"
+    },
+    {
+      "from": "posts",
+      "to": "read",
+      "kind": "sync",
+      "label": "hydrate bodies in one batched lookup"
+    },
+    {
+      "from": "read",
+      "to": "bob",
+      "kind": "sync"
+    }
+  ],
+  "groups": [
+    {
+      "id": "write_path",
+      "label": "Write path (fan-out on write)",
+      "nodes": [
+        "alice",
+        "fanout",
+        "timelines"
+      ]
+    },
+    {
+      "id": "read_path",
+      "label": "Read path (fan-out on read)",
+      "nodes": [
+        "celeb",
+        "read",
+        "bob"
+      ]
+    }
+  ],
+  "caption": "Timelines hold post ids, never bodies, which is why a delete is a tombstone on one row rather than a chase through 50M cached copies."
+}
 \`\`\`
 
 ## Storage, ranking, deletes
@@ -870,11 +973,156 @@ The single most important decision: photos go in object storage (S3, GCS), and t
 
 The naive path streams the photo through your app servers to S3, which doubles bandwidth and makes your app tier a throughput bottleneck. Instead the client asks the app server for a presigned S3 URL, then uploads the bytes directly to S3. Your app servers never touch the image bytes. The app tier does auth and issues a short-lived signed URL; S3 absorbs the upload.
 
-\`\`\`
-Client -> app: "I want to upload" -> app returns presigned PUT URL (+ media_key)
-Client -> S3: PUT bytes directly (app never sees them)
-S3 event -> queue -> transcode worker: make 1080/640/thumbnail variants
-Worker -> writes variant keys; marks post ready; triggers feed fan-out
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Upload path: the bytes never cross the app tier",
+  "nodes": [
+    {
+      "id": "client",
+      "label": "Client (3MB photo)",
+      "kind": "client"
+    },
+    {
+      "id": "app",
+      "label": "App tier (auth, returns a short lived presigned PUT URL and media_key)",
+      "kind": "service"
+    },
+    {
+      "id": "s3",
+      "label": "Object store (S3): original bytes plus every variant",
+      "kind": "db"
+    },
+    {
+      "id": "meta",
+      "label": "Metadata DB (post_id, user_id, caption, media_key, like_count)",
+      "kind": "db"
+    },
+    {
+      "id": "queue",
+      "label": "S3 event queue",
+      "kind": "queue"
+    },
+    {
+      "id": "worker",
+      "label": "Transcode worker (1080w, 640w, 320w, square thumb)",
+      "kind": "service"
+    },
+    {
+      "id": "feed",
+      "label": "Hybrid fan-out (push post ids to normal followers)",
+      "kind": "service"
+    },
+    {
+      "id": "cdn",
+      "label": "CDN (immutable media, long TTL, versioned key)",
+      "kind": "cdn"
+    },
+    {
+      "id": "viewer",
+      "label": "Viewer (requests the resolution that fits the screen)",
+      "kind": "client"
+    }
+  ],
+  "edges": [
+    {
+      "from": "client",
+      "to": "app",
+      "kind": "sync",
+      "label": "I want to upload"
+    },
+    {
+      "from": "client",
+      "to": "s3",
+      "kind": "sync",
+      "label": "PUT bytes directly"
+    },
+    {
+      "from": "app",
+      "to": "meta",
+      "kind": "sync",
+      "label": "post row, a few hundred bytes"
+    },
+    {
+      "from": "s3",
+      "to": "queue",
+      "kind": "async",
+      "label": "object created event"
+    },
+    {
+      "from": "queue",
+      "to": "worker",
+      "kind": "async"
+    },
+    {
+      "from": "worker",
+      "to": "s3",
+      "kind": "feedback",
+      "label": "write variant keys back"
+    },
+    {
+      "from": "worker",
+      "to": "meta",
+      "kind": "sync",
+      "label": "mark post ready"
+    },
+    {
+      "from": "worker",
+      "to": "feed",
+      "kind": "async",
+      "label": "trigger fan-out"
+    },
+    {
+      "from": "s3",
+      "to": "cdn",
+      "kind": "sync",
+      "label": "origin fetch, then cached at the edge"
+    },
+    {
+      "from": "cdn",
+      "to": "viewer",
+      "kind": "sync",
+      "label": "over 90 percent of reads never touch origin"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "client",
+        "app",
+        "s3"
+      ],
+      "note": "Sizing the app fleet for media bandwidth rather than request volume is the failure to avoid, so the app tier only authenticates and hands back a presigned URL, and the bytes go straight to object storage."
+    },
+    {
+      "adds": [
+        "meta"
+      ],
+      "note": "The feed has to filter and sort posts, which needs a row store, so the database keeps ids, caption and a media key and never the image bytes that would wreck its buffer cache."
+    },
+    {
+      "adds": [
+        "queue",
+        "worker"
+      ],
+      "note": "Clients need a resolution that fits their screen and the uploader must not wait for it, so an object created event drives variant generation asynchronously."
+    },
+    {
+      "adds": [
+        "feed"
+      ],
+      "note": "A post is only worth delivering once its variants exist, so the worker marks it ready and that is what triggers fan-out."
+    },
+    {
+      "adds": [
+        "cdn",
+        "viewer"
+      ],
+      "note": "Media is immutable and read far more than written, so long TTLs at the edge are what keep read bandwidth off the origin."
+    }
+  ],
+  "caption": "One rule applied everywhere: bytes go in object storage, the database gets a pointer."
+}
 \`\`\`
 
 ## Async variants, CDN, feed reuse, counters
@@ -1025,12 +1273,167 @@ A notification system is a reusable delivery backbone: something happens (a like
 
 Do not scatter APNs, FCM, Twilio, and SES calls through your code. Define one internal notification, then route it to channel adapters. Each adapter (a Push adapter over APNs and FCM, an SMS adapter over Twilio, an Email adapter over SES) implements a common interface, handles that provider's quirks, retries transient failures with backoff, and can fail over to a backup provider (Twilio to a second SMS vendor). Adding a new channel is a new adapter, not a rewrite.
 
-\`\`\`
-event -> ingestion API -> queue
-   -> preference/eligibility filter (opt-out? quiet hours? channel enabled?)
-   -> template/render service (localized, per-channel)
-   -> per-channel queues (priority lanes) -> provider adapters (retry/failover)
-   -> provider (APNs/FCM/Twilio/SES) -> delivery-status callback -> tracking + DLQ
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "The delivery backbone, stage by stage",
+  "nodes": [
+    {
+      "id": "event",
+      "label": "Event (a like, a shipped order, a fraud alert)",
+      "kind": "external"
+    },
+    {
+      "id": "api",
+      "label": "Ingestion API (validate and enqueue, return fast)",
+      "kind": "service"
+    },
+    {
+      "id": "queue",
+      "label": "Durable queue (Kafka or SQS)",
+      "kind": "queue"
+    },
+    {
+      "id": "prefs",
+      "label": "Preference and eligibility filter (opt-out, quiet hours, channel enabled, digest)",
+      "kind": "service"
+    },
+    {
+      "id": "render",
+      "label": "Template and render service (localized, per channel)",
+      "kind": "service"
+    },
+    {
+      "id": "lanes",
+      "label": "Per-channel priority lanes (2FA ahead of a marketing blast)",
+      "kind": "queue"
+    },
+    {
+      "id": "dedup",
+      "label": "Dedup store (idempotency key: event + user + channel, TTL)",
+      "kind": "cache"
+    },
+    {
+      "id": "adapters",
+      "label": "Provider adapters (retry with backoff, failover)",
+      "kind": "service"
+    },
+    {
+      "id": "provider",
+      "label": "APNs, FCM, Twilio, SES",
+      "kind": "external"
+    },
+    {
+      "id": "tracking",
+      "label": "Tracking (delivery and open callbacks)",
+      "kind": "db"
+    },
+    {
+      "id": "dlq",
+      "label": "Dead-letter queue (inspect and replay)",
+      "kind": "queue"
+    }
+  ],
+  "edges": [
+    {
+      "from": "event",
+      "to": "api",
+      "kind": "sync"
+    },
+    {
+      "from": "api",
+      "to": "queue",
+      "kind": "async",
+      "label": "enqueue and return"
+    },
+    {
+      "from": "queue",
+      "to": "prefs",
+      "kind": "async"
+    },
+    {
+      "from": "prefs",
+      "to": "render",
+      "kind": "sync",
+      "label": "eligible recipients only"
+    },
+    {
+      "from": "render",
+      "to": "lanes",
+      "kind": "sync",
+      "label": "rendered per channel"
+    },
+    {
+      "from": "lanes",
+      "to": "dedup",
+      "kind": "sync",
+      "label": "check the key before dispatch"
+    },
+    {
+      "from": "dedup",
+      "to": "adapters",
+      "kind": "sync",
+      "label": "first time only"
+    },
+    {
+      "from": "adapters",
+      "to": "provider",
+      "kind": "sync",
+      "label": "per-provider throttling"
+    },
+    {
+      "from": "provider",
+      "to": "tracking",
+      "kind": "async",
+      "label": "delivery and open callbacks"
+    },
+    {
+      "from": "adapters",
+      "to": "dlq",
+      "kind": "async",
+      "label": "retries exhausted"
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "event",
+        "api",
+        "queue"
+      ],
+      "note": "The caller must not wait for delivery, so ingestion validates and enqueues only, and the queue is what absorbs a spiky event source."
+    },
+    {
+      "adds": [
+        "prefs"
+      ],
+      "note": "A user who opted out, disabled a channel or is inside quiet hours must never be reached, so eligibility is decided before any content is produced."
+    },
+    {
+      "adds": [
+        "render"
+      ],
+      "note": "A push is a title and a short body, an email is HTML and an SMS is 160 characters, so one internal notification renders per channel and locale, and product can change copy without touching delivery."
+    },
+    {
+      "adds": [
+        "lanes",
+        "dedup",
+        "adapters"
+      ],
+      "note": "A 2FA code cannot sit behind a million marketing pushes, which is what lanes buy, and the pipeline is at-least-once, so the idempotency check has to sit in front of dispatch rather than trusting the broker."
+    },
+    {
+      "adds": [
+        "provider",
+        "tracking",
+        "dlq"
+      ],
+      "note": "Providers are third parties that degrade and confirm asynchronously, so adapters retry and fail over, callbacks feed tracking, and anything that exhausts its retries lands in a dead-letter queue rather than vanishing."
+    }
+  ],
+  "caption": "Adding a channel is a new adapter, not a rewrite, because every provider quirk lives behind one interface."
+}
 \`\`\`
 
 ## Queues, priority lanes, and idempotency
