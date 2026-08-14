@@ -1886,6 +1886,30 @@ are real: HTTP caching mostly stops working because everything is a POST to \`/g
 add explicit query-cost limiting and depth limiting to stop a client from asking for the whole graph,
 and the resolver layer invites N+1 database calls unless you add DataLoader-style batching.
 
+There is a third guard next to cost and depth limits, and where you control the client it is the
+strongest of the three: **persisted queries**, also called an allow list. The build extracts every
+query the app can ever issue, registers it with the server, and ships the client an id instead of a
+document.
+
+\`\`\`
+# build time: each query in the app is extracted and registered once
+register "a3f19c" -> query ProductCard($id: ID!) { product(id: $id) { name price } }
+
+# run time: the client sends the id, never a query document
+POST /graphql   { "id": "a3f19c", "variables": { "id": "42" } }
+
+# anything not on the list is refused before it is parsed, let alone planned
+POST /graphql   { "query": "{ users { orders { items { product { reviews { author { orders ..." }
+-> 400 Bad Request, query not in the allow list
+\`\`\`
+
+That is a different guarantee from the other two. Cost and depth limits ask "is this query too
+expensive"; an allow list asks "is this query one of ours", so the server only ever runs a fixed,
+reviewable set. It also stops you parsing and validating a document on every request and shrinks the
+request itself, which mobile clients notice. The catch is the flip side of the same property: a
+caller who can no longer invent a query is a caller you must control, so a public API open to
+third-party developers cannot use this and is left with cost and depth limits.
+
 \`\`\`cswidget
 {
   "type": "check",
