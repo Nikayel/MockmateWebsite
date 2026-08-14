@@ -1400,6 +1400,56 @@ property without maintaining a ring, and selecting the top-k replicas is trivial
 highest). The tradeoff is O(N) per lookup, so it suits smaller or bounded node sets, like choosing
 replicas or a load-balancer backend, rather than a thousand-node ring.
 
+### Who knows the node list? Membership and failure detection
+
+The ring is a pure function of the node set, so every client and routing proxy has to agree on that
+set or two of them will send the same key to different nodes. Distributing it is a real design
+decision with two standard answers.
+
+**A coordination service.** Each node registers an ephemeral entry in etcd or ZooKeeper, clients
+watch that prefix, and any change pushes a new membership list to every watcher. Strongly consistent,
+so everyone sees the same list in the same order. The cost is a consensus cluster you now operate,
+sitting on the path of every routing change.
+
+**Gossip.** No registry at all. Every node holds its own view of the cluster (each node, its state,
+and a heartbeat version), and once a second it picks a few random peers and exchanges views, keeping
+the higher version wherever the two disagree. Nothing is broadcast, yet news reaches everyone in
+roughly log(N) rounds, because the count of informed nodes multiplies each round. Cassandra and
+Dynamo work this way.
+
+\`\`\`
+100 nodes, node 57 dies, each node gossips to 3 random peers per second:
+
+  round 0:    1 node knows (the one whose probe to n57 timed out)
+  round 1:   ~4
+  round 2:  ~16
+  round 3:  ~55        growth slows as gossip starts landing on nodes that know
+  round 4:  ~99        about log(N) rounds, so seconds, with no coordinator
+
+what two nodes actually exchange is a small versioned digest:
+
+  node   state   heartbeat_version
+  n12    UP      88214
+  n57    DOWN    41902     <- they disagree here; the peer still lists n57 UP
+  n88    UP      90310
+
+  merge rule: for each node, keep the entry with the higher heartbeat_version.
+  That one rule is what makes independent views converge with no leader.
+\`\`\`
+
+The hard part is not spreading the news, it is deciding n57 is really down. A fixed timeout is wrong
+in both directions: too short and a GC pause or a network blip triggers a needless rebalance, too
+long and requests keep routing into a black hole. Cassandra uses a **phi-accrual failure detector**,
+which tracks the distribution of recent heartbeat intervals per node and outputs a rising suspicion
+level rather than a boolean, so the threshold adapts to a link that is simply slow. Whichever
+detector you use, hold a **grace window** before rebuilding the ring, because every false positive
+costs 1/N of the keyspace in movement.
+
+The tradeoff in one line: a coordination service gives one consistent list plus a dependency to
+operate, while gossip has no single point of failure and scales to thousands of nodes but leaves
+membership eventually consistent, so two clients can route the same key differently for a second or
+two during a change.
+
 **Interview nuance:** the phrase to earn is "only ~1/N keys move." If you are asked how a cache
 cluster survives a node loss and you say hash mod N, you have just described the failure. Say
 consistent hashing with vnodes, quantify the movement, and note that replicas are placed on the next
@@ -1418,7 +1468,9 @@ consistent hash ring (with vnodes):
 
 Recap: hash mod N remaps nearly every key on resize; consistent hashing moves only ~1/N and only
 between neighbors; virtual nodes smooth load, spread rebalancing, and enable weighting; bounded-load
-caps hotspots; and rendezvous hashing is a ring-free alternative for small replica-selection cases.
+caps hotspots; rendezvous hashing is a ring-free alternative for small replica-selection cases; and
+the node list itself comes from either a coordination service or gossip, guarded by a failure
+detector and a grace window so a blip does not move 1/N of your keys.
 
 \`\`\`cswidget
 {
