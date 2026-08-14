@@ -1735,9 +1735,9 @@ concurrency hard. This is why it does not survive at internet scale.
   "prompt": "3PC adds a pre-commit phase so participants can time out and make progress when the coordinator vanishes. Why is it almost never used in production?",
   "options": [
     {
-      "label": "It assumes bounded message delays; under a real network partition it can violate atomicity",
+      "label": "It assumes bounded message delays",
       "correct": true,
-      "feedback": "Right. Timeout-based progress only works if silence reliably means crash. In a partition, the two sides can time out independently and decide differently, with some committing and some aborting."
+      "feedback": "Right. Timeout-based progress is only safe when silence reliably means crash. Under a real partition each side times out independently and can reach a different decision, so some participants commit while others abort and atomicity is gone. That is a safety failure, which is fatal, not a performance one."
     },
     {
       "label": "It is strictly slower than 2PC, and nobody accepts the extra round trip",
@@ -1775,9 +1775,9 @@ sagas.
   "prompt": "Spanner and CockroachDB still run 2PC across shards at serious scale. What makes it survivable for them?",
   "options": [
     {
-      "label": "They replicate the coordinator's state with Paxos or Raft, so a coordinator crash is just a failover and the in-doubt window closes in seconds",
+      "label": "They replicate the coordinator with consensus",
       "correct": true,
-      "feedback": "Right. The fatal flaw was a single coordinator dying while holding the decision. Make the decision itself replicated and blocking shrinks to the length of a failover."
+      "feedback": "Right. The fatal flaw was a single coordinator dying while it alone held the decision. Replicate that state through Paxos or Raft and a crash becomes a failover to a replica that already knows the outcome, so the in-doubt window shrinks from 'as long as the coordinator is down' to seconds."
     },
     {
       "label": "They quietly switched to 3PC internally",

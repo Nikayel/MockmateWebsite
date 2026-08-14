@@ -911,9 +911,9 @@ because resolver caching bounds it.
       "feedback": "Tempting because it is one API call, but resolver caching bounds it: some clients hammer the dead region for minutes, and the follow-up question 'how long until the last user leaves' is coming."
     },
     {
-      "label": "Withdraw the region's anycast announcement so traffic reconverges in seconds, let in-flight requests finish, then take it down",
+      "label": "Withdraw its anycast announcement, drain, then take it down",
       "correct": true,
-      "feedback": "Right. BGP withdrawal is cache-free and fast, draining protects in-flight work, and it only holds up if the surviving regions run active-active with the headroom to absorb the shifted share."
+      "feedback": "Right. BGP withdrawal is cache-free, so traffic reconverges to the next-nearest PoP in seconds with no client waiting out a TTL, and draining lets in-flight requests finish before the region goes away. It only holds up if the surviving regions run active-active with the headroom to absorb the shifted share."
     },
     {
       "label": "Lower the DNS weight to zero and power the region down immediately",
@@ -1180,9 +1180,9 @@ concerns to the mesh, and hold the line against business logic creeping into the
       "feedback": "Tempting, and this is exactly how gateway rot starts: each addition looks convenient in isolation. But coupon rules are domain logic owned by the checkout service, not a cross-cutting concern."
     },
     {
-      "label": "The gateway has become a god-object: feature changes need edge deploys and teams serialize on one component.",
+      "label": "The gateway has become a god-object.",
       "correct": true,
-      "feedback": "Right. 'Just one more' pieces of business logic accrete until you have rebuilt the distributed monolith you split up to avoid. Hold the rule: the gateway does cross-cutting concerns and routing only."
+      "feedback": "Right. 'Just one more' piece of business logic accretes until every feature change needs an edge deploy, teams serialize on one component, and you have rebuilt the distributed monolith you split up to avoid. Hold the rule: the gateway does cross-cutting concerns and routing only."
     }
   ],
   "reveal": "In your design write, name the gateway's exact responsibility list (TLS, authn, rate limits, routing, observability), give each client type a BFF if payload needs genuinely differ, and state explicitly that business logic stays in the owning services while the mesh handles east-west."
@@ -1320,9 +1320,9 @@ balancing to actually spread load.
       "feedback": "Tempting because TLS placement is the flashiest decision, but termination decides where crypto happens, not which backend a request reaches."
     },
     {
-      "label": "The long-lived pooled connections: they were balanced once, at connect time, and are pinned to the old pods",
+      "label": "The long-lived pooled connections: pinned at connect time",
       "correct": true,
-      "feedback": "Right. Multiplexed H2/gRPC connections pin to the backend picked at establishment. Add per-stream balancing at an Envoy-style proxy, client-side load balancing, or max-connection-age so clients re-resolve after scale events."
+      "feedback": "Right. A multiplexed H2 or gRPC connection is balanced exactly once, when it is established, so every stream on it stays on the backend picked then and the new pods never get a turn. Add per-stream balancing at an Envoy-style proxy, client-side load balancing, or max-connection-age so clients re-resolve after scale events."
     },
     {
       "label": "Internal mTLS: sidecar handshakes are throttling the new pods",
