@@ -1572,10 +1572,108 @@ Replicate each data shard across regions with a consensus protocol (Paxos or Raf
 
 You do not need every row to be globally consistent. **Geo-partition**: pin each row to a home region near its owner. A European user's account lives with its leader in Frankfurt, so their reads and writes are local (single-region quorum, single-digit ms) and only rarely touch another continent. US users' rows are led from us-east. You pay cross-region latency only for genuinely cross-region operations. Add **follower reads** (read a nearby replica at a slightly stale timestamp) and **read leases** (a leader holds a lease so it can serve strongly consistent reads without a quorum round trip) to make local reads cheap.
 
-\`\`\`
-EU user  -> leader in Frankfurt   -> local quorum (EU replicas) ~ single-digit ms
-US user  -> leader in us-east     -> local quorum (US replicas) ~ single-digit ms
-cross-region txn (EU pays US) -> two-region coordination ~ 100+ ms  (rare by design)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Geo-partitioning: every row led from its home region",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "euuser",
+      "label": "EU user",
+      "kind": "client"
+    },
+    {
+      "id": "euleader",
+      "label": "Leader in Frankfurt",
+      "kind": "db"
+    },
+    {
+      "id": "eureplicas",
+      "label": "EU replicas (local quorum, single-digit ms)",
+      "kind": "db"
+    },
+    {
+      "id": "ususer",
+      "label": "US user",
+      "kind": "client"
+    },
+    {
+      "id": "usleader",
+      "label": "Leader in us-east",
+      "kind": "db"
+    },
+    {
+      "id": "usreplicas",
+      "label": "US replicas (local quorum, single-digit ms)",
+      "kind": "db"
+    },
+    {
+      "id": "crosstxn",
+      "label": "Cross-region transaction (an EU account pays a US account)",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "euuser",
+      "to": "euleader",
+      "kind": "sync",
+      "label": "reads and writes stay in region"
+    },
+    {
+      "from": "euleader",
+      "to": "eureplicas",
+      "kind": "sync",
+      "label": "replicate, wait for a majority"
+    },
+    {
+      "from": "ususer",
+      "to": "usleader",
+      "kind": "sync",
+      "label": "reads and writes stay in region"
+    },
+    {
+      "from": "usleader",
+      "to": "usreplicas",
+      "kind": "sync",
+      "label": "replicate, wait for a majority"
+    },
+    {
+      "from": "crosstxn",
+      "to": "euleader",
+      "kind": "sync",
+      "label": "two-region coordination, 100+ ms"
+    },
+    {
+      "from": "crosstxn",
+      "to": "usleader",
+      "kind": "sync",
+      "label": "rare by design"
+    }
+  ],
+  "groups": [
+    {
+      "id": "eu",
+      "label": "EU region",
+      "nodes": [
+        "euuser",
+        "euleader",
+        "eureplicas"
+      ]
+    },
+    {
+      "id": "us",
+      "label": "US region",
+      "nodes": [
+        "ususer",
+        "usleader",
+        "usreplicas"
+      ]
+    }
+  ],
+  "caption": "Two local quorums answer in single-digit milliseconds because neither one crosses an ocean. Only the genuinely cross-region transaction pays the 100+ ms, which is what makes placement the lever rather than the database setting."
+}
 \`\`\`
 
 ## Active-active, and the consistency spectrum
