@@ -1700,6 +1700,50 @@ The senior move is **tiered isolation**: pool your thousands of small self-serve
 
 Wherever tenants share, isolation must be **enforced at the data layer, not just the app layer**, because app-layer checks are one forgotten \`WHERE\` clause from a breach. **Postgres Row-Level Security (RLS)** is the workhorse: you set \`current_setting('app.tenant_id')\` at the start of each request's transaction, and a policy \`USING (tenant_id = current_setting('app.tenant_id')::uuid)\` makes the database itself refuse to return other tenants' rows even if application SQL forgets the filter. Combine with per-tenant encryption keys (crypto-isolation) and connection/schema routing where the tenant maps to a database.
 
+That phrase "per-tenant encryption keys" is doing a lot of work, so unpack it. The structure is **envelope encryption**: the tenant's data is encrypted under a symmetric **DEK** (data encryption key) that is itself stored encrypted, wrapped by a **KEK** (key encryption key) that lives in a KMS and never comes out. Two layers, and the second one is where tenancy becomes cryptographic, because the KEK can belong to somebody other than you. An enterprise customer on **BYOK** (bring your own key) keeps the KEK in their own cloud KMS account and grants your service permission to call unwrap. Follow one tenant's data through that and see what each party actually holds.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Layer",
+    "Where it lives in your pooled system",
+    "What happens when acme revokes their KEK"
+  ],
+  "rows": [
+    [
+      "Message rows for acme and globex",
+      "Interleaved in the same pooled table, each row's body encrypted under its own tenant's DEK",
+      "acme's rows decrypt to noise. globex's rows are untouched, because they were never under acme's key"
+    ],
+    [
+      "acme's DEK",
+      "Stored wrapped, right beside acme's ciphertext",
+      "Still sitting there, still wrapped, and now permanently unwrappable"
+    ],
+    [
+      "acme's KEK",
+      "In acme's own KMS account. You hold a grant to call unwrap; you do not hold the key",
+      "The grant is gone, so your unwrap call returns access denied. No amount of access to your own infrastructure changes that"
+    ],
+    [
+      "Backups, read replicas, the search index snapshot",
+      "Every copy carries the same ciphertext and the same wrapped DEK",
+      "All unreadable too, without editing a single immutable file. That is crypto-shredding: erase the key, not the copies"
+    ],
+    [
+      "The isolation claim you can make in the contract",
+      "Without this: our WHERE clauses are correct and RLS backs them up",
+      "With this: we cannot read your data even if we wanted to, and you hold the key that makes that true"
+    ]
+  ],
+  "highlightCols": [
+    "What happens when acme revokes their KEK"
+  ],
+  "caption": "The split between the two layers is the entire mechanism. The DEK is per tenant and travels with the data, so co-mingled storage is still cryptographically separated. The KEK travels with nobody, so whoever holds it decides whether the data is readable at all. Pay for it honestly: every read path needs an unwrap, so unwrapped DEKs get cached in memory under a short TTL, and a customer who revokes has deliberately bricked their own tenancy, which means revocation needs to be as hard to do by accident as it is easy to do on purpose."
+}
+\`\`\`
+
 **Interview nuance:** the deciding detail is *where and when tenant context is resolved*. It must be established on **every request, before any business logic runs**, from a trusted source: the JWT/session claim or a subdomain (\`acme.app.com\`), never from a request body field the client can set. Then \`tenant_id\` propagates through the entire call chain (into the DB session var, into cache keys, into async job payloads, into log fields). If tenant context is derived late or from untrusted input, everything downstream is exploitable.
 
 ## The non-obvious leakage vectors
