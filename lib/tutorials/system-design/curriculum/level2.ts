@@ -3037,12 +3037,128 @@ is durability, cost, cache pollution, and egress path: object storage is cheaper
 durable, and lets clients transfer directly via presigned URLs and a CDN, so bytes never bottleneck
 on your database or app tier.
 
-\`\`\`
-  client --(1) ask to upload--> app server (authz) --(2) presigned PUT URL-->
-  client --(3) PUT bytes directly--------------------------------> S3 bucket
-                                                                     |
-  DB row: {id, owner, key, w, h, type}  <--(4) app writes metadata--/
-  read:  client <-- CDN edge cache <-- (signed GET) <-- S3 origin
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Upload path and read path for one photo",
+  "nodes": [
+    {
+      "id": "uploader",
+      "label": "Uploading client",
+      "kind": "client"
+    },
+    {
+      "id": "app",
+      "label": "App server: authorizes the user, signs the URL",
+      "kind": "service"
+    },
+    {
+      "id": "bucket",
+      "label": "S3 bucket: the object bytes, eleven nines of durability",
+      "kind": "db"
+    },
+    {
+      "id": "db",
+      "label": "Database row: id, owner, caption, w, h, content_type, object_key",
+      "kind": "db"
+    },
+    {
+      "id": "cdn",
+      "label": "CDN edge cache, serving the signed GET",
+      "kind": "cdn"
+    },
+    {
+      "id": "viewer",
+      "label": "Viewing client",
+      "kind": "client"
+    }
+  ],
+  "edges": [
+    {
+      "from": "uploader",
+      "to": "app",
+      "kind": "sync",
+      "label": "1. ask to upload"
+    },
+    {
+      "from": "app",
+      "to": "uploader",
+      "kind": "feedback",
+      "label": "2. presigned PUT URL, one key, 15 minutes"
+    },
+    {
+      "from": "uploader",
+      "to": "bucket",
+      "kind": "sync",
+      "label": "3. PUT bytes directly, multipart if large"
+    },
+    {
+      "from": "app",
+      "to": "db",
+      "kind": "sync",
+      "label": "4. write the metadata row plus the object key"
+    },
+    {
+      "from": "bucket",
+      "to": "cdn",
+      "kind": "sync",
+      "label": "origin fetch on an edge miss"
+    },
+    {
+      "from": "cdn",
+      "to": "viewer",
+      "kind": "sync",
+      "label": "read served from a PoP about 20 ms away"
+    }
+  ],
+  "groups": [
+    {
+      "id": "control",
+      "label": "Control plane: mints capability tokens, never moves bytes",
+      "nodes": [
+        "app",
+        "db"
+      ]
+    },
+    {
+      "id": "data",
+      "label": "Data plane: every byte, none of it through your servers",
+      "nodes": [
+        "bucket",
+        "cdn"
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "uploader",
+        "app"
+      ],
+      "note": "The upload opens as a permission request, not a file. Authorizing this user for this key is the only part of the transfer your server is actually needed for."
+    },
+    {
+      "adds": [
+        "bucket"
+      ],
+      "note": "A small app fleet has to carry petabytes of transfer, so the signed URL sends the 200 MB body straight to the bucket and the app tier never sees it."
+    },
+    {
+      "adds": [
+        "db"
+      ],
+      "note": "The row holds only what you query on. Put the bytes in a column instead and you stretch every backup and replication window, and one video eviction flushes thousands of hot rows out of the buffer cache."
+    },
+    {
+      "adds": [
+        "cdn",
+        "viewer"
+      ],
+      "note": "Reads are the volume: without an edge cache a viral photo hits one region 150 ms away for every viewer, so the CDN serves it from a nearby PoP and the origin bucket sees a fraction of the traffic."
+    }
+  ],
+  "caption": "Bytes in object storage, the key plus metadata in the database, and your servers on the control path only."
+}
 \`\`\`
 
 Recap: Keep bytes in object storage with eleven-nines durability and only the key plus metadata in
