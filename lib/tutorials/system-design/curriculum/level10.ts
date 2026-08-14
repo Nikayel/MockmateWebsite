@@ -5123,7 +5123,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-message-queue",
           title: "Design a Message Queue / Streaming Log (Kafka)",
           summary:
-            "Model it as a partitioned append-only log with per-partition ordering, get durability from ISR replication and acks=all, offer at-least-once delivery plus idempotent consumers for exactly-once processing (never claim exactly-once delivery), and scale reads with consumer groups where parallelism equals partition count.",
+            "Why exactly-once delivery is a lie, what idempotent consumers buy instead, and why partition count is both ordering unit and parallelism cap.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["message-queue", "kafka", "delivery-semantics"],
@@ -5169,7 +5169,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-job-scheduler",
           title: "Design a Distributed Job Scheduler / Cron",
           summary:
-            "Index jobs by run time and poll the due window, make a single worker win via a compare-and-set lease with a visibility timeout so crashes retry rather than duplicate, add fencing tokens to defeat the paused-worker double-run, achieve effectively-once with idempotency keys, and handle clock skew and missed windows with an explicit misfire policy.",
+            "A lease makes a crashed worker's job retry rather than duplicate, and a fencing token handles the case a lease cannot: a worker that wakes up.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["job-scheduler", "leasing", "idempotency"],
@@ -5214,7 +5214,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-distributed-lock",
           title: "Design a Distributed Lock / Coordination Service (ZooKeeper/etcd)",
           summary:
-            "A Redis SETNX-with-TTL lock is unsafe because a single node can fail over and a paused holder can outlive its TTL; build on a consensus-backed store for linearizable lock state, auto-release via session leases and heartbeats, defeat the stale-holder double-run with monotonic fencing tokens, notify clients with watches instead of polling, and elect leaders with ordered ephemeral keys.",
+            "Why a Redis SETNX lock is unsafe at any TTL, and what consensus-backed leases plus fencing tokens add that the naive version never had.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["coordination", "consensus", "distributed-systems", "case-study"],
@@ -5260,7 +5260,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-code-sandbox",
           title: "Design a Code Execution Sandbox / Online Judge",
           summary:
-            "Pick the isolation boundary deliberately (microVM/Firecracker as the strong default, hardened seccomp container as the middle ground, never a bare container for hostile code), bound every resource with cgroups plus timeouts plus a pids limit plus no network, run each submission in a fresh throwaway sandbox behind a queue and autoscaling worker pool with a warm pool, and stream results while enforcing per-user fairness.",
+            "Choosing an isolation boundary for hostile code: a container shares the host kernel, a Firecracker microVM does not, and a pids limit stops fork bombs.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["sandboxing", "security", "isolation", "case-study"],
