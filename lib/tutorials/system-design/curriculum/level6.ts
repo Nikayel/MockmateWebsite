@@ -529,12 +529,52 @@ The drivers to reason about out loud:
 
 ### The landscape
 
-\`\`\`
-Logs / streams:   Kafka, Pulsar, Kinesis   -> high throughput, ordering, retention, replay
-Queues:           RabbitMQ, SQS            -> per-message ack, routing, DLQ, work distribution
-Managed fan-out:  SNS, Google Pub/Sub      -> topic fan-out without running a broker
-Ordered managed:  SQS FIFO                 -> per-group ordering, exactly-once-ish, lower throughput
-Lightweight:      NATS, Redis Streams      -> low latency, simple ops, smaller durability guarantees
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Family",
+    "Examples",
+    "What it buys you",
+    "What it costs"
+  ],
+  "rows": [
+    [
+      "Log / stream",
+      "Kafka, Pulsar, Kinesis",
+      "High throughput, per-partition ordering, retention, replay",
+      "Partitions, consumer groups, rebalancing, retention tuning, a KRaft quorum to run"
+    ],
+    [
+      "Queue",
+      "RabbitMQ, SQS",
+      "Per-message ack, routing, DLQ, work distribution",
+      "Delete on consume, so no replay and no second reader"
+    ],
+    [
+      "Managed fan-out",
+      "SNS, Google Pub/Sub",
+      "Topic fan-out without running a broker",
+      "No retention, so a subscriber that is down misses the message"
+    ],
+    [
+      "Ordered managed",
+      "SQS FIFO",
+      "Per-group ordering, exactly-once-ish",
+      "Lower throughput than a standard queue"
+    ],
+    [
+      "Lightweight",
+      "NATS, Redis Streams",
+      "Low latency, simple ops",
+      "Smaller durability guarantees"
+    ]
+  ],
+  "highlightCols": [
+    "What it buys you"
+  ],
+  "caption": "The landscape read as a decision table. Name the drivers out loud, then take the cheapest row that satisfies all of them, and remember that no broker at all is sometimes the row you want."
+}
 \`\`\`
 
 RabbitMQ is a smart broker for complex routing and per-message workflows at moderate scale; SQS is a
@@ -708,12 +748,66 @@ decide the trade:
 mean "just the leader" after followers drop out, so a leader crash still loses acknowledged writes.
 The durable combination is \`acks=all\` **and** \`min.insync.replicas>=2\` **and** RF>=3.
 
-\`\`\`
-Topic "rides", partition 3:
- offset:  0    1    2    3    4  <- append here (tail)
- record: [r0] [r1] [r2] [r3] [r4]
- Leader (broker 1) --replicate--> Follower (b2), Follower (b3)
- ISR = {1,2,3}. acks=all + min.insync.replicas=2 -> survives 1 loss.
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Topic rides, partition 3: leader and ISR",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "producer",
+      "label": "Producer (acks=all)",
+      "kind": "client"
+    },
+    {
+      "id": "leader",
+      "label": "Leader b1: log r0 to r4, tail at 5",
+      "kind": "db"
+    },
+    {
+      "id": "follower2",
+      "label": "Follower b2 (in ISR)",
+      "kind": "db"
+    },
+    {
+      "id": "follower3",
+      "label": "Follower b3 (in ISR)",
+      "kind": "db"
+    },
+    {
+      "id": "consumer",
+      "label": "Consumer group (own offset)",
+      "kind": "client"
+    }
+  ],
+  "edges": [
+    {
+      "from": "producer",
+      "to": "leader",
+      "kind": "sync",
+      "label": "append at offset 5"
+    },
+    {
+      "from": "leader",
+      "to": "follower2",
+      "kind": "replication",
+      "label": "fetch, caught up"
+    },
+    {
+      "from": "leader",
+      "to": "follower3",
+      "kind": "replication",
+      "label": "fetch, caught up"
+    },
+    {
+      "from": "leader",
+      "to": "consumer",
+      "kind": "sync",
+      "label": "read forward, no delete"
+    }
+  ],
+  "caption": "ISR = {1, 2, 3}. With acks=all and min.insync.replicas=2 the write is accepted only while the leader plus at least one follower are in sync, so the partition survives losing one broker with zero acknowledged-message loss and still takes writes. Reading never deletes: the consumer owns the cursor, the broker owns retention."
+}
 \`\`\`
 
 **Log segments and retention:** a partition is stored as segment files that roll by size/time; old
