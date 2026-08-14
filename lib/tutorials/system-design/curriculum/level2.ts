@@ -3701,6 +3701,52 @@ access pattern.
 \`\`\`
 `.trim()
 
+/**
+ * Read-only artifact for `sd-l2-access-pattern-modeling-practice`, which is a CRITIQUE: the learner
+ * reviews this schema rather than writing one from a blank page.
+ *
+ * It is written as a design doc an engineer would defend, and the defects are consequences of
+ * plausible choices rather than planted mistakes: an unread counter fanned out per member, a channel
+ * partition key with no shard suffix, a workspace-wide GSI partition key, and the belief that
+ * table-wide provisioned capacity is the ceiling that binds. Patterns 1 and 3's membership key is
+ * deliberately CORRECT, so the exercise is a review and not a hunt.
+ *
+ * Nothing here states a verdict. `exercise-genres.test.ts` enforces that, because an artifact that
+ * announces its own defect leaves the learner nothing to find and still scores as complete.
+ */
+const accessPatternCritiqueArtifact = `
+**Design doc: team chat on DynamoDB, single table, revision 3**
+
+Scale we are building for: 40 million users, 2 million channels, and one outlier, #general in our
+largest workspace, with 500,000 members. #general peaks near 1,800 messages per second during an
+incident. The table is provisioned at 200,000 write units per second, roughly ten times steady-state
+load, so capacity is budgeted and understood.
+
+Access patterns, in priority order:
+
+1. List my channels, most recent activity first.
+2. Load the last 50 messages in a channel and page backward.
+3. Show an unread badge per channel.
+4. Admin view: all message activity in a workspace over the last hour.
+
+Item layout, one table:
+
+- Membership item, \`PK = USER#userId\`, \`SK = CHAN#lastActivityTs#channelId\`, carrying the channel
+  name and an \`unreadCount\` attribute. Serves patterns 1 and 3 together in one Query, descending.
+- Message item, \`PK = CHAN#channelId\`, \`SK = TS#messageTs\`, carrying sender and body. Serves
+  pattern 2 in one Query, descending, with Limit 50.
+
+GSI1 serves pattern 4: \`PK = WORKSPACE#workspaceId\`, \`SK = TS#messageTs\`, projecting channelId,
+senderId and timestamp, so the admin view is one Query on the workspace partition.
+
+Write path for a new message: put the message item, then a BatchWrite loop over the channel's
+members that bumps \`lastActivityTs\` and applies \`ADD unreadCount 1\` to every membership item
+except the sender's. Opening a channel sets that member's \`unreadCount\` back to 0.
+
+Reads: patterns 1 and 2 use strongly consistent reads. Pattern 4 reads GSI1 and tolerates a second
+or two of staleness.
+`.trim()
+
 const keysIdsConstraintsTeach = `
 ## The most trivial-looking column is the highest-leverage one
 
@@ -4578,6 +4624,47 @@ stores, not a collection.
 \`\`\`
 `.trim()
 
+/**
+ * Read-only artifact for `sd-l2-choosing-db-polyglot-practice`, the level's second CRITIQUE.
+ *
+ * Written as a real ADR: three of the six calls (Cassandra for messages, Postgres for the small
+ * relational core, S3 for attachment bytes) are CORRECT and defended on their drivers, so the
+ * learner has to separate the good arguments from the ones that only sound good. The three that do
+ * not hold are each justified by something a tired team genuinely says, "we already operate it" and
+ * "the primary is never touched", which is what makes them worth reviewing rather than spotting.
+ */
+const polyglotCritiqueArtifact = `
+**ADR-014: storage for launch. Chat product, 12 million monthly users.**
+
+Numbers we are designing against: 3 million concurrent connections at peak, 400,000 messages per
+second written across all channels, 8 billion messages retained, and every connected client
+heartbeating its presence every 10 seconds.
+
+**Messages: Cassandra.** Partition key (channel_id, 10-day bucket), clustered by message id
+descending, so the hot read "the most recent 50 messages in this channel" is a single-partition
+slice. Postgres was rejected here: 8 billion rows at 400,000 writes per second is past one node, and
+the read needs no joins.
+
+**Users, servers, roles, permissions: Postgres.** Small, highly relational, and a permission change
+has to be a multi-row transaction. One primary, two read replicas.
+
+**Attachments: S3.** The bytes live in object storage; the Cassandra row keeps the key and the
+content type.
+
+**Presence: Postgres.** A \`user_presence(user_id primary key, status, last_seen)\` table on the same
+primary. Every heartbeat runs \`UPDATE user_presence SET status = ?, last_seen = now() WHERE
+user_id = ?\`, and presence is read on every channel open. We considered Redis and chose Postgres
+because we already operate it, and one fewer system at launch is worth real money.
+
+**Search: Postgres.** Every message is inserted a second time into
+\`messages_fts(message_id, channel_id, body)\` with a GIN index over \`to_tsvector(body)\`. The API
+handler writes the Cassandra row first, then the \`messages_fts\` row, inside the same request.
+Search runs \`WHERE channel_id = ? AND to_tsvector(body) @@ plainto_tsquery(?)\`.
+
+**Analytics: Postgres read replicas.** The weekly engagement dashboard aggregates over a year of
+rows against the two replicas, so the primary is never touched.
+`.trim()
+
 export const systemDesignLevel2: DesignLevel = {
   id: 2,
   slug: "data-storage",
@@ -5295,19 +5382,57 @@ export const systemDesignLevel2: DesignLevel = {
           practice: {
             id: "sd-l2-access-pattern-modeling-practice",
             prompt:
-              "Design the DynamoDB key schema for Slack-scale messaging where a single channel can have 500,000 members and a viral message triggers hundreds of thousands of unread-count updates in seconds. Show how you keep 'list my channels,' 'load channel history,' and 'unread badge' as single lookups without a hot partition melting down.",
+              "Review the proposed key schema below and say which parts of it survive the scale it is written for and which do not. For each weak point, name the change you would make to the key or the write path, and say what that change costs on the read side.",
             thinkAbout: [
-              "What does one message cost if unread is a per-member counter in a 500k-member channel?",
-              "How does a sequence-number difference turn an O(members) write into O(1)?",
-              "Where does channel history need write sharding, and what does the read pay for it?",
+              "Count the item writes one message in the 500,000-member channel actually performs.",
+              "The table is provisioned at 200,000 write units per second. Which ceiling binds first for #general?",
+              "How many distinct partition-key values does GSI1 have, and where do a workspace's writes land?",
             ],
             modelAnswerOutline: [
-              "Assume hundreds of millions of users, channels up to 500k members, and fan-out spikes when a message lands in a mega-channel. The naive design (increment an unreadCount on every member item per message) means one message = 500k writes, melting write capacity and doing pointless work for offline users.",
-              "**History (channel partition, write-sharded):** `PK = CHAN#<id>#<shard>`, `SK = TS#<ts>`, shard chosen by hash of message id across ~16 shards. A mega-channel's writes spread across 16 physical partitions, staying under the per-partition write ceiling; 'load history' scatter-reads the 16 shards and merges by timestamp, still bounded and low-latency.",
-              "**List my channels:** `PK = USER#<id>`, `SK = CHAN#<lastActivityTs>#<channelId>` membership items, so a user's channel list is one pre-sorted Query keyed by the user, spreading load perfectly across users.",
-              "**Unread badge without 500k writes:** no per-member counter fan-out. Each channel stores a monotonic `lastMessageSeq`; each membership item stores the user's `lastReadSeq`. Unread = lastMessageSeq - lastReadSeq, computed at read time, returned with the channel-list query. One message is a single write (bump the channel's seq) instead of 500k; reading a channel updates only that user's lastReadSeq. O(members) write becomes O(1).",
-              "**The trade:** a per-message mention badge (distinct from unread) still needs targeted fan-out, but only to the people actually @-mentioned: a small, bounded set, which is exactly the fan-out that is fine.",
-              "Common wrong turn: treating a 500k-member channel like a 5-member DM and fanning out counters, or keeping channel history on one partition key and throttling the moment a channel goes viral.",
+              "**What holds up, and say so first.** The membership item is right: `PK = USER#userId`, `SK = CHAN#lastActivityTs#channelId` spreads across 40 million partition keys, comes back already ordered by recency, and lets the unread badge ride along with pattern 1 at no extra read. Strongly consistent reads on patterns 1 and 2 are cheap here and correct.",
+              "**The unread fan-out is the expensive call.** `ADD unreadCount 1` on every membership item makes a single message in #general 500,000 item writes, which alone is more than twice the table's entire 200,000 write units per second, and #general is taking 1,800 messages per second. Replace the counter with two sequence numbers: a monotonic `lastMessageSeq` on the channel item and a `lastReadSeq` on each membership item, with unread computed as the difference at read time. One message becomes one write, and the badge still arrives with the pattern-1 Query.",
+              "**The message partition key needs a shard suffix.** `PK = CHAN#channelId` puts a channel's whole write stream on one physical partition, and a DynamoDB partition tops out near 1,000 writes per second, so #general throttles at roughly half its 1,800 per second peak. Use `CHAN#channelId#0..15` chosen by hash of the message id. The cost lands on pattern 2: loading history now scatter-reads 16 partitions and merges by timestamp instead of one Query.",
+              "**Provisioned capacity is not the ceiling that binds.** 200,000 write units is a table-wide number and does not raise the per-partition limit, so buying more of it leaves #general throttling while the rest of the table idles.",
+              "**GSI1 concentrates a workspace onto one index partition.** `PK = WORKSPACE#workspaceId` has one value per workspace, so every message write in the largest workspace hits the same index partition against the same ceiling, and every base write is replicated into the index, roughly doubling the write cost of the whole system. Bucket the key by hour, or serve pattern 4 off a stream into a store built for scans rather than off a GSI at all.",
+              "Common wrong turn in a review like this: rewriting the schema from scratch. Patterns 1 and 2 have the right shape. Three key changes and one write-path change carry the whole answer.",
+            ],
+            supplied: {
+              label: "Proposed key schema, revision 3",
+              body: accessPatternCritiqueArtifact,
+            },
+            rubric: [
+              {
+                name: "Write amplification",
+                weak: "Reads the write path as one message equals one write, and never counts the per-member updates behind it.",
+                adequate:
+                  "Names the per-member fan-out but leaves it as 'a lot of writes', with no number attached to it.",
+                strong:
+                  "Puts 500,000 item writes on one message in #general, sets that against the table's 200,000 write units, and replaces the counter with a constant-cost mechanism.",
+              },
+              {
+                name: "Per-partition ceiling",
+                weak: "Treats the 200,000 provisioned write units as the only capacity number in play.",
+                adequate:
+                  "Says the channel partition will run hot without naming the roughly 1,000 writes per second one partition allows.",
+                strong:
+                  "Sets #general's 1,800 messages per second against the per-partition ceiling, shards the channel key, and names the scatter-read that shard costs pattern 2.",
+              },
+              {
+                name: "Secondary index cost",
+                weak: "Leaves GSI1 unexamined, or waves it through because the admin view tolerates staleness.",
+                adequate:
+                  "Notices that the workspace partition key has few distinct values, without following it through to the write path.",
+                strong:
+                  "Names both effects, a workspace's writes landing on one index partition and every base write being duplicated into GSI1, then rekeys or reroutes pattern 4.",
+              },
+              {
+                name: "Fair reading of the design",
+                weak: "Rejects the schema wholesale, often proposing a relational rewrite in its place.",
+                adequate:
+                  "Repairs the weak points without saying which parts of the design were already correct.",
+                strong:
+                  "Keeps the membership key and its pre-sorted channel list explicitly, and confines every change to the message partition key, the unread mechanism and GSI1.",
+              },
             ],
           },
         },
@@ -5456,20 +5581,56 @@ export const systemDesignLevel2: DesignLevel = {
           practice: {
             id: "sd-l2-choosing-db-polyglot-practice",
             prompt:
-              "Choose the datastores for building Discord (real-time chat) from scratch: billions of messages, a hot read pattern of 'the most recent messages in a channel,' presence for millions of concurrent users, and full-text search across message history. Justify each store and describe how they stay in sync (polyglot persistence).",
+              "Review the storage plan below and say which of its six choices you would keep as written and which you would move to a different family. For each move, name the driver that forces it and say how the new store stays in sync with the source of truth.",
             thinkAbout: [
-              "Which of the four workloads could a single relational database actually not survive, and why?",
-              "Which data is worthless if stale by a minute, and what store does that imply?",
-              "What spine keeps the derived stores (search) in sync with the source of truth?",
+              "3 million clients, one presence heartbeat each every 10 seconds: what rate is that, and which box absorbs it?",
+              "Which of these stores holds derived data you could delete outright, and what would you rebuild it from?",
+              "The handler writes Cassandra, then messages_fts. What is true of a message if the process dies between the two?",
             ],
             modelAnswerOutline: [
-              "This is a polyglot problem: no single store wins all four workloads, so assign each to the family that fits and sync between them.",
-              "**Messages (the core): wide-column, Cassandra or ScyllaDB** (what Discord actually runs). Billions of rows, append-heavy writes, and the dominant query 'most recent N messages in channel X' is a partition-plus-range read, not an ad hoc join. Partition by (channel_id, time_bucket), cluster by message id descending so the hot read is a single-partition sequential scan. Explicitly reject a single Postgres: at billions of messages and this write rate it exceeds one node, and the access pattern needs no joins.",
-              "**Presence and sessions ('who is online,' typing): in-memory key-value, Redis,** keyed by user and channel with short TTLs. Ephemeral, constantly updated, worthless if stale by a minute: single-digit-ms reads/writes and durability does not matter, so Redis's weakness does not bite.",
-              "**Full-text search across history: Elasticsearch,** because neither Cassandra nor Redis does relevance-ranked text search.",
-              "**Systems of record for small relational data (users, servers, membership, permissions): Postgres or Vitess-sharded MySQL,** because it is joinable, transactional, and small.",
-              "**Keeping them in sync (the polyglot cost):** the message write goes to Cassandra as the source of truth, then a CDC/event stream (Kafka) fans it out to derived stores: an indexer consumes the stream and writes Elasticsearch, so search is eventually consistent and can lag a few seconds, acceptable. Presence never syncs to durable stores; it lives and dies in Redis.",
-              "Common wrong turn: serving recent-message reads, search, and presence all from one relational database, which either melts under write load or forces slow LIKE scans and hot-row contention. Each workload gets the store it deserves, and Kafka is the spine that keeps derived copies in sync.",
+              "**Keep three of the six.** Cassandra for messages is right: partition by (channel_id, 10-day bucket) clustered by message id descending makes the hot read a single-partition slice, and 8 billion rows at 400,000 writes per second is genuinely past one relational node with no joins in the read path. Postgres for users, servers, roles and permissions is right: small, relational, multi-row transactional. S3 for attachment bytes with only the key on the Cassandra row is right.",
+              "**Presence is on the wrong family and on the wrong box.** 3 million clients heartbeating every 10 seconds is 300,000 UPDATE statements per second aimed at a primary that serves tens of thousands of QPS when it is well indexed. Each one is a durable WAL write for a fact that is worthless 60 seconds later, and it shares that primary with permissions, so presence load turns into failed logins. Presence is the key-value signature: known key, single-digit-millisecond budget, no durability requirement. Put it in Redis keyed by user with a short TTL and let the key expire instead of writing 'offline'. The 'one fewer system to operate' argument is real, and it is being paid for with 300,000 writes per second of throwaway traffic on the system of record.",
+              "**Search: right that it needs its own path, wrong store and wrong plumbing.** `messages_fts` is a second full copy of 8 billion messages on the box whose stated job is small relational data, and Postgres full-text gives no relevance tuning, no fuzziness, no faceting. Elasticsearch, and treat it as derived data: droppable and rebuildable. The plumbing matters more than the store. Writing Cassandra and then `messages_fts` in one handler is a dual write with no atomicity, so any crash between the two leaves a message that exists and is permanently unsearchable, with nothing to detect it. Write once to Cassandra, publish a change stream (Kafka or CDC), let an indexer consume it, and accept a few seconds of search lag.",
+              "**Analytics on the read replicas is still OLTP hardware.** Aggregating a year of rows evicts the buffer cache of replicas that are also serving permission reads, so the dashboard's cost is paid as product p99. Feed the same change stream into a columnar store (ClickHouse, BigQuery) and let the dashboard scan there.",
+              "**The through-line:** every choice in ADR-014 is justified by operational convenience. Justify by drivers: ephemeral plus known key plus millisecond budget goes to Redis, ranked text over a huge corpus goes to a search engine as derived data, year-long scans go to a columnar store. And whatever gets added, one write path plus a change stream, never two writes in a request handler.",
+            ],
+            supplied: {
+              label: "ADR-014: storage plan for launch",
+              body: polyglotCritiqueArtifact,
+            },
+            rubric: [
+              {
+                name: "Presence workload",
+                weak: "Leaves presence in Postgres, or moves it somewhere else without ever costing the heartbeats.",
+                adequate:
+                  "Names Redis for presence on the general grounds that it is ephemeral, with no arithmetic on the heartbeat rate.",
+                strong:
+                  "Turns 3 million clients at one heartbeat per 10 seconds into 300,000 writes per second, weighs that against one Postgres primary, and names the shared blast radius with permissions.",
+              },
+              {
+                name: "Search store and its plumbing",
+                weak: "Accepts messages_fts as written, or swaps the store while leaving both writes in the request handler.",
+                adequate:
+                  "Moves search to a search engine but treats the two writes in one handler as an implementation detail.",
+                strong:
+                  "Rejects store and plumbing both: names the second copy of 8 billion messages, and the message that lives in Cassandra but never reaches the index when the handler dies mid-request.",
+              },
+              {
+                name: "Sync spine",
+                weak: "Never says how the stores stay in agreement once there is more than one of them.",
+                adequate:
+                  "Reaches for a queue or CDC without naming which store is the source of truth the others follow.",
+                strong:
+                  "Puts Cassandra as the record and one change stream as the fan-out to both the search index and the columnar store, and calls both rebuildable from it.",
+              },
+              {
+                name: "Fair reading of the plan",
+                weak: "Rewrites all six choices, usually collapsing the whole plan back onto one database.",
+                adequate:
+                  "Keeps the Cassandra, Postgres and S3 calls without saying what makes each of them correct.",
+                strong:
+                  "Defends the message partitioning and the small relational core on their own drivers, and confines the changes to presence, search and analytics.",
+              },
             ],
           },
         },
