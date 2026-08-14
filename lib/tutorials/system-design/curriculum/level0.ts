@@ -781,9 +781,33 @@ writes, so you may not need to shard yet. A read QPS of 15k tells you that you w
 read replicas. A daily storage number tells you whether you need object storage plus a sharded metadata
 DB. If a calculation cannot move the architecture, skip it.
 
-\`\`\`
-assumptions  ->  arithmetic  ->  a number  ->  a design decision
-   (state)        (round)        (label)         (justify)
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "What an estimate is for",
+  "stages": [
+    {
+      "label": "Assumptions",
+      "note": "state every one out loud"
+    },
+    {
+      "label": "Arithmetic",
+      "note": "round to powers of ten"
+    },
+    {
+      "label": "A number",
+      "note": "label its units"
+    },
+    {
+      "label": "A design decision",
+      "note": "justify one choice with it"
+    }
+  ],
+  "highlight": [
+    "A design decision"
+  ],
+  "caption": "If the chain does not end in a design decision, the number was not worth the minutes it cost."
+}
 \`\`\`
 
 **Interview nuance:** the classic failure here is analysis paralysis, spending eight minutes deriving
@@ -1440,11 +1464,33 @@ a minute of video (SD/HD)   ~ 5-15 MB
 
 The rough capacities you assume before proving otherwise:
 
-\`\`\`
-Tuned app server (stateless)   ~ 10k-50k QPS
-Redis / in-memory cache node   ~ 100k+ ops/sec
-Single relational DB primary   ~ few k writes/sec, tens of k reads/sec
-One server's live connections  ~ 100k+ WebSockets (tuned)
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "One machine",
+    "Rough ceiling to assume before you prove otherwise"
+  ],
+  "rows": [
+    [
+      "Tuned app server (stateless)",
+      "~10k to 50k QPS"
+    ],
+    [
+      "Redis or in-memory cache node",
+      "~100k+ ops/sec"
+    ],
+    [
+      "Single relational DB primary",
+      "A few thousand writes/sec, tens of thousands of reads/sec"
+    ],
+    [
+      "One server's live connections",
+      "~100k+ WebSockets (tuned)"
+    ]
+  ],
+  "caption": "These turn a QPS number into a server count in one step: 30k peak read QPS at ~10k per server is 3 to 4 servers plus headroom, and 1M write QPS against a ~5k-writes/sec node is ~200 shards."
+}
 \`\`\`
 
 </details>
