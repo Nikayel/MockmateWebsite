@@ -1776,7 +1776,17 @@ how CDC pipelines bootstrap read models.
 
 **Deletes in a compacted topic** use a **tombstone**: a record with the key and a \`null\` value.
 Compaction keeps the tombstone long enough for all consumers to observe the deletion, then removes
-both the tombstone and all prior values for that key.
+both the tombstone and all prior values for that key. "Long enough" is a setting, not a hope:
+\`delete.retention.ms\` (24 hours by default) is how long the null marker survives, and a consumer
+lagging by more than that comes back, never sees the delete, and keeps the removed key in its
+materialized state indefinitely.
+
+There is a matching knob on the other side of the same problem. Compaction may collect a superseded
+value as soon as a newer one exists, so a consumer that needs the intermediate values and not only
+the current one can have them removed before it ever reads them. \`min.compaction.lag.ms\` sets how
+long a record stays ineligible for compaction after it is written, which buys exactly that much room
+for a lagging consumer. Size both knobs against your worst expected consumer lag, the same way you
+size a dedup window against the replay window.
 
 \`\`\`cswidget
 {
@@ -1908,9 +1918,143 @@ both the tombstone and all prior values for that key.
           ]
         }
       ]
+    },
+    {
+      "note": "Now the hazard. A consumer is lagging: its cursor is still at offset 0 when compaction runs, and compaction never waits for a consumer. u1=A, u2=X and u1=B are gone before it reads them, so it resumes and sees u1 jump straight to C, never observing the values in between.",
+      "rows": [
+        {
+          "label": "log",
+          "cells": [
+            {
+              "text": "u1=A",
+              "state": "dropped"
+            },
+            {
+              "text": "u2=X",
+              "state": "dropped"
+            },
+            {
+              "text": "u1=B",
+              "state": "dropped"
+            },
+            {
+              "text": "u3=Q",
+              "state": "dim"
+            },
+            {
+              "text": "u1=C",
+              "state": "dim"
+            },
+            {
+              "text": "u2=Y",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "lagging consumer",
+          "cells": [
+            {
+              "text": "missed",
+              "state": "dropped"
+            },
+            {
+              "text": "missed",
+              "state": "dropped"
+            },
+            {
+              "text": "missed",
+              "state": "dropped"
+            },
+            {
+              "text": "reads Q",
+              "state": "active"
+            },
+            {
+              "text": "reads C",
+              "state": "active"
+            },
+            {
+              "text": "reads Y",
+              "state": "active"
+            }
+          ]
+        }
+      ],
+      "predict": {
+        "question": "A consumer that needs every value of u1, not just the current one, resumes from offset 0 after compaction has run. What does it see for u1?",
+        "options": [
+          "A, then B, then C, in order",
+          "Only C: the superseded values were collected before it read them",
+          "Nothing: its offsets are invalid after compaction"
+        ]
+      }
+    },
+    {
+      "note": "The knob for that is min.compaction.lag.ms: a record cannot be compacted until it is that old, so anything written inside the window survives for a consumer lagging by less. delete.retention.ms is its twin for tombstones, holding the null marker long enough for every consumer to observe a delete.",
+      "rows": [
+        {
+          "label": "log",
+          "cells": [
+            {
+              "text": "u1=A",
+              "state": "dropped"
+            },
+            {
+              "text": "u2=X",
+              "state": "dropped"
+            },
+            {
+              "text": "u1=B",
+              "state": "active"
+            },
+            {
+              "text": "u3=Q",
+              "state": "active"
+            },
+            {
+              "text": "u1=C",
+              "state": "active"
+            },
+            {
+              "text": "u2=Y",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "eligible to compact?",
+          "cells": [
+            {
+              "text": "yes, older than the lag",
+              "state": "dim"
+            },
+            {
+              "text": "yes, older than the lag",
+              "state": "dim"
+            },
+            {
+              "text": "no, inside the lag window",
+              "state": "new"
+            },
+            {
+              "text": "no, inside the lag window",
+              "state": "new"
+            },
+            {
+              "text": "no, inside the lag window",
+              "state": "new"
+            },
+            {
+              "text": "no, inside the lag window",
+              "state": "new"
+            }
+          ]
+        }
+      ]
     }
   ],
-  "caption": "cleanup.policy=compact keeps at least the latest value per key, turning the log into a rebuildable table/changelog."
+  "caption": "cleanup.policy=compact keeps at least the latest value per key, turning the log into a rebuildable table/changelog. The timing knobs decide who is allowed to fall behind: min.compaction.lag.ms protects recent superseded values for a lagging consumer, delete.retention.ms protects tombstones so a delete is not missed."
 }
 \`\`\`
 
@@ -1956,7 +2100,9 @@ Retention and dedup must be sized together.
 
 Recap: delete-retention makes a topic a replayable stream bounded by its window; log compaction keeps
 the latest value per key and makes a topic a rebuildable table/changelog (with tombstones for
-deletes); tiered storage puts cold segments in object storage for cheap long retention; GDPR erasure
+deletes, held for \`delete.retention.ms\`, and \`min.compaction.lag.ms\` protecting recent superseded
+values for a lagging consumer); tiered storage puts cold segments in object storage for cheap long
+retention; GDPR erasure
 on immutable logs uses crypto-shredding or tombstones; and the dedup window must be at least the
 replay window or replays double-apply.
 
