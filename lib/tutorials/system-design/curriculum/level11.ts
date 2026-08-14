@@ -2016,6 +2016,96 @@ A **series** is identified by a metric name plus a set of key/value **tags/label
 }
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "What One Extra Tag Does to Series Count",
+  "predictPrompt": {
+    "question": "A fleet of 1,000 hosts reports 50 metrics each, so 50,000 series. A team adds one tag, 'build_sha', and about 300 build values sit in the index at any moment. What happens to the series count?",
+    "options": [
+      "It stays near 50,000, since only a handful of builds run at a time",
+      "It rises by about 300, one new series per build",
+      "It multiplies by about 300, to roughly 15 million"
+    ]
+  },
+  "workedExample": "The initial values are 1,000 hosts reporting 50 metrics each with no extra tag, so 1,000 times 50 is 50,000 distinct series, and at 2,000 bytes of index memory per active series that is about 100 MB. Now change the extra tag. A tag value does not add a series, it multiplies the ones already there, because a series is one metric name plus one complete set of tag values. Switch to 'build_sha' and the count crosses ten million on a fleet that never grew by a single host.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "hosts",
+      "label": "Hosts in the fleet",
+      "min": 10,
+      "max": 100000,
+      "scale": "log",
+      "initial": 1000,
+      "unit": "hosts"
+    },
+    {
+      "kind": "slider",
+      "id": "metrics",
+      "label": "Metrics reported per host",
+      "min": 1,
+      "max": 200,
+      "scale": "linear",
+      "step": 1,
+      "initial": 50,
+      "unit": "metrics"
+    },
+    {
+      "kind": "select",
+      "id": "extratag",
+      "label": "One extra tag on every metric",
+      "initial": 0,
+      "options": [
+        {
+          "label": "None",
+          "value": 1
+        },
+        {
+          "label": "status_code, about 20 values",
+          "value": 20
+        },
+        {
+          "label": "build_sha, about 300 live in the index",
+          "value": 300
+        },
+        {
+          "label": "session_id, one per visit, 50,000 live",
+          "value": 50000
+        }
+      ]
+    },
+    {
+      "kind": "slider",
+      "id": "rambytes",
+      "label": "Index memory per active series",
+      "min": 500,
+      "max": 4000,
+      "scale": "linear",
+      "step": 100,
+      "initial": 2000,
+      "unit": "bytes"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "series",
+      "label": "Distinct series",
+      "expr": "hosts * metrics * extratag",
+      "format": "compact",
+      "unit": "series"
+    },
+    {
+      "id": "indexram",
+      "label": "Memory held by the active series index",
+      "expr": "series * rambytes",
+      "format": "bytes"
+    }
+  ],
+  "caption": "Cardinality is a product, not a sum. Every tag you add multiplies the series count by its number of distinct values, which is why an unbounded tag OOM-kills a database that a hundred times more hosts would not have troubled."
+}
+\`\`\`
+
 ## Append-optimized, columnar, compressed storage
 
 TSDBs use **LSM-tree** style storage (buffer writes in memory, flush sorted immutable chunks to disk) and store data **columnar** per series so a range scan reads one contiguous block. Compression is where TSDBs win big, using two Gorilla/Facebook techniques:
