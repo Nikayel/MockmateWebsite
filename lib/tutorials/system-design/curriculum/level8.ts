@@ -555,6 +555,47 @@ Platform authenticators are built into the device (Touch ID, Windows Hello). Roa
 
 If a passkey is device-bound and the device is gone, the user is locked out unless they enrolled a second authenticator. Practical designs require enrolling at least two passkeys (phone plus a backup key), or fall back to another enrolled factor. Rolling out passkeys onto an existing password base uses progressive enrollment: keep passwords working, prompt users to add a passkey after a successful login, and over time let passkey-only users disable their password. Do not force a hard cutover; you will lock out the users whose only device just broke.
 
+## The enterprise lifecycle, including the account you hope never to use
+
+Two enrolled authenticators is the consumer answer to device loss. An enterprise has to answer a harder version of the same question, because the accounts are not owned by the people holding them and there is nobody above an admin to reset them at 03:00. Walk the credential through the whole employment lifecycle and a fourth path appears that consumer designs never need.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Path",
+    "How the credential moves",
+    "What makes it safe"
+  ],
+  "rows": [
+    [
+      "Joiner: new hire, day one",
+      "HR creates the record, SCIM (the automated provisioning protocol covered in the next lesson) pushes the account into the IdP, and at desk setup the employee enrolls a platform passkey plus a roaming hardware key",
+      "Two authenticators from the first login, so the single-credential window never exists"
+    ],
+    [
+      "Leaver: offboarded Friday",
+      "HR marks them terminated and SCIM deprovisions the account across every connected app in one push, so the enrolled credentials still exist on their devices but no account will accept them",
+      "Revocation is central and automatic. Chasing per-app accounts by hand is how orphaned access survives an offboarding."
+    ],
+    [
+      "Privileged user loses their hardware key",
+      "They sign in with the second enrolled authenticator, enroll a replacement, and the lost credential_id is deleted from the credentials table",
+      "The two-authenticator rule for admins is why this is a Tuesday and not an incident"
+    ],
+    [
+      "Nobody can get in: the IdP is misconfigured, or the last super admin left",
+      "Use the break-glass account: a standing, never-used-in-anger admin identity whose hardware key sits in a sealed, numbered envelope in a physical safe, deliberately excluded from SCIM and from conditional-access policy so a broken policy cannot lock it out",
+      "Physical custody plus an alarm on use. Opening the envelope is logged, authenticating pages the security team immediately, every action in the session is reviewed afterwards, and the key is re-sealed and rotated once the incident closes."
+    ]
+  ],
+  "highlightCols": [
+    "What makes it safe"
+  ],
+  "caption": "The break-glass account inverts the usual controls on purpose: it is exempt from the automation precisely so the automation cannot lock it out, and its compensating control is not prevention but detection. That is the trade to say out loud, because a standing admin credential outside policy is a real risk you are accepting in exchange for never being locked out of your own identity provider."
+}
+\`\`\`
+
 **Recap:** passkeys replace shared secrets with a device-held private key so the server stores only a useless-to-steal public key, origin binding makes them phishing-resistant where OTP and SMS are not, synced passkeys solve device loss for consumers while device-bound plus attestation suits enterprise, and you roll them out via progressive enrollment alongside passwords.
 
 \`\`\`cswidget
