@@ -2235,13 +2235,51 @@ script. The template is a backbone you hang the specific prompt on, not a monolo
 <details>
 <summary>The phase backbone (45-minute budget)</summary>
 
-\`\`\`
-1. Scope & requirements      ~5 min   functional + non-functional, clarify
-2. Estimation (back-of-env)  ~2 min   QPS, storage, bandwidth
-3. API + data model          ~5 min   the contract and the schema
-4. High-level design         ~15 min  box-and-arrow, request path
-5. Deep dive(s)              ~10 min  the 1-2 hard parts
-6. Bottlenecks & wrap-up     ~3 min   scale, failure, tradeoffs, what next
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Phase",
+    "Budget",
+    "What you walk away with"
+  ],
+  "rows": [
+    [
+      "1. Scope and requirements",
+      "~5 min",
+      "Functional and non-functional reqs, clarified"
+    ],
+    [
+      "2. Estimation (back of envelope)",
+      "~2 min",
+      "QPS, storage, bandwidth"
+    ],
+    [
+      "3. API and data model",
+      "~5 min",
+      "The contract and the schema"
+    ],
+    [
+      "4. High-level design",
+      "~15 min",
+      "Box-and-arrow, request path"
+    ],
+    [
+      "5. Deep dive(s)",
+      "~10 min",
+      "The one or two hard parts"
+    ],
+    [
+      "6. Bottlenecks and wrap-up",
+      "~3 min",
+      "Scale, failure, tradeoffs, what next"
+    ]
+  ],
+  "highlightCols": [
+    "Budget"
+  ],
+  "caption": "The backbone to reproduce in 60 seconds. Bend it to the prompt, and say out loud which phases you are skipping."
+}
 \`\`\`
 
 </details>
@@ -2412,17 +2450,36 @@ for a few seconds about the write path" is night-and-day better than ten silent 
 
 A layout that always works:
 
-\`\`\`
-+-----------------------------+------------------+
-| Requirements & numbers      |  Parking lot     |
-| - 10M DAU, 4K QPS peak      |  - analytics     |
-| - p99 < 100ms, read-heavy   |  - custom alias  |
-+-----------------------------+------------------+
-|                                                |
-|      [Client]->[LB]->[API]->[Cache]->[DB]      |
-|                          box-and-arrow         |
-|                                                |
-+------------------------------------------------+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Zone on the board",
+    "What lives there",
+    "Why it earns the space"
+  ],
+  "rows": [
+    [
+      "Top left, pinned",
+      "10M DAU, 4K QPS peak. p99 under 100ms, read heavy.",
+      "You and the interviewer share one reference for every number either of you quotes"
+    ],
+    [
+      "Right edge",
+      "Parking lot: analytics, custom alias",
+      "Shows the deferral was deliberate rather than forgotten"
+    ],
+    [
+      "Center, with room to grow",
+      "Client to load balancer to API to cache to database, box and arrow",
+      "The design is the thing being graded, so it gets the largest area"
+    ]
+  ],
+  "highlightCols": [
+    "Zone on the board"
+  ],
+  "caption": "A layout that always works: requirements pinned top left, the design in the middle where it can grow, and a parking lot on the side for what you deferred out loud."
+}
 \`\`\`
 
 Requirements and estimates pinned top-left so you and the interviewer share a reference. The
