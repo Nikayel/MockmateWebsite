@@ -59,8 +59,14 @@ export const USER_KEYED_DOCUMENTS: readonly UserKeyedDocument[] = [
   { collection: "profiles" },
   {
     collection: "users",
-    subcollections: ["session_summaries", "usage_summaries"],
-    note: "Per-session scoring summaries and billing-period usage rollups live here, not at the top level.",
+    subcollections: [
+      "session_summaries",
+      "usage_summaries",
+      "daily_usage",
+      "learn_usage",
+      "learn_daily",
+    ],
+    note: "Per-session scoring summaries, usage rollups (billing-period + daily), and Learn time rollups (per-lesson + per-day) live here, not at the top level.",
   },
   { collection: "user_learning_state" },
   {

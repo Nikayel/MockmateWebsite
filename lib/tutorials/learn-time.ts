@@ -244,6 +244,8 @@ export async function scanLearnDailySince(
   const snapshot = await adminDb
     .collectionGroup(LEARN_DAILY_COLLECTION)
     .where("day", ">=", sinceDayKey)
+    // Newest first, so when the cap bites it is the OLDEST days that fall off the report.
+    .orderBy("day", "desc")
     .limit(LEARN_DAILY_SCAN_LIMIT)
     .get()
   return {
