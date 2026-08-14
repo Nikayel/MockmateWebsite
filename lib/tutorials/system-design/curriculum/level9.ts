@@ -2108,7 +2108,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-monolith-vs-microservices",
           title: "Monolith vs Modular Monolith vs Microservices",
           summary:
-            "Default to a modular monolith with clean seams, extract services only on a concrete org, cadence, or scaling trigger, and never build a distributed monolith (shared DB or coupled deploys) that has every cost and no benefit.",
+            "Why a distributed monolith is the worst of both worlds, and the concrete triggers that justify extracting your first service from a modular monolith.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["microservices", "monolith", "architecture"],
@@ -2157,7 +2157,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-decomposition-ddd",
           title: "Service Decomposition & Bounded Contexts (DDD)",
           summary:
-            "Cut along business capabilities and bounded contexts, give every service exclusive ownership of its data (API/event access only, never a shared table), size services to one team each, and extract incrementally with the Strangler Fig and an anti-corruption layer.",
+            "Where to cut a monolith: bounded contexts over technical layers, one owner per dataset, and Strangler Fig extraction behind an anti-corruption layer.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["ddd", "bounded-context", "decomposition"],
@@ -2205,7 +2205,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-inter-service-comm",
           title: "Inter-Service Communication",
           summary:
-            "Sync for must-know-now reads (gRPC inside, REST at the edge), async events to decouple and absorb slowness, orchestration for complex flows and choreography for simple ones, sagas with compensations for cross-service consistency, and timeouts plus jittered retries plus circuit breakers plus idempotency to stop cascades.",
+            "When one service should call another synchronously, when an event is better, and the four primitives that stop a slow dependency cascading into an outage.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["inter-service", "grpc", "saga"],
@@ -2262,7 +2262,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-containers-k8s",
           title: "Containers & Kubernetes Fundamentals",
           summary:
-            "Build small immutable images, use Deployments for stateless and StatefulSets (or a managed DB) for stateful, set requests/limits and a PodDisruptionBudget, and let readiness probes gate a maxUnavailable: 0 rolling update to stay zero-downtime.",
+            "Why readiness probes, not liveness probes, are what make a Kubernetes rolling update zero-downtime, and which controller each workload belongs in.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["kubernetes", "containers", "probes"],
@@ -2310,7 +2310,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-k8s-autoscaling",
           title: "Autoscaling & Elasticity",
           summary:
-            "Pick the scaler to the problem (HPA Pods, cluster autoscaler nodes, KEDA events with scale-to-zero), scale on the signal that reflects user pain (RPS, p99, queue depth) not reflexive CPU, and blunt cold starts with a warm floor and stabilization windows.",
+            "HPA, cluster autoscaler and KEDA solve different problems, and CPU is usually the wrong signal: scale on the queue depth or p99 that reflects user pain.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["autoscaling", "keda", "elasticity"],
@@ -2359,7 +2359,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-service-mesh",
           title: "Service Mesh (Sidecar vs Sidecarless/Ambient/eBPF)",
           summary:
-            "A mesh moves mTLS, retries/timeouts, traffic shifting, and L7 telemetry out of app code; sidecars cost memory and latency per Pod, Istio Ambient cuts that tax while keeping per-connection mTLS and Cilium replaces the proxy with kernel eBPF policy plus SPIFFE mutual authentication and WireGuard or IPsec encryption, and for a small fleet a mesh is often not worth it.",
+            "What the sidecar tax really costs per proxy traversal, how Istio Ambient and Cilium cut it, and when a small fleet is better off with no mesh at all.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["service-mesh", "ebpf", "mtls"],
@@ -2408,7 +2408,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-cloud-native-12factor",
           title: "Cloud-Native & 12-Factor Principles",
           summary:
-            "Config in the environment (one image everywhere), stateless disposable processes (Redis session, S3 files, graceful SIGTERM), backing services attached by URL, and immutable build/release/run separation, all so a process is safe to kill and restart anywhere at any time.",
+            "The 12-factor changes that let a platform kill and restart a service safely: config in the environment, session in Redis, files in S3, a real SIGTERM drain.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["cloud-native", "twelve-factor", "deployment"],
@@ -2465,7 +2465,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-serverless-faas",
           title: "Serverless / FaaS Architecture",
           summary:
-            "FaaS trades capacity management for per-invocation billing and instant scale, which wins for spiky event-driven glue but loses on cold-start latency, hard execution limits, statelessness, and a cost model that inverts against containers under high steady load.",
+            "Where serverless wins and where the bill inverts against a container: cold starts on the p99 tail, the 15-minute cap, and no durable local state.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["serverless", "faas", "cold-start"],
@@ -2513,7 +2513,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-edge-wasm",
           title: "Edge Computing, CDN Compute & WebAssembly",
           summary:
-            "V8 isolates start in under 5ms and WASM sub-ms, so edge compute delivers global sub-50ms TTFB for lightweight request-path work like routing, auth, and personalization, while heavy compute and strong-consistency data stay at the origin because edge runtimes are CPU/memory/API constrained and edge data is eventually consistent by default.",
+            "V8 isolates start in under 5ms, so routing, auth and personalization run next to the user, while a large or cold working set belongs back at the origin.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["edge", "wasm", "workers"],
@@ -2569,7 +2569,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-platform-gitops",
           title: "Platform Engineering, IDPs & GitOps",
           summary:
-            "An IDP is a product that gives teams self-service golden paths (scaffold, deploy, observe) and abstraction over raw Kubernetes; GitOps makes Git the declarative source of truth with an Argo CD/Flux reconciler for audit, rollback, and self-healing; guardrails as code (OPA/Kyverno) and supply-chain controls (SBOM, cosign, SLSA) replace gatekeeping; the anti-pattern is a ticket-queue platform team.",
+            "What an internal developer platform must give teams before it becomes a ticket queue, and how a GitOps reconciler buys audit, rollback and self-healing.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["platform-engineering", "gitops", "idp"],
@@ -2618,7 +2618,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-iac-progressive-delivery",
           title: "IaC, Environments & Progressive Delivery",
           summary:
-            "IaC with remote-state locking and shared modules gives environment parity and kills drift; never make manual console changes; promote the same artifact dev to staging to prod; use canary with automated metric analysis and auto-rollback for a payments service, blue-green when versions cannot coexist; feature flags decouple deploy from release; and use expand/contract so a migration never breaks the version still running during a canary.",
+            "How Terraform state and shared modules kill drift, and why a canary with auto-rollback still breaks if the same deploy carries a destructive migration.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["iac", "progressive-delivery", "terraform"],
@@ -2667,7 +2667,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-cloud-finops",
           title: "Cloud Cost & FinOps",
           summary:
-            "Run FinOps as Inform (tag/allocate) -> Optimize (rightsize to P90/P95, spot for fault-tolerant work, commitments for baseline, scale-to-zero) -> Operate (budgets, anomaly detection); fix opaque Kubernetes cost with OpenCost/Kubecost plus consistent labels and rightsized requests; and do not ignore egress/inter-AZ transfer, storage tiering, warehouse scans, and GPU spend.",
+            "Why the cloud bill cannot tell you what one service costs on Kubernetes, and which levers cut waste without trading away the reliability your SLO promised.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["finops", "cost", "kubernetes"],
@@ -2724,7 +2724,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-oltp-vs-olap",
           title: "OLTP vs OLAP Fundamentals",
           summary:
-            "OLTP is row-store, normalized, small high-concurrency transactions (Postgres/DynamoDB); OLAP is column-store, denormalized star schema, huge scans with compression and vectorized execution (Snowflake/BigQuery/ClickHouse); never analyze on the OLTP primary because scans destroy transactional latency; move data via ETL, ELT, or CDC trading freshness for simplicity.",
+            "Why a read replica is not an analytics store: row layout versus column layout, and what changes when you point a dashboard at a transactional database.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["oltp", "olap", "columnar"],
@@ -2771,7 +2771,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-warehouse-lake-lakehouse",
           title: "Warehouse vs Lake vs Lakehouse",
           summary:
-            "Warehouse is schema-on-write, curated, strong BI/governance, pricey for raw data; lake is schema-on-read, cheap object storage, risks becoming a swamp; lakehouse gets lake economics plus warehouse features via open table formats and a catalog; use the medallion (bronze/silver/gold) pattern for governed refinement; separating storage and compute lets you scale independently and run many engines on one copy.",
+            "Warehouse, lake or lakehouse: what Parquet on S3 still does not buy you, and why ACID and time travel come from the table format rather than the files.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["lakehouse", "warehouse", "data-lake"],
@@ -2818,7 +2818,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-table-formats-cdc",
           title: "Open Table Formats & CDC",
           summary:
-            "Table formats (Iceberg/Delta/Hudi/Paimon) add ACID, schema/partition evolution, time travel, and hidden partitioning over Parquet, coordinated by a catalog; pick Iceberg for multi-engine, Hudi for upsert-heavy CDC; use log-based CDC (Debezium on the WAL/binlog) plus a transactional outbox to avoid the dual-write problem; delivery is at-least-once so make consumers idempotent for effective exactly-once.",
+            "Why the dual write between your database and Kafka can never be repaired by a retry, and how a transactional outbox plus log-based CDC removes the problem.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["iceberg", "cdc", "table-formats"],
@@ -2865,7 +2865,7 @@ export const systemDesignLevel9: DesignLevel = {
           id: "sd-l9-batch-streaming",
           title: "Batch vs Streaming: Lambda vs Kappa",
           summary:
-            "Batch is high-throughput/high-latency and simple, streaming is low-latency/continuous and correctness-hard; Lambda runs parallel batch and speed layers (accurate but two codebases that drift), Kappa runs one streaming path and replays the retained log to recompute; window by event-time with watermarks to handle late/out-of-order data trading latency for completeness; choose exactly-once where counts must be exact; and Flink-into-Iceberg collapses real-time and reporting into one pipeline.",
+            "Why Lambda architecture costs you two codebases that drift, and how Kappa plus log replay and streaming into lake tables gets both outputs from one pipeline.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["batch", "streaming", "lambda-kappa"],
