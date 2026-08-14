@@ -3738,18 +3738,82 @@ export const systemDesignLevel6: DesignLevel = {
           practice: {
             id: "sd-l6-partitioning-ordering-practice",
             prompt:
-              "Design the partitioning key for a Coinbase-style crypto matching engine feed where every order for a given trading pair (BTC-USD) must be sequenced in strict arrival order, but BTC-USD alone can be 100x the volume of a quiet pair like a new listing. Choose the key, set partition count, and handle the case where one pair's volume exceeds a single partition's ceiling.",
+              "Read the post-incident notes below and say what is happening. Account for how a debit can be rejected for insufficient funds 400ms after the credit that funds it, say which recorded facts rule the rival explanations out, and say why the rejections stopped at 14:31 with nothing deployed.",
             thinkAbout: [
-              "Why can you never salt the BTC-USD stream?",
-              "Where is the real bottleneck: the partition or the matcher?",
-              "How do you isolate the hot pairs from the long tail?",
+              "On a topic keyed by account_id, what has to change for one account's events to arrive on two partitions?",
+              "The EU fleet runs the same producer build. What does that let you eliminate?",
+              "Why does the incident end within a minute of p7's backlog draining?",
             ],
             modelAnswerOutline: [
-              "Assumptions: an order-event stream (new, cancel, fill) feeding a per-pair matching engine. The hard invariant is price-time priority: within a pair, orders must be processed in exact arrival order or the matching is wrong and the exchange is liable. Cross-pair order is irrelevant. BTC-USD dominates volume.",
-              "**Key by `trading_pair`:** every event for BTC-USD lands on one partition and is strictly ordered, exactly what price-time priority requires; a single matching-engine worker consumes it and maintains the order book. Quiet pairs share partitions and process in parallel. Because one strict serial stream per pair is a genuine business requirement, do NOT salt or compound the key for a pair: that would destroy the arrival ordering the matcher depends on.",
-              "**The throughput tension is architectural, not a Kafka trick:** BTC-USD may exceed a single partition's ceiling. You cannot spread it without losing order. Keep events small (order id, side, price, qty, timestamp) in a compact binary format so one partition goes far (high-hundreds of MB/s). Recognize the **matching engine is single-threaded per pair by design** (LMAX-style), so the partition is not the bottleneck, the matcher is, and both scale by pair, not within a pair.",
-              "**Isolate the hot pairs:** route the top handful (BTC-USD, ETH-USD) each to their own dedicated single-partition topic with dedicated brokers and consumers, so their volume never contends with the long tail; long-tail pairs share a multi-partition topic keyed by pair.",
-              "**Partition count:** the shared long-tail topic provisions generously (say 100) since resizing breaks key stability; each hot pair gets exactly one partition with vertical scaling and an in-memory order book. Common wrong turn: salting BTC-USD to gain throughput, which reorders events and corrupts price-time priority: unacceptable for a matching engine.",
+              "**What the notes actually say.** Every rejected debit was read from a partition other than the one holding its funding credit, on a topic keyed by `account_id`. Two records with the same key can only land on different partitions if the key-to-partition mapping changed between them, and exactly one recorded event changes it: the partition count going from 24 to 32 at 14:02.",
+              "**Mechanism.** The producer picks a partition as `hash(account_id) mod N` with murmur2. Raising N from 24 to 32 remaps most keys, so an account's pre-14:02 events stay where they were while its post-14:02 events go somewhere new. Kafka totally orders records inside a partition and promises nothing across partitions, so a credit still sitting in p7's backlog and a debit arriving on a freshly mapped partition are two independent sequences with no relative order at all. `ledger-apply` applied the debit against a balance that had not yet received its credit, and rejected it.",
+              "**Why it self-healed at 14:31.** Only accounts whose history straddled 14:02 were exposed, and the exposure lasts exactly as long as the old partition stays behind. The other 31 partitions held under 300ms of lag, so the window was governed by p7's backlog, which finished draining at 14:30. Once p7 was current, every account's events were again in one partition and the rejections stopped without anyone deploying anything.",
+              "**Ruling out the rivals.** The producer 3.7 upgrade is cleared by the EU fleet: same build since Tuesday, topic still at 24 partitions, zero rejections, so the client version varies while the symptom does not. The clock drift is cleared on mechanism, because Kafka neither routes nor orders by event timestamp, so a 300ms skew cannot move a record between partitions, and it covers only 6 of the 42 rejections anyway. A rebalance storm is cleared by the single 220ms cooperative rebalance, and the brokers by flat 33% CPU with no ISR shrink and zero produce errors.",
+              "**What a safe partition increase looks like.** Adding partitions to a keyed topic is a migration, not a config change: either stand up a new topic at the new count and cut producers over only after `ledger-apply` has drained the old one to zero, or quiesce producers for the affected keys until the old partitions are current. For the original hot-p7 problem the options are the lesson's own: isolate the heavy account onto its own topic and scale that consumer vertically, or move to a compound key where the ledger math genuinely tolerates sub-stream ordering. Common wrong turn: reading this as a consumer bug and sorting by timestamp inside the consumer, which cannot re-order records it has not been handed.",
+            ],
+            supplied: {
+              label: "Post-incident notes: ledger-apply rejections",
+              body: `
+**System.** \`ledger_events\` on Kafka, keyed by \`account_id\` with the default murmur2 partitioner.
+One consumer group, \`ledger-apply\`, applies credits and debits to per-account balances and rejects
+any debit that would take a balance below zero. Cross-account order does not matter.
+
+| Time | Event |
+| --- | --- |
+| 13:55 | Producer client upgraded from 3.4 to 3.7 across the US fleet. |
+| 14:02 | Partition count on \`ledger_events\` raised from 24 to 32, to relieve p7, which had run hot for a week. Cooperative rebalance completes in 220ms. |
+| 14:09 | First \`insufficient_funds\` rejection, on an account credited 400ms earlier. |
+| 14:09 to 14:31 | 41 more rejections, every one on an account credited and then debited within about a second. |
+| 14:31 | Rejections stop. Nothing was deployed, rolled back or restarted between 14:09 and 14:31. |
+
+**Collected afterwards**
+
+- For all 42 rejections, the funding credit was read from p7 and the debit was read from a different
+  partition.
+- Consumer lag: 31 of the 32 partitions stayed under 300ms all afternoon. p7 carried a backlog that
+  finished draining at 14:30.
+- The EU fleet has run producer 3.7 since Tuesday. Its \`ledger_events\` topic is still at 24
+  partitions and has logged zero rejections.
+- On 6 of the 42 rejected debits the event timestamp is earlier than its funding credit's timestamp.
+  Producer host clocks drift up to 300ms and NTP last synced at 09:00.
+- Broker CPU flat at 33%, no ISR shrink, no consumer ERROR lines, produce error rate 0.
+- Overnight reconciliation is clean: no money created or lost, and every rejected order was retried
+  by the client and succeeded.
+`.trim(),
+            },
+            rubric: [
+              {
+                name: "Locating the change",
+                weak: "Names the 13:55 producer upgrade or the clock drift as the trigger and never reaches the 14:02 partition-count change.",
+                adequate:
+                  "Points at the 24 to 32 partition change without saying why it moves an existing account's events to a new partition.",
+                strong:
+                  "Ties the 14:02 change to hash(account_id) mod N, so most keys remap and an account's history continues on a partition it never used before.",
+              },
+              {
+                name: "Ordering mechanism",
+                weak: "Treats Kafka as globally ordered and reads the out-of-order apply as a bug in ledger-apply's balance check.",
+                adequate:
+                  "States that order holds only inside a partition but does not connect that to the credit stranded in p7's backlog.",
+                strong:
+                  "Says the credit in p7 and the debit on the remapped partition are independent sequences with no relative order, so the debit applied first.",
+              },
+              {
+                name: "Ruling the rivals out",
+                weak: "Leaves the producer 3.7 upgrade or the 300ms clock drift standing as a live explanation.",
+                adequate:
+                  "Clears one rival, usually the upgrade via the EU fleet, and lets the timestamp evidence go unaddressed.",
+                strong:
+                  "Clears the upgrade with the EU fleet still at 24 partitions, and the drift on mechanism, since Kafka routes by key hash and never by timestamp.",
+              },
+              {
+                name: "Why the window closed at 14:31",
+                weak: "Gives no account of why the rejections stopped with nothing deployed, rolled back or restarted.",
+                adequate:
+                  "Links the end of the window to p7 draining but not to why draining restores per-account ordering.",
+                strong:
+                  "Says only straddling accounts were exposed, so when p7 drained at 14:30 every account sat on one partition again and the window closed.",
+              },
             ],
           },
         },
@@ -3786,19 +3850,79 @@ export const systemDesignLevel6: DesignLevel = {
           practice: {
             id: "sd-l6-consumer-groups-practice",
             prompt:
-              "Design the consumer tier for Uber's real-time driver-location pipeline consuming 1M events/sec, where you deploy new consumer code multiple times a day and each deploy currently causes a visible latency spike from rebalancing. Eliminate the deploy-time stall and explain how you keep processing exactly-once-effectively across the handoff.",
+              "Read the incident timeline below and say what is happening to the geo-index consumer group. Name what is capping its throughput, say which recorded signals rule out the explanations that do not fit, and give the levers that would actually move lag.",
             thinkAbout: [
-              "What makes a rolling deploy cause zero rebalances?",
-              "How does a reassigned pod rebuild local state without replaying the whole source?",
-              "What keeps a reprocessed location update from corrupting the geo-index?",
+              "How many pods in this group can own a partition at the same time?",
+              "If the RocksDB write path had regressed, what would the owning pods' CPU look like?",
+              "Once a group is sitting on its parallelism cap, which levers are left?",
             ],
             modelAnswerOutline: [
-              "Assumptions: a high-volume location topic feeding a stateful geo-index. Deploys happen many times a day via rolling restart, and today each restarted pod leaves and rejoins the group, causing an eager stop-the-world rebalance and a latency spike (stale driver positions).",
-              "**Root cause:** a rolling deploy churns group membership, and eager rebalancing stops the whole group on every churn. Three changes remove the stall.",
-              "**1. Static group membership:** assign each pod a stable `group.instance.id` (from the StatefulSet ordinal) and set session.timeout.ms comfortably above the pod restart time (say 5 minutes during deploys). Now a restarting pod gets its identical partitions back with NO rebalance, so a rolling deploy of 50 pods causes zero reassignments as long as each pod returns within the timeout.",
-              "**2. Adopt the KIP-848 consumer protocol** (Kafka 4.0) or at minimum the cooperative sticky assignor, so any rebalance from a genuine crash moves only the affected partitions incrementally. **3. Size partitions well above peak worker count** (e.g., 256) so the pool has parallelism headroom and each pod owns a small, stable slice.",
-              "**Correctness across handoff:** commit offsets after the geo-index update (at-least-once), and make the update idempotent by keying the index on `driver_id` with last-write-wins on event timestamp, so a reprocessed location update is a no-op or an in-order overwrite, not a corruption. Because state is local (RocksDB-backed), use a changelog topic so a reassigned pod rebuilds state from the changelog rather than replaying the whole source. Monitor consumer lag per partition as the SLA signal; a deploy should show a flat lag line.",
-              "Common wrong turn: bumping consumer count past 256 expecting more throughput, when the partition count is the real ceiling.",
+              "**What the timeline shows.** A produce-rate step at 08:47 from 780k/s to 1.1M/s that never comes back down, and a lag curve growing at a steady 45k messages per second straight through two scale-ups. Growth that does not bend when capacity is added means the added capacity is doing no work.",
+              "**The cap.** `driver_location` has 24 partitions and each partition is assigned to at most one consumer in the group, so `geo-index` has 24 working slots no matter how many pods run. The 10:00 sample states it outright: 24 pods pinned at 82 to 90% CPU and 24 pods at 1 to 3% with near-zero heap churn. The autoscaler was right to trigger on lag and useless past pod 24, and the 09:41 hand-scale to 48 added 8 more idle pods.",
+              "**Ruling out the write path.** RocksDB write p99 is 210ms against a 205ms baseline from the same hour last week, which is flat. And a handler blocked on writes would leave its pod idle on CPU, not pinned at 82 to 90%: the owners are burning CPU, not waiting on I/O. The handler is the cost, but it is not a regression.",
+              "**Ruling out rebalancing, brokers and skew.** Rebalances stopped at 09:12 while lag kept climbing at the same 45k/s for three more hours, so churn is not driving it. Broker CPU is flat at 31% with no ISR shrink and zero produce errors, so the brokers are not saturated. Per-partition lag is even at 190k to 210k, so there is no hot partition and no skewed `driver_id` distribution.",
+              "**Levers that remain.** First, per-message cost, because it is the only lever that does not touch topic layout: batch the RocksDB writes, move non-essential work off the hot path, shrink the position payload. Second, partition count, priced honestly: `hash(driver_id) mod N` remaps most keys, splits a driver's history across two partitions through the cut-over, and forces every pod to rebuild local state from its changelog. Deliberately not a lever: more pods. Common wrong turn: concluding lag is a misleading signal and moving the autoscaler onto CPU, when lag is correct and it is the partition count that ran out.",
+            ],
+            supplied: {
+              label: "Incident timeline: geo-index consumer lag",
+              body: `
+**Service.** \`geo-index\`, a stateful consumer group that writes driver positions into a
+RocksDB-backed geo index. Source topic \`driver_location\`: 24 partitions, keyed by \`driver_id\`,
+unchanged since launch. The pod autoscaler targets total consumer lag under 500k messages.
+
+| Time | Event |
+| --- | --- |
+| 08:47 | Marketing push goes out. Produce rate on \`driver_location\` rises from 780k/s to 1.1M/s and stays there. |
+| 08:53 | Total lag crosses 500k. The autoscaler starts adding pods. |
+| 09:12 | Pod count reaches its configured ceiling of 40. No scaling events after this. |
+| 09:20 | Total lag 2.1M, growing at roughly 45k messages per second. |
+| 09:41 | On-call raises the ceiling and hand-scales to 48 pods. Lag keeps growing at the same rate. |
+| 10:15 | Total lag 4.8M. Freshness SLO breached; the rider map shows driver positions up to 40s stale. |
+
+**Signals**
+
+- Pod CPU, sampled at 10:00 across all 48 pods: 24 pinned between 82 and 90%, the other 24 between
+  1 and 3% with near-zero heap churn.
+- Per-partition lag is even: every partition between 190k and 210k. No skew, no single hot partition.
+- Rebalances: 3 during the 08:53 to 09:12 scale-up, none after 09:12.
+- RocksDB write p99: 210ms, against a 205ms baseline measured the same hour last week.
+- Broker CPU flat at 31%, no ISR shrink, produce-side error rate 0.
+- Consumer logs are clean: no ERROR lines, no poll timeouts, no commit failures.
+`.trim(),
+            },
+            rubric: [
+              {
+                name: "Partition ceiling",
+                weak: "Reads the idle pods as an autoscaler or scheduler failure and never connects 24 partitions to 24 working pods.",
+                adequate:
+                  "Says the group is at its parallelism cap without tying that to the 24 pods at 1 to 3% CPU or to the hand-scale to 48.",
+                strong:
+                  "States that a partition goes to at most one consumer in the group, so 24 of the 48 pods can never own work and the 09:41 hand-scale was inert.",
+              },
+              {
+                name: "Ruling out the RocksDB path",
+                weak: "Takes the 210ms write p99 as the cause without comparing it to the 205ms baseline from the same hour last week.",
+                adequate:
+                  "Notes the write p99 is at baseline but does not use the 82 to 90% CPU on the owning pods as corroboration.",
+                strong:
+                  "Clears RocksDB twice over: 210ms against a 205ms baseline is flat, and pods blocked on writes would sit idle rather than pin near 90% CPU.",
+              },
+              {
+                name: "Rebalance and broker hypotheses",
+                weak: "Attributes the lag to rebalance churn or broker saturation with no reference to the signals that contradict it.",
+                adequate:
+                  "Discards one of the two, usually rebalancing, and leaves the broker side of the picture unaddressed.",
+                strong:
+                  "Uses zero rebalances after 09:12 against three more hours of 45k/s growth, plus flat 31% broker CPU and zero produce errors, to drop both.",
+              },
+              {
+                name: "Levers that remain",
+                weak: "Ends on more pods, a higher autoscaler ceiling, or moving the autoscaler off lag and onto CPU.",
+                adequate:
+                  "Names per-message cost or partition count but not both, and never prices what more partitions cost a keyed, stateful group.",
+                strong:
+                  "Names handler cost and partition count as the only levers left, and flags that more partitions remap hash(driver_id) and force a state rebuild.",
+              },
             ],
           },
         },

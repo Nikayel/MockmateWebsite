@@ -3468,19 +3468,86 @@ export const systemDesignLevel4: DesignLevel = {
           practice: {
             id: "sd-l4-lb-algorithms-practice",
             prompt:
-              "Design the balancing and affinity strategy for Discord-style stateful gateway nodes where each node holds thousands of live connections plus per-guild in-memory fan-out state, request/message durations are highly variable, and a redeploy reshuffles the fleet several times a day.",
+              "Review the proposed gateway design below and rank its balancing and affinity decisions by how much damage each one does in production. For each decision you would change, say what the fleet actually experiences and what rule you would put in its place, and name the decisions you would keep untouched.",
             thinkAbout: [
-              "What does hash % N do to guild state on every deploy, and what fixes it?",
-              "How do you stop a viral guild from overloading its assigned node?",
-              "Which state must be rebuildable rather than durable for this to work?",
+              "The fleet ships four times a weekday and rotates all 300 nodes. What does an ownership rule keyed on liveNodeCount do each time?",
+              "Message handling is 0.4ms at p50 and 900ms at p99. What does a rotation-based admission rule do with a spread that wide?",
+              "One guild goes viral overnight. What in this design limits how much of it lands on a single node?",
+              "Which decision here is already right, and what does it let the fleet survive?",
             ],
             modelAnswerOutline: [
-              "Assumptions: a gateway fleet where each node holds many long-lived connections and per-guild fan-out state in memory; message-handling cost varies widely (a quiet DM vs a 100k-member guild broadcast); deploys rotate the fleet multiple times daily.",
-              "**Two interacting problems: balancing variable work, and keeping guild state coherent across a churning fleet.** For spreading connections and per-message work: least-connections / least-outstanding-requests so a node stuck fanning out to a huge guild stops receiving new connections. Because the fleet is large, implement it as power-of-two-choices: O(1), no global load table, no herd.",
-              "**Guild stickiness under churn:** naive `hash(guild) % N` is unusable because changing N (every deploy) remaps almost every guild and cold-flushes all state. Use consistent hashing (or rendezvous hashing) on guild ID, so a guild deterministically maps to a node and its warm fan-out state, and a deploy migrates only ~1/N of guilds.",
-              "**The viral-guild escape valve:** pair with bounded-load consistent hashing so a hot guild does not overload its assigned node: past a load threshold, overflow spills to the next node in the ring.",
-              "**Deploy handling:** affinity loses in-memory state on node death, so drain connections gracefully, let clients reconnect, and treat per-guild fan-out state as rebuildable (reload from the authoritative store on reconnect) rather than durable.",
-              "Common wrong turn: `hash % N` stickiness, which turns every deploy into a fleet-wide cache stampede as nearly every guild remaps at once; consistent hashing bounds that churn to a small fraction.",
+              "Order the review by blast radius: guild ownership by hash(guildId) % liveNodeCount first, then weighted round robin for connection admission, then the missing overflow path for a hot guild. The state model is sound and stays.",
+              "**Ownership keyed on liveNodeCount remaps almost every guild whenever the node count moves.** The fleet ships 4 times a weekday and rotates all 300 nodes, so the modulus changes repeatedly during each rollout and the guild-to-node mapping is effectively re-randomised. Every new owner takes a guild whose member list it does not hold and rebuilds it from the primary datastore, so each deploy becomes a fleet-wide cold-read stampede against that store. Consistent hashing or rendezvous hashing on guildId holds the movement to roughly 1/N of guilds per node change, which is the difference between a migration and a reshuffle.",
+              "**Weighted round robin is blind to in-flight load, and this workload runs 0.4ms at p50 against 900ms at p99.** Rotation hands a node its next connection on its turn no matter how buried it is, so the node that just took a 100k-member guild broadcast keeps collecting new sockets. Least-outstanding-requests routes around it because its in-flight count is high; at 300 nodes with many balancer instances, run it as power-of-two-choices (pick two backends at random, send to the lighter) for O(1) cost with no global load table and no herd onto whichever node last looked idle. Worth noting that the weights are inert anyway: the design says instance sizes are uniform today.",
+              "**Nothing caps one guild's share of its owner.** A single hash pins a viral guild to one node permanently, and fan-out for it is one owner-node loop, so that node saturates while the other 299 sit idle. Bounded-load consistent hashing puts a per-node cap on the ring and spills overflow to the next node; splitting fan-out for the largest guilds across a small replica set is the heavier alternative when one node cannot hold the member list at all.",
+              "**Keep the state model.** Nothing in gateway memory is authoritative: membership, roles and channel config live in the primary datastore and the in-memory copy is a rebuildable read cache. That is what makes affinity here sound engineering rather than a smell, because pinning buys a cache-hit win and a node death costs a rebuild rather than data. Keep the 30-second drain with an explicit reconnect frame too; it is the reason a rollout is a reconnect blip instead of an outage.",
+            ],
+            supplied: {
+              label: "Proposed design: gateway balancing",
+              body: `
+**Service.** The gateway tier for a chat product. Each node terminates roughly 40,000 live WebSocket
+connections and holds per-guild fan-out state in memory: member list, presence, and the channel
+subscription map for every guild it owns. The fleet is 300 nodes and ships 4 times on a normal
+weekday, rotating every node.
+
+**Connection admission.** New WebSocket connections are spread across the fleet by weighted round
+robin, weighted by instance size. Instance sizes are uniform today, so every node takes an equal
+share of new connections.
+
+**Guild ownership.** Each guild is owned by exactly one node, selected as
+hash(guildId) % liveNodeCount. Every gateway node computes the same function over the same
+membership list, so a node that receives a message for a guild it does not own forwards it to the
+owner over the internal mesh. Ownership therefore needs no coordination service and no lookup table.
+
+**Fan-out.** The owner node holds the guild's member list in memory and pushes each message to the
+subscribed sockets it holds locally, forwarding to peer nodes for members connected elsewhere. A
+100k-member guild broadcast is a single loop on the owner; a two-person DM is a couple of writes.
+
+**State durability.** Nothing in gateway memory is authoritative. Guild membership, roles and channel
+config live in the primary datastore; the in-memory copy is a read cache that a node rebuilds on the
+first message for a guild it has just taken over.
+
+**Deploys.** Nodes are replaced in batches of 20. A node stops accepting new connections, sends a
+reconnect frame to its sockets, waits 30 seconds for them to migrate, then exits. Clients reconnect
+with jitter and are placed on a healthy node.
+
+**Measured on a normal Tuesday.** Message handling is 0.4ms at p50 and 900ms at p99, with the tail
+driven by the largest guilds.
+`.trim(),
+            },
+            rubric: [
+              {
+                name: "Deploy churn under hash mod N",
+                weak: "Reads guild ownership as fine, or calls it fragile without tying the churn to liveNodeCount changing during a rollout.",
+                adequate:
+                  "Names the modulus as the churn source but does not follow through to what every new owner then does to the primary datastore.",
+                strong:
+                  "Connects the four daily rollouts to a near-total guild remap, names the cold-read stampede on the primary datastore, and bounds movement to about 1/N with consistent or rendezvous hashing.",
+              },
+              {
+                name: "Algorithm choice against duration spread",
+                weak: "Leaves weighted round robin unchallenged, or objects to it without reference to the 0.4ms to 900ms spread.",
+                adequate:
+                  "Argues from the latency spread to a load-aware rule and stops at exact least-connections for a 300-node fleet.",
+                strong:
+                  "Rejects rotation on the strength of the p99, picks least-outstanding-requests, and drops to power-of-two-choices at 300 nodes to avoid an O(N) scan and the herd.",
+              },
+              {
+                name: "Hot-guild containment",
+                weak: "Never asks what happens when one guild's fan-out outgrows the single node that owns it.",
+                adequate:
+                  "Spots the viral-guild hotspot and settles for 'add capacity' or 'shard it somehow' without a mechanism.",
+                strong:
+                  "Reaches for bounded-load consistent hashing or an explicit fan-out split for the largest guilds, and prices what the overflow path costs in cache locality.",
+              },
+              {
+                name: "Reading the sound parts",
+                weak: "Rejects the design wholesale, rebuildable in-memory cache and 30-second drain included.",
+                adequate:
+                  "Leaves the state model unmentioned, so the review never separates a sound decision from a broken one.",
+                strong:
+                  "Keeps the non-authoritative in-memory cache and the drain-plus-reconnect-frame sequence, and says why affinity over rebuildable state is sound rather than a smell.",
+              },
             ],
           },
         },
@@ -3925,19 +3992,90 @@ export const systemDesignLevel4: DesignLevel = {
           practice: {
             id: "sd-l4-autoscaling-practice",
             prompt:
-              "Design autoscaling for a video transcoding pipeline like Mux or Cloudflare Stream where users upload files in bursty, unpredictable waves, each job takes 30 to 300 seconds of heavy CPU, and cost matters because transcoding is expensive. Lead with what signal you scale on.",
+              "Review the autoscaling configuration below and walk through what the transcode fleet does when a 500-upload wave lands after an idle hour. Rank the changes you would make by what each one costs today, name the signal you would scale on, and say which decisions you would keep.",
             thinkAbout: [
-              "Why does CPU tell you nothing about pending transcode work?",
-              "What must scale-down respect when jobs run for minutes?",
-              "Where do spot instances fit for retryable work?",
+              "A worker mid-transcode pins a core for the whole job. What does the 70% CPU target read while 500 jobs sit in the queue?",
+              "Jobs run up to 300 seconds and the pod termination grace period is 30. What does a scale-down event do to work in flight?",
+              "The live path has a 5-second startup budget. Which part of this configuration is aimed at meeting it?",
+              "Which decisions here are already right for a workload where a lost job can simply be re-driven?",
             ],
             modelAnswerOutline: [
-              "Assumptions: uploads land in S3, an event enqueues a transcode job onto SQS (or Kafka), a worker fleet pulls jobs. Load is spiky and unpredictable, jobs are long and CPU-bound, idle transcode instances are costly.",
-              "**Scale on queue depth / consumer lag, not CPU, using KEDA** with the SQS or Kafka scaler. The textbook event-driven case: the moment jobs pile up, KEDA adds workers, and when the backlog drains it scales the fleet to zero: critical for cost. CPU-based scaling is wrong twice over: a worker mid-transcode is already at 100% CPU (so CPU says nothing about pending work), and it would keep expensive nodes alive with an empty queue.",
-              "**Graceful scale-down for long jobs:** KEDA/HPA must not kill a pod mid-job. Long termination grace periods plus a drain that lets in-flight transcodes finish (or checkpoint), and an SQS visibility timeout above the max job time so a job is not redelivered while still processing.",
-              "**Cold-start lag:** a warm pool of pre-provisioned nodes (or Karpenter with a small standing buffer) so the first burst of uploads does not wait 2 minutes for VMs. Scale the target ratio by desired backlog: one worker per ~5 queued jobs, so a 500-job wave provisions ~100 workers.",
-              "**Cost mix:** baseline on spot instances (transcoding is retryable and interruption-tolerant: a lost spot node just re-queues its job), with a small on-demand floor for latency-sensitive live jobs. The tradeoff: scale-to-zero adds cold-start latency on the first job after idle, acceptable for async transcoding.",
-              "Common wrong turn: autoscaling on CPU and paying for idle transcode nodes between upload waves.",
+              "Rank by what each costs today: the scaling signal, then the termination grace period, then the live path sharing the batch deployment. The spot choice and the 600-second visibility timeout are right and stay.",
+              "**A 70% CPU target cannot see the wave.** A worker mid-transcode pins a core for the full 30 to 300 seconds, so average fleet CPU reads near 100% with two pods busy and 500 jobs waiting, and near zero with the same two pods idle and an empty queue. CPU tracks how hard the current jobs are, not how much work is pending, so the HPA only moves after the first jobs finish. Scale on SQS queue depth with KEDA: the backlog moves the instant arrivals outrun the drain, and it is the only signal that lets this fleet scale to zero between waves, which is the cost line the design says it cares about. Set a backlog-per-worker target, say one worker per 5 queued jobs, so a 500-job wave asks for about 100 workers in a single decision.",
+              "**A 30-second grace period under jobs that run 300 seconds means scale-down destroys work in flight.** A pod picked for removal gets 30 seconds and then SIGKILL, so a transcode four minutes in is abandoned. SQS does redeliver it, but only once the 600-second visibility timeout expires, so that upload's end-to-end latency becomes its own runtime plus ten minutes and its CPU is paid for twice. Raise the grace period above the longest job and drain by refusing new pulls, or checkpoint long transcodes into segments so a kill costs one segment rather than the whole job.",
+              "**The live path does not belong on this deployment.** Live transcoding with a 5-second startup budget shares a queue with batch jobs that run for minutes, so it waits behind them, and it shares a spot fleet where a reclaim is unrecoverable because re-driving a live stream is meaningless. Give it its own queue and an on-demand pool with a standing floor: a 90-second Karpenter node plus the usual 2 to 5 minute reactive pipeline cannot serve a 5-second budget under any signal. Batch keeps spot.",
+              "**Changing the signal does not remove the lag.** Even on queue depth, a fresh Karpenter node still takes about 90 seconds to join and pull the transcoder image, so the front of a wave waits. A warm pool of pre-booted nodes or a small standing buffer covers that first minute. For batch transcoding a 90-second wait may simply be acceptable, and saying so explicitly is stronger than implying KEDA made the lag disappear.",
+              "**Keep:** spot for batch, since a lost job returns to SQS and the 600-second visibility timeout already sits above the 300-second maximum job, and Karpenter for node supply. Both are correct for a retryable, interruption-tolerant workload.",
+            ],
+            supplied: {
+              label: "Proposed autoscaling config: transcode",
+              body: `
+**Workload.** Uploads land in S3 and an event enqueues one transcode job per upload onto SQS. A
+worker fleet on Kubernetes pulls jobs. Each job runs 30 to 300 seconds and pins a core for its whole
+duration. Waves are bursty and unpredictable: a quiet hour, then 500 uploads in two minutes.
+
+**Scaling policy.** An HPA on the worker deployment targets 70% average CPU across the fleet, metrics
+scraped every 30 seconds, with a 5-minute stabilization window on scale-down. Min replicas 2, max
+replicas 400.
+
+**Nodes.** Karpenter provisions compute-optimized nodes when pods go unschedulable. A fresh node
+takes about 90 seconds to join the cluster and pull the transcoder image.
+
+**Cost.** The worker fleet runs entirely on spot instances. The reasoning: a transcode job is pure
+recompute, so an interrupted job is re-driven at no cost beyond the CPU. SQS redelivers any message
+whose visibility timeout lapses, and the visibility timeout is set to 600 seconds, above the longest
+job we have measured.
+
+**Scale-down.** When average CPU falls below target the HPA removes pods. The deployment sets
+terminationGracePeriodSeconds to 30, matching the platform default for the other services in this
+cluster.
+
+**Live jobs.** Roughly 3% of traffic is live-stream transcoding with a 5-second startup budget. It
+runs on the same deployment, off the same queue, so there is one fleet to operate and one set of
+dashboards.
+`.trim(),
+            },
+            rubric: [
+              {
+                name: "Scaling signal",
+                weak: "Accepts CPU as the trigger, or swaps in queue depth without saying what CPU reads on a core-pinned worker.",
+                adequate:
+                  "Names queue depth as the right signal but connects it to neither scale-to-zero nor a backlog-per-worker target.",
+                strong:
+                  "Shows that a core-pinned worker reads the same at 0 and 500 queued jobs, moves to SQS depth via KEDA, and sets a backlog-per-worker ratio the wave can be sized against.",
+              },
+              {
+                name: "Scale-down against long jobs",
+                weak: "Does not register that a 30-second grace period sits under a job that can run 300 seconds.",
+                adequate:
+                  "Flags the grace period but does not trace what redelivery then costs in end-to-end latency and repeated CPU.",
+                strong:
+                  "Puts the grace period above the longest job or checkpoints into segments, and prices the alternative as the job's runtime plus the 600-second visibility timeout.",
+              },
+              {
+                name: "Live path isolation",
+                weak: "Treats live and batch as one workload, so the 5-second startup budget is never tested against the configuration.",
+                adequate:
+                  "Separates live from batch without saying why spot reclaims and 90-second node provisioning are the specific obstacles.",
+                strong:
+                  "Splits live onto its own queue and an on-demand floor, arguing from the 5-second budget against 90-second Karpenter nodes and unrecoverable spot reclaims.",
+              },
+              {
+                name: "Residual scaling lag",
+                weak: "Presents the signal change as if it removed the wait for capacity entirely.",
+                adequate:
+                  "Acknowledges node boot time and stops there, with no warm pool, no headroom, and no statement that the wait is acceptable.",
+                strong:
+                  "Keeps the 90-second node provision in view after the signal change and either buys a warm pool and headroom or states plainly that batch transcoding can absorb it.",
+              },
+              {
+                name: "What survives review",
+                weak: "Rejects the configuration wholesale, spot instances and Karpenter included.",
+                adequate:
+                  "Keeps spot without stating what makes this particular workload safe to interrupt.",
+                strong:
+                  "Keeps spot and Karpenter for batch and justifies it from re-drive: an interrupted job returns to SQS and the 600-second timeout already covers the 300-second maximum.",
+              },
             ],
           },
         },
