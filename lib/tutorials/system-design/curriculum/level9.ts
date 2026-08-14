@@ -2667,6 +2667,35 @@ The cloud bill shows you *nodes* (EC2 instances), but you run *many apps per nod
 
 **Data-transfer/egress** charges are easy to ignore and brutal at scale: inter-AZ traffic (keep chatty services zone-aligned), cross-region replication, and internet egress (a CDN both speeds delivery and cuts origin egress). **Storage tiering**: move cold objects from hot storage to infrequent-access/archive tiers (S3 Intelligent-Tiering/Glacier). **Warehouse query cost**: a single unpartitioned full-table scan in BigQuery/Snowflake can cost more than a server; partition, cluster, and cache. And the current top concern is **AI/GPU spend**: GPUs are expensive and often idle between jobs, so batch and bin-pack inference, use spot for training with checkpointing, and right-size the model to the task.
 
+## Put unit prices on the levers
+
+Every sentence above is a direction. What turns a direction into a plan is the unit price, because the same dollar figure on the invoice points at opposite fixes depending on which rate produced it. These are approximate US-region list prices, good to an order of magnitude and no further; they drift year to year and the ratios between them are the durable part.
+
+\`\`\`
+compute, one vCPU-hour on demand        ~0.045 dollars   (~33 dollars a vCPU-month)
+one high-end GPU-hour                   ~2 to 10 dollars, by provider and commitment
+transfer between AZs                    ~0.01 dollars per GB each way  = ~20 dollars per TB round trip
+egress to the internet                  ~0.09 dollars per GB           = ~90 dollars per TB
+warehouse scan, on-demand pricing       ~6 dollars per TB scanned
+object storage, standard                ~23 dollars per TB-month
+object storage, deep archive            ~1 dollar per TB-month
+
+a 40,000 dollar a month transfer line is either
+  inter-AZ chatter    40,000 / 20  =  ~2,000 TB a month between your own services
+  internet egress     40,000 / 90  =    ~450 TB a month out to users (~1.4 Gbps average)
+
+a dashboard scanning one 20 TB unpartitioned table, refreshed hourly
+  20 x 6 = ~120 dollars a query, x 24 x 30   =  ~86,000 dollars a month
+  partitioned by day, the query touches ~1 day of it
+  0.2 x 6 x 24 x 30                          =     ~900 dollars a month
+\`\`\`
+
+**The unit price tells you which problem you have.** 2,000 TB of internal chatter is a topology problem: co-locate the chatty pair in one AZ, cache at the caller, or stop the fan-out. 450 TB going out to users is a delivery problem, and a CDN fixes it by never letting most of those bytes leave your origin. Same line on the invoice, opposite fix, and only the rate distinguishes them.
+
+**"Costs more than a server" is literal, not rhetorical.** At roughly 33 dollars a vCPU-month, that one unpartitioned dashboard is spending what about 2,600 vCPUs would cost, and partitioning takes it down roughly a hundredfold. It is also the cheapest fix on this page to execute, because it is a schema decision rather than a purchasing negotiation.
+
+**Idle is priced by what is idle.** A vCPU-hour and a high-end GPU-hour differ by roughly two orders of magnitude, so an hour of idle GPU costs what a small fleet of idle CPU costs all month. That is why the first question on an AI bill is utilization while the first question on a web bill is rightsizing: the same 35 percent utilization is a rounding error on one and the whole invoice on the other.
+
 **Interview nuance:** never cut cost by cutting reliability blindly. Deleting a standby replica or a multi-AZ setup saves money until the outage costs 10x the savings. Frame every cut as "reduce waste (idle, over-provisioned, untiered) while preserving the reliability the SLO requires."
 
 **Recap:** run FinOps as Inform (tag/allocate) -> Optimize (rightsize to P90/P95, spot for fault-tolerant work, commitments for baseline, scale-to-zero) -> Operate (budgets, anomaly detection); fix opaque Kubernetes cost with OpenCost/Kubecost plus consistent labels and rightsized requests; and do not ignore egress/inter-AZ transfer, storage tiering, warehouse scans, and GPU spend.
