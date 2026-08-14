@@ -1867,7 +1867,7 @@ You want every insert/update/delete in Postgres to flow to analytics and a searc
 
 ## The dual-write problem and the outbox
 
-The trap: your service writes to Postgres and then also writes to Kafka (or directly to the search index). These are two systems with no shared transaction, so a crash between them leaves you inconsistent forever: the order is in the DB but the event never published, or published but the DB rolled back. You cannot fix this with retries because you do not know which write succeeded.
+The trap: your service writes to Postgres and then also writes to Kafka (or directly to the search index). These are two systems with no shared transaction, so a crash between them leaves you inconsistent forever: the order is in the DB but the event never published, or published but the DB rolled back.
 
 \`\`\`cswidget
 {
@@ -1877,12 +1877,12 @@ The trap: your service writes to Postgres and then also writes to Kafka (or dire
   "options": [
     {
       "label": "Yes: republish the event on startup, since the order is sitting in the database",
-      "feedback": "You would have to know that this particular order never got its event. The crash took that knowledge with it, and republishing everything duplicates instead."
+      "feedback": "You would have to know that this particular order never got its event. The crash took that knowledge with it, and republishing every order in the table duplicates instead of repairing."
     },
     {
-      "label": "No: there is no shared transaction, so you cannot tell which of the two writes landed",
+      "label": "No: you cannot tell which of the two writes landed",
       "correct": true,
-      "feedback": "Right, that is the dual-write problem. Two systems, no atomicity, and no reliable record of how far you got, so the fix has to make the two writes one commit."
+      "feedback": "Right, and that is the dual-write problem. With no shared transaction there is no record of how far you got, so republishing risks a duplicate and doing nothing risks a permanently missing event. The only way out is to stop having two writes."
     },
     {
       "label": "No, but a two-phase commit across Postgres and Kafka would solve it cleanly",
@@ -1892,7 +1892,7 @@ The trap: your service writes to Postgres and then also writes to Kafka (or dire
 }
 \`\`\`
 
-The fix is the **transactional outbox**: within the same DB transaction that writes the order, insert a row into an \`outbox\` table. The business write and the event are now atomic (one transaction). CDC then tails the WAL, sees the outbox insert, and publishes it to Kafka. There is exactly one source of truth (the DB log) and no distributed transaction.
+You cannot fix this with retries because you do not know which write succeeded. The fix is the **transactional outbox**: within the same DB transaction that writes the order, insert a row into an \`outbox\` table. The business write and the event are now atomic (one transaction). CDC then tails the WAL, sees the outbox insert, and publishes it to Kafka. There is exactly one source of truth (the DB log) and no distributed transaction.
 
 \`\`\`
   service --tx--> [orders row + outbox row]  (one Postgres commit)
@@ -1949,7 +1949,7 @@ A throughput-versus-latency tradeoff. **Batch** processes a bounded chunk (yeste
 
 ## Lambda architecture
 
-The first mainstream answer to "I need both fast and correct." It runs **two parallel layers**: a **batch layer** that reprocesses all history nightly to produce accurate, complete results, and a **speed layer** that processes the live stream for low-latency approximate results, with a serving layer merging the two so recent data comes from the speed layer and older data from the batch layer. It works and is self-correcting (the batch layer eventually overwrites any speed-layer approximation). The cost is brutal: you implement the **same business logic twice**, once in a batch engine and once in a streaming engine, in different code, and they drift. Every metric change is two implementations to keep in sync.
+The first mainstream answer to "I need both fast and correct." It runs **two parallel layers**: a **batch layer** that reprocesses all history nightly to produce accurate, complete results, and a **speed layer** that processes the live stream for low-latency approximate results, with a serving layer merging the two so recent data comes from the speed layer and older data from the batch layer. It works and is self-correcting: the batch layer eventually overwrites any speed-layer approximation, so a wrong number is temporary rather than permanent.
 
 \`\`\`cswidget
 {
@@ -1958,9 +1958,9 @@ The first mainstream answer to "I need both fast and correct." It runs **two par
   "prompt": "Lambda architecture genuinely delivers both fast and accurate results. Which cost accumulates on you over the years?",
   "options": [
     {
-      "label": "The same business logic is implemented twice, in two engines, and the two copies drift apart",
+      "label": "The same logic is written twice, in two engines",
       "correct": true,
-      "feedback": "Right. Every change to a metric definition is two changes in two codebases, and on the day the two numbers disagree nobody can say which one is correct."
+      "feedback": "Right. Every change to a metric definition is two changes in two codebases written against different engines, so they drift, and on the day the two numbers disagree nobody can say which one is correct."
     },
     {
       "label": "The speed layer's approximate results stay permanently wrong",
@@ -1977,6 +1977,8 @@ The first mainstream answer to "I need both fast and correct." It runs **two par
   ]
 }
 \`\`\`
+
+The cost is brutal: you implement the **same business logic twice**, once in a batch engine and once in a streaming engine, in different code, and they drift. Every metric change is two implementations to keep in sync.
 
 ## Kappa architecture
 
@@ -2024,10 +2026,6 @@ The reaction: delete the batch layer. There is **one streaming path**, and the d
 
 **Delivery semantics.** **At-least-once** can double-count; **exactly-once** requires the engine to coordinate checkpoints with idempotent/transactional sinks. Flink provides exactly-once via distributed checkpointing (Chandy-Lamport) plus two-phase-commit sinks. For a fraud counter or a financial total this matters; for a rough traffic dashboard at-least-once is fine.
 
-## Streaming-into-lakehouse collapses the two paths
-
-The modern move that makes Kappa practical for reporting too: **Flink writes the stream directly into Iceberg** tables (exactly-once). Now the live stream powers the real-time signal, and the same Iceberg tables it lands in are queried by batch SQL (Trino, Spark) for nightly reports. One pipeline feeds both the real-time consumer and the reporting consumer, so you no longer maintain a separate batch path at all.
-
 \`\`\`cswidget
 {
   "type": "check",
@@ -2039,9 +2037,9 @@ The modern move that makes Kappa practical for reporting too: **Flink writes the
       "feedback": "They are different consumers, which is not the same as different pipelines. Assuming they must be separate is how teams end up in Lambda by default."
     },
     {
-      "label": "No: one streaming job can write into lake tables that batch SQL then queries for the report",
+      "label": "No: the stream job can land its output in a table the report queries",
       "correct": true,
-      "feedback": "Right. Flink writing exactly-once into Iceberg gives the live consumer its signal and leaves the reporting consumer an ordinary table to query, from one codebase."
+      "feedback": "Right. A streaming engine that writes exactly-once into an open table format gives the live consumer its signal and leaves the reporting consumer an ordinary table to query, out of one codebase."
     },
     {
       "label": "No: run the nightly report by replaying the entire log through the stream job each night",
@@ -2050,6 +2048,10 @@ The modern move that makes Kappa practical for reporting too: **Flink writes the
   ]
 }
 \`\`\`
+
+## Streaming-into-lakehouse collapses the two paths
+
+The modern move that makes Kappa practical for reporting too: **Flink writes the stream directly into Iceberg** tables (exactly-once). Now the live stream powers the real-time signal, and the same Iceberg tables it lands in are queried by batch SQL (Trino, Spark) for nightly reports. One pipeline feeds both the real-time consumer and the reporting consumer, so you no longer maintain a separate batch path at all.
 
 **Interview nuance:** do not reflexively say "Lambda" because you need both real-time and batch outputs. State the condition: Lambda is justified only when the batch engine can express something the stream cannot, or when you need a periodic full-reprocessing guarantee the stream cannot give cheaply. Otherwise Kappa plus log replay plus streaming-into-lakehouse gives you both outputs from one codebase, and that is the stronger default answer.
 
