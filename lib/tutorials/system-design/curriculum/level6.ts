@@ -1856,9 +1856,9 @@ Aggregations are stateful (a per-user counter lives somewhere). Flink keeps this
   "prompt": "A Flink job crashes, restores its last checkpoint, rewinds Kafka to the checkpointed offsets, and reprocesses. Why do the per-user counters not double-count?",
   "options": [
     {
-      "label": "The checkpoint snapshots operator state and source offsets together, so replayed events apply to a state that has not seen them yet",
+      "label": "State and source offsets rewind as one snapshot",
       "correct": true,
-      "feedback": "Right: state and offsets rewind as one consistent snapshot, which is what exactly-once state semantics means despite reprocessing."
+      "feedback": "Right. The checkpoint captures operator state and the Kafka offsets at the same consistent instant, so after a restore the replayed events land on a state that genuinely has not seen them yet. That is what exactly-once state semantics means: each event affects state once, even though it is reprocessed."
     },
     {
       "label": "Kafka deduplicates redelivered records before the job sees them",
@@ -1885,9 +1885,9 @@ Aggregations are stateful (a per-user counter lives somewhere). Flink keeps this
   "prompt": "Your 5-minute event-time windows fire with a tight 5-second lateness bound and zero allowed lateness. Backend-service metrics are perfect, but counts for mobile users on the subway run consistently low. What is happening?",
   "options": [
     {
-      "label": "The phones flush buffered events after the watermark already fired their window, and the stragglers are silently dropped",
+      "label": "Subway phones flush after their window already fired",
       "correct": true,
-      "feedback": "Right: event-time skew from offline clients meets a tight watermark bound; loosen the bound, keep allowed lateness for corrected results, or route late events to a side output."
+      "feedback": "Right. Event-time skew from offline clients runs straight into a 5-second watermark bound, so those stragglers arrive past the fire and zero allowed lateness drops them without a trace. Loosen the bound, keep allowed lateness so the window can emit a correction, or route late events to a side output."
     },
     {
       "label": "Event time is the wrong clock for mobile traffic, so the windows misfile the burst",
