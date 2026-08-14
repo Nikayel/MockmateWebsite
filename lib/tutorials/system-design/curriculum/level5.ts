@@ -2299,16 +2299,8 @@ decide. If the coordinator crashes *after* participants voted yes but *before* b
 decision, every participant is stuck: it cannot commit (maybe someone voted no) and cannot abort
 (maybe everyone voted yes and the coordinator already told others to commit). They hold their locks
 and wait. This is the classic in-doubt window, and it lasts as long as the coordinator is down.
-
-\`\`\`
-Coordinator          P1            P2
-   |---- prepare ---->|             |
-   |---- prepare ------------------>|
-   |<---- yes --------|             |
-   |<---- yes ----------------------|
-   X (crash here)                       <- P1, P2 now BLOCKED holding locks
-   |                 (wait...)     (wait...)
-\`\`\`
+Switch on the **Coordinator crash** toggle in the simulation above and step through it: both
+participants end at "cannot commit or abort alone" with their locks still held.
 
 The second problem is **throughput**. Locks are held across the *entire* protocol: multiple network
 round trips plus disk forces. A single-node commit holds a lock for microseconds; a 2PC lock is held
