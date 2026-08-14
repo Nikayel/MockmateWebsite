@@ -2501,14 +2501,15 @@ the outage.
 const loadSheddingBackpressureTeach = `
 ## Systems die by accepting more than they can finish
 
-Level 1's "Backpressure, Flow Control & Load Shedding" lesson established the primitives: bound every
-queue, let backpressure propagate, and reject early because latency explodes as utilization nears
-100%. This lesson takes those as given and leads with the failure they exist to prevent, the
-retry-storm death spiral, plus the two senior moves for beating it, adaptive concurrency limits and
-brownout. Rate limiting caps one client's demand; overload protection is what you reach for when total
-legitimate demand simply exceeds your capacity, or a dependency slows and requests pile up. The goal
-is blunt: at 150% of capacity, stay up and keep serving the most important traffic, instead of trying
-to serve everything and serving nothing.
+Level 1's "Backpressure, Flow Control & Load Shedding" lesson owns the primitives, and this lesson
+does not re-derive them: bound every queue, let backpressure propagate, and reject early because
+latency explodes as utilization nears 100%. Taking those as given, this lesson is about what happens
+when they are not enough. It leads with the failure they exist to prevent, the retry-storm death
+spiral that outlives its own trigger, and then the two controls that beat it, adaptive concurrency
+limits and brownout. Rate limiting caps one client's demand; overload protection is what you reach for
+when total legitimate demand simply exceeds your capacity, or a dependency slows and requests pile up.
+The goal is blunt: at 150% of capacity, stay up and keep serving the most important traffic, instead
+of trying to serve everything and serving nothing.
 
 \`\`\`cswidget
 {
@@ -2563,13 +2564,18 @@ in time until memory runs out.
 }
 \`\`\`
 
-### Load shedding: reject early, by priority
+### The Level 1 mechanics, recapped in one pass
 
-A request you reject in 1ms costs almost nothing; a request you accept, queue for 5s, then fail costs
-capacity you needed for good traffic. So you **shed before collapse**, at a threshold below 100%, and
-you shed the **right** traffic. **Priority-aware shedding** classifies traffic (health checks and
-paying-customer writes are critical; bulk exports, retries, and best-effort reads are droppable) and
-drops low-priority first, so the checkout path survives while a recommendation call is dropped.
+Level 1 owns the how, so take these as settled: reject early at the door with a **429** or **503**
+rather than accepting work you will fail later, bound every queue so it returns a fast 503 instead of
+growing, propagate a per-request **deadline** through the call chain and drop anything already past
+it, and classify traffic so low-value requests die before paying-customer writes.
+
+Two things change once the enemy is a spiral rather than a latency tail. The shedding threshold moves
+**below** 100%, because you have to shed before collapse rather than at the moment of it. And
+**retried requests move near the top of the drop list**, because retries are the fuel the spiral runs
+on: dropping them cheaply is how you starve it. The one class you never shed is health checks, since
+dropping those makes the load balancer mark you dead and converts an overload into an outage.
 
 \`\`\`cswidget
 {
@@ -2616,17 +2622,16 @@ system probes by raising its concurrency limit while latency stays flat and back
 rises (a gradient / TCP-Vegas style loop, as in Netflix's adaptive concurrency limiter). The limit
 tracks the real, current capacity with no operator-tuned magic number.
 
-### Backpressure
+### Brownout: shed features, not just requests
 
-Refuse upstream when you are full, so pressure propagates back to the source instead of accumulating
-in you. Use **bounded queues** that reject (or return a fast 503) when full. Propagate
-**deadlines**: pass a per-request deadline through the call chain and drop any request whose deadline
-has already passed, since finishing already-dead work is pure waste.
-
-**Interview nuance:** graceful degradation / **brownout** is the senior move. Under overload you can
-shed **features**: serve a cached or partial response, skip the personalization call, drop the
-recommendation carousel, return the core page. Combine with retry hygiene (exponential backoff plus
-jitter, and **circuit breakers**) and you break the retry storm at both ends.
+**Interview nuance:** graceful degradation / **brownout** is the senior move, and it is the control
+Level 1 has no equivalent for, because it does not choose between requests at all. Under overload you
+shed **features** instead: serve a cached or partial response, skip the personalization call, drop the
+recommendation carousel, return the core page. Every browned-out response costs less work than a full
+one, so admitted traffic gets cheaper at exactly the moment capacity is scarce, and the user still
+gets an answer rather than a 429. Combine it with retry hygiene (exponential backoff plus jitter, and
+**circuit breakers**) and you break the retry storm at both ends: fewer retries arriving, and less
+work spent on each request you do admit.
 
 \`\`\`csdiagram
 {
@@ -4101,9 +4106,9 @@ driven by the largest guilds.
         },
         {
           id: "sd-l4-load-shedding-backpressure",
-          title: "Load Shedding, Adaptive Concurrency & Backpressure",
+          title: "Congestion Collapse & Adaptive Concurrency",
           summary:
-            "Why an unbounded queue turns 150 percent load into zero throughput, and what adaptive concurrency, priority shedding and brownout do instead.",
+            "Why an unbounded queue turns 150 percent load into zero throughput, and what adaptive concurrency limits and brownout do instead.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["load-shedding", "backpressure", "concurrency"],
