@@ -2129,6 +2129,36 @@ consumers reading old offsets fetch from object storage automatically. This make
 effectively infinite retention viable: 7 years of audit data at S3 prices instead of years of broker
 SSD, and brokers rebalance faster.
 
+### Price the retention, because "expensive" is not a design input
+
+The tier decision flips on magnitude and on nothing else, so put numbers on it. Take an audit stream
+at 200 GB a day that compliance wants kept for 7 years, and two approximate cloud prices.
+Provisioned block storage, which is what a broker's disk is, runs on the order of 80 dollars per
+TB-month, and you pay it once per replica, so RF=3 costs about 240 dollars per TB-month of retained
+data. Standard object storage runs on the order of 23 dollars per TB-month with no replication
+multiplier, because the provider replicates internally and bills you for one logical copy. Both
+figures are approximate and vendor-specific and will drift; the roughly 10x gap between them is the
+part that has held for a decade and the part your design rests on.
+
+\`\`\`
+history:  200 GB/day x 365 x 7 years           = ~510 TB
+
+all hot:  510 TB x 3 copies x $80 per TB-month = ~$122,000 / month
+tiered:   7 days hot: 1.4 TB x 3 x $80         = ~$340 / month
+          510 TB cold: 510 x $23               = ~$11,700 / month
+                                         total = ~$12,000 / month
+\`\`\`
+
+Two conclusions, and the second is the one candidates miss. First, at this retention tiering is not
+a tuning preference, it is a 10x line item, so "7 years on broker disk" is not a design you present.
+Second, notice where the money is not. Widening the hot window from 7 days to 30 days costs about
+1,100 dollars a month, under 10 percent of the bill, while cutting retention from 7 years to 1 year
+saves about 10,000 a month. So be generous with the hot window, which buys fast replay of the recent
+data everyone actually reads, and spend your negotiating effort on the retention requirement itself.
+What the cold tier charges you back is a first touch on a cold segment measured in hundreds of
+milliseconds instead of a page-cache read measured in microseconds, which is the right trade for
+data queried a few times a year and the wrong one for data on the serving path.
+
 The subtle correctness trap: your **dedup/idempotency window must be at least as long as the
 replay/retention window.** If you keep 7 days of events but your consumer only remembers processed
 ids for 24 hours, replaying day-6 events sails past the dedup memory and **double-applies** them.
@@ -2137,8 +2167,8 @@ Retention and dedup must be sized together.
 Recap: delete-retention makes a topic a replayable stream bounded by its window; log compaction keeps
 the latest value per key and makes a topic a rebuildable table/changelog (with tombstones for
 deletes, held for \`delete.retention.ms\`, and \`min.compaction.lag.ms\` protecting recent superseded
-values for a lagging consumer); tiered storage puts cold segments in object storage for cheap long
-retention; GDPR erasure
+values for a lagging consumer); tiered storage puts cold segments in object storage at roughly a
+tenth of broker-disk cost, which is what makes multi-year retention presentable; GDPR erasure
 on immutable logs uses crypto-shredding or tombstones; and the dedup window must be at least the
 replay window or replays double-apply.
 
@@ -4518,7 +4548,7 @@ unchanged since launch. The pod autoscaler targets total consumer lag under 500k
             ],
             modelAnswerOutline: [
               "Assumptions: the audit stream is an append-only record compliance requires kept 7 years and must be replayable and immutable. The user-profile topic must let any service know the current profile of every user and rebuild that state from scratch.",
-              "**Audit stream: delete-retention + tiered storage.** A pure event stream, so `cleanup.policy=delete` with `retention.ms` set to 7 years. Never compact it, because every event matters individually (compaction would drop superseded records, destroying the audit trail). Seven years on broker SSD would be enormous, so enable tiered storage: hot recent segments (last 7-30 days, queried often) on local SSD, everything older offloaded to S3 at a few cents/GB/month. Replay of an old range fetches transparently from S3. Durability RF=3, acks=all, min.insync.replicas=2. For GDPR erasure without mutating the immutable log, crypto-shred: encrypt per-user fields with a per-user key and delete the key.",
+              "**Audit stream: delete-retention + tiered storage.** A pure event stream, so `cleanup.policy=delete` with `retention.ms` set to 7 years. Never compact it, because every event matters individually (compaction would drop superseded records, destroying the audit trail). Price the retention rather than calling it expensive: at 200 GB a day, 7 years is about 510 TB, which on broker disk at RF=3 and roughly 80 dollars per TB-month is on the order of 120,000 dollars a month, against roughly 12,000 with tiered storage at object-storage rates. That 10x is why tiering is the design here and not a refinement: hot recent segments (last 7-30 days, queried often) on local SSD, everything older offloaded to S3, and replay of an old range fetches transparently from S3. Durability RF=3, acks=all, min.insync.replicas=2. For GDPR erasure without mutating the immutable log, crypto-shred: encrypt per-user fields with a per-user key and delete the key.",
               "**User-profile changelog: log compaction.** A table, not a stream, so `cleanup.policy=compact`, keyed by `user_id`, each record the latest full profile (or a merged patch). Compaction keeps at least the latest value per key, so the compacted tail is the current profile of every user. A new service, or a rebuilt search index, reads from offset 0 and materializes the entire current-state table with no separate database: KTable/CDC bootstrap behavior.",
               "**Deletes and lagging consumers:** a deleted user is a tombstone (key + null), retained long enough (`delete.retention.ms`) for all consumers to see the deletion before it is compacted away. Set `min.compaction.lag.ms` so very recent updates are not compacted before a lagging consumer reads them. Storage stays small because only the latest value per key survives, so tiered storage is optional here.",
               "**The unifying idea:** retention policy is a semantic choice. Delete-retention = replayable history (stream); compaction = current-state table (changelog). Common wrong turn: setting a dedup window on the audit consumers shorter than the 7-year retention, so a replay after a fix double-applies old events. Size the dedup window to cover the replay window (or make handlers idempotent by construction).",
@@ -4535,7 +4565,7 @@ unchanged since launch. The pod autoscaler targets total consumer lag under 500k
             ],
             modelAnswerOutline: [
               "Assumptions: play events are high-volume immutable facts (play, pause, seek, stop) that ML pipelines reprocess for up to 6 months to retrain models; the playback-position store must return 'where did profile P stop in title T' instantly.",
-              "**Play-events stream: delete-retention + tiered storage.** `cleanup.policy=delete`, `retention.ms` at 6 months to cover the ML replay horizon. At billions/day this is petabytes, so tiered storage is mandatory: keep ~the last 7 days hot on broker SSD for real-time consumers, offload the rest to S3 where 6-month retention costs S3 rates. ML backfills read old offsets straight from S3. Key by `profile_id` so a profile's events stay ordered for sessionization. Durability RF=3, acks=all, min.insync.replicas=2. Critically, size the ML pipeline's idempotency to cover the full 6-month replay window (or make its aggregations idempotent) so a reprocess does not double-count watch time.",
+              "**Play-events stream: delete-retention + tiered storage.** `cleanup.policy=delete`, `retention.ms` at 6 months to cover the ML replay horizon. At billions/day this is petabytes, and a petabyte held on broker disk at RF=3 is on the order of 240,000 dollars a month against roughly 23,000 for the same petabyte in object storage, so tiered storage is mandatory rather than optional: keep ~the last 7 days hot on broker SSD for real-time consumers and offload the rest to S3. ML backfills read old offsets straight from S3. Key by `profile_id` so a profile's events stay ordered for sessionization. Durability RF=3, acks=all, min.insync.replicas=2. Critically, size the ML pipeline's idempotency to cover the full 6-month replay window (or make its aggregations idempotent) so a reprocess does not double-count watch time.",
               "**Playback-position changelog: log compaction.** `cleanup.policy=compact`, keyed by `(profile_id, title_id)`, each record the latest position. Compaction keeps the latest position per key. For single-digit-ms reads, do NOT serve from Kafka directly: materialize the compacted changelog into a fast key-value store (DynamoDB or Redis) via Kafka Streams or a consumer; the compacted topic is the durable source of truth that can rebuild that store from offset 0 after a wipe. Compaction keeps the changelog and its downstream store small regardless of how many pauses a user racks up.",
               "**Title pulled for legal reasons:** for the compacted changelog, emit tombstones (`(profile_id, title_id)` -> null) for every position tied to that title; compaction propagates them and removes the resume entries, and downstream stores apply the tombstone as a delete. For the immutable play-events stream, do not rewrite history: either crypto-shred the title's records by dropping its encryption key, or add a suppression/filter list so consumers exclude the pulled title, preserving the log's immutability while making the content effectively unavailable.",
               "Common wrong turn: trying to mutate the immutable stream in place, which breaks replayability and offsets.",
