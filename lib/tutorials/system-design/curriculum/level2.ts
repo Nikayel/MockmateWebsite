@@ -2323,6 +2323,27 @@ write (read-your-writes freshness) for that key while tolerating one node down. 
 consistency**, not linearizability: the overlap does not order concurrent writes, which can land on
 different quorums and produce conflicting versions that still need reconciling.
 
+\`\`\`cswidget
+{
+  "type": "quorum",
+  "title": "The Cassandra dial: N=3, R=2, W=2",
+  "predictPrompt": {
+    "question": "N=3 with reads and writes both at QUORUM. Two clients write different values to the same key at the same moment, each acknowledged by 2 replicas. What has the overlap guaranteed?",
+    "options": [
+      "One write is ordered ahead of the other, and the loser is rejected",
+      "A later read sees at least one copy of an acknowledged write, but the two versions still need reconciling",
+      "Nothing: with two writers in flight the quorum guarantee does not apply"
+    ]
+  },
+  "workedExample": "Start at N=3, R=2, W=2. R + W = 4, which is greater than N = 3, so any read set and any acknowledged write set share at least one replica and a read cannot miss a write that was acknowledged before it started. Kill one replica and writes keep flowing, because 2 of the 2 survivors can still acknowledge. Now drag R down to 1: R + W = 3 is no longer greater than 3, the two sets can be disjoint, and the single replica you happen to ask may be the one the write never reached. What no setting of this dial buys you is an ordering between two writes issued at the same moment to different quorums.",
+  "preset": "dynamo",
+  "n": 3,
+  "r": 2,
+  "w": 2,
+  "caption": "Overlap is a freshness guarantee, not an ordering one. Find the settings where R + W > N holds, then say out loud what they still do not promise."
+}
+\`\`\`
+
 **Interview nuance:** The classic question is "why not just add a secondary index in Cassandra?"
 Answer: Cassandra secondary indexes query across all partitions (a scatter-gather that does not
 scale) and are an anti-pattern for high-cardinality columns; the idiomatic solution is a second
