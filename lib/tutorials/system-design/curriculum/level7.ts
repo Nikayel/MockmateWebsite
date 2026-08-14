@@ -2525,10 +2525,40 @@ A deploy is a change to a running system, and most outages are self-inflicted by
 
 **Canary** routes a small slice (1%, then 5%, 25%, 50%, 100%) of real production traffic to the new version and watches it. It has the smallest blast radius of the three because a bad build only touches 1% of users before you catch it. Canary is only as good as its **automated analysis**: a system (Argo Rollouts + Prometheus, Spinnaker + Kayenta, Flagger) that compares the golden signals (error rate, p99 latency, saturation) of the canary against the baseline over a **bake time** at each step, and auto-aborts if the canary's SLIs diverge. Without automated analysis a canary is just a slow manual deploy where a human squints at a dashboard.
 
-\`\`\`
-Rolling:   [v1 v1 v1 v1] -> [v2 v1 v1 v1] -> [v2 v2 v1 v1] -> [v2 v2 v2 v2]   (both versions live mid-roll)
-Blue-Green: blue=100% live | green warmed --smoke ok--> router flip --> green=100% (blue idle, instant rollback)
-Canary:    v2 gets 1% -> analyze -> 5% -> analyze -> 25% -> ... auto-abort if SLIs diverge
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Strategy",
+    "How the fleet moves",
+    "Rollback",
+    "Cost"
+  ],
+  "rows": [
+    [
+      "Rolling",
+      "Pods replaced batch by batch: all v1, then one v2 among three v1, then two and two, then all v2. Both versions serve live traffic for the whole roll.",
+      "Slow: reversing it is another rolling deploy, run for the first time during the incident",
+      "Near zero, no extra fleet"
+    ],
+    [
+      "Blue-green",
+      "Blue serves 100% while green is stood up, warmed and smoke-tested, then the router sends 100% to green in one move and blue sits idle.",
+      "Instant: flip the router back to blue, which is still running",
+      "Double the fleet for the duration, plus one shared database both versions must tolerate at the flip and the flip back"
+    ],
+    [
+      "Canary",
+      "1% of real production traffic to v2, bake and compare against baseline, then 5%, 25%, and on to 100%.",
+      "Fast and often automatic: analysis aborts the rollout when the canary SLIs diverge",
+      "A small extra slice, plus the automated analysis without which it is only a slow manual deploy"
+    ]
+  ],
+  "highlightCols": [
+    "Rollback"
+  ],
+  "caption": "The highlighted column is what you are buying, and all three run two versions at once while you buy it. Separating deploy from release is what turns rollback into a routing change measured in seconds instead of a rebuild measured in minutes."
+}
 \`\`\`
 
 \`\`\`cswidget
