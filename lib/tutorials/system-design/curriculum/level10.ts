@@ -5306,7 +5306,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-webhook-delivery",
           title: "Design a Reliable Webhook Delivery System",
           summary:
-            "Guarantee at-least-once (persist, enqueue, ack on 2xx) with a stable event id so consumers dedupe, deliver from a separate queue-driven service (never inline), retry with exponential backoff plus jitter over a long window, sign payloads with HMAC-SHA256 plus timestamp and rotate secrets, make ordering opt-in per resource key, and protect everyone with dead-letters plus per-tenant isolation and circuit breakers.",
+            "Never call a customer's endpoint inline: persist, enqueue, retry with backoff, sign with HMAC, and let a stable event id handle duplicates.",
           estimatedMinutes: 40,
           difficulty: "medium",
           skills: ["messaging", "reliability", "api-design", "case-study"],
@@ -5360,7 +5360,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-payment-ledger",
           title: "Design a Payment System & Ledger",
           summary:
-            "Idempotency keys on every mutating call turn retries safe, an append-only double-entry ledger with derived balances gives auditability and reconciliation, and a saga with compensations plus idempotent webhook handling coordinates the provider, wallet, and orders without a distributed transaction.",
+            "Idempotency keys, an append-only double-entry ledger with derived balances, and a saga instead of a two-phase commit across a payment provider.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["payments", "ledger", "idempotency"],
@@ -5405,7 +5405,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-ecommerce-flash-sale",
           title: "Design E-Commerce Inventory / Flash Sale (Ticketmaster)",
           summary:
-            "Prevent oversell with a single atomic conditional decrement (never read-then-write), use reservation holds with TTL and automatic release for the cart window, and put a fair, rate-limiting waiting room in front to shed and pace the spike so the inventory store sees bounded load.",
+            "One atomic conditional decrement prevents oversell, holds with a TTL cover the cart window, and a waiting room bounds what reaches the counter.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["flash-sale", "inventory", "contention"],
@@ -5450,7 +5450,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-web-crawler",
           title: "Design a Web Crawler",
           summary:
-            "A two-layer frontier balances priority and per-host politeness, bloom-filter URL dedup plus simhash content dedup avoid redundant work and traps, distributed async fetchers with DNS caching do the I/O, and adaptive incremental recrawl with conditional GETs keeps the corpus fresh.",
+            "Politeness is the first thing an interviewer probes here, and it is why the frontier is two layers of queues rather than one priority queue.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["web-crawler", "frontier", "dedup"],
