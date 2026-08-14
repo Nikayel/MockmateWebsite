@@ -1471,13 +1471,262 @@ data is never lost.
 }
 \`\`\`
 
-\`\`\`
-  5-node cluster, leader crashes:
-    term 4 leader (S1) dies
-    S2..S5 election timeouts fire (randomized) -> S3 first
-    S3 (up-to-date log) requests votes -> S2,S4 grant -> majority 3/5
-    S3 becomes leader for term 5, resumes AppendEntries
-    an uncommitted term-4 entry only on S1 is overwritten, never was committed
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "A leader crash, one term later",
+  "frames": [
+    {
+      "note": "Term 4, S1 leading. It has appended an entry that has not yet reached a majority, so the entry is not committed and no client has been acknowledged for it.",
+      "rows": [
+        {
+          "label": "cluster",
+          "cells": [
+            {
+              "text": "S1 leader",
+              "state": "active"
+            },
+            {
+              "text": "S2"
+            },
+            {
+              "text": "S3"
+            },
+            {
+              "text": "S4"
+            },
+            {
+              "text": "S5"
+            }
+          ]
+        },
+        {
+          "label": "term 4 entry",
+          "cells": [
+            {
+              "text": "on S1 only",
+              "state": "new"
+            },
+            {
+              "text": "absent",
+              "state": "dim"
+            },
+            {
+              "text": "absent",
+              "state": "dim"
+            },
+            {
+              "text": "absent",
+              "state": "dim"
+            },
+            {
+              "text": "absent",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "S1 dies. The four survivors stop hearing AppendEntries, and each election timeout is randomized in a range like 150 to 300ms, which is what keeps them from all becoming candidates in the same instant and splitting the vote.",
+      "rows": [
+        {
+          "label": "cluster",
+          "cells": [
+            {
+              "text": "S1 crashed",
+              "state": "dropped"
+            },
+            {
+              "text": "S2 waiting"
+            },
+            {
+              "text": "S3 waiting"
+            },
+            {
+              "text": "S4 waiting"
+            },
+            {
+              "text": "S5 waiting"
+            }
+          ]
+        },
+        {
+          "label": "timeout fires at",
+          "cells": [
+            {
+              "text": "-",
+              "state": "dim"
+            },
+            {
+              "text": "271ms"
+            },
+            {
+              "text": "162ms",
+              "state": "active"
+            },
+            {
+              "text": "248ms"
+            },
+            {
+              "text": "219ms"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "S3 fires first, increments the term to 5, votes for itself and sends RequestVote. A node grants its vote only to a candidate whose log is at least as up to date as its own, which is what keeps a stale node out of the leadership.",
+      "rows": [
+        {
+          "label": "cluster",
+          "cells": [
+            {
+              "text": "S1 crashed",
+              "state": "dropped"
+            },
+            {
+              "text": "S2"
+            },
+            {
+              "text": "S3 candidate",
+              "state": "active"
+            },
+            {
+              "text": "S4"
+            },
+            {
+              "text": "S5"
+            }
+          ]
+        },
+        {
+          "label": "term",
+          "cells": [
+            {
+              "text": "4",
+              "state": "dim"
+            },
+            {
+              "text": "4"
+            },
+            {
+              "text": "5",
+              "state": "new"
+            },
+            {
+              "text": "4"
+            },
+            {
+              "text": "4"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "S2 and S4 grant. With its own vote that is 3 of the 5 configured nodes, a majority of the whole cluster and not merely of the survivors, so S3 leads term 5 and resumes AppendEntries.",
+      "predict": {
+        "question": "S3 has asked the three reachable nodes for votes. How many does it need before it may lead term 5?",
+        "options": [
+          "All four survivors, since unanimity avoids a split brain",
+          "3 of the 5 configured nodes, counting its own vote",
+          "2 of the 5, because a dead node cannot object",
+          "None: the highest term always wins automatically"
+        ]
+      },
+      "rows": [
+        {
+          "label": "vote in term 5",
+          "cells": [
+            {
+              "text": "S1 unreachable",
+              "state": "dropped"
+            },
+            {
+              "text": "S2 grants",
+              "state": "new"
+            },
+            {
+              "text": "S3 self",
+              "state": "active"
+            },
+            {
+              "text": "S4 grants",
+              "state": "new"
+            },
+            {
+              "text": "S5 no answer yet",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "tally",
+          "cells": [
+            {
+              "text": "3 of 5 is a majority",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "S1 restarts, sees the higher term and steps down. Its uncommitted term-4 entry is overwritten, and that is correct rather than a data loss bug: no majority ever stored it, so no client was ever told it committed.",
+      "rows": [
+        {
+          "label": "cluster",
+          "cells": [
+            {
+              "text": "S1 follower",
+              "state": "new"
+            },
+            {
+              "text": "S2"
+            },
+            {
+              "text": "S3 leader",
+              "state": "active"
+            },
+            {
+              "text": "S4"
+            },
+            {
+              "text": "S5"
+            }
+          ]
+        },
+        {
+          "label": "term 4 entry",
+          "cells": [
+            {
+              "text": "overwritten",
+              "state": "dropped"
+            },
+            {
+              "text": "absent",
+              "state": "dim"
+            },
+            {
+              "text": "absent",
+              "state": "dim"
+            },
+            {
+              "text": "absent",
+              "state": "dim"
+            },
+            {
+              "text": "absent",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Randomized timeouts stop the split vote, the majority is counted over the configured cluster rather than the survivors, and only a committed entry is immortal."
+}
 \`\`\`
 
 ### Safety

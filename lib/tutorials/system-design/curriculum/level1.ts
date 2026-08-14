@@ -1926,6 +1926,179 @@ they converge on one answer instead of both charging. In practice you insert the
 with a unique constraint (a Redis \`SETNX\` or a unique DB row) before doing work; the loser of that
 race waits and returns the winner's stored response.
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "One lost response, with and without the key",
+  "actors": [
+    {
+      "id": "client",
+      "label": "Client"
+    },
+    {
+      "id": "api",
+      "label": "Payments API"
+    },
+    {
+      "id": "keys",
+      "label": "Idempotency store"
+    },
+    {
+      "id": "psp",
+      "label": "Card network"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "noKey",
+      "label": "Client sends no Idempotency-Key",
+      "description": "the retry is just another POST"
+    }
+  ],
+  "steps": [
+    {
+      "from": "client",
+      "to": "api",
+      "kind": "request",
+      "label": "POST /charges + key K",
+      "when": "!noKey"
+    },
+    {
+      "from": "client",
+      "to": "api",
+      "kind": "request",
+      "label": "POST /charges, no key",
+      "when": "noKey"
+    },
+    {
+      "from": "api",
+      "to": "keys",
+      "kind": "request",
+      "label": "INSERT K, unique index",
+      "when": "!noKey",
+      "state": {
+        "charges made": "0",
+        "key K": "claimed, in flight"
+      }
+    },
+    {
+      "from": "api",
+      "to": "psp",
+      "kind": "request",
+      "label": "charge 50 dollars"
+    },
+    {
+      "from": "psp",
+      "to": "api",
+      "kind": "response",
+      "label": "ok, charge ch_1",
+      "state": {
+        "charges made": "1"
+      }
+    },
+    {
+      "from": "api",
+      "to": "keys",
+      "kind": "request",
+      "label": "store the 201 under K",
+      "when": "!noKey",
+      "state": {
+        "charges made": "1",
+        "key K": "201 ch_1 stored"
+      }
+    },
+    {
+      "from": "api",
+      "to": "client",
+      "kind": "response",
+      "label": "201 ch_1",
+      "status": "lost"
+    },
+    {
+      "from": "client",
+      "kind": "timer",
+      "label": "timeout, no answer",
+      "status": "late",
+      "predict": {
+        "question": "The 201 never arrived. What does the client actually know about the charge?",
+        "options": [
+          "That it did not happen: no response came back",
+          "Nothing: a lost request and a lost response look identical from here",
+          "That it happened, since the card network would have rejected it otherwise"
+        ]
+      }
+    },
+    {
+      "from": "client",
+      "to": "api",
+      "kind": "request",
+      "label": "retry, same key K",
+      "when": "!noKey"
+    },
+    {
+      "from": "client",
+      "to": "api",
+      "kind": "request",
+      "label": "retry, still no key",
+      "when": "noKey"
+    },
+    {
+      "from": "api",
+      "to": "keys",
+      "kind": "request",
+      "label": "INSERT K: already exists",
+      "when": "!noKey"
+    },
+    {
+      "from": "keys",
+      "to": "api",
+      "kind": "response",
+      "label": "stored 201 ch_1",
+      "when": "!noKey"
+    },
+    {
+      "from": "api",
+      "to": "client",
+      "kind": "response",
+      "label": "201 ch_1, replayed",
+      "when": "!noKey",
+      "state": {
+        "charges made": "1",
+        "key K": "201 ch_1 stored"
+      }
+    },
+    {
+      "from": "api",
+      "to": "psp",
+      "kind": "request",
+      "label": "charge 50 dollars again",
+      "when": "noKey",
+      "status": "error"
+    },
+    {
+      "from": "psp",
+      "to": "api",
+      "kind": "response",
+      "label": "ok, charge ch_2",
+      "when": "noKey",
+      "status": "error",
+      "state": {
+        "charges made": "2, customer billed twice"
+      }
+    },
+    {
+      "from": "api",
+      "to": "client",
+      "kind": "response",
+      "label": "201 ch_2",
+      "when": "noKey",
+      "status": "error"
+    }
+  ],
+  "caption": "The retry is not the bug: the client cannot tell a lost request from a lost response, so it has to retry. What the key buys is that the second POST is answered from the store and never reaches the card network. Watch the 'charges made' row with the toggle on."
+}
+\`\`\`
+
 ### From at-least-once to effectively-once
 
 Networks and queues give you at-least-once delivery: a message can arrive more than once. Idempotency
