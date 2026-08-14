@@ -24,6 +24,11 @@ that composition never makes a title longer than the lesson's own name plus the 
 with no suffix at all and still do not fit. The metadata layer deliberately does NOT truncate them:
 silently shortening a title would hide this list from the test that should surface it.
 
+**And the remainder is not where the original ticket implied.** Measured 2026-08-13, the 27 split
+data-engineering 20, system-design 4, python 3. Every worst case is a SQL lesson. That matters for
+who does the work: the System Design authoring sweeps do not touch this list at all, so it will not
+close as a side effect of curriculum work and needs a deliberate Data Engineering copy pass.
+
 ## Why
 
 Lesson titles become the SERP title. Google truncates around 60 characters, and the title template
