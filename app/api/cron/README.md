@@ -24,7 +24,7 @@ Current jobs (see each route header for details):
 | -------------------------------- | ------------------------------------ |
 | `aggregate-usage`                | hourly                               |
 | `subscription-reconcile`         | daily                                |
-| `subscription-expiry`            | daily                                |
+| `subscription-expiry`            | DEPRECATED no-op stub; owner should delete the job (consolidated into `email-notifications` 2026-08-14) |
 | `expire-referral-rewards`        | daily                                |
 | `guest-session-cleanup`          | daily                                |
 | `email-notifications`            | see route header                     |

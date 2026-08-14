@@ -39,6 +39,7 @@ import {
 } from "@/lib/email"
 import type { Profile, UserLearningState, ProblemMasteryRecord } from "@/lib/types"
 import { checkStreakAtRisk, sendDailyReminderIfNeeded } from "@/lib/services/session-notifications"
+import { updateQuotaToFree, resetYearlySubscriberQuota } from "@/lib/quota/yearly-quota"
 
 const db = adminDb
 
@@ -152,7 +153,7 @@ export async function GET(request: NextRequest) {
       inactivityEmails: { sent: 0, skipped: 0, failed: 0, skippedTimezone: 0 },
       spacedRepetitionEmails: { sent: 0, skipped: 0, failed: 0, skippedTimezone: 0 },
       roadmapEmails: { sent: 0, skipped: 0, failed: 0, skippedTimezone: 0 },
-      subscriptionExpiry: { reminders7d: 0, reminders1d: 0, downgrades: 0 },
+      subscriptionExpiry: { reminders7d: 0, reminders1d: 0, downgrades: 0, quotaResets: 0 },
       streakAlerts: { sent: 0, skipped: 0 },
       errors: [] as string[],
     }
@@ -210,11 +211,17 @@ async function processWelcomeEmails(now: Date, results: any): Promise<void> {
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
   try {
-    // Query profiles without welcome_email_sent (or where it's false)
-    // Filter by created_at in memory to avoid composite index requirement
-    const profilesSnap = await db.collection("profiles").limit(100).get()
+    // Range on created_at alone (single-field index, no composite needed) so the
+    // scan always contains the new signups. The previous unordered limit(100)
+    // read an arbitrary 100 profiles, so past 100 users a new signup could sit
+    // outside the window forever and never get the fallback welcome email.
+    const profilesSnap = await db
+      .collection("profiles")
+      .where("created_at", ">=", twentyFourHoursAgo.toISOString())
+      .limit(100)
+      .get()
 
-    // Filter in memory for profiles created in last 24h without welcome email
+    // Filter in memory for profiles still owed a welcome email
     const eligibleProfiles = profilesSnap.docs
       .filter((doc) => {
         const profile = doc.data()
@@ -342,13 +349,16 @@ async function processInactivityReminders(now: Date, results: any): Promise<void
     reportDedupFailure("Inactivity", indexError, results)
   }
 
-  // Get learning states where last_session_at is before 24h ago
-  // Filter for 72h in memory to avoid composite index requirement
+  // Both bounds on the same field (single-field index): last session between
+  // 72h and 24h ago. With only the upper bound, Firestore's implicit ordering
+  // returned the 100 LONGEST-dormant users first, so once 100 users were
+  // dormant past 72h the window this reminder targets never got scanned.
   let learningStatesSnap
   try {
     learningStatesSnap = await db
       .collection("user_learning_state")
       .where("last_session_at", "<=", twentyFourHoursAgo.toISOString())
+      .where("last_session_at", ">=", seventyTwoHoursAgo.toISOString())
       .limit(100)
       .get()
   } catch (queryError: any) {
@@ -490,15 +500,17 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
     reportDedupFailure("Spaced repetition", indexError, results)
   }
 
-  // Find users with problem mastery data (new system)
-  const problemMasteryUsersSnap = await db.collection("problem_mastery").limit(100).get()
+  // The problem-level system writes ONLY the problems subcollection; no writer
+  // ever creates the problem_mastery/{uid} parent document, so scanning that
+  // parent collection returns zero docs and this loop processed nobody, ever.
+  // Drive it from user_learning_state instead, which every session write creates.
+  const learningStatesSnap = await db.collection("user_learning_state").limit(100).get()
 
   const processedUsers = new Set<string>()
 
   // Process problem-level mastery (new system)
-  for (const userDoc of problemMasteryUsersSnap.docs) {
-    const userId = userDoc.id
-    processedUsers.add(userId)
+  for (const stateDoc of learningStatesSnap.docs) {
+    const userId = stateDoc.id
 
     // DUPLICATE PREVENTION: Skip if user already received SR email in last 24 hours
     if (usersWithRecentSREmail.has(userId)) {
@@ -516,7 +528,19 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
         .limit(10)
         .get()
 
-      if (problemsSnap.empty) continue
+      if (problemsSnap.empty) {
+        // Nothing due, but if the user is in the problem-level system at all,
+        // keep the legacy topic path away from their stale topic snapshots.
+        const anyProblem = await db
+          .collection("problem_mastery")
+          .doc(userId)
+          .collection("problems")
+          .limit(1)
+          .get()
+        if (!anyProblem.empty) processedUsers.add(userId)
+        continue
+      }
+      processedUsers.add(userId)
 
       // Calculate problems due with days overdue
       const problemsDue = problemsSnap.docs
@@ -619,9 +643,8 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
     }
   }
 
-  // Also process legacy topic-level data for users not in new system
-  const learningStatesSnap = await db.collection("user_learning_state").limit(100).get()
-
+  // Also process legacy topic-level data for users not in new system,
+  // reusing the snapshot the problem-level pass already paid for.
   for (const doc of learningStatesSnap.docs) {
     const learningState = doc.data() as UserLearningState
     const userId = learningState.user_id
@@ -1135,6 +1158,17 @@ async function processSubscriptionExpiry(now: Date, results: any): Promise<void>
           updated_at: now.toISOString(),
         })
 
+        // Clamp the session quota down with the tier, or the downgraded account
+        // keeps a Pro-sized allowance until the next period rollover.
+        try {
+          await updateQuotaToFree(userId, {
+            created_at: profile.created_at as string | undefined,
+            subscription_type: profile.subscription_type as string | undefined,
+          })
+        } catch (quotaError) {
+          logger.error("[Cron] Downgrade quota clamp failed", { userId, error: quotaError })
+        }
+
         results.subscriptionExpiry.downgrades++
         logger.info("[Cron] Downgraded user - yearly plan expired", { userId })
 
@@ -1237,6 +1271,39 @@ async function processSubscriptionExpiry(now: Date, results: any): Promise<void>
         } catch (error) {
           logger.error("[Cron] Failed to send 1-day reminder", { userId, error })
         }
+      }
+    }
+
+    // 4. Monthly quota reset for ACTIVE yearly subscribers. Yearly Pro has no
+    // Stripe subscription behind it, so no webhook resets their monthly session
+    // allowance; this sweep is the only thing that does. Ported from the
+    // deprecated subscription-expiry cron.
+    const activeYearlyQuery = await db
+      .collection("profiles")
+      .where("subscription_type", "==", "yearly")
+      .where("subscription_tier", "==", "pro")
+      .where("subscription_current_period_end", ">", now.toISOString())
+      .limit(500)
+      .get()
+
+    for (const doc of activeYearlyQuery.docs) {
+      const userId = doc.id
+      const yearlyProfile = doc.data()
+
+      try {
+        const wasReset = await resetYearlySubscriberQuota(userId, {
+          created_at: yearlyProfile.created_at as string | undefined,
+        })
+        if (wasReset) {
+          results.subscriptionExpiry.quotaResets++
+          logger.info("[Cron] Reset monthly quota for yearly subscriber", { userId })
+          await db.collection("profiles").doc(userId).update({
+            last_quota_reset: now.toISOString(),
+            updated_at: now.toISOString(),
+          })
+        }
+      } catch (error) {
+        logger.error("[Cron] Failed to reset yearly subscriber quota", { userId, error })
       }
     }
   } catch (error) {
