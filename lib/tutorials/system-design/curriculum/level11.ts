@@ -420,6 +420,160 @@ When you build a training row for "user U at event time T," every feature must b
 
 **Interview nuance:** if the interviewer asks "how do you know your feature store works," the strong answer is not "we tested it," it is "we log served feature vectors and compare them to the offline-computed vectors for the same entity and time; skew shows up as a mismatch rate."
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Building One Training Row, Two Ways",
+  "frames": [
+    {
+      "note": "One user, one feature. The value of total lifetime purchases changes over time, and the label we want to learn from is a churn event on March 3.",
+      "rows": [
+        {
+          "label": "feature over time",
+          "cells": [
+            {
+              "text": "Jan 1: 2 purchases"
+            },
+            {
+              "text": "Mar 1: 5"
+            },
+            {
+              "text": "Jun 1: 9"
+            },
+            {
+              "text": "today: 40"
+            }
+          ]
+        },
+        {
+          "label": "labeled event",
+          "cells": [
+            {
+              "text": "Mar 3: this user churned",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "predict": {
+        "question": "We are building the training row for that March 3 label. Which value of total lifetime purchases belongs in it?",
+        "options": [
+          "40, whatever the store holds right now",
+          "5, the last value known strictly before March 3",
+          "9, the first value recorded after March 3"
+        ]
+      },
+      "note": "The naive join reads the store as it is today, so a row about a March event carries a number that did not exist until June. The model is handed the future and learns from it.",
+      "rows": [
+        {
+          "label": "feature over time",
+          "cells": [
+            {
+              "text": "Jan 1: 2 purchases",
+              "state": "dim"
+            },
+            {
+              "text": "Mar 1: 5",
+              "state": "dim"
+            },
+            {
+              "text": "Jun 1: 9",
+              "state": "dim"
+            },
+            {
+              "text": "today: 40",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "training row",
+          "cells": [
+            {
+              "text": "user U"
+            },
+            {
+              "text": "label: churned"
+            },
+            {
+              "text": "purchases: 40",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Leakage does not announce itself. Offline scores rise, because part of the answer sits inside a value only knowable after the fact, and the model then underperforms quietly against live requests that have no future to read.",
+      "rows": [
+        {
+          "label": "offline holdout",
+          "cells": [
+            {
+              "text": "scores look excellent",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "live traffic",
+          "cells": [
+            {
+              "text": "quietly underperforms",
+              "state": "dropped"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The as-of join is the fix: for a label at time T, take the last value known strictly before T. Same pipeline, same definition, different join. One shared definition removed code divergence; only this removes time divergence.",
+      "rows": [
+        {
+          "label": "feature over time",
+          "cells": [
+            {
+              "text": "Jan 1: 2 purchases",
+              "state": "dim"
+            },
+            {
+              "text": "Mar 1: 5",
+              "state": "active"
+            },
+            {
+              "text": "Jun 1: 9",
+              "state": "dropped"
+            },
+            {
+              "text": "today: 40",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "training row",
+          "cells": [
+            {
+              "text": "user U"
+            },
+            {
+              "text": "label: churned"
+            },
+            {
+              "text": "purchases: 5",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Identical code on both paths cannot prevent this. Time divergence is a join problem, and an as-of join keyed on entity and event time is the only thing that fixes it."
+}
+\`\`\`
+
 ## Freshness tiers
 
 Batch features (7-day average spend) recompute hourly or daily. Streaming features (clicks in the last 5 minutes) update within seconds via Kafka plus Flink. On-demand features (distance between user and merchant) are computed at request time from request inputs because they cannot be precomputed. A registry tracks each feature's definition, owner, freshness, and lineage so features are reused rather than reinvented, and so you can reason about high-cardinality features whose online storage cost (one row per user times millions of users) can dwarf everything else.
