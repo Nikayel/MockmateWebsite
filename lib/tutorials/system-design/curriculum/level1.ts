@@ -3212,6 +3212,103 @@ aggressive compression can add tail latency on large responses (the compressor h
 first byte goes out). So set a payload-size threshold below which you do not compress (compressing a
 200-byte response is a net loss), and do not double-compress already-compressed data (images, video).
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Does compressing this response actually buy anything",
+  "predictPrompt": {
+    "question": "A 200-byte JSON health response goes out 5,000 times a second, and gzip shrinks that text about 4x. How many TCP segments does compressing it save?",
+    "options": [
+      "About three quarters of them",
+      "Roughly one in four",
+      "None: it fits in a single segment either way",
+      "It depends on the client"
+    ]
+  },
+  "workedExample": "At the initial values, a 200-byte JSON body compressed about 4x, the wire body is 50 bytes. A TCP segment carries about 1460 bytes, so both the 200-byte and the 50-byte version travel in exactly one segment: segments saved is 0, and the response arrives after the same number of round trips it always did. Meanwhile the compressor runs on all 5,000 requests per second, roughly 0.022 ms each, which is about 0.11 of a CPU core burned to change nothing. Now drag the payload up toward a megabyte and watch segments saved climb, then switch the content to an already-compressed JPEG and watch it collapse back to zero.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "payload_bytes",
+      "label": "Uncompressed response size",
+      "min": 100,
+      "max": 5000000,
+      "scale": "log",
+      "initial": 200,
+      "unit": "bytes"
+    },
+    {
+      "kind": "select",
+      "id": "ratio",
+      "label": "What the body actually is",
+      "options": [
+        {
+          "label": "JSON or HTML text (about 4x)",
+          "value": 4
+        },
+        {
+          "label": "Repetitive log lines (about 8x)",
+          "value": 8
+        },
+        {
+          "label": "Already-compressed JPEG, MP4 or ZIP (about 1x)",
+          "value": 1
+        }
+      ],
+      "initial": 0
+    },
+    {
+      "kind": "slider",
+      "id": "qps",
+      "label": "Requests per second",
+      "min": 10,
+      "max": 100000,
+      "scale": "log",
+      "initial": 5000,
+      "unit": "QPS"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "wire_bytes",
+      "label": "Bytes actually put on the wire",
+      "expr": "payload_bytes / ratio",
+      "format": "bytes"
+    },
+    {
+      "id": "segments_raw",
+      "label": "TCP segments uncompressed (about 1460 bytes each)",
+      "expr": "ceil(payload_bytes / 1460)",
+      "format": "number"
+    },
+    {
+      "id": "segments_saved",
+      "label": "TCP segments the compression saves",
+      "expr": "segments_raw - ceil(wire_bytes / 1460)",
+      "format": "number",
+      "sparkline": {
+        "over": "payload_bytes"
+      }
+    },
+    {
+      "id": "cores_burned",
+      "label": "CPU cores spent compressing",
+      "expr": "(0.02 + payload_bytes / 100000) * qps / 1000",
+      "format": "number",
+      "unit": "cores"
+    },
+    {
+      "id": "bandwidth_saved",
+      "label": "Bandwidth saved every second",
+      "expr": "(payload_bytes - wire_bytes) * qps",
+      "format": "bytes",
+      "unit": "per second"
+    }
+  ],
+  "caption": "Compression pays in segments and in bandwidth, not in percentages. Below one segment there is no round trip to remove, so the percentage saved looks great and the user feels nothing, while the CPU column keeps climbing with traffic."
+}
+\`\`\`
+
 ### Schema evolution: the part people forget
 
 Protobuf, Avro, and Thrift all support forward and backward compatibility if you follow the rules:
