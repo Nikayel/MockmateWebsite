@@ -962,11 +962,15 @@ Edge compute runs your code in the CDN's points of presence (Cloudflare has hund
 
 ## V8 isolates and WASM
 
-Container-based FaaS boots an OS-level sandbox per function, which is why cold starts are 100ms to 1s+. Edge platforms like **Cloudflare Workers** instead run **V8 isolates**: many tenants share one V8 process, each request gets a lightweight isolate (the same isolation a browser tab uses), and spinning one up is **under 5ms**, effectively no cold start. There is no VM or container to provision. **WebAssembly (WASM)** goes further: a precompiled WASM module can start in **sub-millisecond** time and lets you run Rust, Go, or C at the edge, not just JavaScript. The tradeoff for this speed is a constrained runtime: strict CPU-time budgets per request (tens of milliseconds of CPU, not seconds), small memory, and **no full Node.js API surface** (no arbitrary filesystem, limited native modules). You write to a web-standard API, not to Node.
+Container-based FaaS boots an OS-level sandbox per function, which is why cold starts are 100ms to 1s+. Edge platforms like **Cloudflare Workers** instead run **V8 isolates**: many tenants share one V8 process, each request gets a lightweight isolate (the same isolation a browser tab uses), and spinning one up is **under 5ms**, effectively no cold start. There is no VM or container to provision. **WebAssembly (WASM)** goes further: a precompiled WASM module can start in **sub-millisecond** time and lets you run Rust, Go, or C at the edge, not just JavaScript. The tradeoff for this speed is a constrained runtime: a small memory ceiling per isolate, a metered CPU budget, and **no full Node.js API surface** (no arbitrary filesystem, limited native modules). You write to a web-standard API, not to Node. Do not memorize the CPU number, because every vendor keeps moving it; memorize the shape of the limit instead.
+
+## The limit that does not move: a PoP holds no data
+
+The durable constraint is architectural rather than quota-shaped. A point of presence caches what is hot and holds nothing else, so code that has to sweep a **large or cold working set** ends up dragging that data across the network to reach the code. That is backwards: the whole win of the edge is moving small code to the user, and it evaporates the moment the work needs data that only lives at the origin. Code travels cheaply; a working set does not.
 
 ## What belongs where
 
-Put at the **edge** the lightweight, latency-sensitive work on the request path: geo/device **routing**, **auth and JWT verification** (reject a bad token in the PoP instead of after a trans-oceanic hop), **A/B assignment**, header rewrites, **personalization** of otherwise-cached pages, bot filtering, and cache logic. Keep at the **origin** the heavy or stateful work: large database transactions, big compute, anything needing the full Node ecosystem, and any operation requiring **strong consistency**.
+Put at the **edge** the lightweight, latency-sensitive work on the request path: geo/device **routing**, **auth and JWT verification** (reject a bad token in the PoP instead of after a trans-oceanic hop), **A/B assignment**, header rewrites, **personalization** of otherwise-cached pages, bot filtering, and cache logic. Keep at the **origin** the heavy or stateful work: large database transactions, big compute, anything that reads a large or cold working set, anything needing the full Node ecosystem, and any operation requiring **strong consistency**.
 
 \`\`\`cswidget
 {
@@ -995,7 +999,7 @@ Put at the **edge** the lightweight, latency-sensitive work on the request path:
 
 That last point is the real constraint. Edge data stores are built for reads-everywhere, not strong writes. **Workers KV** is eventually consistent with propagation that can take seconds; edge caches and **regional read replicas** serve stale-tolerant reads fast. Newer primitives shift the tradeoff: **Durable Objects** give you single-threaded strong consistency for one key by pinning it to one location (so you pay latency for writes to that object), and **D1** offers a SQL database at the edge. But the general rule holds: you cannot get globally strong, low-latency writes for free, so edge data must be either read-mostly, eventually consistent, or explicitly pinned.
 
-**Interview nuance:** the two failure modes interviewers listen for are (1) pushing heavy compute or a full Node app to the edge and hitting the CPU-time and API limits, and (2) putting strong-consistency data (balances, inventory, idempotency keys) in eventually consistent edge KV and getting stale reads or lost updates. Also flag that **observability is harder**: your code runs in hundreds of PoPs, so you lean on the platform's aggregated logs and tracing rather than SSHing into a box.
+**Interview nuance:** the two failure modes interviewers listen for are (1) pushing heavy compute, a full Node app, or a large working set out to the edge, where the runtime is deliberately small and the PoP holds no data to work on, and (2) putting strong-consistency data (balances, inventory, idempotency keys) in eventually consistent edge KV and getting stale reads or lost updates. Also flag that **observability is harder**: your code runs in hundreds of PoPs, so you lean on the platform's aggregated logs and tracing rather than SSHing into a box.
 
 \`\`\`
 USER --> nearest PoP (V8 isolate, <5ms start / WASM <1ms)
@@ -1006,7 +1010,7 @@ USER --> nearest PoP (V8 isolate, <5ms start / WASM <1ms)
    edge data: KV (eventual), read replicas, Durable Objects (pinned strong)
 \`\`\`
 
-**Recap:** V8 isolates start in under 5ms and WASM sub-ms, so edge compute delivers global sub-50ms TTFB for lightweight request-path work like routing, auth, and personalization, while heavy compute and strong-consistency data stay at the origin because edge runtimes are CPU/memory/API constrained and edge data is eventually consistent by default.
+**Recap:** V8 isolates start in under 5ms and WASM sub-ms, so edge compute delivers global sub-50ms TTFB for lightweight request-path work like routing, auth, and personalization, while heavy compute, large working sets, and strong-consistency data stay at the origin, because an edge runtime is deliberately small, a PoP holds only what is hot, and edge data is eventually consistent by default.
 
 \`\`\`cswidget
 {
@@ -1034,9 +1038,9 @@ USER --> nearest PoP (V8 isolate, <5ms start / WASM <1ms)
       "feedback": "This needs strong consistency, which edge data does not offer unless you pin the object, and then you are paying the write latency anyway."
     },
     {
-      "label": "Rendering a report that runs two seconds of CPU",
+      "label": "Rendering a monthly report over a year of order history",
       "bucket": "Origin region",
-      "feedback": "Edge runtimes budget tens of milliseconds of CPU per request, so this breaches the limit long before it becomes a latency question."
+      "feedback": "The report has to sweep a large, mostly cold working set, and a point of presence caches what is hot and holds nothing else. Running it at the edge drags the data to the code instead of the code to the user, which is the win the edge exists for, thrown away."
     },
     {
       "label": "Choosing which regional origin to forward a request to, based on the caller's country",
@@ -1044,7 +1048,7 @@ USER --> nearest PoP (V8 isolate, <5ms start / WASM <1ms)
       "feedback": "Routing is the canonical edge job: the point of presence already knows where the caller is, and the decision costs almost no CPU."
     }
   ],
-  "reveal": "V8 isolates start in under 5 ms and WASM in under a millisecond, so the edge can do lightweight request-path work next to the user for global sub-50 ms TTFB. What stays at the origin is set by two limits: the edge CPU, memory, and API budget, and the fact that edge data is eventually consistent unless you explicitly pin it to one location."
+  "reveal": "V8 isolates start in under 5 ms and WASM in under a millisecond, so the edge can do lightweight request-path work next to the user for global sub-50 ms TTFB. What stays at the origin is set by where the data is, not by a CPU quota vendors keep raising: a point of presence caches what is hot and holds nothing else, so a large or cold working set belongs where it lives, and edge data is eventually consistent unless you explicitly pin it to one location."
 }
 \`\`\`
 `.trim()
