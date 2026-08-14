@@ -83,9 +83,9 @@ A 301 (permanent) is cacheable by browsers and proxies, so the follow-up request
   "prompt": "Product says per-click analytics is the whole feature, and you sized reads at roughly 116K per second. Which pair of choices does that force?",
   "options": [
     {
-      "label": "302 redirects so every click comes back to you, with Redis in front of a sharded KV store to absorb the read volume",
+      "label": "302 redirects so every click comes back to you, and a Redis cache absorbing the reads ahead of the sharded store",
       "correct": true,
-      "feedback": "Right. 302 keeps clicks measurable by giving up browser and proxy caching, and the cache in front of a sharded KV store is what makes 116K reads per second affordable."
+      "feedback": "Right. 302 keeps clicks measurable by giving up browser and proxy caching, and the cache is what makes 116K reads per second affordable on a small fleet. Both halves are forced by the numbers, not chosen for taste."
     },
     {
       "label": "301 redirects so browsers cache the hop, with Redis in front of a sharded KV store",
