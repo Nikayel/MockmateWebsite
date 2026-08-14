@@ -172,9 +172,9 @@ INSERT INTO query_billing (query_id, tb_scanned, compute_seconds) VALUES
 
 const mppArchitecture: SqlLesson = {
   id: "de-l7-mpp-architecture",
-  title: "Inside an MPP Warehouse: Nodes, Slices, and the Slowest Slice",
+  title: "MPP Warehouses: Nodes, Slices, and the Slowest Slice",
   summary:
-    "A leader node plans, compute nodes execute, and every distributed table is sharded across every slice. The query runs on all of them at once and finishes at the speed of the slowest one, which is why skew in slice-level row counts is a performance bug.",
+    "Why an MPP query finishes at the speed of its slowest slice, and why uneven row counts across slices are a performance bug rather than a cosmetic one.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
@@ -422,7 +422,7 @@ const distSortKeys: SqlLesson = {
   id: "de-l7-dist-sort-keys",
   title: "Distribution Styles, Sort Keys, and Reading the Query Plan",
   summary:
-    "KEY co-locates joins, ALL copies small dimensions everywhere, EVEN round-robins facts nobody joins on. The plan tells you when you chose wrong, and DS_DIST_BOTH is the step interviewers ask you to spot.",
+    "How to choose between KEY, ALL and EVEN distribution, and how to spot the DS_DIST_BOTH plan step that proves you chose wrong.",
   estimatedMinutes: 30,
   difficulty: "hard",
   skills: [
@@ -666,9 +666,9 @@ ORDER BY p.query_id;`,
 
 const loadingAndCost: SqlLesson = {
   id: "de-l7-loading-and-cost",
-  title: "COPY from Stage, Never Row Inserts, and the Two Billing Models",
+  title: "COPY from Stage, Never Row Inserts, and Two Billing Models",
   summary:
-    "Warehouses ingest by pointing COPY at a stage of files in object storage and loading them in parallel across slices. Then the money: per-TB-scanned and per-second-compute price the same workload very differently.",
+    "Why warehouses load with COPY from a stage instead of row inserts, and how per-TB-scanned and per-second-compute price the same workload differently.",
   estimatedMinutes: 28,
   difficulty: "medium",
   skills: [
