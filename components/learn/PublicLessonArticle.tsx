@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, ChevronRight, Clock } from "lucide-react"
+import { ArrowLeft, ArrowRight, ChevronRight, Clock, Timer } from "lucide-react"
 
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -17,6 +17,7 @@ import {
   trackPath,
 } from "@/lib/tutorials/lesson-routes"
 import { levelLabel } from "@/lib/tutorials/level-title"
+import { drillForLesson } from "@/lib/tutorials/system-design/lesson-drills"
 import type { PublicExercisePreview, PublicLessonPreview } from "@/lib/tutorials/public-preview"
 import type { CourseId } from "@/lib/tutorials/types"
 import type { DifficultyLevel } from "@/lib/scenarios/types"
@@ -204,6 +205,8 @@ export function PublicLessonArticle({
   const levelHref = levelPath(preview.courseId, preview.levelSlug)
   const lessonPath = publicLessonPath(preview.courseId, preview.levelSlug, preview.id)
   const demoLanguage = DEMO_LANGUAGE[preview.courseId]
+  // Null for ~196 of 208 lessons, by design: see lesson-drills.ts on why this is a curated table.
+  const drill = drillForLesson(preview.id)
 
   return (
     <>
@@ -364,6 +367,34 @@ export function PublicLessonArticle({
             lessonId={preview.id}
             lessonTitle={preview.title}
           />
+
+          {/* The untimed lesson and the timed round on the same system are the same exercise at two
+              difficulties, and until now neither page mentioned the other. Only the Level 10 case
+              studies have an honest counterpart, so this renders for about a dozen lessons and is
+              absent everywhere else rather than inventing a link. */}
+          {drill && (
+            <aside className="border-border mt-6 rounded-2xl border p-5">
+              <h2 className="text-foreground text-sm font-semibold tracking-tight">
+                Ready for the timed version?
+              </h2>
+              <p className="text-muted-foreground mt-1.5 text-sm text-pretty">
+                You just read this system at your own pace. The drill is the same problem as a{" "}
+                {drill.estimatedTime}-minute round with an AI interviewer who questions your design
+                while you build it, then scores it.
+              </p>
+              <Link
+                href={drill.href}
+                className="text-accent-strong hover:text-accent-strong/80 focus-visible:ring-accent/50 group mt-3 inline-flex items-center gap-1.5 rounded-sm text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              >
+                <Timer className="h-4 w-4 shrink-0" aria-hidden="true" />
+                {drill.title}
+                <ArrowRight
+                  className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5"
+                  aria-hidden="true"
+                />
+              </Link>
+            </aside>
+          )}
         </article>
 
         {/* Prev/next keeps the corpus shallow for a crawler and gives a reader somewhere to go that

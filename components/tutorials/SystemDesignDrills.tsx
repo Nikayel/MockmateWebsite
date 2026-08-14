@@ -1,6 +1,7 @@
 import Link from "next/link"
-import { ArrowRight, Clock, Timer } from "lucide-react"
+import { ArrowRight, BookOpen, Clock, Timer } from "lucide-react"
 import { scenarios } from "@/lib/scenarios"
+import { lessonForDrill } from "@/lib/tutorials/system-design/lesson-drills"
 import type { DifficultyLevel, SystemDesignScenario } from "@/lib/scenarios/types"
 
 /**
@@ -105,6 +106,20 @@ export function SystemDesignDrills() {
                 </span>
               </div>
             </Link>
+            {/* Deliberately a SIBLING of the card, not a child: the whole card is already an anchor
+                and nesting one inside another is invalid HTML that browsers recover from by
+                unnesting, which would put a stray link outside the card. */}
+            {lessonForDrill(drill.id) && (
+              <p className="mt-2 pl-1 text-xs">
+                <Link
+                  href={lessonForDrill(drill.id)!.href}
+                  className="text-muted-foreground hover:text-foreground focus-visible:ring-accent/50 inline-flex items-center gap-1.5 rounded-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  <BookOpen className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  Read the lesson on this system first
+                </Link>
+              </p>
+            )}
           </li>
         ))}
       </ul>

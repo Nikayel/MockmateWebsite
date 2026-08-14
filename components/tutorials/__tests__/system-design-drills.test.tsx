@@ -31,6 +31,16 @@ const renderedHrefs = [...html.matchAll(/href="([^"]+)"/g)].map((match) =>
   match[1].replaceAll("&amp;", "&")
 )
 
+/**
+ * Card links only.
+ *
+ * Each card may now be followed by a sibling "read the lesson" back-link into `/learn`, so counting
+ * every anchor no longer counts cards. Partitioning by destination keeps both assertions honest:
+ * every drill still needs exactly one card, and every card link still needs `practice=true`.
+ */
+const drillHrefs = renderedHrefs.filter((href) => href.startsWith("/interview"))
+const lessonHrefs = renderedHrefs.filter((href) => href.startsWith("/learn"))
+
 describe("SystemDesignDrills", () => {
   it("has a real registry to work from", () => {
     // Guards the guard: an empty filter would make every id assertion below vacuously true.
@@ -45,9 +55,20 @@ describe("SystemDesignDrills", () => {
 
   it("renders one card per scenario, linked by id", () => {
     for (const drill of registryDrills) {
-      expect(renderedHrefs).toContain(`/interview?scenario=${drill.id}&practice=true`)
+      expect(drillHrefs).toContain(`/interview?scenario=${drill.id}&practice=true`)
     }
-    expect(renderedHrefs).toHaveLength(registryDrills.length)
+    expect(drillHrefs).toHaveLength(registryDrills.length)
+  })
+
+  it("points a drill back at the lesson that teaches the same system, where one exists", () => {
+    // The other half of SD-W13. A learner who opens a 45-minute timed round cold and struggles had
+    // no route to the untimed lesson on the same system, and the lesson had no route here.
+    expect(lessonHrefs.length).toBeGreaterThan(0)
+    for (const href of lessonHrefs) {
+      expect(href).toMatch(/^\/learn\/system-design\/case-studies\/sd-l10-[\w-]+$/)
+    }
+    // Never more back-links than cards: one per drill at most.
+    expect(lessonHrefs.length).toBeLessThanOrEqual(registryDrills.length)
   })
 
   it("shows each scenario's own title, time, and description", () => {
@@ -64,7 +85,7 @@ describe("SystemDesignDrills", () => {
    * (app/interview/_hooks/useSessionReopen.ts:374). Without it every card lands on the browser.
    */
   it("carries the practice flag the interview route needs to honour the deep link", () => {
-    for (const href of renderedHrefs) {
+    for (const href of drillHrefs) {
       expect(href).toMatch(/^\/interview\?scenario=[\w-]+&practice=true$/)
     }
   })
