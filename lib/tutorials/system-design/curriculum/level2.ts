@@ -270,8 +270,10 @@ don't block readers" in Postgres, MySQL InnoDB, Oracle, and most serious OLTP en
 write does not overwrite a row in place; it creates a new version of the row, tagged with the
 transaction that created it. Every transaction runs against a consistent snapshot defined by which
 versions were committed as of its start. So a long analytical read sees a frozen, coherent view while
-writers keep creating new versions alongside it, and neither waits on the other. This is what makes
-snapshot isolation cheap and is why read-heavy systems love it.
+writers keep creating new versions alongside it, and neither waits on the other. Concretely: a reader
+whose snapshot was taken once v2 was committed sees v2 and ignores the in-flight v3 a writer is
+building beside it, and it waits for nothing. This is what makes snapshot isolation cheap and is why
+read-heavy systems love it.
 
 \`\`\`cswidget
 {
@@ -357,10 +359,130 @@ and caps throughput at one-at-a-time. The right moves: **shard the counter** int
 N-fold; or aggregate increments in memory/Redis and flush periodically; or use an atomic in-database
 increment so each write is a single short operation rather than a read-modify-write holding a lock.
 
-\`\`\`
-MVCC read:  txn snapshot --> sees v2 (committed), ignores v3 (in-flight) -- no wait
-Hot counter: 1 row, all writers -- LOCK --> serialized (bad)
-             N shards, random pick ------> ~N-way parallel, sum on read (good)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "One hot counter row against N sharded rows",
+  "nodes": [
+    {
+      "id": "writers",
+      "label": "Thousands of increments per second on one viral post",
+      "kind": "client"
+    },
+    {
+      "id": "hot",
+      "label": "like_count: one row, exclusive lock per writer",
+      "kind": "db"
+    },
+    {
+      "id": "shard0",
+      "label": "like_count_shard_0",
+      "kind": "db"
+    },
+    {
+      "id": "shard1",
+      "label": "like_count_shard_1",
+      "kind": "db"
+    },
+    {
+      "id": "shardn",
+      "label": "like_count_shard_N",
+      "kind": "db"
+    },
+    {
+      "id": "reader",
+      "label": "Read path: SUM over all N shard rows",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "writers",
+      "to": "hot",
+      "kind": "sync",
+      "label": "LOCK: writers serialize, one at a time"
+    },
+    {
+      "from": "writers",
+      "to": "shard0",
+      "kind": "sync",
+      "label": "random shard pick"
+    },
+    {
+      "from": "writers",
+      "to": "shard1",
+      "kind": "sync",
+      "label": "random shard pick"
+    },
+    {
+      "from": "writers",
+      "to": "shardn",
+      "kind": "sync",
+      "label": "random shard pick"
+    },
+    {
+      "from": "shard0",
+      "to": "reader",
+      "kind": "sync",
+      "label": "read all N"
+    },
+    {
+      "from": "shard1",
+      "to": "reader",
+      "kind": "sync",
+      "label": "read all N"
+    },
+    {
+      "from": "shardn",
+      "to": "reader",
+      "kind": "sync",
+      "label": "read all N"
+    }
+  ],
+  "groups": [
+    {
+      "id": "serialized",
+      "label": "Serialized: throughput caps at one lock holder",
+      "nodes": [
+        "hot"
+      ]
+    },
+    {
+      "id": "sharded",
+      "label": "Sharded: roughly N-way parallel",
+      "nodes": [
+        "shard0",
+        "shard1",
+        "shardn",
+        "reader"
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "adds": [
+        "writers",
+        "hot"
+      ],
+      "note": "The requirement is thousands of increments per second landing on one row. A pessimistic lock is correct and still wrong here: every writer queues behind the current holder, so throughput caps at whatever one holder finishes. Optimistic version checks are worse, because nearly every check fails and retries."
+    },
+    {
+      "adds": [
+        "shard0",
+        "shard1",
+        "shardn"
+      ],
+      "note": "Nothing about the requirement demanded a single row, so change the shape of the writes: split the counter into N rows and have each writer increment a random one. Two writers now collide only when they pick the same shard, which spreads contention about N-fold."
+    },
+    {
+      "adds": [
+        "reader"
+      ],
+      "note": "The cost the fix moves rather than removes. The true count is now a SUM across N rows, so reads do more work and can be momentarily behind. That is a fine trade for a like counter and the wrong trade for an account balance."
+    }
+  ],
+  "caption": "The other two fixes have the same shape: batch increments in memory or Redis and flush periodically, or use one atomic in-database increment so no writer holds a lock across a read-modify-write."
+}
 \`\`\`
 
 Recap: MVCC makes readers and writers not block each other by versioning rows, at the cost of vacuum
