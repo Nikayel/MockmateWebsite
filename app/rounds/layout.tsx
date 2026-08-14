@@ -5,13 +5,6 @@ export const metadata: Metadata = {
   title: "Rounds - Two rounds, one session",
   description:
     "The interview rounds LeetCode skips: a failing test to debug and a real-world case to design, with an AI interviewer that reacts as you work.",
-  keywords: [
-    "bug fix interview round",
-    "case study interview",
-    "real-world interview practice",
-    "AI interviewer",
-    "system design practice",
-  ],
   alternates: {
     canonical: "/rounds",
   },

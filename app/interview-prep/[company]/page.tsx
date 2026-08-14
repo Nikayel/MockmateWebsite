@@ -64,18 +64,6 @@ export async function generateMetadata({
   return {
     title,
     description,
-    keywords: [
-      `${company.name} interview prep`,
-      `${company.name} coding interview`,
-      `${company.name} technical interview`,
-      `${company.name} DSA questions`,
-      `${company.name} interview questions ${currentYear}`,
-      `${company.name} interview process`,
-      `${company.name} interview tips`,
-      `how to prepare for ${company.name} interview`,
-      `${company.name} leetcode questions`,
-      `${company.name} interview difficulty`,
-    ],
     alternates: {
       canonical: `/interview-prep/${company.id}`,
     },

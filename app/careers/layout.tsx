@@ -8,15 +8,6 @@ export const metadata: Metadata = {
   description: truncateForDescription(
     "Join CodeSparring and help developers ace their coding interviews. Open Growth and Fullstack roles, with equity for early team members."
   ),
-  keywords: [
-    "CodeSparring careers",
-    "startup jobs",
-    "AI startup hiring",
-    "developer jobs",
-    "fullstack developer job",
-    "growth marketing job",
-    "equity compensation",
-  ],
   alternates: {
     canonical: "/careers",
   },

@@ -20,14 +20,6 @@ export const metadata: Metadata = {
   description: truncateForDescription(
     `Start free with ${freeSessions} AI mock interviews a month, or go Pro for ${proSessions}. Full feedback on every session, ${comparisonClaim}.`
   ),
-  keywords: [
-    "coding interview pricing",
-    "mock interview cost",
-    "LeetCode alternative price",
-    "interview prep subscription",
-    "AI interview practice pricing",
-    "tech interview preparation cost",
-  ],
   alternates: {
     canonical: "/pricing",
   },

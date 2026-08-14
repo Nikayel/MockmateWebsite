@@ -8,14 +8,6 @@ export const metadata: Metadata = {
   description: truncateForDescription(
     "The complete guide to practicing coding interviews with CodeSparring. Keyboard shortcuts, features, and how to get the most from each mock interview."
   ),
-  keywords: [
-    "CodeSparring documentation",
-    "coding interview tutorial",
-    "mock interview guide",
-    "AI interview help",
-    "interview prep getting started",
-    "coding practice guide",
-  ],
   alternates: {
     canonical: "/docs",
   },

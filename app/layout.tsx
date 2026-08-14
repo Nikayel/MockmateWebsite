@@ -78,53 +78,14 @@ export const metadata: Metadata = {
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
-  keywords: [
-    // Primary keywords - differentiation focus
-    "coding interview prep",
-    "mock interview",
-    "AI interviewer",
-    "interview performance training",
-    "LeetCode alternative",
-    // Competitive positioning keywords
-    "better than LeetCode",
-    "LeetCode vs CodeSparring",
-    "cheap mock interviews",
-    "Interviewing.io alternative",
-    "voice coding interview practice",
-    // Data engineering keywords - the role half of the audience
-    "data engineering interview prep",
-    "data engineer mock interview",
-    "SQL interview practice",
-    "system design interview practice",
-    // Long-tail keywords
-    "tech interview preparation",
-    "software engineering interview",
-    "FAANG interview prep",
-    "Google interview prep",
-    "Amazon interview questions",
-    "Meta coding interview",
-    // Problem keywords
-    "why I fail coding interviews",
-    "LeetCode not enough",
-    "interview anxiety practice",
-    "practice thinking out loud coding",
-    // Feature keywords
-    "voice mock interview",
-    "AI coding tutor",
-    "spaced repetition coding",
-    "interview practice app",
-    "24/7 mock interviews",
-    // Algorithm keywords
-    "DSA practice",
-    "algorithm practice",
-    "data structures practice",
-    "coding interview questions",
-    // Related searches
-    "how to pass coding interview",
-    "coding interview tips",
-    "technical interview practice",
-    "software engineer interview questions",
-  ],
+  // No `keywords` meta tag, deliberately. This used to set a 37-term global array, so every page
+  // on the site rendered the same block: the stock exchange lesson advertised itself with
+  // "LeetCode alternative", "cheap mock interviews" and "interview anxiety practice", none of which
+  // describes a page about order-matching engines. Google has ignored meta keywords since 2009, so
+  // it was not costing rankings; it was costing ~700 bytes of identical payload on every page and
+  // sending a stuffed-keyword quality signal to the crawlers that DO still read it, including the
+  // AI crawlers this site deliberately welcomes in `app/robots.ts` and `public/llms.txt`.
+  // Do not reintroduce it per-page either: the tag has no consumer worth serving.
   authors: [{ name: "Nikayel Ali Jamal" }],
   creator: siteConfig.name,
   publisher: siteConfig.name,

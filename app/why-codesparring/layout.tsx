@@ -8,16 +8,6 @@ export const metadata: Metadata = {
   description: truncateForDescription(
     "How CodeSparring uses spaced repetition, the testing effect, and 40 years of cognitive science to help you retain DSA patterns for interviews."
   ),
-  keywords: [
-    "spaced repetition coding",
-    "interview prep science",
-    "forgetting curve learning",
-    "DSA pattern retention",
-    "cognitive science interview prep",
-    "smart practice algorithm",
-    "testing effect learning",
-    "interleaving practice coding",
-  ],
   alternates: {
     canonical: "/why-codesparring",
   },

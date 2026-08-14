@@ -8,15 +8,6 @@ export const metadata: Metadata = {
   description: truncateForDescription(
     "See real AI interview feedback. Browse sample coding sessions graded A+ to C, including Two Sum, Binary Tree, and Dynamic Programming problems."
   ),
-  keywords: [
-    "coding interview feedback examples",
-    "mock interview sample reports",
-    "AI interview feedback",
-    "Two Sum solution feedback",
-    "coding interview grading",
-    "DSA interview examples",
-    "interview performance analysis",
-  ],
   alternates: {
     canonical: "/samples",
   },
