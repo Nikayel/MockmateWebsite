@@ -3570,6 +3570,37 @@ afford RAM; IVF-PQ when scale and memory dominate.
 }
 \`\`\`
 
+### The same tradeoff, priced at two scales
+
+"HNSW when you can afford RAM" is not a rule you can apply until you know what RAM costs, and the
+answer flips inside this one lesson. Renting memory by the instance works out to roughly **5 dollars
+per GB-month**, against roughly **0.08 dollars per GB-month** for SSD block storage: RAM is on the
+order of 50 to 100x the price of the same byte on disk. Those are approximate figures that drift
+year to year, but the gap between them is structural and has held for a long time. HNSW keeps the
+vectors and the link graph **resident**, so this is a standing monthly floor, not a peak.
+
+\`\`\`
+200,000 chunks at 1,536 dims (this lesson's running example)
+  HNSW resident   1.2 GB vectors + 0.03 GB links  = ~1.3 GB   -> ~7 dollars a month
+  IVF-PQ          200,000 x 64 bytes = 13 MB                  ->  cents
+  what the recall loss buys you                               -> about 7 dollars a month
+
+100,000,000 chunks at 1,536 dims
+  HNSW resident   614 GB vectors + 13 GB links    = ~630 GB   -> ~3,100 dollars a month
+                  plus one replica to survive a node loss     -> ~6,300 dollars a month
+  IVF-PQ          100M x 64 bytes = 6.4 GB, fits one box      ->    ~65 dollars a month
+  what the recall loss buys you                               -> about 6,000 dollars a month
+\`\`\`
+
+Same index families, same tradeoff, opposite answers, and the only thing that moved was the
+magnitude. At 200,000 chunks the entire memory argument is worth about 7 dollars a month, so trading
+away recall to win it is a bad deal and you should not even raise IVF-PQ: take HNSW, and take it
+inside Postgres. At 100 million the same few points of recall buy roughly 6,000 dollars a month plus
+the difference between one modest machine and a sharded memory cluster with an on-call rotation, and
+that is when PQ becomes the senior answer. An interviewer who asks "why HNSW here" is checking
+whether you know which side of that line you are on, so say the scale out loud before you name an
+index.
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -3661,7 +3692,14 @@ vector database for 50k chunks; pgvector is plenty.
 **distance metric** (cosine for normalized text embeddings, dot product, or L2). **Chunking**
 strategy (size and overlap) hugely affects retrieval quality. And critically, **re-embedding
 migrations**: if you switch embedding models, every stored vector is now in a different space and
-must be **re-embedded**, an expensive backfill you must plan for, so version your embeddings.
+must be **re-embedded**, an expensive backfill you must plan for, so version your embeddings. Price
+that backfill in the right currency before you fear the wrong one. Re-embedding those 100 million
+chunks at roughly 500 tokens each is about 50 billion tokens, and at something like 0.02 dollars per
+million tokens for a small hosted embedding model (approximate, and still falling) that is about
+1,000 dollars: a rounding error beside the 3,100 dollars a month the index already costs. What
+actually bites is that you must keep serving the old index while you build the new one, so the
+resident memory bill doubles for the length of the migration, and provider rate limits rather than
+money decide how long that is.
 
 Recap: Vector databases do approximate nearest-neighbor search over embeddings, trading recall for
 latency and memory; choose HNSW for recall at cost of RAM or IVF-PQ for billion-scale memory
