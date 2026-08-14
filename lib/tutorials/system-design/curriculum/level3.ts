@@ -1770,12 +1770,109 @@ cold start. A cold cache is a stampede on every key at once, so "just flush and 
 at scale. You **warm** the cache before taking traffic, or ramp traffic gradually, and keep
 coalescing on. Treating a flush as free is the classic mistake.
 
-\`\`\`
-NAIVE (stampede)                 COALESCED (singleflight)
- key expires                      key expires
-  req1 -> DB \\                     req1 -> lock -> DB -> set cache
-  req2 -> DB  }  N queries         req2..N -> wait -> read cache
-  reqN -> DB /  DB at 100%         => exactly 1 DB query
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Stampede versus singleflight, the instant a hot key expires",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "naive_reqs",
+      "label": "Req 1 to N: every one misses at the same instant",
+      "kind": "client"
+    },
+    {
+      "id": "naive_db",
+      "label": "Database: N concurrent copies of the same slow rebuild, CPU at 100 percent",
+      "kind": "db"
+    },
+    {
+      "id": "first_req",
+      "label": "Req 1: wins the lock and rebuilds",
+      "kind": "client"
+    },
+    {
+      "id": "other_reqs",
+      "label": "Req 2 to N: block on the single in-flight rebuild",
+      "kind": "client"
+    },
+    {
+      "id": "lock",
+      "label": "Per-key lock (Redis SET NX with a short TTL) so one node across the fleet rebuilds",
+      "kind": "cache"
+    },
+    {
+      "id": "co_db",
+      "label": "Database: exactly one rebuild per expiry",
+      "kind": "db"
+    },
+    {
+      "id": "co_cache",
+      "label": "Cache repopulated once",
+      "kind": "cache"
+    }
+  ],
+  "edges": [
+    {
+      "from": "naive_reqs",
+      "to": "naive_db",
+      "kind": "sync",
+      "label": "each miss launches its own duplicate query, and the pile grows faster than the first rebuild finishes"
+    },
+    {
+      "from": "first_req",
+      "to": "lock",
+      "kind": "sync",
+      "label": "acquires"
+    },
+    {
+      "from": "other_reqs",
+      "to": "lock",
+      "kind": "sync",
+      "label": "blocked on the same key"
+    },
+    {
+      "from": "lock",
+      "to": "co_db",
+      "kind": "sync",
+      "label": "exactly one query reaches the origin"
+    },
+    {
+      "from": "co_db",
+      "to": "co_cache",
+      "kind": "sync",
+      "label": "the rebuilt value is written back once"
+    },
+    {
+      "from": "co_cache",
+      "to": "other_reqs",
+      "kind": "feedback",
+      "label": "the waiters wake and read the fresh value"
+    }
+  ],
+  "groups": [
+    {
+      "id": "naive",
+      "label": "Naive: every miss rebuilds independently",
+      "nodes": [
+        "naive_reqs",
+        "naive_db"
+      ]
+    },
+    {
+      "id": "coalesced",
+      "label": "Coalesced: request coalescing (singleflight)",
+      "nodes": [
+        "first_req",
+        "other_reqs",
+        "lock",
+        "co_db",
+        "co_cache"
+      ]
+    }
+  ],
+  "caption": "Coalescing does not make the rebuild faster, it makes it singular. It fixes rebuild-on-miss only: a genuinely hot key whose value is present needs replication across shards or an L1 near cache instead."
+}
 \`\`\`
 
 Recap: stop expiry stampedes with request coalescing (singleflight) plus jittered TTLs and
@@ -2597,11 +2694,37 @@ and **shards by prefix**, and a proximity query becomes a prefix range scan. The
 problems**: two points a meter apart can straddle a cell edge and share almost no prefix. The fix is
 to query the target cell **plus its 8 neighbors** (a 3x3 ring) so you never miss a nearby point.
 
-\`\`\`
-  geohash "9q8yy" and neighbors (query a 3x3 ring to avoid edge misses):
-     9q8yw 9q8yx 9q8yz
-     9q8yt [9q8yy] 9q8zn      <- center cell + 8 neighbors
-     9q8ym 9q8yq 9q8yr
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Neighbor ring",
+    "West",
+    "Center",
+    "East"
+  ],
+  "rows": [
+    [
+      "North",
+      "9q8yw",
+      "9q8yx",
+      "9q8yz"
+    ],
+    [
+      "Center",
+      "9q8yt",
+      "9q8yy (the query cell)",
+      "9q8zn"
+    ],
+    [
+      "South",
+      "9q8ym",
+      "9q8yq",
+      "9q8yr"
+    ]
+  ],
+  "caption": "Two points a meter apart can straddle a cell edge and share almost no prefix, so a proximity query prefix-scans the center cell plus all eight neighbors, then does an exact-distance filter and sort on the small candidate set."
+}
 \`\`\`
 
 ### Quadtree, S2, and H3
