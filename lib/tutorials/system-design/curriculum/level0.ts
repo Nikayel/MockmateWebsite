@@ -548,6 +548,80 @@ per year, versus 99.9% which is about 8.7 hours) because the extra nine changes 
 multi-region failover. It means concrete scale (100M DAU, 50k peak QPS) because that is what forces
 sharding.
 
+The nines are also where an availability promise quietly stops being yours alone. Your service
+sits on a path of other services, and the request only succeeds if every one of them does.
+
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "What a chain of dependencies does to your availability promise",
+  "predictPrompt": {
+    "question": "Five services sit on one request path, each promising 99.99% availability. What can you honestly promise the user?",
+    "options": [
+      "99.99%, the number every service promises",
+      "About 99.95%",
+      "99.999%, five services help each other",
+      "It depends which one fails"
+    ]
+  },
+  "workedExample": "At four nines apiece, one service is allowed about 53 minutes of downtime a year. Put five of them in series on the same request path and the availabilities multiply rather than hold: 0.9999 to the fifth power is 99.95%, which is about 4.4 hours a year, five times the budget you thought you had. Drag the path out to ten services and the honest promise falls to 99.9%, about 8.8 hours, which is the three-nines number from the paragraph above.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "nines",
+      "label": "Nines each service promises",
+      "min": 2,
+      "max": 5,
+      "scale": "linear",
+      "step": 1,
+      "initial": 4,
+      "unit": "nines"
+    },
+    {
+      "kind": "slider",
+      "id": "services",
+      "label": "Services on the request path",
+      "min": 1,
+      "max": 12,
+      "scale": "linear",
+      "step": 1,
+      "initial": 5,
+      "unit": "services"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "single_uptime",
+      "label": "Availability of one service",
+      "expr": "1 - pow(10, -nines)",
+      "format": "percent"
+    },
+    {
+      "id": "single_downtime",
+      "label": "Downtime budget per service, per year",
+      "expr": "(1 - single_uptime) * 31536000",
+      "format": "duration"
+    },
+    {
+      "id": "chain_uptime",
+      "label": "Availability the user actually gets",
+      "expr": "pow(single_uptime, services)",
+      "format": "percent"
+    },
+    {
+      "id": "chain_downtime",
+      "label": "Downtime the user actually sees, per year",
+      "expr": "(1 - chain_uptime) * 31536000",
+      "format": "duration",
+      "sparkline": {
+        "over": "services"
+      }
+    }
+  ],
+  "caption": "Availability multiplies down a serial path, it does not hold. Every extra hop on the critical path is a tax on the number you promise, which is why the lever an availability NFR forces is redundancy and graceful degradation rather than more nines painted on each box."
+}
+\`\`\`
+
 ### The categories worth walking every time
 
 - **Scalability:** target DAU and peak QPS. Lever: horizontal sharding, stateless services behind a
