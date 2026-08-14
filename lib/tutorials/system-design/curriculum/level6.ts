@@ -1886,6 +1886,222 @@ A unique constraint (or a Redis \`SET key value NX\`, or a DynamoDB conditional 
 }
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "sequence",
+  "title": "Two duplicates, one millisecond apart",
+  "actors": [
+    {
+      "id": "client",
+      "label": "Client"
+    },
+    {
+      "id": "srv_a",
+      "label": "Server A"
+    },
+    {
+      "id": "srv_b",
+      "label": "Server B"
+    },
+    {
+      "id": "store",
+      "label": "Dedup store"
+    }
+  ],
+  "toggles": [
+    {
+      "id": "atomic",
+      "label": "Make the check-and-set atomic",
+      "description": "One insert guarded by a unique constraint, instead of a read and then a write."
+    }
+  ],
+  "steps": [
+    {
+      "from": "client",
+      "to": "srv_a",
+      "kind": "request",
+      "label": "Charge, key k-91",
+      "when": "!atomic",
+      "state": {
+        "row for k-91": "absent",
+        "charges": "0"
+      }
+    },
+    {
+      "from": "client",
+      "to": "srv_b",
+      "kind": "request",
+      "label": "Retry, same key k-91",
+      "when": "!atomic",
+      "state": {
+        "row for k-91": "absent",
+        "charges": "0"
+      }
+    },
+    {
+      "from": "srv_a",
+      "to": "store",
+      "kind": "request",
+      "label": "Read: is k-91 there?",
+      "when": "!atomic"
+    },
+    {
+      "from": "store",
+      "to": "srv_a",
+      "kind": "response",
+      "label": "Not present",
+      "when": "!atomic",
+      "state": {
+        "row for k-91": "absent",
+        "charges": "0"
+      }
+    },
+    {
+      "from": "srv_b",
+      "to": "store",
+      "kind": "request",
+      "label": "Read: is k-91 there?",
+      "when": "!atomic",
+      "predict": {
+        "question": "Server A has read but has not written yet. What does Server B's read return?",
+        "options": [
+          "A's row, so B returns the stored result",
+          "Not present, so B also decides to execute",
+          "An error, because the store serializes the two reads"
+        ]
+      }
+    },
+    {
+      "from": "store",
+      "to": "srv_b",
+      "kind": "response",
+      "label": "Not present",
+      "when": "!atomic",
+      "state": {
+        "row for k-91": "absent",
+        "charges": "0"
+      }
+    },
+    {
+      "from": "srv_a",
+      "to": "store",
+      "kind": "request",
+      "label": "Write k-91, charge card",
+      "when": "!atomic",
+      "state": {
+        "row for k-91": "seen",
+        "charges": "1"
+      }
+    },
+    {
+      "from": "srv_b",
+      "to": "store",
+      "kind": "request",
+      "label": "Write k-91, charge card",
+      "when": "!atomic",
+      "status": "error",
+      "state": {
+        "row for k-91": "seen",
+        "charges": "2"
+      }
+    },
+    {
+      "from": "srv_b",
+      "kind": "note",
+      "label": "Customer charged twice",
+      "status": "error",
+      "when": "!atomic",
+      "state": {
+        "row for k-91": "seen",
+        "charges": "2"
+      }
+    },
+    {
+      "from": "client",
+      "to": "srv_a",
+      "kind": "request",
+      "label": "Charge, key k-91",
+      "when": "atomic",
+      "state": {
+        "row for k-91": "absent",
+        "charges": "0"
+      }
+    },
+    {
+      "from": "client",
+      "to": "srv_b",
+      "kind": "request",
+      "label": "Retry, same key k-91",
+      "when": "atomic",
+      "state": {
+        "row for k-91": "absent",
+        "charges": "0"
+      }
+    },
+    {
+      "from": "srv_a",
+      "to": "store",
+      "kind": "request",
+      "label": "Insert k-91 or conflict",
+      "when": "atomic"
+    },
+    {
+      "from": "srv_b",
+      "to": "store",
+      "kind": "request",
+      "label": "Insert k-91 or conflict",
+      "when": "atomic"
+    },
+    {
+      "from": "store",
+      "to": "srv_a",
+      "kind": "response",
+      "label": "You won the key",
+      "when": "atomic",
+      "state": {
+        "row for k-91": "in progress",
+        "charges": "0"
+      }
+    },
+    {
+      "from": "store",
+      "to": "srv_b",
+      "kind": "response",
+      "label": "Conflict, key taken",
+      "status": "late",
+      "when": "atomic",
+      "state": {
+        "row for k-91": "in progress",
+        "charges": "0"
+      }
+    },
+    {
+      "from": "srv_a",
+      "to": "store",
+      "kind": "request",
+      "label": "Charge, save the result",
+      "when": "atomic",
+      "state": {
+        "row for k-91": "completed",
+        "charges": "1"
+      }
+    },
+    {
+      "from": "srv_b",
+      "to": "client",
+      "kind": "response",
+      "label": "A's stored result",
+      "when": "atomic",
+      "state": {
+        "row for k-91": "completed",
+        "charges": "1"
+      }
+    }
+  ],
+  "caption": "Watch the shared row, not the arrows. Both reads land before either write, so a read-then-write check passes twice and the card is charged twice. Flip the toggle and one insert wins the unique constraint: the loser gets a conflict and returns the winner's saved result, which is why the store has to hold the result rather than a seen flag."
+}
+\`\`\`
+
 ## Sizing the dedup window
 
 The dedup store keeps keys for a TTL, and that TTL must be **at least as long as the longest window in which a duplicate can arrive.** Two windows matter: the client retry horizon (how long clients keep retrying, usually minutes) and the broker **replay/retention** window (Kafka can replay days of history during a reprocess or consumer reset). If your dedup TTL is 1 hour but you replay a 3-day-old topic, every replayed message looks new and re-applies. Size the TTL to cover the replay window, or use a permanent natural key so replays are inherently safe.
