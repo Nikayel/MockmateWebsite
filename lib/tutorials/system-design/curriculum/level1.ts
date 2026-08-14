@@ -4286,10 +4286,40 @@ plus tuned OS limits:
   thousands of threads reserve tens of GB. That is a real cost, though blocking IO is what actually
   caps thread-per-request; event loops sidestep both by not having a thread per connection.
 
-\`\`\`
-Thread-per-request:   [req]->thread->BLOCK on IO (idle, 8MB)   ... caps at ~thousands
-Event loop:           epoll -> 1 thread -> 100k idle sockets   ... never block it
-                                     \`-> CPU task? offload to worker pool (N=cores)
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Model",
+    "What holds one in-flight request",
+    "What idling costs",
+    "Where it stops"
+  ],
+  "rows": [
+    [
+      "Thread-per-request",
+      "a thread, blocked inside the IO call",
+      "a reserved stack (8MB on glibc, 1MB in a JVM) plus a scheduler slot, all of it idle while it waits",
+      "a few thousand connections, because blocking IO caps it before memory does"
+    ],
+    [
+      "Event loop",
+      "a file descriptor registered with epoll or kqueue, on one thread",
+      "a descriptor and a little kernel state, no stack",
+      "around 100k idle sockets, and one blocking call freezes every one of them"
+    ],
+    [
+      "Event loop plus worker pool",
+      "the loop for the waiting, a pool worker for the computing",
+      "the same as the event loop, plus N worker threads sized to the core count",
+      "the core count for CPU work, which is the ceiling async cannot move"
+    ]
+  ],
+  "highlightCols": [
+    "Model"
+  ],
+  "caption": "Event loops are for waiting, thread and worker pools are for computing. The third row is the one people skip: a JSON.parse of a 50MB payload or an image transcode left on the loop serializes the whole server behind it, so CPU work is offloaded rather than made async."
+}
 \`\`\`
 
 Recap: CPU-bound work wants a worker pool sized to cores, IO-bound fan-out wants an event loop
