@@ -3140,6 +3140,46 @@ to query the target cell **plus its 8 neighbors** (a 3x3 ring) so you never miss
 }
 \`\`\`
 
+### The exact-distance filter is haversine, not Pythagoras
+
+The cell scan hands you candidates, not an answer: cells are rectangles and your query is a circle,
+so something has to measure the real distance and cut. That something is the **haversine formula**,
+which takes two lat/lng pairs and returns metres along the great circle. Treating lat/lng as a flat
+plane is the tempting shortcut, and it is wrong by a factor of \`cos(latitude)\` on the east-west
+axis, because a degree of longitude narrows as you leave the equator.
+
+\`\`\`
+haversine(lat1, lng1, lat2, lng2) -> metres, with R = 6371000 (mean Earth radius)
+
+  dLat = radians(lat2 - lat1)
+  dLng = radians(lng2 - lng1)
+  a    = sin(dLat/2)^2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dLng/2)^2
+  c    = 2 * atan2(sqrt(a), sqrt(1 - a))
+  return R * c
+
+rider  (37.7749, -122.4194)   Union Square, San Francisco
+driver (37.7849, -122.4094)   0.01 degrees north, 0.01 degrees east
+
+  dLat = dLng                                   = 0.00017453 rad
+  sin(dLat/2)^2                                 = 7.6154e-9
+  cos(37.7749) * cos(37.7849) * sin(dLng/2)^2
+      = 0.79042 * 0.79032 * 7.6154e-9           = 4.7572e-9
+  a                                             = 1.23727e-8
+  c    = 2 * atan2(sqrt(a), sqrt(1 - a))        = 2.2247e-4
+  d    = 6371000 * 2.2247e-4                    = 1417 metres
+
+flat-plane shortcut, for comparison:
+  sqrt(0.01^2 + 0.01^2) * 111320                = 1574 metres
+
+  157 metres too far, an 11 percent error, because at latitude 37.8 one degree of
+  longitude spans 111320 * cos(37.8) = about 88000 metres, not 111320.
+\`\`\`
+
+So a proximity query is three steps, and only the first one is the index: prefix-scan the center
+cell plus its 8 neighbors, run haversine on every candidate against the query point, then sort and
+cut at the radius. The cell key narrows the set; haversine is what actually answers "within 2 km".
+A 1417-metre answer and a 1574-metre answer are the difference between offering a driver and not.
+
 ### Quadtree, S2, and H3
 
 **Quadtree** recursively subdivides space into four quadrants, but only where it is dense: a downtown
@@ -3152,6 +3192,26 @@ spherical geometry, with 30 levels of precision. **H3 (Uber)** tiles the world i
 Hexagons matter because every neighbor is equidistant (a square has 4 close and 4 diagonal
 neighbors), which makes movement, coverage, and radius queries cleaner: exactly what a rideshare or
 delivery system wants.
+
+H3's neighbor query has a name you should use by name: \`kRing(cell, k)\` returns every cell within
+k steps of the center, center included (the h3 v4 spelling is \`gridDisk\`, same thing). Because a
+hexagon has exactly six neighbors, the ring sizes are regular arithmetic:
+
+\`\`\`
+kRing("8928308280fffff", 0)  ->  1 cell    the center only
+kRing("8928308280fffff", 1)  ->  7 cells   center + 6 neighbors, every one the same distance out
+kRing("8928308280fffff", 2)  -> 19 cells   center + 6 + 12
+
+count(k) = 3k^2 + 3k + 1
+
+the geohash equivalent, for contrast:
+  center + 8 neighbors, but the 4 diagonals sit about 1.41x further out than the 4 edge
+  neighbors, so a geohash "ring" is a square annulus, not a constant-radius one
+\`\`\`
+
+That is the practical payoff of equidistant neighbors: \`kRing(cell, k)\` covers a near-circular area
+of known radius, so sizing k to your query radius is arithmetic (k = ceil(radius / cell edge length))
+rather than guesswork, and the same k works in every direction.
 
 \`\`\`cswidget
 {
@@ -3194,7 +3254,7 @@ delivery system wants.
 The central tuning knob is **cell size versus cell count**. Finer cells hold fewer points (cheap
 scans) but a radius query must enumerate more cells; coarser cells mean fewer cells but more points
 per cell to scan and filter. Rule of thumb: pick a resolution near your **typical query radius**,
-query a **ring of neighbor cells**, then do a final exact-distance filter and sort on the small
+query a **ring of neighbor cells**, then do a final exact haversine filter and sort on the small
 candidate set.
 
 \`\`\`cswidget
