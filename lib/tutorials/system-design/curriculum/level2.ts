@@ -284,9 +284,9 @@ snapshot isolation cheap and is why read-heavy systems love it.
       "feedback": "Tempting, because it is true that no writer blocks on it. The damage is not blocking; it is what the database is forbidden to clean up while that old snapshot stays alive."
     },
     {
-      "label": "No. Its old snapshot pins version cleanup, so dead row versions accumulate as bloat and performance sinks.",
+      "label": "No, its old snapshot stops vacuum reclaiming dead versions",
       "correct": true,
-      "feedback": "Right. Vacuum cannot reclaim any version newer than the oldest snapshot, so one forgotten transaction can bloat a table to many times its live size."
+      "feedback": "Right. Vacuum cannot reclaim any row version newer than the oldest live snapshot, so one forgotten transaction holds that horizon still while writers keep creating versions alongside it. Dead tuples pile up as bloat, the table and its indexes swell to many times their live size, and sequential scans slow down. The damage was never blocking; it is the cleanup the database is forbidden to do."
     },
     {
       "label": "No, but only because the database automatically kills any transaction after a few minutes.",
