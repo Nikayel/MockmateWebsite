@@ -1701,6 +1701,47 @@ Two multipliers people forget, both of which change the answer materially:
 - **Index and overhead.** Secondary indexes, B-tree overhead, and free space commonly add 20 to 50% on
   top of raw row size for databases.
 
+### Price the multiplier, because the price is what decides
+
+"Consider tiering" is not a judgement, it is a gesture at one. The judgement needs a number, so carry
+three approximate storage prices and say out loud that they are approximate: standard cloud object
+storage is roughly 20 dollars per TB-month, archive tiers roughly 1 to 4 dollars per TB-month, and
+in-memory cache roughly 5 dollars per GB-month, which is 5,000 dollars per TB-month. The absolute
+figures drift year to year and large customers negotiate them down, so hedge them. The ratios survive:
+memory is over 200x the price of object storage per byte, and archive is another 10x below standard.
+
+Run the replication lever on the 12 TB above:
+
+\`\`\`
+raw payload                     12 TB
+RF=3, standard object store     36 TB x ~20 USD/TB-month  ~=   720 USD a month
+erasure coded at ~1.4x          17 TB x ~20 USD/TB-month  ~=   340 USD a month
+saving                                                    ~=   380 USD a month
+\`\`\`
+
+Now run the identical lever on the media service in the exercise below, 20 TB of new blobs a day held
+for five years:
+
+\`\`\`
+raw payload                    ~36 PB  (36,500 TB)
+RF=3, standard object store    ~110 PB x ~20 USD/TB-month ~=  2.2M USD a month
+erasure coded at ~1.4x          ~51 PB x ~20 USD/TB-month ~=  1.0M USD a month
+saving                                                    ~=  1.2M USD a month
+\`\`\`
+
+Same lever, same percentage saved, opposite decisions. At 12 TB the whole argument is worth 380
+dollars a month, less than an afternoon of your time, so tiering is a footnote and spending three
+interview minutes on it is a mistake. At 36 PB it is over a million dollars a month, which is a
+headcount, and a candidate who never raises it has walked past the dominant line item in their own
+design. Magnitude, not principle, decides whether a cost lever is worth naming.
+
+Name the catch beside the saving, or the number is only half an argument. Erasure coding rebuilds a
+lost shard by reading the surviving shards, so a failure costs read bandwidth and CPU instead of a
+straight copy, which suits cold blobs that are rarely read and suits a hot tier badly. Archive tiers
+cut the bill by that further 10x and charge for it in restore time of minutes to hours, per-GB
+retrieval fees, and a minimum storage duration. That is why the answer is tier by age rather than move
+everything: the bytes you are still reading stay where reads are cheap.
+
 ### Bandwidth: ingress and egress separately
 
 \`\`\`
@@ -1739,6 +1780,17 @@ lets 20% of the data serve 80% of reads also means the leftover requests are spr
 long tail, so going from an 80% to a 90% hit rate costs a bit more than double (70 GB becomes about
 164 GB on this service), and 99% needs most of the actively-read slice. Each extra nine is bought at a
 worse price than the one before it.
+
+At the approximate 5 dollars per GB-month above, those three cache sizes are about 350 dollars a month
+for the 80% target, about 820 for 90%, and near 1,750 for 99%. Two decisions fall out of that, and
+neither one falls out of the percentages alone. First, the sizing mistake now has a bill: quoting 900
+GB off the retained 4.5 TB rather than the actively-read window is about 4,500 dollars a month to hold
+bytes nobody is asking for, and it climbs every time somebody extends retention. Second, whether to
+buy the extra ten points of hit rate is arithmetic. Those points cost about 470 dollars a month and
+remove 10% of origin reads: at 50k read QPS that is 5k QPS, which fits inside one existing replica's
+headroom, so you are paying for nothing. At 500k QPS the same ten points is 50k QPS, which at the tens
+of thousands of reads per second one node sustains is two or three read replicas you no longer run,
+and now the cache is the cheap side of the trade.
 
 \`\`\`cswidget
 {
@@ -1872,7 +1924,9 @@ total storage pulled from thin air.
 Recap: size storage as objects x size x retention with metadata and blobs kept separate, multiply by
 replication factor and add index overhead, compute ingress and egress bandwidth separately (egress
 drives CDN), and size the cache from the hot ~20% of the actively read window against a target hit
-rate.
+rate. Then price it at roughly 20 dollars per TB-month for object storage and 5 dollars per GB-month
+for cache memory, because the same tiering lever is a footnote at 12 TB and over a million dollars a
+month at 36 PB.
 
 \`\`\`cswidget
 {
