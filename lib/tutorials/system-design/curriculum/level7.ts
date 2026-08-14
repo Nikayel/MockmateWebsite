@@ -2955,6 +2955,260 @@ Blast radius is the safety discipline that separates engineering from sabotage. 
 
 \`\`\`cswidget
 {
+  "type": "steps",
+  "title": "One experiment, from steady state to auto-abort",
+  "frames": [
+    {
+      "note": "Step one injects nothing. It measures the output that means healthy to a user, which is why the steady state is checkouts per second and never CPU. Without this line there is nothing for the rest of the experiment to be compared against.",
+      "rows": [
+        {
+          "label": "Steady state, checkouts/s",
+          "cells": [
+            {
+              "text": "120"
+            },
+            {
+              "text": "119"
+            },
+            {
+              "text": "121"
+            },
+            {
+              "text": "120"
+            }
+          ]
+        },
+        {
+          "label": "Blast radius",
+          "cells": [
+            {
+              "text": "nothing injected yet",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "Abort condition",
+          "cells": [
+            {
+              "text": "halt if checkouts/s falls 10%"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The hypothesis names the mechanism you expect to absorb the fault, which is what lets the experiment fail rather than merely happen. The blast radius starts at the smallest scope that can still test it: one instance, off-peak.",
+      "rows": [
+        {
+          "label": "Steady state, checkouts/s",
+          "cells": [
+            {
+              "text": "120"
+            },
+            {
+              "text": "120"
+            },
+            {
+              "text": "119"
+            },
+            {
+              "text": "120"
+            }
+          ]
+        },
+        {
+          "label": "Hypothesis",
+          "cells": [
+            {
+              "text": "one node dies, failover absorbs it",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "Blast radius",
+          "cells": [
+            {
+              "text": "1 instance, off-peak",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "Abort condition",
+          "cells": [
+            {
+              "text": "halt if checkouts/s falls 10%"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The metric stayed inside tolerance, so the failover you designed is evidence now instead of a guess. Note what has not been tested: nothing here says anything about losing a whole availability zone.",
+      "rows": [
+        {
+          "label": "Steady state, checkouts/s",
+          "cells": [
+            {
+              "text": "120"
+            },
+            {
+              "text": "118"
+            },
+            {
+              "text": "119",
+              "state": "active"
+            },
+            {
+              "text": "120"
+            }
+          ]
+        },
+        {
+          "label": "Fault injected",
+          "cells": [
+            {
+              "text": "terminate 1 instance",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "Blast radius",
+          "cells": [
+            {
+              "text": "1 instance, off-peak"
+            }
+          ]
+        },
+        {
+          "label": "Result",
+          "cells": [
+            {
+              "text": "hypothesis held",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Expanding to a whole zone crosses the threshold: cross-zone failover is not holding the way the single-instance run suggested. This is the weakness found on your terms in the afternoon rather than on its own at 3 a.m.",
+      "rows": [
+        {
+          "label": "Steady state, checkouts/s",
+          "cells": [
+            {
+              "text": "120"
+            },
+            {
+              "text": "104"
+            },
+            {
+              "text": "96"
+            },
+            {
+              "text": "91",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "Fault injected",
+          "cells": [
+            {
+              "text": "dark one availability zone",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "Blast radius",
+          "cells": [
+            {
+              "text": "1 AZ, 5% of traffic",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "Abort condition",
+          "cells": [
+            {
+              "text": "halt if checkouts/s falls 10%",
+              "state": "active"
+            }
+          ]
+        }
+      ],
+      "predict": {
+        "question": "Checkouts have fallen from 120 to 91 per second, past the 10 percent abort condition. What happens next?",
+        "options": [
+          "The experiment halts and reverts itself",
+          "The team watches to see whether it recovers on its own",
+          "It runs on to full scope, since a dark zone is a realistic fault"
+        ]
+      }
+    },
+    {
+      "note": "The abort is tied to the error budget, so an experiment can never cost more than your reliability target already tolerates. Random breakage has no steady state to be compared against and no threshold that stops it, and that is the whole difference.",
+      "rows": [
+        {
+          "label": "Steady state, checkouts/s",
+          "cells": [
+            {
+              "text": "91"
+            },
+            {
+              "text": "108"
+            },
+            {
+              "text": "118"
+            },
+            {
+              "text": "120",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "Fault injected",
+          "cells": [
+            {
+              "text": "reverted by the auto-abort",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "Error budget spent",
+          "cells": [
+            {
+              "text": "0.4% of the month",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "Action item",
+          "cells": [
+            {
+              "text": "fix cross-AZ failover, then retest",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Every frame is governed by two numbers chosen in advance: the steady state the hypothesis is written against, and the threshold that stops the run. Take either away and what is left is not an experiment."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "check",
   "kind": "predict",
   "id": "why-production-not-staging",
