@@ -3689,6 +3689,219 @@ consumer group G: P0 -> C1, P1 -> C2   (one partition per consumer)
    process msg -> commit offset  (at-least-once) ; dedupe by id -> exactly-once processing
 \`\`\`
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Consumer group G as consumers and partitions come and go",
+  "frames": [
+    {
+      "note": "Two partitions, two consumers. Each partition is assigned to exactly one consumer in the group, so both have work, and every message routed to P0 is processed in offset order.",
+      "rows": [
+        {
+          "label": "P0",
+          "cells": [
+            {
+              "text": "m0"
+            },
+            {
+              "text": "m1"
+            },
+            {
+              "text": "m2"
+            }
+          ]
+        },
+        {
+          "label": "P1",
+          "cells": [
+            {
+              "text": "n0"
+            },
+            {
+              "text": "n1"
+            },
+            {
+              "text": "n2"
+            }
+          ]
+        },
+        {
+          "label": "group G",
+          "cells": [
+            {
+              "text": "C1 reads P0"
+            },
+            {
+              "text": "C2 reads P1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "predict": {
+        "question": "A third consumer joins group G and the topic still has two partitions. What does C3 do?",
+        "options": [
+          "Takes a share of both partitions, so throughput rises by half",
+          "Sits idle, because a partition goes to exactly one consumer in a group",
+          "Takes over P1, and C2 becomes its standby",
+          "Splits P0 by key, so C1 and C3 both read it"
+        ]
+      },
+      "note": "C3 sits idle. Parallelism inside a consumer group is capped by the partition count, so a consumer beyond that count is spare capacity for the next rebalance, not extra throughput.",
+      "rows": [
+        {
+          "label": "P0",
+          "cells": [
+            {
+              "text": "m0",
+              "state": "dim"
+            },
+            {
+              "text": "m1",
+              "state": "dim"
+            },
+            {
+              "text": "m2",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "P1",
+          "cells": [
+            {
+              "text": "n0",
+              "state": "dim"
+            },
+            {
+              "text": "n1",
+              "state": "dim"
+            },
+            {
+              "text": "n2",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "group G",
+          "cells": [
+            {
+              "text": "C1 reads P0"
+            },
+            {
+              "text": "C2 reads P1"
+            },
+            {
+              "text": "C3 idle",
+              "state": "dropped"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Adding a partition is what adds parallelism, and the group rebalances to pick it up. The cost lands on ordering: a key that used to hash to P0 can now hash to P2, and there is no ordering between partitions.",
+      "rows": [
+        {
+          "label": "P0",
+          "cells": [
+            {
+              "text": "m0"
+            },
+            {
+              "text": "m1"
+            },
+            {
+              "text": "m2"
+            }
+          ]
+        },
+        {
+          "label": "P1",
+          "cells": [
+            {
+              "text": "n0"
+            },
+            {
+              "text": "n1"
+            },
+            {
+              "text": "n2"
+            }
+          ]
+        },
+        {
+          "label": "P2",
+          "cells": [
+            {
+              "text": "p0",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "group G",
+          "cells": [
+            {
+              "text": "C1 reads P0"
+            },
+            {
+              "text": "C2 reads P1"
+            },
+            {
+              "text": "C3 reads P2",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Within a partition the offset is committed after processing, never before. A crash between the two redelivers m1, which is at-least-once delivery and exactly why the consumer dedupes on a message id. Committing first would be at-most-once and would lose it.",
+      "rows": [
+        {
+          "label": "P0",
+          "cells": [
+            {
+              "text": "m0 processed"
+            },
+            {
+              "text": "m1 in flight",
+              "state": "active"
+            },
+            {
+              "text": "m2 waiting",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "committed offset",
+          "cells": [
+            {
+              "text": "0",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "on crash",
+          "cells": [
+            {
+              "text": "m1 is redelivered",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Partition count is doing two jobs at once: it is the only way to order a key's events, and the only way to add consumer parallelism."
+}
+\`\`\`
+
 **Recap:** model it as a partitioned append-only log with per-partition ordering, get durability from ISR replication and acks=all, offer at-least-once delivery plus idempotent consumers for exactly-once processing (never claim exactly-once delivery), and scale reads with consumer groups where parallelism equals partition count.
 
 \`\`\`cswidget
