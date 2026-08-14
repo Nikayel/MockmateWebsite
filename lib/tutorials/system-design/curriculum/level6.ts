@@ -973,14 +973,40 @@ One \`account_id\` (a celebrity, an omnibus account, a viral post) can flood its
 others idle. You cannot just split it, because splitting breaks the ordering you keyed for. Options,
 in order of preference:
 
-\`\`\`
-Hot key "acct_42" floods partition 3:
- (a) Compound key: hash(account_id + sub_stream) -> spread across a few
-     partitions, but ordering now only holds within each sub-stream.
- (b) Salting: key = account_id + (0..k) -> k partitions, then a downstream
-     merge/serializer re-establishes per-account order by sequence number.
- (c) Accept it: if the hot key truly needs strict single-stream order,
-     one partition is the ceiling; scale vertically and isolate it.
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Mitigation",
+    "What the key becomes",
+    "Ordering you keep",
+    "What it costs"
+  ],
+  "rows": [
+    [
+      "Compound key",
+      "hash(account_id + sub_stream)",
+      "Order holds within each sub-stream only",
+      "The account's history is now spread over a few partitions, so nothing downstream sees one account in order"
+    ],
+    [
+      "Salting",
+      "account_id + (0..k)",
+      "Order holds within each salted sub-stream only",
+      "k partitions of throughput, paid for with a downstream merge that re-establishes per-account order by sequence number"
+    ],
+    [
+      "Accept the ceiling",
+      "account_id, unchanged",
+      "Strict single-stream order for the account",
+      "One partition is the throughput ceiling: scale that broker vertically and isolate the hot key"
+    ]
+  ],
+  "highlightCols": [
+    "Ordering you keep"
+  ],
+  "caption": "The hot key acct_42 floods partition 3 while the others idle. Every mitigation trades ordering scope for throughput, and the third row is the honest answer when strict per-account order is a real requirement rather than a habit."
+}
 \`\`\`
 
 Every mitigation trades ordering scope for throughput. You either keep strict per-account order (one
@@ -1285,11 +1311,40 @@ rebalances, each a latency and duplicate spike.
 }
 \`\`\`
 
-\`\`\`
-Group "ranking", topic 6 partitions, 3 consumers:
-  C1 -> p0,p1   C2 -> p2,p3   C3 -> p4,p5
-C3 dies -> rebalance -> C1 -> p0,p1,p4   C2 -> p2,p3,p5
- Eager: ALL stop, revoke everything, reassign. Cooperative: only p4,p5 move.
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Consumer",
+    "Assignment",
+    "After C3 misses its heartbeats",
+    "Moved?"
+  ],
+  "rows": [
+    [
+      "C1",
+      "p0, p1",
+      "p0, p1, p4",
+      "gains p4"
+    ],
+    [
+      "C2",
+      "p2, p3",
+      "p2, p3, p5",
+      "gains p5"
+    ],
+    [
+      "C3",
+      "p4, p5",
+      "removed from the group",
+      "loses both"
+    ]
+  ],
+  "highlightCols": [
+    "After C3 misses its heartbeats"
+  ],
+  "caption": "Group ranking over a 6-partition topic with 3 consumers, so each partition has exactly one owner and a 7th consumer would sit idle. Eager rebalancing stops all three, revokes everything, and reassigns from scratch. Cooperative rebalancing moves only p4 and p5, so C1 and C2 keep processing their untouched partitions throughout."
+}
 \`\`\`
 
 **Cooperative (incremental) rebalancing** revokes only the partitions that must move, so consumers
