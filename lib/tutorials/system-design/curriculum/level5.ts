@@ -1240,7 +1240,73 @@ Spanner *waits out epsilon* (until \`TT.now().earliest > t\`) before releasing l
 acknowledging. That deliberate wait guarantees any transaction that starts later gets a strictly
 higher timestamp, giving Spanner **external consistency (linearizability) globally**. The price: a
 couple of milliseconds of added commit latency on every write, plus GPS and atomic clocks in every
-datacenter.
+datacenter. The interval is **twice epsilon wide**, so the expected wait is about \`2 * epsilon\`, and
+the transaction spends all of it still holding its locks.
+
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Commit-wait: what bounded clock uncertainty costs every write",
+  "predictPrompt": {
+    "question": "A GPS antenna degrades and TrueTime's uncertainty widens from 4 ms to 12 ms. What happens to one contended row?",
+    "options": [
+      "Nothing: the wait is per transaction, so throughput is untouched",
+      "Its ceiling on commits per second nearly halves",
+      "Reads slow down, but writes are unaffected"
+    ]
+  },
+  "workedExample": "Start at Spanner's published numbers: about 4 ms of uncertainty and a 10 ms Paxos quorum round trip. The commit-wait is roughly 8 ms, the locks are held for about 18 ms in total, and one contended row therefore tops out near 55 commits per second no matter how much hardware you point at it. Now drag uncertainty out to 12 ms, which is what a failing time master looks like, and watch the ceiling fall while every individual commit still looks fast.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "epsilon",
+      "label": "Clock uncertainty (epsilon) reported by TrueTime",
+      "min": 0.5,
+      "max": 20,
+      "scale": "linear",
+      "step": 0.5,
+      "initial": 4,
+      "unit": "ms"
+    },
+    {
+      "kind": "slider",
+      "id": "quorum",
+      "label": "Paxos quorum round trip for the commit",
+      "min": 1,
+      "max": 100,
+      "scale": "linear",
+      "step": 1,
+      "initial": 10,
+      "unit": "ms"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "wait",
+      "label": "Commit-wait, twice epsilon",
+      "expr": "2 * epsilon / 1000",
+      "format": "duration"
+    },
+    {
+      "id": "hold",
+      "label": "How long the commit holds its locks",
+      "expr": "(quorum + 2 * epsilon) / 1000",
+      "format": "duration"
+    },
+    {
+      "id": "ceiling",
+      "label": "Ceiling on commits per second for one contended row",
+      "expr": "1000 / (quorum + 2 * epsilon)",
+      "format": "number",
+      "unit": "commits/s",
+      "sparkline": {
+        "over": "epsilon"
+      }
+    }
+  ],
+  "caption": "The wait is not latency you can hide behind more replicas: it happens with the locks held, so it sets a hard ceiling on how fast a single hot row can commit. Clock uncertainty is a throughput input as well as a correctness one, which is why Spanner alerts on epsilon rather than merely reporting it."
+}
+\`\`\`
 
 \`\`\`csdiagram
 {

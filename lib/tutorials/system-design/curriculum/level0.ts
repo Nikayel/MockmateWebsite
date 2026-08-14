@@ -2348,6 +2348,43 @@ recipient's connection receiving a push, or the recipient client pulling on reco
 you to notice gaps: where is the message stored before delivery, what happens if the recipient is
 offline, how does the sender get an ack.
 
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "One chat message traced end to end",
+  "stages": [
+    {
+      "label": "Client",
+      "note": "sends on an open WebSocket"
+    },
+    {
+      "label": "Gateway",
+      "note": "auth, rate limit, TLS termination"
+    },
+    {
+      "label": "Chat service",
+      "note": "validates, assigns a message id"
+    },
+    {
+      "label": "Message store",
+      "note": "durable write, then ack the sender"
+    },
+    {
+      "label": "Delivery queue",
+      "note": "async fan-out to recipients"
+    },
+    {
+      "label": "Recipient",
+      "note": "push if online, pull on reconnect"
+    }
+  ],
+  "highlight": [
+    "Message store"
+  ],
+  "caption": "The write path and the delivery path of one message, in the order they happen. Tracing it is what surfaces the gaps: where the message waits before delivery, what happens when the recipient is offline, and at which stage the sender gets an ack."
+}
+\`\`\`
+
 **Interview nuance:** label your arrows. An arrow should carry what flows and how: "WebSocket frame,"
 "gRPC call," "async event on Kafka topic \`messages\`." Unlabeled arrows hide the exact decisions
 interviewers probe. Group boxes into tiers (edge, service, data) so the diagram stays legible as it
