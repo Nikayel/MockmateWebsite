@@ -4334,7 +4334,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-url-shortener",
           title: "Design a URL Shortener (TinyURL)",
           summary:
-            "Estimate first (~1.2K writes/sec, ~116K reads/sec, ~20 TB/yr), generate keys with base62 of a counter/Snowflake to avoid collisions and hotspots, serve reads from Redis in front of a sharded KV store, and choose 301 vs 302 by whether you need click analytics.",
+            "Why a URL shortener refuses an AUTO_INCREMENT primary key, and how base62 keys plus a cache carry 116K reads per second.",
           estimatedMinutes: 35,
           difficulty: "easy",
           skills: ["url-shortener", "kv-store", "caching"],
@@ -4383,7 +4383,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-rate-limiter",
           title: "Design a Distributed Rate Limiter",
           summary:
-            "Pick the algorithm by burst tolerance (token bucket) vs accurate hard cap (sliding window counter), keep the shared counter in Redis with an atomic INCR+TTL or Lua script to avoid the read-modify-write race, compute time on the Redis side to dodge clock skew, and consciously choose fail-open vs fail-closed on a Redis outage.",
+            "Token bucket for bursts, sliding window counter for an accurate cap, and one Lua script so twenty nodes cannot each grant the full limit.",
           estimatedMinutes: 35,
           difficulty: "medium",
           skills: ["rate-limiter", "redis", "distributed"],
@@ -4432,7 +4432,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-unique-id-generator",
           title: "Design a Distributed Unique ID Generator (Snowflake)",
           summary:
-            "Budget the 64 bits (timestamp high for sortability, worker id, sequence), which lets every node mint millions of unique IDs per second with zero coordination; defend the clock by refusing to issue on a backward jump; and remember that sortability trades away unpredictability, so hide raw ids when enumeration is a threat.",
+            "How Snowflake spends 64 bits so every node mints sortable ids alone, and why a clock that jumps backwards must stop issuing.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["snowflake", "id-generation", "clocks"],
@@ -4481,7 +4481,7 @@ export const systemDesignLevel10: DesignLevel = {
           id: "sd-l10-typeahead",
           title: "Design Typeahead / Autocomplete",
           summary:
-            "Serve completions from a trie with top-k cached per node so lookup is O(prefix length) with no subtree walk, rank offline by frequency/recency/personalization, refresh from a Kafka stream (batch rebuild plus incremental for trending), and cut origin load with client debouncing and edge caching, never a per-keystroke SQL LIKE query.",
+            "Why a typeahead trie caches its top-k at every node, and how debouncing and edge caching shed most keystroke traffic before the origin.",
           estimatedMinutes: 35,
           difficulty: "medium",
           skills: ["typeahead", "trie", "ranking"],
