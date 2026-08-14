@@ -94,17 +94,17 @@ have a shared contract and you move. If they correct you, you just avoided desig
   "prompt": "You ask 'How many users should I design for?' and the interviewer shrugs: 'You tell me.' What is the strongest response?",
   "options": [
     {
-      "label": "Ask a narrower follow-up, like whether it is more or less than a million users",
-      "feedback": "Tempting, a narrower question feels safer. But you are still waiting for the oracle to hand you an answer, and the clock keeps running."
+      "label": "Ask a narrower follow-up, above or below a million users",
+      "feedback": "Tempting, because a yes-or-no question feels easier to answer than an open one. But you are still waiting for an oracle to hand you a number, and the clock runs at the same speed either way."
     },
     {
-      "label": "Propose a number out loud: 'I will assume 100 million DAU and a 100:1 read to write ratio, is that reasonable?'",
+      "label": "Propose a number and ask for a nod",
       "correct": true,
-      "feedback": "Right. Treat the interviewer as a collaborator: a proposed assumption gets a yes or a correction in seconds, and either way it signals seniority."
+      "feedback": "Right. Say it out loud: 'I will assume 100 million DAU and a 100 to 1 read to write ratio, is that reasonable?' A proposed assumption gets a yes or a correction in seconds, which is the collaborator move rather than the oracle move, and it signals seniority."
     },
     {
-      "label": "Skip scale for now and start on the data model; you can size things later",
-      "feedback": "Tempting because it feels like progress, but scale decides one database versus a sharded fleet. Sizing later can mean redesigning later."
+      "label": "Skip scale and start on the data model",
+      "feedback": "Tempting because it feels like progress, but scale decides one database versus a sharded fleet. Sizing later usually means redesigning later, and the redesign lands in the minutes you least have to spare."
     }
   ]
 }
@@ -127,17 +127,17 @@ Three to five questions, a restated scope, then draw.
   "prompt": "The interviewer says 'design a photo-sharing app' and goes quiet. What is the strongest opening move?",
   "options": [
     {
-      "label": "Start drawing the load balancer and services so the whiteboard fills early",
-      "feedback": "Tempting, because momentum feels like progress. But you are now designing an unagreed system: this is the jumping-to-boxes failure mode the lesson names."
+      "label": "Start drawing the load balancer and the service tier",
+      "feedback": "Tempting, because momentum feels like progress. But you are now designing a system nobody agreed to, which is the jumping-to-boxes failure mode this lesson names. A full whiteboard of the wrong system is worth less than an empty one."
     },
     {
-      "label": "Ask a dozen clarifying questions until every requirement is pinned down",
-      "feedback": "Half right: clarifying matters, but interrogation burns the clock. The lesson's bar is three to five questions, not a checklist recital."
+      "label": "Ask a dozen clarifying questions until everything is pinned down",
+      "feedback": "Half right: clarifying matters. But interrogation is the other failure mode, and the bar here is three to five sharp questions, not a checklist recital. A dozen questions leaves no clock for the design they were supposed to unblock."
     },
     {
-      "label": "Propose scoped assumptions out loud (users, scale, read/write mix), get a nod, restate, then draw",
+      "label": "Propose scoped assumptions, get a nod, then draw",
       "correct": true,
-      "feedback": "Right. Proposing assumptions instead of open-ended asking is faster and signals seniority, and the restated scope becomes your shared contract."
+      "feedback": "Right. Name the users, the scale, and the read/write mix as proposals rather than open questions, take the nod, and restate the scope in one sentence. That restatement is your shared contract, and it costs seconds instead of minutes."
     }
   ],
   "reveal": "In your design write below, open exactly this way: propose the scale and consistency assumptions, restate the scope in one sentence, and only then name components."
@@ -339,17 +339,17 @@ sharding.
   "prompt": "For the feed you promise both strong consistency and 99.99% availability. Then a network partition splits your replicas. What are your options?",
   "options": [
     {
-      "label": "Keep both promises; that is what replication is for",
-      "feedback": "Tempting, replication solves many things. But during a partition the replicas cannot talk: serving reads risks stale data, and refusing them sacrifices availability. There is no third door."
+      "label": "Keep both; that is what replication is for",
+      "feedback": "Tempting, because replication does solve durability and read scaling. But during a partition the replicas cannot reach each other, and holding both promises at once is the single thing replication cannot buy you."
     },
     {
-      "label": "Pick one: serve possibly stale data (availability) or refuse requests (consistency)",
+      "label": "Pick one: stale data or refused requests",
       "correct": true,
-      "feedback": "Right. Under a partition it is availability or consistency, never both. For a feed, a few seconds of staleness beats an error page, which is the AP stance the next paragraph defends."
+      "feedback": "Right. Serving reads from a replica that cannot sync risks stale data, and refusing those reads sacrifices availability. There is no third door. For a feed, a few seconds of staleness beats an error page, which is the AP stance the next paragraph defends."
     },
     {
-      "label": "Invest in better network hardware so partitions never happen",
-      "feedback": "Partitions are a when, not an if, in any distributed system. A design that assumes they never happen has no answer when the interviewer forces the choice."
+      "label": "Buy better hardware so partitions never happen",
+      "feedback": "Better networks lower the rate of partitions and never reach zero, so this is a when rather than an if. A design that assumes partitions never happen has no answer at all when the interviewer forces the choice."
     }
   ]
 }
