@@ -2551,16 +2551,16 @@ across multiple write nodes that would collide on the next value.
   "prompt": "To fix the rightmost-page insert hotspot, you switch the clustered primary key from auto-increment to random UUIDv4. What happens to write performance on a large table?",
   "options": [
     {
-      "label": "It improves: inserts now spread across the whole B-tree instead of piling onto one page.",
-      "feedback": "This is exactly the tempting logic, and the spreading is real. The catch: every insert now touches a random page, so the hot working set becomes the entire index instead of one page."
+      "label": "It improves: inserts spread across the tree, not one page",
+      "feedback": "This is exactly the tempting logic, and the spreading is real. The catch is what spreading costs once the table no longer fits in memory: you stopped concentrating the load and started scattering it."
     },
     {
-      "label": "It often gets worse: every insert lands on a random page, pages split constantly, the cache can no longer hold the working set, and the index fragments.",
+      "label": "It often gets worse: now every page is hot",
       "correct": true,
-      "feedback": "Right. You traded one hot page for touching all pages. On a large table this can multiply write cost and index size several-fold, which is why random UUIDv4 as a clustered key is such a common and expensive mistake."
+      "feedback": "Right. You traded one hot page for touching all of them. Each insert lands on a random page, so pages split constantly, the index fragments, and the working set you must keep cached becomes the whole index instead of its right edge. On a large table that can multiply write cost and index size several-fold, which is why random UUIDv4 as a clustered primary key is such a common and expensive mistake."
     },
     {
-      "label": "Nothing changes: the key's value has no effect on where rows are stored.",
+      "label": "Nothing changes; the key value does not decide where rows sit",
       "feedback": "Tempting if you picture the primary key as just a lookup handle, but in a clustered index the key literally determines physical row placement. That is exactly why this column is so high-leverage."
     }
   ]
@@ -2866,9 +2866,9 @@ constraints, enforce invariants with DB constraints, and pick types that encode 
       "feedback": "Coordination-free, yes, but as a clustered key it fragments the index. You would trade the hotspot disease for the fragmentation disease."
     },
     {
-      "label": "A ULID or UUIDv7 surrogate key, with natural attributes as UNIQUE constraints and invariants enforced by NOT NULL, FOREIGN KEY, and CHECK.",
+      "label": "ULID or UUIDv7: time-ordered and coordination-free.",
       "correct": true,
-      "feedback": "Right. Time-ordered for index locality, random-tailed for coordination-free generation across writers, immutable because it carries no business meaning, and the database enforces the invariants no service can write around."
+      "feedback": "Right. The millisecond timestamp prefix gives auto-increment-like index locality, the random tail keeps it collision-free and generatable on any writer with no coordination, and carrying no business meaning makes it immutable as a foreign-key target. Keep email and the other natural attributes beside it as UNIQUE constraints, and let NOT NULL, FOREIGN KEY, and CHECK enforce the invariants no service can write around."
     }
   ],
   "reveal": "The full checklist for the design write: a surrogate, time-ordered ID (ULID/UUIDv7, or Snowflake if you need 64 bits and have worker-id assignment), natural attributes as UNIQUE constraints, invariants in the database via NOT NULL, FOREIGN KEY, and CHECK, money as integer cents, timezone-aware timestamps, and a deliberate soft-vs-hard delete decision."
