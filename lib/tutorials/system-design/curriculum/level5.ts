@@ -3274,6 +3274,92 @@ a row and B is declared dead. Simple, but the fixed threshold is exactly the fla
 threshold tuned for a quiet datacenter false-positives the moment latency rises under load, precisely
 when you least want spurious failovers.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "One fixed timeout, two costs, moving in opposite directions",
+  "predictPrompt": {
+    "question": "You halve the heartbeat interval so a real crash is caught twice as fast. What happens to the other cost?",
+    "options": [
+      "Nothing: detection simply gets faster",
+      "It eats the margin that absorbs a routine GC pause",
+      "Both costs fall together, which is why fast detection is free"
+    ]
+  },
+  "workedExample": "The starting values are the ordinary ones: a 1 second heartbeat, three missed beats before declaring death, and a node carrying 500 requests per second. Detection takes 3 seconds, so roughly 1,500 requests are routed into a node that is already dead. The margin over a routine 800 ms stall is 2.2 seconds, so a healthy but paused node survives. Now drag the interval down to 200 ms to buy fast detection and watch the margin go negative: the detector starts evicting healthy nodes, which is flapping.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "interval",
+      "label": "Heartbeat interval",
+      "min": 100,
+      "max": 3000,
+      "scale": "linear",
+      "step": 100,
+      "initial": 1000,
+      "unit": "ms"
+    },
+    {
+      "kind": "slider",
+      "id": "misses",
+      "label": "Missed beats before declaring the node dead",
+      "min": 1,
+      "max": 10,
+      "scale": "linear",
+      "step": 1,
+      "initial": 3
+    },
+    {
+      "kind": "slider",
+      "id": "stall",
+      "label": "Worst routine stall on a healthy node (GC pause, NIC hiccup)",
+      "min": 100,
+      "max": 3000,
+      "scale": "linear",
+      "step": 100,
+      "initial": 800,
+      "unit": "ms"
+    },
+    {
+      "kind": "slider",
+      "id": "qps",
+      "label": "Requests per second routed to that node",
+      "min": 10,
+      "max": 2000,
+      "scale": "linear",
+      "step": 10,
+      "initial": 500,
+      "unit": "QPS"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "detect",
+      "label": "Time to notice a real crash",
+      "expr": "interval * misses / 1000",
+      "format": "duration"
+    },
+    {
+      "id": "blackhole",
+      "label": "Requests sent into the black hole before anyone notices",
+      "expr": "ceil(detect * qps)",
+      "format": "compact",
+      "unit": "requests"
+    },
+    {
+      "id": "margin",
+      "label": "Margin over the routine stall (negative evicts a healthy node)",
+      "expr": "(interval * misses - stall) / 1000",
+      "format": "duration",
+      "sparkline": {
+        "over": "interval"
+      }
+    }
+  ],
+  "caption": "The two costs disagree, and no setting of a fixed timeout makes both small. That is completeness versus accuracy as a number rather than a slogan, and it is the argument for a detector that adapts its threshold per link instead of one number chosen for the whole fleet."
+}
+\`\`\`
+
 ### Phi-accrual: adapt to the link
 
 **Phi-accrual failure detection** (the Cassandra/Akka lineage) outputs a continuous **suspicion level

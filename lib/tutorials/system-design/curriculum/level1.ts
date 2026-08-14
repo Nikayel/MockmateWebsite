@@ -1900,6 +1900,39 @@ in CI. If a provider is about to ship a change that violates a consumer's expect
 fails *before* deploy, not at 2am in production. This is the single highest-leverage practice for
 teams shipping independent services.
 
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "Schema first: one artifact, everything else generated from it",
+  "stages": [
+    {
+      "label": "Schema",
+      "note": "OpenAPI, a Protobuf IDL, or GraphQL SDL: the single source of truth"
+    },
+    {
+      "label": "Generate",
+      "note": "server stubs, client SDKs, request validation, reference docs"
+    },
+    {
+      "label": "Consumer expectations",
+      "note": "each consumer records the fields and behavior it actually relies on"
+    },
+    {
+      "label": "Provider CI",
+      "note": "every provider build replays those expectations against the new code"
+    },
+    {
+      "label": "Deploy",
+      "note": "a breaking change fails the build here, not at 2am in production"
+    }
+  ],
+  "highlight": [
+    "Provider CI"
+  ],
+  "caption": "The contract cannot drift from the implementation because the implementation is generated from it or validated against it. Coordination between the two teams is not a stage in this chain, which is the point: it does not scale past a handful of services."
+}
+\`\`\`
+
 **Interview nuance:** when asked "how do you keep two teams' services compatible," the strong answer
 is "schema as source of truth plus consumer-driven contract tests in CI," not "we coordinate
 releases." Coordination does not scale past a handful of services.
