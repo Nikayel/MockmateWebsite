@@ -25,13 +25,13 @@ Authentication answers one question: who is this request from? Keep it strictly 
       "feedback": "Tempting because encryption sounds like the serious option, but encryption is reversible by design and the key usually lives near the data. You never need to read a password back, so reversibility is pure downside."
     },
     {
-      "label": "Hash each password with SHA-256, since hashes cannot be reversed",
+      "label": "Hash each password with SHA-256",
       "feedback": "Tempting because SHA-256 really is one-way, but it is built for speed: GPUs test hundreds of billions of SHA-256 guesses per second, so the dumped table is crackable offline in days."
     },
     {
-      "label": "Hash with a slow, memory-hard KDF like argon2id plus a unique per-user salt",
+      "label": "Hash each password with argon2id and a per-user salt",
       "correct": true,
-      "feedback": "Right. A KDF tuned to cost 50 to 100 ms per guess makes offline cracking economically hopeless, and per-user salts kill precomputed tables. Add a pepper held in a KMS and the dump alone can never be cracked."
+      "feedback": "Right. argon2id is a slow, memory-hard key derivation function, so tuning it to cost 50 to 100 ms per guess makes offline cracking economically hopeless, and a unique per-user salt kills precomputed rainbow tables. Add a pepper held in a KMS and the dump alone can never be cracked."
     }
   ]
 }
@@ -111,9 +111,9 @@ Defend against credential stuffing (attackers replaying passwords leaked from ot
       "feedback": "Tempting because distinct status codes feel like clean API design, but different codes are the loudest enumeration oracle of all; a script does not even need to parse the body."
     },
     {
-      "label": "The exact same generic error, status code, and near-identical timing as a wrong password",
+      "label": "The same generic error, status code, and timing",
       "correct": true,
-      "feedback": "Right. Any observable difference in message, code, or timing tells an attacker whether the account exists. Pair this with per-account and per-IP throttling and breached-password checks."
+      "feedback": "Right. Any observable difference in message, status code, or response time tells an attacker whether the account exists, so all three have to match the wrong-password path exactly. Pair that with per-account and per-IP throttling, breached-password checks, and constant-time comparison so timing does not leak either."
     }
   ],
   "reveal": "In your design write, cover the full survivability stack the recap names: argon2id with per-user salt and a KMS pepper so the dump is dead, phishing-resistant MFA with SMS demoted to last resort, recovery flows as strong as the login itself, and enumeration-safe errors with throttling and breach checks."
@@ -147,9 +147,9 @@ During registration (WebAuthn \`navigator.credentials.create\`), the authenticat
       "feedback": "Tempting because the user gesture happens locally either way, but the gesture only unlocks a credential the browser is willing to use, and the browser refuses to use the real site's credential on any other origin."
     },
     {
-      "label": "No. The credential is bound to the exact origin, and the browser refuses to use it anywhere else",
+      "label": "No. The browser will not offer it on the wrong origin",
       "correct": true,
-      "feedback": "Right. Origin binding means the fake domain never sees a signature at all, and any signature is over a challenge tied to a specific origin, so it cannot be replayed. This is what phishing-resistant actually means."
+      "feedback": "Right. The credential is cryptographically bound to the exact origin, and the browser refuses to use it anywhere else, so the fake domain never sees a signature at all. Any signature it did somehow obtain is over a challenge tied to a specific origin and cannot be replayed. This is what phishing-resistant actually means."
     }
   ]
 }
@@ -223,9 +223,9 @@ If a passkey is device-bound and the device is gone, the user is locked out unle
       "feedback": "Tempting because the password is the weak link you want dead, but a hard cutover locks out every user whose only device just broke or who never enrolled; device loss needs a second enrolled authenticator or a fallback factor first."
     },
     {
-      "label": "Progressive enrollment: prompt users to add a passkey after a successful login, keep passwords working, and let passkey-only users disable their password later",
+      "label": "Progressive enrollment alongside the existing password",
       "correct": true,
-      "feedback": "Right. Enrollment rides on an already-authenticated session, nobody gets stranded, and the phishable credential is retired account by account instead of all at once."
+      "feedback": "Right. Prompt users to add a passkey after a successful login, keep passwords working, and let passkey-only users disable their password later. Enrollment rides on an already-authenticated session, nobody gets stranded, and the phishable credential is retired account by account instead of all at once."
     },
     {
       "label": "Keep the password as the primary credential and use the passkey only as a second factor forever",
