@@ -2703,6 +2703,41 @@ the main failure mode, what you would monitor (specific metrics and alerts), and
 driver. Add any unaddressed security or privacy gap as a prioritized next step. This wrap-up is what
 makes you sound like someone who has run systems in production, not just drawn them.
 
+### The cost driver is a ranking, and it is rarely the box you drew
+
+"Cost driver" means the line item that dominates the bill, so the answer is a ranking with a winner,
+not a list of things that cost money. Three candidates take that top spot almost every time: bytes
+that leave your network (egress), bytes you keep forever (raw x retention x replication factor), and
+memory or GPUs held hot so a request can be answered fast. Application compute is rarely the winner,
+and neither is the component you were proudest of drawing.
+
+Rank the photo feed from the exercise below, using the approximate prices from the storage lesson and
+saying out loud that they are approximate: about 20 dollars per TB-month for standard object storage,
+about 2 for an archive tier, about 5 dollars per GB-month for cache memory, and about 10 dollars per
+TB of CDN egress at negotiated volume.
+
+\`\`\`
+blob storage  100M new photos/day x 2 MB      = 200 TB/day, ~73 PB raw after a year
+              at RF=3, ~20 USD/TB-month       = ~4.4M USD a month, +360k each further month
+CDN egress    500M users x 50 views/day x 150 KB
+              = ~110 PB/month, ~10 USD/TB     = ~1.1M USD a month
+feed cache    500M feeds x 200 entries x ~64 B
+              = ~6.4 TB of RAM, ~5 USD/GB     = ~32k USD a month
+\`\`\`
+
+That ranking changes what you say in the last two minutes. Trimming precomputed feeds from 200 posts
+to 100, the change you can actually see on your own diagram, saves about 16,000 dollars a month
+against a bill near 5.5 million: a rounding error, and proposing it signals you optimized whatever you
+happened to draw. Ageing blobs past 90 days onto an archive tier attacks the top line instead, and
+since about three quarters of a year-old corpus is already older than 90 days, it moves most of that
+4.4 million into a tier costing roughly a tenth as much, paid for in restore latency on the rare old
+photo. Name the line you are attacking and roughly what it is worth, and the cost item stops being a
+checklist word.
+
+The storage line is also the only one of the three that grows while traffic is flat, which is what
+makes retention a design decision rather than an ops setting. Nobody has to use the product any more
+than they already do for that extra 360,000 dollars a month to arrive.
+
 **Interview nuance:** the wrap-up is where you volunteer what you did not have time to cover. "I did
 not address abuse or rate limiting; at this scale I would put that behind the gateway as the next
 step." Naming your own gaps is a seniority signal, not a weakness.
@@ -2888,7 +2923,8 @@ step." Naming your own gaps is a seniority signal, not a weakness.
 
 Recap: let the NFRs and traffic model pick the bottleneck, dive with the right lever, compare two
 options and commit with a quantified reason, then close in 2 to 3 minutes on the top remaining
-bottleneck, failure mode, monitoring, and cost driver.
+bottleneck, failure mode, monitoring, and cost driver, where the cost driver is the ranked top line
+with a rough monthly figure attached rather than the name of a component.
 
 \`\`\`cswidget
 {
