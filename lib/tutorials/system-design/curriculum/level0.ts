@@ -2512,6 +2512,33 @@ offline, how does the sender get an ack.
 }
 \`\`\`
 
+Tracing also surfaces a decision the boxes cannot show on their own: what puts the messages in order.
+Two clients send at almost the same moment, each stamping its own clock:
+
+\`\`\`
+client A, phone clock 12:00:03.100   "did you send it?"   reaches the chat service second
+client B, phone clock 12:00:02.900   "sending now"        reaches the chat service first
+
+ordered by the clients' clocks -> B, then A
+   but B's phone runs 400ms slow, so that order is fiction and nothing in the system can detect it
+\`\`\`
+
+The chat service is already assigning a message id on the way through, so give it the ordering job
+too. The conversation is the partition key, which means exactly one partition owns conversation c-77,
+and that one authority hands out a sequence number per conversation as messages arrive:
+
+\`\`\`
+partition owning c-77, next_seq = 41
+  B's message arrives  -> seq 41   stored in c-77
+  A's message arrives  -> seq 42   stored in c-77
+
+every reader of c-77 sorts by seq and sees the same order, including a client that reconnects
+and pulls everything after its last-seen seq. Client clocks are kept for display only.
+\`\`\`
+
+Server-assigned, monotonic, one authority per conversation. Across conversations there is no shared
+order, and none is needed, which is why the partition key can be the conversation.
+
 **Interview nuance:** label your arrows. An arrow should carry what flows and how: "WebSocket frame,"
 "gRPC call," "async event on Kafka topic \`messages\`." Unlabeled arrows hide the exact decisions
 interviewers probe. Group boxes into tiers (edge, service, data) so the diagram stays legible as it

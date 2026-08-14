@@ -1168,6 +1168,78 @@ when you are busiest. "Leveled" compaction (RocksDB default) gives better read a
 amplification but more write amplification; "size-tiered" (Cassandra default) is the reverse. Naming
 this tradeoff signals you have actually operated one.
 
+### The third strategy: compact by time, not by size
+
+Leveled and size-tiered both pick merge candidates by **size**, and on write-once, read-recent data
+that is the wrong axis. Picture a sensor table taking 24 GB a day, never updated, read almost
+entirely for "the last few hours." Under size-tiered compaction, a January SSTable keeps getting
+swept into merges with newer similarly-sized files for as long as it exists:
+
+\`\`\`
+size-tiered, day 90:
+  today's flushes  ->  merged with similar-sized files  ->  merged again as the result grows
+  ...
+  a January row has now been rewritten several times over, and nothing ever read it.
+  Write amplification is paid forever, on data that is immutable and cold.
+\`\`\`
+
+**Time-window compaction (TWCS)** buckets SSTables by the time range of the rows inside them and
+compacts only within the current window. Once a window closes, its file is final:
+
+\`\`\`
+TWCS with a one-day window, day 90:
+  window 2026-08-14  OPEN    today's flushes merge into one file for the day
+  window 2026-08-13  CLOSED  1 SSTable, never rewritten again
+  window 2026-08-12  CLOSED  1 SSTable, never rewritten again
+  ...
+  window 2026-05-16  CLOSED  every row past its TTL -> drop the whole file, no merge at all
+\`\`\`
+
+Two wins fall out. Cold data is written once and then left alone, so write amplification is bounded
+by roughly one window's volume instead of by the table's whole history. And expiry becomes a file
+delete: when every row in a closed window is past its TTL, the SSTable is dropped whole, with no
+compaction pass needed to find and discard expired rows one at a time.
+
+The price is the assumption. TWCS needs data to arrive roughly in time order and not be updated
+afterward. Backfill an old day and those rows land in the *current* window, so a read for that day
+now touches two windows and the guarantee frays. Use TWCS for append-only time-ordered data, and
+size-tiered or leveled for anything you overwrite.
+
+### Two LSM stores are not interchangeable: where the tail comes from
+
+"It is an LSM engine" does not finish the choice, because two engines implementing the same tree can
+behave very differently at p99. LSM tail latency has two sources, and they stack:
+
+- **Compaction contention.** A background merge is reading and writing hundreds of megabytes while
+  your queries want the same disk and CPU. Every LSM engine has this.
+- **Garbage-collection pauses.** Cassandra runs on the JVM. A heap holding large memtables and
+  per-request buffers produces stop-the-world collections, and a collection that freezes the process
+  freezes every in-flight request on that node with it. Nothing is running slowly; the process is
+  simply not running.
+
+\`\`\`
+Cassandra node under steady read load:
+  p50    ~1 ms
+  p99    tens of ms         compaction stealing disk and CPU from queries
+  p999   hundreds of ms     a stop-the-world GC pause landed on these requests
+\`\`\`
+
+That last line is why "tune compaction harder" does not fix it: a GC pause is not work you can
+schedule around. **ScyllaDB** is a C++ reimplementation of the same data model and wire protocol
+with no managed runtime, so there is no garbage collector to pause anything. It also pins one thread
+per core and shards the data across those cores (**shard-per-core**), so a request is served
+entirely on the core owning its shard, with no cross-core locking and no shared heap:
+
+\`\`\`
+Scylla node, same workload:
+  p50    ~1 ms
+  p99    single-digit ms    compaction, now scheduled against per-core I/O budgets
+  p999   single-digit ms    there is no garbage collector, so no pause to land on anything
+\`\`\`
+
+So a choice between two LSM stores is a runtime and threading argument, not a data-model one. If the
+pain you are solving is p99 and p999 rather than throughput or schema, that is the axis to argue on.
+
 \`\`\`csdiagram
 {
   "type": "topology",
@@ -1264,7 +1336,9 @@ this tradeoff signals you have actually operated one.
 
 Recap: B-tree updates pages in place for fast reads and range scans at the cost of write
 amplification; LSM appends to a memtable then compacts immutable SSTables for high write throughput,
-using bloom filters and compaction to keep reads sane.
+using bloom filters and compaction to keep reads sane. Pick the compaction strategy from the
+workload (time-window for append-only time-ordered data, size-tiered or leveled when you overwrite),
+and remember that between two LSM engines the tail latency argument is about the runtime.
 
 \`\`\`cswidget
 {
