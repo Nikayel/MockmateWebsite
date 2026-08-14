@@ -2585,9 +2585,29 @@ An audit log records who did what to which resource when, and its whole value is
 
 What to capture per event: actor (user or service identity), action, resource, timestamp, source IP/session, and result (success or failure). Critically, keep PII and secrets **out** of the audit log. The log is widely readable for investigations and retained for years, so a password or SSN in it is a second breach waiting to happen. Log that user 123 viewed record 456, not the record's contents.
 
-\`\`\`
-{ ts, actor, action, resource, source_ip, result, prev_hash, hash }
-   -> append-only stream -> WORM store (S3 Object Lock) + hash chain
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "The tamper-evident audit write path",
+  "stages": [
+    {
+      "label": "Event record",
+      "note": "ts, actor, action, resource, source_ip, result. No PII and no secrets: this log is widely readable and kept for years"
+    },
+    {
+      "label": "Append-only stream",
+      "note": "separate from application logs, so an insider who gains admin on the app cannot quietly edit it"
+    },
+    {
+      "label": "WORM store, plus a hash chain",
+      "note": "S3 Object Lock refuses to overwrite or delete before the retention date, and each entry carries prev_hash so removing any record breaks the chain"
+    }
+  ],
+  "highlight": [
+    "WORM store, plus a hash chain"
+  ],
+  "caption": "Log that user 123 viewed record 456, never the record's contents. The two techniques compose: WORM stops the edit, the hash chain proves none happened."
+}
 \`\`\`
 
 ## OWASP application defenses at the gateway
@@ -2681,12 +2701,37 @@ When a key or credential is compromised, panic causes two classic mistakes: wipi
 
 ## The NIST-style loop
 
-\`\`\`
-Detection  -> know something is wrong
-Containment-> stop the bleeding without destroying evidence
-Eradication-> remove the foothold, rotate secrets
-Recovery   -> restore trusted state, watch for reinfection
-Lessons    -> blameless postmortem, fix root cause
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "The NIST-style incident loop",
+  "stages": [
+    {
+      "label": "Detection",
+      "note": "the SIEM flags anomalous key use, a honeytoken fires, or an outsider tells you first"
+    },
+    {
+      "label": "Containment",
+      "note": "pull hosts from the load balancer, cut egress, revoke sessions. Stop the bleeding without destroying evidence"
+    },
+    {
+      "label": "Eradication",
+      "note": "remove the foothold and rotate every potentially exposed secret, only once evidence is preserved"
+    },
+    {
+      "label": "Recovery",
+      "note": "restore from a known-good, object-locked backup and watch closely for reinfection"
+    },
+    {
+      "label": "Lessons",
+      "note": "blameless postmortem, then actually fix the root cause"
+    }
+  ],
+  "highlight": [
+    "Containment"
+  ],
+  "caption": "Two things run in parallel with the whole loop from hour zero: forensic preservation with chain of custody, and the GDPR 72-hour notification clock. Wiping first feels decisive and destroys both."
+}
 \`\`\`
 
 **Detection.** Feed everything into centralized logging or a SIEM (Splunk, Elastic, a cloud-native equivalent) and alert on anomalous key usage: geo-velocity impossibilities (the key signs from two continents a minute apart), unusual volume, or calls at odd hours. Seed **honeytokens** (a fake credential that should never be used, so any use is a certain intrusion signal). And plan for the humbling reality that an outside party (a researcher, a customer, law enforcement) often notifies you first, so build an intake path for external reports.
