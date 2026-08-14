@@ -461,16 +461,16 @@ The tuning tradeoff: shorter windows and lower burn-rate thresholds detect probl
   "type": "check",
   "kind": "predict",
   "id": "burn-rate-arithmetic",
-  "prompt": "A service with a 99.9 percent objective has returned 1.44 percent errors for the last 40 minutes, and the last 5 minutes look the same. What fires, and why?",
+  "prompt": "A service with a 99.9 percent objective has returned 1.44 percent errors steadily for the last 90 minutes, and the last 5 minutes look the same. What fires, and why?",
   "options": [
     {
       "label": "A slow-burn ticket, since 1.44 percent is a small number",
       "feedback": "1.44 percent against a 0.1 percent budget is a 14.4x burn: about 2 percent of the month spent every hour, and the whole budget gone in roughly 2 days. That is the fast-burn case."
     },
     {
-      "label": "A fast-burn page: burn rate is the observed error rate divided by 1 minus the objective, so 1.44 over 0.1 is 14.4x, and both windows are over threshold",
+      "label": "A fast-burn page, because 1.44 over 0.1 is a 14.4x burn",
       "correct": true,
-      "feedback": "Right. The long window supplies significance and the short window is also over threshold, which is exactly the multi-window trigger."
+      "feedback": "Right. Burn rate is the observed error rate divided by 1 minus the objective, so 1.44 percent against a 0.1 percent budget is 14.4x. Ninety minutes of it fully covers the 1 hour long window, so that window reads 14.4x, and the 5 minute short window reads 14.4x as well. Both windows over threshold at the same moment is the multi-window trigger, and at that pace about 2 percent of the month goes every hour."
     },
     {
       "label": "Nothing: an error rate under 2 percent is inside a 99 percent objective",
