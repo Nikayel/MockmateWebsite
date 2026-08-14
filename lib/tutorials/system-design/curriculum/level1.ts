@@ -3239,18 +3239,38 @@ and naming things") is a joke that ships incidents.
 
 Think of caching as a **stack of layers**, each catching what the layer above missed:
 
-\`\`\`
-Browser cache (private, per user)
-   |
-CDN / edge POP (shared, geographic)
-   |
-Reverse proxy / gateway cache
-   |
-App in-memory cache (local, per instance)
-   |
-Distributed cache (Redis / Memcached, shared)
-   |
-Database buffer pool (pages in RAM)
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "Cache layers a read falls through",
+  "stages": [
+    {
+      "label": "Browser cache",
+      "note": "private, per user"
+    },
+    {
+      "label": "CDN / edge POP",
+      "note": "shared, geographic"
+    },
+    {
+      "label": "Reverse proxy / gateway cache",
+      "note": "shared, in front of your services"
+    },
+    {
+      "label": "App in-memory cache",
+      "note": "local, per instance"
+    },
+    {
+      "label": "Distributed cache",
+      "note": "Redis or Memcached, shared"
+    },
+    {
+      "label": "Database buffer pool",
+      "note": "pages in RAM"
+    }
+  ],
+  "caption": "Each layer only sees what the one above it missed, so the further down a read travels the more it costs. A product page image should be answered by the browser or the CDN; reaching the buffer pool for it means every layer above failed."
+}
 \`\`\`
 
 The closer to the user a request is served, the cheaper and faster it is, so you try to satisfy reads

@@ -173,13 +173,37 @@ the entire design. If you phrase them well, your data model and API almost write
 Consider a photo-sharing app like Instagram. The dozens of possible features include stories, reels,
 DMs, explore, shopping, and comments. But the core loop is:
 
-\`\`\`
-Requirement                         Noun(s)        Verb -> Endpoint
-------------------------------------------------------------------
-Users can post a photo              Photo, User    POST /photos
-Users can follow other users        Follow         POST /follows
-Users can view a feed of photos     Feed, Photo    GET  /feed
-       from people they follow
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Requirement",
+    "Nouns (entities)",
+    "Verb (endpoint)"
+  ],
+  "rows": [
+    [
+      "Users can post a photo",
+      "Photo, User",
+      "POST /photos"
+    ],
+    [
+      "Users can follow other users",
+      "Follow",
+      "POST /follows"
+    ],
+    [
+      "Users can view a feed of photos from people they follow",
+      "Feed, Photo",
+      "GET /feed"
+    ]
+  ],
+  "highlightCols": [
+    "Nouns (entities)",
+    "Verb (endpoint)"
+  ],
+  "caption": "Three requirements, three nouns, three endpoints. The nouns become the data model and the verbs become the API, which is why well-phrased requirements are the seed of the whole design."
+}
 \`\`\`
 
 Three requirements, three nouns, three endpoints. Everything else (search, notifications, likes,
@@ -370,14 +394,40 @@ Split read-path and write-path SLAs, because they are genuinely different system
 500ms and the tweet is durably stored" is the goal, with fan-out happening asynchronously afterward.
 Conflating them leads you to either make writes too slow or reads not durable enough.
 
-\`\`\`
-NFR                          -> forces
-------------------------------------------------
-p99 read < 200ms             -> Redis cache + CDN
-100M DAU, ~50k peak QPS      -> shard datastore, stateless app tier
-99.99% availability          -> multi-region replication, failover
-No data loss on ack          -> quorum/replicated writes, WAL
-Feed eventual consistency OK -> AP stance, async fan-out via Kafka
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Non-functional requirement",
+    "Design lever it forces"
+  ],
+  "rows": [
+    [
+      "p99 read under 200ms",
+      "Redis cache plus a CDN on the read path"
+    ],
+    [
+      "100M DAU, about 50k peak QPS",
+      "Shard the datastore, keep the app tier stateless"
+    ],
+    [
+      "99.99% availability",
+      "Multi-region replication with failover"
+    ],
+    [
+      "No data loss once a write is acked",
+      "Quorum or replicated writes, write-ahead log"
+    ],
+    [
+      "Feed may be eventually consistent",
+      "AP stance, async fan-out via Kafka"
+    ]
+  ],
+  "highlightCols": [
+    "Design lever it forces"
+  ],
+  "caption": "Each NFR is a number, and each one names the lever it forces. An NFR that forces no lever is filler, and you should drop it."
+}
 \`\`\`
 
 **Interview nuance:** When you state an NFR, immediately name the design lever it forces. That single
