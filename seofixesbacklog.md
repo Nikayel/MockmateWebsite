@@ -538,10 +538,42 @@ legacy index rows that consolidate on re-crawl.
 have ever received an impression. Spot-checked URLs return "URL is unknown to Google" despite being
 in the sitemap. This is normal queue latency for a young domain, not a defect.
 
-**Do.** Nothing beyond keeping the sitemap accurate and the internal linking dense (see SEO-24).
-Re-count indexed pages monthly.
+**Correction, 2026-08-14. The "normal queue latency" reading above is wrong, or at least incomplete.**
+Latency is uniform over time; what is actually in the data is level-shaped. Share of a level's
+lessons that have ever drawn an impression, 30 days to 2026-08-13, 205 of 425 lessons overall:
 
-**Accept.** Ranking page count grows month over month.
+| Level | Surfaced | Level | Surfaced |
+| --- | --- | --- | --- |
+| system-design/reliability-ops | 16/17 (94%) | system-design/interview-method | 7/15 (47%) |
+| system-design/event-driven | 14/15 (93%) | python/applied | 5/14 (36%) |
+| system-design/distributed-core | 16/18 (89%) | data-engineering/foundations | 4/11 (36%) |
+| system-design/data-storage | 15/17 (88%) | data-engineering/modeling | 2/12 (17%) |
+| system-design/specialized-systems | 13/15 (87%) | python/fundamentals | 3/21 (14%) |
+| system-design/case-studies | 24/28 (86%) | python/verification | 2/17 (12%) |
+| system-design/security-privacy | 13/16 (81%) | python/engineering | 1/10 (10%) |
+| system-design/foundations | 16/21 (76%) | data-engineering/advanced-company-sql | 1/14 (7%) |
+| system-design/scaling-data | 10/16 (63%) | **system-design/scaling-compute** | **1/14 (7%)** |
+
+`scaling-compute` is the finding. Every other System Design level except L0 and L3 sits at or above
+76 percent, and `git log --diff-filter=A` shows all twelve level files first landed on the same day,
+2026-07-05, so they have had identical time in the queue. Spot-inspected `sd-l4-rate-limit-algorithms`
+and `sd-l4-autoscaling`: both "Discovered - currently not indexed", both carrying exactly one
+referring URL. The control, `sd-l5-logical-clocks` (72 impressions), is "Submitted and indexed",
+crawled 2026-08-08, and has the SAME single referring URL. So internal-link COUNT is not what
+separates them, and SEO-24 will not fix this on its own.
+
+Note also that L4 is where the rate-limiting cluster lives (`sd-l4-rate-limit-algorithms`,
+`sd-l4-distributed-rate-limiting`), which is a high-demand interview query the site currently cannot
+receive because the pages are not in the index.
+
+**Do.** Treat the python and data-engineering figures as latency, since those tracks are younger and
+uniformly low. Treat `scaling-compute` as a specific case to diagnose: it is one level out of a
+cohort of twelve that shipped together, so whatever is suppressing it is a property of the level, not
+of the domain. Compare its rendered pages against an indexed sibling before proposing a fix, and
+request indexing on the two rate-limiting URLs to test whether they hold a position once crawled.
+
+**Accept.** Ranking page count grows month over month, and `scaling-compute` is either explained or
+above 50 percent.
 
 ### SEO-32 — Robots.txt validation on the three blocked pages
 
