@@ -2040,6 +2040,82 @@ cache** for speed, and **asynchronously sync** their consumption to Redis every 
 at most one sync interval's worth of traffic while keeping the hot path in local memory. Envoy's
 global rate limiting and many CDNs work roughly this way.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "What N nodes actually enforce",
+  "predictPrompt": {
+    "question": "Twenty gateway nodes each enforce the documented limit of 100 requests per minute, exactly as written. One user sprays requests across all twenty. What does the fleet actually allow that user?",
+    "options": [
+      "100 per minute: that is the limit",
+      "About 500 per minute",
+      "2000 per minute",
+      "It depends on which node the balancer picks"
+    ]
+  },
+  "workedExample": "Start where the lesson starts: 20 gateway nodes, a documented limit of 100 requests per minute, and a hybrid that syncs every 100ms. With every node enforcing the full 100 itself, the fleet allows 20 times 100, which is 2000 per minute. Nobody wrote a bug to get there; each node is obeying the number in the spec. Divide the budget instead and each node holds 100 / 20 = 5 per minute, which is correct only while the balancer spreads that user evenly across all twenty. Now read the third row: 100 per minute is 1.67 per second, a 100ms window is 0.167 of a request per node, so across 20 nodes the worst case overshoot before the next true-up is about 3 requests. Drag the sync interval to 2000ms and watch that bound grow twentyfold.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "nodes",
+      "label": "Gateway nodes in the fleet",
+      "min": 2,
+      "max": 50,
+      "step": 1,
+      "initial": 20,
+      "unit": "nodes"
+    },
+    {
+      "kind": "slider",
+      "id": "globalLimit",
+      "label": "The documented global limit",
+      "min": 60,
+      "max": 6000,
+      "step": 20,
+      "initial": 100,
+      "unit": "req/min"
+    },
+    {
+      "kind": "slider",
+      "id": "syncMs",
+      "label": "Hybrid sync interval",
+      "min": 50,
+      "max": 2000,
+      "step": 50,
+      "initial": 100,
+      "unit": "ms"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "naiveGlobal",
+      "label": "Naive per-node: what the fleet really allows",
+      "expr": "nodes * globalLimit",
+      "format": "compact",
+      "unit": "req/min",
+      "sparkline": {
+        "over": "nodes"
+      }
+    },
+    {
+      "id": "slice",
+      "label": "Local slice per node once you divide the budget",
+      "expr": "globalLimit / nodes",
+      "format": "number",
+      "unit": "req/min"
+    },
+    {
+      "id": "hybridOvershoot",
+      "label": "Hybrid worst case overshoot before the next true-up",
+      "expr": "nodes * (globalLimit / 60) * (syncMs / 1000)",
+      "format": "number",
+      "unit": "requests"
+    }
+  ],
+  "caption": "The first row is the whole problem: nothing is misconfigured, every node enforces the documented number, and the fleet still grants N times it. The third row is what you buy with the hybrid, a bounded overshoot you can quote out loud, instead of a Redis round trip on every single request."
+}
+\`\`\`
+
 **Interview nuance:** you will always be asked "what if Redis is down?" A rate limiter must not
 become a **single point of failure** for the whole API. The standard answer is **fail open**: if the
 shared store is unreachable, fall back to permissive local limits and let downstream load shedding

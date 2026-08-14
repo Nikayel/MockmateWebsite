@@ -2846,10 +2846,93 @@ A cache stampede happens when a hot key expires and thousands of concurrent requ
 
 Replication gives availability: each shard has a primary and one or more replicas, with async replication for speed (and a small window of lost writes on failover) or sync for safety. On primary failure a sentinel or the cluster gossip promotes a replica.
 
-\`\`\`
-GET k -> hash(k) -> ring -> node N3 (primary)
-   miss -> coalesce -> DB read -> SET k (jittered TTL) -> return
-hot key: replicate k to N3,N5,N7 -> client picks a random replica
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "One GET, and what happens when it misses",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "client",
+      "label": "Client: GET k",
+      "kind": "client"
+    },
+    {
+      "id": "ring",
+      "label": "Consistent hash ring (100 to 200 virtual nodes per physical node)",
+      "kind": "service"
+    },
+    {
+      "id": "n3",
+      "label": "Node N3: the first node clockwise from hash(k)",
+      "kind": "cache"
+    },
+    {
+      "id": "n5",
+      "label": "Node N5: hot-key replica",
+      "kind": "cache"
+    },
+    {
+      "id": "n7",
+      "label": "Node N7: hot-key replica",
+      "kind": "cache"
+    },
+    {
+      "id": "coalesce",
+      "label": "Request coalescing: one in-flight fetch per key, the rest wait for it",
+      "kind": "service"
+    },
+    {
+      "id": "db",
+      "label": "Database",
+      "kind": "db"
+    }
+  ],
+  "edges": [
+    {
+      "from": "client",
+      "to": "ring",
+      "kind": "sync",
+      "label": "hash(k), never hash mod N"
+    },
+    {
+      "from": "ring",
+      "to": "n3",
+      "kind": "sync",
+      "label": "the owner"
+    },
+    {
+      "from": "ring",
+      "to": "n5",
+      "kind": "sync",
+      "label": "hot key: the client picks a replica at random"
+    },
+    {
+      "from": "ring",
+      "to": "n7",
+      "kind": "sync"
+    },
+    {
+      "from": "n3",
+      "to": "coalesce",
+      "kind": "sync",
+      "label": "miss"
+    },
+    {
+      "from": "coalesce",
+      "to": "db",
+      "kind": "sync",
+      "label": "one read, however many waiters"
+    },
+    {
+      "from": "db",
+      "to": "n3",
+      "kind": "feedback",
+      "label": "SET k with a jittered TTL"
+    }
+  ],
+  "caption": "Consistent hashing spreads keys; it does nothing for a single hot key, because that is one key on one node. Replication answers the hot key, coalescing plus TTL jitter answers the stampede."
+}
 \`\`\`
 
 **Recap:** place keys with consistent hashing plus virtual nodes (never hash mod N), evict with LRU or LFU plus TTL, choose cache-aside by default, and defend hot keys with replication and stampedes with coalescing plus TTL jitter.
@@ -3010,10 +3093,127 @@ Reads may check several SSTables, so a bloom filter per SSTable skips ones that 
 
 Membership uses gossip: nodes periodically exchange state so the cluster learns of joins and failures without a central coordinator. Hinted handoff keeps writes available during a brief node outage: a neighbor accepts the write with a hint and replays it when the owner returns.
 
-\`\`\`
-write k=v -> coordinator -> replicas [N1,N2,N3]
-   commit log -> memtable -> (flush) SSTable ; bloom filter per SSTable
-   ack after W replicas ; read waits for R ; R+W>N overlaps
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "A write down the preference list, and where it lands on disk",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "client",
+      "label": "Client: write k=v",
+      "kind": "client"
+    },
+    {
+      "id": "coord",
+      "label": "Coordinator (any node): forwards to the preference list, acks after W replicas confirm",
+      "kind": "service"
+    },
+    {
+      "id": "n1",
+      "label": "Replica N1",
+      "kind": "db"
+    },
+    {
+      "id": "n2",
+      "label": "Replica N2",
+      "kind": "db"
+    },
+    {
+      "id": "n3",
+      "label": "Replica N3",
+      "kind": "db"
+    },
+    {
+      "id": "log",
+      "label": "Commit log (append-only, for durability)",
+      "kind": "db"
+    },
+    {
+      "id": "memtable",
+      "label": "Memtable (in memory, sorted)",
+      "kind": "cache"
+    },
+    {
+      "id": "sstable",
+      "label": "SSTable: immutable, sorted, one bloom filter per file",
+      "kind": "db"
+    },
+    {
+      "id": "read",
+      "label": "Read: waits for R replicas, and R + W > N forces the quorums to overlap",
+      "kind": "service"
+    },
+    {
+      "id": "repair",
+      "label": "Read repair, plus Merkle-tree anti-entropy between nodes",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "client",
+      "to": "coord",
+      "kind": "sync"
+    },
+    {
+      "from": "coord",
+      "to": "n1",
+      "kind": "sync",
+      "label": "N replicas clockwise on the ring"
+    },
+    {
+      "from": "coord",
+      "to": "n2",
+      "kind": "sync"
+    },
+    {
+      "from": "coord",
+      "to": "n3",
+      "kind": "sync"
+    },
+    {
+      "from": "n1",
+      "to": "log",
+      "kind": "sync",
+      "label": "every write is a sequential append"
+    },
+    {
+      "from": "log",
+      "to": "memtable",
+      "kind": "sync"
+    },
+    {
+      "from": "memtable",
+      "to": "sstable",
+      "kind": "async",
+      "label": "flush when it fills; nothing is updated in place"
+    },
+    {
+      "from": "n1",
+      "to": "read",
+      "kind": "sync",
+      "label": "R responses, not all N"
+    },
+    {
+      "from": "n2",
+      "to": "read",
+      "kind": "sync"
+    },
+    {
+      "from": "n3",
+      "to": "read",
+      "kind": "sync"
+    },
+    {
+      "from": "read",
+      "to": "repair",
+      "kind": "async",
+      "label": "replicas disagree: push the newest to the stale ones"
+    }
+  ],
+  "caption": "Quorum overlap buys freshness, not linearizability: concurrent writes, read-repair timing and sloppy quorums still allow anomalies, and true linearizability needs consensus."
+}
 \`\`\`
 
 **Recap:** partition with consistent hashing and replication factor N, tune consistency with R + W > N (which is freshness, not linearizability), resolve conflicts with vector clocks or LWW plus read-repair and Merkle anti-entropy, and store writes in an LSM (commit log, memtable, SSTable, compaction).
@@ -3173,10 +3373,101 @@ Multipart upload lets a client split a large object into parts, upload them in p
 
 Background health: every shard is checksummed on write and periodically scrubbed. A scrubber detects bit rot or a failed disk, reconstructs the lost shards from the survivors, and rebalances data when nodes are added or removed, which is how durability is maintained over years, not just at write time. Lifecycle policies tier cold objects to cheaper storage (S3 to Glacier).
 
-\`\`\`
-PUT obj -> split into k data shards -> compute m parity (Reed-Solomon)
-        -> place k+m shards across racks/AZs -> commit metadata (bucket+key -> shard map)
-GET range -> metadata lookup -> read shards covering range -> (reconstruct if shard missing)
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Erasure coding on the way in, a range read on the way out",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "put",
+      "label": "PUT object",
+      "kind": "client"
+    },
+    {
+      "id": "api",
+      "label": "Storage API (stateless front door)",
+      "kind": "service"
+    },
+    {
+      "id": "coder",
+      "label": "Erasure coder: k data shards plus m parity (Reed-Solomon), 10 + 4 costs 40 percent overhead",
+      "kind": "service"
+    },
+    {
+      "id": "placement",
+      "label": "Placement across different disks, racks and availability zones",
+      "kind": "service"
+    },
+    {
+      "id": "shards",
+      "label": "Shard stores: any k of the k + m shards reconstruct the object",
+      "kind": "db"
+    },
+    {
+      "id": "meta",
+      "label": "Metadata store: bucket plus key to shard map, range-partitioned so a prefix listing does not touch every shard",
+      "kind": "db"
+    },
+    {
+      "id": "get",
+      "label": "GET with a byte range",
+      "kind": "client"
+    },
+    {
+      "id": "reader",
+      "label": "Range read: only the shards covering the range, reconstructing if one is missing",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "put",
+      "to": "api",
+      "kind": "sync"
+    },
+    {
+      "from": "api",
+      "to": "coder",
+      "kind": "sync"
+    },
+    {
+      "from": "coder",
+      "to": "placement",
+      "kind": "sync",
+      "label": "k + m shards"
+    },
+    {
+      "from": "placement",
+      "to": "shards",
+      "kind": "sync"
+    },
+    {
+      "from": "placement",
+      "to": "meta",
+      "kind": "sync",
+      "label": "commit the shard map last"
+    },
+    {
+      "from": "get",
+      "to": "reader",
+      "kind": "sync"
+    },
+    {
+      "from": "meta",
+      "to": "reader",
+      "kind": "sync",
+      "label": "where the shards are"
+    },
+    {
+      "from": "shards",
+      "to": "reader",
+      "kind": "sync",
+      "label": "read amplification when a shard is gone"
+    }
+  ],
+  "caption": "Three-way replication costs 200 percent overhead and tolerates fewer losses than 10 + 4 does at 40 percent. The price of erasure coding is CPU on write and a degraded read when a shard is missing."
+}
 \`\`\`
 
 **Recap:** hit 11 nines with erasure coding (k + m Reed-Solomon, roughly 1.4x overhead) instead of 3x replication, scale the metadata index by partitioning bucket+key across a KV store, give strong read-after-write via a durable metadata commit, support multipart upload and range GET, and maintain durability with checksums, scrubbing, and reconstruction.
