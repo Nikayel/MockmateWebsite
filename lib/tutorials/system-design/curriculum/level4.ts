@@ -720,6 +720,31 @@ node behind readiness until it is warm, then admit it.
   If the LB immediately gives it a full 1/N share, it can fall over or spike latency. Slow-start
   ramps its traffic share up over some seconds.
 
+**A long-lived stream needs a signal, not a deadline.** A drain deadline works for a request that was
+always going to finish on its own. A gRPC stream, a WebSocket, or an HTTP/2 connection carrying a
+subscription has no natural end: it is still open when the deadline expires, and the deadline is the
+thing that severs it. HTTP/2 has a frame for exactly this. The server sends **GOAWAY**, which means
+"finish the streams already open on this connection, start no new ones here". Draining one node then
+runs like this:
+
+1. Mark the node not-ready. The LB stops handing it new connections. Every connection already
+   established is untouched, because the LB is no longer in that path.
+2. The server sends \`GOAWAY(last_stream_id = 4001)\` on each open connection. Streams numbered up to
+   4001 keep running; the client must not open 4003 on this connection.
+3. The client reacts at once: it dials a fresh connection, which goes back through the LB and lands
+   on a healthy node, and it sends all NEW work there while its existing streams finish on the old
+   connection.
+4. The drain deadline still backstops the node, but the only thing left for it to sever is a stream
+   that was already open at step 2, and the client has known since step 2 that this connection is
+   going away.
+
+Servers usually send GOAWAY twice: a first one with \`last_stream_id\` set to the maximum, which
+commits to nothing and only warns, then the real one after a grace period, so a client that was
+mid-request is never surprised. WebSockets have no GOAWAY frame, so the equivalent is an
+application-level control message ("reconnect now") or a close code the client treats that way.
+Either way, jitter the reconnects: 50 nodes draining through a rolling deploy otherwise turn every
+client into one synchronized reconnect storm.
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -752,6 +777,93 @@ drops out**, turning a minor blip into a total outage. The mature answer: deep e
 truly broken node, with hysteresis, and not so coupled that a shared-dependency blip fails the entire
 fleet simultaneously.
 
+### Cap how much of the pool ejection is allowed to remove
+
+Passive outlier ejection decides one host at a time, but a shared dependency fails all of them at
+once, so "eject the bad host" and "empty the fleet" become the same instruction the moment every host
+is bad together. Envoy's outlier detector therefore takes a ceiling as well as a trigger, and an
+answer that names the trigger without the ceiling has described half the mechanism:
+
+- \`consecutive_5xx\` (default 5): how many failures on real traffic eject a host.
+- \`base_ejection_time\` (default 30s): how long an ejection lasts, multiplied by the number of times
+  that host has been ejected before.
+- \`max_ejection_percent\` (default 10): the ceiling on what fraction of the pool may be ejected at
+  once. Past it the detector simply refuses to eject, however bad the next host looks.
+
+Run a 500-pod fleet through a 10-second blip in a shared auth service, both ways:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Moment",
+    "No ceiling (max_ejection_percent 100)",
+    "max_ejection_percent 20"
+  ],
+  "rows": [
+    [
+      "t=0, auth blips",
+      "All 500 pods start failing real requests with 5xx",
+      "Identical: the pods are equally broken either way"
+    ],
+    [
+      "t=2s, consecutive_5xx crossed",
+      "Every host qualifies, so every host is ejected",
+      "The detector ejects 100 hosts, then stops"
+    ],
+    [
+      "t=3s, routing a request",
+      "0 healthy hosts left, so every request fails, including the ones auth was never on the path for",
+      "400 hosts still routable, so anything that does not touch auth keeps succeeding"
+    ],
+    [
+      "t=10s, auth recovers",
+      "Hosts stay out for base_ejection_time, so a 10 second blip costs 30+ seconds of hard down",
+      "Nothing to recover from: the pool never emptied"
+    ]
+  ],
+  "highlightCols": [
+    "max_ejection_percent 20"
+  ],
+  "caption": "The ceiling does not make the ejected hosts healthy. It buys the only thing that matters during a correlated failure, which is a pool that still exists when the dependency comes back."
+}
+\`\`\`
+
+Envoy backstops this a second time in the load balancer itself: if fewer than
+\`healthy_panic_threshold\` of the hosts (default 50%) are healthy it enters **panic mode** and
+balances across ALL hosts, healthy or not, on the reasoning that spraying traffic at a mostly-broken
+fleet still beats routing into an empty pool.
+
+Note where this ceiling lives. It bounds **passive ejection in the mesh**, and Kubernetes readiness
+has no equivalent: if all 500 pods fail their readiness probe the Endpoints list legitimately empties
+and the Service has nowhere to send anything. That asymmetry is why the two mechanisms get different
+jobs. Keep readiness a **local** question that a shared dependency cannot answer on your behalf, and
+let capped passive ejection be what reacts to a downstream that really is failing requests.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "max-ejection-percent-ceiling",
+  "prompt": "500 pods sit behind Envoy sidecars with outlier detection on, and a shared auth service blips for 10 seconds so every pod starts returning 5xx. max_ejection_percent is set to 20. What does the mesh do?",
+  "options": [
+    {
+      "label": "Every host crosses the failure threshold, so the pool ejects down to zero",
+      "feedback": "That is the uncapped run, and it is the exact outcome the ceiling exists to prevent. Setting a cap changes nothing about which hosts qualify for ejection; it changes how many of those qualifying hosts the detector will actually act on."
+    },
+    {
+      "label": "It ejects 100 of the 500 hosts and then refuses to eject another",
+      "correct": true,
+      "feedback": "Right. 20 percent of 500 is 100, so once 100 hosts are out the detector will not take the 101st however bad it looks. The surviving 400 are still broken for auth-dependent requests, but everything that does not touch auth keeps serving and the pool is intact when auth returns."
+    },
+    {
+      "label": "Nothing: a correlated failure is not an outlier",
+      "feedback": "Outlier detection has no notion of correlation. It judges each host against the failure threshold on its own, which is precisely why it needs a ceiling: 500 individually-defensible decisions add up to one catastrophic one."
+    }
+  ]
+}
+\`\`\`
+
 \`\`\`csdiagram
 {
   "type": "pipeline",
@@ -779,7 +891,7 @@ fleet simultaneously.
     },
     {
       "label": "LB stops NEW traffic",
-      "note": "in-flight requests keep going"
+      "note": "in-flight keeps going, streams get GOAWAY"
     },
     {
       "label": "In-flight finishes",
@@ -798,10 +910,11 @@ fleet simultaneously.
 }
 \`\`\`
 
-Recap: use active probes plus passive outlier ejection; keep liveness (restart) separate from
-readiness (pull from pool, do not kill); drain connections and slow-start new nodes so a rolling
-deploy drops nothing; and make checks deep enough to catch a broken downstream without letting one
-shared-dependency blip fail the whole fleet at once.
+Recap: use active probes plus passive outlier ejection under a \`max_ejection_percent\` ceiling; keep
+liveness (restart) separate from readiness (pull from pool, do not kill); drain connections, signal
+long-lived streams to reconnect rather than waiting out a deadline, and slow-start new nodes so a
+rolling deploy drops nothing; and make checks deep enough to catch a broken downstream without
+letting one shared-dependency blip fail the whole fleet at once.
 
 \`\`\`cswidget
 {
@@ -816,14 +929,14 @@ shared-dependency blip fail the whole fleet at once.
     {
       "label": "Every node goes unhealthy at once and the pool empties",
       "correct": true,
-      "feedback": "Right. Correlated checks turn a shared-dependency blip into a fleet-wide eviction, so ten seconds of database trouble becomes a total outage with no healthy node left to route to. The mature design is deep enough to catch a truly broken node, with hysteresis, and never coupled so tightly that one blip fails everyone."
+      "feedback": "Right. Correlated checks turn a shared-dependency blip into a fleet-wide eviction, so ten seconds of database trouble becomes a total outage with no healthy node left to route to. A max_ejection_percent ceiling does not save you here either: it bounds passive ejection in the mesh, not a readiness probe that all 500 pods are failing honestly. The mature design is deep enough to catch a truly broken node, with hysteresis, and never coupled so tightly that one blip fails everyone."
     },
     {
       "label": "Nothing, health checks hold their last result through short blips",
       "feedback": "Checks run continuously on an interval with no such grace by default; hysteresis is something you must design in deliberately."
     }
   ],
-  "reveal": "Bringing the lesson together for your design write: active probes plus passive ejection, liveness (restart) kept separate from readiness (pull from pool, do not kill), draining and slow-start so a rolling deploy drops nothing, and a stated answer for how deep your check goes without letting one shared blip empty the pool."
+  "reveal": "Bringing the lesson together for your design write: active probes plus passive ejection under a max_ejection_percent ceiling, liveness (restart) kept separate from readiness (pull from pool, do not kill), draining plus a GOAWAY-style reconnect signal for long-lived streams so a rolling deploy drops nothing, and a stated answer for how deep your check goes without letting one shared blip empty the pool."
 }
 \`\`\`
 `.trim()
