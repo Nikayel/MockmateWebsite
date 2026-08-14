@@ -5,6 +5,7 @@ import { Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { checkItemId, type CheckSpec } from "@/lib/tutorials/widgets/schema"
+import { orderedOptions } from "@/lib/tutorials/widgets/option-order"
 import { useLessonTelemetry } from "../LessonTelemetryProvider"
 import { useWidgetA11y, WidgetFrame } from "./WidgetFrame"
 
@@ -86,7 +87,13 @@ function StatusWord({ correct }: { correct: boolean }) {
 // ---- predict: MCQ with exactly one correct option ----
 
 function PredictBody({ spec }: { spec: CheckSpec }) {
-  const options = spec.options ?? []
+  // Presented in a stable, content-derived order rather than the authored one. The authored order
+  // carried an enormous tell: correct sat at option 1 in all 67 L10 checks and at option 2 in all
+  // 22 L11 checks, so "always click position N" scored 63 to 100 percent per level, which is worth
+  // more to a guessing learner than every length signal the CUR-01 sweep removed. Deterministic, so
+  // the same check always renders the same way (content-integrity asserts byte-identical HTML
+  // twice) and a returning learner meets the same page. See lib/tutorials/widgets/option-order.ts.
+  const options = orderedOptions(spec.prompt, spec.options ?? [])
   const groupName = useId()
   const { announce } = useWidgetA11y()
   const { lessonId, record } = useLessonTelemetry()
@@ -107,7 +114,7 @@ function PredictBody({ spec }: { spec: CheckSpec }) {
 
   const commit = () => {
     if (selected === null) return
-    const option = options[selected]
+    const option = options[selected]?.option
     setCommitted(selected)
     announce(option?.correct ? "Correct." : "Not quite.")
     record({
@@ -115,7 +122,9 @@ function PredictBody({ spec }: { spec: CheckSpec }) {
       section: "teach",
       itemId: checkItemId(spec, lessonId),
       checkKind: "predict",
-      selectedIndex: selected,
+      // The AUTHORED index, not the rendered one. A response log whose indices meant "wherever
+      // this happened to render" would be unjoinable across a label edit.
+      selectedIndex: options[selected]?.authoredIndex ?? selected,
       selectedLabel: option?.label,
       correct: option?.correct === true,
       itemsTotal: options.length,
@@ -124,7 +133,7 @@ function PredictBody({ spec }: { spec: CheckSpec }) {
     })
   }
 
-  const committedOption = committed !== null ? options[committed] : null
+  const committedOption = committed !== null ? options[committed].option : null
   const isCorrect = committedOption?.correct === true
 
   return (
@@ -132,7 +141,7 @@ function PredictBody({ spec }: { spec: CheckSpec }) {
       <fieldset disabled={committed !== null} className="min-w-0">
         <legend className="text-foreground mb-3 text-sm font-medium">{spec.prompt}</legend>
         <div className="flex flex-col gap-2">
-          {options.map((option, i) => (
+          {options.map(({ option }, i) => (
             <label
               key={i}
               className={cn(
