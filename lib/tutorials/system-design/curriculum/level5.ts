@@ -1103,9 +1103,9 @@ wearing different clothes.
       "feedback": "Tempting, because 'broadcast' sounds like plain messaging. But total-order broadcast already forces every node to deliver the same messages in the same order, and that order is agreement in disguise."
     },
     {
-      "label": "No: to decide a value, every node broadcasts its proposal and adopts the first one delivered",
+      "label": "No: broadcast a proposal and adopt the first delivered",
       "correct": true,
-      "feedback": "Right. Identical delivery order means every node adopts the same first proposal, which is consensus. The reduction runs both ways, which is why the two problems are equivalent in power."
+      "feedback": "Right. Every node broadcasts its own proposal, and because total-order broadcast forces identical delivery order, every node adopts the same first one. That is agreement on a value, which is consensus. The reduction runs the other way too, which is why the two problems are equivalent in power."
     }
   ]
 }
@@ -1385,13 +1385,13 @@ guaranteed to observe at least one copy of the freshest value.
   "prompt": "N=3, R=2, W=2, so 'R + W > N' holds and every read set overlaps every acknowledged write set. Does this configuration give you strong consistency (linearizability)?",
   "options": [
     {
-      "label": "Yes: guaranteed overlap means every read sees the latest write, and that is strong consistency",
-      "feedback": "This is the number-one trap. Overlap only guarantees the read touches at least one fresh replica. Concurrent writes can land on different quorums and conflict, and a read racing an in-flight write can return old or new depending on timing."
+      "label": "Yes: guaranteed overlap is strong consistency",
+      "feedback": "This is the number-one trap in the lesson. Overlap only guarantees the read touches at least one fresh replica. Concurrent writes can still land on different quorums and conflict, and a read racing an in-flight write can return old or new depending on timing."
     },
     {
-      "label": "No: you get quorum consistency, which is weaker; conflicts and ordering still need version vectors, LWW, or real consensus",
+      "label": "No: that is quorum consistency",
       "correct": true,
-      "feedback": "Right. Overlap says a read sees at least one copy of the latest acknowledged write, and nothing about how concurrent writes resolve or what order clients observe events in. Linearizability requires consensus, not quorums."
+      "feedback": "Right. Overlap buys exactly one thing: a read sees at least one copy of the latest acknowledged write. It says nothing about how two concurrent writes reconcile, which still needs version vectors or last-writer-wins, and nothing about the order clients observe events in. Linearizability requires consensus, not quorums."
     }
   ]
 }

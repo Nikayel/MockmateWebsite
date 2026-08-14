@@ -536,9 +536,9 @@ misses. Production uses both.
       "feedback": "Tempting, because that is exactly what a readiness failure alone would do. But the same failing endpoint is also the liveness check, and liveness failures trigger restarts."
     },
     {
-      "label": "It crash-loops: the orchestrator kills and restarts it before it ever finishes warming",
+      "label": "It crash-loops before it ever finishes warming",
       "correct": true,
-      "feedback": "Right. 'Not warm yet' read as 'dead' means the restart timer beats the warmup timer every time. Keeping liveness and readiness as separate questions is the fix."
+      "feedback": "Right. One endpoint is answering two different questions, so 'not warm yet' is read as 'dead': the orchestrator kills and restarts the node, and the restart timer beats the 90 second warmup timer every time. Keeping liveness and readiness as separate questions is the fix."
     },
     {
       "label": "The balancer slow-starts it on a reduced traffic share",
@@ -770,9 +770,9 @@ IPs or long-TTL DNS that keeps sending traffic to terminated instances.
       "feedback": "Tempting because short TTLs feel fast, but resolver and stub caching still stretch propagation to a minute or more, and nothing pushes updates to callers."
     },
     {
-      "label": "A registry with heartbeats and readiness, plus client-side LB watching it on short check intervals",
+      "label": "A watched registry with heartbeats and readiness",
       "correct": true,
-      "feedback": "Right. Watch or push propagation gets a terminated instance out of every caller's view in seconds, and readiness gates cold instances until they are warm. This is the gRPC-plus-etcd shape the lesson names."
+      "feedback": "Right. Instances heartbeat into the registry and readiness gates them until warm, and because each client-side balancer watches the registry rather than sitting on a cached answer until a TTL expires, watch or push propagation gets a terminated instance out of every caller's view in seconds. This is the gRPC-plus-etcd shape the lesson names."
     },
     {
       "label": "Hardcoded instance addresses refreshed on each deploy",
