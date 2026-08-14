@@ -2126,9 +2126,15 @@ Declare the desired infrastructure in **Terraform/OpenTofu or Pulumi**, keep it 
       "1%, then 5%, 25%, 100%, baking between steps",
       "One step's worth of pods",
       "During the bake, from metrics on 1% of traffic, and it auto-halts"
+    ],
+    [
+      "Shadow (mirror)",
+      "It does not move any traffic: a copy of live requests goes to the new version and its answers are discarded",
+      "A shadow fleet sized to the mirrored share",
+      "Before a single user is exposed, from a diff of the two versions' answers to the same request"
     ]
   ],
-  "caption": "The three differ less in how they move traffic than in when you learn the version is bad and how much of production learns it with you. On a payments path that is the whole argument for canary with automated analysis."
+  "caption": "The four differ less in how they move traffic than in when you learn the version is bad and how much of production learns it with you. Shadow is the odd one out: it never moves traffic at all, so it buys a comparison rather than a rollout. On a payments path that is the argument for shadow first, then canary with automated analysis."
 }
 \`\`\`
 
@@ -2458,6 +2464,30 @@ For a **critical payments service** you want **canary with automated analysis an
 }
 \`\`\`
 
+## Shadow traffic buys a comparison before anyone is exposed
+
+A canary is still a live experiment. At 1 percent, one in a hundred real users gets the new version's real answer, and if that answer is wrong they wear it. When the output itself is the risky part, an authorization decision, a fraud score, a price, you can test the new version against production traffic with nobody exposed at all, by **mirroring**. The proxy in front of the service copies each request, sends the copy to the shadow version, forwards the original to the stable version as always, and returns the stable version's response to the user. The shadow's response is read by your comparison job and then thrown away. It never reaches a client.
+
+In an Istio VirtualService that is two fields:
+
+\`\`\`yaml
+spec:
+  http:
+    - route:
+        - destination:          # the only response any user ever sees
+            host: authorize
+            subset: v1
+      mirror:
+        host: authorize         # a copy of the same request, fire and forget
+        subset: v2
+      mirrorPercentage:
+        value: 10.0
+\`\`\`
+
+The comparison is the whole point and it is yours to build: log what each version decided for the same request id, then diff the two streams offline. "v2 declines 0.4 percent of the authorizations v1 approved" is a defect you found with no merchant's payment attached to it, which is exactly what a canary cannot give you.
+
+Two costs to say out loud. You are running a second fleet sized to the mirrored share, so 10 percent mirroring is 10 percent extra capacity. And a mirrored request hits real dependencies: if the shadow version writes to the ledger, sends the email, or calls the card network, you have just charged a customer twice to run a test. Mirroring is safe for the read-shaped part of a request; anything that writes has to be stubbed, pointed at a scratch datastore, or excluded from the mirror.
+
 **Feature flags decouple deploy from release.** Deploying code and releasing a feature become separate events: ship the code dark behind a flag (LaunchDarkly, Unleash, or a homegrown flag service), then turn it on for 1% of users independent of the deploy. This means you can roll back a *feature* instantly without redeploying, and you can deploy risky code safely because it is inert until flagged on.
 
 \`\`\`cswidget
@@ -2489,7 +2519,7 @@ For a **critical payments service** you want **canary with automated analysis an
 
 **Interview nuance:** database migrations are the trap in any progressive rollout. Canary assumes old and new code run simultaneously, so a **destructive migration in one deploy** (drop a column the old version still reads) breaks the stable version mid-canary. Use **expand/contract** (a.k.a. parallel-change): first expand (add the new column, write to both, backfill), deploy code reading the new shape, then in a later deploy contract (drop the old column) once nothing reads it. Migrations must be backward-compatible across at least one version.
 
-**Recap:** IaC (Terraform/OpenTofu) with remote-state locking and shared modules gives environment parity and kills drift; never make manual console changes; promote the same artifact dev to staging to prod; use canary with automated metric analysis and auto-rollback (Argo Rollouts/Flagger) for a payments service, blue-green when versions cannot coexist; feature flags decouple deploy from release; and use expand/contract so a migration never breaks the version still running during a canary.
+**Recap:** IaC (Terraform/OpenTofu) with remote-state locking and shared modules gives environment parity and kills drift; never make manual console changes; promote the same artifact dev to staging to prod; use canary with automated metric analysis and auto-rollback (Argo Rollouts/Flagger) for a payments service, blue-green when versions cannot coexist, and mirror traffic to a shadow version whose answers you diff and discard when you need that comparison before anyone is exposed; feature flags decouple deploy from release; and use expand/contract so a migration never breaks the version still running during a canary.
 
 \`\`\`cswidget
 {
