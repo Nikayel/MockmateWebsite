@@ -68,9 +68,9 @@ Argue both directions from the requirements. If asked to justify microservices, 
   "prompt": "Your 12-engineer team runs a modular monolith. Which of these is a real trigger to extract the first service?",
   "options": [
     {
-      "label": "Search needs roughly 10 times the hardware of everything else and is starving checkout of capacity",
+      "label": "Search alone needs roughly 10 times the hardware of everything else",
       "correct": true,
-      "feedback": "Right. A divergent scaling profile is one of the named triggers, alongside org scaling, divergent deploy cadence, fault isolation for a critical path, and a genuine polyglot need."
+      "feedback": "Right, and here it is already starving checkout of capacity. A divergent scaling profile is one of the named triggers, alongside org scaling, divergent deploy cadence, fault isolation for a critical path, and a genuine polyglot need."
     },
     {
       "label": "Microservices are the modern default and the codebase is over a year old",
@@ -776,9 +776,9 @@ For a handful of services, you can get mTLS from the platform, retries and timeo
       "feedback": "mTLS is not optional, but a mesh is not its only source. The platform can provide it, and at this size the proxies cost more to operate than they return."
     },
     {
-      "label": "Decline for now: at 6 same-language services, platform mTLS plus a shared client library covers it and the mesh does not repay its operating cost yet",
+      "label": "Decline for now, since it does not repay its operating cost yet",
       "correct": true,
-      "feedback": "Right. A mesh earns its keep when per-language client libraries stop being viable, which is dozens of services in mixed languages, not six in one."
+      "feedback": "Right. Platform mTLS plus one shared Go client library already covers mTLS, retries and timeouts at this size. A mesh earns its keep when per-language client libraries stop being viable, which is dozens of services in mixed languages, not six in one."
     },
     {
       "label": "Decline permanently, since meshes are legacy technology now that eBPF exists",
@@ -814,9 +814,9 @@ Config and secrets live outside the image, in env vars, a ConfigMap, or a secret
       "feedback": "A container's filesystem and its heap die with the container, and the platform will kill and reschedule instances routinely for drains, spot reclaims, and scale-in."
     },
     {
-      "label": "Users get logged out at random and uploads go missing, depending on which replica serves each request",
+      "label": "Users get logged out at random and uploads go missing",
       "correct": true,
-      "feedback": "Right. Once there is more than one instance, state that lives on one box makes every request a coin flip, and a scale-in deletes whatever was on the instance it removed."
+      "feedback": "Right. Once there is more than one instance, which replica answers is effectively a coin flip, so a session held in one process's memory is found only some of the time, and a file on one container's disk is invisible to the others and deleted outright when a scale-in removes that instance."
     },
     {
       "label": "Only scale-in is a problem, since scaling out just adds empty instances",
@@ -1126,7 +1126,7 @@ Instead of a review board that manually approves each deploy, you encode policy:
       "feedback": "Argo compares the manifest to the cluster, and the manifest still names the same tag it always did. Desired state never changed, so there is no drift for the reconciler to find."
     },
     {
-      "label": "Nothing in Git or Argo: admission has to verify the image",
+      "label": "Nothing in Git or Argo: admission has to verify the image itself",
       "correct": true,
       "feedback": "Right, and this is why supply-chain control belongs in the platform rather than bolted on. The repository is the record of what you asked for, not of what a tag currently points at. Sign at build with cosign, attach SLSA provenance, and let the admission controller refuse anything whose signature and provenance do not match your pipeline."
     },
@@ -1526,12 +1526,12 @@ For a **critical payments service** you want **canary with automated analysis an
 {
   "type": "check",
   "kind": "predict",
-  "prompt": "A release that passed staging fails in prod. Both environments are built from the same Terraform module, and the module has not changed in weeks. What do you suspect first, and what would have caught it?",
+  "prompt": "A release that passed staging fails in prod. Both environments are built from the same Terraform module, and the module has not changed in weeks. What do you suspect first?",
   "options": [
     {
-      "label": "Someone changed prod by hand in the console, so real state no longer matches the code. A scheduled plan that alerts on any non-empty diff would have caught it",
+      "label": "Prod was changed by hand and the code never learned of it",
       "correct": true,
-      "feedback": "Right. Manual console changes are invisible to the repository and are exactly what makes staging a liar. Running the plan on a schedule turns silent drift into an alert."
+      "feedback": "Right. Manual console changes are invisible to the repository and are exactly what makes staging a liar. Detection is cheap once you look for it: run the plan on a schedule and alert on any non-empty diff, which turns silent drift into a page rather than a surprise at release time."
     },
     {
       "label": "Prod simply has more traffic, so it needs bigger instances",
@@ -1584,9 +1584,9 @@ You cannot optimize what you cannot see. Enforce a **tagging/labeling policy** (
       "feedback": "Those nodes run a dozen other workloads too. Charging one tenant for the whole node overstates it, and splitting evenly is not much closer to the truth."
     },
     {
-      "label": "No: many workloads share every node, so you need per-workload allocation from something like OpenCost or Kubecost",
+      "label": "No: many workloads share every node the bill itemizes",
       "correct": true,
-      "feedback": "Right. The bill sees instances while you run pods. Allocation tools split node cost by each workload's requests and usage, which only works if labels are consistent."
+      "feedback": "Right. The bill sees instances while you run pods, so you need per-workload allocation from something like OpenCost or Kubecost, which splits node cost by each workload's requests and actual usage. That only works if the labels are consistent, which loops straight back to Inform."
     },
     {
       "label": "No, and nothing can answer it: Kubernetes cost is fundamentally unattributable",
@@ -1619,7 +1619,7 @@ The cloud bill shows you *nodes* (EC2 instances), but you run *many apps per nod
       "feedback": "This is the safest large lever: you are reclaiming capacity nobody used, and the percentile protects you from sizing to one freak spike."
     },
     {
-      "label": "Drop the multi-AZ standby for the primary database",
+      "label": "Drop the multi-AZ standby that backs the primary database",
       "correct": true,
       "feedback": "Right, this is the wrong lead. It trades a reliability guarantee you promised for a modest saving, and a single outage costs many times what it saved."
     },
@@ -1675,9 +1675,9 @@ Three patterns. **ETL** (extract, transform, then load) transforms before loadin
       "feedback": "The primary really is protected from the contention, which is genuine progress. But the query itself did not improve, and the replica is not free capacity either."
     },
     {
-      "label": "The primary is protected, but the replica is still a row store, so column aggregations remain slow and expensive",
+      "label": "The primary is protected, but the replica is still a row store",
       "correct": true,
-      "feedback": "Right. A replica changes which machine runs the scan, not the physical layout being scanned. A read replica is not an analytics store."
+      "feedback": "Right. A replica changes which machine runs the scan, not the physical layout being scanned, so the aggregation still drags all forty columns off disk to sum one of them. Use a replica to scale OLTP-shaped reads; it is not an analytics store."
     },
     {
       "label": "It is strictly worse, because replication lag makes every dashboard number wrong",
@@ -1806,9 +1806,9 @@ The enabler underneath all of this. In old Redshift/on-prem warehouses, storage 
       "feedback": "The BI half fits, but warehouse storage prices raw logs and semi-structured data badly, and the ML team loses access to the unmodeled data it needs."
     },
     {
-      "label": "A lakehouse: object storage with an open table format and a catalog, refined bronze to silver to gold",
+      "label": "A lakehouse: object storage under an open table format",
       "correct": true,
-      "feedback": "Right. One cheap copy of the raw data, ACID and schema enforcement from the table format, and the medallion layers carrying the governance BI needs."
+      "feedback": "Right. One cheap copy of the raw data for the ML team, ACID and schema enforcement from the table format and its catalog, and the medallion layers, bronze to silver to gold, carrying the governance BI needs."
     },
     {
       "label": "A plain data lake, since object storage is cheapest and both teams can read files",
@@ -1962,7 +1962,7 @@ The first mainstream answer to "I need both fast and correct." It runs **two par
   "prompt": "Lambda architecture genuinely delivers both fast and accurate results. Which cost accumulates on you over the years?",
   "options": [
     {
-      "label": "The same logic is written twice, in two engines",
+      "label": "The same logic is written twice, in two different engines",
       "correct": true,
       "feedback": "Right. Every change to a metric definition is two changes in two codebases written against different engines, so they drift, and on the day the two numbers disagree nobody can say which one is correct."
     },
