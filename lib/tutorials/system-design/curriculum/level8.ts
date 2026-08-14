@@ -969,7 +969,96 @@ Multi-tenancy is running many customers (tenants) on one platform. The whole gam
   "highlightCols": [
     "Isolation"
   ],
-  "caption": "Tiered isolation is the senior move: pool the thousands of self-serve SMB tenants for cost, silo the regulated enterprise tenants, and sell the second posture as a premium tier."
+  "caption": "The third column is the decision. Silo and bridge make a cross-tenant read structurally impossible; pool makes it one missing predicate away, which is why pool needs the discipline the other two get for free."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "What siloing everybody actually costs",
+  "predictPrompt": {
+    "question": "You have 5,000 tenants and you give every one of them a dedicated database, because isolation is worth paying for. A schema migration now has to run against each database, five minutes of engineer time apiece. How long is that one migration?",
+    "options": [
+      "Under an hour",
+      "About half a working day",
+      "About ten working weeks",
+      "Zero, because migrations are automated"
+    ]
+  },
+  "workedExample": "At the initial settings every one of the 5,000 tenants is siloed: 5,000 dedicated databases at 400 USD a month is 2,000,000 USD a month, and one schema migration at five minutes each is 416.67 engineer-hours, which is roughly ten working weeks of one person's time for a single migration. Now drag the dedicated share down to 2 percent, the regulated slice that actually asked for it, and the same three readings become 100 databases, 40,000 USD a month, and 8.33 hours. Nothing about the isolation guarantee changed for those 100 tenants; what changed is who is paying for it.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "tenants",
+      "label": "Tenants on the platform",
+      "min": 10,
+      "max": 50000,
+      "scale": "log",
+      "initial": 5000,
+      "unit": "tenants"
+    },
+    {
+      "kind": "slider",
+      "id": "dedicated_pct",
+      "label": "Share you give a dedicated database",
+      "min": 0,
+      "max": 100,
+      "scale": "linear",
+      "step": 1,
+      "initial": 100,
+      "unit": "percent"
+    },
+    {
+      "kind": "slider",
+      "id": "db_cost",
+      "label": "Monthly cost of one dedicated database",
+      "min": 50,
+      "max": 2000,
+      "scale": "linear",
+      "step": 50,
+      "initial": 400,
+      "unit": "USD"
+    },
+    {
+      "kind": "slider",
+      "id": "migrate_min",
+      "label": "Engineer minutes per database, per schema migration",
+      "min": 1,
+      "max": 60,
+      "scale": "linear",
+      "step": 1,
+      "initial": 5,
+      "unit": "min"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "siloed",
+      "label": "Databases you now operate",
+      "expr": "ceil(tenants * dedicated_pct / 100)",
+      "format": "number",
+      "unit": "databases"
+    },
+    {
+      "id": "monthly",
+      "label": "Infrastructure cost of the isolation",
+      "expr": "siloed * db_cost",
+      "format": "compact",
+      "unit": "USD per month",
+      "sparkline": {
+        "over": "dedicated_pct"
+      }
+    },
+    {
+      "id": "migration",
+      "label": "One schema migration",
+      "expr": "siloed * migrate_min / 60",
+      "format": "number",
+      "unit": "engineer-hours"
+    }
+  ],
+  "caption": "Silo isolation is bought, not declared. The third reading is the one that surprises people: the cost of the silo posture is paid again on every migration, forever, which is why the answer is tiered rather than uniform."
 }
 \`\`\`
 

@@ -877,6 +877,217 @@ failing instance actually leaves every caller's view. With short check intervals
 watch/push, a bad instance is out of rotation within **seconds**; with long DNS TTLs it can be
 minutes, which is the failure mode to avoid.
 
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "How long a terminated instance keeps taking traffic",
+  "frames": [
+    {
+      "note": "Instance i-7 is terminated during scale-in. Neither mechanism knows yet, so all three callers are still holding an address that now refuses connections.",
+      "rows": [
+        {
+          "label": "Instance i-7",
+          "cells": [
+            {
+              "text": "terminated at t = 0",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "Registry watch",
+          "cells": [
+            {
+              "text": "caller A: still lists i-7",
+              "state": "active"
+            },
+            {
+              "text": "caller B: still lists i-7",
+              "state": "active"
+            },
+            {
+              "text": "caller C: still lists i-7",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "DNS, 60s TTL",
+          "cells": [
+            {
+              "text": "caller A: still lists i-7",
+              "state": "active"
+            },
+            {
+              "text": "caller B: still lists i-7",
+              "state": "active"
+            },
+            {
+              "text": "caller C: still lists i-7",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "The instance deregistered on shutdown, and the registry pushed that to every watcher. The DNS record was updated at the same instant, and it changed nothing: no resolver was told, because DNS has no channel to tell them.",
+      "predict": {
+        "question": "The registry deregisters on shutdown and pushes to watchers. The DNS record is edited in the same second, with a 60 second TTL. Two seconds later, who is still dialing the dead instance?",
+        "options": [
+          "Neither: both mechanisms have propagated",
+          "Only the DNS callers",
+          "Only the registry callers",
+          "Both, until their next request fails"
+        ]
+      },
+      "rows": [
+        {
+          "label": "Instance i-7",
+          "cells": [
+            {
+              "text": "gone, t = 2s",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "Registry watch",
+          "cells": [
+            {
+              "text": "caller A: removed",
+              "state": "new"
+            },
+            {
+              "text": "caller B: removed",
+              "state": "new"
+            },
+            {
+              "text": "caller C: removed",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "DNS, 60s TTL",
+          "cells": [
+            {
+              "text": "caller A: cache still says i-7",
+              "state": "active"
+            },
+            {
+              "text": "caller B: cache still says i-7",
+              "state": "active"
+            },
+            {
+              "text": "caller C: cache still says i-7",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "At t = 60s the TTL expires, and it expires only for the caller that honors it. A resolver refetches; an OS stub cache and a browser connection cache both keep their own copies on their own schedules.",
+      "rows": [
+        {
+          "label": "Instance i-7",
+          "cells": [
+            {
+              "text": "gone, t = 60s",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "Registry watch",
+          "cells": [
+            {
+              "text": "caller A: healthy",
+              "state": "normal"
+            },
+            {
+              "text": "caller B: healthy",
+              "state": "normal"
+            },
+            {
+              "text": "caller C: healthy",
+              "state": "normal"
+            }
+          ]
+        },
+        {
+          "label": "DNS, 60s TTL",
+          "cells": [
+            {
+              "text": "caller A: TTL expired, refetched",
+              "state": "new"
+            },
+            {
+              "text": "caller B: stub resolver cached",
+              "state": "active"
+            },
+            {
+              "text": "caller C: browser cached",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Three minutes in, one caller is still sending requests to hardware that no longer exists. The registry path finished in seconds; the DNS path has a tail nobody controls, which is why the TTL is a bound on well behaved caches rather than on reality.",
+      "rows": [
+        {
+          "label": "Instance i-7",
+          "cells": [
+            {
+              "text": "gone, t = 3 min",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "Registry watch",
+          "cells": [
+            {
+              "text": "caller A: healthy",
+              "state": "normal"
+            },
+            {
+              "text": "caller B: healthy",
+              "state": "normal"
+            },
+            {
+              "text": "caller C: healthy",
+              "state": "normal"
+            }
+          ]
+        },
+        {
+          "label": "DNS, 60s TTL",
+          "cells": [
+            {
+              "text": "caller A: healthy",
+              "state": "normal"
+            },
+            {
+              "text": "caller B: refetched at last",
+              "state": "new"
+            },
+            {
+              "text": "caller C: still dialing i-7",
+              "state": "dropped"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "This is the propagation number the lesson asks you to quote: seconds with a watched registry, minutes with DNS, and no upper bound you can promise once a resolver decides to ignore your TTL."
+}
+\`\`\`
+
 ### Where the balancing decision happens
 
 - **Server-side load balancing:** clients hit one stable VIP or DNS name and a dedicated load
