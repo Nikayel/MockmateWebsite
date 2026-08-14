@@ -1490,9 +1490,9 @@ slow dependency cannot stall the whole path.
       "feedback": "Each stage needs the previous one's answer: you cannot handshake TCP before DNS returns an IP, or send HTTP before TLS finishes. Cold setup is strictly sequential."
     },
     {
-      "label": "Around 2 to 3 RTTs, so 400 to 600ms, before the first request byte even reaches origin",
+      "label": "Around 2 to 3 RTTs, so 400 to 600ms",
       "correct": true,
-      "feedback": "Right. The DNS walk plus the TCP handshake plus TLS 1.3 is 2+ RTTs of pure ceremony at 200ms each, and the request still has to clear the WAF, LB, gateway, and auth before a Redis miss sends it to the database."
+      "feedback": "Right, and none of that is work: it is ceremony spent before the first request byte reaches origin. The DNS walk plus the TCP handshake plus TLS 1.3 is 2 or more round trips at 200ms each, and only then does the request start clearing the WAF, LB, gateway, and auth on its way to a Redis miss and the database."
     },
     {
       "label": "About one RTT; each of these layers is individually cheap",
@@ -1549,9 +1549,9 @@ and the resolver layer invites N+1 database calls unless you add DataLoader-styl
       "feedback": "Tempting, and the payload savings are real, but a public API's consumers are browsers and 'curl'-level integrators you do not control. gRPC needs grpc-web plus a proxy for browsers and defeats HTTP caching, so speed is not the deciding axis here."
     },
     {
-      "label": "Consumer shape: external developers need ubiquity, 'curl' debugging, and HTTP caching, which points to REST",
+      "label": "Consumer shape: who calls it, and from where",
       "correct": true,
-      "feedback": "Right. A paradigm is a bet about who the consumer is and what the traffic looks like. For a public developer API, ubiquity and the HTTP ecosystem outweigh binary-payload savings."
+      "feedback": "Right. A paradigm is a bet about who the consumer is and what the traffic looks like. External developers in dozens of languages need near-universal client support, plain 'curl' debugging, and HTTP caching, which is the whole free ecosystem REST inherits and the exact set gRPC gives up. For a public developer API those outweigh binary-payload savings."
     },
     {
       "label": "Whatever the biggest tech companies use",
@@ -1717,9 +1717,9 @@ evolution, and enforce it with consumer-driven contract tests in CI.
       "feedback": "Cross-team code review is slow, optional, and misses behavioral expectations. The code is not the contract; the schema is."
     },
     {
-      "label": "A machine-readable schema as source of truth plus consumer-driven contract tests in CI",
+      "label": "A shared schema plus contract tests in CI",
       "correct": true,
-      "feedback": "Right. The schema stops silent drift because everything is generated from or validated against it, and contract tests replay each consumer's real expectations so a breaking change fails the build before deploy, not at 2am."
+      "feedback": "Right. A machine-readable schema is the source of truth, so drift cannot happen silently: everything is generated from it or validated against it. Consumer-driven contract tests then replay each consumer's real expectations on every provider build, so a breaking change fails CI before deploy rather than at 2am."
     }
   ],
   "reveal": "Carry this into the design write: name the schema artifact (OpenAPI, Protobuf, or SDL), state that evolution is additive with tolerant readers, and name the CI enforcement that catches the breaks people miss."
