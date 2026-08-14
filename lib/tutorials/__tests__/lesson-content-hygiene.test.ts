@@ -109,19 +109,19 @@ const SUMMARY_HARD_CEILING = 700
 const SUMMARY_ALLOW_LIST: ReadonlySet<string> = new Set([])
 
 /**
- * Lessons whose own title exceeds the 60-character SERP budget, deliberately.
+ * Empty, and it should stay that way.
  *
- * Each one is a list of searchable terms rather than a title that drifted into describing a
- * lesson, which is the distinction SEO-010 draws. The metadata layer no longer adds a suffix to
- * these (`lib/seo/learn-metadata.ts` degrades to `title.absolute`), so what renders is exactly the
- * string below and nothing more.
+ * Four titles were briefly listed here on the argument that each was a genuine list of searchable
+ * terms and shortening one meant dropping a term. That argument was wrong on inspection: all four
+ * fit under 60 characters while keeping EVERY term, once the throat-clearing came out. "Real-Time
+ * Delivery: Short-Poll, Long-Poll, SSE, WebSocket & Webhooks" (68) is "Real-Time: WebSocket, SSE,
+ * Long-Poll, Short-Poll, Webhooks" (58) with the highest-volume term moved to the front, which is
+ * what SEO-010 asks for anyway since titles truncate from the right.
+ *
+ * The lesson generalises: an allow-list entry is usually a copy edit nobody attempted. Add one
+ * only with the shortened candidate written out and a reason it is worse.
  */
-const TITLE_ALLOW_LIST: ReadonlySet<string> = new Set([
-  "sd-l1-realtime-comms",
-  "sd-l1-concurrency-models",
-  "sd-l7-progressive-delivery-schema",
-  "sd-l10-distributed-lock",
-])
+const TITLE_ALLOW_LIST: ReadonlySet<string> = new Set([])
 
 /** A human-readable locator for an offender, since ids alone do not say where to look. */
 function locate(entry: CatalogEntry): string {

@@ -4113,7 +4113,7 @@ export const systemDesignLevel7: DesignLevel = {
         },
         {
           id: "sd-l7-progressive-delivery-schema",
-          title: "Progressive Delivery, Feature Flags & Zero-Downtime Schema Changes",
+          title: "Feature Flags, Progressive Delivery & Schema Migrations",
           summary:
             "Why renaming a database column is never one step in a live system, and how expand and contract makes every migration step separately reversible.",
           estimatedMinutes: 35,

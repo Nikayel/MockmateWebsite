@@ -7742,7 +7742,7 @@ export const systemDesignLevel10: DesignLevel = {
         },
         {
           id: "sd-l10-distributed-lock",
-          title: "Design a Distributed Lock / Coordination Service (ZooKeeper/etcd)",
+          title: "Design a Distributed Lock (ZooKeeper, etcd, Fencing)",
           summary:
             "Why a Redis SETNX lock is unsafe at any TTL, and what consensus-backed leases plus fencing tokens add that the naive version never had.",
           estimatedMinutes: 40,

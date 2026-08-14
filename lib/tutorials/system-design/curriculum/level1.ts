@@ -5955,7 +5955,7 @@ export const systemDesignLevel1: DesignLevel = {
         },
         {
           id: "sd-l1-realtime-comms",
-          title: "Real-Time Delivery: Short-Poll, Long-Poll, SSE, WebSocket & Webhooks",
+          title: "Real-Time: WebSocket, SSE, Long-Poll, Short-Poll, Webhooks",
           summary:
             "Choose by direction, latency, per-connection cost, and delivery guarantee: SSE for one-way streaming, WebSocket for true duplex, webhooks for server-to-server.",
           estimatedMinutes: 30,
@@ -6424,7 +6424,7 @@ export const systemDesignLevel1: DesignLevel = {
         },
         {
           id: "sd-l1-concurrency-models",
-          title: "Server Concurrency Models: Thread-per-Request vs Event Loop & C10k",
+          title: "Server Concurrency: Thread-per-Request vs Event Loop, C10k",
           summary:
             "CPU-bound work wants a core-sized worker pool; IO-bound fan-out wants an event loop that you never block; past 10k connections, tune fds, ports, and memory.",
           estimatedMinutes: 30,
