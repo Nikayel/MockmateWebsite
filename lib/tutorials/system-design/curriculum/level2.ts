@@ -2464,16 +2464,16 @@ table** (single-table design), keyed so each access pattern hits one partition.
   "prompt": "A tasks table uses partition key 'status'. Every new task is written with status ACTIVE. Writes start throttling, so you provision 10x more total table capacity. What happens?",
   "options": [
     {
-      "label": "Throttling stops: capacity was the ceiling and you just raised it.",
+      "label": "Throttling stops; capacity was the ceiling and you raised it",
       "feedback": "Tempting because provisioned capacity sounds like one global pool, but the ceiling that matters is per partition. Total table capacity does nothing for a single overloaded key."
     },
     {
-      "label": "Still throttles: every write targets the one ACTIVE partition, and a single partition has its own fixed throughput ceiling.",
+      "label": "Still throttles; the ceiling that binds is per partition",
       "correct": true,
-      "feedback": "Right. The partition key routes to a physical node with a hard cap, so a low-cardinality key concentrates all the heat on one node no matter how much capacity you buy."
+      "feedback": "Right. Every new task carries status ACTIVE, so every write hashes to the one partition that key owns, and that physical partition has its own fixed throughput ceiling no matter how much total table capacity you buy. A low-cardinality partition key concentrates all the heat on one node by construction, which is why the key has to be chosen for spread, not for readability."
     },
     {
-      "label": "The database automatically splits the ACTIVE partition across more nodes.",
+      "label": "The ACTIVE partition is split automatically across more nodes",
       "feedback": "Tempting because these systems do split data by key range, but they cannot split a single partition-key value. Only a higher-cardinality key or write sharding spreads this load."
     }
   ]
@@ -2509,16 +2509,16 @@ access pattern.
   "prompt": "You are about to model a chat app on DynamoDB. What is the first artifact you write down?",
   "options": [
     {
-      "label": "An entity-relationship diagram: users, conversations, messages.",
+      "label": "An entity-relationship diagram: users, conversations, messages",
       "feedback": "Tempting because that is exactly right for relational design, but with no joins and no flexible planner, entities-first is the tell of a weak answer: you discover too late that a query you need requires a full scan."
     },
     {
-      "label": "The complete list of access patterns as concrete sentences, each of which must become one query against one partition.",
+      "label": "The list of access patterns, written as concrete sentences",
       "correct": true,
-      "feedback": "Right. Partition and sort keys, embed-vs-reference choices, single-table layout, and secondary indexes are all derived from that list, never the other way around."
+      "feedback": "Right. Write out every read and write the feature performs as a sentence, such as 'list a user's conversations, most recent first', and require each one to become a single query against a single partition. Partition and sort keys, embed-versus-reference calls, the single-table layout, and any secondary index are all derived from that list, never the other way around."
     },
     {
-      "label": "The set of global secondary indexes you will need.",
+      "label": "The set of global secondary indexes the app will need",
       "feedback": "Tempting because GSIs do buy extra access patterns, but they are eventually consistent and cost write capacity, so they are added last, one per named pattern the base keys cannot serve."
     }
   ],
