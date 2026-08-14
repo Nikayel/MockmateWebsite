@@ -1563,7 +1563,31 @@ Multi-step logic does not belong inside one giant function. Orchestrate it with 
 }
 \`\`\`
 
-**Interview nuance:** the cost model inverts at high steady load. FaaS is priced for bursty utilization; if a function runs flat-out 24/7, per-invocation billing costs several times what an equivalently sized, well-utilized container or reserved instance would. The crossover is roughly when sustained utilization passes ~40 to 60 percent. Saying "serverless is cheaper" without "for spiky load" is the tell of someone who has not seen the bill.
+## Price the crossover
+
+"Several times more expensive" is an adjective with a number underneath it, and the number is what picks the architecture, so do the arithmetic. The figures below are approximate US-region list prices, good to an order of magnitude and no further. They drift year to year; the ratios between them are the durable part.
+
+\`\`\`
+Lambda bills memory-time and hands out CPU in proportion, roughly 1 vCPU per 1.8 GB.
+  1 vCPU-hour = 1.8 GB x 3600 s x ~0.0000167 dollars per GB-second  =  ~0.11 dollars
+  plus a request fee of ~0.20 dollars per million invocations
+
+The same vCPU-hour on a general-purpose instance
+  on demand                 ~0.045 dollars
+  one-year commitment       ~0.030 dollars
+
+Break-even utilization = instance rate / Lambda rate
+  against on demand         0.045 / 0.11          =  ~40 percent busy
+  against a commitment      0.030 / 0.11          =  ~27 percent busy
+  against on demand, if you only dare average 70 percent CPU on the box
+                            (0.045 / 0.7) / 0.11  =  ~58 percent busy
+\`\`\`
+
+Two things fall out of those numbers. **The crossover is a utilization figure, not a request count.** A function that is idle four fifths of the hour bills for the fifth it works, and a fifth of 0.11 comfortably beats a full hour of 0.045; a function pinned at full load pays 0.11 against 0.030, which is the "several times" made concrete at roughly 3.5x. Nobody can tell you whether 200 million invocations a month is expensive without knowing how much of each hour they occupy.
+
+**Headroom is why the rule of thumb is a band rather than a point.** You cannot safely average 100 percent CPU on a box, so an honest comparison charges the container for the headroom it must keep, and that alone slides break-even from about 40 percent up towards 60. Provisioned concurrency slides it the other way: it converts part of the bill back into always-on cost at a keep-warm rate you pay whether or not a request arrives, which is why you size it to the steady baseline and let bursts spill into on-demand instances.
+
+**Interview nuance:** the cost model inverts at high steady load. FaaS is priced for bursty utilization; if a function runs flat-out 24/7, per-invocation billing costs several times what an equivalently sized, well-utilized container or reserved instance would. The crossover is roughly when sustained utilization passes ~40 to 60 percent. Saying "serverless is cheaper" without "for spiky load" is the tell of someone who has not seen the bill. A tier that sits near 90 percent CPU all day is the 3.5x case by definition, so it belongs on committed or spot containers no matter how event-shaped its trigger looks.
 
 \`\`\`csdiagram
 {
