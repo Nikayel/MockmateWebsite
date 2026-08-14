@@ -965,9 +965,9 @@ Delivery is a state machine per message: sent (server accepted), delivered (reci
   "prompt": "Bob's phone is offline when Alice sends. There is no socket to push to. What does the system do?",
   "options": [
     {
-      "label": "Persist the message in Bob's durable inbox, and let his device pull everything after its last acknowledged sequence number when it reconnects",
+      "label": "Persist it in Bob's durable inbox until he reconnects",
       "correct": true,
-      "feedback": "Right. Store and forward is what makes the send succeed even though delivery cannot, and the sequence number is what tells the reconnecting device exactly where to resume."
+      "feedback": "Right, this is store and forward: the send succeeds even though delivery cannot. When the device comes back it pulls everything after its last acknowledged sequence number, which is what lets it resume at exactly the right point instead of refetching the conversation."
     },
     {
       "label": "Retry the push every few seconds until Bob's device reappears",
@@ -1259,9 +1259,9 @@ The **dispatch/matching engine** does candidate generation (query the rider's H3
   "prompt": "Two riders request at the same instant, and the matcher ranks the same driver first for both. What prevents a double booking?",
   "options": [
     {
-      "label": "An exclusive assignment: a short lock or conditional write on the driver's state so only one match wins, with the offer expiring if the driver does not accept",
+      "label": "An exclusive assignment on the driver's state, with an expiring offer",
       "correct": true,
-      "feedback": "Right. Ranking suggests, assignment decides, and the decision has to be a single winner. The expiry is what returns an unresponsive driver to the pool instead of stranding the rider."
+      "feedback": "Right. Ranking suggests, assignment decides, and the decision has to produce a single winner: a short lock or a conditional write on the driver's state so only one match commits. The expiry is the other half, returning an unresponsive driver to the pool instead of stranding the rider."
     },
     {
       "label": "Ranking by ETA, which will differ for the two riders and separate them",
@@ -1293,9 +1293,9 @@ File sync looks like "upload files to the cloud," but the entire difficulty is i
   "prompt": "Suppose you split every file into fixed 4MB blocks and hash each block. A user inserts one byte near the front of a 2GB file. How many block hashes change?",
   "options": [
     {
-      "label": "Effectively all of them, because every following byte shifts and each fixed boundary now cuts different content",
+      "label": "Effectively all of them, every boundary shifts",
       "correct": true,
-      "feedback": "Right, and that is the whole reason content-defined chunking exists. Fixed offsets have no relationship to the content, so an insert near the front re-uploads the file."
+      "feedback": "Right, and this is the whole reason content-defined chunking exists. Every byte after the insert moves one position, so each fixed 4MB boundary now cuts different content and rehashes. One byte re-uploads a 2GB file."
     },
     {
       "label": "One, the block containing the inserted byte",
@@ -1608,9 +1608,9 @@ Separate from blob storage, a metadata DB tracks: the file tree (paths, folders)
   "prompt": "Two people edit the same file, and the second client uploads based on version N when the server is already at N+1. What does the pragmatic product do?",
   "options": [
     {
-      "label": "Keep both: commit one as the new version and save the other as a conflicted copy, with full version history so nothing is destroyed",
+      "label": "Keep both, as a new version and a conflicted copy",
       "correct": true,
-      "feedback": "Right. Dropbox's answer is deliberately unambitious, because the one unacceptable outcome is a silently lost edit."
+      "feedback": "Right, and Dropbox's answer is deliberately unambitious. One upload commits as the new version, the other lands beside it as a conflicted copy, and full version history means nothing is destroyed. The one unacceptable outcome is a silently lost edit."
     },
     {
       "label": "Merge the two versions automatically with a three way diff",
