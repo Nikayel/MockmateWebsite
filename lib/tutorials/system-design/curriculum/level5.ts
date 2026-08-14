@@ -3246,7 +3246,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-smr-total-order",
           title: "State-Machine Replication & Total-Order Broadcast",
           summary:
-            "Identical replicas come from deterministic commands applied in one agreed order; that order is total-order broadcast, equivalent to consensus, with snapshots bounding the log.",
+            "How replicas stay identical: deterministic commands applied in one agreed order, which turns out to be consensus wearing different clothes.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["smr", "total-order-broadcast"],
@@ -3294,7 +3294,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-raft-paxos",
           title: "Consensus in Depth: Raft (and the Paxos Family)",
           summary:
-            "Randomized-timeout election, majority-quorum commit, and four safety properties make committed entries immortal; minority partitions stall safely and clusters should be odd-sized.",
+            "How Raft elects a leader and commits on a majority, and why a committed entry survives every future leader change while an appended one may not.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["raft", "paxos", "consensus"],
@@ -3342,7 +3342,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-quorums-tunable",
           title: "Quorums & Dynamo-Style Tunable Consistency",
           summary:
-            "R+W>N forces read/write overlap (quorum consistency, NOT linearizability); latency tracks the slowest quorum member, and sloppy quorums buy availability during partitions.",
+            "Why R+W>N buys read and write overlap but never linearizability, and what a sloppy quorum trades away to keep taking writes.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["quorums", "tunable-consistency", "dynamo"],
@@ -3399,7 +3399,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-2pc-3pc",
           title: "Distributed Transactions: 2PC / 3PC & Their Limits",
           summary:
-            "2PC gives atomicity via prepare-then-commit, but a coordinator crash after the vote blocks participants holding locks; harden the coordinator with consensus or use sagas.",
+            "Two-phase commit buys atomicity and pays in blocking: what happens to participants holding locks when the coordinator dies after the vote.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["2pc", "distributed-transactions"],
@@ -3448,7 +3448,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-sagas",
           title: "Sagas: Orchestration vs Choreography & Compensation",
           summary:
-            "Chain local transactions with compensating undos: atomicity of outcome without isolation, contained by semantic locks, with idempotent compensations backed by retries and a DLQ.",
+            "Sagas trade atomic transactions for compensating undos: you keep the all-or-nothing outcome, you lose isolation, and you design for both.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["saga", "compensation", "orchestration"],
@@ -3498,7 +3498,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-outbox-messaging",
           title: "Transactional Messaging: Outbox, Inbox & CDC",
           summary:
-            "The dual write either loses or fabricates events; write the event to an outbox in the same local transaction, relay it at-least-once, and dedupe with a consumer inbox.",
+            "The dual-write problem, and why a transactional outbox plus a consumer inbox is the standard cure for lost and phantom events.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["outbox", "cdc", "messaging"],
@@ -3548,7 +3548,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-delivery-idempotency",
           title: "Delivery Semantics, Idempotency & Exactly-Once Reality",
           summary:
-            "Exactly-once delivery is impossible; build exactly-once effect from at-least-once plus idempotency keys stored atomically with the side effect, with fencing tokens for stale actors.",
+            "Exactly-once delivery is impossible: what at-least-once plus idempotency keys buys you instead, and where fencing tokens fit in.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["delivery-semantics", "idempotency", "exactly-once"],
@@ -3606,7 +3606,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-crdts",
           title: "CRDTs, Strong Eventual Consistency & Anti-Entropy",
           summary:
-            "Commutative, associative, idempotent merges give deterministic convergence, at the cost of tombstones and no global invariants, and only with anti-entropy delivering the missed writes.",
+            "CRDTs converge without coordination because their merges commute, and the bill arrives as tombstones and no global invariants.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["crdt", "anti-entropy", "gossip"],
@@ -3655,7 +3655,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-failure-detection",
           title: "Failure Detection: Heartbeats, Phi-Accrual & SWIM",
           summary:
-            "Dead and slow are indistinguishable, so use phi-accrual's adaptive suspicion, a refutation window, and SWIM's O(1) probes with gossip instead of one fixed timeout.",
+            "You cannot tell a dead node from a slow one, so detectors trade accuracy against speed: phi-accrual, suspicion windows, and SWIM.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["failure-detection", "swim", "gossip"],
@@ -3703,7 +3703,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-leader-election-fencing",
           title: "Leader Election, Leases, Fencing & Split-Brain",
           summary:
-            "A GC pause can create two leaders despite a valid lease, so enforce monotonic fencing tokens at the storage layer; on a 3-2 split the majority leads and the minority is fenced.",
+            "A GC pause can produce two leaders both holding valid leases, and only a fencing token checked at the storage layer stops the old one.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["leader-election", "fencing", "split-brain"],
@@ -3752,7 +3752,7 @@ export const systemDesignLevel5: DesignLevel = {
           id: "sd-l5-byzantine-fault-tolerance",
           title: "Byzantine Fault Tolerance & BFT Consensus",
           summary:
-            "Byzantine nodes lie and equivocate, forcing 3f+1 nodes and heavier messaging (PBFT, linear HotStuff); use BFT only across real trust boundaries, Raft plus checksums/TLS inside one.",
+            "Why tolerating nodes that lie costs 3f+1 replicas instead of 2f+1, and when a real trust boundary makes that price worth paying.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["consensus", "distributed-systems", "fault-tolerance"],
