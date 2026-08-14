@@ -853,9 +853,9 @@ are guaranteed around every crash and every rebalance.
   "prompt": "A consumer commits offsets only after its payment side effect is durably done. It crashes after processing but before committing. What happens on restart?",
   "options": [
     {
-      "label": "The message is reprocessed, so the handler sees a duplicate: this is at-least-once, and the handler must be idempotent",
+      "label": "The message is reprocessed and the handler sees a duplicate",
       "correct": true,
-      "feedback": "Right: commit-after-process trades lost work for duplicate work, and duplicates surround every crash and rebalance."
+      "feedback": "Right. Commit-after-process is at-least-once: the payment really happened but the committed offset never advanced past it, so the broker redelivers. Commit timing trades lost work for duplicate work, and duplicates surround every crash and every rebalance, which is why the handler has to be idempotent."
     },
     {
       "label": "The message is skipped, because the broker saw it delivered once already",
@@ -1094,9 +1094,9 @@ metric you scale and alert on.
   "prompt": "Consumer lag keeps rising on a 12-partition topic, and the group already runs 12 consumers on healthy CPUs. What actually helps?",
   "options": [
     {
-      "label": "Make handlers faster or add partitions: lag is the right signal, but autoscaling consumers stopped working at the partition ceiling",
+      "label": "Make the handler faster, or add partitions",
       "correct": true,
-      "feedback": "Right: scale on lag, but only up to partition count; at the ceiling the fix moves to per-message cost or more partitions."
+      "feedback": "Right. Lag is still the correct signal, but the lever it normally pulls has run out: group parallelism is capped by partition count and the group is sitting on that cap. From here the only levers left are per-message cost and partition count."
     },
     {
       "label": "Add four more consumers, since rising lag says scale out",
@@ -1328,9 +1328,9 @@ compaction does the erasure directly.
   "prompt": "A user invokes right-to-erasure against your immutable 7-year audit stream. What is the standard pattern?",
   "options": [
     {
-      "label": "Crypto-shredding: their data was encrypted with a per-user key, so deleting the key renders it unrecoverable without mutating the log",
+      "label": "Crypto-shredding: delete that user's key",
       "correct": true,
-      "feedback": "Right: you erase access, not bytes, which keeps the log immutable."
+      "feedback": "Right. Their data was encrypted under a key belonging to them alone, so destroying the key renders every copy unrecoverable without rewriting a byte. You erase access rather than bytes, which keeps the stream immutable and every consumer offset into it still valid."
     },
     {
       "label": "Rewrite the log with that user's records filtered out",
