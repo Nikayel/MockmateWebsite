@@ -288,7 +288,7 @@ const driverAndExecutors: SqlLesson = {
   id: "de-l10-driver-and-executors",
   title: "The Driver, the Executors, and One Task per Core",
   summary:
-    "The two kinds of process in every Spark application, how work lands on core slots one task at a time, and the driver-versus-executor OOM fork read straight off the executor metrics.",
+    "Why a Spark out-of-memory error on the driver needs a different fix than one on an executor, and how the metrics tell you which you hit.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
@@ -524,9 +524,9 @@ LIMIT 1;`,
 
 const lazyEvaluation: SqlLesson = {
   id: "de-l10-lazy-evaluation",
-  title: "Lazy Evaluation: Transformations Build a Plan, Actions Run It",
+  title: "Lazy Evaluation: Transformations Plan, Actions Execute",
   summary:
-    "Why Spark refuses to do anything until you ask for a result, how to tell a transformation from an action, and how to count stages off a physical plan by counting its Exchange operators.",
+    "Why Spark does no work until an action asks for a result, and how to count a job's stages by counting Exchange operators in its plan.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [

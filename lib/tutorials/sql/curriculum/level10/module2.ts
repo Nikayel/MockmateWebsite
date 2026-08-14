@@ -379,7 +379,7 @@ const narrowWideAndBroadcast: SqlLesson = {
   id: "de-l10-narrow-wide-and-broadcast",
   title: "Narrow, Wide, and the Broadcast Decision at 10 MB and 100 MB",
   summary:
-    "Read narrow from wide off the shuffle metrics, pick auto-broadcast, hinted broadcast, or sort-merge with the real byte thresholds, and flag the stages whose shuffle write crosses the 10 GB line.",
+    "When a broadcast join beats sort-merge: the 10 MB auto threshold, the 100 MB manual ceiling, and the driver-memory bet in between.",
   estimatedMinutes: 28,
   difficulty: "medium",
   skills: [
@@ -627,7 +627,7 @@ const shufflePartitionCount: SqlLesson = {
   id: "de-l10-shuffle-partition-count",
   title: "Shuffle Partition Count: Why 200 Is Wrong for Your Job",
   summary:
-    "Size spark.sql.shuffle.partitions with the 2-to-4-per-core heuristic, spot over- and under-partitioned stages from task metrics, and say what AQE now does for you automatically.",
+    "Why Spark's default of 200 shuffle partitions is wrong for your job, and how the 2-to-4-tasks-per-core heuristic sizes it correctly.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
@@ -862,9 +862,9 @@ ORDER BY stage_id;`,
 
 const diagnosingSkew: SqlLesson = {
   id: "de-l10-diagnosing-skew",
-  title: "Skew Diagnosis with Percentiles: Max vs Median, Not Max vs Mean",
+  title: "Skew Diagnosis: Max vs Median, Not Max vs Mean",
   summary:
-    "Compute a median and a percentile in plain SQL, apply the max-over-median skew signal and AQE's 5x-median rule, and name the fix ladder in the order an interviewer expects.",
+    "Why the mean hides a straggler task and the median exposes it, plus AQE's 5x-median rule and the skew fix ladder in order.",
   estimatedMinutes: 28,
   difficulty: "hard",
   skills: [
@@ -1149,7 +1149,7 @@ const cachingAndSlowJobCapstone: SqlLesson = {
   id: "de-l10-caching-and-slow-job-capstone",
   title: "Caching Decisions, and the Slow-Job Investigation",
   summary:
-    "Decide when caching pays from the evidence in the metrics, then run the whole Amazon slow-job walk on a snapshot you have never seen and check your diagnosis against the model answer.",
+    "When caching a Spark DataFrame actually pays for itself, then a full slow-job investigation run on metrics you have never seen.",
   estimatedMinutes: 30,
   difficulty: "hard",
   skills: [
