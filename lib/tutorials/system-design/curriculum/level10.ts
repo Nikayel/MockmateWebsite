@@ -2855,6 +2855,30 @@ Because the underlying data is stable, you cache hard: popular \`(cell, filter)\
 
 That is the one filter that fights the caching policy. Keep open-now evaluation out of the cached artifact (cache the candidate set and apply the hours filter at request time), or give result pages carrying that filter a TTL of minutes rather than hours.
 
+\`\`\`cswidget
+{
+  "type": "cache-sim",
+  "title": "What a small result cache buys, and what open-now costs it",
+  "predictPrompt": {
+    "question": "Twenty distinct (cell, filter) result pages, one of them asked about half the time, and a cache that holds only eight of them. What hit ratio would you expect?",
+    "options": [
+      "About 40 percent, matching the 8 of 20 pages it can hold",
+      "Well above half, because the popular pages are asked far more often than the rare ones",
+      "Near zero until the cache is large enough to hold every page",
+      "About 5 percent, since a new query almost always arrives"
+    ]
+  },
+  "workedExample": "The stream is 240 searches over 20 distinct (cell, filter) pages, skewed the way real search traffic is: one page takes about half the requests. A cache holding 8 of those 20 pages serves 153 of the 240 searches, a hit ratio of about 64 percent, and leaves 87 reads for Elasticsearch. Capacity is not what earns that; skew is. Now model the open-now filter by dropping the TTL from 120 ticks to 12, because an answer that depends on the current time cannot be held for hours. The hit ratio falls to about 45 percent, Elasticsearch takes 131 reads instead of 87, and the hot page piles up 5 rebuilds at once because every miss during a rebuild launches another one. Turn coalescing on and that pile-up is capped at 1.",
+  "seed": "yelp-nearby",
+  "keys": 20,
+  "ticks": 240,
+  "capacity": 8,
+  "ttl": 120,
+  "rebuildTicks": 6,
+  "caption": "This is why open-now is the filter that fights the caching policy: it is the one attribute whose answer changes without any place being edited, so either it comes out of the cached artifact and is applied at request time, or its pages carry a TTL of minutes."
+}
+\`\`\`
+
 New reviews, edits, and new places are comparatively low-rate. They update the source of truth, then flow through an indexing pipeline that updates the ES read model and invalidates affected cache entries. You never optimize this path for high throughput because the workload does not have it.
 
 **Interview nuance:** the trap is to over-engineer the write path. If you find yourself building a high-frequency location-write ingestion system or geofencing with constant updates, you have modeled Yelp like Uber and wasted your design budget on throughput the workload never generates. The senior move is to explicitly state "this is read-heavy and mostly static, so I precompute and cache instead of optimizing writes."
