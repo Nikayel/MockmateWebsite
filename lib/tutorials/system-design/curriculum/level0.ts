@@ -2888,8 +2888,28 @@ it:
   or read time (fan-out on read, cheap writes, slow reads)? Celebrity followers break naive push.
 - **Sync vs async**: does the caller block for the result, or do you accept the request, return a 202,
   and finish on a queue? Async buys throughput and resilience at the cost of end-to-end visibility.
+- **Durability vs freshness**: does this data have to survive a crash, or is it superseded faster than
+  you could restore it? A ledger row has to survive. A position ping that a new one replaces every few
+  seconds does not, and paying for durability on it costs write throughput and buys nothing.
 - **SQL vs NoSQL, normalize vs denormalize, cache vs recompute**: each is a spend-here-to-save-there
   trade.
+
+The durability lens is the one candidates skip, because "store it durably" always sounds like the
+responsible answer. Run it on the geospatial index from the high-level design lesson. The same query
+has two homes, and they trade different things:
+
+\`\`\`
+Durable, on the primary store              In memory, in a cell-partitioned geo index
+  UPDATE ... SET loc = POINT(x, y)           GEOADD   things:cell-9q8y x y thing:42
+  SELECT ... WHERE ST_DWithin(...)           GEOSEARCH things:cell-9q8y FROMLONLAT x y BYRADIUS 2 km
+  survives a restart, every write            answers from RAM, survives nothing: a restart is
+  is a WAL write on one primary              empty until every reporter checks in again
+\`\`\`
+
+Neither line is a decision yet. It becomes one when you say how long a stale position is worth
+anything, what an empty index for a few seconds after a restart actually costs, and which data in the
+same system (the trip, the receipt, the dispute) has the opposite answer and therefore belongs in a
+different store.
 
 ### Commit, with the assumption stated
 
