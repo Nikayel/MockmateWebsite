@@ -266,14 +266,89 @@ For internal east-west traffic between services, gRPC with protobuf is the defau
 
 ## Orchestration vs choreography
 
-\`\`\`
- Orchestration                     Choreography
- [ Coordinator ] --> Payment       Order -event-> Payment -event-> Inventory
-   (saga)        --> Inventory     each service reacts to the
-                 --> Shipping      previous one's event; no central brain
- central visibility, one           low coupling, but flow is
- place to change, but a            implicit and hard to trace
- coupling hotspot
+\`\`\`csdiagram
+{
+  "type": "topology",
+  "title": "Two ways to wire the same checkout",
+  "layout": "lr",
+  "reveal": "all",
+  "nodes": [
+    {
+      "id": "order",
+      "label": "Order service",
+      "kind": "service"
+    },
+    {
+      "id": "saga",
+      "label": "Saga orchestrator (Temporal)",
+      "kind": "service"
+    },
+    {
+      "id": "pay_o",
+      "label": "Payment",
+      "kind": "service"
+    },
+    {
+      "id": "inv_o",
+      "label": "Inventory",
+      "kind": "service"
+    },
+    {
+      "id": "ship_o",
+      "label": "Shipping",
+      "kind": "service"
+    },
+    {
+      "id": "pay_c",
+      "label": "Payment (on OrderPlaced)",
+      "kind": "service"
+    },
+    {
+      "id": "inv_c",
+      "label": "Inventory (on PaymentTaken)",
+      "kind": "service"
+    }
+  ],
+  "edges": [
+    {
+      "from": "order",
+      "to": "saga",
+      "kind": "sync",
+      "label": "orchestration"
+    },
+    {
+      "from": "saga",
+      "to": "pay_o",
+      "kind": "sync",
+      "label": "step 1"
+    },
+    {
+      "from": "saga",
+      "to": "inv_o",
+      "kind": "sync",
+      "label": "step 2"
+    },
+    {
+      "from": "saga",
+      "to": "ship_o",
+      "kind": "sync",
+      "label": "step 3"
+    },
+    {
+      "from": "order",
+      "to": "pay_c",
+      "kind": "async",
+      "label": "choreography"
+    },
+    {
+      "from": "pay_c",
+      "to": "inv_c",
+      "kind": "async",
+      "label": "PaymentTaken"
+    }
+  ],
+  "caption": "Orchestration puts the whole flow in one component you can read, change, and audit, and that component ends up knowing about everyone, which is the coupling hotspot. Choreography couples least and leaves the end-to-end flow living nowhere, which is what makes it hard to trace. Choreography for two or three simple steps, orchestration once the workflow has branching, compensation, and an audit requirement."
+}
 \`\`\`
 
 Orchestration puts a central coordinator (a saga orchestrator like Temporal or a workflow service) in charge of calling each service in order and handling failures. You get one place to see and change the flow, at the cost of a component that knows about everyone. Choreography has each service emit events and react to others' events with no central brain: lowest coupling, but the end-to-end flow lives nowhere and is painful to debug and reason about. Rule of thumb: choreography for simple 2 to 3 step flows, orchestration once a workflow has real branching, compensation, and needs auditability.
