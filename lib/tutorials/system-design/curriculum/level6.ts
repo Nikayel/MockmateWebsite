@@ -588,6 +588,66 @@ The cost is a more complex deployment. Choose it when multi-tenancy or independe
 scaling is a real requirement, not by default. **NATS and Redis Streams** cover the low-latency,
 lightweight end when you want simple pub/sub or a small stream with minimal ops.
 
+### Tiered storage, since "retention" is where the bill lives
+
+That phrase **tiered storage** appears in every log vendor's pitch, so know what it actually does
+before you cite it. A partition is stored as a run of **segment files**. Without tiering, every one
+of those segments sits on local broker disk, on every replica, for the whole retention window. Ask
+for 90 days and you are buying provisioned SSD for 90 days of history times the replication factor,
+and you are buying it on machines you sized for serving, not for storage.
+
+Tiering splits that run in two. The segment currently being appended to, plus recent closed segments,
+stay on local disk (the hot tier). Once a segment is closed and older than a **local** retention
+threshold, the broker uploads it to object storage (S3, GCS) and deletes the local copy, keeping the
+metadata that maps offset ranges to remote objects. So one topic now has two retention settings
+rather than one: how long a segment stays on broker disk, and how long it exists at all.
+
+The part that matters for design is that this is invisible to the consumer. Offsets do not change and
+the fetch API does not change. A consumer reading near the tail is served from page cache exactly as
+before. A consumer that seeks to a three-month-old offset issues the same fetch, and the broker
+transparently reads that segment from object storage, at object-storage latency for the first touch
+of a cold segment. Replay gets slower, not unavailable.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Segment age",
+    "Where the bytes live",
+    "How a read is served",
+    "What it costs per GB-month"
+  ],
+  "rows": [
+    [
+      "Active (being appended)",
+      "Local disk, replicated RF times",
+      "Page cache, zero-copy",
+      "provisioned SSD x RF"
+    ],
+    [
+      "Closed, inside local retention",
+      "Local disk, replicated RF times",
+      "Local disk read",
+      "provisioned SSD x RF"
+    ],
+    [
+      "Older than local retention",
+      "Object storage, one copy, durable there",
+      "Same fetch, broker pulls the remote segment",
+      "object storage, cents, no RF multiplier"
+    ]
+  ],
+  "highlightCols": [
+    "What it costs per GB-month"
+  ],
+  "caption": "Tiered storage is a hot/cold split over the same offset space. Long retention stops sizing the cluster: it becomes an object-storage line item instead of more brokers, and the price is first-touch latency on a cold segment rather than lost replay."
+}
+\`\`\`
+
+Kafka added this as KIP-405 and Pulsar has offloading built in, so tiered storage is not by itself a
+reason to prefer one over the other. What it changes is the shape of the retention driver: with it,
+"keep everything for 90 days" stops being a cluster-sizing problem and becomes a storage bill.
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -618,7 +678,9 @@ make ten calls a second is over-engineering you should call out.
 
 Recap: match the broker to the drivers (throughput, ordering, retention/replay, delivery, routing,
 ops budget); use a log only when replay/throughput justify its ops, a queue for work distribution and
-routing, managed services when the team is small, and sometimes no broker at all.
+routing, managed services when the team is small, and sometimes no broker at all. Long retention is
+priced by tiered storage, which moves cold segments to object storage and keeps them readable at the
+same offsets.
 
 \`\`\`cswidget
 {
