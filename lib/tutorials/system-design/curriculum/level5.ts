@@ -4206,19 +4206,89 @@ export const systemDesignLevel5: DesignLevel = {
           practice: {
             id: "sd-l5-session-guarantees-practice",
             prompt:
-              "Design session-guarantee handling for Twitter/X's 'compose tweet then land on your profile timeline' flow at read-replica scale (a fan-out timeline served from many geo-distributed cache and DB replicas), where a user commonly composes on mobile and immediately opens the web app, and must see their own new tweet at the top.",
+              "Read the incident timeline below and say what is happening. Name the session guarantee each of the two reported symptoms violates, work out how much of the reported traffic the 30s sticky-routing window actually covers, and say what the signals do to the lost-write and CDN-change hypotheses.",
             thinkAbout: [
-              "Where must the 'user U wrote up to T' fact live for the phone-then-web case to work?",
-              "How do you avoid making the whole timeline linearizable for one UX requirement?",
-              "What keeps refresh and paging from revealing an earlier state?",
+              "Which symptom is about a client's own write, and which is about a view moving backwards?",
+              "Where does the ryw cookie live, and what is left of it when the compose happens in the app and the read happens in a browser?",
+              "Which of the listed numbers are flat or normal, and what does each one eliminate?",
             ],
             modelAnswerOutline: [
-              "Assumptions: writes go to a primary and fan out to timeline caches and geo replicas lagging ms to seconds; the user's own new tweet appearing instantly on their profile is a hard product requirement, cross-device.",
-              "**Design:** the moment the tweet commits, the write path returns a commit token (tweet id plus commit timestamp/LSN) and, critically, records 'user U wrote up to token T' in a shared per-user marker in a fast global store (Redis / edge KV replicated to regions), not just the client. Any device opening U's profile reads the marker and requires its timeline read to reflect at least T; if the local replica or cache has not caught up, the read waits a bounded few hundred ms or falls back to the authoritative store for U's own tweets. Because the marker is per-user and server-side, the phone-then-web case works.",
-              "**Monotonic reads across scrolling:** carry the highest observed token so paging and refresh never reveal an earlier state (no tweets vanishing on refresh).",
-              "**Deliberately stay eventual for everyone else:** other users seeing the tweet a second or two later is fine and buys full availability and cheap fan-out.",
-              "**The scale trick:** do not make the whole timeline linearizable. Special-case the author's own recent writes: prepend the just-written tweet from a small 'my recent tweets' authoritative read merged over the eventually-consistent fanned-out timeline. Read-your-writes only for your own content gives the instant-feedback UX while keeping the hot fan-out path eventually consistent.",
-              "Common wrong turn: relying on client-side stickiness, which cannot survive the mobile-to-web device switch and leaves the user staring at a timeline missing the tweet they just posted.",
+              "**What is happening:** every read in these reports is served by a replica that has not applied the compose yet, and nothing in the read path makes a read wait for that user's own commit. The two symptoms are two different session guarantees going unmet, not one bug. The missing post is a read-your-writes violation. The reply count reading 12, then 9, then 12 is a monotonic-reads violation, produced by least-connections balancing sending each refresh to a replica with a different apply lag while nothing pins the user to one replica.",
+              "**How little the sticky window covers:** the `ryw` cookie is scoped to the browser that sent the write, so the 82% who composed in the iOS or Android app and read in a desktop browser arrive with no cookie at all and are balanced onto the replica pool like any anonymous read. The other 18% stayed in one browser but read a median of 44 seconds after composing, outside the 30s window, while apply lag runs to a p99 of 47s during the backfill that 78% of the reports fall inside. The window is wrong on scope and too short for the lag it is meant to cover.",
+              "**What the flat signals eliminate:** the write path sits at a flat 0.02% error rate and the new row is readable on the primary within 120ms in every sampled case, so nothing is being dropped on write. Zero tickets describe a post that never appeared, and the fan-out queue peaks at 4,000 and drains within 2s, so a fan-out backlog is not holding posts back. The Redis timeline cache is flat at a 91% hit rate with CPU flat at 30%, so the cache is not behaving differently than it did last week.",
+              "**Ruling out the CDN change:** the routing rule shipped Tue 09:14, and the missing-post report was already running at 140 a day the previous Thursday and Friday, so it predates the change. Timeline responses also carry `private, no-store`, so no shared cache holds them. Coincident change, not the mechanism.",
+              "**What closes it:** move the guarantee off the browser and onto the user. Return the commit position (LSN or commit timestamp) from the write, record 'user U has committed up to L' in a per-user marker in a fast shared store such as Redis, and have every timeline read for U require a replica whose applied position is at least L, waiting a bounded few hundred ms or falling back to the primary for U's own posts. That marker travels from the phone to the desktop, which is exactly what a cookie cannot do. Carrying the highest observed position forward across refresh and paging also stops the 12, 9, 12 flapping.",
+              "**What not to reach for:** making the whole timeline linearizable would put global coordination on every feed read for every user to cure a per-client staleness symptom. Read-your-writes on the author's own recent posts, merged over the eventually consistent fan-out, buys the same UX at a fraction of the cost.",
+            ],
+            supplied: {
+              label: "Incident timeline",
+              body: `
+**Product:** Chirp, a fan-out timeline. Writes commit to one primary per shard. Profile and home timelines are served from 40 read replicas plus a Redis timeline cache across three regions.
+
+**Support queue, Mon 09:00 to Thu 18:00, 612 tickets:**
+- 511: "I posted from the phone, opened the site, and my post is not on my profile." Median time from compose to the failing read is 22 seconds. The post shows up on a later refresh, median 38 seconds after compose, longest sampled 52 seconds.
+- 101: "The reply count on my post read 12, then 9, then 12 again across three refreshes."
+- 0 tickets describe a post that never appeared at all.
+
+**Client split of the 511, from the session log:**
+- 82% composed in the iOS or Android app and read in a desktop browser within 90 seconds.
+- 18% composed and read in the same browser, a median of 44 seconds after composing.
+- 78% of the 511 are timestamped inside the 08:00 to 11:00 fan-out backfill window.
+
+**Read-path config, unchanged since March:**
+- On a successful write the edge sets a \`ryw\` cookie for 30s on the browser that sent the write, and routes that browser's timeline reads to the primary for the window.
+- Requests without the cookie are balanced across the replica pool by least connections. Replica choice is not pinned per user.
+- Timeline responses carry \`Cache-Control: private, no-store\`.
+
+**Signals over the window:**
+- Write path error rate 0.02%, flat all week. In every sampled case the new row is readable on the primary within 120ms of the compose call.
+- Replica apply lag: p50 900ms outside the backfill, p50 11s and p99 47s during it.
+- Redis timeline cache hit rate 91%, flat. Cache CPU flat at 30%.
+- Fan-out worker queue depth peaks at 4,000 and drains within 2s. No backlog alarm fired.
+
+**Change log:** a CDN routing rule for static assets shipped Tue 09:14. The missing-post report was already running at 140 a day on the previous Thursday and Friday.
+`.trim(),
+            },
+            rubric: [
+              {
+                name: "Symptom to guarantee mapping",
+                weak: "Calls the timeline stale without separating the missing post from the reply count that moved backwards.",
+                adequate:
+                  "Names read-your-writes for the missing post but treats the 12, 9, 12 count as the same symptom.",
+                strong:
+                  "Maps the missing post to read-your-writes and the 12, 9, 12 reply count to monotonic reads, and ties the second one to least-connections balancing across replicas at different lags.",
+              },
+              {
+                name: "Scope of the sticky window",
+                weak: "Treats the 30s cookie window as adequate coverage and hunts for the cause elsewhere in the read path.",
+                adequate:
+                  "Notes that the cookie is per browser without connecting it to the 82% who switched clients.",
+                strong:
+                  "Ties the cookie's browser scope to the 82% cross-client reports and the 30s window to the 44 second same-browser median against a 47s lag p99.",
+              },
+              {
+                name: "Use of the flat signals",
+                weak: "Leaves a dropped or delayed write on the table, citing none of the write-path numbers.",
+                adequate: "States that no write was lost without naming the signal that shows it.",
+                strong:
+                  "Eliminates a lost write with the flat 0.02% error rate and the row readable on the primary within 120ms, and eliminates fan-out backlog with the queue draining in 2s.",
+              },
+              {
+                name: "Handling of the CDN change",
+                weak: "Accepts the Tue 09:14 CDN rule as a cause or a contributor with no argument from the timeline.",
+                adequate:
+                  "Sets the CDN rule aside but rests on only one of the two available reasons.",
+                strong:
+                  "Rules the CDN rule out on the dates, since the report ran at 140 a day the previous week, and on the private, no-store header that keeps timelines out of shared caches.",
+              },
+              {
+                name: "Where the guarantee is stored",
+                weak: "Proposes another cookie or client-side pin, which lands back where the reports came from.",
+                adequate:
+                  "Reaches for a version token but leaves it on the client, or makes the whole timeline linearizable.",
+                strong:
+                  "Puts a per-user commit marker server-side, has reads for that user wait for a replica past it, and leaves everyone else's fan-out reads eventually consistent.",
+              },
             ],
           },
         },
@@ -4304,18 +4374,85 @@ export const systemDesignLevel5: DesignLevel = {
           practice: {
             id: "sd-l5-physical-time-hlc-practice",
             prompt:
-              "Choose a clock/timestamp strategy for a globally distributed ledger like a payment-transaction store spanning us-east, eu-west, and ap-south at ~50K writes/sec, where transactions must be totally ordered for audit and a lost or misordered write is a financial correctness bug. Justify HLC versus TrueTime and address the residual skew window.",
+              "Read the incident timeline below and say what is happening to the ledger rows that revert. Name the mechanism that decides which of two writes to a row survives, say what the signals do to the stale-read and driver-upgrade hypotheses, and state the timestamp scheme you would move this ledger to.",
             thinkAbout: [
-              "Where does the authoritative total order come from when clocks cannot be trusted?",
-              "What closes the residual skew window on reads in the commodity-cloud design?",
-              "What makes commit-wait the natural fit for a ledger?",
+              "What does write B carrying a lower stamp than write A tell you about the two clocks that produced them?",
+              "Which signals would look different if this were a stale read rather than the stored value?",
+              "What does repointing api-7 at a good NTP source do to the size of the window, and what does it not do?",
             ],
             modelAnswerOutline: [
-              "Assumptions: append-heavy ledger, cross-region, strict audit requirement (a globally agreed order of transactions), zero tolerance for dropped or inverted writes. The stakes rule out naive LWW immediately: at 50K writes/sec across three regions with NTP skew, wall-clock LWW would misorder and drop writes constantly, each one a financial bug.",
-              "**On a major cloud (NTP only):** use HLC for causal/monotonic timestamps, but HLC alone does not give the external total order auditors want, so layer ordering on consensus: each ledger shard is a Raft/Paxos group, writes go through the leader, and the replicated log IS the authoritative total order (HLC rides along for MVCC and human-readable ordering, not as the source of truth). Cross-shard atomicity uses a coordinated commit.",
-              "**Close the residual skew window on reads** with CockroachDB's trick: an uncertainty interval around each read timestamp; if a read encounters a value written within the interval it cannot safely order, it restarts at a higher timestamp, never returning a result that violates the real order. Correctness on commodity hardware, paying consensus latency rather than clock hardware.",
-              "**On owned datacenters:** deploy TrueTime-style GPS + atomic clocks and use commit-wait: stamp each committed transaction and wait out epsilon (a few ms) before acknowledging, so any later transaction gets a strictly higher timestamp and the timestamp order IS the true global order: no read-restart dance. What Spanner does, and the natural fit for a ledger, at the cost of clock hardware in every region and ~epsilon per commit.",
-              "**Decision:** for a financial ledger the external total order is worth the most robust available option: TrueTime + commit-wait on owned hardware; HLC + per-shard consensus + uncertainty-interval read restarts on commodity cloud. Either way the total order comes from a bounded-uncertainty clock or from consensus, never from a bare wall-clock comparison.",
+              "**What is happening:** conflict resolution on this table is last-writer-wins over a client-supplied wall-clock stamp, and api-7's clock has been 412ms ahead since it was repointed on the 3rd. Write A, handled by api-7 at real time 14:41:02.118, carries stamp 14:41:02.530. Write B, the correction handled 284ms later in real time by api-4 whose offset is under 8ms, carries 14:41:02.402. LWW compares stamps rather than real time, keeps the higher one, and discards the genuinely newer write with no error and no log line. Cassandra's LWW resolution is doing exactly what it is configured to do on numbers it has no reason to distrust.",
+              "**Why nothing alerted:** both writes were acknowledged, and the loss happens later at conflict resolution, so a flat 0.00% error rate and a flat 3ms coordinator p99 are what this failure looks like from the write path. There is no counter for 'a newer write lost a timestamp comparison', which is why 1,412 rows accumulated over 9 days before reconciliation caught them.",
+              "**The stale-read hypothesis does not survive:** reads and writes are both LOCAL_QUORUM on RF=3, so R+W = 4 > 3 and every read quorum overlaps every write quorum. Staleness would also heal, and this does not: all nine replicas across three regions return 240.00, nightly repair completed clean, 0 hints were stored and 0 mutations dropped. The 240.00 is what is durably stored, not a stale view of something else.",
+              "**The driver upgrade does not survive either:** 4.17 reached 100% of hosts on the 2nd at 11:00, and the earliest flagged row is stamped the 3rd at 14:44, eight minutes after api-7 was repointed at 14:36. The anomaly tracks the clock change, not the rollout.",
+              "**Blast radius:** only a write landing within 412ms after an api-7 write to the same row can be inverted, which is why the count is 1,412 rows rather than every contended row in 9 days. Repointing api-7 shrinks that window without closing it: NTP leaves anywhere from a few ms to tens of ms of offset on a healthy host and can step a clock backward while correcting, so the same inversion returns at a smaller scale.",
+              "**Where the ledger lands:** stop deriving order from a bare wall-clock comparison. On commodity cloud, HLC gives causal and monotonic stamps on plain NTP (a physical part tracking NTP plus a logical counter, taking the max of local and incoming on every send and receive), and CockroachDB-style uncertainty-interval read restarts close the residual window. For the audit requirement that the ledger owes a single agreed order, put the order in a per-shard consensus log so the replicated log is the authority, with HLC riding along for MVCC rather than as the source of truth. On owned hardware, TrueTime-style bounded uncertainty plus commit-wait pays roughly 2 epsilon per commit and guarantees every later transaction a strictly higher timestamp.",
+            ],
+            supplied: {
+              label: "Incident timeline: settlement ledger",
+              body: `
+**System:** the settlement ledger, a Cassandra keyspace at RF=3 per region across us-east, eu-west and ap-south. Each API host stamps its own write with \`USING TIMESTAMP\`, taken from that host's system clock, and conflicting writes to a row resolve by keeping the highest stamp. Reads and writes both run at LOCAL_QUORUM.
+
+**Reported symptom:** Monday's reconciliation flags 1,412 ledger rows from the previous 9 days whose exported balance equals the value from before the last acknowledged update. Support has 37 matching tickets, all of the form "the correction showed, then the old amount came back".
+
+**Sampled row \`merchant/8831\`:**
+- 14:41:02.118 real time: write A (amount 240.00) handled by api-7 in eu-west, acknowledged, stamped 14:41:02.530.
+- 14:41:02.402 real time: write B (amount 0.00, the correction) handled by api-4 in eu-west, acknowledged, stamped 14:41:02.402.
+- All nine replicas across the three regions now return 240.00. The row has not changed since.
+
+**Signals across the 9 days:**
+- Write error rate 0.00%. All 1,412 updates returned an ack to the caller.
+- Coordinator write latency p99 flat at 3ms, read p99 flat at 4ms.
+- Hinted handoff: 0 hints stored. Nightly \`nodetool repair\` completed clean every night.
+- Dropped mutations: 0. Read repair counts in line with the previous month.
+
+**Clock and change data:**
+- \`chronyc tracking\` on api-7 reports a system time offset of +412ms, and has reported it since Wed the 3rd at 14:36, when the host was repointed to a new NTP source. The other 23 API hosts, api-4 included, report offsets under 8ms.
+- The Java driver upgrade to 4.17 reached 100% of API hosts on Tue the 2nd at 11:00.
+- The earliest of the 1,412 flagged rows is stamped Wed the 3rd at 14:44.
+`.trim(),
+            },
+            rubric: [
+              {
+                name: "Ordering mechanism",
+                weak: "Attributes the reverted rows to replication or a race without saying how a winner between two writes is chosen.",
+                adequate:
+                  "Names last-writer-wins on wall-clock stamps but never walks the two stamps on merchant/8831.",
+                strong:
+                  "Walks write A stamped 14:41:02.530 against write B stamped 14:41:02.402 and states that keeping the higher stamp lets api-7's 412ms offset carry the older write.",
+              },
+              {
+                name: "Stale-read hypothesis",
+                weak: "Leaves eventual consistency as the explanation, or calls the reconciliation export a stale view.",
+                adequate:
+                  "Says the old value is durably stored without citing the quorum overlap or the clean repairs.",
+                strong:
+                  "Rules a stale read out with LOCAL_QUORUM on RF=3 giving R+W = 4 > 3, all nine replicas returning 240.00, 0 hints stored and clean nightly repair.",
+              },
+              {
+                name: "Driver upgrade hypothesis",
+                weak: "Keeps the 4.17 upgrade as a cause or a contributor with no dates attached to the claim.",
+                adequate:
+                  "Discounts the driver upgrade but offers nothing from the timeline beyond it sounding unrelated.",
+                strong:
+                  "Puts the 4.17 rollout finishing on the 2nd at 11:00 against the earliest flagged row on the 3rd at 14:44, eight minutes after the 14:36 NTP repoint.",
+              },
+              {
+                name: "Why nothing alerted",
+                weak: "Never accounts for the 0.00% error rate, leaving the reader to assume something logged a failure.",
+                adequate:
+                  "Notes that no error was raised without saying the discarded write was acknowledged first.",
+                strong:
+                  "Explains that both writes were acknowledged and the loss happens at conflict resolution, so a flat 3ms p99 and 0.00% errors sit alongside 1,412 lost updates.",
+              },
+              {
+                name: "Replacement timestamp scheme",
+                weak: "Stops at repointing NTP or tightening the offset alarm on api-7.",
+                adequate:
+                  "Reaches for HLC without saying what it guarantees or where the ledger's audit order comes from.",
+                strong:
+                  "Moves to HLC for causal and monotonic stamps on NTP hardware, sources the audit order from a consensus log or TrueTime commit-wait, and says NTP tuning shrinks the window without closing it.",
+              },
             ],
           },
         },

@@ -3641,19 +3641,80 @@ export const systemDesignLevel7: DesignLevel = {
           practice: {
             id: "sd-l7-golden-signals-practice",
             prompt:
-              "Design the golden-signal instrumentation for Uber's ride-matching service at ~10,000 match requests/sec across 400 cities, where 'success' is subtle (a match returned is not the same as a good match) and you must keep per-city visibility without letting cardinality explode.",
+              "Read the incident timeline below and say what is happening to match-svc: which signals describe the failure, which of the signals that improved are consequences of it, and which hypotheses the flat signals eliminate. Finish with the one metric that, alerted on, would have paged someone at 08:12 instead of leaving this to the support queue.",
             thinkAbout: [
-              "Why is 'match returned' not the same as a good outcome, and how do you measure the difference?",
-              "How do you keep per-city visibility without multiplying every series by 400?",
-              "Why does an empty match often return fast and flatter the p95?",
+              "Which of the 08:12 moves could come from requests doing less work rather than from the service getting healthier?",
+              "What does the flat 5xx rate eliminate, and separately, what does the flat drivers_online_total eliminate?",
+              "Two changes landed either side of the shift, at 07:52 and 08:40. What does the timing do to each of them?",
             ],
+            supplied: {
+              label: "Incident timeline: match-svc",
+              body: `**Service:** \`match-svc\`, ride matching, about 10,200 match requests/sec across 400 cities. Latency SLO is p95 under 2s, availability SLO 99.9%. No alert fires at any point in this timeline.
+
+**07:52** Rolling replacement of three nodes in the Redis geospatial cluster finishes. Hit rate on the nearby-driver index moves from 82% to 97% and stays there.
+
+**08:05** \`match-svc\` v412 reaches all regions. Release note: "unify the nearby-driver lookup on a fixed S2 cell level 13, about 1.2 km per cell edge, in place of the per-city configured search radius."
+
+**08:12** Dashboard deltas, all of them sustained for the next two hours:
+
+| Signal | Before | After |
+| --- | --- | --- |
+| p95 latency, all requests | 1.9s | 640ms |
+| p99 latency, all requests | 3.4s | 1.1s |
+| 5xx rate | 0.11% | 0.12% |
+| Traffic | 10,200 req/s | 10,150 req/s |
+| Driver-index query pool utilization | 71% | 44% |
+| match_empty_total share, city_tier top | 5% | 5% |
+| match_empty_total share, city_tier mid | 6% | 9% |
+| match_empty_total share, city_tier long-tail | 7% | 46% |
+| drivers_online_total, long-tail cities | 38,400 | 38,100 |
+
+**08:40** Driver app 6.31 reaches 40% of the driver fleet, carrying a background location-batching change.
+
+**09:20** Support queue holds 210 rider tickets, all from long-tail cities, all saying "no cars available". Drivers in those same cities report sitting online and idle for 40 minutes.
+
+**09:35** On-call opens the SLO dashboard: latency burn rate 0.2x, availability burn rate 0.3x, 94% of the monthly error budget unspent.`,
+            },
             modelAnswerOutline: [
-              "Assumptions: `match-svc` receives a rider request, queries nearby-driver indexes, and returns a matched driver; 10k req/s, 400 cities, p95 match latency SLO of 2s, and a business KPI of match *rate* (fraction of requests that get an acceptable driver).",
-              "**Traffic:** `match_requests_total{city_tier, status_class}` as QPS. I do not label by raw `city_id` on every metric; 400 cities times other labels is borderline, so I bucket into `city_tier` (top / mid / long-tail) for high-frequency counters and keep full per-city breakdown only on a small number of key metrics where I have budgeted for it.",
-              "**Errors and the 'subtle success' problem:** a returned match is not automatically a good outcome, so I instrument three tiers. Hard errors (5xx, timeouts) as RED errors. Implicit errors: requests that returned *no* driver (`match_empty_total`) and requests where the offered driver was rejected or the ETA exceeded threshold (`match_low_quality_total{reason}`). The headline health metric is **match rate = matched / requested**, tracked per city_tier. This catches the classic trap where latency and 5xx look perfect but riders in one city cannot get a car.",
-              "**Latency:** histogram split by success vs empty-result vs error, because an empty match often returns *fast* and would otherwise flatter the p95. Buckets tuned around the 2s SLO.",
-              "**Saturation (USE):** the driver-index query pool, the geospatial cache (Redis/S2 cell store), and the matching worker concurrency. Saturation here predicts the surge-hour latency cliff.",
-              "**Cardinality control:** per-city detail is a real business need, so I split storage: bounded `city_tier` labels on the hot high-QPS metrics for cheap alerting, and full per-city dimensions pushed to a longer-retention analytics store (a columnar OLAP system) sampled or pre-aggregated per minute, not on the live Prometheus path. Common wrong turn: slapping `city_id` on every counter and histogram bucket, which multiplies series by 400 and takes down the metrics backend during exactly the surge event you needed it for.",
+              "**What is happening.** Since v412 reached all regions at 08:05, match-svc is answering a large share of requests in sparse cities with no driver at all. The empty-match share in the long-tail tier went 7% to 46% while the top tier held flat at 5%, and the support queue plus idle drivers in those same cities say both demand and supply are present. This is an implicit-error outage: every one of those empty matches is a 200.",
+              "**Why the tiers split.** A fixed S2 cell level 13 lookup searches about 1.2 km of ground regardless of city. In a dense top-tier city that cell still holds candidate drivers; in a long-tail city, where the per-city configured radius it replaced was much wider, it often holds none. Same code path, same query, different driver density, which is why nothing aggregated across all 400 cities shows it.",
+              "**The signals that improved are consequences, not health.** An empty match skips the candidate-ranking work, so p95 fell from 1.9s to 640ms and driver-index pool utilization fell from 71% to 44%. That is the fast-failure trap: failures returning quickly drag aggregate latency down and make a bad release look like a latency win. Here the fast path returns 200, so the 5xx rate stays at 0.12% and no error-rate alert can ever see it.",
+              "**What the flat signals eliminate.** Traffic flat at 10,150 req/s rules out a demand surge. drivers_online_total flat at 38,100 in the affected cities rules out a driver-supply collapse or a driver-app outage. The Redis cluster replacement at 07:52 moved hit rate 82% to 97% twenty minutes before the empty-match share moved and did not move it then, and driver app 6.31 only reached 40% of the fleet at 08:40, after the shift. Neither lines up with 08:12; the v412 rollout does.",
+              "**The instrumentation gap.** Match rate, matched over requested, is the headline health metric for this service and nothing pages on it, so a 46% empty rate in a whole tier burned no error budget (94% left) and arrived as 210 support tickets 68 minutes late. Fixes: alert on match rate per city_tier, split the latency histogram into matched, empty, and error series so an empty result cannot flatter p95, and keep per-city detail in the analytics store for drill-down rather than on every hot counter.",
+            ],
+            rubric: [
+              {
+                name: "What is failing",
+                weak: "Reports that the dashboards look healthy, or pins the incident on the 08:40 driver app release.",
+                adequate:
+                  "States that empty matches are rising in long-tail cities but never connects that to the fixed 1.2 km cell lookup shipped at 08:05.",
+                strong:
+                  "Ties the 7% to 46% jump in long-tail empty matches to the fixed-radius lookup in v412 and says why dense top-tier cities are untouched by the same code.",
+              },
+              {
+                name: "Improving signals read correctly",
+                weak: "Takes the p95 drop to 640ms and the fall in pool utilization as evidence the service got healthier.",
+                adequate:
+                  "Calls the latency drop suspicious without saying what makes an empty match cheap to serve.",
+                strong:
+                  "Reads the 1.9s to 640ms latency drop and the 71% to 44% pool drop as skipped work, and notes an empty match returns 200 so the 5xx rate cannot see it.",
+              },
+              {
+                name: "Hypotheses eliminated",
+                weak: "Commits to one cause without using any flat signal to knock out an alternative.",
+                adequate:
+                  "Uses the flat traffic or the flat 5xx rate to rule one thing out, but leaves the 07:52 Redis replacement and the 08:40 app release standing.",
+                strong:
+                  "Knocks out a demand surge on flat traffic, a supply collapse on flat drivers_online_total, and both the Redis change and the app release on timing against 08:12.",
+              },
+              {
+                name: "Detection gap",
+                weak: "Stops at the diagnosis and never asks why nothing paged for 68 minutes.",
+                adequate:
+                  "Observes that no alert fired without naming which metric would have carried that alert.",
+                strong:
+                  "Names match rate per city_tier as the missing paging signal and splits the latency histogram by matched, empty, and error so a fast empty result cannot flatter p95.",
+              },
             ],
           },
         },
@@ -3744,18 +3805,80 @@ export const systemDesignLevel7: DesignLevel = {
           practice: {
             id: "sd-l7-timeouts-retries-practice",
             prompt:
-              "Design the retry and timeout policy for Stripe's API gateway fronting a payments core, handling 5k QPS with a hard rule of zero double-charges even during a 90 second partial outage of the ledger service. Lead with the deliverable.",
+              "Read the incident timeline below and say what is keeping the ledger pinned at 14:14, twelve minutes after the event that started it. Account for the traffic the ledger is actually receiving, say what the flat signals eliminate, and name the single change you would make first and what it does to the numbers.",
             thinkAbout: [
-              "How does an idempotency key make retries safe at any layer?",
-              "Why must the gateway stop retrying (not raise the timeout) during the brownout?",
-              "How do backoff and a retry budget let the ledger drain its backlog?",
+              "Multiply the three retry layers out: how many ledger writes can one client charge become in the worst case?",
+              "The event at 14:02 lasted 40 seconds. What is generating the load at 14:14?",
+              "What does the flat client-facing traffic eliminate, and what does the dedupe counter tell you that zero duplicate ledger entries does not?",
             ],
+            supplied: {
+              label: "Incident timeline: charge path",
+              body: `**System:** \`pay-gateway\` fronts \`payments-core\`, which writes to a 5-node \`ledger\` cluster. Steady state 5,100 charges/sec. A charge trace shows exactly three hops: pay-gateway, payments-core, ledger.
+
+**Retry configuration in effect**, from three separately owned config files:
+
+| Layer | Attempts (first + retries) | Delay between attempts | Request timeout |
+| --- | --- | --- | --- |
+| pay-gateway to payments-core | 1 + 3 | fixed 200ms | 6s, raised from 800ms eight days ago |
+| payments-core client to ledger | 1 + 3 | 100ms x 2^attempt, no randomization | 900ms |
+| ledger driver, inside payments-core | 1 + 2 | fixed 50ms | 400ms |
+
+**14:02:00** A ledger node reboots for a kernel patch and the cluster elects a new leader. Ledger write p99 goes from 310ms to 1.9s.
+
+**14:02:40** Leader election completes. The new leader reports healthy and stays that way: disk write latency flat at 1.1ms, replication lag flat at 40ms, no failed health check since.
+
+**14:03:10** Writes arriving at the ledger climb from 5,400/sec to 21,600/sec. Ledger CPU 55% to 96%. Commit queue depth 40 to 9,800.
+
+**14:03:30** Client-facing traffic into pay-gateway: flat at 5,100/sec, no upstream surge.
+
+**14:04:00** \`fraud-svc\` v88 deploys. fraud-svc serves the checkout read path.
+
+**14:05:00** pay-gateway worker pool in use goes from 128 of 400 to 400 of 400. Client-visible 504 rate 0.2% to 18%.
+
+**14:07:00** Idempotency dedupe counter in payments-core: 340,000 repeat keys served from the key store in five minutes, against a baseline near 900. Zero duplicate ledger entries.
+
+**14:14:00** Ledger write p99 still 2.4s. Arrivals at the ledger still above 20,000/sec. Ledger CPU still 96%. Client-facing traffic still flat at 5,100/sec.`,
+            },
             modelAnswerOutline: [
-              "Deliverable: a gateway policy that keeps charges correct and the ledger recoverable during a 90 second brownout.",
-              "**Idempotency first.** Every charge request carries a client-supplied `Idempotency-Key`. The gateway persists the key with the request fingerprint and the eventual result in a fast store (Redis with a durable backing) before touching the ledger. A repeat of the same key returns the stored response verbatim and never re-executes, which is what makes retries safe at any layer.",
-              "**Gateway to ledger timeouts:** connect timeout 30 ms, request timeout 800 ms (ledger p99 is ~300 ms but writes fsync). On timeout the gateway does not know if the write landed, so it retries the same idempotency key: the ledger dedupes, so at most one charge is recorded. Retries use full jitter, `delay = random(0, min(1s, 50ms * 2^attempt))`, capped at 2 attempts, gated by a retry budget of 10% of recent successes.",
-              "**During the 90 second brownout** the budget saturates within seconds and the circuit trips, so the gateway stops retrying and returns a fast `503` with `Retry-After`. This is the crucial move: continuing to retry a struggling ledger prevents it from draining its backlog and recovering. Idempotency keys mean clients can safely retry after the brownout with the same key and still get exactly one charge.",
-              "Common wrong turn: raising the request timeout to 10 seconds 'so slow charges succeed.' That holds threads through the entire brownout, exhausts the gateway pool, and turns a ledger slowdown into a total payments outage.",
+              "**What is happening.** Retry amplification is holding the ledger down after the trigger has passed. Three layers retry independently, at 4, 4 and 3 attempts per call, so one client charge can reach the ledger as 4 x 4 x 3 = 48 write attempts in the worst case. The amplification is also measured, not just derived: client-facing traffic is flat at 5,100/sec while arrivals at the ledger sit above 20,000/sec, about 4x.",
+              "**The trigger is over; the load is not.** The leader election ran for 40 seconds and completed at 14:02:40, and the new leader is healthy on every resource signal: disk write latency flat at 1.1ms, replication lag flat at 40ms, no failed health check. At 14:14 the ledger is still at 96% CPU with p99 2.4s entirely because of traffic the retry layers are manufacturing. The system is now the thing keeping itself down.",
+              "**Evidence the load is retries rather than customers.** pay-gateway inbound never moves off 5,100/sec, and the idempotency dedupe counter jumps from a baseline near 900 to 340,000 repeat keys in five minutes. Those repeats are the retries landing. Zero duplicate ledger entries is good news about correctness and says nothing about volume, so do not read it as evidence the retries are harmless.",
+              "**Two amplifiers on top.** The payments-core to ledger backoff is 100ms x 2^attempt with no randomization, so every caller that failed in the same instant retries in the same instant and the ledger sees a synchronized wave rather than a spread. Separately the 6s pay-gateway timeout, raised from 800ms eight days ago, is why the worker pool went 128 of 400 to 400 of 400 and 504s hit 18%: each worker parks for up to 6s against a dependency whose healthy p99 is 310ms, so 5,100/sec exhausts 400 workers in seconds.",
+              "**First change, then the rest.** Collapse retrying to one layer: pay-gateway owns the deadline and keeps its retries, while the payments-core client and the ledger driver go to zero retries and fail fast. That alone takes worst case ledger amplification from 48 to 4 and lets the commit queue drain. Then full jitter, delay = random(0, min(1s, 100ms x 2^attempt)); a retry budget capping retries near 10% of recent successes so a sick ledger sheds load instead of absorbing more; the request timeout back to roughly 800ms, about 2.5x the healthy 310ms p99, with the remaining deadline propagated so payments-core abandons work nobody is waiting for. fraud-svc v88 at 14:04 sits on the checkout read path and not on the three-hop charge trace, so it is not in this picture.",
+            ],
+            rubric: [
+              {
+                name: "Amplification arithmetic",
+                weak: "Puts the sustained load down to a customer surge or to the rebooted ledger node, with no retry math anywhere.",
+                adequate:
+                  "Names retries as the extra load but never multiplies the three layers out and never uses the 5,100/sec versus 20,000/sec gap.",
+                strong:
+                  "Multiplies the three configured layers to a worst case near 48 ledger attempts per charge and anchors it on arrivals above 20,000/sec against flat 5,100/sec inbound.",
+              },
+              {
+                name: "Trigger versus sustainer",
+                weak: "Treats the 14:02 leader election as the ongoing cause and reaches for more ledger capacity.",
+                adequate:
+                  "Notes the election finished at 14:02:40 but does not say what is generating the load still arriving at 14:14.",
+                strong:
+                  "Separates the 40 second election from the self-sustaining retry load, citing flat 1.1ms disk latency and flat 40ms replication lag as proof the ledger itself recovered.",
+              },
+              {
+                name: "Hypotheses eliminated",
+                weak: "Settles on one cause and never uses a flat or normal signal to knock out an alternative.",
+                adequate:
+                  "Rules out an upstream surge from the flat 5,100/sec inbound, but leaves the fraud-svc deploy and a double-charge bug in play.",
+                strong:
+                  "Knocks out an upstream surge on flat inbound, double-charging on zero duplicate ledger entries, and fraud-svc v88 because the charge trace has only three hops.",
+              },
+              {
+                name: "Remediation order",
+                weak: "Raises timeouts or adds ledger nodes, leaving all three retry layers exactly as they are.",
+                adequate:
+                  "Turns retries off somewhere without saying which layer keeps them or why that layer is the one that owns the deadline.",
+                strong:
+                  "Collapses retries to pay-gateway as the deadline owner first, then adds full jitter and a retry budget and returns the 6s timeout to roughly 2.5x the 310ms p99.",
+              },
             ],
           },
         },
