@@ -2784,6 +2784,112 @@ afford RAM; IVF-PQ when scale and memory dominate.
 
 \`\`\`cswidget
 {
+  "type": "calc",
+  "title": "What the index costs in RAM",
+  "predictPrompt": {
+    "question": "200,000 support-doc chunks embedded at 1,536 dimensions in fp32. How much RAM do the raw vectors alone need?",
+    "options": [
+      "About 12 MB",
+      "About 120 MB",
+      "About 1.2 GB",
+      "About 12 GB"
+    ]
+  },
+  "workedExample": "At the initial 200,000 chunks and 1,536 dimensions, one vector is 1,536 x 4 = 6,144 bytes, so the raw vectors alone come to about 1.2 GB, and HNSW adds roughly 16 x 8 bytes of graph links per vector on top of that. The same corpus stored as 64-byte PQ codes is about 13 MB, near a hundred times smaller, and that gap is what the recall you give up is buying. Now switch the model to 3,072 dimensions: the raw figure doubles and the PQ figure does not move at all.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "vectors",
+      "label": "Vectors stored",
+      "min": 10000,
+      "max": 10000000000,
+      "scale": "log",
+      "initial": 200000,
+      "unit": "vectors"
+    },
+    {
+      "kind": "select",
+      "id": "dims",
+      "label": "Embedding dimensions",
+      "initial": 2,
+      "options": [
+        {
+          "label": "384 (small open model)",
+          "value": 384
+        },
+        {
+          "label": "768",
+          "value": 768
+        },
+        {
+          "label": "1536 (typical)",
+          "value": 1536
+        },
+        {
+          "label": "3072 (large)",
+          "value": 3072
+        }
+      ]
+    },
+    {
+      "kind": "slider",
+      "id": "m_links",
+      "label": "HNSW links per node (M)",
+      "min": 8,
+      "max": 64,
+      "scale": "linear",
+      "step": 8,
+      "initial": 16,
+      "unit": "links"
+    },
+    {
+      "kind": "slider",
+      "id": "pq_code",
+      "label": "PQ code size per vector",
+      "min": 16,
+      "max": 256,
+      "scale": "linear",
+      "step": 16,
+      "initial": 64,
+      "unit": "bytes"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "raw_bytes",
+      "label": "Raw fp32 vectors",
+      "expr": "vectors * dims * 4",
+      "format": "bytes",
+      "sparkline": {
+        "over": "vectors"
+      }
+    },
+    {
+      "id": "hnsw_bytes",
+      "label": "HNSW: vectors plus the link graph",
+      "expr": "raw_bytes + vectors * m_links * 8",
+      "format": "bytes"
+    },
+    {
+      "id": "pq_bytes",
+      "label": "IVF-PQ: compressed codes",
+      "expr": "vectors * pq_code",
+      "format": "bytes"
+    },
+    {
+      "id": "shrink",
+      "label": "How much smaller the PQ index is",
+      "expr": "hnsw_bytes / pq_bytes",
+      "format": "compact",
+      "unit": "x"
+    }
+  ],
+  "caption": "Dimensionality is not only a quality knob: it multiplies straight through the raw index. A PQ code is a fixed size whatever the model does, which is why memory-constrained deployments at billion scale end up there."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
   "type": "check",
   "kind": "classify",
   "prompt": "Sort each property or knob under the index family it belongs to.",
