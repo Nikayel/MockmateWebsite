@@ -3817,6 +3817,50 @@ add only optional/new fields, and never reuse or renumber a field tag (mark remo
 JSON has no built-in schema, so it relies on the tolerant-reader discipline: consumers ignore unknown
 fields and tolerate missing optional ones.
 
+A rule is worth what enforces it, and on a stream the enforcement point is a **schema registry**.
+Every schema is registered before anything writes with it, each topic carries a compatibility mode,
+and a registration that would violate that mode is refused. The modes are named for the direction
+they protect: BACKWARD means a new schema can still read data written by the old one, FORWARD is the
+reverse, FULL demands both.
+
+\`\`\`
+# topic "orders" is set to BACKWARD
+POST /subjects/orders-value/versions
+  fields: [ id: string, total_cents: long ]
+-> 200 OK, registered as version 4
+
+# now try to drop a field that consumers still read
+POST /subjects/orders-value/versions
+  fields: [ id: string ]
+-> 409 Conflict, incompatible with version 4 under BACKWARD
+
+# adding a field WITH A DEFAULT is fine: an old record just supplies the default
+POST /subjects/orders-value/versions
+  fields: [ id: string, total_cents: long, currency: string = "USD" ]
+-> 200 OK, registered as version 5
+\`\`\`
+
+The check runs at registration time, which is the entire value: the break is refused in a deploy
+pipeline instead of being discovered when a consumer crashes on a message that is already durable in
+the log and about to be replayed.
+
+At read time the message carries no field names at all, only the id of the schema it was written
+with:
+
+\`\`\`
+on the wire:   [magic byte][schema id = 5][encoded body]
+
+consumer is still running READER schema v4
+1. read schema id 5 out of the message
+2. fetch WRITER schema v5 from the registry (once, then cached)
+3. resolve writer v5 against reader v4: "currency" is unknown to the reader, so it is skipped
+   -> the consumer decodes the fields it knows about and keeps running
+\`\`\`
+
+That resolution step, writer schema against reader schema, is what lets producers and consumers
+deploy on their own schedules. The consumer is not inferring anything from field names, it is being
+told exactly what the bytes were written as.
+
 Putting it together with content negotiation: a public API defaults to JSON, honors
 \`Accept-Encoding\` to pick Brotli for browsers, and sets \`Vary: Accept-Encoding\` so a shared cache
 does not hand a Brotli body to a client that only speaks gzip. An internal mesh uses Protobuf with
@@ -3828,8 +3872,9 @@ the network savings are usually tiny relative to the developer and debugging cos
 surface.
 
 Recap: choose format and codec by bottleneck (JSON+Brotli for public/bandwidth, Protobuf+zstd for
-internal/CPU), never compress tiny or already-compressed payloads, and keep schemas evolvable by
-adding optional fields and never reusing field tags.
+internal/CPU), never compress tiny or already-compressed payloads, keep schemas evolvable by adding
+optional fields and never reusing field tags, and put a registry with a per-topic compatibility mode
+in front of a stream so a breaking schema is refused at registration rather than at 3am.
 
 \`\`\`cswidget
 {
