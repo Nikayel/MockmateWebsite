@@ -950,6 +950,34 @@ Rollout strategies form a ladder of increasing exposure with a measurement gate 
 }
 \`\`\`
 
+## Ranking quality and calibration are two different gates
+
+Once shadow mode is giving you the challenger's predictions on real traffic, the question is what to compare. Ranking quality is the obvious half: AUC asks whether the model orders impressions correctly. Calibration is the half teams forget: when the model says 4 percent, do 4 percent of those impressions actually convert? A model can be perfect on the first and badly wrong on the second, because AUC is invariant to any monotonic rescaling of the scores. Multiply every prediction by 1.5 and no pair of items swaps order, so AUC does not move at all.
+
+You measure calibration by bucketing predictions and comparing each bucket's predicted rate against what actually happened in it.
+
+\`\`\`
+one hour of shadow traffic, identical impressions scored by both models
+
+                        champion (AUC 0.71)        challenger (AUC 0.74)
+bucket    n       observed   predicted             predicted     |pred - obs|
+0-2%      400k      1.4%       1.4%                  2.1%            0.7
+2-5%      300k      3.2%       3.3%                  4.8%            1.6
+5-10%     200k      7.0%       6.9%                 10.5%            3.5
+10%+      100k     14.0%      13.8%                 21.0%            7.0
+
+expected calibration error = the bucket gaps, weighted by bucket size
+
+  champion    0.4(0.0) + 0.3(0.1) + 0.2(0.1) + 0.1(0.2) = 0.07 points
+  challenger  0.4(0.7) + 0.3(1.6) + 0.2(3.5) + 0.1(7.0) = 2.16 points
+\`\`\`
+
+Every challenger prediction is exactly 1.5x the observed rate. Its ordering genuinely improved, which is what lifted AUC and what a ranking-only gate would have shipped on, and every probability it emits is wrong by half again.
+
+Uniform inflation is invisible inside a single auction, since every candidate is scored by the same model and \`bid x 1.5p\` ranks exactly as \`bid x p\` does. It gets expensive at every point where the number leaves the ranker and meets a currency threshold. Budget pacing spends against expected value, so it believes the hour will deliver 50 percent more clicks than it will and front-loads the budget. A reserve price gets cleared by an ad that should not have cleared it. And in a blended feed where ads compete against organic items priced by expected value, the inflated side takes slots it did not earn. None of that shows up as an error rate or a latency regression, which is why it can run for days.
+
+So the promotion gate is two numbers. Refuse a challenger whose calibration error regresses even when its AUC improves. The repair is usually not a retrain: fit a one-dimensional recalibration map on held-out data (Platt scaling, or isotonic regression when the distortion is not a simple curve), apply it after the model, and re-measure the buckets. Ranking is untouched by a monotonic map, so you keep the AUC gain and get the probabilities back.
+
 ## Separate weights from serving code
 
 The registry holds versioned, reproducible artifacts (weights plus the feature schema plus preprocessing) addressed by id; the serving binary loads an artifact by id. This lets you roll a model forward or back by pointing at a different id without shipping code, and it makes rollback a config change measured in seconds.
@@ -986,7 +1014,7 @@ Meeting the latency budget is mostly a feature-fetch problem, not a model-math p
 
 **Interview nuance:** the question that fails most candidates is "what happens when the model service is down." A strong answer is a graceful degradation ladder: serve the last cached prediction, then a simpler fallback model that needs fewer or no features, then a static heuristic or default, and only then error. A fraud system, for example, falls back to strict rules rather than approving everything; the fallback's bias should fail safe for the domain.
 
-**Recap:** roll models out through shadow to canary to A/B with automatic rollback on an online metric, keep versioned artifacts in a registry so rollback is a hot config switch, pick batch/real-time/streaming inference with micro-batching for throughput, spend your latency budget on feature fetch, and always have a graceful degradation ladder for when the model is unavailable.
+**Recap:** roll models out through shadow to canary to A/B with automatic rollback on an online metric, gate promotion on calibration as well as ranking quality whenever a downstream system spends money on the predicted number, keep versioned artifacts in a registry so rollback is a hot config switch, pick batch/real-time/streaming inference with micro-batching for throughput, spend your latency budget on feature fetch, and always have a graceful degradation ladder for when the model is unavailable.
 
 \`\`\`cswidget
 {
