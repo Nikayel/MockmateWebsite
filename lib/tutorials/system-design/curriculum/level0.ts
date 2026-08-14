@@ -110,6 +110,209 @@ have a shared contract and you move. If they correct you, you just avoided desig
 }
 \`\`\`
 
+The three moves are not three questions. Watch what each one removes from the problem, and
+notice that the round ends with a restatement rather than with a list of answers.
+
+\`\`\`cswidget
+{
+  "type": "steps",
+  "title": "Three moves from a vague prompt to a finishable problem",
+  "frames": [
+    {
+      "note": "Design Twitter. Four seconds in, every feature is still in play, which means any two engineers in the room would build two different systems. Nothing on the board is agreed.",
+      "rows": [
+        {
+          "label": "Still in play",
+          "cells": [
+            {
+              "text": "Home timeline"
+            },
+            {
+              "text": "Search"
+            },
+            {
+              "text": "Ads"
+            },
+            {
+              "text": "Direct messages"
+            },
+            {
+              "text": "Trends"
+            },
+            {
+              "text": "Notifications"
+            }
+          ]
+        },
+        {
+          "label": "Agreed out loud",
+          "cells": [
+            {
+              "text": "Nothing yet",
+              "state": "dim"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Move one separates the product ask from the system ask. Confirm the one slice, and say what you are not building. Naming the exclusions out loud is how you protect the time budget.",
+      "rows": [
+        {
+          "label": "Still in play",
+          "cells": [
+            {
+              "text": "Home timeline",
+              "state": "active"
+            },
+            {
+              "text": "Search",
+              "state": "dropped"
+            },
+            {
+              "text": "Ads",
+              "state": "dropped"
+            },
+            {
+              "text": "Direct messages",
+              "state": "dropped"
+            },
+            {
+              "text": "Trends",
+              "state": "dropped"
+            },
+            {
+              "text": "Notifications",
+              "state": "dropped"
+            }
+          ]
+        },
+        {
+          "label": "Agreed out loud",
+          "cells": [
+            {
+              "text": "Post a tweet, load a timeline",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "note": "Move two pins actors, scale, and the read/write mix. Tens of millions of users closes the single-database branch, and a 100 to 1 read/write mix opens the caching and fan-out branch. Two answers, two branches settled.",
+      "rows": [
+        {
+          "label": "Still in play",
+          "cells": [
+            {
+              "text": "Home timeline",
+              "state": "active"
+            }
+          ]
+        },
+        {
+          "label": "Agreed out loud",
+          "cells": [
+            {
+              "text": "Post a tweet, load a timeline",
+              "state": "dim"
+            },
+            {
+              "text": "Tens of millions of DAU",
+              "state": "new"
+            },
+            {
+              "text": "Read heavy, about 100 to 1",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "Branches now closed",
+          "cells": [
+            {
+              "text": "One database is out, shard it",
+              "state": "new"
+            },
+            {
+              "text": "Caching and fan-out are in",
+              "state": "new"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "predict": {
+        "question": "Three questions in. The slice, the scale and the read/write mix are all agreed, and you still have budget left. What is the last move before you draw?",
+        "options": [
+          "Spend the remaining questions, the budget is there",
+          "Restate the whole scope in one sentence",
+          "Start drawing the load balancer",
+          "Name the database you plan to use"
+        ]
+      },
+      "note": "Move three plays the problem back in one sentence and takes the nod. An unspent question is not a reason to keep asking. The restatement is the shared contract, which is what makes a correction here cost seconds instead of the round.",
+      "rows": [
+        {
+          "label": "Still in play",
+          "cells": [
+            {
+              "text": "Home timeline",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "Agreed out loud",
+          "cells": [
+            {
+              "text": "Post a tweet, load a timeline",
+              "state": "dim"
+            },
+            {
+              "text": "Tens of millions of DAU",
+              "state": "dim"
+            },
+            {
+              "text": "Read heavy, about 100 to 1",
+              "state": "dim"
+            },
+            {
+              "text": "Eventual consistency is fine",
+              "state": "new"
+            }
+          ]
+        },
+        {
+          "label": "Branches now closed",
+          "cells": [
+            {
+              "text": "One database is out, shard it",
+              "state": "dim"
+            },
+            {
+              "text": "Caching and fan-out are in",
+              "state": "dim"
+            }
+          ]
+        },
+        {
+          "label": "Restated in one sentence",
+          "cells": [
+            {
+              "text": "They nodded. It is a contract now.",
+              "state": "active"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "caption": "Every move removes something: move one removes features, move two removes architectures, and move three removes the risk that you and the interviewer are picturing different systems. A question that removes nothing has spent clock you do not get back."
+}
+\`\`\`
+
 ### The mindset that makes this work
 
 Treat the interviewer as a **collaborator, not an oracle.** You are allowed to propose an assumption
