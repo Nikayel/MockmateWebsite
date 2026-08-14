@@ -671,6 +671,54 @@ Split read-path and write-path SLAs, because they are genuinely different system
 500ms and the tweet is durably stored" is the goal, with fan-out happening asynchronously afterward.
 Conflating them leads you to either make writes too slow or reads not durable enough.
 
+### Two levers you only need when a wrong write is expensive
+
+A feed's levers are caches and async fan-out, because its worst failure is a few seconds of staleness.
+Systems where an incorrect or duplicated write is expensive reach for two different levers, and both
+are worth having in hand before you meet one.
+
+**An idempotency key is what makes a retry safe.** A client that sends a write and then times out
+knows nothing useful: the request may have committed and only the response was lost. It has to retry,
+and on a bare endpoint the retry runs the write a second time. The fix is a key the client generates
+once, before the first attempt, and sends on every attempt, plus a server that records the result
+under that key:
+
+\`\`\`
+POST /orders   Idempotency-Key: k-42   { sku: "A1", qty: 1 }
+  server: no record for k-42 -> create order_9f3, save (k-42 -> order_9f3), reply 201 order_9f3
+  ... reply lost in the network, client sees a timeout ...
+
+POST /orders   Idempotency-Key: k-42   { sku: "A1", qty: 1 }      (the client retries)
+  server: record exists for k-42 -> do not create anything, reply 201 order_9f3
+\`\`\`
+
+One order exists, and the client still gets an answer instead of an error. The safety comes from the
+key being the client's and being generated before the first attempt: that is what makes the second
+request recognisable as the same request rather than a new one. A server-generated id cannot do this,
+because the client never received it.
+
+**Active-passive keeps one writer; active-active gives that up.** "Multi-region" is two different
+designs. In **active-active**, every region accepts writes locally, which is what makes it fast
+everywhere and what lets it survive losing a region with no failover step. It also means two regions
+can accept conflicting writes to the same row at the same instant, and neither region is wrong:
+
+\`\`\`
+t0   stock for sku A1 = 1, replicated to both regions
+t1   region US accepts  "reserve 1 of A1"  -> US now says stock 0, order U-70 confirmed
+t1   region EU accepts  "reserve 1 of A1"  -> EU now says stock 0, order E-31 confirmed
+t2   the regions replicate to each other and disagree: two confirmed orders for one unit,
+     both committed locally, and no authority that can say which one happened first
+\`\`\`
+
+In **active-passive**, one region owns every write and the other is a warm standby replicating from
+it. There is exactly one authority for ordering, so the conflict above cannot happen, and that single
+source of truth is what a strong-consistency promise is built on. You pay for it at failover:
+promoting the standby takes seconds to minutes during which writes fail, and any replication lag at
+the moment of failure is data somebody has to reconcile by hand.
+
+So an availability NFR does not automatically mean "more regions accepting traffic". Ask what a
+partition is allowed to do to a write, and let that answer pick the topology.
+
 \`\`\`csdiagram
 {
   "type": "table",
