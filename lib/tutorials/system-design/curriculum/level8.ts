@@ -3149,18 +3149,25 @@ Compliance frameworks feel like legal noise until you realize each one is really
       "PCI-DSS",
       "Cardholder data",
       "Isolate and encrypt the PAN, segment the network, and reduce scope"
+    ],
+    [
+      "PSD2",
+      "EU payment initiation",
+      "Strong Customer Authentication (SCA) on EU payments: two of knowledge, possession, and inherence, satisfied in practice by 3-D Secure"
     ]
   ],
   "highlightCols": [
     "Core demand on your architecture"
   ],
-  "caption": "Read the third column as a build list. The shared baseline (TLS, KMS-managed encryption at rest, least-privilege access, central logging, tested backups, vendor and change management) satisfies most of all four, and then each framework layers one non-negotiable on top."
+  "caption": "Read the third column as a build list. The shared baseline (TLS, KMS-managed encryption at rest, least-privilege access, central logging, tested backups, vendor and change management) satisfies most of all five, and then each framework layers one non-negotiable on top. Note that PSD2's demand is the only one that reaches into a user-facing flow rather than into storage or process: it changes what checkout does, not merely how the data behind it is held."
 }
 \`\`\`
 
+PSD2 is the European payment-services regulation, and the row above is the part of it that shows up in an architecture. **Strong Customer Authentication** requires an EU payment to be authenticated with two independent factors drawn from three categories: knowledge (a password or PIN), possession (a phone or a card), and inherence (a fingerprint or a face). That is the same factor taxonomy as MFA, applied to the payment rather than to the login, which is why a valid session is not sufficient: the transaction itself has to be authenticated. In practice card payments satisfy it through **3-D Secure**, the step in checkout that hands the shopper to their bank to confirm the specific amount and merchant before the authorization completes. Exemptions exist (low-value transactions, merchants the customer has allowlisted, low-risk transactions under a provider's fraud rate) so the design question is where the SCA step-up sits in the checkout flow and which payments skip it, not whether to authenticate at all.
+
 ## The shared baseline
 
-Encryption in transit (TLS 1.2+) and at rest (AES-256 with KMS-managed keys), least-privilege access control (RBAC/ABAC with MFA), centralized logging and monitoring, tested backups and DR, vendor/processor management, and change management show up in all four. Build those once and you have cleared most of the surface area. Then you layer the framework-specific non-negotiables: GDPR needs a lawful basis and honored data-subject rights; HIPAA needs a signed BAA (Business Associate Agreement) with every subprocessor that touches PHI; PCI needs network segmentation isolating the cardholder data environment; SOC 2 needs the controls to demonstrably operate over a period, not just exist on audit day.
+Encryption in transit (TLS 1.2+) and at rest (AES-256 with KMS-managed keys), least-privilege access control (RBAC/ABAC with MFA), centralized logging and monitoring, tested backups and DR, vendor/processor management, and change management show up in every one of the data-protection regimes above. Build those once and you have cleared most of the surface area. Then you layer the framework-specific non-negotiables: GDPR needs a lawful basis and honored data-subject rights; HIPAA needs a signed BAA (Business Associate Agreement) with every subprocessor that touches PHI; PCI needs network segmentation isolating the cardholder data environment; SOC 2 needs the controls to demonstrably operate over a period, not just exist on audit day; PSD2 needs an SCA step-up wired into the EU payment flow itself.
 
 \`\`\`cswidget
 {
