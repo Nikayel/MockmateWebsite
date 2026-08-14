@@ -2493,12 +2493,38 @@ Feature flags are runtime conditionals (\`if flag('new_pricing_engine', user)\`)
 
 Expand/contract migrates schema in ordered, individually-safe steps so that at no point does the deployed code disagree with the schema:
 
-\`\`\`
-1. EXPAND    add the new column/table (nullable, additive) -- old code unaffected
-2. DUAL-WRITE deploy code that writes BOTH old and new; reads still from old
-3. BACKFILL  copy historical rows old -> new, throttled + idempotent + restartable
-4. MIGRATE READS switch reads to the new column (behind a flag), verify parity
-5. CONTRACT  once nothing reads the old column, stop dual-writing, then drop old
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "Expand and contract, one separately reversible step at a time",
+  "stages": [
+    {
+      "label": "1. Expand",
+      "note": "add the new column or table, nullable and additive, so old code is unaffected"
+    },
+    {
+      "label": "2. Dual-write",
+      "note": "deploy code that writes both old and new; reads still come from old"
+    },
+    {
+      "label": "3. Backfill",
+      "note": "copy historical rows old to new, throttled, idempotent, restartable"
+    },
+    {
+      "label": "4. Migrate reads",
+      "note": "switch reads to the new column behind a flag, then verify parity"
+    },
+    {
+      "label": "5. Contract",
+      "note": "once nothing reads the old column, stop dual-writing, then drop it"
+    }
+  ],
+  "highlight": [
+    "1. Expand",
+    "5. Contract"
+  ],
+  "caption": "The two highlighted steps are the ones that must never share a deploy. Every arrow here is a separate deploy that can be reversed on its own, which is exactly what pairing add-new with drop-old takes away from you."
+}
 \`\`\`
 
 Each arrow is a separately deployable, separately reversible step. You never combine "add new" with "drop old" in one deploy, because that is exactly the destructive change that makes rollback impossible.
@@ -2713,9 +2739,46 @@ Roles exist to separate coordination from fixing, because the person elbow-deep 
 
 **The response flow prioritizes mitigation over diagnosis:** detect -> triage/declare severity -> **mitigate (stop the bleeding)** -> then root-cause. During an active incident, restoring service beats understanding it. If a bad deploy is suspected, roll it back first and investigate after; if a region is unhealthy, fail traffic away first. Chasing the root cause while users are down is a classic and expensive mistake. Diagnosis is what the postmortem is for; mitigation is what the incident is for.
 
-\`\`\`
-detect -> declare SEV + assign IC/Comms/Ops -> MITIGATE (rollback / failover / shed) -> service restored
-        -> (only now) diagnose root cause -> blameless postmortem -> action items -> tracked to done
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "Incident response flow: mitigate first, diagnose after",
+  "stages": [
+    {
+      "label": "Detect",
+      "note": "an alert on the SLO-burn symptom, not on a cause"
+    },
+    {
+      "label": "Declare SEV",
+      "note": "explicit entry criteria, then assign IC, Comms and Ops"
+    },
+    {
+      "label": "Mitigate",
+      "note": "roll back, fail traffic away, or shed: stop the bleeding"
+    },
+    {
+      "label": "Service restored",
+      "note": "users are whole; the clock stops here"
+    },
+    {
+      "label": "Diagnose root cause",
+      "note": "only now, because this is what the postmortem is for"
+    },
+    {
+      "label": "Blameless postmortem",
+      "note": "timeline, impact, and several contributing causes"
+    },
+    {
+      "label": "Action items tracked to done",
+      "note": "untracked items are why the same incident recurs"
+    }
+  ],
+  "highlight": [
+    "Mitigate",
+    "Diagnose root cause"
+  ],
+  "caption": "The order of the two highlighted stages is the whole discipline: chasing the root cause while users are down is the classic and expensive mistake."
+}
 \`\`\`
 
 ## The blameless postmortem
