@@ -1,9 +1,20 @@
 import { PRICING_CONFIG } from "@/lib/config"
 import { getLeetCodeSavingsPercent } from "@/lib/pricing-comparison"
+import { listCourseEntries } from "@/lib/tutorials/course-catalog"
+import { totalLessonCount, type CourseLessonCounts } from "@/lib/pricing-features"
 import { PricingPageClient } from "@/components/pricing/PricingPageClient"
 import { SessionPreview } from "@/components/pricing/SessionPreview"
 
 const { monthly, yearly } = PRICING_CONFIG.pro.website
+
+// Derived at build time from the server-only course catalog, so the page can
+// never advertise a lesson count the curriculum does not contain. Only these
+// numbers cross into the client bundle, not the catalog itself.
+const courseLessonCounts: CourseLessonCounts = {
+  python: listCourseEntries("python").length,
+  dataEngineering: listCourseEntries("data-engineering").length,
+  systemDesign: listCourseEntries("system-design").length,
+}
 
 /**
  * Pricing Page - Server Component
@@ -26,7 +37,7 @@ const faqs = [
   },
   {
     question: "Is there a free trial?",
-    answer: `The free plan gives you 20+ problems with unlimited practice and ${PRICING_CONFIG.free.sessionsPerMonth} full interview sessions per month. Full AI feedback included, plus free Python, Data Engineering, and System Design courses to build your fundamentals, none of which use interview sessions. No credit card required.`,
+    answer: `The free plan gives you 20+ problems with unlimited practice and ${PRICING_CONFIG.free.sessionsPerMonth} full interview sessions per month. Full AI feedback included, plus free Python, Data Engineering, and System Design courses (${totalLessonCount(courseLessonCounts)} lessons) to build your fundamentals, none of which use interview sessions. No credit card required.`,
   },
   {
     question: "How does billing work?",
@@ -59,7 +70,7 @@ export default function PricingPage() {
           an unrendered schema type is bytes on every page for no return. The faqs
           array below is still the real page content, just no longer duplicated
           into a graph nothing reads. */}
-      <PricingPageClient faqs={faqs}>
+      <PricingPageClient faqs={faqs} courses={courseLessonCounts}>
         <SessionPreview />
       </PricingPageClient>
     </>

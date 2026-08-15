@@ -28,10 +28,12 @@ const REPO_ROOT = join(__dirname, "..", "..", "..")
 /** The pricing page's full component tree. */
 const PRICING_TREE = [
   "components/pricing/PricingPageClient.tsx",
+  "components/pricing/FeatureMatrix.tsx",
   "components/pricing/SessionPreview.tsx",
   "components/comparison-section.tsx",
   "app/pricing/page.tsx",
   "app/pricing/layout.tsx",
+  "lib/pricing-features.ts",
 ]
 
 /**

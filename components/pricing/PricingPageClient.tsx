@@ -11,9 +11,14 @@ import Link from "next/link"
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { ComparisonSection } from "@/components/comparison-section"
+import { FeatureMatrix } from "@/components/pricing/FeatureMatrix"
+import { totalLessonCount, type CourseLessonCounts } from "@/lib/pricing-features"
 
 interface PricingPageClientProps {
   faqs: { question: string; answer: string }[]
+  /** Lesson counts per course, derived from the server-only catalog at build
+   *  time (see app/pricing/page.tsx). Only the numbers cross the boundary. */
+  courses: CourseLessonCounts
   /** The session preview, rendered on the server and passed in. Importing it
    *  here would drag a static section across the "use client" boundary and
    *  ship it as JS for no reason. */
@@ -28,38 +33,45 @@ const BILLING_PERIODS: { value: BillingPeriod; label: string }[] = [
 ]
 
 /* Session counts are the enforced server quota, not copy: they must move with
-   PRICING_CONFIG or this page advertises a limit the server no longer grants. */
-const FREE_FEATURES = [
-  "20+ problems, unlimited practice",
+   PRICING_CONFIG or this page advertises a limit the server no longer grants.
+   The lesson count is derived from the course catalog for the same reason. */
+const buildFreeFeatures = (lessonTotal: number) => [
   `${PRICING_CONFIG.free.sessionsPerMonth} full interview sessions/month`,
-  "AI interviewer feedback",
+  "Voice + chat AI interviewer with feedback",
+  "DSA and Debugging interview tracks · 20+ problems",
+  `Python, Data Engineering & System Design courses · all ${lessonTotal} lessons free`,
+  "Case Labs inside a real codebase",
+  "Progress dashboard & analytics",
 ]
 
 const PRO_FEATURES = [
   `${PRICING_CONFIG.pro.sessionsPerMonth} sessions/month`,
-  "Spaced repetition scheduling",
+  "Spaced repetition review scheduling",
   "Personalized study roadmap",
+  "Pattern mastery tracking",
+  "Learner model you can inspect and challenge",
   "Priority support",
 ]
 
 /** One feature row. Written seven times by hand before, with three different
- *  check-icon colours between the two cards. */
+ *  check-icon colours between the two cards. items-start, not items-center:
+ *  the longer rows wrap to two lines and the check must hold the first line. */
 function PlanFeature({ children, accent = false }: { children: string; accent?: boolean }) {
   return (
-    <li className="flex items-center gap-2">
+    <li className="flex items-start gap-2">
       <Check
         aria-hidden
         className={cn(
-          "h-3.5 w-3.5 shrink-0",
-          accent ? "text-accent-strong" : "text-muted-foreground"
+          "mt-0.5 h-3.5 w-3.5 shrink-0",
+          accent ? "text-accent-strong" : "text-neural-strong"
         )}
       />
-      {children}
+      <span>{children}</span>
     </li>
   )
 }
 
-export function PricingPageClient({ faqs, children }: PricingPageClientProps) {
+export function PricingPageClient({ faqs, courses, children }: PricingPageClientProps) {
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("yearly")
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const prefersReducedMotion = useReducedMotion()
@@ -67,6 +79,7 @@ export function PricingPageClient({ faqs, children }: PricingPageClientProps) {
   const proPricing = getProPricing("website")
 
   const currentProPrice = billingPeriod === "yearly" ? proPricing.yearly : proPricing.monthly
+  const freeFeatures = buildFreeFeatures(totalLessonCount(courses))
 
   /** Arrow keys move between radios and select as they go, per the WAI-ARIA
    *  radiogroup pattern. Without this the group is reachable but unusable by
@@ -153,10 +166,11 @@ export function PricingPageClient({ faqs, children }: PricingPageClientProps) {
               </span>
             </div>
 
-            {/* Pricing Cards - Ultra Compact */}
-            <div className="mx-auto mb-4 grid max-w-2xl grid-cols-1 gap-4 md:grid-cols-2">
+            {/* Pricing Cards. pt-3 keeps the Pro card's overlapping "Most
+              popular" chip clear of the toggle row above. */}
+            <div className="mx-auto mb-4 grid max-w-3xl grid-cols-1 gap-4 pt-3 md:grid-cols-2">
               {/* Free Plan */}
-              <div className="border-border bg-card rounded-xl border p-5">
+              <div className="border-border bg-card flex flex-col rounded-[18px] border p-6">
                 <h3 className="text-muted-foreground mb-3 text-xs font-semibold tracking-[0.12em] uppercase">
                   Free
                 </h3>
@@ -164,12 +178,16 @@ export function PricingPageClient({ faqs, children }: PricingPageClientProps) {
                 {/* The price block used to render the word "Free" a second time,
                   directly under the "Free" heading. $0 states the same thing and
                   reads as a price, which is what this slot is for. */}
-                <div className="mb-2 flex items-baseline gap-1">
+                <div className="mb-1 flex items-baseline gap-1">
                   <span className="font-heading text-foreground text-4xl font-bold">
                     {PRICING_CONFIG.free.priceDisplay}
                   </span>
                   <span className="text-muted-foreground text-sm">forever</span>
                 </div>
+
+                {/* Same height as the Pro card's billing note so the two CTA
+                  buttons sit on one line across the grid. */}
+                <p className="text-muted-foreground mb-3 text-xs">No card required</p>
 
                 <Button asChild variant="outline" className="mb-4 w-full">
                   <Link
@@ -186,27 +204,48 @@ export function PricingPageClient({ faqs, children }: PricingPageClientProps) {
                 </Button>
 
                 <p className="text-muted-foreground mb-2 text-xs">
-                  Try before you commit. Includes free Python, Data Engineering, and System Design
-                  courses.
+                  The whole platform, including every course. Pro adds volume and retention.
                 </p>
 
-                <ul className="text-muted-foreground space-y-1.5 text-sm">
-                  {FREE_FEATURES.map((feature) => (
+                <ul className="text-muted-foreground space-y-2 text-sm">
+                  {freeFeatures.map((feature) => (
                     <PlanFeature key={feature}>{feature}</PlanFeature>
                   ))}
                 </ul>
               </div>
 
               {/* Pro Plan */}
-              <div className="from-accent/8 border-accent bg-card rounded-xl border-2 bg-gradient-to-br to-transparent p-5">
+              <div className="from-accent/8 border-accent bg-card relative flex flex-col rounded-[18px] border-2 bg-gradient-to-br to-transparent p-6">
+                <span className="bg-accent-strong text-accent-foreground absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-[10px] font-semibold tracking-[0.1em] uppercase">
+                  Most popular
+                </span>
+
                 <h3 className="text-accent-strong mb-3 text-xs font-semibold tracking-[0.12em] uppercase">
                   Pro
                 </h3>
 
-                <div className="mb-1 flex items-baseline gap-1">
-                  <span className="font-heading text-foreground text-4xl font-bold">
-                    {currentProPrice.priceDisplay}
-                  </span>
+                {/* Keyed on the billing period: remounting the span replays the
+                  entry animation, so the price slides in on toggle instead of
+                  snapping. No AnimatePresence needed since the old value can
+                  simply be replaced. h-10 pins the row height so the swap never
+                  reflows the card. */}
+                <div className="mb-1 flex h-10 items-baseline gap-2 overflow-hidden">
+                  <motion.span
+                    key={billingPeriod}
+                    initial={prefersReducedMotion ? false : { opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25, ease: "easeOut" }}
+                    className="flex items-baseline gap-2"
+                  >
+                    {billingPeriod === "yearly" && (
+                      <span aria-hidden className="text-muted-foreground text-lg line-through">
+                        {proPricing.monthly.priceDisplay}
+                      </span>
+                    )}
+                    <span className="font-heading text-foreground text-4xl font-bold">
+                      {currentProPrice.priceDisplay}
+                    </span>
+                  </motion.span>
                   <span className="text-muted-foreground text-sm">{currentProPrice.period}</span>
                 </div>
 
@@ -241,7 +280,7 @@ export function PricingPageClient({ faqs, children }: PricingPageClientProps) {
                 </Button>
 
                 <p className="text-muted-foreground mb-2 text-xs">Everything in Free, plus...</p>
-                <ul className="text-foreground space-y-1.5 text-sm">
+                <ul className="text-foreground space-y-2 text-sm">
                   {PRO_FEATURES.map((feature) => (
                     <PlanFeature key={feature} accent>
                       {feature}
@@ -265,6 +304,11 @@ export function PricingPageClient({ faqs, children }: PricingPageClientProps) {
             </p>
           </div>
         </section>
+
+        {/* The complete Free-vs-Pro inventory: every course, track, lab, and
+          the Pro retention layer. The cards above stay scannable because this
+          section carries the detail. */}
+        <FeatureMatrix courses={courses} />
 
         {/* SessionPreview, rendered on the server (see props) */}
         {children}
