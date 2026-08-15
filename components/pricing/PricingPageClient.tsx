@@ -4,8 +4,9 @@ import React, { useRef, useState } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { Check, ChevronDown } from "lucide-react"
+import { Check, ChevronDown, Lock } from "lucide-react"
 import { getProPricing, PRICING_CONFIG } from "@/lib/config"
+import { PRO_AI_LIMIT_MULTIPLIER } from "@/lib/pricing"
 import { trackEvent } from "@/lib/analytics"
 import Link from "next/link"
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
@@ -37,20 +38,32 @@ const BILLING_PERIODS: { value: BillingPeriod; label: string }[] = [
    The lesson count is derived from the course catalog for the same reason. */
 const buildFreeFeatures = (lessonTotal: number) => [
   `${PRICING_CONFIG.free.sessionsPerMonth} full interview sessions/month`,
-  "Voice + chat AI interviewer with feedback",
+  "Voice + chat AI interviewer · standard rate limits",
   "DSA and Debugging interview tracks · 20+ problems",
   `Python, Data Engineering & System Design courses · all ${lessonTotal} lessons free`,
   "Case Labs inside a real codebase",
   "Progress dashboard & analytics",
 ]
 
+/* The multiplier is derived in lib/pricing.ts from the enforced RATE_LIMITS
+   table, so this bullet moves with the limiter instead of overstating it. */
 const PRO_FEATURES = [
   `${PRICING_CONFIG.pro.sessionsPerMonth} sessions/month`,
+  `${PRO_AI_LIMIT_MULTIPLIER}x higher AI chat limits`,
   "Spaced repetition review scheduling",
   "Personalized study roadmap",
   "Pattern mastery tracking",
   "Learner model you can inspect and challenge",
   "Priority support",
+]
+
+/* Shown greyed-out with a lock on the Free card: the standout Pro features a
+   free user does not get. Same claims as PRO_FEATURES and the matrix, phrased
+   as the things waiting behind the upgrade. */
+const LOCKED_IN_FREE = [
+  "Spaced repetition scheduling",
+  "Personalized study roadmap",
+  `${PRO_AI_LIMIT_MULTIPLIER}x higher AI chat limits`,
 ]
 
 /** One feature row. Written seven times by hand before, with three different
@@ -212,6 +225,26 @@ export function PricingPageClient({ faqs, courses, children }: PricingPageClient
                     <PlanFeature key={feature}>{feature}</PlanFeature>
                   ))}
                 </ul>
+
+                {/* What the upgrade is FOR, visible from the free card itself.
+                  A list heading, not decoration, so it stays a real list for
+                  screen readers too. */}
+                <div className="border-border mt-4 border-t pt-3">
+                  <p className="text-muted-foreground mb-2 text-xs">
+                    Not in Free · Pro unlocks these
+                  </p>
+                  {/* No opacity fade on these rows: --muted-foreground sits just
+                    above the AA floor, so 70% of it would land near 3:1. The lock
+                    icon and the heading already mark these as not included. */}
+                  <ul className="text-muted-foreground space-y-2 text-sm">
+                    {LOCKED_IN_FREE.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2">
+                        <Lock aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
 
               {/* Pro Plan */}

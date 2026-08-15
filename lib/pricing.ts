@@ -88,6 +88,55 @@ export const AI_BUDGET_CAPS = {
   enterprise: 112.0, // 4x pro
 } as const
 
+// Per-tier AI rate limits. Lived in lib/rate-limiter.ts (which re-exports them),
+// but that module imports firebase-admin, and the pricing page advertises the
+// free-vs-pro ratio, so the table itself belongs in this client-safe module per
+// the header rule: never hardcode tier numbers elsewhere.
+//
+// tokensPerMinute is sized so a normal interview never reaches it. It used to be 5,000 on
+// the free tier, and a single measured mid-interview turn is about 4,600: the system prompt
+// is ~10.5k characters before the RAG block, and every turn re-sends the whole transcript,
+// the candidate's code and the workspace files. So the first message was allowed, the second
+// was refused, and the interviewer went dead mid-conversation for a minute.
+//
+// These are burst guards, not the cost control. Spend is bounded by budgetPerCycle above and
+// by the global daily ceiling; call rate is bounded by requestsPerMinute. Each tier is now
+// requestsPerMinute x ~6,000 tokens, which makes the request cap the binding constraint and
+// leaves this to catch only genuinely abnormal payloads.
+export const RATE_LIMITS = {
+  free: {
+    requestsPerMinute: 10,
+    tokensPerMinute: 60000,
+    maxConcurrentRequests: 2,
+    budgetPerCycle: AI_BUDGET_CAPS.free,
+  },
+  pro: {
+    requestsPerMinute: 30,
+    tokensPerMinute: 180000,
+    maxConcurrentRequests: 5,
+    budgetPerCycle: AI_BUDGET_CAPS.pro,
+  },
+  enterprise: {
+    requestsPerMinute: 100,
+    tokensPerMinute: 600000,
+    maxConcurrentRequests: 20,
+    budgetPerCycle: AI_BUDGET_CAPS.enterprise,
+  },
+} as const
+
+export type RateLimitTier = keyof typeof RATE_LIMITS
+
+/**
+ * The Pro-vs-Free AI throughput multiple the pricing page advertises. Derived
+ * as the floor across both per-minute dimensions so the marketing claim is
+ * conservative by construction: if someone raises only one limit, the
+ * advertised number moves to whichever ratio is now smaller.
+ */
+export const PRO_AI_LIMIT_MULTIPLIER = Math.min(
+  Math.floor(RATE_LIMITS.pro.requestsPerMinute / RATE_LIMITS.free.requestsPerMinute),
+  Math.floor(RATE_LIMITS.pro.tokensPerMinute / RATE_LIMITS.free.tokensPerMinute)
+)
+
 /**
  * Get AI budget cap for a tier
  */

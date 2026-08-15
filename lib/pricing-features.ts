@@ -1,4 +1,5 @@
 import { PRICING_CONFIG } from "@/lib/config"
+import { PRO_AI_LIMIT_MULTIPLIER } from "@/lib/pricing"
 
 /**
  * The Free-vs-Pro feature matrix rendered on /pricing.
@@ -74,6 +75,11 @@ export function buildFeatureMatrix(counts: CourseLessonCounts): PlanFeatureGroup
           pro: `${PRICING_CONFIG.pro.sessionsPerMonth} / month`,
         },
         { label: "Voice + chat AI interviewer", free: true, pro: true },
+        {
+          label: "AI chat throughput (requests and tokens per minute)",
+          free: "Standard",
+          pro: `${PRO_AI_LIMIT_MULTIPLIER}x higher`,
+        },
         { label: "DSA track · 20+ problems, unlimited practice", free: true, pro: true },
         { label: "Debugging track · hunt real bugs in multi-file code", free: true, pro: true },
         { label: "Scored feedback on four interview criteria", free: true, pro: true },
