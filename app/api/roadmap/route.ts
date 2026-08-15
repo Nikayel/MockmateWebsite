@@ -273,7 +273,7 @@ export async function POST(request: NextRequest) {
           {
             error: "Pro feature required",
             message:
-              "Personalized study roadmaps are available with Pro. Upgrade to unlock custom prep plans tailored to your target company and interview date.",
+              "Interview roadmaps are available with Pro. Upgrade to unlock a prep plan tailored to your target company, role, and skills.",
             code: "PRO_REQUIRED",
             upgradeUrl: "/upgrade",
           },

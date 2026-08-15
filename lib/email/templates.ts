@@ -708,7 +708,7 @@ export function getSubscriptionConfirmationEmailHtml(
 
     ${oneTimeNote}
 
-    <p>Pro gives you 35 interview sessions a month, spaced repetition scheduling, and a personalized study roadmap.</p>
+    <p>Pro gives you 35 interview sessions a month, spaced repetition scheduling, and an interview roadmap tailored to your company, role, and skills.</p>
 
     ${ctaButton("Start practicing", `${data.appUrl}/dashboard`)}
 
@@ -743,7 +743,7 @@ Thanks for upgrading. Pro is active on your account.
 
 ${planBlock}
 
-Pro gives you 35 interview sessions a month, spaced repetition scheduling, and a personalized study roadmap.
+Pro gives you 35 interview sessions a month, spaced repetition scheduling, and an interview roadmap tailored to your company, role, and skills.
 
 Start practicing: ${data.appUrl}/dashboard
 

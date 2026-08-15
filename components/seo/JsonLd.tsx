@@ -150,7 +150,7 @@ export function SoftwareApplicationJsonLd() {
         price: String(monthly.price),
         priceCurrency: "USD",
         billingDuration: "P1M",
-        description: `${PRICING_CONFIG.pro.sessionsPerMonth} interview sessions/month, spaced repetition scheduling, personalized study roadmap, company-specific prep for FAANG and top tech companies. ${comparisonClaim}.`,
+        description: `${PRICING_CONFIG.pro.sessionsPerMonth} interview sessions/month, spaced repetition scheduling, interview roadmap tailored to your company and role, company-specific prep for FAANG and top tech companies. ${comparisonClaim}.`,
       },
       {
         "@type": "Offer",

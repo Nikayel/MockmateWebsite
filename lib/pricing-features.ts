@@ -21,6 +21,15 @@ export interface CourseLessonCounts {
   systemDesign: number
 }
 
+/**
+ * One string for every surface that sells the roadmap (plan cards, locked list,
+ * matrix, /upgrade checkout card). Each clause is backed by an input the
+ * roadmap wizard actually collects (UserRoadmapAssessment): targetCompany,
+ * targetTrack ("role-aware question prioritization"), and experienceLevel plus
+ * patternFamiliarity for the skills claim.
+ */
+export const ROADMAP_FEATURE_COPY = "Interview roadmap tailored to your company, role, and skills"
+
 export function totalLessonCount(counts: CourseLessonCounts): number {
   return counts.python + counts.dataEngineering + counts.systemDesign
 }
@@ -92,7 +101,7 @@ export function buildFeatureMatrix(counts: CourseLessonCounts): PlanFeatureGroup
       note: "The Pro layer: keeps what you practice from fading.",
       rows: [
         { label: "Spaced repetition review scheduling", free: false, pro: true },
-        { label: "Personalized study roadmap", free: false, pro: true },
+        { label: ROADMAP_FEATURE_COPY, free: false, pro: true },
         { label: "Pattern mastery tracking", free: false, pro: true },
         {
           label: "Open learner model: inspect and challenge the AI's read of your skills",

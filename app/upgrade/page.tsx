@@ -22,6 +22,7 @@ import { toast } from "sonner"
 import { ErrorBoundary } from "@/components/error-boundary"
 import Link from "next/link"
 import { isPaidTier } from "@/lib/pricing"
+import { ROADMAP_FEATURE_COPY } from "@/lib/pricing-features"
 import type { SubscriptionTier } from "@/lib/config"
 import { SparraLoader } from "@/components/brand/SparraLoader"
 
@@ -320,9 +321,12 @@ function UpgradePageContent() {
                     <Check className="text-accent h-3.5 w-3.5" />
                     Spaced repetition scheduling
                   </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="text-accent h-3.5 w-3.5" />
-                    Personalized study roadmap
+                  {/* items-start, not items-center: this row wraps to two lines
+                      and the check must hold the first line. shrink-0 keeps the
+                      icon square when it does. */}
+                  <li className="flex items-start gap-2">
+                    <Check className="text-accent mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    {ROADMAP_FEATURE_COPY}
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="text-accent h-3.5 w-3.5" />

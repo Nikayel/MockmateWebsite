@@ -13,7 +13,11 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { ComparisonSection } from "@/components/comparison-section"
 import { FeatureMatrix } from "@/components/pricing/FeatureMatrix"
-import { totalLessonCount, type CourseLessonCounts } from "@/lib/pricing-features"
+import {
+  ROADMAP_FEATURE_COPY,
+  totalLessonCount,
+  type CourseLessonCounts,
+} from "@/lib/pricing-features"
 
 interface PricingPageClientProps {
   faqs: { question: string; answer: string }[]
@@ -51,7 +55,7 @@ const PRO_FEATURES = [
   `${PRICING_CONFIG.pro.sessionsPerMonth} sessions/month`,
   `${PRO_AI_LIMIT_MULTIPLIER}x higher AI chat limits`,
   "Spaced repetition review scheduling",
-  "Personalized study roadmap",
+  ROADMAP_FEATURE_COPY,
   "Pattern mastery tracking",
   "Learner model you can inspect and challenge",
   "Priority support",
@@ -62,7 +66,7 @@ const PRO_FEATURES = [
    as the things waiting behind the upgrade. */
 const LOCKED_IN_FREE = [
   "Spaced repetition scheduling",
-  "Personalized study roadmap",
+  ROADMAP_FEATURE_COPY,
   `${PRO_AI_LIMIT_MULTIPLIER}x higher AI chat limits`,
 ]
 

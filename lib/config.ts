@@ -24,7 +24,7 @@ export const PRICING_CONFIG = {
       "In-browser code editor with per-language syntax highlighting",
     ],
     limitations: [
-      "No personalized study roadmap",
+      "No tailored interview roadmap",
       "No spaced repetition scheduling",
       "No pattern mastery tracking",
     ],
@@ -81,7 +81,7 @@ export const PRICING_CONFIG = {
           "AI schedules your reviews at the scientifically optimal time for long-term retention. Never forget what you've learned.",
       },
       {
-        title: "Personalized Study Roadmap",
+        title: "Tailored Interview Roadmap",
         description:
           "Get a custom prep plan based on your target company, interview date, and skill gaps. Updated daily based on your progress.",
       },
@@ -91,7 +91,7 @@ export const PRICING_CONFIG = {
       "35 full interview sessions per month",
       "Unlimited practice within each scenario",
       "Spaced repetition scheduling",
-      "Personalized study roadmap",
+      "Interview roadmap tailored to your company, role, and skills",
       "Pattern mastery tracking (15+ patterns)",
       "Company-specific prep (FAANG, startups)",
       "System design interviews",
@@ -104,7 +104,7 @@ export const PRICING_CONFIG = {
       "35 sessions/month",
       "Unlimited practice per problem",
       "Spaced repetition scheduling",
-      "Personalized roadmap",
+      "Tailored interview roadmap",
       "Pattern mastery tracking",
       "System design interviews",
       "Company-specific prep",
