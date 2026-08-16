@@ -167,6 +167,19 @@ export interface CaseLab {
   buildCurveball?: CaseLabCurveball
 }
 
+/**
+ * A lab as the `/labs` browse surface needs it: the authored record plus the one-paragraph summary
+ * shown on its row.
+ *
+ * The summary is derived on the server from `brief.situation` rather than authored a second time,
+ * so a rewritten brief cannot leave a stale pitch behind on the gallery. It is a separate field
+ * because the derivation uses the shared SEO text helpers, and the browse list is a client component
+ * that has no business importing those into the browser bundle.
+ */
+export interface BrowsableCaseLab extends CaseLab {
+  summary: string
+}
+
 // ============================================================
 // Milestone answers (user inputs, §7)
 // ============================================================

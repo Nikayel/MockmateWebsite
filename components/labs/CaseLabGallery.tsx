@@ -1,17 +1,25 @@
 "use client"
 
 /**
- * CaseLabGallery — client-side browse surface for `/labs`. Renders the lab grid
- * plus company/skill filter chips. The lab list is authored content passed in
- * from the server page (plain serializable objects), so filtering stays on the
- * client without a round trip.
+ * CaseLabGallery — the filterable browse list on `/labs`.
+ *
+ * Scope note: this used to own the whole page, heading and intro copy included, which meant the
+ * only explanation of what a case lab is lived inside a client component below a filter bar. The
+ * page (`app/labs/page.tsx`) now owns the chrome and the prose as Server Components, and this is
+ * back to the one thing that has to be interactive: chips, and the list they narrow.
+ *
+ * The lab list is authored content passed in from the server page (plain serializable objects), so
+ * filtering stays on the client without a round trip. Filter state is `useState` and deliberately
+ * NOT the URL: a four-lab catalog behind query-string filters would mint a couple of dozen
+ * near-identical indexable URLs, which is a doorway-page generator rather than navigation.
  */
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 import { CaseLabRow } from "@/components/labs/CaseLabRow"
-import { ThemeToggle } from "@/components/ThemeToggle"
-import type { CaseLab } from "@/lib/labs/types"
+import { groupCaseLabsByRound } from "@/lib/labs/case-lab-rounds"
+import { trackCaseLabListViewed } from "@/lib/labs/case-lab-analytics"
+import type { BrowsableCaseLab } from "@/lib/labs/types"
 
 /** A user can narrow by at most this many skills at once. */
 const MAX_SKILLS = 2
@@ -46,11 +54,18 @@ function FilterChip({
   )
 }
 
-export function CaseLabGallery({ labs }: { labs: CaseLab[] }) {
+export function CaseLabGallery({ labs }: { labs: BrowsableCaseLab[] }) {
   const [company, setCompany] = useState<string | null>(null)
   // Skills are multi-select but capped at MAX_SKILLS so the filter stays a quick
   // narrowing tool, not an unbounded query builder.
   const [skills, setSkills] = useState<string[]>([])
+
+  // Top of the lab funnel. Fires once per mount, not per filter change: the question this answers is
+  // how many people saw the catalog at all, against which starts can be read.
+  const labCount = labs.length
+  useEffect(() => {
+    trackCaseLabListViewed({ labCount })
+  }, [labCount])
 
   const companies = useMemo(
     () => Array.from(new Set(labs.map((lab) => lab.company))).sort(),
@@ -71,6 +86,10 @@ export function CaseLabGallery({ labs }: { labs: CaseLab[] }) {
     [labs, company, skills]
   )
 
+  // Grouped by the round each lab's build milestone puts you in — the same grouping the prose above
+  // the list explains, from the same constant.
+  const groups = useMemo(() => groupCaseLabsByRound(filtered), [filtered])
+
   const toggleSkill = (value: string) => {
     setSkills((current) => {
       if (current.includes(value)) return current.filter((s) => s !== value)
@@ -86,78 +105,72 @@ export function CaseLabGallery({ labs }: { labs: CaseLab[] }) {
   const skillCapReached = skills.length >= MAX_SKILLS
 
   return (
-    <div className="case-lab-workbook min-h-screen bg-[var(--wb-page)] text-[var(--wb-text)]">
-      <div className="container mx-auto max-w-5xl px-4 pt-24 pb-16 sm:pt-28">
-        <header className="mb-6 flex items-start justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-bold text-[var(--wb-text)]">Case Labs</h1>
-            <p className="text-sm text-[var(--wb-text-secondary)]">
-              Company-style problems you carry end to end — clarify, decompose, design, then build
-              the fix inside a real codebase.
-            </p>
-          </div>
-          <ThemeToggle className="mt-1 shrink-0" />
-        </header>
+    <section aria-labelledby="all-case-labs" className="flex flex-col gap-5">
+      <h2 id="all-case-labs" className="text-xl font-semibold text-[var(--wb-text)] sm:text-2xl">
+        All case labs
+      </h2>
 
-        <div className="flex flex-col gap-5">
-          {(showCompanyFilter || showSkillFilter) && (
-            <div className="flex flex-col gap-3">
-              {showCompanyFilter && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="mr-1 text-xs font-medium text-[var(--wb-muted)]">Company</span>
-                  <FilterChip
-                    label="All"
-                    active={company === null}
-                    onClick={() => setCompany(null)}
-                  />
-                  {companies.map((value) => (
-                    <FilterChip
-                      key={value}
-                      label={value}
-                      active={company === value}
-                      onClick={() => setCompany(value)}
-                    />
-                  ))}
-                </div>
-              )}
-              {showSkillFilter && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="mr-1 text-xs font-medium text-[var(--wb-muted)]">
-                    Skill <span className="text-[var(--wb-faint)]">(max {MAX_SKILLS})</span>
-                  </span>
-                  <FilterChip
-                    label="All"
-                    active={skills.length === 0}
-                    onClick={() => setSkills([])}
-                  />
-                  {allSkills.map((value) => {
-                    const active = skills.includes(value)
-                    return (
-                      <FilterChip
-                        key={value}
-                        label={value}
-                        active={active}
-                        disabled={!active && skillCapReached}
-                        onClick={() => toggleSkill(value)}
-                      />
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {filtered.length === 0 ? (
-            <p className="text-sm text-[var(--wb-text-secondary)]">No labs match these filters.</p>
-          ) : (
-            <div className="divide-y divide-[var(--wb-border)] overflow-hidden rounded-xl border border-[var(--wb-border)] bg-[var(--wb-main)]">
-              {filtered.map((lab) => (
-                <CaseLabRow key={lab.id} lab={lab} />
+      {(showCompanyFilter || showSkillFilter) && (
+        <div className="flex flex-col gap-3">
+          {showCompanyFilter && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs font-medium text-[var(--wb-text-secondary)]">
+                Company
+              </span>
+              <FilterChip label="All" active={company === null} onClick={() => setCompany(null)} />
+              {companies.map((value) => (
+                <FilterChip
+                  key={value}
+                  label={value}
+                  active={company === value}
+                  onClick={() => setCompany(value)}
+                />
               ))}
             </div>
           )}
+          {showSkillFilter && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs font-medium text-[var(--wb-text-secondary)]">
+                Skill (max {MAX_SKILLS})
+              </span>
+              <FilterChip label="All" active={skills.length === 0} onClick={() => setSkills([])} />
+              {allSkills.map((value) => {
+                const active = skills.includes(value)
+                return (
+                  <FilterChip
+                    key={value}
+                    label={value}
+                    active={active}
+                    disabled={!active && skillCapReached}
+                    onClick={() => toggleSkill(value)}
+                  />
+                )
+              })}
+            </div>
+          )}
         </div>
-      </div>
-    </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <p className="text-sm text-[var(--wb-text-secondary)]" role="status">
+          No labs match these filters.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {groups.map(({ group, labs: groupLabs }) => (
+            <div key={group.type} className="flex flex-col gap-2">
+              <h3 className="text-sm font-semibold tracking-wide text-[var(--wb-text-secondary)] uppercase">
+                {group.heading}
+              </h3>
+              <div className="divide-y divide-[var(--wb-border)] overflow-hidden rounded-xl border border-[var(--wb-border)] bg-[var(--wb-main)]">
+                {groupLabs.map((lab) => (
+                  <CaseLabRow key={lab.id} lab={lab} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
