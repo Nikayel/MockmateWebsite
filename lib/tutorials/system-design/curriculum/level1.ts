@@ -1013,7 +1013,7 @@ More parity per group buys tolerance of more loss for more bytes, so it is a dia
 loss rate you actually measure.
 
 **Packet loss concealment (PLC)** covers what FEC could not. When a 20ms audio frame is simply gone,
-the decoder synthesizes a replacement from the pitch and energy of its neighbours and plays that. It
+the decoder synthesizes a replacement from the pitch and energy of its neighbors and plays that. It
 is wrong, but it is wrong for 20ms and nobody hears a click. Video's equivalent is holding the last
 good frame until the next keyframe lands.
 
@@ -3631,7 +3631,7 @@ document state it was written for, so an operation that arrives late gets adjust
 landed before it.
 
 **CRDTs** reach the same place without a central sequencer. Each character carries an immutable
-identifier that sorts between its neighbours, so a position never depends on a count some other edit
+identifier that sorts between its neighbors, so a position never depends on a count some other edit
 can shift:
 
 \`\`\`
