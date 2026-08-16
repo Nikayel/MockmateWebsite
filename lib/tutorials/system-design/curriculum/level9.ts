@@ -3249,7 +3249,7 @@ You cannot fix this with retries because you do not know which write succeeded. 
 
 Because delivery is **at-least-once** (a connector can replay after a crash), downstream consumers must be **idempotent**: upsert by primary key into the search index and the Iceberg table so a redelivered event does not duplicate. Iceberg/Hudi upserts (merge-on-read or copy-on-write) handle this on the lake side.
 
-**Interview nuance:** the outbox does not give you exactly-once end-to-end, it gives you at-least-once with an atomic source write, and you achieve effective exactly-once by making consumers idempotent. Claiming true exactly-once across DB, Kafka, and a search index without idempotency is the tell of someone who has not run this in production.
+**Interview nuance:** candidates reach for 'exactly-once' here almost every time. The question that settles it is what happens when the connector restarts mid-batch, and whether the sink can tell a redelivery from a new event; a design that cannot answer both has not earned the phrase. Claiming true exactly-once across DB, Kafka, and a search index without idempotency is the tell of someone who has not run this in production.
 
 **Recap:** table formats (Iceberg/Delta/Hudi/Paimon) add ACID, schema/partition evolution, time travel, and hidden partitioning over Parquet, coordinated by a catalog; pick Iceberg for multi-engine, Hudi for upsert-heavy CDC; use log-based CDC (Debezium on the WAL/binlog) plus a transactional outbox to avoid the dual-write problem; delivery is at-least-once so make consumers idempotent for effective exactly-once.
 
