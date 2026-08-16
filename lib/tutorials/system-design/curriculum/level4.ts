@@ -2158,6 +2158,11 @@ per-IP, per-API-key, per-endpoint, or global), do I allow or reject the next one
 part is the shape of what you allow. Two systems can both permit "100 requests per minute" and behave
 completely differently at the second scale.
 
+That shape is all this lesson is about: four algorithms, what each one lets through, and the response
+contract that goes with the decision. Holding one limit across a fleet is the next lesson's problem,
+and Level 10's [end-to-end limiter case study](/learn/system-design/case-studies/sd-l10-rate-limiter)
+assembles a whole component from both.
+
 **Token bucket** is the usual default because it is burst-friendly. A bucket holds up to \`B\` tokens
 and refills at \`R\` tokens per second. Each request removes one token; if the bucket is empty,
 reject. A client that has been idle accumulates up to \`B\` tokens, so it can fire a burst of \`B\`
@@ -2342,8 +2347,11 @@ const distributedRateLimitingTeach = `
 A single-node limiter is easy because one process owns the counter. Production limiters run on a
 **fleet of gateway nodes** behind a load balancer, and a user's requests land on any of them. If each
 of 20 nodes independently enforces "100 req/min," a user spraying across all 20 gets **2000
-req/min**, 20x the intended limit. The whole problem of distributed rate limiting is enforcing one
-global limit across N nodes without paying an unacceptable latency or availability tax.
+req/min**, 20x the intended limit. Enforcing one global limit across N nodes without paying an
+unacceptable latency or availability tax is the whole of the coordination problem, and the whole of
+this lesson. The algorithms themselves came from the previous lesson, and Level 10's
+[end-to-end limiter case study](/learn/system-design/case-studies/sd-l10-rate-limiter) builds a full
+component around the two together.
 
 \`\`\`cswidget
 {
@@ -2522,8 +2530,9 @@ the outage.
 const loadSheddingBackpressureTeach = `
 ## Systems die by accepting more than they can finish
 
-Level 1's "Backpressure, Flow Control & Load Shedding" lesson owns the primitives, and this lesson
-does not re-derive them: bound every queue, let backpressure propagate, and reject early because
+Level 1's [introductory treatment of flow control](/learn/system-design/foundations/sd-l1-backpressure-shedding)
+owns the primitives, and this lesson does not re-derive them: bound every queue, let backpressure
+propagate, and reject early because
 latency explodes as utilization nears 100%. Taking those as given, this lesson is about what happens
 when they are not enough. It leads with the failure they exist to prevent, the retry-storm death
 spiral that outlives its own trigger, and then the two controls that beat it, adaptive concurrency
@@ -4031,7 +4040,7 @@ driven by the largest guilds.
       lessons: [
         {
           id: "sd-l4-rate-limit-algorithms",
-          title: "Rate Limiting Algorithms",
+          title: "Rate Limiting Algorithms: Token Bucket vs Sliding Window",
           summary:
             "Why a fixed window lets a client send double its limit in two seconds, and what token bucket and sliding-window counter do about it.",
           estimatedMinutes: 30,
@@ -4079,7 +4088,7 @@ driven by the largest guilds.
         },
         {
           id: "sd-l4-distributed-rate-limiting",
-          title: "Distributed Rate Limiting",
+          title: "Global Rate Limits Across a Fleet: Redis Atomics & Sync",
           summary:
             "Naive per-node limits grant Nx; enforce exactly with atomic Redis ops or hybrid local-cache-plus-async-sync for bounded overshoot, always with a fail-open plan.",
           estimatedMinutes: 30,
