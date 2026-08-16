@@ -1342,10 +1342,6 @@ consumer in the group.** A group with 4 consumers over a 12-partition topic give
 partitions. Two different groups ("ranking" and "analytics") each get the full stream independently:
 that is how one topic fans out to many pipelines.
 
-The immediate ceiling: **group parallelism is capped by partition count.** With 12 partitions, a 13th
-consumer sits idle. This is the number one scaling mistake: adding consumers past the partition count
-does nothing. You scale reads by having enough partitions in the first place.
-
 \`\`\`cswidget
 {
   "type": "check",
@@ -1353,7 +1349,7 @@ does nothing. You scale reads by having enough partitions in the first place.
   "prompt": "A 12-partition topic is falling behind, so the team scales its consumer group from 12 to 16 consumers. What improves?",
   "options": [
     {
-      "label": "Nothing: each partition is assigned to at most one consumer in the group, so four consumers sit idle",
+      "label": "Nothing: twelve partitions cannot be dealt out sixteen ways, so four of the pods never receive an assignment",
       "correct": true,
       "feedback": "Right: group parallelism is capped by partition count, and consumers past that cap do nothing."
     },
@@ -1368,6 +1364,10 @@ does nothing. You scale reads by having enough partitions in the first place.
   ]
 }
 \`\`\`
+
+The immediate ceiling: **group parallelism is capped by partition count.** With 12 partitions, a 13th
+consumer sits idle. This is the number one scaling mistake: adding consumers past the partition count
+does nothing. You scale reads by having enough partitions in the first place.
 
 ### Offsets and delivery semantics
 
