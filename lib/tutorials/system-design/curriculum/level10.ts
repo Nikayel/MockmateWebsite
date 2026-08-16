@@ -1893,7 +1893,7 @@ Store each unique chunk hash exactly once in the object store. A file becomes a 
   "title": "Chunk dedup and delta sync",
   "frames": [
     {
-      "note": "Content-defined chunking cuts the 2GB file at rolling-hash boundaries into 4 variable chunks (about 4MB each). Each chunk is hashed with SHA-256; that hash is both its content address and its dedup key.",
+      "note": "Content-defined chunking cuts the 2GB file at rolling-hash boundaries into about 512 variable chunks (about 4MB each); four are shown. Each chunk is hashed with SHA-256; that hash is both its content address and its dedup key.",
       "rows": [
         {
           "label": "file v1 (2GB)",
@@ -2000,7 +2000,7 @@ Store each unique chunk hash exactly once in the object store. A file becomes a 
       ]
     },
     {
-      "note": "The user edits bytes near the start. CDC boundaries are anchored to content, so only chunk c1 changes and rehashes to h1'. The client computes manifest v2 and sends just the 4 hashes to the server: kilobytes of network so far.",
+      "note": "The user edits bytes near the start. CDC boundaries are anchored to content, so only chunk c1 changes and rehashes to h1'. The client computes manifest v2 and sends just the hashes to the server: kilobytes of network so far.",
       "rows": [
         {
           "label": "file v2",
