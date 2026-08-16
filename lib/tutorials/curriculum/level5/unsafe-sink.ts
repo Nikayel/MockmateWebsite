@@ -404,6 +404,24 @@ def refuses(rel_path):
     raise AssertionError(repr(rel_path) + " was served instead of raising ValueError: " + repr(result))
 
 
+def never_serves(rel_path):
+    """Assert that fetch refuses the path, by whichever error the spelling makes correct.
+
+    An absolute fragment lands outside docs/ when the base is attached with posixpath.join and
+    inside it when the base is attached by concatenation, so ValueError and LookupError are both
+    honest refusals here. Serving the document is the only failure.
+    """
+    try:
+        result = fetch(rel_path)
+    except (ValueError, LookupError):
+        return
+    except Exception as exc:
+        raise AssertionError(
+            repr(rel_path) + " raised " + type(exc).__name__ + " instead of refusing the path"
+        )
+    raise AssertionError(repr(rel_path) + " was served instead of being refused: " + repr(result))
+
+
 def run_tests(record):
     def parent_segment_escape():
         refuses("../internal/rotation-list.md")
@@ -412,7 +430,7 @@ def run_tests(record):
         refuses("sub/../../internal/rotation-list.md")
 
     def absolute_path_escape():
-        refuses("/internal/rotation-list.md")
+        never_serves("/internal/rotation-list.md")
 
     def dot_segment_still_resolves():
         got = fetch("./setup.md")
