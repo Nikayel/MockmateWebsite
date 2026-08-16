@@ -3204,7 +3204,7 @@ Writing the hidden loop out by hand is the technique. Once \`in\` is a visible \
       "feedback": "Appending to a list is constant time on average, so building a list of n pieces is linear no matter how long the pieces are."
     },
     {
-      "label": "report = report + text",
+      "label": "report = report + text + chr(10)",
       "bucket": "Quadratic overall",
       "feedback": "Strings are immutable, so each concatenation copies everything accumulated so far into a new string."
     },
