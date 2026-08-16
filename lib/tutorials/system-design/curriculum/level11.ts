@@ -683,7 +683,7 @@ A recommender is a latency-constrained funnel that turns a catalog of millions i
     },
     {
       "label": "Ranking",
-      "note": "deep multi-task model on those candidates, ~100 scored"
+      "note": "deep multi-task model on all ~1000, down to ~100"
     },
     {
       "label": "Re-ranking",
