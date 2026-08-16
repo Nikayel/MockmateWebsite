@@ -19,6 +19,7 @@ import {
   listCompanyLearnPaths,
   summarizeLearnCorpus,
 } from "@/lib/interview-prep/company-learn-routes"
+import { canonicalPageMetadata } from "@/lib/seo/page-metadata"
 import { absoluteUrl } from "@/lib/seo/site"
 
 /**
@@ -42,6 +43,40 @@ export async function generateStaticParams() {
   }))
 }
 
+/**
+ * What Google shows of a title, and what the root `title.template` appends to ours.
+ *
+ * Kept local rather than imported from `lib/seo/learn-metadata.ts`: that module's ladder degrades a
+ * ` · Learn {course}` suffix, which is a Learn concept. Only the two numbers are shared, and sharing
+ * a number is not worth coupling a marketing route to the curriculum head builder.
+ */
+const TITLE_BUDGET = 60
+const BRAND_SUFFIX = " | CodeSparring"
+
+/**
+ * The company title, degraded to fit the SERP.
+ *
+ * All 38 pages rendered 74 to 88 characters, every one of them cut mid-phrase:
+ *
+ *     Goldman Sachs Interview Prep Guide 2026 | Patterns, Questions & Tips | CodeSparring   (83)
+ *
+ * The head phrase is what a searcher actually types, so it leads and it is never truncated. What
+ * degrades is the tail, exactly as the Learn ladder does it. Two rungs cover the live roster; the
+ * `absolute` rung exists for a company name past 24 characters, which none is today.
+ *
+ * The year is gone. It was `new Date().getFullYear()`, so the title claimed a freshness the page
+ * does not have: the content is not re-authored annually, and a build in January would have
+ * restamped all 38 pages with a new year and no new facts. That is the same defect class as the
+ * sitemap stamping build time as `lastModified`, which is the one this site has already paid for.
+ */
+function composeCompanyTitle(companyName: string): Metadata["title"] {
+  const head = `${companyName} Interview Questions`
+  const withGuide = `${head} and Prep Guide`
+  if (withGuide.length + BRAND_SUFFIX.length <= TITLE_BUDGET) return withGuide
+  if (head.length + BRAND_SUFFIX.length <= TITLE_BUDGET) return head
+  return { absolute: head }
+}
+
 // Dynamic metadata for each company
 export async function generateMetadata({
   params,
@@ -57,25 +92,41 @@ export async function generateMetadata({
     }
   }
 
-  const currentYear = new Date().getFullYear()
-  const title = `${company.name} Interview Prep Guide ${currentYear} | Patterns, Questions & Tips`
-  const description = `Complete ${company.name} coding interview preparation guide. The top ${company.topPatterns.length} DSA patterns, ${company.mustKnowQuestions.length} commonly reported questions, the ${company.interviewProcess.totalRounds}-round loop, and free lessons you can start reading without an account.`
+  const patterns = company.topPatterns.length
+  const questions = company.mustKnowQuestions.length
+  const rounds = company.interviewProcess.totalRounds
+
+  // 137 to 151 characters across the roster, against a snippet budget of 155. The old sentence ran
+  // 181 to 195, so Google cut it before it reached the round count, and often rewrote it entirely.
+  const description =
+    `${company.name} coding interview guide: the ${patterns} DSA patterns that come up most, ` +
+    `${questions} commonly reported questions, and the ${rounds}-round loop. Free, no account.`
+
+  // canonicalPageMetadata, not a hand-rolled `alternates`, for the reason that module exists: the
+  // canonical it emits is absolute and pinned to the production origin, so a preview deployment
+  // cannot ship 38 canonicals pointing at itself.
+  const base = canonicalPageMetadata({
+    path: `/interview-prep/${company.id}`,
+    // The head phrase, because the builder's signature takes a string and the ladder can return
+    // `{ absolute }`. The composed title is applied over the top; both OG titles are overridden
+    // below, so this value only ever reaches the `<title>` if the spread below stops replacing it.
+    title: `${company.name} Interview Questions`,
+    description,
+    openGraphType: "article",
+  })
 
   return {
-    title,
-    description,
-    alternates: {
-      canonical: `/interview-prep/${company.id}`,
-    },
+    ...base,
+    title: composeCompanyTitle(company.name),
     openGraph: {
+      ...base.openGraph,
       // `images` is intentionally omitted: `app/opengraph-image.tsx` is inherited by this segment.
+      // No template is applied to OG tags, so this one carries the brand itself.
       title: `${company.name} Interview Prep | CodeSparring`,
-      description: `${company.name} interview guide: ${company.topPatterns.length} patterns, ${company.mustKnowQuestions.length} commonly reported questions, and the ${company.interviewProcess.totalRounds}-round loop.`,
-      url: `/interview-prep/${company.id}`,
-      type: "article",
+      description: `${company.name} interview guide: ${patterns} patterns, ${questions} commonly reported questions, and the ${rounds}-round loop.`,
     },
     twitter: {
-      card: "summary_large_image",
+      ...base.twitter,
       title: `${company.name} Interview Prep Guide`,
       description: `Everything you need to prepare for your ${company.name} coding interview.`,
     },

@@ -33,12 +33,19 @@ const COMPANY_COUNT = ALL_COMPANIES.length
 /**
  * Companies named explicitly in search-facing copy. These are the highest-volume queries, not a
  * ranking, and the "and N more" figure beside them is derived rather than typed.
+ *
+ * Four names, not six. The meta description ran 232 characters with six, so Google cut it partway
+ * through the list and the round structure never reached the snippet at all. The two dropped names
+ * are the two whose head terms are least winnable for a domain this young.
  */
-const HEADLINE_COMPANY_NAMES = ["Google", "Meta", "Amazon", "Apple", "Netflix", "Microsoft"]
+const HEADLINE_COMPANY_NAMES = ["Google", "Meta", "Amazon", "Apple"]
 
 export const metadata: Metadata = {
   title: "Interview Prep Guides by Company | Google, Meta, Amazon & More",
-  description: `Free interview preparation guides for ${COMPANY_COUNT} tech companies. Company-specific patterns, difficulty distributions, must-know questions, round structure, and interview tips for ${HEADLINE_COMPANY_NAMES.join(", ")}, and ${COMPANY_COUNT - HEADLINE_COMPANY_NAMES.length} more.`,
+  // 143 characters, against the 155 Google shows. The previous sentence ran 232, so it was cut
+  // inside the company list and the reader never reached what the guides actually contain. Every
+  // number here is still derived, so adding a company cannot make the sentence wrong.
+  description: `Free interview prep guides for ${COMPANY_COUNT} tech companies: ${HEADLINE_COMPANY_NAMES.join(", ")}, and ${COMPANY_COUNT - HEADLINE_COMPANY_NAMES.length} more. Patterns, must-know questions, and round structure.`,
   alternates: {
     canonical: "/interview-prep",
   },
