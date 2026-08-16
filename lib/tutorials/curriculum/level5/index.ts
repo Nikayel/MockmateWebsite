@@ -958,7 +958,7 @@ Naming the shape tells you the test to write. That is the whole payoff.
       "feedback": "Any response that is not valid JSON raises JSONDecodeError right here, before any field is read."
     },
     {
-      "label": "output += line + chr(10)",
+      "label": "output = output + line + chr(10)",
       "bucket": "Right answer, wrong cost",
       "feedback": "Each concatenation copies the whole accumulated string, so building a large document this way is quadratic in its length."
     }
