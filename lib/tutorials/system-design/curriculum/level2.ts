@@ -1135,10 +1135,14 @@ the difference between guessing at a database and reasoning about one.
 
 ### B+tree: in-place pages, fast reads and ranges
 
-A **B+tree** (Postgres, MySQL/InnoDB, most SQL engines) keeps data in fixed-size pages, typically 8KB
-or 16KB, arranged as a balanced tree with all rows in the leaf pages. Updates happen **in place**: to
-change a row you find its leaf page, load it into memory, modify it, and eventually write the whole
-page back. This gives excellent point reads (a lookup is 3 to 4 page reads for billions of rows) and,
+A **B+tree** (Postgres, MySQL/InnoDB, most SQL engines) keeps index entries in fixed-size pages,
+typically 8KB or 16KB, arranged as a balanced tree with entries linked in sorted leaf pages. What sits
+in a leaf differs by engine: MySQL/InnoDB's primary index is **clustered**, so the leaf entry *is* the
+row, and updates happen **in place**, loading the page, modifying it, and writing the whole page back.
+Postgres tables are **heap-organized** instead: a B-tree leaf holds a key plus a pointer into the heap,
+and MVCC means an update never overwrites that heap tuple in place, it writes a new row version (see
+[how MVCC implements snapshot isolation](/learn/system-design/data-storage/sd-l2-mvcc-locking)).
+Either way you get excellent point reads (a lookup is 3 to 4 page reads for billions of rows) and,
 crucially, excellent **range scans**, because leaves are linked in sorted order, so "created_at
 between X and Y" is a sequential walk. The cost is **write amplification**: changing one 200-byte row
 can force an 8KB page write, plus a write-ahead log record, and page splits when a page fills. Random
