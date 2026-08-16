@@ -596,7 +596,38 @@ const innerJoin: SqlLevel["modules"][number]["lessons"][number] = {
   skills: ["INNER JOIN", "ON", "join keys", "table aliases", "qualifying columns"],
   teach: {
     estimatedMinutes: 8,
-    markdown: `## Real data lives in many tables
+    markdown: `## What does an INNER JOIN do?
+
+An \`INNER JOIN\` returns only the rows that have a match in **both** tables. Wherever the join key is equal on both sides it glues the two rows' columns together into one wider row, and any row with no match on the other side is dropped from the result.
+
+Two source tables. **\`orders\`**:
+
+| order_id | customer_id | total_cents |
+| --- | --- | --- |
+| 100 | 1 | 2500 |
+| 101 | 2 | 5000 |
+| 102 | 1 | 9900 |
+| 103 | 9 | 1500 |
+
+And **\`customers\`**:
+
+| customer_id | customer_name |
+| --- | --- |
+| 1 | Ada Lovelace |
+| 2 | Grace Hopper |
+| 3 | Alan Turing |
+
+Joining them on the shared \`customer_id\` returns three rows, not four:
+
+| order_id | total_cents | customer_name |
+| --- | --- | --- |
+| 100 | 2500 | Ada Lovelace |
+| 101 | 5000 | Grace Hopper |
+| 102 | 9900 | Ada Lovelace |
+
+Order 103 points at customer 9, who does not exist, so the order disappears. Alan placed no orders, so he never appears either. That is the "inner" part, and it is the behavior to reach for when a row without a match is a row you do not want. When you need the unmatched rows kept instead, that is a different join: [LEFT JOIN preserves every row](/learn/data-engineering/aggregation/sql-l2-left-join) from the left table and fills the missing side with \`NULL\`.
+
+## Real data lives in many tables
 
 Real source data is never in one table. A raw e-commerce feed splits \`orders\` (who bought, when,
 total) from \`customers\` (name, region, email) from \`products\` (name, category, price). To answer
