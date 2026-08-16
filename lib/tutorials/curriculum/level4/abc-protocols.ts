@@ -456,7 +456,7 @@ Read that second line carefully before you lean on it: \`isinstance\` against a 
     ["Can it accept a third-party class?", "Only if you can edit it to subclass", "Yes, it never needs to know your type exists"],
     ["Enforced when?", "At instantiation: TypeError on a missing method", "At type-check time; runtime needs @runtime_checkable"],
     ["Can it ship shared code?", "Yes, concrete helpers live on the base", "No, it is a shape description only"],
-    ["Reach for it when", "You own the hierarchy and want shared behaviour", "You are accepting things that already fit"]
+    ["Reach for it when", "You own the hierarchy and want shared behavior", "You are accepting things that already fit"]
   ],
   "highlightCols": ["Question"],
   "caption": "One question decides it: do you control the classes that must conform? If yes, an ABC also buys you shared code. If they come from a library you do not own, only a Protocol can describe them."
