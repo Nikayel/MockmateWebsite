@@ -1413,8 +1413,12 @@ const globalGslbTeach = `
 
 Once your product serves users on multiple continents from multiple regions, you need a way to steer
 each user to a nearby healthy region and, when a region catches fire, to pull all traffic off it
-fast. There are two distinct mechanisms, and interviewers want you to know they operate at different
-layers.
+fast. Level 1's [introductory treatment of name resolution](/learn/system-design/foundations/sd-l1-dns)
+covers the resolver chain, TTL tradeoffs, and the steering records themselves. This lesson starts
+where that ends, at the failover clock: why resolution alone cannot pull traffic off a burning region
+inside a minute, what anycast plus a BGP withdrawal does instead, and how much headroom active-active
+regions need to absorb one another. There are two distinct mechanisms, and interviewers want you to
+know they operate at different layers.
 
 \`\`\`cswidget
 {
@@ -1645,6 +1649,11 @@ cross-cutting concerns live? Every client call needs authentication, TLS, rate l
 observability. You do not want thirty services reimplementing all of that, and you do not want each
 client talking directly to thirty services. The **API gateway** is the single north-south entry point
 that owns those concerns so the services behind it stay thin.
+
+Level 1's [introductory treatment of the reverse proxy](/learn/system-design/foundations/sd-l1-reverse-proxy-gateway)
+establishes that a thin edge exists and what it is for. This lesson draws the boundaries around it:
+what stays at the gateway, what belongs to the mesh carrying traffic between services, what a
+per-client BFF owns, and what must never leave the service that owns the domain.
 
 A gateway centralizes: **TLS termination**, **authentication and authorization**, **rate limiting and
 quotas**, **routing**, **request/response transformation**, **response aggregation**, **API
@@ -1908,6 +1917,12 @@ const tlsConnectionMgmtTeach = `
 Two questions decide the health of a system's front door under real load: where do you decrypt, and
 how many TCP connections does your backend actually have to hold open? Getting either wrong shows up
 as CPU burn, port exhaustion, or a load balancer that silently stops balancing.
+
+Level 1's [introductory treatment of the secure handshake](/learn/system-design/foundations/sd-l1-tls-https)
+owns the protocol: what the handshake exchanges, what resumption saves, what mTLS proves. This lesson
+is the operational half. Where the termination point goes once the fleet is large, how many
+connections that leaves each backend holding, and what a long-lived multiplexed connection does to
+the balancing you thought you had.
 
 ### Where you terminate TLS
 
@@ -3867,7 +3882,7 @@ driven by the largest guilds.
       lessons: [
         {
           id: "sd-l4-global-gslb",
-          title: "Global & DNS-Level Load Balancing (GSLB, Anycast)",
+          title: "GSLB & Anycast: Sub-Minute Regional Failover",
           summary:
             "GeoDNS steers coarsely but is TTL-bound; anycast plus BGP withdrawal gives seconds-scale failover; active-active regions need headroom to absorb a lost region.",
           estimatedMinutes: 30,
@@ -3915,7 +3930,7 @@ driven by the largest guilds.
         },
         {
           id: "sd-l4-api-gateway-bff",
-          title: "API Gateway & Backend-for-Frontend",
+          title: "API Gateway vs Service Mesh, and Where BFFs Fit",
           summary:
             "What belongs at an API gateway, what belongs in a BFF, and how to stop the edge rotting into a god-object full of business logic.",
           estimatedMinutes: 30,
@@ -3961,7 +3976,7 @@ driven by the largest guilds.
         },
         {
           id: "sd-l4-tls-connection-mgmt",
-          title: "TLS Termination & Connection Management",
+          title: "Connection Management: TLS Offload, Pooling & gRPC Pinning",
           summary:
             "Where to terminate TLS, and why a long-lived gRPC or WebSocket connection pins to one backend so your scale-up adds pods that get no traffic.",
           estimatedMinutes: 30,
