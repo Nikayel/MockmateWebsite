@@ -1004,7 +1004,7 @@ const closuresDecoratorsLesson: PythonLesson = {
   title: "Scope, closures & decorators",
   summary: "Capture state in a closure and wrap behaviour with a decorator.",
   seoDescription:
-    "A closure is an inner function plus a live link to the variables of the function that made it, and a decorator wraps a function to add behaviour around it.",
+    "A closure is an inner function plus a live link to the variables of the function that made it, and a decorator wraps a function to add behavior around it.",
   estimatedMinutes: 12,
   difficulty: "medium",
   skills: ["closures", "scope", "decorators", "functions"],

@@ -80,7 +80,7 @@ export default function SystemDesignInterviewPracticePage() {
           <p>
             A coding problem has a right answer. System design does not: it is an open-ended
             conversation about trade-offs, and about how you handle ambiguity when there is no
-            single correct diagram. Practising that alone is the hard part. A book can explain
+            single correct diagram. Practicing that alone is the hard part. A book can explain
             consistency models. It will not ask a follow-up when your answer leaves a gap.
           </p>
           <p>There are two ways to work on it here, and it is worth knowing which is which.</p>
@@ -269,7 +269,7 @@ export default function SystemDesignInterviewPracticePage() {
     {
       question: "Do I draw a diagram?",
       answer:
-        "No. The design is written: a notes editor that opens on headings for requirements, architecture, data model, and API design, and a conversation with the interviewer alongside it. There is no whiteboard or canvas. If your target company runs a diagram-first round, practise the reasoning here and the drawing elsewhere.",
+        "No. The design is written: a notes editor that opens on headings for requirements, architecture, data model, and API design, and a conversation with the interviewer alongside it. There is no whiteboard or canvas. If your target company runs a diagram-first round, practice the reasoning here and the drawing elsewhere.",
     },
     {
       question: "Does a system design round cost anything?",
