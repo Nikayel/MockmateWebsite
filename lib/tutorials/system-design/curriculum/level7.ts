@@ -2530,6 +2530,24 @@ So multi-AZ protects against a data-center failure (power, cooling, a fire in on
 
 **Multi-region** spreads across regions hundreds or thousands of km apart, with 50-150+ ms of round-trip latency between them. It protects against losing an entire region (natural disaster, region-wide provider outage, regulatory blackout). But that latency changes everything about data: synchronous replication across regions would add 100+ ms to every write, so you almost always replicate **asynchronously**, which means the remote copy lags and a region loss can lose the un-replicated tail. Multi-region is expensive (full or partial stacks in each region, cross-region data transfer, more operational surface) and it makes consistency genuinely hard.
 
+## Multi-AZ vs multi-region: which do you need?
+
+Multi-AZ if the failure you have to survive is one data center, multi-region if it is the whole region. Everything else follows from that one answer, because the replication mode, the latency bill, the consistency work and the cost are all consequences of the failure domain you just bought coverage for.
+
+| Choice | Failure domain covered | Latency cost | Data consistency | What you pay for | When it is enough |
+| --- | --- | --- | --- | --- | --- |
+| Multi-AZ | One data center: power, cooling, a fire, a zone-wide network fault | Single-digit ms between zones, cheap enough to replicate synchronously | Strong. One writer, one current copy, nothing to reconcile | Extra instances and storage replicas per zone. Inter-AZ transfer is cheap and there is no cross-region egress bill | Almost every internal service, and anything whose named risk is hardware or a building |
+| Multi-region, active-passive (one region serves, a second stands by warm) | Loss of an entire region: provider outage, natural disaster, regulatory blackout | 50 to 150+ ms between regions, so replication is asynchronous | Standby trails by seconds, so a sudden region loss forfeits the un-replicated tail | A second stack you fund and almost never serve from, plus continuous cross-region data transfer | Revenue-critical or regulated systems that must survive a region but can absorb a failover measured in minutes and a small data loss |
+| Multi-region, active-active (both regions take writes) | Loss of an entire region, with no failover step left to execute | Local reads and writes stay fast, but anything that must agree across regions pays the WAN round trip | Hard. Two writers on one record means you owe a conflict story before you ship | Full serving capacity in both regions, cross-region traffic, and the largest operational surface: two of everything to deploy, observe and drill | A global user base where the far region's latency is itself the problem, and only once that conflict story is real |
+
+**A decision framework that survives the follow-up questions:**
+
+1. **Name the failure you have to survive, out loud.** "A zone goes dark" and "the region goes dark" have different answers, and reaching for multi-region without naming a region-level risk is buying the expensive option by default.
+2. **Read the answer off the recovery objectives you were given.** Hours of allowed recovery is a backup-and-restore problem, minutes is active-passive, seconds with no failover step to execute is active-active. Those two numbers come from [disaster recovery, RTO and RPO](/learn/system-design/reliability-ops/sd-l7-dr-rto-rpo).
+3. **Check that the availability target actually needs a second region.** Multi-AZ redundancy with automated failover usually reaches four nines on its own, so a second region is the lever for the fifth nine or for a risk multi-AZ cannot cover, not a general reliability upgrade. [Availability math and the nines](/learn/system-design/reliability-ops/sd-l7-availability-nines) has the downtime budget each target buys.
+4. **Only then choose the write topology.** Passive is one writer and no conflicts. Active-active is two writers and a reconciliation problem you own for the life of the system, so choose it for latency or for a zero-failover requirement, never because it sounds more modern.
+5. **Prove it by draining a region on purpose.** An untested failover is a plan, not a capability, and the drill is what turns the second region from a line item into an answer.
+
 ## The consistency crux (CAP made concrete)
 
 Across a WAN partition you cannot have both strong consistency and full availability:
