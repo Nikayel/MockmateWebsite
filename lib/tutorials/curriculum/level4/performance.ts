@@ -394,7 +394,7 @@ cProfile.run("slow_function()")
   "type": "check",
   "kind": "predict",
   "id": "reading-tottime-vs-cumtime",
-  "prompt": "That profile is your whole optimisation budget for the afternoon. slow_function shows cumtime 0.900 with tottime 0.002. lookup shows tottime 0.850 across 900000 calls. Where do you spend the afternoon?",
+  "prompt": "That profile is your whole optimization budget for the afternoon. slow_function shows cumtime 0.900 with tottime 0.002. lookup shows tottime 0.850 across 900000 calls. Where do you spend the afternoon?",
   "options": [
     {
       "label": "slow_function, since its cumtime of 0.900 is essentially the entire run",
