@@ -486,7 +486,7 @@ const brokerSelectionTeach = `
 
 The senior move is to name the decision drivers, then match the workload to the cheapest tool that
 satisfies them. Kafka is a superb distributed log, but it is also operationally heavy (partitions,
-consumer groups, rebalancing, retention tuning, and a ZooKeeper or KRaft quorum to run). If you do
+consumer groups, rebalancing, retention tuning, and a KRaft controller quorum to run). If you do
 not need what it gives, you are paying its tax for nothing.
 
 \`\`\`cswidget
