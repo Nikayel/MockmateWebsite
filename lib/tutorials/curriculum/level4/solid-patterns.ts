@@ -411,7 +411,7 @@ The other three matter less here but come up in review, so it is worth being abl
     ["D: dependency inversion", "depend on the abstraction, not the concrete type", "a service that builds its own DB client, so tests cannot swap it"]
   ],
   "highlightCols": ["The smell it names"],
-  "caption": "The highlighted column is the useful half. Almost nobody recalls the five letters under pressure, but everyone recognises the smells, and each smell is what the principle was written to describe."
+  "caption": "The highlighted column is the useful half. Almost nobody recalls the five letters under pressure, but everyone recognizes the smells, and each smell is what the principle was written to describe."
 }
 \`\`\`
 
@@ -550,7 +550,7 @@ Handle the unknown key. \`STRATEGIES[kind]\` raises \`KeyError\` for a tier you 
   "options": [
     {
       "label": "One hash lookup instead of up to five comparisons, so pricing gets faster",
-      "feedback": "True on paper and the first thing most candidates say, but five string comparisons are nanoseconds and nobody profiled this. Leading with speed signals that you reach for micro-optimisation before design."
+      "feedback": "True on paper and the first thing most candidates say, but five string comparisons are nanoseconds and nobody profiled this. Leading with speed signals that you reach for micro-optimization before design."
     },
     {
       "label": "Adding a tier touches zero existing lines, so nothing that already passes can regress",
@@ -559,7 +559,7 @@ Handle the unknown key. \`STRATEGIES[kind]\` raises \`KeyError\` for a tier you 
     },
     {
       "label": "The dict version is shorter, so there is less code to read",
-      "feedback": "Often true, and brevity is worth something, but it is a weak defence: someone can always rewrite the chain into a compact ternary and your argument evaporates. Blast radius survives that rewrite."
+      "feedback": "Often true, and brevity is worth something, but it is a weak defense: someone can always rewrite the chain into a compact ternary and your argument evaporates. Blast radius survives that rewrite."
     }
   ],
   "reveal": "Both answers are correct facts. Only one of them is a reason. The dispatch table wins because adding behavior stops being an edit to code that already works, which is the entire point of open/closed."
