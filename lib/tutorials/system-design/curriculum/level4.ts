@@ -4328,6 +4328,8 @@ dashboards.
           title: "Capacity Planning & Back-of-Envelope Sizing",
           summary:
             "Turn RPS and latency into a defensible instance count with Little's Law, a utilization target, and an explicit N+1 availability-zone factor.",
+          seoDescription:
+            "Back-of-envelope capacity sizing runs on Little's Law: concurrency is RPS times latency, divided by what one instance holds, then by a 50 to 70% target.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["capacity", "sizing", "littles-law"],
