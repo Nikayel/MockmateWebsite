@@ -252,7 +252,7 @@ One 400-line \`.py\` file is where a project goes to die: you scroll forever, ev
 
 A **module** is a single \`.py\` file. When you import it, Python runs the file top to bottom once and hands you a namespace object whose attributes are the names defined inside.
 
-A **package** is a directory of modules with an \`__init__.py\` file (it may be empty). That file marks the folder as importable and runs the first time the package is imported.
+A **package** is a directory of modules with an \`__init__.py\` file (it may be empty). That file marks the folder as a *regular* package: a real module of its own, whose body runs the first time the package is imported. A folder without one is still importable, as a **namespace package** (PEP 420), but there is no module body, so you get nowhere to hang the package's public surface and nothing runs on import.
 
 \`\`\`text
 store/
