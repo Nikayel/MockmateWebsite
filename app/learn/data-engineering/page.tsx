@@ -4,6 +4,7 @@ import { ArrowRight, Database } from "lucide-react"
 import { listSqlLevels } from "@/lib/tutorials/sql/registry"
 import { learnTrackMetadata } from "@/lib/seo/learn-metadata"
 import { learnCourseSchemaInput } from "@/lib/seo/learn-course-schema"
+import { Footer } from "@/components/footer"
 import { listCourseEntries } from "@/lib/tutorials/course-catalog"
 import {
   LEARN_HUB_PATH,
@@ -163,6 +164,7 @@ export default function LearnDataEngineeringPage() {
           ))}
         </div>
       </div>
+      <Footer />
     </>
   )
 }

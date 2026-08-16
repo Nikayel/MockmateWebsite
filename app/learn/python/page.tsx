@@ -11,6 +11,7 @@ import { BreadcrumbJsonLd, CourseJsonLd, LessonListJsonLd } from "@/components/s
 import { LevelSelector } from "@/components/tutorials/LevelSelector"
 import { ResumeLearning } from "@/components/tutorials/ResumeLearning"
 import { LearnPathTopBar } from "@/components/tutorials/LearnPathTopBar"
+import { Footer } from "@/components/footer"
 
 export const metadata: Metadata = learnTrackMetadata({
   courseId: "python",
@@ -96,6 +97,7 @@ export default function LearnPythonPage() {
 
         <LevelSelector levels={levels} />
       </div>
+      <Footer />
     </>
   )
 }

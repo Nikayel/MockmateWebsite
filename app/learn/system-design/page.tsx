@@ -4,6 +4,7 @@ import { ArrowRight, Network, Timer } from "lucide-react"
 import { listSystemDesignLevels } from "@/lib/tutorials/system-design/registry"
 import { learnTrackMetadata } from "@/lib/seo/learn-metadata"
 import { learnCourseSchemaInput } from "@/lib/seo/learn-course-schema"
+import { Footer } from "@/components/footer"
 import { findCatalogEntry, listCourseEntries } from "@/lib/tutorials/course-catalog"
 import {
   LEARN_HUB_PATH,
@@ -208,6 +209,7 @@ export default function LearnSystemDesignPage() {
             here needs to know how many drills exist. */}
         <SystemDesignDrills />
       </div>
+      <Footer />
     </>
   )
 }
