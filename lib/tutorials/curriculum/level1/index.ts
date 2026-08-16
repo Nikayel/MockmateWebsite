@@ -1933,12 +1933,12 @@ print(square(9))   # 81
       "feedback": "Tempting, because both operators look like division and the same numbers go in. But // is floor division: it throws away everything after the decimal point."
     },
     {
-      "label": "37.0",
+      "label": "37",
       "correct": true,
-      "feedback": "Right. // floors the result, and since a float went in a float comes back, so you get 37.0 rather than 37.78. Use a single / in this formula."
+      "feedback": "Right. // floors the result and throws the fraction away, so you get 37 rather than 37.78. Both operands are ints here, so the answer is an int too. Use a single / in this formula."
     },
     {
-      "label": "38.0, because 37.77 rounds up",
+      "label": "38, because 37.77 rounds up",
       "feedback": "Close, and this is the most common wrong instinct. Floor division does not round to nearest; it always goes down to the next whole number."
     },
     {
