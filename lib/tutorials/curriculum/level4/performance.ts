@@ -445,9 +445,10 @@ class Point:
         self.y = y
 \`\`\`
 
-Measured on CPython 3.11 for a two-attribute object, \`sys.getsizeof\` reports 48 bytes with \`__slots__\`
-against 56 bytes **plus** a separate per-instance dict without it. Across a million objects that gap
-is the difference between fitting in memory and not. Attribute access also gets slightly faster,
+Measured on 64-bit CPython 3.11 for a two-attribute object, \`sys.getsizeof\` reports 48 bytes with
+\`__slots__\` against 56 bytes **plus** a separate per-instance dict without it (the in-browser sandbox
+here is 32-bit, so do not expect to reproduce those exact numbers in the runner). Across a million
+objects that gap is the difference between fitting in memory and not. Attribute access also gets slightly faster,
 because it is an array offset rather than a dict lookup.
 
 \`\`\`cswidget
