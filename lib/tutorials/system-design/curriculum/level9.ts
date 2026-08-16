@@ -767,7 +767,7 @@ const k8sAutoscalingTeach = `
 Elastic scaling, matching capacity to load automatically, is the core reason to run cloud-native. There are four distinct scalers and they solve different problems; naming them precisely is the interview signal.
 
 - **HPA (Horizontal Pod Autoscaler):** adds and removes Pod replicas to hit a target metric. The workhorse for stateless services.
-- **VPA (Vertical Pod Autoscaler):** right-sizes a Pod's CPU/memory requests. Useful for workloads that cannot scale horizontally, but it usually restarts the Pod to apply, so it does not fight HPA on the same metric.
+- **VPA (Vertical Pod Autoscaler):** right-sizes a Pod's CPU/memory requests. Useful for workloads that cannot scale horizontally, but it usually restarts the Pod to apply, and it must never run against HPA on the same resource metric, CPU or memory, because the two controllers fight over the same signal; pair VPA with an HPA driven by a custom or external metric instead.
 - **Cluster Autoscaler / Karpenter:** adds and removes **nodes** when Pods cannot be scheduled (Pending) or when nodes are underused. HPA makes more Pods; the cluster autoscaler makes room for them.
 - **KEDA (Kubernetes Event-Driven Autoscaling):** scales on external event sources (Kafka lag, SQS depth, Redis list length, cron) and, critically, can **scale to zero** when the source is empty.
 
