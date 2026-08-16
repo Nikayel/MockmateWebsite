@@ -4290,9 +4290,9 @@ Nothing on that list is exotic and every row is a bug somebody shipped this mont
       "feedback": "It removes every occurrence anywhere in the string, so a path containing .tmp in a directory name loses that too."
     },
     {
-      "label": "config.get('retries').upper()",
+      "label": "config.get('retries', 0)",
       "bucket": "Runs and is quietly wrong",
-      "feedback": "It runs cleanly whenever the key exists, and raises AttributeError on None only for the configurations that omit it, which is usually not the one you tested."
+      "feedback": "A default is a value, not a signal. A config that omits retries silently becomes zero retries, so a run that should have retried looks like one that was configured not to, and nothing anywhere raises."
     }
   ]
 }
