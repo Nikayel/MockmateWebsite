@@ -3043,7 +3043,7 @@ You cut the infinite stream into finite chunks. *Tumbling* windows are fixed, no
 
 ## Watermarks
 
-A watermark is the engine's assertion "I believe I have now seen all events with event time <= T." It is a heuristic, usually \`max_event_time_seen - allowed_lateness\`. When the watermark passes a window's end, the window *fires* and emits its result. This is the mechanism that lets an unbounded stream produce bounded, timely output. You tune the lateness bound: a tight bound (say 5s) gives low latency but drops stragglers; a loose bound (say 5 min) waits longer but captures late data. *Allowed lateness* additionally keeps a window's state around after firing so a late event can trigger an updated (retracted/corrected) result instead of being dropped.
+A watermark is the engine's assertion "I believe I have now seen all events with event time <= T." It is a heuristic, usually \`max_event_time_seen - max_out_of_orderness\`. When the watermark passes a window's end, the window *fires* and emits its result. This is the mechanism that lets an unbounded stream produce bounded, timely output. You tune that out-of-orderness bound: a tight bound (say 5s) gives low latency but drops stragglers; a loose bound (say 5 min) waits longer but captures late data. *Allowed lateness* additionally keeps a window's state around after firing so a late event can trigger an updated (retracted/corrected) result instead of being dropped.
 
 \`\`\`cswidget
 {
