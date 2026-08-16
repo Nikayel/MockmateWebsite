@@ -3997,7 +3997,8 @@ Three concrete shapes:
 
 Production frequently refuses the either/or and runs both: a content-blind L4 tier at the edge
 absorbing connections in front of an L7 fleet that does the routing. That two-tier stack is the
-subject of [the dedicated L4 vs L7 deep dive](/learn/system-design/scaling-compute/sd-l4-lb-l4-l7).
+subject of
+[a dedicated lesson on running a two-tier edge: connection handling and TLS termination at scale](/learn/system-design/scaling-compute/sd-l4-lb-l4-l7).
 Here, pick the single layer the requirement forces and say what it costs you.
 
 ### The algorithm
