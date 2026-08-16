@@ -3694,7 +3694,7 @@ The tool that makes this safe is a **schema registry** (Confluent Schema Registr
 
 ## Compatibility modes are the heart of the interview
 
-- **Backward** (the common default): new schema can read old data. You may add a field with a default and delete an optional field. Consumers upgrade first, then producers.
+- **Backward** (the common default): new schema can read old data. You may add a field with a default and delete a field. Consumers upgrade first, then producers.
 - **Forward:** old schema can read new data. You may add a field and remove one that had a default. Producers upgrade first, then consumers.
 - **Full:** both directions hold. The safe intersection: add or remove only optional fields with defaults, never touch required ones.
 
