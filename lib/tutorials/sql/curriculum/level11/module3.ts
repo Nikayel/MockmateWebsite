@@ -149,6 +149,8 @@ const exactDedup: SqlLesson = {
     estimatedMinutes: 13,
     markdown: `## The first real stage of a training pipeline is throwing things away
 
+**Exact deduplication removes the documents whose content is byte-for-byte identical, and the standard approach is three steps: hash each document's normalized content, group the rows by that hash, and keep exactly one row per group.** The hash is the easy part. Which copy survives is a rule you have to choose and then make deterministic, and that is what the rest of this lesson is about.
+
 A training corpus starts as a crawl, and a crawl of the open web is mostly the same pages over and over: mirrors, syndication feeds, CDN caches, aggregators republishing an article verbatim, and the same forum thread reachable at four different URLs. **Deduplication removes 20 to 30 percent of raw web data**, before any other quality work happens. Falcon's RefinedWeb pipeline took roughly 1 billion crawled pages down to 2.8 TB of clean text, and dedup did a large share of that reduction.
 
 The reason this matters is not disk space. A document that appears four times is seen four times during training, which quietly reweights the corpus toward whatever happens to be mirrored the most. And a duplicate is one of the ways evaluation text sneaks into training data, which is how a benchmark score stops meaning anything.
