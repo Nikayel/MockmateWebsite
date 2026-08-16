@@ -149,6 +149,18 @@ The \`{word: len(word) for word in words}\` form is precisely what the Practice 
 
 Interns mix these up constantly. If your output got shorter, you filtered. If it stayed the same length, you mapped.
 
+### The walrus operator: compute once, filter and emit
+
+Some filters need a value that the output also wants, and computing it twice (once in the \`if\`, once in the output expression) is wasteful, or outright wrong if the computation is not repeatable. The walrus operator \`:=\` (3.8+) assigns inside an expression, so a comprehension can compute a value once, filter on it, and reuse that same value in what it emits:
+
+\`\`\`python
+xs = [1, 2, 3, 4, 5]
+doubled_big = [y for x in xs if (y := x * 2) > 4]
+print(doubled_big)   # [6, 8, 10]
+\`\`\`
+
+\`(y := x * 2)\` assigns \`y\` and evaluates to it at the same time, so the \`if\` tests the doubled value while the output expression reuses \`y\` instead of recomputing \`x * 2\`. The same pattern shows up outside comprehensions, most often reading a stream until a sentinel: \`while (line := f.readline()):\` assigns and tests in one line, instead of one assignment above the loop and a repeated one at the bottom.
+
 \`\`\`cswidget
 {
   "type": "check",
