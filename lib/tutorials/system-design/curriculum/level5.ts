@@ -684,10 +684,10 @@ read-your-writes."
   "type": "table",
   "columns": ["System", "If partitioned", "Else (no partition)", "What that costs in practice"],
   "rows": [
-    ["DynamoDB", "PA: stay available", "EL: favour latency", "Nearest-copy read, which may be stale"],
+    ["DynamoDB", "PA: stay available", "EL: favor latency", "Nearest-copy read, which may be stale"],
     ["Cassandra", "PA: stay available", "EL or EC, per query", "Tunable at the call site: ONE is EL, QUORUM is EC"],
-    ["Spanner", "PC: keep consistency", "EC: favour consistency", "Quorum plus commit-wait on every commit"],
-    ["CockroachDB", "PC: keep consistency", "EC: favour consistency", "A Raft quorum per range, on every write"]
+    ["Spanner", "PC: keep consistency", "EC: favor consistency", "Quorum plus commit-wait on every commit"],
+    ["CockroachDB", "PC: keep consistency", "EC: favor consistency", "A Raft quorum per range, on every write"]
   ],
   "highlightCols": ["Else (no partition)"],
   "caption": "PACELC reads: if P → (A or C), else E → (L or C). The highlighted column is the half CAP leaves out and the half you pay for constantly, because partitions are rare while the else-case is every single request."
@@ -3741,8 +3741,8 @@ existing ones.
 Deleting is where the other piece of CRDT machinery appears. A delete does not remove the position,
 it marks it dead and keeps it, and that dead marker is a **tombstone**. It has to stay because a
 concurrent insert on another replica may already be anchored between that character and its
-neighbour. Drop the position and that insert has nowhere to land; keep the tombstone and the insert
-still sorts into the right slot, invisible neighbour and all. The decimal above is a teaching convenience: real implementations use a variable-length
+neighbor. Drop the position and that insert has nowhere to land; keep the tombstone and the insert
+still sorts into the right slot, invisible neighbor and all. The decimal above is a teaching convenience: real implementations use a variable-length
 identifier (a list of digits, or a path through a tree) because unbounded dense insertion needs
 unbounded precision, and ids plus tombstones are the metadata that makes a long-lived document need
 periodic compaction.
@@ -3760,7 +3760,7 @@ periodic compaction.
     {
       "label": "Each insert carries a unique position id that sorts the same way on every replica",
       "correct": true,
-      "feedback": "Right. The order comes from the ids, not from delivery: unique and densely orderable, so each insert has a defined place between its neighbours no matter when it arrives or how often."
+      "feedback": "Right. The order comes from the ids, not from delivery: unique and densely orderable, so each insert has a defined place between its neighbors no matter when it arrives or how often."
     },
     {
       "label": "The server rewrites the second operation's index",
@@ -4327,7 +4327,7 @@ end.
 safely, not a monotonically increasing number the resource can compare, which is the gap Kleppmann's
 critique names.
 
-Two neighbouring lessons finish the picture. A coordinator that goes silent mid-protocol leaves
+Two neighboring lessons finish the picture. A coordinator that goes silent mid-protocol leaves
 participants unable to decide alone, the same stale-view ambiguity seen from the transaction side:
 [two-phase vs three-phase commit](/learn/system-design/distributed-core/sd-l5-2pc-3pc). The applied
 build of everything above is [distributed lock design with fencing tokens](/learn/system-design/case-studies/sd-l10-distributed-lock).
