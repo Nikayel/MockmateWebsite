@@ -29,7 +29,7 @@
  * exports the lesson; the lead agent wires it into level5/index.ts inside the
  * "py-l5-real-codebases" module.
  *
- * Budget: 40 minutes (12 read, roughly 16 apply, roughly 12 practice). The apply exercise costs
+ * Budget: see `estimatedMinutes` on the lesson and on each exercise. The apply exercise costs
  * more than a normal workspace because the learner reads a build-swapping audit harness, writes a
  * test in an unfamiliar record(name, fn) shape, watches it go red, and only then makes the fix.
  */
