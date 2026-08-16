@@ -4442,12 +4442,13 @@ over-fetch a web-sized response. BFFs prevent one generic API from being pulled 
 directions by different clients.
 
 For internal, service-to-service concerns, a **service mesh** (Istio, Linkerd) is often the better
-tool than the gateway. Each service gets a sidecar proxy (Envoy for Istio, its own Rust micro-proxy
-for Linkerd) that handles mTLS between services,
-retries, timeouts, circuit breaking, and traffic-shifting, controlled centrally without changing app
-code. Mental model: the **gateway is north-south** (client to system), the **mesh is east-west**
-(service to service). Add a **WAF** and **DDoS protection** at the very edge, in front of the
-gateway, to filter malicious traffic before it costs you anything.
+tool than the gateway. Each service gets a proxy: a per-pod sidecar (Envoy for Istio's sidecar mode,
+its own Rust micro-proxy for Linkerd), or, in Istio's ambient mode, a shared per-node proxy with no
+sidecar at all. Either way, that proxy handles mTLS between services, retries, timeouts, circuit
+breaking, and traffic-shifting, controlled centrally without changing app code. Mental model: the
+**gateway is north-south** (client to system), the **mesh is east-west** (service to service). Add a
+**WAF** and **DDoS protection** at the very edge, in front of the gateway, to filter malicious traffic
+before it costs you anything.
 
 The failure mode to avoid: the gateway becoming a **logic monolith**. It is tempting to keep adding
 "just one more" business rule to the gateway until it holds pricing logic, feature flags, and
@@ -6135,7 +6136,7 @@ export const systemDesignLevel1: DesignLevel = {
             ],
             modelAnswerOutline: [
               "The 'no plaintext anywhere' and 'every call attributable' rules push to end-to-end mTLS with a service mesh, not edge-terminate-and-trust-the-network.",
-              "**Encryption on every wire:** do not terminate to plaintext behind the edge. The public edge terminates the client's TLS (or passes through), and every internal hop runs its own mTLS connection, so no packet is ever plaintext on any wire. A sidecar proxy sits next to each service and handles the TLS so app code stays simple, whether that is Istio (Envoy sidecars) or Linkerd (its own Rust micro-proxy); plaintext only exists inside the loopback between app and its own sidecar, which never touches a wire.",
+              "**Encryption on every wire:** do not terminate to plaintext behind the edge. The public edge terminates the client's TLS (or passes through), and every internal hop runs its own mTLS connection, so no packet is ever plaintext on any wire. A sidecar proxy sits next to each service and handles the TLS so app code stays simple, whether that is Istio sidecar mode (Envoy sidecars) or Linkerd (its own Rust micro-proxy); plaintext only exists inside the loopback between app and its own sidecar, which never touches a wire.",
               "**Attributable identity:** mTLS with SPIFFE/SPIRE-issued identities. Each service gets an X.509 SVID encoding its identity (e.g. `spiffe://bank/payments/settlement`). Both sides verify certs on every connection, so every call is provably from a named service, and the mesh emits audit logs keyed by that identity. Authorization policies ('only settlement may call ledger-write') are enforced on identity, not IP.",
               "**Key rotation:** short-lived certs, on the order of hours, auto-rotated by SPIRE. Short lifetimes shrink the blast radius of a leaked key and remove the manual-rotation outage risk; the mesh rotates transparently, so no midnight cert-expiry outage.",
               "**Keeping latency in budget:** (1) TLS 1.3 for 1-RTT handshakes; (2) aggressive connection reuse/pooling between sidecars so the handshake amortizes over thousands of requests (steady state is symmetric-key encryption, cheap and often hardware-accelerated AES-NI); (3) session resumption for reconnects; (4) shallow call graphs so handshake RTTs do not stack. Do not enable 0-RTT: these are payment mutations, and 0-RTT's replay risk is unacceptable for a charge.",
