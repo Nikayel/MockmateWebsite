@@ -2773,7 +2773,13 @@ const autoscalingTeach = `
 ## Match capacity to demand, and respect the lag
 
 Autoscaling is the machinery that grows and shrinks a fleet so you pay for roughly what you use while
-still meeting your SLOs. There are three layers, and interviewers want you to name them distinctly.
+still meeting your SLOs. Level 9's
+[platform-side treatment of elasticity](/learn/system-design/modern-architecture/sd-l9-k8s-autoscaling)
+takes the Kubernetes components one at a time, the HPA against the cluster autoscaler against KEDA.
+This lesson is about the thing none of those components removes: the lag. Every reactive loop trails
+the burst that triggered it by minutes, so the design work is picking a signal that moves early and
+buying cover for the window before capacity lands. There are three layers, and interviewers want you
+to name them distinctly.
 
 **Horizontal Pod/instance autoscaling (HPA)** adds or removes replicas based on a metric. The default
 metric is **CPU or memory utilization**: target 60% CPU, add pods when the average climbs above that.
@@ -3230,6 +3236,11 @@ poison-pill request, a bad deploy, a runaway tenant, a corrupted cache entry: al
 across the whole fleet because every node shares the same pool, the same code version, and the same
 downstream dependencies. Cell-based architecture and shuffle sharding are the two techniques for
 **bounding blast radius** so a failure takes down a slice, not the service.
+
+Level 7's [reliability-side view of blast radius](/learn/system-design/reliability-ops/sd-l7-blast-radius-cells)
+argues the principle and pairs it with static stability. This lesson is the partitioning mechanics:
+how a cell is drawn, what the router may and may not be allowed to do, and the combinatorics that
+turn a random subset of workers into a stated bound on how many tenants one bad neighbor can reach.
 
 ### Cells
 
@@ -4194,7 +4205,7 @@ driven by the largest guilds.
       lessons: [
         {
           id: "sd-l4-autoscaling",
-          title: "Autoscaling: Reactive, Event-Driven & Predictive",
+          title: "Autoscaling Lag: Warm Pools, Pre-Scaling & Headroom",
           summary:
             "Scale on leading signals (queue depth, RPS) not lagging CPU, and hide the 2-5 minute reactive lag with warm pools, scheduled pre-scaling, and standing headroom.",
           estimatedMinutes: 30,
@@ -4364,7 +4375,7 @@ dashboards.
         },
         {
           id: "sd-l4-cell-shuffle-sharding",
-          title: "Cell-Based Architecture & Shuffle Sharding",
+          title: "Shuffle Sharding & Cell-Based Architecture",
           summary:
             "How cells cap a bad deploy at one slice of users, and why shuffle sharding makes two tenants sharing total fate a 1-in-28 event.",
           estimatedMinutes: 30,
