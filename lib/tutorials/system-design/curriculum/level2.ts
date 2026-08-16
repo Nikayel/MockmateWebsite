@@ -5590,6 +5590,8 @@ export const systemDesignLevel2: DesignLevel = {
           title: "Isolation Levels & Read Anomalies",
           summary:
             "Why snapshot isolation still allows write skew, and how naming the exact anomaly gets you a surgical fix instead of Serializable.",
+          seoDescription:
+            "Read Committed stops dirty reads, Repeatable Read stops non-repeatable reads, Serializable stops phantoms and write skew, Read Uncommitted stops nothing.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["isolation", "concurrency", "transactions"],
@@ -5640,6 +5642,8 @@ export const systemDesignLevel2: DesignLevel = {
           title: "Concurrency Control: MVCC, Locking, OCC",
           summary:
             "MVCC versions rows so readers and writers never block each other, and one forgotten long transaction bloats the table by pinning vacuum.",
+          seoDescription:
+            "MVCC implements snapshot isolation by writing a new row version instead of overwriting, so readers never block writers. One idle transaction stalls vacuum.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["mvcc", "locking", "concurrency"],
@@ -5952,6 +5956,8 @@ export const systemDesignLevel2: DesignLevel = {
           title: "Wide-Column / Column-Family Stores",
           summary:
             "Why Cassandra wants one denormalized table per query, and how a partition key spreads load without growing unbounded.",
+          seoDescription:
+            "A wide-column store (Cassandra, Bigtable) is a distributed sorted map: a partition key spreads rows across the cluster, and you model one table per query.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["wide-column", "cassandra", "modeling"],
