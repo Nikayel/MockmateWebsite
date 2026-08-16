@@ -208,6 +208,34 @@ export function Header() {
     }
   }
 
+  // The nav renders the marketing links from the first paint, before `useAuth()` reports back.
+  // It used to render a spinner for the whole row instead, which meant the server HTML (the only
+  // version a crawler ever reads) carried exactly one link out of the header: the wordmark. Only
+  // the two auth-dependent controls actually need to wait, so only they do, and they wait in a
+  // fixed-size slot so nothing around them moves when the answer arrives.
+  const showAppNav = initialized && user
+  const authSlot = (mobile: boolean) =>
+    initialized ? (
+      <Link
+        href="/login"
+        onClick={mobile ? () => setIsMobileMenuOpen(false) : undefined}
+        className={
+          mobile
+            ? "border-accent/40 bg-accent/10 text-accent hover:border-accent/60 hover:bg-accent/15 focus-visible:ring-accent/50 inline-flex h-9 w-fit items-center rounded-full border px-4 text-sm font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
+            : "border-accent/40 bg-accent/10 text-accent hover:border-accent/60 hover:bg-accent/15 focus-visible:ring-accent/50 inline-flex h-8 items-center rounded-full border px-4 text-[13px] font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
+        }
+      >
+        Sign in
+      </Link>
+    ) : (
+      <div
+        aria-hidden="true"
+        className={`inline-flex items-center justify-center ${mobile ? "h-9 w-[88px]" : "h-8 w-[82px]"}`}
+      >
+        <div className="border-foreground h-4 w-4 animate-spin rounded-full border-b-2 opacity-50" />
+      </div>
+    )
+
   return (
     <header
       style={{ top: "var(--announcement-banner-height, 0px)" }}
@@ -249,11 +277,7 @@ export function Header() {
             {/* The logged-out row gained a "Learn" link, so it tightens to gap-5 at the md
                 breakpoint (where the bar is narrowest) and only opens back up to gap-8 at lg. */}
             <nav className={`hidden items-center md:flex ${user ? "space-x-5" : "gap-5 lg:gap-8"}`}>
-              {!initialized ? (
-                <div className="flex h-10 items-center">
-                  <div className="border-foreground h-5 w-5 animate-spin rounded-full border-b-2 opacity-50"></div>
-                </div>
-              ) : user ? (
+              {showAppNav ? (
                 <>
                   <div className="flex items-center gap-0.5">
                     {APP_NAV.map((item) => {
@@ -351,12 +375,7 @@ export function Header() {
                   <Link href="/careers" className={marketingTabClass(false)}>
                     Join us
                   </Link>
-                  <Link
-                    href="/login"
-                    className="border-accent/40 bg-accent/10 text-accent hover:border-accent/60 hover:bg-accent/15 focus-visible:ring-accent/50 inline-flex h-8 items-center rounded-full border px-4 text-[13px] font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
-                  >
-                    Sign in
-                  </Link>
+                  {authSlot(false)}
                 </>
               )}
             </nav>
@@ -389,11 +408,7 @@ export function Header() {
               className="border-border mt-4 border-t pb-4 md:hidden"
             >
               <div className="flex flex-col space-y-4 pt-4">
-                {!initialized ? (
-                  <div className="flex justify-center py-4">
-                    <div className="border-foreground h-6 w-6 animate-spin rounded-full border-b-2 opacity-50"></div>
-                  </div>
-                ) : user ? (
+                {showAppNav ? (
                   <>
                     {APP_NAV.map((item) => {
                       const Icon = item.icon
@@ -489,13 +504,7 @@ export function Header() {
                     >
                       Join us
                     </Link>
-                    <Link
-                      href="/login"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="border-accent/40 bg-accent/10 text-accent hover:border-accent/60 hover:bg-accent/15 focus-visible:ring-accent/50 inline-flex h-9 w-fit items-center rounded-full border px-4 text-sm font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
-                    >
-                      Sign in
-                    </Link>
+                    {authSlot(true)}
                   </>
                 )}
               </div>
