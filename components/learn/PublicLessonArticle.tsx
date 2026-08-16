@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, ChevronRight, Clock, Timer } from "lucide-react"
+import { ArrowLeft, ArrowRight, ArrowUpRight, ChevronRight, Clock, Timer } from "lucide-react"
 
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -8,6 +8,7 @@ import { LessonUnlockCard } from "./LessonUnlockCard"
 import { ExerciseWorkspaceCue } from "./ExerciseWorkspaceCue"
 import { BreadcrumbJsonLd } from "@/components/seo/JsonLd"
 import { LessonJsonLd } from "@/components/seo/LessonJsonLd"
+import { TrackedCtaLink } from "@/components/seo/TrackedCtaLink"
 import { truncateForDescription } from "@/lib/seo/learn-metadata"
 import {
   LEARN_COURSE_LABEL,
@@ -17,6 +18,7 @@ import {
   trackPath,
 } from "@/lib/tutorials/lesson-routes"
 import { levelLabel } from "@/lib/tutorials/level-title"
+import { resolveRelatedConcepts } from "@/lib/tutorials/related-concepts"
 import { drillForLesson } from "@/lib/tutorials/system-design/lesson-drills"
 import type { PublicExercisePreview, PublicLessonPreview } from "@/lib/tutorials/public-preview"
 import type { CourseId } from "@/lib/tutorials/types"
@@ -209,6 +211,9 @@ export function PublicLessonArticle({
   const demoLanguage = DEMO_LANGUAGE[preview.courseId]
   // Null for ~196 of 208 lessons, by design: see lesson-drills.ts on why this is a curated table.
   const drill = drillForLesson(preview.id)
+  // Empty for most of the 425 lessons, also by design: an unseeded lesson renders no block rather
+  // than an invented one. See lib/tutorials/related-concepts.ts.
+  const related = resolveRelatedConcepts(preview.id, preview.courseId)
 
   return (
     <>
@@ -398,6 +403,77 @@ export function PublicLessonArticle({
             </aside>
           )}
         </article>
+
+        {/* The one contextual practice CTA a lesson may carry, per the 28-day brief's section 3.
+            Curated in `related-concepts.ts`, never inferred, and never present on a lesson that
+            already shows the timed-drill card above, so no page offers two competing routes into
+            practice. The label says what the reader will practise; "Start now" is denylisted by the
+            registry's test. Rendered as a real anchor in the server HTML, so it is a crawlable
+            internal link into a commercial page as well as a button for a human. */}
+        {related.cta && (
+          <aside
+            aria-label="Practice this in an interview"
+            className="border-border mt-6 rounded-2xl border p-5"
+          >
+            <h2 className="text-foreground text-sm font-semibold tracking-tight">
+              Take it into a round
+            </h2>
+            <TrackedCtaLink
+              href={related.cta.href}
+              location="learn_lesson_practice"
+              keyword={preview.id}
+              prefetch={false}
+              className="text-accent-strong hover:text-accent-strong/80 focus-visible:ring-accent/50 group mt-2 inline-flex items-start gap-1.5 rounded-sm text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <span className="text-pretty">{related.cta.label}</span>
+              <ArrowRight
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5"
+                aria-hidden="true"
+              />
+            </TrackedCtaLink>
+          </aside>
+        )}
+
+        {/* The cross-track related-concepts block (SEO-24). Prev/next below chains one course in
+            one direction; this is the only thing on the page that links sideways, and for a lesson
+            in another track it is the only link between the two corpora at all.
+
+            `prefetch={false}` deliberately: four neighbours per lesson across 425 statically
+            generated pages is a lot of speculative fetching for links a reader follows one of, and
+            the anchor in the HTML is what this block exists for either way. */}
+        {related.links.length > 0 && (
+          <nav aria-label="Related concepts" className="border-border mt-12 border-t pt-8">
+            <h2 className="text-foreground text-sm font-semibold tracking-tight">
+              Related concepts
+            </h2>
+            <p className="text-muted-foreground mt-1 text-sm text-pretty">
+              Where this idea shows up elsewhere in the courses.
+            </p>
+            <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+              {related.links.map((link) => (
+                <li key={link.href} className="min-w-0">
+                  <Link
+                    href={link.href}
+                    prefetch={false}
+                    className="border-border hover:border-accent/50 focus-visible:ring-accent/50 flex h-full flex-col gap-1.5 rounded-xl border p-4 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                  >
+                    <span className="text-foreground text-sm font-medium text-pretty">
+                      {link.anchor}
+                    </span>
+                    {/* Only when the link leaves this course. Inside one track the label would be
+                        the same word on every card, which is noise rather than orientation. */}
+                    {link.crossTrack && (
+                      <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+                        <ArrowUpRight className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        {link.courseLabel}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
 
         {/* Prev/next keeps the corpus shallow for a crawler and gives a reader somewhere to go that
             is not the back button. Neighbours are resolved across level boundaries by the caller. */}

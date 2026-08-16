@@ -6,10 +6,16 @@ import { trackEvent } from "@/lib/analytics"
 
 interface TrackedCtaLinkProps {
   href: string
-  location: "seo_landing_hero" | "seo_landing_footer"
+  /**
+   * Where on the site the click happened. `learn_lesson_practice` is the one contextual practice
+   * CTA a Learn lesson may carry (see `lib/tutorials/related-concepts.ts`); it reports against the
+   * lesson id rather than a keyword, because a lesson has no single primary query.
+   */
+  location: "seo_landing_hero" | "seo_landing_footer" | "learn_lesson_practice"
   keyword: string
   children: ReactNode
   className?: string
+  prefetch?: boolean
 }
 
 /**
@@ -25,10 +31,12 @@ export function TrackedCtaLink({
   keyword,
   children,
   className,
+  prefetch,
 }: TrackedCtaLinkProps) {
   return (
     <Link
       href={href}
+      prefetch={prefetch}
       className={className}
       onClick={() => trackEvent("cta_click", { location, destination: href, keyword })}
     >
