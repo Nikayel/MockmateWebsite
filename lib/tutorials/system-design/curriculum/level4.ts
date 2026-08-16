@@ -3902,7 +3902,7 @@ driven by the largest guilds.
       lessons: [
         {
           id: "sd-l4-global-gslb",
-          title: "GSLB & Anycast: Sub-Minute Regional Failover",
+          title: "GSLB vs Anycast: Why DNS Failover Is Not Sub-Minute",
           summary:
             "GeoDNS steers coarsely but is TTL-bound; anycast plus BGP withdrawal gives seconds-scale failover; active-active regions need headroom to absorb a lost region.",
           estimatedMinutes: 30,
@@ -4329,7 +4329,7 @@ dashboards.
           summary:
             "Turn RPS and latency into a defensible instance count with Little's Law, a utilization target, and an explicit N+1 availability-zone factor.",
           seoDescription:
-            "Back-of-envelope capacity sizing runs on Little's Law: concurrency is RPS times latency, divided by what one instance holds, then by a 50 to 70% target.",
+            "Back-of-envelope sizing runs on Little's Law: concurrency is RPS times latency. Divide that by what one instance holds, then by a 50 to 70% target.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["capacity", "sizing", "littles-law"],
