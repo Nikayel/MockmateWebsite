@@ -1640,7 +1640,8 @@ rebalances, each a latency and duplicate spike.
 **Cooperative (incremental) rebalancing** revokes only the partitions that must move, so consumers
 keep processing unaffected partitions. **Static group membership** (\`group.instance.id\`) lets a
 restarting consumer rejoin with its old assignment within \`session.timeout.ms\`, so a rolling deploy
-causes **no rebalance at all**. And **KIP-848** (the new consumer-group protocol, GA in Kafka 4.0)
+causes **no rebalance at all**. And **KIP-848** (the new consumer-group protocol, GA in Kafka 4.0,
+on by default broker-side but opt-in per consumer via \`group.protocol=consumer\`)
 moves assignment computation to the broker-side coordinator and makes rebalances fully incremental,
 removing the stop-the-world join barrier. Tuning \`session.timeout.ms\`/\`heartbeat.interval.ms\`
 sensibly (e.g., 45s/3s) avoids spurious rebalances from a GC pause.
