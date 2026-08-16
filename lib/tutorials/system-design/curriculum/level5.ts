@@ -4109,6 +4109,11 @@ and SWIM's random direct/indirect probes plus infection-style gossip to keep per
 const leaderElectionFencingTeach = `
 ## One leader, guaranteed, even when the network lies
 
+A **fencing token** is a number that only ever goes up, handed out with each leadership grant and
+stamped on every write, which storage rejects if it is lower than the highest token it has already
+seen. Election alone cannot stop split-brain: a paused leader wakes still believing it leads, and its
+write arrives looking legitimate.
+
 Many systems need a **single active primary**: one node that owns writes, holds a lock, or
 coordinates work. The hard part is not electing one, it is guaranteeing there is *never* a second one
 acting at the same time, because the asynchronous network gives you no reliable way to tell a dead
@@ -4175,7 +4180,7 @@ was hit; a legal pause alone produced two active leaders.
 }
 \`\`\`
 
-### Fencing tokens: enforce at the resource
+### What is a fencing token, and where is it enforced?
 
 Leases alone cannot fix this, because the paused leader's problem is that its own view of "do I still
 hold the lease" is stale. The fix lives at the **resource**. Every time leadership is granted, the
@@ -4213,7 +4218,7 @@ Redlock**.
 }
 \`\`\`
 
-### Split-brain and partitions
+### Split brain on a 3-2 partition
 
 Take a 5-node cluster split **3-2**. Consensus-based leadership requires a **majority quorum (3 of
 5)**. The majority side can elect and keep a leader and stays **writable**; the minority side cannot
@@ -4227,6 +4232,27 @@ clusters use **odd numbers**.
 leads, and a **fencing token enforced at the storage layer** for why a paused old leader cannot
 corrupt state. Stopping at "etcd elects a leader" fails the follow-up "what happens during a GC
 pause?"
+
+### Interview follow-ups
+
+**"What if the storage layer cannot check a token?"** Then the fence moves to whatever in the path
+can compare one: a conditional write on a version column, an object-store request conditioned on the
+current ETag, or a row that holds the highest term seen. If nothing between the leader and the data
+can reject a stale writer, there is no fence, only a lock and an assumption.
+
+**"Is a Raft term or an etcd revision a real fencing token?"** Yes. Both increase monotonically and
+both are issued by the same system that granted leadership, which is the entire requirement. The
+failure is rarely the number; it is forgetting to carry it on the write and compare it at the far
+end.
+
+**"Does Redlock give you this?"** No. It hands the client a random value used to release the lock
+safely, not a monotonically increasing number the resource can compare, which is the gap Kleppmann's
+critique names.
+
+Two neighbouring lessons finish the picture. A coordinator that goes silent mid-protocol leaves
+participants unable to decide alone, the same stale-view ambiguity seen from the transaction side:
+[two-phase vs three-phase commit](/learn/system-design/distributed-core/sd-l5-2pc-3pc). The applied
+build of everything above is [distributed lock design with fencing tokens](/learn/system-design/case-studies/sd-l10-distributed-lock).
 
 Recap: elect one leader via consensus and a lease, but because a GC pause can briefly create two
 leaders, enforce fencing tokens (monotonic numbers the storage rejects if stale); on a 3-2 split the
