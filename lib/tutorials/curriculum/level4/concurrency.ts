@@ -466,7 +466,7 @@ CPython protects its internal memory with a **Global Interpreter Lock**. Only on
     {
       "label": "Fetching 200 product records from a slow vendor API",
       "bucket": "A thread pool helps",
-      "feedback": "Almost all of that time is a socket wait, and the interpreter lock is released while a thread waits, so 200 waits collapse into roughly one."
+      "feedback": "Almost all of that time is a socket wait, and the interpreter lock is released while a thread waits, so 200 waits collapse into a handful of waves instead of 200."
     },
     {
       "label": "Scoring 2 million rows with a pure-Python loop",
@@ -491,7 +491,7 @@ CPython protects its internal memory with a **Global Interpreter Lock**. Only on
     {
       "label": "Waiting on 40 database queries that each take about half a second server-side",
       "bucket": "A thread pool helps",
-      "feedback": "Your process is blocked on a socket while the database does the work, so overlapping the waits turns 20 seconds into roughly half a second."
+      "feedback": "Your process is blocked on a socket while the database does the work, so 40 waits overlap into a few seconds instead of 20."
     }
   ]
 }
