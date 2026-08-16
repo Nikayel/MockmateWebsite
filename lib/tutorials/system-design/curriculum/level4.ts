@@ -2107,7 +2107,7 @@ the new pods sit idle.
 \`\`\`
 
 The fixes: **client-side load balancing** (the client spreads RPCs itself, via gRPC's round_robin
-resolver or an xDS/mesh control plane), balance at **L7 per-request** with a proxy that understands
+load-balancing policy or an xDS/mesh control plane), balance at **L7 per-request** with a proxy that understands
 H2 streams (Envoy balances individual streams, not just connections), or periodically **cycle
 connections** (max-connection-age) so clients re-resolve and rebalance. WebSockets have the same
 pinning problem, so plan for connection draining and rebalancing on scale events.
