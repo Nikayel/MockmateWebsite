@@ -1,6 +1,10 @@
 import { Metadata } from "next"
 import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
+// The competitor figures live in one sourced, date-stamped module so a price on a landing page and
+// a price on a comparison table cannot drift apart (each entry carries its source URL and the date
+// it was checked).
+import { COMPETITOR_PRICING, formatPlanPrice } from "@/lib/pricing-comparison"
 
 export const metadata: Metadata = {
   title: "Best AI Coding Interview Tools in 2026",
@@ -65,9 +69,12 @@ export default function BestAIToolsPage() {
           <li>
             <strong>Hello Interview:</strong> system design first. Guided practice where the AI
             reads your whiteboard diagram as you explain it, voice supported, plus strong written
-            system design guides, much of which is free to read. Premium runs about $47 to $59 a
-            month. It wound down its human mock program in May 2026, so the product is now
-            self-paced content plus AI practice.
+            system design guides, much of which is free to read. Premium is sold as an access window
+            rather than a subscription:{" "}
+            {formatPlanPrice(COMPETITOR_PRICING.helloInterview.plans.month)} for a month or{" "}
+            {formatPlanPrice(COMPETITOR_PRICING.helloInterview.plans.year)} for a year, neither of
+            which auto-renews. It wound down its human mock program in May 2026, so the product is
+            now self-paced content plus AI practice.
           </li>
         </ul>
       ),
