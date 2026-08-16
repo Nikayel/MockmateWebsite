@@ -47,7 +47,7 @@ const sciencePrinciples = [
     title: "Interleaving",
     finding: "Beats one pattern at a time",
     description:
-      "Mixing problem types feels harder in the moment and transfers better to problems you have not seen. Your queue varies the pattern rather than blocking it.",
+      "Mixing problem types feels harder in the moment and transfers better to problems you have not seen. Your roadmap spreads coding, debugging, and design work through the plan instead of clustering it.",
     citation: "Rohrer & Taylor, 2007",
     source: "Instructional Science",
   },
