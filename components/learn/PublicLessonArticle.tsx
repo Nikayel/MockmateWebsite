@@ -9,7 +9,7 @@ import { ExerciseWorkspaceCue } from "./ExerciseWorkspaceCue"
 import { BreadcrumbJsonLd } from "@/components/seo/JsonLd"
 import { LessonJsonLd } from "@/components/seo/LessonJsonLd"
 import { TrackedCtaLink } from "@/components/seo/TrackedCtaLink"
-import { truncateForDescription } from "@/lib/seo/learn-metadata"
+import { lessonMetaDescription } from "@/lib/seo/learn-metadata"
 import {
   LEARN_COURSE_LABEL,
   LEARN_HUB_PATH,
@@ -243,12 +243,12 @@ export function PublicLessonArticle({
         {/* Structured data describing THE LESSON. Until this landed, the only JSON-LD on a lesson
             page was the four site-level blocks, every one of which describes CodeSparring the
             product, so a page about fencing tokens told Google it was software priced at $25 a
-            month. The description is the same string the meta tag carries, built by the same
-            truncation, so the two cannot drift. */}
+            month. The description comes from the same builder the meta tag uses, so a lesson with
+            an authored `seoDescription` carries it in both places and the two cannot drift. */}
         <LessonJsonLd
           preview={preview}
           path={lessonPath}
-          description={truncateForDescription(preview.summary)}
+          description={lessonMetaDescription(preview)}
         />
         <nav aria-label="Breadcrumb" className="mb-6">
           <ol className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">

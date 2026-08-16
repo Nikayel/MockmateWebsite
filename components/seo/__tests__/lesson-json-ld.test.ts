@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest"
 
 import { buildLessonSchema } from "../LessonJsonLd"
 import { listAllCatalogEntries } from "@/lib/tutorials/course-catalog"
-import { truncateForDescription } from "@/lib/seo/learn-metadata"
+import { learnLessonMetadata, lessonMetaDescription } from "@/lib/seo/learn-metadata"
 import { publicLessonPath } from "@/lib/tutorials/lesson-routes"
 import { toPublicLessonPreview } from "@/lib/tutorials/public-preview"
 import { GATED_FIELD_NAMES } from "@/lib/tutorials/public-preview"
@@ -23,7 +23,7 @@ function schemaFor(entry: (typeof ENTRIES)[number]) {
   return buildLessonSchema({
     preview,
     path: publicLessonPath(preview.courseId, preview.levelSlug, preview.id),
-    description: truncateForDescription(preview.summary),
+    description: lessonMetaDescription(preview),
   })
 }
 
@@ -115,10 +115,25 @@ describe("lesson structured data", () => {
 
   it("keeps the description identical to the meta description", () => {
     // Two different descriptions for one URL is a contradiction a crawler has to resolve, and
-    // it resolves it by trusting neither.
-    for (const entry of ENTRIES.slice(0, 30)) {
+    // it resolves it by trusting neither. The comparison is against the head this page actually
+    // renders, not against a second copy of the same formula: the graph used to build its own
+    // string from the summary, which held only while `seoDescription` was unset everywhere.
+    for (const entry of ENTRIES) {
       const preview = toPublicLessonPreview(entry)
-      expect(schemaFor(entry).description).toBe(truncateForDescription(preview.summary))
+      expect(schemaFor(entry).description, entry.lesson.id).toBe(
+        learnLessonMetadata(preview).description
+      )
+    }
+  })
+
+  it("carries the authored seoDescription, not the summary, wherever one is set", () => {
+    // The regression this guards: an authored override reaching the meta tag while the graph
+    // kept describing the page from its summary, which is the drift the test above forbids and
+    // the reason a shared builder replaced the inline truncation here.
+    const authored = ENTRIES.filter((entry) => entry.lesson.seoDescription)
+    expect(authored.length).toBeGreaterThan(0)
+    for (const entry of authored) {
+      expect(schemaFor(entry).description, entry.lesson.id).toBe(entry.lesson.seoDescription)
     }
   })
 
