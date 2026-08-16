@@ -256,10 +256,12 @@ wins for hard-to-shard stateful tiers until you are forced to shard.
 const lbL4L7Teach = `
 ## Stacking L4 and L7, the production shape
 
-Level 1's "Load Balancing: L4 vs L7 & Health Checks" lesson introduced the two layers. This lesson
-credits that and goes to the shape real systems actually run: an L4 tier stacked in front of an L7
-fleet. A one-paragraph refresher first, because the layer choice still decides your routing features
-and throughput.
+Level 1's [introductory pass on balancer layers](/learn/system-design/foundations/sd-l1-load-balancing)
+owns the comparison itself: what each layer can see, and which one a given service needs. This lesson
+takes that as settled and builds the topology production actually runs, a thin L4 tier stacked in
+front of an L7 proxy fleet, plus the high availability that balancer tier needs so it is not the
+single point of failure everything else routes through. A one-paragraph refresher first, because the
+layer choice still decides your routing features and throughput.
 
 **L4 (transport-layer)** balancers work at TCP/UDP, see only IP and port, and forward packets without
 parsing the payload, so they are fast, protocol-agnostic (raw TCP, database connections, WebSockets),
@@ -463,10 +465,11 @@ anycast) so it is never a SPOF.
 const lbAlgorithmsTeach = `
 ## The rule for who gets the next request
 
-Level 1 introduced load balancing at the L4/L7 layer and health checks; this lesson goes deep on the
-piece it left open, the algorithm that picks which backend serves the next request. Once a load
-balancer has a pool of healthy backends, it needs a rule for **which one gets the next request**. The
-rule matters because the wrong one creates hotspots: some nodes melt while others sit idle.
+Level 1's [introductory treatment of load balancing](/learn/system-design/foundations/sd-l1-load-balancing)
+covers the layer choice and health checks; this lesson goes deep on the piece it left open, the
+algorithm that picks which backend serves the next request. Once a load balancer has a pool of healthy
+backends, it needs a rule for **which one gets the next request**. The rule matters because the wrong
+one creates hotspots: some nodes melt while others sit idle.
 
 \`\`\`cswidget
 {
@@ -663,10 +666,13 @@ even load and loses that node's state when it dies, so use it deliberately.
 const healthChecksTeach = `
 ## Send traffic only to nodes that can serve it
 
-Level 1's load-balancing lesson named health checks as the mechanism that keeps a pool healthy; this
-lesson is the deep treatment. A load balancer only helps if it sends traffic to nodes that can
-actually serve it and stops sending to nodes that cannot. That is the job of **health checks**, and
-the subtlety is doing it without evicting healthy nodes or dropping in-flight work during a deploy.
+Level 1's [introductory treatment of load balancing](/learn/system-design/foundations/sd-l1-load-balancing)
+named health checks as the mechanism that keeps a pool healthy. This lesson is the deep treatment, and
+its center of gravity is a distinction that introduction leaves alone: **liveness** and **readiness**
+are two different questions, and answering both with one endpoint is what crash-loops a node that is
+merely warming up. A load balancer only helps if it sends traffic to nodes that can actually serve it
+and stops sending to nodes that cannot. That is the job of **health checks**, and the subtlety is
+doing it without evicting healthy nodes or dropping in-flight work during a deploy.
 
 There are two ways to know a node is bad. **Active checks** have the LB **probe** each backend on an
 interval (an HTTP GET \`/healthz\`, a TCP connect) and mark it unhealthy after N consecutive
@@ -3591,7 +3597,7 @@ export const systemDesignLevel4: DesignLevel = {
         },
         {
           id: "sd-l4-lb-l4-l7",
-          title: "Load Balancer Fundamentals: L4 vs L7",
+          title: "Stacked Load Balancer Tiers: L4 Edge, L7 Proxy Fleet",
           summary:
             "Why production stacks a content-blind L4 balancer at the edge in front of an L7 fleet that routes on path and terminates TLS.",
           estimatedMinutes: 30,
@@ -3640,7 +3646,7 @@ export const systemDesignLevel4: DesignLevel = {
         },
         {
           id: "sd-l4-lb-algorithms",
-          title: "Load-Balancing Algorithms & Session Affinity",
+          title: "Load Balancing Algorithms: Round Robin vs Least Connections",
           summary:
             "Why least-connections beats round robin when request durations vary, and when to reach for power-of-two-choices or consistent hashing instead.",
           estimatedMinutes: 25,
@@ -3756,7 +3762,7 @@ driven by the largest guilds.
         },
         {
           id: "sd-l4-health-checks",
-          title: "Health Checks, Draining & Graceful Rollout",
+          title: "Liveness vs Readiness: Draining & Graceful Rollout",
           summary:
             "Why conflating liveness with readiness crash-loops a warming node, and how draining and slow-start keep a rolling deploy from dropping requests.",
           estimatedMinutes: 25,
