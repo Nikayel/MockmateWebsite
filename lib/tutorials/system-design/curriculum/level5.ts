@@ -1374,9 +1374,9 @@ saying out loud in an interview: the same clock uncertainty has to be paid somew
 where. Spanner pays it on every **write**, holding locks for roughly 2 epsilon before acknowledging.
 CockroachDB pays it on the **reads that actually hit an ambiguous value**, as a restart. Writes stay
 cheap, contended recent rows restart more often, and a wider offset means a wider window and more
-restarts. That is also why the offset is enforced rather than advisory: a node that discovers its
-clock has drifted beyond the configured maximum shuts itself down instead of serving orders it
-cannot justify.
+restarts. That is also why the offset is enforced rather than advisory: a node that finds its clock
+out of sync with half the cluster by 80% of the configured maximum, 400ms at the 500ms default,
+shuts itself down rather than serve orders it cannot justify.
 
 \`\`\`cswidget
 {
