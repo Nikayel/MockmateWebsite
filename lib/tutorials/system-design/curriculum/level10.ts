@@ -6602,11 +6602,13 @@ Durability matters: Redis is the fast serving/index layer, not the system of rec
 `.trim()
 
 const stockExchangeTeach = `
-## Web instincts are all wrong here
+## The order-matching engine
+
+A matching engine is the component of an exchange that holds one instrument's order book and pairs each incoming buy order against the resting sell orders, and each incoming sell against the resting buys, under a published fairness rule. Everything else on the venue exists to feed it or to publish what it decided: gateways and pre-trade risk checks in front, market data and clearing behind. So the design question is not which services to draw, it is what this one component has to guarantee and what that rules out.
 
 An order-matching engine is the interview where the usual web instincts (throw it in a database, shard it, scale horizontally) are all wrong, and knowing why is the whole point. The requirements are microsecond latency, perfect determinism (an audit must be able to replay every fill exactly), and strict fairness. Those force a single-writer, in-memory, event-sourced design.
 
-## Price-time priority
+## Price-time priority: how a fill is decided
 
 The matching rule is price-time priority over a limit order book: for buys, highest price first; for sells, lowest price first; and at the same price, the earliest order wins (time priority). A limit order rests in the book until matched; a market order takes the best available price immediately; a cancel removes a resting order. The book is two sorted structures (bids descending, asks ascending) grouped by price level, each level a FIFO queue of orders. Matching pops the best price levels and fills in time order.
 
@@ -6833,6 +6835,24 @@ The matching rule is price-time priority over a limit order book: for buys, high
 }
 \`\`\`
 
+## The order book: which data structure, and why
+
+The book is what the rest of the design is built around, so settle it before drawing any architecture. Its shape is already fixed by the matching rule: two sides, bids ordered by price descending and asks ascending, and inside a single price level a FIFO queue of orders in arrival order.
+
+What varies is how the price levels are stored, and the deciding factor is that the hot path is narrow. An incoming order reads the best price level, fills against the front of that level's queue, and either empties the level or leaves a partial fill. A cancel removes one order from the middle of a queue. A new resting order appends to a level or creates one. Reading the best bid or the best ask happens on every single message; the ranged sorted query that a general-purpose index is built for happens never.
+
+| Order-book structure | Read the best bid or ask | Rest a new order | Fits when |
+| --- | --- | --- | --- |
+| Array of price levels indexed by tick | O(1) through a best-level cursor | O(1) append to that level's queue | Prices are dense and bounded, as on a listed equity |
+| Balanced tree, skip list, or treap keyed by price | O(1) through a cached edge pointer | O(log n) to create a new price level | Prices are sparse or unbounded, as on a crypto pair |
+| One sorted list of orders, with no price levels | O(1) at the head | O(n) to find the insertion point | Never at production volume: every message re-walks the list |
+
+The array of price levels is the usual answer for a listed equity. Prices move in ticks across a narrow band, so a level is an index lookup and the best level is a cursor you nudge as levels empty and fill, which is where the O(1) best-bid read comes from. A skip list or a treap earns its place when the price range is wide or unbounded and a dense array would be mostly empty, and a cached edge pointer keeps the best-price read O(1) there too.
+
+Either workable option also needs a hash map from order id to the order's node in its queue. Cancels are the most common message on many venues, and a cancel that scans a price level to find its order turns the cheapest operation into the most expensive one.
+
+**Interview nuance:** naming the structure is worth less than naming the operations that chose it. Say which reads and writes sit on the hot path (best price on every message, append to a level, cancel by id, delete an emptied level) and the structure follows from them.
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -6856,7 +6876,7 @@ The matching rule is price-time priority over a limit order book: for buys, high
 }
 \`\`\`
 
-## Single-writer, single-threaded
+## Single-writer sequencing
 
 The counterintuitive core: use a single-writer, single-threaded matching engine, not a database with locks. Why is single-threaded faster and more correct here? Because a lock per order in a general database adds milliseconds and nondeterminism (thread scheduling decides tie-breaks), and this domain needs microseconds and reproducibility. A sequencer assigns a total order to all inbound events (every order, cancel, and modify gets a monotonic sequence number), and a single thread processes them one at a time from an in-memory ring buffer (the LMAX Disruptor pattern), with no locks, cache-friendly memory access, and no cross-thread nondeterminism. Horizontal scale comes from sharding by instrument: each symbol (AAPL, TSLA) gets its own single-writer engine, and there is no cross-symbol coordination on the hot path.
 
@@ -6887,7 +6907,7 @@ The order book lives entirely in memory (arrays or intrusive structures per pric
 }
 \`\`\`
 
-## Determinism and recovery
+## Deterministic replay from the journal
 
 Determinism is a hard requirement, not a nice-to-have, because regulators and replay demand that the same ordered input always yields identical output. That means: no wall-clock decisions in matching logic (derive time and ids from the sequence number), no random tie-breaking, and no multi-threaded races. Given the exact same sequenced input, a replay must reproduce every fill identically.
 
@@ -6996,6 +7016,16 @@ Recovery uses event sourcing. Before the engine acts on an accepted event, appen
 \`\`\`
 
 Market-data fan-out must not slow matching: publish trades and book deltas onto a separate high-throughput multicast or streaming bus so slow subscribers cannot backpressure the matcher. Availability comes from hot-standby replicas that consume the same sequenced log and can take over deterministically, plus pre-trade risk checks in front of the matcher (credit/position limits) so bad orders never reach the book.
+
+## Failure modes and what each one costs
+
+| Failure | What breaks | What the design does about it |
+| --- | --- | --- |
+| The matching engine process dies mid session | The in-memory book is gone | Replay the journal into a fresh engine from the last snapshot: because matching is deterministic, the rebuilt book is identical rather than approximate |
+| The engine matches before the journal append is durable | A fill exists that no replay can reproduce | Append the sequenced event to the replicated journal first, then match, so the journal is always the input of record |
+| A market-data subscriber falls behind | Backpressure reaches the matcher and the tail-latency budget is gone | Publish fills and book deltas on a separate bus, so a slow subscriber only slows itself |
+| Matching reads a wall clock or breaks a tie at random | A replay produces different fills from the original run | Derive time, ids, and tie-breaks from the sequence number alone |
+| An order breaches a client's credit or position limits | A trade the client cannot settle reaches the book | Pre-trade risk checks sit in front of the sequencer, so the order is rejected before it is ever sequenced |
 
 **Recap:** match by price-time priority in an in-memory order book, process a single-writer sequenced event stream single-threaded (Disruptor style) for lock-free determinism and microsecond latency, shard by instrument for scale, keep matching fully deterministic (no wall-clock, no randomness), recover by replaying a replicated event journal from snapshots, and fan out market data on a separate bus with hot standbys for availability.
 
@@ -8463,7 +8493,7 @@ A rejection from any layer returns 429. The concurrency layer's 429 carries \`X-
         },
         {
           id: "sd-l10-stock-exchange",
-          title: "Design a Stock Exchange / Order-Matching Engine",
+          title: "Design a Stock Exchange: Order Matching Engine",
           summary:
             "Why a matching engine is single-threaded and in-memory: determinism and tail latency beat throughput, and a replayed journal rebuilds the book.",
           estimatedMinutes: 45,
