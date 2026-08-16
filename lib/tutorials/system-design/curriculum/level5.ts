@@ -4189,8 +4189,8 @@ const leaderElectionFencingTeach = `
 
 A **fencing token** is a number that only ever goes up, handed out with each leadership grant and
 stamped on every write, which storage rejects if it is lower than the highest token it has already
-seen. Election alone cannot stop split-brain: a paused leader wakes still believing it leads, and its
-write arrives looking legitimate.
+seen. Election alone cannot stop split-brain, because an election only appoints a successor: nothing
+in it reaches back and stops what the previous leader still has in flight.
 
 Many systems need a **single active primary**: one node that owns writes, holds a lock, or
 coordinates work. The hard part is not electing one, it is guaranteeing there is *never* a second one
