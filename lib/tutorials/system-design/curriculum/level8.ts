@@ -3182,7 +3182,7 @@ That second mode is easy to read as a weaker posture you settle for. It is bette
     ],
     [
       "an unowned cron job on a build host",
-      "Accepted. Tagged PLAINTEXT, and its existence is now a fact rather than a rumour",
+      "Accepted. Tagged PLAINTEXT, and its existence is now a fact rather than a rumor",
       "Connection refused, and you find out what it did from whoever complains"
     ]
   ],
