@@ -1750,7 +1750,7 @@ The **dispatch/matching engine** does candidate generation (query the rider's H3
   "type": "calc",
   "title": "Cell resolution vs drivers per cell",
   "predictPrompt": {
-    "question": "The matching engine drops to cells half as wide to tighten candidate ranking. What happens to the driver count in each cell?",
+    "question": "The matching engine drops to cells one step finer, half as wide and half as tall to tighten candidate ranking. What happens to the driver count in each cell?",
     "options": [
       "It halves",
       "It drops to a quarter",
