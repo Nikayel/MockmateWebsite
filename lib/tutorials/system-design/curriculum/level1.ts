@@ -5671,6 +5671,14 @@ const concurrencyModelsTeach = `
 How a server maps incoming connections onto CPU work is one of the oldest and most consequential
 design choices, and it is entirely governed by one question: is the workload CPU-bound or IO-bound?
 
+**The short answer.** CPU-bound work wants a thread or worker pool sized to the number of cores,
+because nothing is waiting and the only win available is keeping every core busy without
+oversubscribing it. IO-bound work wants an event loop, because those requests spend nearly all their
+wall-clock time waiting on the network, and an event loop lets a waiting connection cost one file
+descriptor instead of a whole thread. Thread-per-request is the simpler model to write and stays a
+fine choice right up until its threads are mostly parked on IO. The rest of this lesson is why that
+split holds and exactly where each model breaks.
+
 ### Thread-per-request
 
 Classic Apache prefork, Tomcat's default, most synchronous frameworks: a thread (or process) per
