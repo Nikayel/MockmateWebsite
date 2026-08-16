@@ -66,7 +66,7 @@ export function SystemDesignDrills() {
           A lesson teaches one concept and asks you to write a design answer you can compare against
           a model answer. A drill is the whole round instead: {drills.length} open-ended briefs,
           each one a timed interview with an AI interviewer who questions your design as you build
-          it and scores it when time is up. Read the levels first, then drill.
+          it and scores it when you submit. Read the levels first, then drill.
         </p>
       </div>
 
