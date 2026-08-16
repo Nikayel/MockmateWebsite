@@ -2918,6 +2918,23 @@ print(Color["RED"])      # Color.RED   (look up by name)
 
 That name lookup is what the Practice driver does: \`Color[name].value\` turns \`"RED"\` into \`"red"\`.
 
+### \`StrEnum\`: when the members ARE strings
+
+\`Color\` above still needs \`.value\` every time you want the string: \`Color.RED\` is not itself \`"red"\`. \`enum.StrEnum\` (3.11+) closes that gap by making each member a real \`str\`, so it compares equal to its value directly and can be dropped straight into an f-string or a JSON payload.
+
+\`\`\`python
+from enum import StrEnum
+
+class Status(StrEnum):
+    OK = "ok"
+    FAILED = "failed"
+
+print(Status.OK == "ok")       # True: Status.OK IS the string "ok"
+print(f"status: {Status.OK}")  # status: ok
+\`\`\`
+
+Reach for \`StrEnum\` at JSON and API boundaries, where you would otherwise write \`.value\` on every access. Keep the plain \`Enum\` above for internal-only choices, where accidentally comparing a member to a raw string is a bug you want caught rather than allowed.
+
 ### Pitfall: mutable default fields
 
 \`\`\`cswidget
