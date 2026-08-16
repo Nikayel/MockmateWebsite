@@ -3978,6 +3978,28 @@ Where TLS ends is the whole difference, and every other row follows from it:
 }
 \`\`\`
 
+### Choosing a layer in practice
+
+One question settles most cases: does anything about where the request goes depend on what is inside
+it? If yes, the balancer has to read the request, and that means L7. If no, take L4 and keep the CPU.
+Three concrete shapes:
+
+- **Multi-tenant SaaS routing on the \`Host\` header to per-tenant pools: L7.** The tenant is in the
+  request, so the balancer cannot pick a backend without decrypting and parsing. It terminates TLS at
+  the edge to do that, which also means certificate rotation happens in one place instead of on every
+  backend.
+- **A Postgres connection pool, a UDP game protocol, or an MQTT broker: L4.** There is no HTTP to
+  parse and the payload is not the balancer's business. TLS passes straight through, the backend does
+  the handshake, and the balancer never holds a private key.
+- **HTTP traffic that a compliance rule says no intermediary may decrypt: L4 passthrough anyway.**
+  The requirement is about who is allowed to read the bytes, and that is the exact row the layer
+  choice turns on. You give up path routing to keep the guarantee.
+
+Production frequently refuses the either/or and runs both: a content-blind L4 tier at the edge
+absorbing connections in front of an L7 fleet that does the routing. That two-tier stack is the
+subject of [the dedicated L4 vs L7 deep dive](/learn/system-design/scaling-compute/sd-l4-lb-l4-l7).
+Here, pick the single layer the requirement forces and say what it costs you.
+
 ### The algorithm
 
 **Round robin** rotates evenly and is fine when every request costs about the same. **Least
@@ -4267,6 +4289,33 @@ active-active pairs, or an anycast VIP fronting multiple LBs, with health-checke
   "caption": "The balancer probes GET /healthz every 3s and drains connections on deploy, so a dead node leaves rotation without killing in-flight requests. Sessions live in Redis rather than in an app node's memory, which is what lets any node serve any user and makes stickiness unnecessary."
 }
 \`\`\`
+
+### Interview follow-ups
+
+**"What is the difference between a load balancer and a reverse proxy?"** They overlap, and the
+framing differs. A reverse proxy is defined by fronting backends and doing work on their behalf: TLS,
+caching, compression, buffering slow clients. Load balancing is one feature such a proxy may have.
+Every L7 load balancer is a reverse proxy, because it terminates the client connection and opens its
+own to the backend. An L4 balancer is not, because it forwards packets without ever terminating
+anything. The proxy side of that is
+[reverse proxies and the API gateway](/learn/system-design/foundations/sd-l1-reverse-proxy-gateway).
+
+**"Why not just use DNS round robin?"** Because DNS hands out an address at resolution time and then
+has no idea what happens next. Resolvers and clients cache records past the TTL, so a dead node keeps
+receiving traffic until those caches expire, and the protocol has no health check to pull it. DNS is a
+useful coarse first hop that steers a client toward a region or a balancer tier, not a replacement for
+one.
+
+**"What does your health check actually check?"** Readiness, not just liveness. A probe that only
+proves the process is running keeps a node in rotation after its database pool is exhausted, so
+\`/healthz\` should touch the dependencies the request path needs. The counterweight is that a check
+which fails whenever a shared downstream is slow can pull an entire healthy fleet out of rotation at
+once, so keep the check cheap and scoped to what this node itself requires to serve.
+
+**"How do you balance across regions rather than instances?"** That is a different tool at a
+different layer. An anycast VIP or a DNS-based global traffic manager picks the region, and the
+balancer inside that region picks the instance. Saying "the load balancer handles it" without naming
+which of the two you mean is the answer interviewers probe.
 
 Recap: Pick L4 for raw speed or L7 for HTTP-aware routing and TLS, use least-connections when
 durations vary, combine active and passive health checks with connection draining, keep services
