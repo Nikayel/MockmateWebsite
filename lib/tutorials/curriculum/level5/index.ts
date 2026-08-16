@@ -2497,7 +2497,7 @@ def shortest_failing_length(ops):
       "feedback": "Every operation is individually harmless: -500 on its own would be skipped by a correct implementation too. Testing them in isolation destroys the state that makes the bug possible."
     },
     {
-      "label": "Test growing prefixes and stop at the first length that misbehaves",
+      "label": "Test growing prefixes and take the shortest one that still fails",
       "correct": true,
       "feedback": "Right. The balance is carried forward, so the trigger is a position in the sequence rather than a value. The third prefix is the first one where the running balance would go negative."
     },
