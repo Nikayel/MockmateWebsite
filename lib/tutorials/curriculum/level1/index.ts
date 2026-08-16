@@ -2875,6 +2875,18 @@ You have to **capture** the return value: \`text = text.strip().lower()\`, or \`
 
 **Interview nuance:** immutability carries a cost interviewers probe. Building a string with repeated \`+=\` in a loop is O(n squared), because each concatenation copies the entire string so far into a fresh one. For \`n\` pieces that is quadratic work. The fix is \`"".join(parts)\`, which walks the pieces once for O(n). Reach for \`str.join\` over \`+=\` whenever you assemble text from many parts.
 
+### Pitfall: \`.strip()\` takes a character set, not a prefix or suffix
+
+\`.strip()\` does not take a substring to cut off. It takes a **set of characters**, and it trims from each end for as long as the next character belongs to that set. That makes \`"text.txt".strip(".txt")\` a trap: Python reads \`".txt"\` as the four characters \`.\`, \`t\`, \`x\`, \`t\`, and strips any of them off either end. It never looks for the substring \`".txt"\` as a whole.
+
+\`\`\`python
+"text.txt".strip(".txt")           # 'e', not 'text'
+"text.txt".removesuffix(".txt")    # 'text'
+"unhappy".removeprefix("un")       # 'happy'
+\`\`\`
+
+\`removesuffix\` and \`removeprefix\` (Python 3.9+) are the fix: each takes the exact substring to drop, and removes it only when it is actually there, from only that one end. Everything else is left alone. Reach for them when you mean "cut off this exact prefix or suffix," and save \`.strip()\` for "trim any of these characters."
+
 You will now normalize some text by stripping and lowercasing it, then build an uppercased greeting with an f-string.`,
     demoCode: `messy = "  PyThOn  "
 print(messy.strip().lower())   # python
