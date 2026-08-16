@@ -6,6 +6,21 @@
 import { trackEvent } from "@/lib/analytics"
 import type { CaseLabMode, MilestoneKind } from "@/lib/labs/types"
 
+/**
+ * The `/labs` browse list was rendered. Paired with {@link trackCaseLabViewed} and
+ * {@link trackCaseLabStarted} this closes the lab funnel: list view -> detail view -> start. Two of
+ * those three steps had no event at all, so the only visible number was how many runs began, with no
+ * denominator to read it against.
+ */
+export function trackCaseLabListViewed(params: { labCount: number }): void {
+  trackEvent("case_lab_list_viewed", params)
+}
+
+/** A lab's detail page was opened (the intro screen, before any run starts). */
+export function trackCaseLabViewed(params: { labId: string; company: string }): void {
+  trackEvent("case_lab_viewed", params)
+}
+
 export function trackCaseLabStarted(params: {
   labId: string
   company: string

@@ -23,7 +23,7 @@ import { OnsiteTimer } from "@/components/labs/OnsiteTimer"
 import { CompanyLogo } from "@/components/labs/CompanyLogo"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { Header } from "@/components/header"
-import { trackCaseLabStarted } from "@/lib/labs/case-lab-analytics"
+import { trackCaseLabStarted, trackCaseLabViewed } from "@/lib/labs/case-lab-analytics"
 import { SparraLoader } from "@/components/brand/SparraLoader"
 
 export default function CaseLabPlayPage() {
@@ -47,6 +47,13 @@ export default function CaseLabPlayPage() {
   useEffect(() => {
     if (lab) setActiveLab(lab)
   }, [lab, setActiveLab])
+
+  // Middle of the lab funnel: opened the lab, has not started a run yet. Keyed on the id so it fires
+  // once per lab rather than once per store update.
+  const labCompany = lab?.company
+  useEffect(() => {
+    if (labId && labCompany) trackCaseLabViewed({ labId, company: labCompany })
+  }, [labId, labCompany])
 
   // Resume an in-progress run for this lab (if any). `reload` retries after a
   // failed/timed-out resume load.
