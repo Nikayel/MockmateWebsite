@@ -2024,9 +2024,9 @@ print(Circle(2).area)   # 12.56636
       "feedback": "Tempting, because adding one method feels like a purely additive change and the equality behaviour is all you asked for. Python quietly sets __hash__ to None at the same time, so the class stops being hashable."
     },
     {
-      "label": "Points can no longer be dict keys or set members, because __hash__ is now None",
+      "label": "Adding a Point to a set now raises TypeError",
       "correct": true,
-      "feedback": "Right, and it fails loudly with TypeError: unhashable type. Define a matching __hash__ over the same fields, or reach for @dataclass(frozen=True), which generates both together."
+      "feedback": "Right. Defining __eq__ sets __hash__ to None, so the class is no longer hashable. Define a matching __hash__ over the same fields, or reach for @dataclass(frozen=True), which generates both together."
     },
     {
       "label": "Points become unsortable, because __lt__ is removed at the same time",
