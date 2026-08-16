@@ -289,11 +289,15 @@ operation genuinely requires it, not by default.
 \`\`\`
 
 **Leaderless (Dynamo-style):** any replica accepts a write, and the client (or a coordinator) writes
-to and reads from multiple replicas. Cassandra, DynamoDB, and Riak work this way. Consistency comes
+to and reads from multiple replicas. Cassandra and Riak work this way. Consistency comes
 from **quorums**: with N replicas, if you require W replicas to ack a write and R to answer a read,
 then **R + W > N** guarantees the read set and write set overlap on at least one node, so a read sees
 the latest acked write. Common config is N=3, W=2, R=2. Tuning W and R trades consistency against
-availability and latency: W=1 is fast but weakly durable, R=1 can read stale data.
+availability and latency: W=1 is fast but weakly durable, R=1 can read stale data. Amazon DynamoDB is
+a common false friend here: despite the name, each partition is a replication group with a single
+leader elected via Multi-Paxos, only that leader serves writes and strongly consistent reads, and the
+only client-facing knob is a boolean choice between eventual and strong reads, not tunable N/W/R. The
+2007 Dynamo paper is this family's ancestor; the DynamoDB product built from it is not a member.
 
 \`\`\`cswidget
 {
