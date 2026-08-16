@@ -1028,7 +1028,10 @@ A → B):
 - If neither A → B nor B → A, the events are **concurrent**, written A ∥ B. Concurrency is the
   interesting case: it is where two clients may have independently updated the same thing.
 
-### Lamport clocks
+### What is a Lamport clock?
+
+A **Lamport clock** is a single integer counter per node, advanced on every local event and carried
+on every message, so that an event which causally precedes another always holds the smaller number.
 
 Each node keeps an integer counter. Increment it on every local event; stamp outgoing messages; on
 receive, set your counter to \`max(local, received) + 1\`. The guarantee: if A → B then
@@ -1064,7 +1067,32 @@ smaller timestamp tells you nothing about causation. **Lamport clocks cannot det
 They can order everything; they cannot tell you *which orderings were forced by causality and which
 were arbitrary*.
 
-### Vector clocks
+### A Lamport clock message exchange, step by step
+
+Three nodes, two messages, every counter starting at zero. Each row applies the same rule: a local
+event adds one, a send carries the sender's new value, and a receive takes
+\`max(local, received) + 1\`.
+
+| # | Event | Counters after (A, B, C) | Timestamp of the event |
+| --- | --- | --- | --- |
+| 1 | A does local work | (1, 0, 0) | 1 |
+| 2 | A sends m1 to B | (2, 0, 0) | 2, carried on m1 |
+| 3 | C does local work, talking to nobody | (2, 0, 1) | 1 |
+| 4 | B receives m1: max(0, 2) + 1 | (2, 3, 1) | 3 |
+| 5 | B does local work | (2, 4, 1) | 4 |
+| 6 | B sends m2 to C | (2, 5, 1) | 5, carried on m2 |
+| 7 | C receives m2: max(1, 5) + 1 | (2, 5, 6) | 6 |
+
+Read it twice. Step 1 on A genuinely happens-before step 7 on C, through m1 and then m2, and the
+stamps climb 1 < 3 < 6 to match: causality forces the numbers. Now compare step 3 on C (stamp 1) with
+step 2 on A (stamp 2). No message and no shared node connects them, so neither influenced the other,
+yet the stamps still came out ordered. That order is an artifact of counting, and nothing in the pair
+of numbers admits it.
+
+### What is a vector clock?
+
+A **vector clock** is one counter per node carried as a whole vector, so comparing two stamps element
+by element proves either that one event caused the other or that the two were concurrent.
 
 Each node keeps a vector with one counter per node. On a local event, increment your own slot. On
 send, attach your whole vector. On receive, take the element-wise max, then increment your own slot.
@@ -1196,6 +1224,19 @@ Compare two vectors:
 That detection is why **Dynamo and Riak use vector clocks (technically version vectors, one entry per
 replica) to surface *siblings***: when a read finds two concurrent versions, it returns both to the
 application (or a merge function / LWW / CRDT) rather than silently picking one and losing a write.
+
+### Lamport vs vector vs hybrid logical clocks
+
+| Clock | Ordering it gives | Size per stamp | Detects concurrency | Reach for it when |
+| --- | --- | --- | --- | --- |
+| Lamport | Total order that never contradicts causality | One integer | No | One agreed order is all you need, as in a replicated log |
+| Vector (version vector) | Partial order that is exactly causality: dominance means one caused the other | One integer per participant, so O(N) | Yes | Concurrent writes to a key must be found rather than silently resolved |
+| Hybrid logical clock (HLC) | Total order that respects causality and stays close to wall-clock time | A physical timestamp plus a small counter, constant size | No | Timestamps must also mean something against real time, as in an MVCC read "as of" an instant |
+
+The rule underneath the table: only per-participant state can prove two events were independent, so
+the vector is the only one of the three that detects concurrency, and O(N) is what it charges for
+that. The HLC row is the next lesson's whole subject,
+[physical time, clock uncertainty and HLC](/learn/system-design/distributed-core/sd-l5-physical-time-hlc).
 
 **Interview nuance, the costs.** Vector clocks are **O(N)** in the number of participants. Worse, in
 a system with many transient actors (mobile clients writing directly), the vector grows without bound
