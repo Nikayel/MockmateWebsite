@@ -140,6 +140,17 @@ jobs:
       # `--sample-lessons=25` thins only the ~425 templated lesson URLs. Every distinct non-lesson
       # page is still crawled in full, because those are the hand-authored ones where a one-off
       # metadata defect can hide. A local run with no flag covers all of them.
+      #
+      # KNOWN RED ON ARRIVAL. The first crawl of the site as it stood on 2026-08-16 found two real
+      # defects, so this step fails until they are fixed:
+      #   - /legal ships no rel=canonical
+      #   - /python-executor renders 72 visible characters of main content server-side
+      # Both are content fixes, not check-tuning: the threshold sits in a wide gap (the next
+      # thinnest page has 391 characters) and every other one of the 549 sitemap URLs passes. A
+      # permanently-red gate trains people to ignore it, which is the failure mode the Build job's
+      # own comment above was written about, so fix the two pages rather than letting this sit red.
+      # If the fixes must land after this workflow, add `continue-on-error: true` HERE and delete it
+      # in the same PR that fixes them. Do not weaken scripts/seo-audit.mjs to go green.
       - name: SEO audit
         run: pnpm seo:audit --sample-lessons=25 --base-url=http://localhost:4256
 
