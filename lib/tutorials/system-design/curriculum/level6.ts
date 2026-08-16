@@ -986,7 +986,7 @@ The durable combination is \`acks=all\` **and** \`min.insync.replicas>=2\` **and
 **Log segments and retention:** a partition is stored as segment files that roll by size/time; old
 segments are deleted (time/size retention) or compacted. **Tiered storage** (KIP-405) offloads cold
 segments to S3-class object storage so retention cost decouples from broker disk. Finally, **KRaft**
-(GA, default in Kafka 4.0) replaced ZooKeeper: cluster metadata now lives in an internal Raft quorum
+(production-ready since Kafka 3.3, and the only mode in Kafka 4.0) replaced ZooKeeper: cluster metadata now lives in an internal Raft quorum
 of controllers, removing the external dependency, speeding failover, and scaling to far more
 partitions.
 
