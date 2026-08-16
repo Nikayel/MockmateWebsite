@@ -408,7 +408,7 @@ print(a.x)   # 2  (b clobbered a)
 
   The fix is exactly what the demo does: store on \`instance\` under a separate name.
 
-- **Same storage name as the attribute.** If \`storage_name\` were \`"balance"\` instead of \`"_balance"\`, then \`setattr(instance, "balance", value)\` re-triggers \`__set__\` forever and you get a \`RecursionError\`. The \`_\` prefix is what breaks the loop.
+- **Same storage name as the attribute.** If \`storage_name\` were \`"balance"\` instead of \`"_balance"\`, then \`setattr(instance, "balance", value)\` re-triggers \`__set__\` forever and you get a \`RecursionError\`. The \`_\` prefix is what breaks the loop. Do not try this one in the sandbox: WASM has no real stack guard, so instead of raising something you can catch it takes the whole runtime down and you have to reload the page.
 
 - **Descriptor as an instance attribute.** \`balance = Positive()\` must sit in the class body. Assign it inside \`__init__\` and Python never invokes the protocol; it is just a normal attribute.
 
