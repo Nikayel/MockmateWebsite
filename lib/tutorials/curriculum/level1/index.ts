@@ -2314,7 +2314,7 @@ str(42)       # "42"   number -> text
   "options": [
     {
       "label": "It returns 0, treating an empty field as nothing",
-      "feedback": "Tempting, because an empty quantity field really does mean zero in the business sense, and that is usually the behaviour you want. int() will not guess: it needs digits to parse."
+      "feedback": "Tempting, because an empty quantity field really does mean zero in the business sense, and that is usually the behavior you want. int() will not guess: it needs digits to parse."
     },
     {
       "label": "It raises a ValueError",
@@ -2337,7 +2337,7 @@ str(42)       # "42"   number -> text
 
 ### Truthiness
 
-In a condition, every value is either **truthy** or **falsy**. Memorise the falsy ones: \`False\`, \`None\`, \`0\`, \`0.0\`, \`""\`, \`[]\`, \`{}\`, and \`()\`. Everything else is truthy.
+In a condition, every value is either **truthy** or **falsy**. Memorize the falsy ones: \`False\`, \`None\`, \`0\`, \`0.0\`, \`""\`, \`[]\`, \`{}\`, and \`()\`. Everything else is truthy.
 
 \`\`\`cswidget
 {
@@ -4011,7 +4011,7 @@ deep = copy.deepcopy(grid)   # inner lists copied too
     },
     {
       "label": "One list, but Python resets it each time the function returns",
-      "feedback": "Close, in that a reset is exactly what you would need for the intuitive behaviour. Nothing resets it: the list lives as long as the function object does."
+      "feedback": "Close, in that a reset is exactly what you would need for the intuitive behavior. Nothing resets it: the list lives as long as the function object does."
     }
   ]
 }
@@ -4233,7 +4233,7 @@ x in a_dict    # O(1) average: same hashing, keyed lookup
     ["x in c", "O(n): scans until found", "O(1) average", "O(1) average, over keys"],
     ["c[i] by position", "O(1)", "not supported", "not supported"],
     ["c[key] by key", "not supported", "not supported", "O(1) average"],
-    ["Add one item", "O(1) amortised (append)", "O(1) average (add)", "O(1) average"],
+    ["Add one item", "O(1) amortized (append)", "O(1) average (add)", "O(1) average"],
     ["Keeps insertion order", "yes", "no", "yes, since Python 3.7"],
     ["Accepts unhashable items", "yes", "no", "values yes, keys no"]
   ],
