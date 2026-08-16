@@ -1214,7 +1214,7 @@ A test that passes both before and after the fix proves nothing about the fix. T
     {
       "label": "assert busiest_hour([5, 5, 2]) == 0",
       "correct": true,
-      "feedback": "Right. This is the smallest input that contains a tie, so it forces the code to reveal which of the tied positions it reports and pins that decision down."
+      "feedback": "Right. This is a small input that contains a tie, so it forces the code to reveal which of the tied positions it reports and pins that decision down."
     },
     {
       "label": "assert busiest_hour([]) is None",
