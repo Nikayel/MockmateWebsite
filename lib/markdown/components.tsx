@@ -150,17 +150,22 @@ export const markdownComponents = {
   // Horizontal rule
   hr: () => <hr className="border-border my-4" />,
 
-  // Links
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-blue-600 underline hover:opacity-80 dark:text-blue-400"
-    >
-      {children}
-    </a>
-  ),
+  // Links. Only OFF-SITE destinations open a new tab: these components render 17 consumers,
+  // including every lesson's teach prose, and forcing `target="_blank"` on an in-app link
+  // ("LEFT JOIN preserves every row", the related-concepts rail) threw the learner into a second
+  // tab and stranded the first. Same rule as the blog renderer (components/blog/MDXContent.tsx).
+  a: ({ href, children }) => {
+    const isInternal = href?.startsWith("/")
+    return (
+      <a
+        href={href}
+        className="text-blue-600 underline hover:opacity-80 dark:text-blue-400"
+        {...(!isInternal && { target: "_blank", rel: "noopener noreferrer" })}
+      >
+        {children}
+      </a>
+    )
+  },
 
   // Reference-sheet accordion card (see remarkDetailsCards). Native disclosure element:
   // Enter/Space toggle, focus ring, and open/closed state all come from the platform.
