@@ -873,7 +873,7 @@ Signature: any comparison against a threshold, a limit, a quota, or an expiry. A
 
 ### 5. The ignored return value
 
-Python's string and tuple methods return new objects. Calling one and throwing away the result is a no-op that looks like work.
+Python's string methods return new objects. Calling one and throwing away the result is a no-op that looks like work.
 
 \`\`\`python
 def redact(text, secrets):
