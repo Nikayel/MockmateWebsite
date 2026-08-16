@@ -3901,7 +3901,7 @@ Every line is answering a question you would otherwise be answering at 3am.
 
 **Parse defensively.** \`json.loads\` raises on bad input, so the \`try\` is how failure becomes a return value instead of an escape.
 
-**Check the shape.** Valid JSON can be a list, a number, or the string \`"null"\`. \`data.get(...)\` on a list raises \`AttributeError\`, so the type of the top-level value is checked before anything is read out of it.
+**Check the shape.** Valid JSON can be a list, a number, or the literal \`null\`, which parses to Python \`None\`. \`data.get(...)\` on a list raises \`AttributeError\`, so the type of the top-level value is checked before anything is read out of it.
 
 **Check every field you will use.** Presence, type, and range are three separate questions. A key can be present and \`None\`. A score can be a string \`"8"\`. A rating meant to be 0 to 10 can be 47.
 
