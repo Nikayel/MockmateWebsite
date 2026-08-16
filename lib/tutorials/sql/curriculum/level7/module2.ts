@@ -1132,6 +1132,8 @@ const kimballVsObt: SqlLesson = {
   title: "Kimball vs One Big Table: The 10 GB Join-Side Heuristic",
   summary:
     "When to choose a star schema over One Big Table, using consumer needs and the 10 GB join-side heuristic instead of dogma.",
+  seoDescription:
+    "Keep a Kimball star while the join side is under roughly 10 GB, where the dimension broadcasts cheaply. Past it, shuffle cost makes One Big Table pay.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
