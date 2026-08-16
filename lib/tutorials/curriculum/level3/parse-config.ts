@@ -550,7 +550,7 @@ Given \`"# db\\nhost = localhost\\nport = 8080"\`, the loop reaches the store st
   "options": [
     {
       "label": "It works: split hands back the key and everything after the first =",
-      "feedback": "Tempting, because that is the behaviour you want, and it is what split('=', 1) gives you. Plain split has no such limit though: it cuts at every = in the line, so this one produces three pieces, not two."
+      "feedback": "Tempting, because that is the behavior you want, and it is what split('=', 1) gives you. Plain split has no such limit though: it cuts at every = in the line, so this one produces three pieces, not two."
     },
     {
       "label": "It raises ValueError: too many values to unpack (expected 2)",
