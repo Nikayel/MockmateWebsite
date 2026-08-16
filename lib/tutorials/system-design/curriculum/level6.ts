@@ -4766,6 +4766,8 @@ unchanged since launch. The pod autoscaler targets total consumer lag under 500k
           title: "Retries, Dead-Letter Queues & Backpressure",
           summary:
             "How to retry a flaky downstream without a thundering herd, and why one poison message wedges an entire Kafka partition.",
+          seoDescription:
+            "Retry transient errors with capped backoff and jitter, send permanent ones to an alerted dead-letter queue, and never retry in place on a Kafka partition.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["retries", "dlq", "backpressure"],
