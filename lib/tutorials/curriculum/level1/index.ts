@@ -3674,6 +3674,8 @@ Style guides (PEP 8) and linters flag \`value == None\`. It usually works, but i
 
 \`==\` runs the object's own \`__eq__\`. A NumPy array, for instance, defines \`==\` to compare elementwise:
 
+(NumPy is not installed in this page's sandbox, so read this one rather than running it.)
+
 \`\`\`python
 import numpy as np
 arr = np.array([1, 2, 3])
