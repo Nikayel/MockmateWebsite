@@ -564,7 +564,7 @@ sits on a path of other services, and the request only succeeds if every one of 
       "It depends which one fails"
     ]
   },
-  "workedExample": "At four nines apiece, one service is allowed about 53 minutes of downtime a year. Put five of them in series on the same request path and the availabilities multiply rather than hold: 0.9999 to the fifth power is 99.95%, which is about 4.4 hours a year, five times the budget you thought you had. Drag the path out to ten services and the honest promise falls to 99.9%, about 8.8 hours, which is the three-nines number from the paragraph above.",
+  "workedExample": "At four nines apiece, one service is allowed about 52 minutes of downtime a year. Put five of them in series on the same request path and the availabilities multiply rather than hold: 0.9999 to the fifth power is 99.95%, which is about 4.4 hours a year, five times the budget you thought you had. Drag the path out to ten services and the honest promise falls to 99.9%, about 8.8 hours, which is the three-nines number from the paragraph above.",
   "inputs": [
     {
       "kind": "slider",
@@ -717,7 +717,7 @@ promoting the standby takes seconds to minutes during which writes fail, and any
 the moment of failure is data somebody has to reconcile by hand.
 
 **The extra nine has a price, and the price is the decision.** Going from 99.9% to 99.99% buys back
-about eight hours a year, from roughly 8.8 hours of downtime down to roughly 53 minutes. Active-passive
+about eight hours a year, from roughly 8.8 hours of downtime down to roughly 52 minutes. Active-passive
 is usually what you buy it with, and a warm standby is a second copy of the serving tier, plus its
 share of storage, plus the cross-region replication traffic, so budget roughly 1.6x to 2x the
 single-region bill with the replication leg priced near 20 dollars per TB moved between regions. Say
