@@ -4992,8 +4992,8 @@ export const level5: PythonLevel = {
   // Thirteen of the seventeen lessons are single-file, so that stays the level default; the four
   // real-codebase lessons set `executionMode: "workspace"` on each exercise explicitly.
   defaultExecutionMode: "single-file",
-  // Sum of the seventeen lessons' estimatedMinutes is 434, so 7 rather than the 5 this carried when
-  // the level ended at the model-calls module.
+  // The seventeen lessons' estimatedMinutes add up to a little over seven hours, so 7 rather than
+  // the 5 this carried when the level ended at the model-calls module.
   estimatedHours: 7,
   modules: [
     {
