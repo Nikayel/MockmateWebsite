@@ -1,6 +1,8 @@
 import { Metadata } from "next"
 import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
+import { PRICING_CONFIG } from "@/lib/config"
+import { COMPETITOR_PRICING } from "@/lib/pricing-comparison"
 
 export const metadata: Metadata = {
   title: "AI Coding Interview Practice",
@@ -24,9 +26,12 @@ export default function AICodingInterviewPracticePage() {
             edges, and whether a faster solution exists. Talk it through out loud or type it.
           </p>
           <p>
-            You can open the workspace and run a problem&apos;s tests without an account. The
-            interviewer itself needs a free account, one click with Google or GitHub, and the free
-            plan includes 8 full sessions a month with complete feedback, no card required.
+            You can try a session without an account: open the workspace, write a solution, and run
+            the tests, with no email and no card. The interviewer itself needs a free account, one
+            click with Google or GitHub. The{" "}
+            <Link href="/free-ai-coding-interview">free AI coding interview page</Link> sets out
+            exactly where that line falls, how many sessions the free plan carries, and when the
+            allowance resets.
           </p>
         </>
       ),
@@ -85,8 +90,11 @@ export default function AICodingInterviewPracticePage() {
   const faqs = [
     {
       question: "How does this compare to a human mock interview?",
-      answer:
-        "Human mock interviews, like interviewing.io or Pramp Pro, typically run $150 to $225 a session, and a real engineer brings judgment an AI cannot fully replicate. CodeSparring is available any time, from free (8 sessions a month) to $25 a month for 35. Many candidates use both: AI sessions for repetition, a human session closer to the real interview.",
+      // Prices are read, never typed. The literals that used to sit in this
+      // answer were the same numbers lib/pricing-comparison.ts exists to keep
+      // in one place, and a price change would have left this FAQ quoting a
+      // rate nothing else on the site charged.
+      answer: `Human mock interviews typically run $${COMPETITOR_PRICING.humanMock.perSessionMin} to $${COMPETITOR_PRICING.humanMock.perSessionMax} a session, and a real engineer brings judgment an AI cannot fully replicate. CodeSparring is available any time, from free (${PRICING_CONFIG.free.sessionsPerMonth} sessions a month) to ${PRICING_CONFIG.pro.website.monthly.priceDisplay} a month for ${PRICING_CONFIG.pro.sessionsPerMonth}. Many candidates use both: AI sessions for repetition, a human session closer to the real interview.`,
     },
     {
       question: "Can I use voice to talk through my solution?",
