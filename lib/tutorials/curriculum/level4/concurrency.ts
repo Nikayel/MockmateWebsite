@@ -567,21 +567,21 @@ You met the reusable version of this in **Decorators with arguments & functools.
   "prompt": "Two threads each do counter += 1 five hundred thousand times against one shared global. What is the final value?",
   "options": [
     {
-      "label": "Exactly 1000000, because the interpreter lock lets only one thread run at a time anyway",
-      "feedback": "The single most common wrong turn on this topic, and it is a fair inference from everything above. The lock is held for a bytecode, not for a statement, and counter += 1 is three bytecodes: read, add, store."
+      "label": "Somewhere under 1000000, and a different number on each run",
+      "feedback": "True through Python 3.9, and still what most write-ups say. Since 3.10 the interpreter only looks for a thread switch after a call and at the top of each loop iteration, so the read, add, store triple in a bare counter += 1 finishes uninterrupted and nothing is lost."
     },
     {
-      "label": "Somewhere under 1000000, and a different number on each run",
+      "label": "Exactly 1000000 on CPython 3.10+, under 1000000 on older versions, which is why you must never rely on either",
       "correct": true,
-      "feedback": "Right. A thread can be suspended between the read and the store, so both threads read the same value and one increment vanishes. The interpreter lock protects the interpreter's own memory, never your invariants."
+      "feedback": "Right. The clean total is an accident of where one interpreter version checks for a thread switch, not a promise about your invariants. Put a call in the middle of the update, counter += one(), and the lost updates come straight back on 3.12: four threads bumping 200000 times each finish short of 800000, by a different amount on every run."
     },
     {
       "label": "Exactly 500000, since the second thread overwrites everything the first one did",
-      "feedback": "Too pessimistic. The lost updates are occasional, not total: most increments interleave cleanly and only the unlucky ones collide, which is why this bug survives testing and shows up in production."
+      "feedback": "Too pessimistic in every version. Threads never discard each other's work wholesale. On the interpreters where this shape did race, it lost the occasional unlucky increment, which is why the bug survived testing and showed up in production."
     },
     {
       "label": "A RuntimeError, because Python detects the concurrent modification",
-      "feedback": "Some containers do raise on concurrent mutation while being iterated, which is probably what this is recalling. A plain integer rebind has no such guard, so the corruption is silent."
+      "feedback": "Some containers do raise on concurrent mutation while being iterated, which is probably what this is recalling. A plain integer rebind has no such guard, so when a lost update does happen there is nothing to tell you."
     }
   ]
 }
@@ -589,7 +589,7 @@ You met the reusable version of this in **Decorators with arguments & functools.
 
 ### Pitfall: threads sharing state
 
-Independent tasks are safe to parallelize. Shared mutable state is not. \`count += 1\` is read, add, write: three steps, and the interpreter can switch threads between them, so two threads read the same value and one increment is lost. The GIL does not make your code thread-safe. Fix it with a \`Lock\`, or better, design the work so tasks never touch shared state (as \`double\` does here).
+Independent tasks are safe to parallelize. Shared mutable state is not. \`count += 1\` is read, add, write: three steps with no lock of your own around them. Whether the interpreter switches threads in the middle depends on where that version happens to check, and the moment a call joins the update (\`count += fee(row)\`, or a lookup then a store two statements apart) the switch becomes possible again and increments start vanishing. The GIL does not make your code thread-safe. Fix it with a \`Lock\`, or better, design the work so tasks never touch shared state (as \`double\` does here).
 
 ### Running where there are no threads
 
