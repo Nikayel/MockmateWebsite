@@ -10,7 +10,7 @@ const PKG_README = buildBrief({
   lesson: "py-l3-packages",
   kind: "ticket",
   headline: "Finish the reportkit split",
-  body: `\`reportkit\` reads lines out of a log file and summarises them. It used to be one module. A
+  body: `\`reportkit\` reads lines out of a log file and summarizes them. It used to be one module. A
 teammate started splitting it up, got halfway, and left for the week.
 
 ## Where the migration got to
@@ -145,7 +145,7 @@ Nothing else may be.
 # TODO: declare __all__ over exactly the three public names.
 `
 
-const PKG_INIT_REFERENCE = String.raw`"""The reportkit package: summarise log lines."""
+const PKG_INIT_REFERENCE = String.raw`"""The reportkit package: summarize log lines."""
 from reportkit.report import build_report
 from reportkit.scan import severity_of, worst
 
@@ -270,7 +270,7 @@ store/
   "options": [
     {
       "label": "Never. There is nothing in it to run, and its only job is to mark the folder.",
-      "feedback": "Tempting, because an empty file has no visible effect and most projects leave it empty forever. But Python really does execute it, which is why dropping an import or a print in there changes behaviour for every consumer of the package."
+      "feedback": "Tempting, because an empty file has no visible effect and most projects leave it empty forever. But Python really does execute it, which is why dropping an import or a print in there changes behavior for every consumer of the package."
     },
     {
       "label": "The first time anything imports store, including a submodule like store.catalog.",
@@ -571,7 +571,7 @@ Give \`levels.py\` the severity table and its \`rank(name)\` lookup, implement \
 and \`worst(lines)\` in \`scan.py\`, and wire \`__init__.py\` so \`from reportkit import build_report,
 severity_of, worst\` works and \`__all__\` lists exactly those three names. \`rank\` and the severity
 table stay internal, and \`levels.py\` must import nothing from the rest of the package. The README
-has the ranks and the exact behaviour. Some tests are hidden.`,
+has the ranks and the exact behavior. Some tests are hidden.`,
     starterCode: "",
     hints: [
       "Two modules import each other right now: `report.py` imports `scan`, and `scan.py` imports `report`. Ask what `scan.py` actually needs, and which module should own it.",
