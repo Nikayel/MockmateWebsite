@@ -1647,7 +1647,7 @@ sensibly (e.g., 45s/3s) avoids spurious rebalances from a GC pause.
 
 ### The revoke callback, and what it does not fix
 
-A rebalance takes partitions away from a consumer that is mid-batch, and the default behaviour is
+A rebalance takes partitions away from a consumer that is mid-batch, and the default behavior is
 brutal: whatever it processed since its last commit is uncommitted, so the new owner starts there and
 does it again. You get one hook to narrow that, \`ConsumerRebalanceListener\`, whose
 \`onPartitionsRevoked\` runs on the losing consumer while it still owns the partitions:
@@ -4124,7 +4124,7 @@ Two formulas earn the offer. Partitions come from throughput: \`partitions ~= ta
 
 ## What that capacity costs, and the line item that surprises people
 
-Capacity math that stops at bytes leaves the next question unanswered, because the bill is not proportional to bytes stored. It is proportional to how many times each byte crosses a boundary somebody meters. The big clouds have long charged on the order of 2 cents per GB for traffic between availability zones once you count both sides of the transfer, and inter-region transfer is in the same neighbourhood. Take the same 1 GB/s stream, which is about 2.6 PB a month of ingest, and follow the bytes.
+Capacity math that stops at bytes leaves the next question unanswered, because the bill is not proportional to bytes stored. It is proportional to how many times each byte crosses a boundary somebody meters. The big clouds have long charged on the order of 2 cents per GB for traffic between availability zones once you count both sides of the transfer, and inter-region transfer is in the same neighborhood. Take the same 1 GB/s stream, which is about 2.6 PB a month of ingest, and follow the bytes.
 
 \`\`\`
 ingest                      1 GB/s                   = ~2.6 PB / month
