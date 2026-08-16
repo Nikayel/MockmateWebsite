@@ -16,6 +16,13 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/roadmap/preview",
   },
+  // Stated explicitly because `app/roadmap/layout.tsx` now noindexes the signed-in roadmap, and
+  // Next.js merges metadata from the root segment down: a field this page does not name is
+  // inherited from its parent. Without this line the preview would inherit `index: false` and drop
+  // out of the index while still being submitted in the sitemap, which is a hard `seo:audit`
+  // failure (NOINDEX). This is the only public page under `/roadmap`; `PRIVATE_PATHS` in
+  // `app/robots.ts` already carves it out the same way, with `/roadmap$` rather than `/roadmap`.
+  robots: { index: true, follow: true },
   openGraph: {
     title: "Preview Your Interview Roadmap | CodeSparring",
     description: "See what a personalized day-by-day study plan looks like.",
