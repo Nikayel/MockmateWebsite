@@ -745,8 +745,8 @@ users compare notes out of band ("I posted first, why is mine below yours?").
 
 **Causal consistency** keeps only the orderings that matter: if event A *causally influenced* B (you
 read a post, then reply to it), everyone sees A before B. Operations with no causal link can appear
-in different orders on different replicas. The crucial property, from the COPS and Bayou research
-lines: **causal consistency is the strongest model you can provide while staying available under a
+in different orders on different replicas. The crucial property, proved by Mahajan, Alvisi and Dahlin:
+**causal consistency is the strongest model you can provide while staying available under a
 network partition**. Anything stronger forces you to block or reject writes when the network splits.
 
 **Eventual consistency** promises only that if writes stop, replicas converge. Along the way you see
