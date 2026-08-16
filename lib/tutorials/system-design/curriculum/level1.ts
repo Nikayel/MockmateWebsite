@@ -4965,6 +4965,22 @@ A distributed system fails one dependency at a time, and the way one failure bec
 almost always the caller mishandling a slow or broken downstream. The client-side call policy is your
 primary defense, and it has four moving parts: timeouts, retries, circuit breakers, and isolation.
 
+Those four are not interchangeable, and an interviewer will ask which one you are reaching for and
+why. Each answers a different failure mode, and this lesson takes them in that order.
+
+| Primitive | Failure mode it counters | Reach for it when |
+| --- | --- | --- |
+| Timeout with a propagated deadline | A stalled downstream holds your threads until the pool drains | Every network call, without exception, because the client default is often infinite |
+| Retry with backoff, jitter, and a budget | A transient blip fails a call that would have succeeded moments later | The error is transient and the call is idempotent or carries an idempotency key |
+| Circuit breaker | A dependency that is genuinely down still charges every caller a full timeout | Failures are sustained rather than transient, so trying again is pure waste |
+| Bulkhead | One slow dependency drains the shared pool every other dependency needs | Several dependencies share one thread pool or connection pool |
+
+They compose in that order rather than compete. The timeout turns a hang into a fast failure, the
+breaker stops you paying for that failure over and over, and the bulkhead confines whatever is still
+failing to one compartment. Retries are the only one of the four that adds load, which is why they
+are the only one that needs a budget. Whatever the caller does next, degrade rather than error: a
+cached value, a default, or a partial response beats a 500 the user cannot act on.
+
 ### Timeouts
 
 Every network call must have one. The default in most HTTP clients is infinite or 30+ seconds, which
@@ -5012,7 +5028,8 @@ policy of 3 attempts per request cannot multiply your offered load 3x and turn a
 a total one.
 
 That is the whole of what this lesson claims about retries, and it is deliberately the introduction.
-Level 7's "Timeouts, Retries, Backoff & Jitter" owns the depth: connect versus request timeouts set
+Level 7's [Timeouts, Retries, Backoff & Jitter](/learn/system-design/reliability-ops/sd-l7-timeouts-retries)
+owns the depth: connect versus request timeouts set
 from a real p99, the exact full-jitter formula, the budget enforced as a live ratio rather than a rule
 of thumb, and what happens to that 3x when more than one layer in a call chain retries independently.
 
