@@ -102,7 +102,9 @@ description = "Read a scored partner feed from a flaky source"
 requires-python = ">=3.11"
 dependencies = []
 
-[project.optional-dependencies]
+# Tooling for working on this project, not a feature anyone installs it for.
+# A dependency group (PEP 735) stays local; an optional-dependencies extra would ship to PyPI.
+[dependency-groups]
 dev = ["pytest", "ruff", "mypy"]
 
 [tool.ruff]
@@ -618,7 +620,7 @@ Your code only creates value once someone else can run it. Packaging is how you 
 
 ### What a wheel actually is
 
-A **wheel** (\`.whl\`) is a zip of your importable code plus metadata, named to a fixed convention. \`pyproject.toml\` is the single source of truth: the \`[project]\` table declares \`name\`, \`version\`, \`requires-python\`, and \`dependencies\`, plus a \`dev\` extra for \`pytest\`, \`ruff\`, and \`mypy\`. A \`[build-system]\` table names the build backend that turns the project into artifacts.
+A **wheel** (\`.whl\`) is a zip of your importable code plus metadata, named to a fixed convention. \`pyproject.toml\` is the single source of truth: the \`[project]\` table declares \`name\`, \`version\`, \`requires-python\`, and \`dependencies\`, plus a \`dev\` dependency group (PEP 735) for \`pytest\`, \`ruff\`, and \`mypy\`. A \`[build-system]\` table names the build backend that turns the project into artifacts. Put dev tooling in \`[dependency-groups]\` rather than \`[project.optional-dependencies]\`: an extra is published metadata, so \`pip install feedstore[dev]\` would hand a consumer your test runner as if it were a feature. A group is local to the project, and \`uv sync\` installs the \`dev\` one with no flags.
 
 \`\`\`bash
 uv build        # writes dist/feedstore-1.0.0.tar.gz and dist/feedstore-1.0.0-py3-none-any.whl
