@@ -954,10 +954,11 @@ Rollout strategies form a ladder of increasing exposure with a measurement gate 
 
 Once shadow mode is giving you the challenger's predictions on real traffic, the question is what to compare. Ranking quality is the obvious half: AUC asks whether the model orders impressions correctly. Calibration is the half teams forget: when the model says 4 percent, do 4 percent of those impressions actually convert? A model can be perfect on the first and badly wrong on the second, because AUC is invariant to any monotonic rescaling of the scores. Multiply every prediction by 1.5 and no pair of items swaps order, so AUC does not move at all.
 
-You measure calibration by bucketing predictions and comparing each bucket's predicted rate against what actually happened in it.
+You measure calibration by bucketing predictions and comparing each bucket's predicted rate against what actually happened in it. In a shadow comparison the buckets are one fixed partition of the same impressions, cut on the champion's predicted rate, so the challenger is scored inside the champion's buckets rather than re-bucketed on its own numbers. That is why a challenger prediction can sit outside the range its row is labeled with.
 
 \`\`\`
 one hour of shadow traffic, identical impressions scored by both models
+bucket boundaries cut on the champion's predicted rate, both models scored inside them
 
                         champion (AUC 0.71)        challenger (AUC 0.74)
 bucket    n       observed   predicted             predicted     |pred - obs|
