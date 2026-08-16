@@ -1133,7 +1133,7 @@ const kimballVsObt: SqlLesson = {
   summary:
     "When to choose a star schema over One Big Table, using consumer needs and the 10 GB join-side heuristic instead of dogma.",
   seoDescription:
-    "Keep a Kimball star while the join side is under roughly 10 GB, where the dimension broadcasts cheaply. Past it, shuffle cost makes One Big Table pay.",
+    "Keep a Kimball star while the join side stays small. Past roughly 10 GB, the shuffle it costs every query is where One Big Table pays for itself.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
@@ -1195,7 +1195,7 @@ Adoption says it is a minority position and a real one. Practitioner surveys put
 
 ## The heuristic that makes the answer sound experienced
 
-The working rule from the modeling community: **stay with Kimball while the join side is under roughly 10 GB.** Under that, the engine can broadcast the dimension to every worker and the star join costs almost nothing. Past it, the dimension has to be shuffled across the network alongside the fact, and shuffle cost can run 10x to 100x the broadcast case. That is when pre-joining into an OBT starts earning its storage bill.
+The working rule from the modeling community: **stay with Kimball while the join side is under roughly 10 GB.** That number is about shuffle cost, not about broadcasting, and merging the two is the mistake an interviewer listens for. Broadcasting is a much smaller world: Spark auto-broadcasts only under \`spark.sql.autoBroadcastJoinThreshold\`, which defaults to 10 MB, and \`BroadcastExchangeExec\` refuses a relation over 8 GB outright. A 10 GB dimension is never a broadcast candidate; it is a shuffle you are choosing to pay for. Under the line, that shuffle is a cost the star absorbs and nobody notices. Past it, the dimension moves across the network alongside the fact on every read, and that is when pre-joining into an OBT starts earning its storage bill.
 
 You have seen this physics before. In Module 7.1, \`DS_BCAST_INNER\` versus \`DS_DIST_BOTH\` in a query plan is the same fork, read off a plan after the fact. Here you are making the same call at design time, before anyone runs anything. Choosing a distribution key that co-locates the join is the third option in the same family.
 
@@ -1209,14 +1209,14 @@ Three conditions override the size heuristic:
 
 **Common mistake:** treating the storage growth as the whole cost and stopping there. Storage is the cheap part. The expensive part is that an OBT converts a small dimension update into a large fact rewrite, and it converts one shared definition into several private copies that drift.
 
-**Interview nuance:** "would you just make one big table?" is a real follow-up to any star-schema answer, and it is a judgment probe, not a knowledge probe. Answering "no, Kimball is correct" reads as dogma. Answering "OBT, it is faster" reads as inexperience. The strong answer names the number and one cost of each path: "I would keep the star while the dimension side stays under about 10 GB, since the engine broadcasts it and the join is nearly free. Past that I would pre-join into a wide table, and I would accept that a dimension change now rewrites the fact and that these attributes stop being conformed."
+**Interview nuance:** "would you just make one big table?" is a real follow-up to any star-schema answer, and it is a judgment probe, not a knowledge probe. Answering "no, Kimball is correct" reads as dogma. Answering "OBT, it is faster" reads as inexperience. The strong answer names the number and one cost of each path: "I would keep the star while the dimension side stays under about 10 GB, since the shuffle it costs per query is small next to the rewrite cost of denormalizing. Past that I would pre-join into a wide table, and I would accept that a dimension change now rewrites the fact and that these attributes stop being conformed." Naming the broadcast threshold as well is what separates the two numbers out loud: broadcasting is the 10 MB case, and nothing at 10 GB broadcasts.
 
 > **On a real platform this differs.** Real OBTs usually are not flat. Snowflake, BigQuery, and Databricks all support nested \`ARRAY<STRUCT>\` columns, so a trips table can carry the driver's attributes as one nested struct and the trip's waypoints as an array, keeping the single-table scan without exploding the row count. And the decision is rarely permanent: teams often keep the Kimball star as the modeled layer and materialize an OBT on top of it for BI, which buys the fast dashboards without giving up the conformed dimensions or the version history.`,
     demoSeedSql: MART_PROFILES_SEED,
     demoCode: `-- The join side is the number the heuristic is about. Which marts are over the line?
 SELECT mart, fact_gb, total_dim_gb,
-       CASE WHEN total_dim_gb > 10 THEN 'over 10 GB: shuffle territory'
-            ELSE 'under 10 GB: broadcast territory' END AS join_side
+       CASE WHEN total_dim_gb > 10 THEN 'over 10 GB: shuffle dominates, consider OBT'
+            ELSE 'under 10 GB: shuffle is affordable, keep the star' END AS join_side
 FROM mart_profiles
 ORDER BY total_dim_gb DESC;`,
     showDemoInput: false,

@@ -1502,7 +1502,7 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
       },
       {
         id: "sd-l2-normalization-denorm",
-        anchor: "Normalization versus denormalization, the modelling choice that creates the join",
+        anchor: "Normalization versus denormalization, the modeling choice that creates the join",
       },
       {
         id: "sql-l6-skew-and-joins",
