@@ -65,7 +65,7 @@ from reportkit.scan import severity_of, worst
 
 
 def build_report(lines):
-    """Summarise log lines: how many of each severity, the worst one, and the line count."""
+    """Summarize log lines: how many of each severity, the worst one, and the line count."""
     counts = {}
     for line in lines:
         name = severity_of(line)
