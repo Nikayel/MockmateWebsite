@@ -1315,7 +1315,7 @@ The mechanism that does answer it is a **per-user revocation epoch**: one stored
 }
 \`\`\`
 
-**Recap:** pick opaque sessions when instant revocation matters and stateless JWTs when cross-service scale matters, then use the hybrid (short JWT + revocable refresh token) with rotation and reuse detection to kill stolen tokens, keep tokens in HttpOnly/Secure/SameSite cookies or a BFF (never localStorage), and validate JWTs strictly (no alg:none, check aud/iss/exp, rotate via JWKS).
+**Recap:** pick opaque sessions when instant revocation matters and stateless JWTs when cross-service scale matters, then use the hybrid (short JWT + revocable refresh token) with rotation and reuse detection to kill stolen tokens, keep tokens somewhere injected script cannot reach, never localStorage, and validate JWTs strictly (no alg:none, check aud/iss/exp, rotate via JWKS).
 
 \`\`\`cswidget
 {
