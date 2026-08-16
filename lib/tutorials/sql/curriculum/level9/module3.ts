@@ -228,6 +228,8 @@ const tumblingHoppingWindows: SqlLesson = {
   title: "Tumbling and Hopping Windows",
   summary:
     "Bucket an event stream into tumbling windows with epoch arithmetic, then into overlapping hopping windows with a join against a window table.",
+  seoDescription:
+    "A tumbling window puts every event in exactly one bucket. A hopping window has a size and a smaller hop, so windows overlap and events land in several.",
   estimatedMinutes: 26,
   difficulty: "medium",
   skills: [
