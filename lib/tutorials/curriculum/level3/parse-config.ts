@@ -466,7 +466,7 @@ In the Practice workspace the same thing happens across two modules: one imports
   "type": "check",
   "kind": "predict",
   "id": "isdigit-rejects-minus",
-  "prompt": "coerce has to decide whether text is integer-looking. What does '-3'.isdigit() return?",
+  "prompt": "read_entry has to decide whether a value is integer-looking. What does '-3'.isdigit() return?",
   "options": [
     {
       "label": "True, because -3 is an integer",
@@ -475,7 +475,7 @@ In the Practice workspace the same thing happens across two modules: one imports
     {
       "label": "False, because the minus sign is not a digit",
       "correct": true,
-      "feedback": "Right. isdigit is a character-by-character test, so a sign, a decimal point, or a stray space all make it False. That is exactly why coerce strips a leading minus before testing."
+      "feedback": "Right. isdigit is a character-by-character test, so a sign, a decimal point, or a stray space all make it False. That is exactly why the rule strips a leading minus before testing."
     },
     {
       "label": "It raises a ValueError, since -3 needs int() to parse",
@@ -530,7 +530,7 @@ for line in text.splitlines():
     if "=" not in stripped:               # no delimiter, so there is no entry here
         continue                          # without this, the next line raises
     key, value = stripped.split("=", 1)   # maxsplit=1
-    # store key.strip() -> coerce(value.strip())
+    # then store key.strip() with the type rule applied to value.strip()
 \`\`\`
 
 That third guard is not optional. Unpacking two names from \`split("=", 1)\` raises \`ValueError: not enough values to unpack (expected 2, got 1)\` the moment a line has no \`=\` in it, so one stray word ends the whole parse.
@@ -564,7 +564,7 @@ Given \`"# db\\nhost = localhost\\nport = 8080"\`, the loop reaches the store st
 ## Pitfalls
 
 - **Splitting without \`maxsplit\`.** \`"url = a=b".split("=")\` returns three parts, so \`key, value = ...\` raises \`ValueError: too many values to unpack (expected 2)\`. Passing \`1\` splits on the first \`=\` only and keeps any \`=\` inside the value intact.
-- **Forgetting to trim the key.** \`"host = localhost".split("=", 1)\` gives \`["host ", " localhost"]\`. The value passes through \`coerce\`, which trims it, but the key does not. Store \`"host "\` (with the trailing space) as the key and a later \`config["host"]\` lookup raises \`KeyError\` instead of returning the value. Call \`.strip()\` on the key before storing it.
+- **Forgetting to trim the key.** \`"host = localhost".split("=", 1)\` gives \`["host ", " localhost"]\`. The value gets trimmed on the way to the store step, but the key does not. Store \`"host "\` (with the trailing space) as the key and a later \`config["host"]\` lookup raises \`KeyError\` instead of returning the value. Call \`.strip()\` on the key before storing it.
 
 **Interview nuance:** bounded splitting is the detail interviewers probe when you parse text. \`stripped.split("=", 1)\` splits on the first \`=\` only, so a value that itself contains \`=\` (a URL like \`url = a=b\`, a base64 token, a connection string) stays intact, while a bare \`split("=")\` raises \`ValueError\` the instant a value holds a second delimiter. Pair that with deciding a value's type from the raw string (trim it, strip a leading sign, then test \`isdigit\`) and you are doing real boundary parsing: turning loose text into typed data without trusting its shape.
 
@@ -604,7 +604,7 @@ Given \`"# db\\nhost = localhost\\nport = 8080"\`, the loop reaches the store st
     {
       "label": "port =   8080  ",
       "bucket": "Becomes an entry",
-      "feedback": "Key 'port' mapped to the int 8080. coerce trims the value and converts integer-looking text, so the caller gets a number rather than a padded string."
+      "feedback": "Key 'port' with the value trimmed down to '8080'. The type rule then converts integer-looking text, so the caller ends up with the number 8080 rather than a padded string."
     }
   ],
   "reveal": "Every guard in that loop exists because some real config file broke a parser that lacked it. Your Practice reader has to survive all six of these lines, and the hidden tests check the awkward ones."
