@@ -4694,7 +4694,7 @@ export const systemDesignLevel3: DesignLevel = {
                 adequate:
                   "Notes that the token lives in the session record and that a second device will not have it, without saying what to key it by instead.",
                 strong:
-                  "Traces the phone post and the laptop read through the Redis session record and re-keys the token to the user account so any device honours it.",
+                  "Traces the phone post and the laptop read through the Redis session record and re-keys the token to the user account so any device honors it.",
               },
               {
                 name: "Monotonic reads",
@@ -5005,7 +5005,7 @@ export const systemDesignLevel3: DesignLevel = {
                 name: "Naming the write policies",
                 weak: "Talks about caching in general without saying which policy the price path or the fragment path is running.",
                 adequate:
-                  "Names write-back on the price path but reads the L1 push as an optimisation rather than as update-on-write.",
+                  "Names write-back on the price path but reads the L1 push as an optimization rather than as update-on-write.",
                 strong:
                   "Labels all three policies in play, cache-aside with invalidation, write-back and update-on-write, and says which data each one suits.",
               },
