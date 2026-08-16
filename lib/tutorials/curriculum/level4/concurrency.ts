@@ -398,7 +398,7 @@ export const concurrencyLesson: PythonLesson = {
 
 Every real service waits: on a database, an HTTP API, a file, a message queue. If you fetch 100 URLs one at a time, your program spends nearly all its wall-clock time blocked, doing nothing. Concurrency lets those waits overlap, so 100 slow calls finish in roughly the time of the slowest one instead of the sum of all of them. Choosing the right model (threads, processes, or \`async\`) is a classic interview question because the wrong choice makes code either no faster or outright wrong.
 
-The reason overlapping waits pays off so enormously is that the costs are not close to each other. Each rung below is roughly ten times the one before it:
+The reason overlapping waits pays off so enormously is that the costs are not close to each other. Each rung below is orders of magnitude off the one before it, and the ladder spans a factor of a hundred million end to end:
 
 \`\`\`csdiagram
 {
