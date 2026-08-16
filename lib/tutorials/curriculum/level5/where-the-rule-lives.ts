@@ -830,7 +830,7 @@ read-only files. Some tests are hidden.`,
     starterCode: "",
     hints: [
       "Read `README.md`, then follow the shipping figure: `cart_preview` and `checkout_summary` both produce one, so find where each gets it.",
-      "Grep for the flat rate `599`: it appears in two files, and only `orders/pricing.py` is documented as the rule's home; the inline copy in checkout has a stale threshold and no oversized branch.",
+      "Grep for the flat rate `599`: it turns up in several files, and only `orders/pricing.py` is documented as the rule's home; the inline copy in checkout has a stale threshold and no oversized branch.",
       "Delete the inline math in `checkout_summary` and set `shipping_cents = pricing.quote_shipping(subtotal_cents, oversized)`.",
     ],
     workspace: {
