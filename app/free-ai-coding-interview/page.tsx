@@ -2,7 +2,7 @@ import { Metadata } from "next"
 import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 import { PRICING_CONFIG } from "@/lib/config"
-import { PRO_AI_LIMIT_MULTIPLIER } from "@/lib/pricing"
+import { FREE_OPENS_PER_PAID_SESSION, PRO_AI_LIMIT_MULTIPLIER } from "@/lib/pricing"
 import { listCourseEntries } from "@/lib/tutorials/course-catalog"
 
 /**
@@ -98,8 +98,9 @@ export default function FreePracticePage() {
             </li>
             <li>
               <strong>Re-opening your work is free.</strong> Starting a session spends one of the{" "}
-              {FREE_SESSIONS} and grants ten free opens, so going back into a problem to try it
-              again does not cost another session until those ten are used.
+              {FREE_SESSIONS} and grants {FREE_OPENS_PER_PAID_SESSION} free opens, so going back
+              into a problem to try it again does not cost another session until those{" "}
+              {FREE_OPENS_PER_PAID_SESSION} are used.
             </li>
             <li>
               <strong>Courses never touch the counter.</strong> All {TOTAL_LESSONS} lessons across

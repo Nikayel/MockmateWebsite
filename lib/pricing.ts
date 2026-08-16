@@ -138,6 +138,18 @@ export const PRO_AI_LIMIT_MULTIPLIER = Math.min(
 )
 
 /**
+ * Re-opens granted when a session start spends a paid session.
+ *
+ * The counter is per user, per billing period, and lives on the `profile_quota` doc as
+ * `free_opens_remaining`; it is NOT scoped to the scenario that was opened. The value is defined
+ * here rather than beside its writer (`lib/quota/session-start-admin.ts`) because that module
+ * imports the Firebase Admin SDK, so a marketing page quoting the number would drag server-only
+ * code into its bundle. Same reason `getSessionsLimitForTier` lives here: this file is the
+ * client-safe home for numbers both the enforcement path and the pages have to agree on.
+ */
+export const FREE_OPENS_PER_PAID_SESSION = 10
+
+/**
  * Get AI budget cap for a tier
  */
 function getAIBudgetCap(tier: SubscriptionTier): number {

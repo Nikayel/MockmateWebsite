@@ -14,10 +14,12 @@
  */
 
 import { adminDb } from "@/lib/firebase-admin"
-import { getSessionsLimitForTier } from "@/lib/pricing"
+import { FREE_OPENS_PER_PAID_SESSION, getSessionsLimitForTier } from "@/lib/pricing"
 import { billingPeriodFromProfile, type BillingProfileFields } from "@/lib/quota/billing-period"
 
-export const FREE_OPENS_PER_PAID_SESSION = 10
+// The grant size now lives in lib/pricing (client-safe) so a marketing page can quote it without
+// importing this module and its Admin SDK. Re-exported so existing call sites keep working.
+export { FREE_OPENS_PER_PAID_SESSION }
 
 export interface SessionStartResult {
   success: boolean
