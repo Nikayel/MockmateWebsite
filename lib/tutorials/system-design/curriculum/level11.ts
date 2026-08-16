@@ -1200,11 +1200,34 @@ Level 2's "Vector Databases & Embeddings" lesson introduced embeddings and simil
 
 ## The ANN index families
 
-- **HNSW (Hierarchical Navigable Small World).** A multi-layer graph you greedily walk from a coarse top layer down to dense lower layers. Highest recall and lowest latency of the common indexes, but it lives in RAM and RAM is the cost driver: 1B vectors of 768 float32 dims is roughly 3TB of raw vectors before graph overhead. Knobs: \`M\` (graph degree), \`ef_construction\` (build quality), \`ef_search\` (candidates explored at query time, the main recall/latency dial).
-- **IVF and IVF-PQ.** IVF clusters vectors into \`nlist\` partitions; a query probes only \`nprobe\` nearest partitions instead of all of them. PQ (Product Quantization) then compresses each vector into a few bytes, cutting memory 10 to 50x at some recall cost. IVF-PQ is how you fit a billion vectors in memory affordably. Knob: \`nprobe\` trades recall for latency.
+- **HNSW (Hierarchical Navigable Small World).** A multi-layer graph you greedily walk from a coarse top layer down to dense lower layers. Highest recall and lowest latency of the common indexes. The graph is traditionally held in RAM, and at full precision RAM is the cost driver: 1B vectors of 768 float32 dims is roughly 3TB of raw vectors before graph overhead. Treat that as a fact about how it has usually been deployed rather than a property of the algorithm, because quantizing the vectors the walk compares is what moved it, and the next section is that lever. Knobs: \`M\` (graph degree), \`ef_construction\` (build quality), \`ef_search\` (candidates explored at query time, the main recall/latency dial).
+- **IVF and IVF-PQ.** IVF clusters vectors into \`nlist\` partitions; a query probes only \`nprobe\` nearest partitions instead of all of them. PQ (Product Quantization) then compresses each vector into a few bytes, cutting memory 10 to 50x at some recall cost, which is one of several ways to fit a billion vectors in memory affordably. Knob: \`nprobe\` trades recall for latency.
 - **DiskANN.** A graph index designed to live on NVMe SSD, not RAM, so you serve billion-scale from a single node cheaply at the cost of SSD read latency. The pick when RAM cost dominates and you can tolerate a few extra ms.
 
 Exact (flat) search is fine only up to maybe a few hundred thousand vectors, or as a re-ranking step over a small ANN candidate set.
+
+## Quantize what the search walks, then rescore
+
+How you narrow the search and how wide each stored vector is are two separate decisions, and quantization is usually the first lever a modern design reaches for. You keep a compressed copy of every vector, let the graph walk or the partition scan compare those, and repair the error at the end.
+
+- **Scalar quantization to int8** keeps one byte per dimension instead of four, so the searched copy is 4x smaller.
+- **Binary quantization** keeps one bit per dimension, so 32x smaller, plus a small per-vector correction term of about 14 bytes. Elasticsearch 9.1 made this the default for dense vectors of 384 dimensions and up, and Qdrant and Milvus ship their own 1-bit forms.
+
+A compressed comparison is approximate, so you ask the index for more candidates than you need, typically 2 to 4x the \`k\` you want, then rescore that oversampled set against the full-precision vectors and keep the true top \`k\`. The rescore is what buys the recall back, and it is cheap because it runs over a few hundred vectors rather than a billion.
+
+\`\`\`
+1B vectors, 768 dims
+
+float32          768 x 4 bytes   = 3,072 B/vector   = 3.07 TB
+int8             768 x 1 byte    =   768 B/vector   = 768 GB
+binary (1 bit)   768 x 1 bit     =    96 B/vector   =  96 GB, plus ~14 B correction
+
+query at k = 10, oversample 4x
+  walk the compressed index for 40 candidates
+  rescore those 40 against their full-precision vectors, return the best 10
+\`\`\`
+
+This is orthogonal to the index family, which is why it changes the memory column without changing the recall story much: a binary-quantized HNSW graph over that billion is nearer 100GB than 3TB, and the full-precision copies the rescore reads do not have to sit in RAM at all.
 
 Laid out side by side, the choice is really one question, and it is a budget question:
 
@@ -1214,12 +1237,13 @@ Laid out side by side, the choice is really one question, and it is a budget que
   "columns": ["Index", "Where it lives", "Recall", "Query latency", "Cost at 1B vectors", "Main dial"],
   "rows": [
     ["Flat (exact)", "RAM", "perfect", "O(N), unusable at scale", "prohibitive", "none"],
-    ["HNSW", "RAM", "highest", "lowest", "~3 TB raw, plus graph overhead", "ef_search"],
-    ["IVF-PQ", "RAM, quantized", "good", "low", "10 to 50x cheaper than HNSW", "nprobe"],
+    ["HNSW, float32", "RAM", "highest", "lowest", "~3 TB raw, plus graph overhead", "ef_search"],
+    ["HNSW, binary-quantized", "RAM, 1-bit codes", "high once rescored", "lowest", "~96 GB of codes, plus rescore reads", "oversample factor"],
+    ["IVF-PQ", "RAM, quantized", "good", "low", "10 to 50x cheaper than float32 HNSW", "nprobe"],
     ["DiskANN", "NVMe SSD", "good", "a few ms more", "cheapest per vector", "beam width"]
   ],
   "highlightCols": ["Where it lives", "Cost at 1B vectors"],
-  "caption": "Recall and latency differ modestly across the three production families. Where the index lives differs by orders of magnitude in cost, which is why that column, not the recall column, usually decides the answer."
+  "caption": "Recall and latency differ modestly across the production families. Where the index lives, and at what precision, differs by orders of magnitude in cost, which is why those columns and not the recall column usually decide the answer."
 }
 \`\`\`
 
@@ -1276,11 +1300,11 @@ Real queries are "similar vectors WHERE category = docs AND updated_at > X." The
 
 ## Operations and build-vs-buy
 
-Vectors stream in and get deleted. HNSW handles inserts but deletes leave tombstones that degrade the graph, so you periodically rebuild. Sharding splits the index across nodes (scatter-gather query, merge top-k); replication gives read throughput and HA. Index builds are CPU and memory heavy, so you build offline and hot-swap. And re-embedding is the migration nobody plans for: switching embedding models invalidates every stored vector, forcing a full re-embed and reindex, which for a billion vectors is a multi-day, expensive job. Version your embeddings.
+Vectors stream in and get deleted. HNSW handles inserts but deletes leave tombstones that degrade the graph, so that space has to be reclaimed. On a managed engine the reclamation is a background job you tune rather than trigger: Weaviate runs tombstone cleanup on an interval you configure, and Qdrant's vacuum optimizer prunes a segment once its deleted fraction crosses a threshold. \`pgvector\` is the outlier where it is still a job you schedule, a reindex plus a vacuum. Sharding splits the index across nodes (scatter-gather query, merge top-k); replication gives read throughput and HA. Index builds are CPU and memory heavy, so you build offline and hot-swap. And re-embedding is the migration nobody plans for: switching embedding models invalidates every stored vector, forcing a full re-embed and reindex, which for a billion vectors is a multi-day, expensive job. Version your embeddings.
 
-For under a few million vectors with existing Postgres, \`pgvector\` is genuinely enough and saves a system. Dedicated stores (Pinecone, Weaviate, Qdrant, Milvus) earn their keep at scale, with filtered search, hybrid, and sharding built in. OpenSearch adds vectors to an existing search cluster.
+For tens of millions of vectors with existing Postgres, \`pgvector\` 0.8+ is genuinely enough and saves a system, and pgvectorscale or VectorChord push it further still; the practical limit is usually index build time and memory, not query latency. Dedicated stores (Pinecone, Weaviate, Qdrant, Milvus) earn their keep at scale, with filtered search, hybrid, and sharding built in. OpenSearch adds vectors to an existing search cluster.
 
-**Recap:** ANN trades recall for speed via HNSW (RAM, high recall), IVF-PQ (quantized, memory-cheap), or DiskANN (SSD-scale); tune \`ef_search\` / \`nprobe\`, and remember that IVF's partition choice is its own nearest-neighbor problem, so the coarse quantizer in front of it is a recall knob too; handle filtered search as a pre-filter pushed into the index; and plan for rebuilds and re-embedding migrations.
+**Recap:** ANN trades recall for speed via HNSW (RAM, high recall), IVF-PQ (quantized, memory-cheap), or DiskANN (SSD-scale), with int8 or binary quantization plus an oversampled rescore as the memory lever that sits on top of any of them; tune \`ef_search\` / \`nprobe\`, and remember that IVF's partition choice is its own nearest-neighbor problem, so the coarse quantizer in front of it is a recall knob too; handle filtered search as a pre-filter pushed into the index; and plan for reclaiming tombstoned space and for re-embedding migrations.
 
 \`\`\`cswidget
 {
@@ -1296,14 +1320,14 @@ For under a few million vectors with existing Postgres, \`pgvector\` is genuinel
     {
       "label": "Deleted vectors leave tombstones that degrade the graph",
       "correct": true,
-      "feedback": "Right. HNSW absorbs inserts happily, but a delete cannot be stitched out of a graph cheaply, so it is marked and the walk still pays to visit it. Periodic offline rebuilds, hot-swapped in, are what restore the recall."
+      "feedback": "Right. HNSW absorbs inserts happily, but a delete cannot be stitched out of a graph cheaply, so it is marked and the walk still pays to visit it. Reclaiming that space is what restores the recall, and on a managed engine it is a background compaction interval you tune rather than a rebuild you trigger; on pgvector it is still a reindex you schedule."
     },
     {
       "label": "The corpus has grown, and recall always falls with scale",
       "feedback": "Recall does get harder as a corpus grows, which is why this sounds right. The count here is flat and the churn is deletes, so a falling number points at the structure rather than the scale."
     }
   ],
-  "reveal": "The whole lesson is one budget surface with four corners: recall, latency, memory, and cost. HNSW buys recall and latency with RAM, IVF-PQ buys memory back with quantization, DiskANN buys cost back with a few milliseconds on NVMe, and exact search is only a reranker over a small candidate set. Then the operational half decides whether it survives: selective filters pushed into the index, tombstones cleaned by periodic rebuilds, offline builds hot-swapped in, and versioned embeddings so a model upgrade is a planned migration instead of a surprise."
+  "reveal": "The whole lesson is one budget surface with four corners: recall, latency, memory, and cost. HNSW buys recall and latency with RAM, IVF-PQ buys memory back with quantization, DiskANN buys cost back with a few milliseconds on NVMe, and exact search is only a reranker over a small candidate set. Cutting across all of them, quantizing the vectors the search walks and rescoring an oversampled candidate set is what decides the memory column now. Then the operational half decides whether it survives: selective filters pushed into the index, tombstoned space reclaimed by compaction you tune, offline builds hot-swapped in, and versioned embeddings so a model upgrade is a planned migration instead of a surprise."
 }
 \`\`\`
 `.trim()
@@ -1333,8 +1357,12 @@ The gateway exposes one API (usually OpenAI-compatible so SDKs just work) and tr
       "note": "embed the prompt, ANN lookup, hit above about 0.95 similarity"
     },
     {
+      "label": "Provider prefix cache",
+      "note": "on a miss, mark a stable prompt prefix; a later read prices at about 0.1x base input"
+    },
+    {
       "label": "Route to a provider",
-      "note": "only a miss ever pays for tokens"
+      "note": "only a miss ever pays full price for tokens"
     },
     {
       "label": "Stream the response",
@@ -1345,7 +1373,7 @@ The gateway exposes one API (usually OpenAI-compatible so SDKs just work) and tr
       "note": "so the next identical or paraphrased prompt stops earlier"
     }
   ],
-  "caption": "Each rung is tried in order and only a miss falls through, which is why the cheapest lookup sits first and the provider call sits last."
+  "caption": "The first two rungs are tried in order and only a miss falls through, which is why the cheapest lookup sits first. The third is different in kind: the provider call still happens, but the shared prefix inside it is discounted, so it is the rung that pays on the requests the response caches never catch."
 }
 \`\`\`
 
@@ -1375,13 +1403,17 @@ The gateway exposes one API (usually OpenAI-compatible so SDKs just work) and tr
 
 Exact-match caching keys on the normalized prompt plus params and returns identical repeats for free. Semantic caching embeds the prompt and returns a cached answer when a past prompt is near-identical in meaning, which catches paraphrases. Semantic caching needs a similarity threshold tuned carefully (too loose and you serve a wrong cached answer to a different question) and invalidation when the underlying data or prompt template changes. For RAG and personalized prompts, cache the expensive shared sub-parts, not the whole personalized response.
 
+The mechanism that does that last part has a name, and it is the third rung. Both caches above it key on the whole exchange, so they only pay when two users ask the same question, which for RAG and per-user prompts is almost never. Provider prompt caching, also called prefix caching, discounts the repeated front of a prompt on requests whose answers differ. You mark a prefix, and a later request whose tokens match it exactly reads it back at a fraction of the base input price: Anthropic prices a cache read at 0.1x base input, with writes at 1.25x on the short-lived tier and 2x on the long-lived one, OpenAI applies prefix caching automatically, and Google's explicit context caching adds a storage charge for the hours you hold the cache. So the question stops being "hit or full price" and becomes "how much of this prompt is shared", and a shared system prompt plus a shared retrieved corpus is a discount every miss still collects.
+
+That makes prompt layout a gateway concern rather than an application detail. A prefix cache matches on a prefix, so any field that changes per request, a request id, a timestamp, a user name, must not sit at token zero: the stable system prompt and shared context go first, the volatile fields go last, and one chokepoint in front of a hundred apps is the only place that ordering can be enforced consistently. Note that the write premium means a prefix has to be reused a few times before it pays, so mark the parts that genuinely repeat rather than everything. The same constraint appears on the self-hosted side of this module, where you own the prefix cache instead of renting it; the mechanism is identical and only the bill changes.
+
 ## Cost, reliability, safety
 
 Per-tenant rate limits and token budgets stop one team from consuming the shared spend. The gateway meters tokens per request, attributes cost per team, and enforces quotas. Retries with backoff on 429/529, per-provider timeouts, and circuit breakers stop hammering a degraded provider and shift traffic to a healthy one. Because responses stream, the gateway must pass tokens through as they arrive, not buffer the whole completion. Graceful degradation means falling back to a cheaper model or a cached answer rather than failing. The gateway is the natural chokepoint for input scanning (prompt-injection and PII detection), output moderation, and audit logging of every prompt and response, plus per-request latency, token, cost, cache-hit, and error metrics.
 
 **Interview nuance:** the gateway must not become a latency tax or a single point of failure. Keep its own processing to a couple of milliseconds, run it multi-instance behind a load balancer, and make cache and routing lookups fast (Redis, in-memory).
 
-**Recap:** an AI gateway is a unified multi-provider API adding failover and routing, exact plus semantic caching, per-tenant quotas and cost metering, retries/timeouts/circuit breakers with streaming passthrough, and input/output safety plus audit logging, all without becoming a SPOF.
+**Recap:** an AI gateway is a unified multi-provider API adding failover and routing, exact plus semantic caching with provider prefix caching under them on the miss path, per-tenant quotas and cost metering, retries/timeouts/circuit breakers with streaming passthrough, and input/output safety plus audit logging, all without becoming a SPOF.
 
 \`\`\`cswidget
 {
@@ -1404,7 +1436,7 @@ Per-tenant rate limits and token budgets stop one team from consuming the shared
       "feedback": "True, and worth watching separately. A slow response and an expensive one are different problems though, and the bill arrived because nothing was counting tokens, not because anything was slow."
     }
   ],
-  "reveal": "An AI gateway is one chokepoint doing five jobs: a unified API that makes providers substitutable, routing and failover on top of that substitutability, exact plus semantic caching as the largest cost lever, per tenant quotas and token metering so one team cannot drain the shared spend, and safety plus audit logging on the way in and out. The constraint on all of it is that the chokepoint must not become the outage: a couple of milliseconds of its own processing, multiple instances behind a load balancer, and streaming passed through rather than buffered."
+  "reveal": "An AI gateway is one chokepoint doing five jobs: a unified API that makes providers substitutable, routing and failover on top of that substitutability, exact plus semantic caching as the largest cost lever with provider prefix caching underneath them so even a miss collects a discount, per tenant quotas and token metering so one team cannot drain the shared spend, and safety plus audit logging on the way in and out. The constraint on all of it is that the chokepoint must not become the outage: a couple of milliseconds of its own processing, multiple instances behind a load balancer, and streaming passed through rather than buffered."
 }
 \`\`\`
 `.trim()
@@ -3157,7 +3189,7 @@ export const systemDesignLevel11: DesignLevel = {
               "**Sharding:** split the 1B vectors across, say, 16 shards of ~60M each. A query scatters to all shards, each returns its local top-20, and a coordinator merges to a global top-20. Replicate each shard 3x for throughput and HA. With `nprobe` tuned so each shard touches a small fraction of its `nlist` partitions, per-shard latency stays a few ms and the scatter-gather plus rerank lands under 50ms.",
               "**Filtering:** tenant and category are common and often selective, so I keep the predicate inside the search. For high-selectivity tenants I partition the index by tenant so a query only searches that tenant's segment (pre-filter by construction). For lower-selectivity filters I use filtered-IVF that restricts probed lists to matching ids. I avoid pure post-filtering, which under-returns when a filter is selective.",
               "**Recall knobs:** raise `nprobe` and the rerank depth until offline recall clears 95% on a labeled query set, then hold latency by capping candidate counts. Deletes are tombstoned and shards rebuilt on a rolling schedule to keep recall from decaying.",
-              "Build vs buy: at 1B with filtered search and sharding I use a dedicated store (Milvus or Qdrant) or a managed one (Pinecone), not pgvector, which is right under a few million vectors on existing Postgres. Common wrong turn: assuming vector search is exact and free, picking flat HNSW for 1B (blows the RAM budget), or bolting a post-filter on and quietly returning 3 results when the tenant filter is selective.",
+              "Build vs buy: at 1B with filtered search and sharding I use a dedicated store (Milvus or Qdrant) or a managed one (Pinecone), not pgvector, which is right into the tens of millions on existing Postgres but not at this scale. Common wrong turn: assuming vector search is exact and free, picking flat HNSW for 1B (blows the RAM budget), or bolting a post-filter on and quietly returning 3 results when the tenant filter is selective.",
             ],
           },
           practice: {
@@ -3200,7 +3232,7 @@ export const systemDesignLevel11: DesignLevel = {
             modelAnswerOutline: [
               "Assumptions: 100+ internal apps, mixed workloads (chat, RAG, batch), multiple providers (OpenAI, Anthropic, Bedrock, plus a self-hosted model), a shared budget finance wants attributed per team, and a requirement that no single provider outage takes everything down.",
               "**Design:** a horizontally scaled stateless gateway service behind a load balancer, fronting Redis (caches, rate-limit counters) and a metering store. It exposes one OpenAI-compatible API. Each app authenticates with a per-team API key that carries its quota, allowed models, and routing policy.",
-              "**Request path:** authenticate and resolve team config, run input guardrails (PII and prompt-injection scan), check the exact-match cache (Redis, keyed on normalized prompt + model + params), then the semantic cache (embed prompt, ANN lookup, serve if similarity clears a tuned threshold). On a miss, apply routing (cheap model first, escalate on rules or a classifier), enforce the team's token budget and rate limit, then call the provider with a timeout, retries with backoff, and a circuit breaker. On provider failure, fail over to the next provider. Stream tokens straight through. On the way out, run output moderation, write both caches, meter tokens, and log the full exchange for audit.",
+              "**Request path:** authenticate and resolve team config, run input guardrails (PII and prompt-injection scan), check the exact-match cache (Redis, keyed on normalized prompt + model + params), then the semantic cache (embed prompt, ANN lookup, serve if similarity clears a tuned threshold). On a miss, apply routing (cheap model first, escalate on rules or a classifier), enforce the team's token budget and rate limit, then call the provider with a timeout, retries with backoff, and a circuit breaker. On that call the gateway assembles the prompt with the stable system prompt and shared context at the front and the per-request fields last, and sets the provider's prefix-cache markers, so the shared prefix reads back at roughly a tenth of base input on every subsequent miss. On provider failure, fail over to the next provider. Stream tokens straight through. On the way out, run output moderation, write both caches, meter tokens, and log the full exchange for audit.",
               "**Cost:** per-team token budgets and rate limits enforced at the gateway, with a dashboard of tokens, dollars, and cache-hit rate per team. Caching plus cheap-first routing are the two biggest spend reducers.",
               "**Reliability:** multi-provider failover plus circuit breakers means one provider's outage degrades to another, not to an outage. The gateway is multi-instance so it is not itself a SPOF, and its per-request overhead is kept to a couple of ms.",
               "Safety and observability: centralized PII/injection input filters, output moderation, and immutable audit logs, plus per-request latency/token/cost/error metrics. Common wrong turn: shipping the gateway with no quotas and no caching, so a single buggy app's loop drains the shared budget and spend and latency balloon with no per-team visibility.",
