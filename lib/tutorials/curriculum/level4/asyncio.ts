@@ -696,23 +696,17 @@ When you have no async version of a call, move it off the loop instead. \`await 
   "reveal": "The practical rule that follows: anything more than a few milliseconds of CPU does not belong directly on the loop. Push it to asyncio.to_thread if a library releases the lock for you, or to a process pool if it is pure Python."
 }
 \`\`\``,
-    demoCode: `# Normally: asyncio.run(asyncio.gather(fetch_one(1), fetch_one(2), fetch_one(3)))
-# This sandbox is already inside an event loop, so we drive the coroutines directly:
+    demoCode: `import asyncio
+
+# asyncio.run is the one piece missing here: it refuses to start when a loop is already
+# running, and this sandbox runs your code inside one. Everything else is the real API,
+# so gather works at top level and the three sleeps overlap.
 async def fetch_one(n):
+    await asyncio.sleep(0.1)
     return n * 10
 
 
-def run_coroutines(coros):
-    out = []
-    for coro in coros:
-        try:
-            coro.send(None)
-        except StopIteration as done:
-            out.append(done.value)
-    return out
-
-
-print(run_coroutines(fetch_one(n) for n in [1, 2, 3]))   # [10, 20, 30]`,
+print(await asyncio.gather(fetch_one(1), fetch_one(2), fetch_one(3)))   # [10, 20, 30]`,
   },
   // Apply budget 12: 34 provided lines to read (the _Sleep/sleep/fetch_one/run_all harness), 7 to
   // write (one coroutine wrapper with a try/except, one call that hands the driver every coroutine
