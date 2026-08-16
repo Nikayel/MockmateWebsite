@@ -606,28 +606,28 @@ Two source tables. **\`orders\`**:
 
 | order_id | customer_id | total_cents |
 | --- | --- | --- |
-| 100 | 1 | 2500 |
-| 101 | 2 | 5000 |
-| 102 | 1 | 9900 |
-| 103 | 9 | 1500 |
+| 500 | 4 | 3400 |
+| 501 | 5 | 12000 |
+| 502 | 4 | 760 |
+| 503 | 8 | 4500 |
 
 And **\`customers\`**:
 
 | customer_id | customer_name |
 | --- | --- |
-| 1 | Ada Lovelace |
-| 2 | Grace Hopper |
-| 3 | Alan Turing |
+| 4 | Katherine Johnson |
+| 5 | Barbara Liskov |
+| 6 | Edsger Dijkstra |
 
 Joining them on the shared \`customer_id\` returns three rows, not four:
 
 | order_id | total_cents | customer_name |
 | --- | --- | --- |
-| 100 | 2500 | Ada Lovelace |
-| 101 | 5000 | Grace Hopper |
-| 102 | 9900 | Ada Lovelace |
+| 500 | 3400 | Katherine Johnson |
+| 501 | 12000 | Barbara Liskov |
+| 502 | 760 | Katherine Johnson |
 
-Order 103 points at customer 9, who does not exist, so the order disappears. Alan placed no orders, so he never appears either. That is the "inner" part, and it is the behavior to reach for when a row without a match is a row you do not want. When you need the unmatched rows kept instead, that is a different join: [LEFT JOIN preserves every row](/learn/data-engineering/aggregation/sql-l2-left-join) from the left table and fills the missing side with \`NULL\`.
+Order 503 points at customer 8, who does not exist, so the order disappears. Edsger placed no orders, so he never appears either. That is the "inner" part, and it is the behavior to reach for when a row without a match is a row you do not want. When you need the unmatched rows kept instead, that is a different join: [LEFT JOIN preserves every row](/learn/data-engineering/aggregation/sql-l2-left-join) from the left table and fills the missing side with \`NULL\`.
 
 ## Real data lives in many tables
 
@@ -653,7 +653,7 @@ Read it as: for each \`orders\` row, find the \`customers\` row whose \`customer
 \`customer_id\`, and glue their columns side by side. An order with no matching customer, or a customer
 with no orders, does **not** appear. That's the "inner" part.
 
-Press play to watch each order find its customer, and see exactly why order 103 and Alan drop out:
+Press play to watch each order find its customer, and see exactly why order 503 and Edsger drop out:
 
 \`\`\`csdiagram
 {
@@ -662,15 +662,15 @@ Press play to watch each order find its customer, and see exactly why order 103 
   "left": {
     "name": "orders",
     "columns": ["order_id", "customer_id", "total_cents"],
-    "rows": [[100, 1, 2500], [101, 2, 5000], [102, 1, 9900], [103, 9, 1500]]
+    "rows": [[500, 4, 3400], [501, 5, 12000], [502, 4, 760], [503, 8, 4500]]
   },
   "right": {
     "name": "customers",
     "columns": ["customer_id", "customer_name"],
-    "rows": [[1, "Ada Lovelace"], [2, "Grace Hopper"], [3, "Alan Turing"]]
+    "rows": [[4, "Katherine Johnson"], [5, "Barbara Liskov"], [6, "Edsger Dijkstra"]]
   },
   "on": ["customer_id", "customer_id"],
-  "caption": "Each order matches its customer on customer_id. Order 103 (customer 9) has no match, so INNER JOIN drops it; Alan (customer 3) has no orders, so he never appears."
+  "caption": "Each order matches its customer on customer_id. Order 503 (customer 8) has no match, so INNER JOIN drops it; Edsger (customer 6) has no orders, so he never appears."
 }
 \`\`\`
 
@@ -737,14 +737,14 @@ CREATE TABLE orders (
   total_cents INTEGER
 );
 INSERT INTO customers VALUES
-  (1, 'Ada Lovelace'),
-  (2, 'Grace Hopper'),
-  (3, 'Alan Turing');
+  (4, 'Katherine Johnson'),
+  (5, 'Barbara Liskov'),
+  (6, 'Edsger Dijkstra');
 INSERT INTO orders VALUES
-  (100, 1, 2500),
-  (101, 2, 5000),
-  (102, 1, 9900),
-  (103, 9, 1500);   -- customer_id 9 does not exist, dropped by INNER JOIN`,
+  (500, 4, 3400),
+  (501, 5, 12000),
+  (502, 4, 760),
+  (503, 8, 4500);   -- customer_id 8 does not exist, dropped by INNER JOIN`,
     showDemoInput: true,
   },
   apply: {
