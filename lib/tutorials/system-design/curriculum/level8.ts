@@ -660,7 +660,7 @@ The four roles: the resource owner (the user), the client (the app requesting ac
 - Authorization Code flow with PKCE is now required for all clients, including confidential ones. PKCE (Proof Key for Code Exchange) has the client send a hashed random \`code_verifier\` up front and reveal it at token exchange, so an intercepted authorization code is useless to an attacker who lacks the verifier.
 - The Implicit grant (tokens returned directly in the URL fragment) is removed. It leaked tokens in browser history and referrers.
 - The Resource Owner Password Credentials grant (app collects the user's password) is removed. It defeats the entire point of delegation.
-- Exact redirect-URI string matching is required, closing open-redirect and token-theft holes.
+- Exact redirect-URI string matching is required, closing open-redirect and token-theft holes, with one carve-out: a loopback redirect for a native or CLI client matches exactly except for the port, which the client picks at runtime.
 
 \`\`\`cswidget
 {
