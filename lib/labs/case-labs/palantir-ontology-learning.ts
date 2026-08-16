@@ -64,6 +64,7 @@ export const palantirOntologyLearning: CaseLab = {
   ],
   buildScenarioId: "palantir-ontology-org-build",
   buildScenarioType: "add-functionality",
+  buildLanguage: "python",
   buildCurveball: {
     title: "Curveball: a dotted-line report just appeared",
     prompt:

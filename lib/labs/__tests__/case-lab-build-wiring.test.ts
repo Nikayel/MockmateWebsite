@@ -21,6 +21,12 @@ describe("case lab build wiring", () => {
     expect(workspace, "build scenario must have a workspace").toBeDefined()
     expect(workspace?.editableFilePaths.length).toBeGreaterThan(0)
     expect(workspace?.files.length).toBeGreaterThan(1) // multi-file
+
+    // `buildLanguage` is authored on the lab so the `/labs` browse rows can label a lab without
+    // dragging the scenario registry into a static page. That mirror is only safe while it is
+    // pinned: a lab that says "python" over a JavaScript workspace is a lie on the busiest
+    // product page we have.
+    expect(lab.buildLanguage, `${lab.id} buildLanguage`).toBe(workspace?.language)
     // The reference solution is sealed server-side (moved out of the client module);
     // assert it exists in the sealed legacy registry so the run-tests path stays verifiable.
     const sealedReferenceFiles = await loadSealedLegacyReferenceFiles(lab.buildScenarioId)

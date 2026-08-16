@@ -34,6 +34,7 @@ export const stripeBillingWebhook: CaseLab = {
   ],
   buildScenarioId: "bugfix-billing-webhook-idempotency",
   buildScenarioType: "bugfix",
+  buildLanguage: "javascript",
   buildCurveball: {
     title: "Curveball: the consumer just scaled to three workers",
     prompt:

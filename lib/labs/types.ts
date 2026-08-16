@@ -152,6 +152,17 @@ export interface CaseLab {
   /** Build milestone reuses an existing multi-file codebase scenario by id. */
   buildScenarioId: string
   buildScenarioType: BuildScenarioType
+  /**
+   * The language the Build workspace is written in.
+   *
+   * Authored here, next to `buildScenarioType`, rather than resolved from the scenario registry at
+   * render time: `/labs` is a static Server Component and `getScenarioById` is an async scan that
+   * loads every DSA pattern module before it reaches the workspace ones, which is a lot of module
+   * graph to drag in for one word on a browse row. Mirroring the fact is safe for the same reason
+   * `buildScenarioType` is: `case-lab-build-wiring.test.ts` asserts both equal the live scenario, so
+   * a drifted value fails the build instead of shipping a wrong label.
+   */
+  buildLanguage: WorkspaceScenarioLanguage
   /** §7.4 Onsite-only: a mid-build constraint change. Omit to skip the curveball. */
   buildCurveball?: CaseLabCurveball
 }

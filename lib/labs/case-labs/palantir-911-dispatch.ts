@@ -64,6 +64,7 @@ export const palantir911Dispatch: CaseLab = {
   ],
   buildScenarioId: "palantir-911-dispatch-build",
   buildScenarioType: "add-functionality",
+  buildLanguage: "python",
   buildCurveball: {
     title: "Curveball: two calls just grabbed the same unit",
     prompt:

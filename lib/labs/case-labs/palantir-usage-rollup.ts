@@ -62,6 +62,7 @@ export const palantirUsageRollup: CaseLab = {
   ],
   buildScenarioId: "bugfix-foundry-usage-rollup",
   buildScenarioType: "bugfix",
+  buildLanguage: "javascript",
   buildCurveball: {
     title: "Curveball: a third ingest shard just came online",
     prompt:
