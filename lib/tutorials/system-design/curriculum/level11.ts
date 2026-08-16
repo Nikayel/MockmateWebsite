@@ -1730,6 +1730,8 @@ LLMs are non-deterministic and sensitive: a one-word prompt tweak or a model ver
 
 You maintain golden datasets: representative inputs paired with expected outputs or with scoring criteria. On every prompt or model change you run the candidate against the golden set in CI and compare scores to the current production version. Scoring methods, in order of reliability: exact/programmatic checks (does the JSON parse, does the SQL run, does the answer contain the required id) are cheapest and most trustworthy; similarity metrics for freer text; and LLM-as-judge, where a strong model grades outputs against a rubric. LLM-as-judge scales but has real biases (it favors longer answers, its own style, and the first option in a pair), so you calibrate it against human labels, use it for relative comparison more than absolute scores, and never let it grade safety-critical outputs alone. A regression suite of past failures runs every time so fixed bugs stay fixed.
 
+The rubric itself is a design decision, not a neutral measuring stick. Score every item strictly right or wrong and you have built an incentive to guess: a guess sometimes lands, and "I do not know" never scores. That is fine for a SQL generator and wrong for anything where abstention is a correct answer, so those features have to score abstention on purpose, crediting a well-placed refusal and charging a confident wrong answer more than a refusal. Otherwise the gate quietly selects for exactly the behavior the guardrails downstream then have to catch.
+
 ## Online eval (post-ship)
 
 Offline sets never cover real traffic, so you also evaluate in production. Canary a new prompt/model to 1 to 5 percent of traffic and watch live quality and guardrail metrics before ramping. A/B test prompt variants on business and quality metrics. Capture implicit signals (thumbs up/down, retries, edits, escalations) and explicit feedback. This is the loop that catches the drift offline eval missed.
@@ -1815,6 +1817,8 @@ Offline sets never cover real traffic, so you also evaluate in production. Canar
 \`\`\`
 
 Input guardrails redact PII before it hits a third-party model and detect prompt-injection and jailbreak attempts. Output guardrails validate structure (the response must be valid JSON matching a schema, else reject and retry), run moderation for toxicity, scan for leaked PII, and for RAG verify groundedness. On failure you block, redact, or return a safe fallback, never the raw bad output. For RAG, score groundedness (is each claim supported by the retrieved context) and verify every citation resolves to a real retrieved chunk. An unsupported claim or a fabricated citation fails the guardrail.
+
+Groundedness scoring does not have to be a second LLM call. A small encoder classifier fine-tuned for hallucination detection sits in a different latency class from a judge model, which is what makes the check affordable inline on every response instead of on a nightly sample. Expect it to be much stronger at deciding that an answer is unsupported than at localizing which span is unsupported, so gate on the whole-answer verdict and treat any highlighted span as a hint for the human reviewing it.
 
 Production failures and human labels feed back into the golden and regression sets, so eval coverage grows toward real usage over time. This human-in-the-loop labeling is what keeps eval from going stale.
 
