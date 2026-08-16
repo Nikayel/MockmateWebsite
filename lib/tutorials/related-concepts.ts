@@ -1893,8 +1893,8 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
       { id: "py-l4-performance", anchor: "Profiling, complexity and caching with functools" },
     ],
     cta: {
-      href: "/ai-coding-interview-practice",
-      label: "Practice a timed coding round and justify the data structure you reached for",
+      href: "/free-ai-coding-interview",
+      label: "Take a free AI coding interview and justify the data structure you reached for",
     },
   },
 
@@ -1932,9 +1932,9 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
       { id: "py-l2-itertools", anchor: "itertools: chain, islice, groupby and product" },
     ],
     cta: {
-      href: "/ai-coding-interview-practice",
+      href: "/free-ai-coding-interview",
       label:
-        "Practice a timed coding round on a counting problem and explain your choice of container",
+        "Take a free AI coding interview on a counting problem and explain your choice of container",
     },
   },
 
