@@ -1551,6 +1551,67 @@ const dates: SqlLevel["modules"][number]["lessons"][number] = {
 
 > **In the warehouse this differs.** SQLite has **no dedicated DATE or TIMESTAMP type**. Dates live as **TEXT in ISO-8601** (\`'2026-03-01'\` or \`'2026-03-01T09:14:00Z'\`), and you manipulate them with the \`date()\`, \`datetime()\`, and \`strftime()\` functions. Real warehouses have native \`DATE\`/\`TIMESTAMP\` types and *different* function names: Postgres uses \`date_trunc('month', ts)\` and \`EXTRACT(YEAR FROM ts)\`; BigQuery uses \`DATE_TRUNC\`/\`FORMAT_DATE\`; Snowflake uses \`DATE_TRUNC\`/\`TO_CHAR\`. The **concepts** below (truncate, extract a part, filter a window) transfer everywhere; the exact syntax does not. Because ISO-8601 text also *sorts and compares* chronologically as plain strings, a lot of date filtering needs no functions at all.
 
+### How does SQLite store dates?
+
+SQLite has **no \`DATE\`, \`TIME\`, or \`TIMESTAMP\` type**. A date is kept in one of three ordinary storage classes, and whoever creates the table picks which:
+
+| Storage class | What the value holds | The same instant, stored |
+| --- | --- | --- |
+| \`TEXT\` | an ISO-8601 string | \`'2026-03-01T09:14:00Z'\` |
+| \`INTEGER\` | Unix epoch seconds | \`1772356440\` |
+| \`REAL\` | a Julian day number | \`2461100.884722\` |
+
+ISO-8601 \`TEXT\` is what this course uses and what most pipelines land, because a fixed-width ISO string **sorts and compares chronologically as plain text**, with no parsing involved:
+
+\`\`\`sql
+SELECT '2026-01-05' < '2026-02-14' AS iso_text_sorts_chronologically;  -- 1 (true)
+\`\`\`
+
+Epoch integers are the compact form, which is why a time-series database keeps timestamps as integers and delta-encodes them ([time-series databases](/learn/system-design/data-storage/sd-l2-time-series)), and a Julian day is a count of days since 4714 BC that nobody reads by eye. All three are readable by the same functions:
+
+\`\`\`sql
+-- One instant, three storage forms, one function.
+SELECT date('2026-03-01T09:14:00Z')  AS from_iso_text,      -- '2026-03-01'
+       date(1772356440, 'unixepoch') AS from_epoch_integer, -- '2026-03-01'
+       date(2461100.884722)          AS from_julian_real;   -- '2026-03-01'
+\`\`\`
+
+A bare number with no modifier is read as a **Julian day**, so an epoch column needs the \`'unixepoch'\` modifier or it quietly means a date thousands of years off. And because a storage class belongs to the value rather than to the column ([data types and CAST](/learn/data-engineering/foundations/sql-l1-cast-types)), one column can hold all three forms at once, which is the argument for standardizing on ISO text at the ingest boundary.
+
+### How do you format a date in SQLite?
+
+\`strftime(format, timevalue)\` builds any output shape from a stored date, and \`date()\`, \`time()\`, and \`datetime()\` are shorthands for the three most common shapes. Every one of them returns **text**, never a date object.
+
+| Call on \`'2026-03-01T09:14:00Z'\` | Result |
+| --- | --- |
+| \`date(ts)\` | \`'2026-03-01'\` |
+| \`time(ts)\` | \`'09:14:00'\` |
+| \`datetime(ts)\` | \`'2026-03-01 09:14:00'\` |
+| \`strftime('%Y-%m', ts)\` | \`'2026-03'\` |
+
+A format string is literal text with \`%\` codes substituted into it, so you are not limited to those four shapes. The codes worth knowing:
+
+| Code | Meaning | Output for \`'2026-03-01T09:14:00Z'\` |
+| --- | --- | --- |
+| \`%Y\` | year, 4 digits | \`2026\` |
+| \`%m\` | month, zero-padded 01 to 12 | \`03\` |
+| \`%d\` | day of month, zero-padded 01 to 31 | \`01\` |
+| \`%H\` | hour, 00 to 23 | \`09\` |
+| \`%M\` | minute, 00 to 59 | \`14\` |
+| \`%S\` | second, 00 to 59 | \`00\` |
+| \`%j\` | day of year, 001 to 366 | \`060\` |
+| \`%w\` | day of week, 0 is Sunday through 6 is Saturday | \`0\` |
+| \`%s\` | Unix epoch seconds | \`1772356440\` |
+
+\`\`\`sql
+-- Reformat and extract in one pass over the orders table below.
+SELECT order_id,
+       strftime('%Y-%m-%d', order_ts) AS order_day,     -- '2026-01-15'
+       strftime('%H:%M', order_ts)    AS order_time,    -- '10:00'
+       strftime('%s', order_ts)       AS epoch_seconds  -- '1768471200'
+FROM orders;
+\`\`\`
+
 ### The core functions (SQLite)
 
 - \`date(ts)\` truncates a timestamp to the day: \`date('2026-03-01T09:14:00Z')\` → \`'2026-03-01'\`.
