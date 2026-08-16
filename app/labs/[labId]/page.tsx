@@ -24,6 +24,7 @@ import { CompanyLogo } from "@/components/labs/CompanyLogo"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { Header } from "@/components/header"
 import { trackCaseLabStarted, trackCaseLabViewed } from "@/lib/labs/case-lab-analytics"
+import { reportFunnelEvent } from "@/lib/metrics/funnel-client"
 import { SparraLoader } from "@/components/brand/SparraLoader"
 
 export default function CaseLabPlayPage() {
@@ -52,7 +53,10 @@ export default function CaseLabPlayPage() {
   // once per lab rather than once per store update.
   const labCompany = lab?.company
   useEffect(() => {
-    if (labId && labCompany) trackCaseLabViewed({ labId, company: labCompany })
+    if (labId && labCompany) {
+      trackCaseLabViewed({ labId, company: labCompany })
+      reportFunnelEvent("lab_detail_view")
+    }
   }, [labId, labCompany])
 
   // Resume an in-progress run for this lab (if any). `reload` retries after a
@@ -207,6 +211,7 @@ export default function CaseLabPlayPage() {
               lab={lab}
               onStart={(mode) => {
                 trackCaseLabStarted({ labId: lab.id, company: lab.company, mode })
+                reportFunnelEvent("lab_start")
                 startRun(lab, mode)
               }}
             />

@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils"
 import { CaseLabRow } from "@/components/labs/CaseLabRow"
 import { groupCaseLabsByRound } from "@/lib/labs/case-lab-rounds"
 import { trackCaseLabListViewed } from "@/lib/labs/case-lab-analytics"
+import { reportFunnelEvent } from "@/lib/metrics/funnel-client"
 import type { BrowsableCaseLab } from "@/lib/labs/types"
 
 /** A user can narrow by at most this many skills at once. */
@@ -65,6 +66,7 @@ export function CaseLabGallery({ labs }: { labs: BrowsableCaseLab[] }) {
   const labCount = labs.length
   useEffect(() => {
     trackCaseLabListViewed({ labCount })
+    reportFunnelEvent("lab_list_view")
   }, [labCount])
 
   const companies = useMemo(

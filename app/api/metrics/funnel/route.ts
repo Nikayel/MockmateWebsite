@@ -23,6 +23,9 @@ const FUNNEL_EVENTS = new Set([
   "signup",
   "login",
   "checkout_start",
+  "lab_list_view",
+  "lab_detail_view",
+  "lab_start",
 ])
 
 export async function POST(request: NextRequest) {

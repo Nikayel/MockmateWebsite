@@ -20,6 +20,9 @@ export type FunnelEvent =
   | "signup"
   | "login"
   | "checkout_start"
+  | "lab_list_view"
+  | "lab_detail_view"
+  | "lab_start"
 
 export function reportFunnelEvent(event: FunnelEvent): void {
   try {
