@@ -363,11 +363,40 @@ give you something to reconcile against and an outbox row carries a promise acro
 `.trim()
 
 const isolationLevelsTeach = `
-## A menu of how much transactions see of each other
+## What are the four transaction isolation levels?
 
-Isolation levels are a menu of how much concurrent transactions are allowed to see of each other's
-in-flight work. The ANSI SQL levels, weakest to strongest, are Read Uncommitted, Read Committed,
-Repeatable Read, and Serializable. Each level forbids more anomalies and costs more throughput.
+The four ANSI SQL isolation levels, weakest to strongest, are **Read Uncommitted**, **Read
+Committed**, **Repeatable Read**, and **Serializable**. Each one permits fewer read anomalies than
+the level beneath it and costs more throughput. In the table, "yes" means the level still allows that
+anomaly to happen.
+
+| Isolation level | Dirty read | Non-repeatable read | Phantom read |
+| --- | --- | --- | --- |
+| Read Uncommitted | Yes | Yes | Yes |
+| Read Committed | No | Yes | Yes |
+| Repeatable Read | No | No | Yes |
+| Serializable | No | No | No |
+
+- **Read Uncommitted** lets you read another transaction's uncommitted writes, so a value you acted
+  on can vanish when that writer rolls back.
+- **Read Committed** shows you only committed data, but takes a fresh view for every statement, so
+  the same row can change underneath you between two reads inside one transaction.
+- **Repeatable Read** holds every row you have already read stable for the life of the transaction,
+  so re-reading a row returns the value you first saw.
+- **Serializable** guarantees the outcome matches some serial order of the transactions, and it is
+  the only level that also rules out write skew, which the grid above never scores.
+
+Two things that grid hides, and interviewers ask about both. **It scores reads, not writes:** lost
+update and write skew are write anomalies ANSI never tabulated, and write skew survives at every
+level below Serializable, snapshot isolation included. **The engine matters more than the level's
+name:** Postgres implements Repeatable Read as snapshot isolation, which blocks the phantoms the
+standard permits there, and MySQL InnoDB blocks them too, by consistent snapshot for plain reads and
+by gap locks for locking reads. Read Uncommitted is nearly fiction in practice, since Postgres
+accepts the keyword and hands you Read Committed anyway.
+
+So isolation levels are a menu of how much concurrent transactions are allowed to see of each other's
+in-flight work, and the skill is ordering the cheapest item on that menu that closes the specific
+anomaly in front of you.
 
 ### The anomalies, in order of nastiness
 
@@ -425,6 +454,11 @@ serializable** forbids write skew, implemented either by Serializable Snapshot I
 detects dangerous read-write dependency cycles and aborts one transaction) or by strict two-phase
 locking (2PL). Serializable costs throughput: SSI adds abort-and-retry churn under contention, 2PL
 adds lock waits.
+
+That snapshot is not a free-floating abstraction, it is a set of row versions the engine keeps side
+by side and eventually has to clean up. The next lesson covers
+[how MVCC implements snapshot isolation](/learn/system-design/data-storage/sd-l2-mvcc-locking), and
+what that versioning costs you in vacuum, bloat, and one forgotten long-running transaction.
 
 \`\`\`cswidget
 {
@@ -767,7 +801,9 @@ const mvccLockingTeach = `
 ## The contract vs the machinery
 
 Isolation levels are the contract; concurrency control is how the database actually delivers them.
-There are two big families, and modern databases lean on the first.
+If the contract is still fuzzy, the previous lesson lays out
+[the four isolation levels and the anomaly each one permits](/learn/system-design/data-storage/sd-l2-isolation-levels)
+in a single table. There are two big families of machinery, and modern databases lean on the first.
 
 ### MVCC: readers don't block writers
 
