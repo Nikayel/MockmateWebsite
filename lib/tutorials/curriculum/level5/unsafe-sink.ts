@@ -24,9 +24,9 @@
  * and it was the one rule asserted only by a hidden test with no hint behind it. Every rule the
  * hidden suite asserts is now stated in the README AND reachable from a hint.
  *
- * Time budget behind `estimatedMinutes` (measured, not guessed): teach 11 (674 prose words, four
- * checks), apply 17 (93 visible lines to read, a 36-line parser to write), practice 8 (50 visible
- * lines, a three-line repair).
+ * Time budget behind `estimatedMinutes`: teach 11 (the prose plus four checks), apply 17 (a
+ * workspace to read and a parser to write), practice 8 (a short workspace and a three-line
+ * repair). Line and word counts are deliberately not recorded here: they rot on every edit.
  */
 import type { PythonLesson } from "../../types"
 import { buildBrief } from "../brief"
