@@ -5350,9 +5350,10 @@ engages. Name the conditions your breaker treats as failures, and check that tim
 ### Isolation and fallback
 
 **Bulkheads** give each dependency its own bounded connection pool or thread pool, so one slow
-dependency drowns only its own bulkhead instead of every thread in the process (the pattern that
-named the Hystrix library). When a call fails fast, **degrade gracefully**: serve a cached value, a
-default, or a partial response rather than an error.
+dependency drowns only its own bulkhead instead of every thread in the process (the pattern
+Netflix's Hystrix popularized; Hystrix is now in maintenance mode, and resilience4j or a service
+mesh's outlier detection is the live equivalent). When a call fails fast, **degrade gracefully**:
+serve a cached value, a default, or a partial response rather than an error.
 
 \`\`\`cswidget
 {
