@@ -49,7 +49,7 @@ is fetched and each one gets its own size in the report.
 
 const CONC_EXECUTOR = String.raw`"""A stand-in for concurrent.futures, because this runtime has no OS threads.
 
-The behaviour that matters is preserved: submitted work produces a future, a future holds
+The behavior that matters is preserved: submitted work produces a future, a future holds
 either a value or the exception the call raised, and completion order is not input order.
 """
 
@@ -158,7 +158,7 @@ def give_up(url, error):
     if isinstance(error, TransientError):
         # Out of attempts: record it as empty rather than failing the whole sweep.
         return 0
-    # PermanentError (and anything unrecognised) has no size the report can stand behind.
+    # PermanentError (and anything unrecognized) has no size the report can stand behind.
     return None
 `
 
@@ -406,7 +406,7 @@ The reason overlapping waits pays off so enormously is that the costs are not cl
   "title": "What a Python program is actually waiting on",
   "scale": "log",
   "bands": [
-    { "label": "CPU instruction", "value": 1, "display": "~1 ns", "note": "One bytecode step. The GIL serialises these across threads." },
+    { "label": "CPU instruction", "value": 1, "display": "~1 ns", "note": "One bytecode step. The GIL serializes these across threads." },
     { "label": "Main memory read", "value": 100, "display": "~100 ns", "note": "A dict lookup or attribute access lands here." },
     { "label": "SSD read", "value": 100000, "display": "~100 μs", "note": "1,000x slower than RAM. The GIL is released while you wait." },
     { "label": "Datacenter round trip", "value": 500000, "display": "~500 μs", "note": "Service to service inside one region." },
@@ -595,7 +595,7 @@ Independent tasks are safe to parallelize. Shared mutable state is not. \`count 
 
 This in-browser sandbox (Pyodide/WASM) has no OS threads, so building a real pool raises \`RuntimeError: can't start new thread\`. The demo above therefore falls back to a plain comprehension, which is honest about one thing and misleading about another: the results match, and nothing about ordering or failure handling gets exercised, because a sequential comprehension has neither problem to solve.
 
-So the exercises in this lesson do not use \`concurrent.futures\` at all. They hand you a **fake executor** that has one method, \`submit(fn, arg)\`, returning a future with one method, \`result()\`. There is no \`map\` on it, deliberately: \`map\` would do the ordering work that is the whole point. Its \`as_completed\` shuffles the futures so completion order is visibly not input order, and its futures store an exception instead of a value when the call raises. Those three behaviours are the ones that survive the move to a real \`ThreadPoolExecutor\`, so the bookkeeping you write here is the bookkeeping you would write against the real API.
+So the exercises in this lesson do not use \`concurrent.futures\` at all. They hand you a **fake executor** that has one method, \`submit(fn, arg)\`, returning a future with one method, \`result()\`. There is no \`map\` on it, deliberately: \`map\` would do the ordering work that is the whole point. Its \`as_completed\` shuffles the futures so completion order is visibly not input order, and its futures store an exception instead of a value when the call raises. Those three behaviors are the ones that survive the move to a real \`ThreadPoolExecutor\`, so the bookkeeping you write here is the bookkeeping you would write against the real API.
 
 **Interview nuance:** Interviewers often follow up with "what is the difference between concurrency and parallelism?" Concurrency is structuring work so tasks make progress by interleaving, which is what a thread pool and \`async\` give you under the GIL. Parallelism is tasks running at the same instant on different cores, which is what a process pool gives you (or the free-threaded no-GIL build, experimental in 3.13 and officially supported since 3.14). So on the default build a \`ThreadPoolExecutor\` buys you concurrency and overlaps I/O waits, but only processes buy you CPU parallelism. On a free-threaded build that changes: threads really do run bytecode on several cores, so a \`ThreadPoolExecutor\` buys CPU parallelism too. It is still a separate opt-in build rather than the interpreter most people are running, so the rule above is the one to answer with unless you are asked about 3.14 specifically. Naming that distinction, and tying it to the GIL, is exactly the signal they are listening for.
 
