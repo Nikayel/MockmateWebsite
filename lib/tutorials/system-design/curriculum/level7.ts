@@ -193,13 +193,37 @@ Common wrong turn: chasing five nines everywhere. If your database ceiling is 99
 const sliSloSlaTeach = `
 ## Turning "reliable enough" into a number
 
-"Reliable enough" is not a target you can enforce. The SLI/SLO/SLA hierarchy is how you turn it into a number a dashboard computes and a policy acts on.
+"Reliable enough" is not a target you can enforce. The SLI/SLO/SLA hierarchy is how you turn it into a number a dashboard computes and a policy acts on. Three terms, one per layer: the indicator measures, the objective targets, the agreement promises.
 
-An **SLI** (Service Level Indicator) is a measured ratio: good events divided by valid events, expressed as a percentage. Availability SLI = (successful requests) / (valid requests). Latency SLI = (requests served faster than 300 ms) / (valid requests). The discipline is defining "good" and "valid" precisely. Good might mean HTTP status not in 5xx and served under a threshold. Valid deliberately excludes noise you should not be graded on: health-check pings, requests from a client that sent a malformed body (a 400 is the client's fault, not an outage), traffic during an announced maintenance window.
+## What is an SLI?
 
-An **SLO** (Service Level Objective) is an SLI plus a target plus a window: "99.9% of valid requests succeed, measured over a rolling 28 days." The window matters. A rolling 28-day window smooths out one bad afternoon; a calendar-month window resets your budget on the 1st. Rolling windows are usually preferred because they do not give you a "free" reset that hides a chronic problem.
+An **SLI** (Service Level Indicator) is a measured ratio of good events over valid events, expressed as a percentage. Availability SLI = (successful requests) / (valid requests). Latency SLI = (requests served faster than 300 ms) / (valid requests).
 
-An **SLA** (Service Level Agreement) is the external, contractual version with teeth: financial penalties (service credits) if you miss it. You always set the internal SLO stricter than the SLA, so your own alerting fires before you owe customers money.
+The discipline is defining "good" and "valid" precisely. Good might mean HTTP status not in 5xx and served under a threshold. Valid deliberately excludes noise you should not be graded on: health-check pings, requests from a client that sent a malformed body (a 400 is the client's fault, not an outage), traffic during an announced maintenance window. An indicator carries no target and no window of its own, which is the whole of what separates it from the objective below.
+
+## What is an SLO?
+
+An **SLO** (Service Level Objective) is an SLI plus a target plus a time window, and it is the internal number a team runs to: "99.9% of valid requests succeed, measured over a rolling 28 days."
+
+The window matters. A rolling 28-day window smooths out one bad afternoon; a calendar-month window resets your budget on the 1st. Rolling windows are usually preferred because they do not give you a "free" reset that hides a chronic problem.
+
+## What is an SLA?
+
+An **SLA** (Service Level Agreement) is the external, contractual version of an objective, carrying financial penalties (service credits) you owe the customer when you miss it.
+
+You always set the internal SLO stricter than the SLA, so your own alerting fires before you owe customers money. A team that has signed a 99.9% SLA typically runs to a 99.95% SLO, and the gap between those two numbers is the warning the team gives itself.
+
+## SLI vs SLO vs SLA
+
+The SLI is the measurement, the SLO is the stricter internal target you run to, and the SLA is the looser external promise that costs money when it is broken. All three are quoted as the same kind of percentage, so the number never sorts them for you: what sorts them is whether it measures, targets, or binds you contractually.
+
+| Term | What it is | Who it binds | On violation | Example with real numbers |
+| --- | --- | --- | --- | --- |
+| SLI | A measured ratio, good events over valid events | Nobody, an indicator is an observation | Nothing happens, because there is no target yet to miss | 99.87% of valid checkout requests returned non-5xx at the load balancer last week |
+| SLO | An SLI plus a target plus a window, set internally | The team that owns the service | The error budget drains and the budget policy acts, typically freezing feature work | 99.95% of valid checkout requests succeed over a rolling 28 days |
+| SLA | The contractual version of an objective, deliberately looser than the SLO | You and the customer, in writing | Service credits are owed, often with a public postmortem | 99.9% monthly uptime, or the customer gets 10% of the monthly fee back |
+
+Read the targets in the last column in order: the SLA promise (99.9%) sits looser than the SLO (99.95%), which is what buys you room to notice and fix a problem before it becomes a refund. Getting that ordering backwards is the classic interview slip, and it means your contract breaches before your own alerting has said a word.
 
 ## Good and valid do not have to be events
 
@@ -439,6 +463,8 @@ The same request looks different at three points. At the **load balancer** you c
 An average hides the tail. If 99 requests take 50 ms and one takes 5 seconds, the mean is ~100 ms, which looks fine while one user in a hundred is furious. p99 = 5 s tells the truth. SLOs are set on p95/p99/p99.9 depending on how much the tail matters. Averages are actively misleading for latency and you should say so.
 
 **Interview nuance:** the strongest answers keep the SLO count small and tie each to a user journey. "99.9% of checkout submissions succeed over 28 days" is a good SLO because a human cares about that event. "CPU under 80%" is not an SLO, it is a resource metric with no user in it. Few SLOs, each anchored to a journey, targets set from what users actually expect (nobody notices 200 ms vs 250 ms, everybody notices 3 s).
+
+Two lessons pick the target up from here. Translating an availability objective into the downtime minutes an on-call rotation actually feels is [availability math and the nines](/learn/system-design/reliability-ops/sd-l7-availability-nines), which is also where serial dependencies cap the number you are allowed to promise. Spending what the objective leaves over is [error budgets and policy](/learn/system-design/reliability-ops/sd-l7-error-budgets), since the budget is just 1 minus the SLO.
 
 **Recap:** SLI is good over valid, counted in events or in seconds when the harm scales with duration; SLO adds a target and window (99.9% over 28 days); SLA is the external promise with penalties; the measurement point (LB vs server vs client) changes the number, and latency SLOs use percentiles because averages hide the tail.
 
