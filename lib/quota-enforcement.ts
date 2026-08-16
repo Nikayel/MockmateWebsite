@@ -143,6 +143,21 @@ interface UserQuota {
   periodEnd: string
 }
 
+/**
+ * The date a paid plan's quota actually rolls over, phrased for the message the user reads.
+ *
+ * The old copy said "the 1st", which was true for nobody: `billingPeriodFromProfile` computes an
+ * ANNIVERSARY window from the subscription's own dates (QUOTA-1), so a subscriber who signed up on
+ * the 14th resets on the 14th. `periodEnd` is already carried on the quota, so the message can name
+ * the real date instead of inventing a calendar rule. UTC because the period boundaries are stored
+ * and compared in UTC; naming a local date could disagree with the boundary by a day.
+ */
+function resetClause(periodEndIso: string): string {
+  const end = new Date(periodEndIso)
+  if (Number.isNaN(end.getTime())) return "when your billing period rolls over"
+  return `on ${end.toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" })}`
+}
+
 // Budget limits per tier (in dollars) resolve through lib/usage/budget.ts, the
 // single owner of the question. Indexing AI_BUDGET_CAPS with the tier directly
 // (as this did) ignores the per-user `custom_budget_cap` an admin can set, so
@@ -597,7 +612,7 @@ export async function checkQuota(
       const sessionLimitMessage =
         tier === "free"
           ? `You've used all ${quota.sessionsLimit} free sessions for this month. Upgrade to Pro for ${PRICING_CONFIG.pro.sessionsPerMonth} sessions per month, a personalized roadmap, and spaced repetition.`
-          : `You've used all ${quota.sessionsLimit} Pro sessions for this month. Your limit resets on the 1st.`
+          : `You've used all ${quota.sessionsLimit} Pro sessions for this billing period. Your limit resets ${resetClause(quota.periodEnd)}.`
       const response = NextResponse.json(
         {
           error: "Session limit exceeded",
@@ -637,7 +652,7 @@ export async function checkQuota(
       const budgetMessage =
         tier === "free"
           ? "You've hit this month's free AI usage limit. Upgrade to Pro for a 50x higher AI allowance plus 35 interview sessions."
-          : `You've used your full $${quota.budgetLimit.toFixed(2)} AI allowance for this month. Your allowance resets on the 1st.`
+          : `You've used your full $${quota.budgetLimit.toFixed(2)} AI allowance for this billing period. Your allowance resets ${resetClause(quota.periodEnd)}.`
       const response = NextResponse.json(
         {
           error: "Budget limit exceeded",
