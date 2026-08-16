@@ -1336,7 +1336,7 @@ An implementation that writes \`defaults.update(overrides)\` and returns \`defau
     },
     {
       "label": "Python raises a RuntimeError for mutating a shared structure",
-      "feedback": "Python only raises for mutating a collection while iterating over it, which is a different situation. A plain update on a shared dict is legal and silent."
+      "feedback": "Python raises only when a dict or set changes size during iteration. A list mutated mid-iteration raises nothing and quietly skips elements. A plain update on a shared dict is legal and silent."
     }
   ]
 }
