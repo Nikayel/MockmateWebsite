@@ -855,7 +855,16 @@ const goldenSignalsTeach = `
 
 When you own a service at 3am and it is misbehaving, you do not have time to stare at forty dashboards. You need a small, dependable set of numbers that tells you *whether* the service is healthy and *which direction* it is failing. Google's SRE book distills this to the **four golden signals**: latency, traffic, errors, and saturation. Instrument these four for every service and you can answer "is it up, is it fast, is it failing, is it about to fall over?" without guessing.
 
-**Latency**: how long a request takes. Measure it as a distribution, not a mean. A mean of 40ms can hide a p99 of 900ms that is torching 1% of your users. Alert and dashboard on p50, p95, p99, and often p99.9. **Traffic**: demand on the system, typically requests per second (QPS) for an API, or bytes per second for a pipe. **Errors**: the rate of failing requests, split by explicit failures (HTTP 500) and implicit ones (a 200 with a wrong or empty body, or a request that blew its latency budget). **Saturation**: how full the most constrained resource is (CPU, memory, connection pool, queue depth). Saturation is your *leading* indicator: latency and errors tell you the house is on fire, saturation tells you the wiring is overheating before it ignites.
+## What are the four golden signals?
+
+The four golden signals are latency (how long requests take), traffic (how much demand arrives), errors (how many requests fail), and saturation (how full the most constrained resource is). In order, with what each one is actually measured as:
+
+1. **Latency**: how long a request takes. Measure it as a distribution, not a mean. A mean of 40ms can hide a p99 of 900ms that is torching 1% of your users. Alert and dashboard on p50, p95, p99, and often p99.9.
+2. **Traffic**: demand on the system, typically requests per second (QPS) for an API, or bytes per second for a pipe.
+3. **Errors**: the rate of failing requests, split by explicit failures (HTTP 500) and implicit ones (a 200 with a wrong or empty body, or a request that blew its latency budget).
+4. **Saturation**: how full the most constrained resource is (CPU, memory, connection pool, queue depth). Saturation is your *leading* indicator: latency and errors tell you the house is on fire, saturation tells you the wiring is overheating before it ignites.
+
+The canonical set is four, from Google's SRE book. If you meet a list of five or six in the wild, look at what was added before you argue about it: it is usually a resource metric that USE already owns, or the errors signal split into its explicit and implicit halves. Answer with the four and make that split yourself, which is the stronger answer anyway.
 
 \`\`\`cswidget
 {
@@ -887,7 +896,9 @@ When you own a service at 3am and it is misbehaving, you do not have time to sta
 
 **Interview nuance:** interviewers love to ask why you separate the latency of successful requests from the latency of failed ones. Fast failures (a validation 400 returning in 2ms) drag your aggregate latency *down* and make a struggling service look healthy; slow failures (a request that times out at 30s then 500s) can hide inside an aggregate that averages them with fast successes. Always chart success latency and error latency as separate series, or a bad deploy that fails fast will look like a latency *improvement*.
 
-## RED and USE
+## RED vs USE: which framework for what
+
+RED instruments **requests**, USE instruments **resources**. Reach for RED when the thing you are watching serves calls, reach for USE when it is the CPU, pool, or queue underneath, and run both, because they answer different halves of the same question.
 
 - **RED** (Rate, Errors, Duration) is for **request-driven services**: an API, a gRPC endpoint, a web handler. Per endpoint you emit request rate, error rate, and duration distribution. This is the workhorse for microservices.
 - **USE** (Utilization, Saturation, Errors) is for **resources**: a CPU, a disk, a NIC, a connection pool, a thread pool. Per resource you emit how busy it is (utilization), how much work is queued beyond what it can serve (saturation), and its error count.
