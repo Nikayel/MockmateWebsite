@@ -7027,7 +7027,7 @@ Recovery uses event sourcing. Before the engine acts on an accepted event, appen
 }
 \`\`\`
 
-Market-data fan-out must not slow matching: publish trades and book deltas onto a separate high-throughput multicast or streaming bus so slow subscribers cannot backpressure the matcher. Availability comes from hot-standby replicas that consume the same sequenced log and can take over deterministically, plus pre-trade risk checks in front of the matcher (credit/position limits) so bad orders never reach the book.
+Market-data fan-out must not slow matching: publish trades and book deltas onto a separate high-throughput multicast or streaming bus so slow subscribers cannot backpressure the matcher. Availability comes from hot-standby replicas that consume the same sequenced log and can take over deterministically, plus pre-trade risk checks in front of the matcher (credit/position limits) so bad orders never reach the book. A takeover also has to **fence** the demoted primary, meaning the election epoch is a number that only ever goes up, it rides every journal append, and the journal refuses any append carrying a lower one, which is what stops a primary that merely paused rather than died from writing when it wakes up still believing it leads (worked through in [leader election, leases, and fencing tokens](/learn/system-design/distributed-core/sd-l5-leader-election-fencing)).
 
 ## Failure modes and what each one costs
 
