@@ -73,32 +73,46 @@ export function learnTrackMetadata(args: { courseId: CourseId; description: stri
   })
 }
 
-/** `/learn/{track}/{levelSlug}` — the level index. The tagline is the authored one-line pitch. */
+/**
+ * `/learn/{track}/{levelSlug}` — the level index. The tagline is the authored one-line pitch.
+ *
+ * The title runs through the same ladder the lesson pages use. It did not, and the omission was
+ * worth 24 of 28 level indexes over the 60-character budget, the worst at 98:
+ *
+ *     Level 5: Advanced & Company-Specific SQL for DE Interviews · Learn Data Engineering | CodeSparring
+ *
+ * A level index is the page a searcher lands on for a whole topic, so it is exactly the page that
+ * cannot afford to be cut before it names its subject.
+ */
 export function learnLevelMetadata(args: {
   courseId: CourseId
   levelSlug: string
   levelTitle: string
   levelTagline: string
 }): Metadata {
-  return headFor({
+  const label = LEARN_COURSE_LABEL[args.courseId]
+  const base = headFor({
     path: levelPath(args.courseId, args.levelSlug),
-    title: `${args.levelTitle} · Learn ${LEARN_COURSE_LABEL[args.courseId]}`,
+    // As with lessons, the Open Graph title keeps the full label: no OG consumer enforces a
+    // 60-character budget, so naming the course there is a gain rather than a truncation risk.
+    title: `${args.levelTitle} · Learn ${label}`,
     description: truncateForDescription(
-      args.levelTagline || `A guided level in the free ${LEARN_COURSE_LABEL[args.courseId]} course.`
+      args.levelTagline || `A guided level in the free ${label} course.`
     ),
   })
+  return { ...base, title: composeLearnTitle(args.levelTitle, label) }
 }
 
 /**
  * Google shows roughly 60 characters of a title before truncating it. That budget has to cover the
- * lesson's own name, whatever course label we add, AND the ` | CodeSparring` the root template
+ * page's own name, whatever course label we add, AND the ` | CodeSparring` the root template
  * appends, because the searcher sees the composed string, not ours.
  */
 const TITLE_BUDGET = 60
 const BRAND_SUFFIX = " | CodeSparring"
 
 /**
- * Compose a lesson title that fits the SERP, degrading the suffix rather than the lesson name.
+ * Compose a Learn title that fits the SERP, degrading the suffix rather than the page's own name.
  *
  * ## The measurement that forced this
  *
@@ -117,25 +131,33 @@ const BRAND_SUFFIX = " | CodeSparring"
  *
  * Three rungs, each dropped only when the one above does not fit:
  *
- *  1. Full label: `Lesson · Learn System Design` + the template's ` | CodeSparring`.
- *  2. Brand only: `Lesson` + ` | CodeSparring`. The course is recoverable from the URL and from
- *     the breadcrumb rich result; the lesson name is not recoverable from anywhere.
+ *  1. Full label: `Page · Learn System Design` + the template's ` | CodeSparring`.
+ *  2. Brand only: `Page` + ` | CodeSparring`. The course is recoverable from the URL and from
+ *     the breadcrumb rich result; the page's own name is not recoverable from anywhere.
  *  3. Bare title via `title.absolute`, which bypasses the root template entirely. Reached only by
- *     a lesson whose own name is already at or past the budget, where adding the brand would cut
+ *     a page whose own name is already at or past the budget, where adding the brand would cut
  *     into the words the searcher is scanning for.
  *
  * Rung 3 is why this returns `Metadata["title"]` rather than a string: `absolute` is the only way
  * to opt out of a template Next.js otherwise applies unconditionally.
  *
- * The lesson title itself is NEVER truncated here. A title too long for the budget is a content
+ * ## Why one function serves lessons and level indexes
+ *
+ * The first fix shipped this for lessons only, under the name `composeLessonTitle`, and
+ * `learnLevelMetadata` kept building its title inline. The level indexes then carried the exact
+ * defect the ladder exists to retire, on the pages that sit one hop above 425 lessons. The budget,
+ * the suffix, and the degrade order are identical for both, so the rule lives in one place and the
+ * name says "Learn", not "lesson".
+ *
+ * The page title itself is NEVER truncated here. A title too long for the budget is a content
  * defect (SEO-01's sibling ticket) and shortening it silently would hide that from the corpus test
  * rather than fix it.
  */
-export function composeLessonTitle(lessonTitle: string, courseLabel: string): Metadata["title"] {
-  const withLabel = `${lessonTitle} · Learn ${courseLabel}`
+export function composeLearnTitle(pageTitle: string, courseLabel: string): Metadata["title"] {
+  const withLabel = `${pageTitle} · Learn ${courseLabel}`
   if (withLabel.length + BRAND_SUFFIX.length <= TITLE_BUDGET) return withLabel
-  if (lessonTitle.length + BRAND_SUFFIX.length <= TITLE_BUDGET) return lessonTitle
-  return { absolute: lessonTitle }
+  if (pageTitle.length + BRAND_SUFFIX.length <= TITLE_BUDGET) return pageTitle
+  return { absolute: pageTitle }
 }
 
 /**
@@ -150,7 +172,7 @@ export function learnLessonMetadata(preview: PublicLessonPreview): Metadata {
   // reach the `absolute` rung, so it composes its own head and overrides just the title. The
   // Open Graph title keeps the full label: no OG consumer enforces a 60-character budget, and
   // Slack or LinkedIn showing the course is a gain rather than a truncation risk.
-  const title = composeLessonTitle(preview.title, LEARN_COURSE_LABEL[preview.courseId])
+  const title = composeLearnTitle(preview.title, LEARN_COURSE_LABEL[preview.courseId])
   const base = headFor({
     path,
     title: `${preview.title} · Learn ${LEARN_COURSE_LABEL[preview.courseId]}`,

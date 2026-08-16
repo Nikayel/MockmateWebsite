@@ -1,5 +1,10 @@
 /**
- * Every Learn lesson title, as the searcher actually sees it, must fit the SERP.
+ * Every Learn title, as the searcher actually sees it, must fit the SERP.
+ *
+ * Covers both public Learn page shapes: the 425 lesson pages and the 28 level indexes above them.
+ * The level indexes were added after the lesson fix shipped and left them behind: 24 of 28 rendered
+ * past the budget, the worst at 98 characters, because `learnLevelMetadata` still composed its
+ * title inline instead of going through the ladder. One builder, one test.
  *
  * ## Why this is a corpus test and not a unit test
  *
@@ -24,10 +29,11 @@
  * from the very test that should surface it. What it requires is that the composition never
  * makes a long title WORSE by bolting 37 characters of suffix onto it.
  */
+import type { Metadata } from "next"
 import { describe, expect, it } from "vitest"
 
-import { composeLessonTitle, learnLessonMetadata } from "../learn-metadata"
-import { listAllCatalogEntries } from "@/lib/tutorials/course-catalog"
+import { composeLearnTitle, learnLessonMetadata, learnLevelMetadata } from "../learn-metadata"
+import { listAllCatalogEntries, listAllCourseLevels } from "@/lib/tutorials/course-catalog"
 import { LEARN_COURSE_LABEL } from "@/lib/tutorials/lesson-routes"
 import { toPublicLessonPreview } from "@/lib/tutorials/public-preview"
 
@@ -36,14 +42,33 @@ const BRAND_SUFFIX = " | CodeSparring"
 const TITLE_BUDGET = 60
 
 const ENTRIES = listAllCatalogEntries()
+const LEVELS = listAllCourseLevels()
 
-/** The exact string Google renders: what the page declares, plus whatever the template adds. */
-function renderedTitle(entry: (typeof ENTRIES)[number]): string {
-  const preview = toPublicLessonPreview(entry)
-  const title = learnLessonMetadata(preview).title
+/**
+ * The exact string Google renders: what the page declares, plus whatever the template adds.
+ *
+ * `title.absolute` opts out of the template, so it is the rendered string on its own. Anything else
+ * is a bug in the builder rather than a value to interpret, hence the throw.
+ */
+function renderTitle(title: Metadata["title"], label: string): string {
   if (typeof title === "string") return `${title}${BRAND_SUFFIX}`
   if (title && typeof title === "object" && "absolute" in title) return String(title.absolute)
-  throw new Error(`${entry.lesson.id} produced an unusable title: ${JSON.stringify(title)}`)
+  throw new Error(`${label} produced an unusable title: ${JSON.stringify(title)}`)
+}
+
+function renderedLessonTitle(entry: (typeof ENTRIES)[number]): string {
+  const preview = toPublicLessonPreview(entry)
+  return renderTitle(learnLessonMetadata(preview).title, entry.lesson.id)
+}
+
+function renderedLevelTitle(level: (typeof LEVELS)[number]): string {
+  const metadata = learnLevelMetadata({
+    courseId: level.courseId,
+    levelSlug: level.level.slug,
+    levelTitle: level.level.title,
+    levelTagline: level.level.tagline,
+  })
+  return renderTitle(metadata.title, `${level.courseId}/${level.level.slug}`)
 }
 
 describe("Learn lesson titles fit the SERP budget", () => {
@@ -57,7 +82,7 @@ describe("Learn lesson titles fit the SERP budget", () => {
     // it holds regardless of how long any individual lesson title is.
     const offenders: string[] = []
     for (const entry of ENTRIES) {
-      const rendered = renderedTitle(entry)
+      const rendered = renderedLessonTitle(entry)
       const floor = entry.lesson.title.length
       if (rendered.length > Math.max(TITLE_BUDGET, floor)) {
         offenders.push(
@@ -75,7 +100,7 @@ describe("Learn lesson titles fit the SERP budget", () => {
       // A lesson whose bare name already exceeds the budget cannot be fixed here; that is a
       // content edit. Everything else has no excuse.
       if (entry.lesson.title.length + BRAND_SUFFIX.length > TITLE_BUDGET) continue
-      const rendered = renderedTitle(entry)
+      const rendered = renderedLessonTitle(entry)
       if (rendered.length > TITLE_BUDGET) {
         offenders.push(`${entry.lesson.id}: ${rendered.length} chars ("${rendered}")`)
       }
@@ -88,7 +113,7 @@ describe("Learn lesson titles fit the SERP budget", () => {
     // name renders "Lesson | CodeSparring | CodeSparring".
     const offenders: string[] = []
     for (const entry of ENTRIES) {
-      const rendered = renderedTitle(entry)
+      const rendered = renderedLessonTitle(entry)
       const occurrences = rendered.split("CodeSparring").length - 1
       if (occurrences > 1) offenders.push(`${entry.lesson.id}: "${rendered}"`)
     }
@@ -100,7 +125,7 @@ describe("Learn lesson titles fit the SERP budget", () => {
     // the lesson name is the only part of the string a searcher is scanning for.
     const offenders: string[] = []
     for (const entry of ENTRIES) {
-      const rendered = renderedTitle(entry)
+      const rendered = renderedLessonTitle(entry)
       if (!rendered.includes(entry.lesson.title)) {
         offenders.push(`${entry.lesson.id}: "${entry.lesson.title}" not intact in "${rendered}"`)
       }
@@ -109,11 +134,75 @@ describe("Learn lesson titles fit the SERP budget", () => {
   })
 })
 
+describe("Learn level index titles fit the SERP budget", () => {
+  it("walks every level of every course", () => {
+    expect(LEVELS.length).toBeGreaterThanOrEqual(28)
+    expect(new Set(LEVELS.map((level) => level.courseId)).size).toBe(3)
+  })
+
+  it("never renders a level index title past 60 characters", () => {
+    // Unconditional, unlike the lesson assertion. Every authored level title is at most 58
+    // characters today, so the ladder can always land inside the budget; a level title long
+    // enough to break this is a content edit, and failing here is how that gets noticed.
+    const offenders: string[] = []
+    for (const level of LEVELS) {
+      const rendered = renderedLevelTitle(level)
+      if (rendered.length > TITLE_BUDGET) {
+        offenders.push(
+          `${level.courseId}/${level.level.slug}: ${rendered.length} chars ("${rendered}")`
+        )
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  it("never truncates the level's own name and never names the brand twice", () => {
+    const offenders: string[] = []
+    for (const level of LEVELS) {
+      const rendered = renderedLevelTitle(level)
+      const id = `${level.courseId}/${level.level.slug}`
+      if (!rendered.includes(level.level.title)) {
+        offenders.push(`${id}: "${level.level.title}" not intact in "${rendered}"`)
+      }
+      if (rendered.split("CodeSparring").length - 1 > 1) {
+        offenders.push(`${id}: brand twice in "${rendered}"`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  it("keeps the course label on the level indexes that have room for it", () => {
+    // The ladder is only worth having if its top rung still fires. Python's short level titles
+    // are the ones that keep it, and a change that dropped the label everywhere would pass the
+    // budget assertion above while quietly making every level index less descriptive.
+    const withLabel = LEVELS.filter((level) =>
+      renderedLevelTitle(level).includes(` · Learn ${LEARN_COURSE_LABEL[level.courseId]}`)
+    )
+    expect(withLabel.length).toBeGreaterThan(0)
+  })
+
+  it("gives the level index a canonical of its own", () => {
+    // The root layout sets none, and the ladder change rebuilds this object, so the canonical is
+    // the thing most likely to be dropped by accident on the way through.
+    for (const level of LEVELS) {
+      const metadata = learnLevelMetadata({
+        courseId: level.courseId,
+        levelSlug: level.level.slug,
+        levelTitle: level.level.title,
+        levelTagline: level.level.tagline,
+      })
+      expect(metadata.alternates?.canonical, `${level.courseId}/${level.level.slug}`).toBe(
+        `https://www.codesparring.dev/learn/${level.courseId}/${level.level.slug}`
+      )
+    }
+  })
+})
+
 describe("the title ladder degrades in the right order", () => {
   const label = LEARN_COURSE_LABEL["system-design"]
 
   it("keeps the course label when it fits", () => {
-    const title = composeLessonTitle("Caching", label)
+    const title = composeLearnTitle("Caching", label)
     expect(title).toBe("Caching · Learn System Design")
     expect(`${title}${BRAND_SUFFIX}`.length).toBeLessThanOrEqual(TITLE_BUDGET)
   })
@@ -122,7 +211,7 @@ describe("the title ladder degrades in the right order", () => {
     // The course is recoverable from the URL and from the breadcrumb rich result. The lesson
     // name is recoverable from nowhere, so it is the last thing to go. 33 chars of title plus
     // 22 of label plus 15 of brand is 70 and does not fit; 33 plus 15 is 48 and does.
-    const title = composeLessonTitle("Leader Election and Fencing Tokens", label)
+    const title = composeLearnTitle("Leader Election and Fencing Tokens", label)
     expect(title).toBe("Leader Election and Fencing Tokens")
     expect(`${title}${BRAND_SUFFIX}`.length).toBeLessThanOrEqual(TITLE_BUDGET)
   })
@@ -131,7 +220,7 @@ describe("the title ladder degrades in the right order", () => {
     // 47 chars of title plus 15 of brand is 62, so the brand itself would be cut mid-word.
     // Dropping it leaves the searcher the whole lesson name, which is the part they scan for.
     const long = "Leader Election, Leases, Fencing and Split-Brain"
-    const title = composeLessonTitle(long, label)
+    const title = composeLearnTitle(long, label)
     // `absolute` is the only way to opt out of the root template, which Next.js otherwise
     // applies unconditionally.
     expect(title).toEqual({ absolute: long })
