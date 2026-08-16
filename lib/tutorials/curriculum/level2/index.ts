@@ -3287,6 +3287,21 @@ print(validate(10))   # ok
 }
 \`\`\`
 
+### \`ExceptionGroup\` and \`except*\`: when more than one thing fails at once
+
+Concurrent code can fail more than one way in the same operation: three uploads run at once and two of them raise. An ordinary \`try\`/\`except\` can only ever catch one exception, so Python 3.11 added \`ExceptionGroup\`, a container that carries several exceptions at once, and \`except*\`, which catches by type from inside that container instead of forcing one catch-all handler for the whole group.
+
+\`\`\`python
+try:
+    raise ExceptionGroup("uploads failed", [ValueError("bad size"), TimeoutError("slow")])
+except* ValueError as eg:
+    print("value problems:", eg.exceptions)
+except* TimeoutError as eg:
+    print("timeout problems:", eg.exceptions)
+\`\`\`
+
+Each \`except*\` clause still names one narrow type, exactly like the ordinary \`except\` clauses above; it just runs once per matching subgroup instead of stopping at the first match. This is what \`asyncio.TaskGroup\` raises when more than one of its tasks fails, so \`except*\` is how you handle partial failure across concurrent work without losing any of the individual errors.
+
 ## Pitfalls
 
 A bare \`except:\` (or \`except Exception:\`) catches too much. If you wrap \`a / b\` in \`except:\` and later mistype a variable name, the resulting \`NameError\` gets swallowed and you silently return \`None\`, hiding a real bug. Catch the narrow type instead. A second trap: a \`return\` inside \`finally\` overrides any return value or exception from the \`try\` and discards it silently, so do not \`return\` from \`finally\`.
