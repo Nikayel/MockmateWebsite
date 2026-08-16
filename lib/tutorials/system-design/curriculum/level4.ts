@@ -2158,10 +2158,11 @@ per-IP, per-API-key, per-endpoint, or global), do I allow or reject the next one
 part is the shape of what you allow. Two systems can both permit "100 requests per minute" and behave
 completely differently at the second scale.
 
-That shape is all this lesson is about: four algorithms, what each one lets through, and the response
-contract that goes with the decision. Holding one limit across a fleet is the next lesson's problem,
-and Level 10's [end-to-end limiter case study](/learn/system-design/case-studies/sd-l10-rate-limiter)
-assembles a whole component from both.
+That shape is all this lesson is about: the algorithms themselves, what each one lets through, and
+the response contract that goes with the decision. Holding one limit across a fleet is the next
+lesson's problem, and Level 10's
+[end-to-end limiter case study](/learn/system-design/case-studies/sd-l10-rate-limiter) assembles a
+whole component from both.
 
 **Token bucket** is the usual default because it is burst-friendly. A bucket holds up to \`B\` tokens
 and refills at \`R\` tokens per second. Each request removes one token; if the bucket is empty,
@@ -2532,9 +2533,8 @@ const loadSheddingBackpressureTeach = `
 
 Level 1's [introductory treatment of flow control](/learn/system-design/foundations/sd-l1-backpressure-shedding)
 owns the primitives, and this lesson does not re-derive them: bound every queue, let backpressure
-propagate, and reject early because
-latency explodes as utilization nears 100%. Taking those as given, this lesson is about what happens
-when they are not enough. It leads with the failure they exist to prevent, the retry-storm death
+propagate, and reject early because latency explodes as utilization nears 100%. Taking those as
+given, this lesson is about what happens when they are not enough. It leads with the failure they exist to prevent, the retry-storm death
 spiral that outlives its own trigger, and then the two controls that beat it, adaptive concurrency
 limits and brownout. Rate limiting caps one client's demand; overload protection is what you reach for
 when total legitimate demand simply exceeds your capacity, or a dependency slows and requests pile up.
