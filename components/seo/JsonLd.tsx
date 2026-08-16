@@ -315,11 +315,34 @@ export function ArticleJsonLd({
  *
  * This is the highest-value schema on a deep Learn corpus: a lesson four segments down otherwise
  * shows a URL, and instead shows "CodeSparring > Learn > Python > Truthiness traps".
+ *
+ * ## Why the list itself carries a `name`
+ *
+ * Verified against production 2026-08-16 with the URL Inspection API on
+ * `/learn/data-engineering/foundations/sql-l1-dates`: the page passes, and the detected rich result
+ * comes back as `{ richResultType: "Breadcrumbs", items: [{ name: "Unnamed item" }] }`. Search
+ * Console labels each detected item by the entity's own `name`, and every `ListItem` inside this
+ * graph had one while the enclosing `BreadcrumbList` did not. The consequence is not a validation
+ * error, it is a reporting one, and it is site-wide: the Breadcrumbs enhancement report filed all
+ * 425 lesson URLs plus every landing page and blog post under a single bucket called "Unnamed item",
+ * which is exactly the report you would use to find out which section lost its breadcrumbs.
+ *
+ * The name defaults to the trail's leaf, which is the page this graph describes, so the report reads
+ * as a list of page titles with no per-call-site upkeep. `name` is inherited from `ItemList` and then
+ * `Thing`, so it is valid on `BreadcrumbList` and Google ignores it for the rich result itself.
  */
-export function BreadcrumbJsonLd({ items }: { items: Array<{ name: string; url: string }> }) {
+export function BreadcrumbJsonLd({
+  items,
+  name,
+}: {
+  items: Array<{ name: string; url: string }>
+  /** Overrides the default leaf name. Rarely needed; the leaf is the page. */
+  name?: string
+}) {
   const schema = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
+    name: name ?? items[items.length - 1]?.name ?? "CodeSparring",
     itemListElement: items.map((item, index) => ({
       "@type": "ListItem",
       position: index + 1,
