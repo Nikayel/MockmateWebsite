@@ -38,7 +38,21 @@ const PREVIOUSLY_ORPHANED_PAGES = [
   "/guides/what-is-a-real-world-coding-interview-round",
 ]
 
+/**
+ * Paths the footer is also the site-wide crawl path for, added later and for different reasons than
+ * the guides column: `/referral-terms` was a third sitemap-only orphan, and `/labs` had nine inbound
+ * links but not one of them site-wide, which on the strongest-ranking product page is its own defect.
+ */
+const SITE_WIDE_ONLY_HERE = ["/labs", "/referral-terms"]
+
 describe("footer internal links", () => {
+  it("links the pages the footer is the site-wide crawl path for", () => {
+    const hrefs = renderedFooterHrefs()
+    for (const path of SITE_WIDE_ONLY_HERE) {
+      expect(hrefs, `${path} has no site-wide internal link`).toContain(path)
+    }
+  })
+
   it("links every previously orphaned landing page and guide", () => {
     const hrefs = renderedFooterHrefs()
     for (const path of PREVIOUSLY_ORPHANED_PAGES) {

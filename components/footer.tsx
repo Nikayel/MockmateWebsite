@@ -132,6 +132,17 @@ export function Footer() {
                   </a>
                 </li>
                 <li>
+                  {/* /labs is the strongest-ranking product page on the site and had nine inbound
+                      internal links, none of them site-wide and none from a lesson. A footer entry
+                      puts it one hop from every page instead. */}
+                  <Link
+                    href="/labs"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Case Labs
+                  </Link>
+                </li>
+                <li>
                   <a
                     href="/samples"
                     className="text-muted-foreground hover:text-foreground transition-colors"
@@ -244,6 +255,17 @@ export function Footer() {
                   >
                     Your Data Rights
                   </a>
+                </li>
+                <li>
+                  {/* Submitted in the sitemap, linked from nowhere: the same "Discovered, currently
+                      not indexed" shape the guides column was built to fix. Legal is where a terms
+                      page belongs, so it costs nothing to give it the one link it needs. */}
+                  <Link
+                    href="/referral-terms"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Referral Terms
+                  </Link>
                 </li>
                 <li>
                   <a
