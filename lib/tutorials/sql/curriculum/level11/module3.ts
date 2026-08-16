@@ -134,6 +134,8 @@ const exactDedup: SqlLesson = {
   title: "Deduplicating a Training Corpus with Hashes",
   summary:
     "Exact-hash dedup strips 20 to 30 percent of a crawled corpus, and the ROW_NUMBER keep rule is only safe once its tiebreaker is deterministic.",
+  seoDescription:
+    "Exact dedup is a hash plus a keep rule: hash each document's content, partition by that hash, and keep ROW_NUMBER 1 under an ordering that breaks ties.",
   estimatedMinutes: 28,
   difficulty: "medium",
   skills: [
