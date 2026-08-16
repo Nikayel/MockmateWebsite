@@ -6934,6 +6934,8 @@ export const systemDesignLevel1: DesignLevel = {
           title: "Cascading Failure & Resilience Primitives",
           summary:
             "Propagated deadlines on every call, retries gated by idempotency with backoff-jitter-budget, circuit breakers to fail fast, and bulkheads to contain the blast.",
+          seoDescription:
+            "A timeout counters a stalled downstream, a retry a transient blip, a circuit breaker a dependency that is truly down, a bulkhead a pool draining the rest.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["resilience", "retries", "circuit-breaker"],
@@ -7050,6 +7052,8 @@ export const systemDesignLevel1: DesignLevel = {
           title: "Backpressure, Flow Control & Load Shedding",
           summary:
             "Bound every queue, run below saturation (latency explodes near 100% utilization), and reject early with 429/503 while prioritizing critical traffic.",
+          seoDescription:
+            "Backpressure is the signal a full buffer sends upstream so producers slow down; load shedding is the deliberate rejection at the door, a fast 429 or 503.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["backpressure", "load-shedding", "overload"],
@@ -7101,6 +7105,8 @@ export const systemDesignLevel1: DesignLevel = {
           title: "Server Concurrency: Thread-per-Request vs Event Loop, C10k",
           summary:
             "CPU-bound work wants a core-sized worker pool; IO-bound fan-out wants an event loop that you never block; past 10k connections, tune fds, ports, and memory.",
+          seoDescription:
+            "CPU-bound work wants a worker pool sized to cores; IO-bound work wants an event loop, where a waiting connection costs one file descriptor, not a thread.",
           estimatedMinutes: 30,
           difficulty: "hard",
           skills: ["concurrency", "performance", "operating-systems"],
