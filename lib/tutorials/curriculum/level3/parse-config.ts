@@ -203,7 +203,7 @@ def typed_value(key, raw):
         return raw
     if declared == "int":
         digits = raw[1:] if raw.startswith("-") else raw
-        if not digits.isdigit():
+        if not digits.isdecimal():
             raise _reject(key, raw, "an int")
         return int(raw)
     if declared == "bool":
@@ -490,15 +490,19 @@ Config values arrive as strings, so the reader has to decide whether a value is 
 \`\`\`python
 >>> "  hi ".strip()
 'hi'
->>> "-3".isdigit()               # the "-" makes this False
+>>> "-3".isdecimal()                  # the "-" makes this False
 False
->>> "-3".lstrip("-").isdigit()   # strip the sign first, then test
+>>> "-3"[1:].isdecimal()              # drop ONE leading sign, then test
 True
 >>> int("-3")
 -3
+>>> "--3".lstrip("-").isdecimal()     # lstrip drops EVERY sign, so this one lies
+True
+>>> "²".isdigit(), "²".isdecimal()   # isdigit accepts digits int() refuses
+(True, False)
 \`\`\`
 
-The rule is: trim the string, strip a leading \`-\` before calling \`isdigit\`, return \`int(value)\` when it looks integer, otherwise return the trimmed string.
+The rule is: trim the string, drop a single leading \`-\` before calling \`isdecimal\`, return \`int(value)\` when it looks integer, otherwise return the trimmed string. \`isdecimal\` is the predicate that matches what \`int()\` accepts; \`isdigit\` is looser, and \`lstrip("-")\` removes every sign rather than one, so a value like \`--3\` gets past both and then crashes \`int()\`.
 
 ## Finding a delimiter by position
 
@@ -566,7 +570,7 @@ Given \`"# db\\nhost = localhost\\nport = 8080"\`, the loop reaches the store st
 - **Splitting without \`maxsplit\`.** \`"url = a=b".split("=")\` returns three parts, so \`key, value = ...\` raises \`ValueError: too many values to unpack (expected 2)\`. Passing \`1\` splits on the first \`=\` only and keeps any \`=\` inside the value intact.
 - **Forgetting to trim the key.** \`"host = localhost".split("=", 1)\` gives \`["host ", " localhost"]\`. The value gets trimmed on the way to the store step, but the key does not. Store \`"host "\` (with the trailing space) as the key and a later \`config["host"]\` lookup raises \`KeyError\` instead of returning the value. Call \`.strip()\` on the key before storing it.
 
-**Interview nuance:** bounded splitting is the detail interviewers probe when you parse text. \`stripped.split("=", 1)\` splits on the first \`=\` only, so a value that itself contains \`=\` (a URL like \`url = a=b\`, a base64 token, a connection string) stays intact, while a bare \`split("=")\` raises \`ValueError\` the instant a value holds a second delimiter. Pair that with deciding a value's type from the raw string (trim it, strip a leading sign, then test \`isdigit\`) and you are doing real boundary parsing: turning loose text into typed data without trusting its shape.
+**Interview nuance:** bounded splitting is the detail interviewers probe when you parse text. \`stripped.split("=", 1)\` splits on the first \`=\` only, so a value that itself contains \`=\` (a URL like \`url = a=b\`, a base64 token, a connection string) stays intact, while a bare \`split("=")\` raises \`ValueError\` the instant a value holds a second delimiter. Pair that with deciding a value's type from the raw string (trim it, drop one leading sign, then test \`isdecimal\`) and you are doing real boundary parsing: turning loose text into typed data without trusting its shape.
 
 \`\`\`cswidget
 {
@@ -640,7 +644,7 @@ read_entry("DEBUG")                # None
     hints: [
       "Work on the stripped line, and get every reason to give up out of the way before you split anything.",
       "Splitting on the first `=` only is what keeps a value like `http://x/?a=b` intact. The key still needs trimming after the split, and an empty key is one of the give-up cases.",
-      '`value.lstrip("-").isdigit()` is True for "42" and "-3" but not for "hi" or "". When it is integer-looking, `int(value)` is the entry\'s value.',
+      '`isdecimal()` is the predicate that matches what `int()` accepts. Test the value with at most one leading `-` removed: True for "42" and "-3", False for "hi", "" and "--3". When it is integer-looking, `int(value)` is the entry\'s value.',
     ],
     referenceSolution: `def read_entry(line):
     stripped = line.strip()
@@ -653,7 +657,8 @@ read_entry("DEBUG")                # None
     if not key:
         return None
     value = raw.strip()
-    if value.lstrip("-").isdigit():
+    body = value[1:] if value.startswith("-") else value
+    if body.isdecimal():
         return (key, int(value))
     return (key, value)`,
     testCases: [
