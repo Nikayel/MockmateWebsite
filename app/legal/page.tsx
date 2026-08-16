@@ -1,5 +1,6 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { canonicalPageMetadata } from "@/lib/seo/page-metadata"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -16,11 +17,24 @@ import {
   AlertTriangle,
 } from "lucide-react"
 
-export const metadata = {
-  title: "Legal & Privacy - CodeSparring",
+/**
+ * Two defects, both invisible until the rendered HTML was read.
+ *
+ * The title carried the brand while the root layout's `title.template` was also appending it, so
+ * the SERP line read "Legal & Privacy - CodeSparring | CodeSparring". And this was the only URL in
+ * the sitemap with no `alternates.canonical` at all: the root layout deliberately sets none, so a
+ * page that declares none ships none, and `pnpm seo:audit` fails the build on it.
+ *
+ * The title now names what people actually search for. "Legal & Privacy" is the H1's phrasing and
+ * the right heading for a visitor already on the page; "Privacy Policy and Terms of Service" is
+ * what someone types, and it is the same two documents.
+ */
+export const metadata = canonicalPageMetadata({
+  path: "/legal",
+  title: "Privacy Policy and Terms of Service",
   description:
     "Privacy Policy, Terms of Service, and legal information for CodeSparring AI-powered interview practice platform.",
-}
+})
 
 export default function LegalPage() {
   // Bump `lastUpdated` whenever anything on this page changes. A privacy policy
