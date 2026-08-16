@@ -621,6 +621,112 @@ monthly baseline into classic and AI appearance so the CTR trend stays honest.
 
 ## Monthly log
 
+Every column is the **page dimension**, which is what the baseline row used. Say so when you add a
+row: the same window reports three different averages depending on how you group it, and a column
+that silently switches dimension turns the trend into noise. For the 2026-08-16 window the three
+were 23.05 (page), 25.84 (site-wide by date) and 48.93 (query).
+
 | Date | Clicks (28d) | Impressions (28d) | Avg position | Queries in top 10 | Notes |
 | --- | --- | --- | --- | --- | --- |
 | 2026-08-13 | 11 | 1,185 | 23.0 | 25 | Baseline. |
+| 2026-08-16 | 13 | 2,614 | 23.05 | 32 | Re-pull, NOT a new baseline. Window 2026-07-19 to 2026-08-15, 247 ranking pages, 327 ranking queries. Site-wide totals for the same window: 2,567 impressions at 25.84. The impression jump is the August crawl event receding (740 on 08-09 down to 115 on 08-14), not growth; see `docs/seo-visibility-event.md`. Query-dimension clicks are still 0 against the page dimension's 13, same withholding as the baseline. |
+
+---
+
+## Closures and corrections, 2026-08-16
+
+Appended rather than edited into the items above, per this file's own append-only rule. An item
+closed here stays where it is; read the two together.
+
+### Closed as shipped
+
+**SEO-01 — the title suffix ate the SERP budget.** `906e05cb`, 2026-08-13. The three-rung ladder
+lives in `lib/seo/learn-metadata.ts` and `lib/seo/__tests__/learn-title-budget.test.ts` holds it
+against the live corpus.
+
+Shipped incomplete, and finished 2026-08-16 in `5ea7084f`. `learnLevelMetadata` still composed its
+title inline, so while all 425 lesson pages were fixed, 24 of the 28 level indexes one hop above
+them still rendered past 60 characters. The worst was 98:
+
+```
+Level 5: Advanced & Company-Specific SQL for DE Interviews · Learn Data Engineering | CodeSparring
+```
+
+Same budget, same suffix, same degrade order, so `composeLessonTitle` became `composeLearnTitle` and
+both callers use it. Every level index now renders at 60 characters or fewer, and the corpus test
+pins that unconditionally, because every authored level title is at most 58 characters.
+
+**SEO-03 — lesson structured data.** `617385df`, 2026-08-13. Lesson pages emit `Article` JSON-LD
+from `components/seo/LessonJsonLd.tsx`, verified in the rendered HTML on 2026-08-16
+(`docs/seo-route-map.csv` records `Article` and `BreadcrumbList` on every lesson row).
+
+Two clauses of the original item were NOT implemented, both on purpose:
+
+- **`datePublished` / `dateModified` are omitted.** The honest value is the last commit that touched
+  the lesson source, and it is not available at build time: Vercel clones shallow, so every file
+  reports the same clone timestamp. Stamping one anyway is exactly the defect `1cc368cb` fixed in
+  the sitemap, re-entering through a different tag. Do not add them.
+- **The `FAQPage` clause is obsolete.** Google stopped rendering FAQ rich results on 2026-05-07, and
+  `FAQPageJsonLd` was deleted from `components/seo/JsonLd.tsx` for that reason. Do not add FAQPage
+  to lessons. The one `FAQPage` block still in the tree is `HomepagePositioningFAQJsonLd`, kept
+  deliberately for the AI crawlers `app/robots.ts` welcomes, which is a different purpose.
+
+**SEO-26 — breadcrumb structured data on Learn.** Verified 2026-08-16, and the answer is that it was
+already there: `d9bb28ee` (2026-08-08) put `BreadcrumbJsonLd` on the lesson reading page, and the
+level indexes, course pages, and hub carry it too. `docs/seo-route-map.csv` records `BreadcrumbList`
+on every Learn row. This was a "check whether" ticket and the check came back positive, so there was
+never a fix to ship. Acceptance (breadcrumbs in the Search Console enhancement report) is the
+owner's to confirm in the UI.
+
+**SEO-35 — lesson summaries were paragraphs.** ~30 commits on 2026-08-13, one per level file, closed
+by `8901703b`, which turned the reporter in `lib/tutorials/__tests__/lesson-content-hygiene.test.ts`
+into a failing assertion with a grandfathered allow-list of zero. Measured on the live corpus
+2026-08-16: **0 of 425 summaries over 160 characters**, down from 216, and **0 titles over 60**, down
+from four. The convention is now enforced by a test rather than by this document, which is the point.
+
+**SEO-36 — the 37-term keywords meta tag.** `5ca15217`, 2026-08-13. Deleted from the root layout and
+not replaced. `app/__tests__/no-keywords-meta.test.ts` fails if it returns.
+
+### SEO-31 — new state, still open
+
+The rendered-HTML comparison the item asked for is **done, and it came back negative.** Full route
+audit 2026-08-16: `docs/seo-route-map.csv` (one row per public URL) and `docs/seo-visibility-event.md`.
+
+`sd-l4-lb-l4-l7`, in the suppressed `scaling-compute` level, is byte-for-byte the same CLASS of page
+as `sd-l5-logical-clocks`, the indexed control: both server-render their teach prose into the initial
+HTML, both declare a self-canonical, both emit the same six schema types, both are in the sitemap,
+both measure 0.10 jaccard against any sibling, which is the chrome baseline. Re-inspected via the
+Search Console API on 2026-08-16: `sd-l4-lb-l4-l7` is "Discovered - currently not indexed" with one
+referring URL (`/learn/system-design`) and no crawl date at all. There is no rendering defect, no
+canonical defect, no schema defect, and no internal-link-count difference to find. That whole class
+of explanation is now ruled out.
+
+**Leading hypothesis: duplicate head-term intent, not page quality.** The route map flags
+`sd-l4-lb-l4-l7` as "unique text but DUPLICATE INTENT with `sd-l1-load-balancing`", and the same
+shape repeats between `scaling-compute` and its L1, L9 and L10 twins. Google appears to have picked
+one page per intent and left the rest discovered-but-uncrawled. That is consistent with the level
+being an outlier at 7% while its same-age siblings sit at 76% and above.
+
+**Remedy, in two halves.**
+
+1. **Title and H1 differentiation on the overlapping pages**, so each one states a different question
+   rather than a different wording of the same one. In flight as C7 in the 2026-08-16 ship.
+2. **Owner action, Search Console UI only:** request indexing on two or three `scaling-compute` URLs
+   (`sd-l4-rate-limit-algorithms`, `sd-l4-distributed-rate-limiting`, `sd-l4-lb-l4-l7`). This is the
+   experiment that distinguishes "Google will not crawl it" from "Google crawled it and declined to
+   keep it", and there is no API for it. Nothing in code can substitute.
+
+### SEO-14 — the L4 vs L7 cluster has an ownership problem, not a content gap
+
+The item proposed a dedicated comparison page. Measurement on 2026-08-16 says the page already
+exists twice and neither copy is winning, so build nothing until the ownership is settled:
+
+| Page | State, 2026-08-16 |
+| --- | --- |
+| `system-design/foundations/sd-l1-load-balancing` | Indexed. 39 impressions at position 52.1, 0 clicks, 28d to 2026-08-15. |
+| `system-design/scaling-compute/sd-l4-lb-l4-l7` | "Discovered - currently not indexed". Never crawled. Titled "Load Balancer Fundamentals: L4 vs L7", which is the exact query. |
+
+The page carrying the cluster's phrase in its title has never been crawled, and the page that ranks
+for the cluster is the one that does not target it. A third page would be a third claimant. Settle
+which URL owns "l4 vs l7 load balancing" first (this is the same duplicate-intent question as
+SEO-31), differentiate the other, and only then judge whether a concept page adds anything.
