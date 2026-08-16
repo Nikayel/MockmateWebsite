@@ -1458,9 +1458,10 @@ presence via BGP. The internet's routing fabric delivers each client's packets t
 nearest PoP announcing that prefix. Withdraw the BGP announcement at a failing PoP and traffic
 reconverges to the next-nearest one in seconds, with no DNS change and no client-side caching to wait
 out. **ECMP** spreads flows across equal-cost paths. The subtlety: plain ECMP rehashes flows when the
-server set changes, which breaks in-flight connections. Production anycast load balancers (Google's
-**Maglev**, AWS **Hyperplane**) use **consistent hashing** so a backend change only remaps a small
-fraction of connections.
+server set changes, which breaks in-flight connections. Production anycast load balancers do the same
+trick with the backend list: Google's **Maglev** uses **consistent hashing** so a backend change only
+remaps a small fraction of connections, and AWS's **Hyperplane** fleet behind NLB keeps flows pinned
+as the backend set changes.
 
 \`\`\`cswidget
 {
