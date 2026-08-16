@@ -429,7 +429,7 @@ class Account:
 get_type_hints(Account)   # {'id': <class 'int'>, 'name': <class 'str'>, 'note': <class 'str'>}
 \`\`\`
 
-That dict is what the opted-in tools are built on: \`@dataclass\` walks it to decide which fields exist and in what order \`__init__\` takes them. It is also how you write a loader that follows a class declaration instead of repeating it. Walk \`get_type_hints(cls)\` and each step gives you a field name and the type that field declared, together, which is exactly the pair a converter needs. Add a field to the class and the loader picks it up with no second edit.
+Those two are not the same tool, and it is worth keeping them apart. \`@dataclass\` reads the raw \`__annotations__\` mapping to decide which fields exist and in what order \`__init__\` takes them, and it never resolves what the annotation strings mean: a field annotated with a name that exists nowhere still builds a working class. \`get_type_hints\` is the resolver that turns those strings into real type objects, and a tool that needs the resolved types calls it itself. It is also how you write a loader that follows a class declaration instead of repeating it. Walk \`get_type_hints(cls)\` and each step gives you a field name and the type that field declared, together, which is exactly the pair a converter needs. Add a field to the class and the loader picks it up with no second edit.
 
 ### Two dict and list moves that go with typed records
 
