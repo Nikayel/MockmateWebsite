@@ -4297,8 +4297,9 @@ active-active pairs, or an anycast VIP fronting multiple LBs, with health-checke
 framing differs. A reverse proxy is defined by fronting backends and doing work on their behalf: TLS,
 caching, compression, buffering slow clients. Load balancing is one feature such a proxy may have.
 Every L7 load balancer is a reverse proxy, because it terminates the client connection and opens its
-own to the backend. An L4 balancer is not, because it forwards packets without ever terminating
-anything. The proxy side of that is
+own to the backend. An L4 balancer usually is not: it forwards or NATs packets without parsing the
+request, though a proxying L4 mode (HAProxy in TCP mode, an NLB terminating TLS) does terminate the
+TCP connection. The proxy side of that is
 [reverse proxies and the API gateway](/learn/system-design/foundations/sd-l1-reverse-proxy-gateway).
 
 **"Why not just use DNS round robin?"** Because DNS hands out an address at resolution time and then
