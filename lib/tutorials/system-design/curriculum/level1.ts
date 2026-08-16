@@ -3853,7 +3853,10 @@ A rule is worth what enforces it, and on a stream the enforcement point is a **s
 Every schema is registered before anything writes with it, each topic carries a compatibility mode,
 and a registration that would violate that mode is refused. The modes are named for the direction
 they protect: BACKWARD means a new schema can still read data written by the old one, FORWARD is the
-reverse, FULL demands both.
+reverse, FULL demands both. Under BACKWARD specifically, a field may be removed only if it was
+optional or carried a default value, and a field may be added only if it carries a default, which is
+why dropping the bare \`total_cents: long\` below is refused while the \`currency\` addition with a
+default is accepted.
 
 \`\`\`
 # topic "orders" is set to BACKWARD
@@ -3861,7 +3864,7 @@ POST /subjects/orders-value/versions
   fields: [ id: string, total_cents: long ]
 -> 200 OK, registered as version 4
 
-# now try to drop a field that consumers still read
+# now try to drop a field that has no default
 POST /subjects/orders-value/versions
   fields: [ id: string ]
 -> 409 Conflict, incompatible with version 4 under BACKWARD
