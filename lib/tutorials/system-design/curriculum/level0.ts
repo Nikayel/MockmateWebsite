@@ -2065,9 +2065,9 @@ Rounded, order-of-magnitude, the numbers that matter:
     },
     {
       "label": "Read 1 MB sequentially from RAM",
-      "value": 10000,
-      "display": "~10 us",
-      "note": "Sequential RAM reads stay in the microseconds even for a full megabyte."
+      "value": 50000,
+      "display": "~50 us",
+      "note": "Sequential RAM reads stay in the tens of microseconds even for a full megabyte."
     },
     {
       "label": "SSD random read",
@@ -2213,7 +2213,7 @@ always translate a number into a design decision.
     {
       "label": "Read 1 MB sequentially from RAM",
       "bucket": "Microseconds",
-      "feedback": "About 10 us. Sequential access is far cheaper than the same bytes fetched randomly."
+      "feedback": "About 50 us. Sequential access is far cheaper than the same bytes fetched randomly."
     },
     {
       "label": "Disk (HDD) seek",
