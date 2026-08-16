@@ -3112,7 +3112,31 @@ Chaos engineering is not "randomly break things." It is the disciplined practice
 4. **Measure** the steady-state metric against the hypothesis.
 5. **Learn**: either you gained confidence, or you found a weakness to fix before it finds you at 3 a.m.
 
+## What is fault injection?
+
+Fault injection is deliberately introducing a specific failure into a running system (added latency, an error response, a terminated instance, a dependency made unreachable) so you can watch how the system responds. It is step 3 of the loop above, and the word doing the work is *specific*: the fault is chosen in advance, scoped in advance, and paired with a hypothesis, which is the entire difference between an experiment and an outage.
+
 **Fault types** map to real failures: added latency (a slow dependency), error injection (a dependency returning 500s), instance/AZ/region termination (Chaos Monkey killing a node, an AZ going dark), resource exhaustion (CPU/memory/disk/file-descriptor pressure), and dependency loss (the cache tier or a downstream service disappearing). Each corresponds to something that will actually happen in production.
+
+Where you inject decides how much of the stack is under test. A **service-mesh or proxy filter** (an Envoy fault filter, for example) adds latency or errors to a share of the calls between two services without touching either one's code, which is the cheapest way to test a caller's timeout and retry behavior. A **library or SDK hook** injects inside the process, so you can fail one specific call rather than everything on the wire. **Infrastructure-level injection** (AWS Fault Injection Simulator, Gremlin, Chaos Mesh) terminates instances, detaches volumes, or blackholes a zone, which is the only way to reach the failures no in-process hook can reproduce.
+
+Four experiments worth having ready, because each one probes a defense you already designed:
+
+| Fault injected | Real failure it stands for | Hypothesis it tests | What a failed run tells you |
+| --- | --- | --- | --- |
+| Add 2 s of latency to 5% of calls to a downstream dependency | A dependency degrades without ever failing outright | The caller's timeout fires and its circuit breaker opens before threads pile up | Your timeout is longer than the caller's patience, or there is no breaker, so a slow dependency is now your outage |
+| Return 500 on 10% of calls to a non-critical service | A secondary dependency starts erroring | The page degrades to a sensible default and the critical path is untouched | Something you called non-critical is on the critical path, which is a design finding rather than a chaos finding |
+| Terminate one instance in a fleet | A host dies, or a spot instance is reclaimed | Health checks pull it, the load balancer redistributes, and no user sees an error | Draining is not graceful and in-flight requests are dropped, or the fleet was sized with no headroom |
+| Exhaust the connection pool on one instance | A slow query or a leak consumes every connection | The pool's queue timeout sheds the excess and the instance reports itself unhealthy | Requests queue without bound while the instance still answers its health check, so it stays in the pool serving nothing |
+
+Every one of those is scoped before it is run, which is the subject of the next section.
+
+**How interviews probe it.** The question is almost never "what is chaos engineering." It arrives as one of these, and each has a tell:
+
+- *"How would you test that this failover actually works?"* A strong answer names the fault, the steady-state metric measured before injection, and the stop condition, in that order. Naming a tool first is the weak answer, because the tool is the least interesting decision.
+- *"What would make you stop the experiment?"* They want a threshold committed to in advance on a user-facing metric, and an automatic revert. "We would watch the dashboards" means there is no abort condition.
+- *"It passed. What did you just prove?"* A pass is evidence for exactly the scope you injected and nothing wider. One instance surviving termination says nothing about a zone going dark, and claiming otherwise is the trap.
+- *"Where does the fault go in?"* The answer should follow from what is under test: a proxy filter to test a caller's timeout, an infrastructure tool to test a failover the process cannot reach.
 
 ## Blast radius is the safety discipline
 
