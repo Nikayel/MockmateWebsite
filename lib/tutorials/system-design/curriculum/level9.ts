@@ -832,7 +832,7 @@ Scaling to zero saves money on spiky, event-driven work, but the first request a
 }
 \`\`\`
 
-**Diurnal and spiky patterns:** for predictable daily cycles use **scheduled or predictive scaling** to pre-provision before the morning ramp so autoscaling is not racing the traffic wave. To avoid **flapping** (rapidly scaling up and down around the threshold), set **stabilization windows** and sensible scale-down delays so a brief dip does not tear down capacity you will need again in 30 seconds.
+**Diurnal and spiky patterns:** for predictable daily cycles use **scheduled or predictive scaling** to pre-provision before the morning ramp so autoscaling is not racing the traffic wave. To avoid **flapping** (rapidly scaling up and down around the threshold), set **stabilization windows** and sensible scale-down delays so a brief dip does not tear down capacity you will need again in 30 seconds. The lag this is fighting is quantified in [the scaling-compute treatment of autoscaling lag](/learn/system-design/scaling-compute/sd-l4-autoscaling), which prices the metric-scrape plus decision plus node-provisioning pipeline at 2 to 5 minutes.
 
 **Interview nuance:** if you say "scale on CPU" for an event-driven or latency-bound service, a strong interviewer will push: "what if CPU is at 40 percent but the queue has a million messages?" The correct answer scales on backlog or p99, and uses KEDA for the queue-depth and scale-to-zero case.
 
