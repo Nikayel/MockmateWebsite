@@ -1571,12 +1571,13 @@ Epoch integers are the compact form, which is why a time-series database keeps t
 
 \`\`\`sql
 -- One instant, three storage forms, one function.
-SELECT date('2026-03-01T09:14:00Z')  AS from_iso_text,      -- '2026-03-01'
-       date(1772356440, 'unixepoch') AS from_epoch_integer, -- '2026-03-01'
-       date(2461100.884722)          AS from_julian_real;   -- '2026-03-01'
+SELECT date('2026-03-01T09:14:00Z')  AS from_iso_text,        -- '2026-03-01'
+       date(1772356440, 'unixepoch') AS from_epoch_integer,   -- '2026-03-01'
+       date(2461100.884722)          AS from_julian_real,     -- '2026-03-01'
+       date(1772356440)              AS epoch_without_modifier; -- NULL
 \`\`\`
 
-A bare number with no modifier is read as a **Julian day**, so an epoch column needs the \`'unixepoch'\` modifier or it quietly means a date thousands of years off. And because a storage class belongs to the value rather than to the column ([data types and CAST](/learn/data-engineering/foundations/sql-l1-cast-types)), one column can hold all three forms at once, which is the argument for standardizing on ISO text at the ingest boundary.
+A bare number with no modifier is read as a **Julian day**, which is what the last column shows: 1772356440 is a Julian day far outside the range SQLite will render, so it hands back \`NULL\` rather than a date. An epoch column needs the \`'unixepoch'\` modifier, and forgetting it costs you a silent empty cell, not an error you can see. And because a storage class belongs to the value rather than to the column ([data types and CAST](/learn/data-engineering/foundations/sql-l1-cast-types)), one column can hold all three forms at once, which is the argument for standardizing on ISO text at the ingest boundary.
 
 ### How do you format a date in SQLite?
 
