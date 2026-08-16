@@ -4315,7 +4315,13 @@ For a cron job, on completion compute the next run and reschedule. Clock skew ac
 `.trim()
 
 const distributedLockTeach = `
-## Why a naive lock is unsafe
+## Why a distributed lock is hard to get right
+
+A distributed lock lets processes on different machines agree that only one of them is inside a critical section at a time. The naive build is a single command: set a key if it does not already exist, with an expiry so that a dead holder cannot deadlock everyone else. It is unsafe, and not in a way any amount of tuning removes. The holder can pause (a long garbage collection, a scheduler preemption, a network partition), the expiry can elapse while it is paused, a second client can acquire the lock, and the first can then wake up still believing it holds it. Two clients are now inside the critical section, and no TTL value prevents that, because a pause has no bound to tune the TTL against.
+
+The fix is a fencing token. Every grant carries a monotonically increasing number, every write to the protected resource carries the number its holder was granted, and the resource remembers the highest number it has accepted and rejects anything lower. The paused holder's late write arrives with a stale token and is refused. Consensus makes the lock state correct, fencing makes the critical section correct, and a design needs both.
+
+That is the substance of **Martin Kleppmann's critique** of the Redlock algorithm: safety cannot be derived from timing assumptions. A lock that treats elapsed clock time as evidence that it is still held breaks the moment a clock jumps or a process pauses for longer than the validity window, with no node having failed at all. Redis's author published a rebuttal, and the disagreement is largely about which system model is fair to assume, but the practical rule survives it. If losing the lock costs only efficiency, say a background job that runs twice, an expiry-based lock is a reasonable tool. If it costs correctness, say a double payment or a corrupted file, you need linearizable lock state plus a fencing token at the resource, because fencing is the only defence that assumes nothing about time.
 
 A coordination service (ZooKeeper, etcd, Consul) gives a cluster the primitives it cannot build safely on its own: mutual exclusion (a distributed lock), leader election, and shared configuration that stays correct across process pauses and network partitions. The interview tests whether you understand why a naive lock is unsafe and how leases, fencing tokens, watches, and consensus combine into a correct one.
 
@@ -4361,6 +4367,8 @@ A client holds a lock via a session with a TTL that it must renew by heartbeat. 
 Fencing tokens are what make leasing safe. Each lock grant includes a monotonically increasing token (etcd's key revision, ZooKeeper's zxid). Every write the lock holder makes to the protected resource carries its token, and the resource remembers the highest token it has accepted and rejects any lower one. So when a paused old holder wakes up and tries to write with an old token, the resource fences it off.
 
 Instead of polling "is the lock free yet," clients register a watch on the lock or leader key and receive a callback when it changes, giving fast failover. Leader election: candidates each create an ordered ephemeral key (a sequence number); the candidate with the lowest number is the leader; each other candidate watches only its immediate predecessor, so when the leader dies exactly one candidate is notified and takes over, avoiding a herd.
+
+Level 5 works the same mechanism from the other side, where the thing being held is a partition rather than a critical section: see [leader election, leases, and fencing tokens](/learn/system-design/distributed-core/sd-l5-leader-election-fencing) for how a demoted leader gets fenced off and why split-brain is the failure it exists to prevent.
 
 \`\`\`csdiagram
 {
