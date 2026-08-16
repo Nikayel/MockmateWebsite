@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react"
-import { useParams } from "next/navigation"
+import { notFound, useParams } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { getCaseLabById } from "@/lib/labs/case-labs"
@@ -54,21 +54,11 @@ export default function CaseLabPlayPage() {
 
   const hasRunForLab = Boolean(activeRun && lab && activeRun.caseLabId === lab.id)
 
-  if (!lab) {
-    return (
-      <main className="bg-background min-h-screen">
-        <Header />
-        <div className="flex min-h-screen items-center justify-center p-6">
-          <div className="flex flex-col items-center gap-3 text-center">
-            <p className="text-muted-foreground text-sm">Lab not found.</p>
-            <Link href="/labs" className="text-primary text-sm underline">
-              Back to labs
-            </Link>
-          </div>
-        </div>
-      </main>
-    )
-  }
+  // An unknown id is a 404, not a page. The layout rejects it server-side (`dynamicParams = false`
+  // plus its own `notFound()`), so this is a type guard that should never fire; it defers to the
+  // real not-found boundary rather than rendering a bespoke "Lab not found" panel, which is what
+  // used to answer HTTP 200 with an indexable head for any string in the URL.
+  if (!lab) notFound()
 
   const signedOutBanner = initialized && !user && (
     <div
