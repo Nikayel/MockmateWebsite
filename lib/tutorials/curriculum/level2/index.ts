@@ -5187,7 +5187,8 @@ Everything in the module returns a lazy iterator, so nothing intermediate is bui
     ["The first n of something unsliceable", "a counter and a break", "islice(stream, n)"],
     ["Runs of equal keys", "a previous-key variable and a buffer", "groupby(rows, key=...) over SORTED rows"],
     ["Every ordered pair", "two nested for loops", "product(items, repeat=2)"],
-    ["Every unordered pair", "a nested loop starting at i + 1", "combinations(items, 2)"]
+    ["Every unordered pair", "a nested loop starting at i + 1", "combinations(items, 2)"],
+    ["Fixed-size chunks of a stream", "a counter and a slice-and-append", "batched(stream, n)"]
   ],
   "highlightCols": ["The itertools name"],
   "caption": "Each of these is a loop you could write by hand in four lines. The value is not the line count: a named function says what the loop is FOR, and it hands back a lazy iterator, so nothing intermediate is ever materialized."
@@ -5354,6 +5355,21 @@ list(combinations("abc", 2))        # order does not matter, no reuse: 3 pairs
   ]
 }
 \`\`\`
+
+### \`batched\`: fixed-size chunks from a stream
+
+\`\`\`python
+from itertools import batched
+
+for chunk in batched(range(10), 3):
+    print(chunk)
+# (0, 1, 2)
+# (3, 4, 5)
+# (6, 7, 8)
+# (9,)
+\`\`\`
+
+\`batched(iterable, n)\` (Python 3.12+) is the fixed-size-chunk loop you would otherwise hand-roll with a counter and a slice: it lazily yields tuples of up to \`n\` items, and the final chunk is shorter rather than padded or dropped. Reach for it whenever you need to send a stream to an API or a database in batches of a fixed size.
 
 ### Pitfalls
 
