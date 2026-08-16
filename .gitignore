@@ -19,6 +19,9 @@ yarn.lock
 /playwright-report/
 /test-results/
 /coverage/
+# Generated audit reports (pnpm seo:audit). Regenerated from a live crawl on every run, so a
+# committed copy is stale the moment the site changes; read the run's own output instead.
+/artifacts/
 
 # production
 /build

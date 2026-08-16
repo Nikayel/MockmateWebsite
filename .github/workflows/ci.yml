@@ -107,3 +107,50 @@ jobs:
           NEXT_PUBLIC_FIREBASE_APP_ID: 1:123456789:web:abc123
           STRIPE_SECRET_KEY: sk_test_dummy_ci_build_only
           STRIPE_WEBHOOK_SECRET: whsec_dummy_ci_build_only
+
+      # The SEO gate rides this job rather than getting its own, because the only expensive thing
+      # it needs is the build that just finished. A separate job would pay for a second checkout,
+      # install, and `next build` to audit bytes identical to these.
+      #
+      # It crawls the SERVED output, not the source: a `metadata` export can be perfect while the
+      # rendered page ships two <h1>s from a shared layout, or ships an empty shell because the
+      # content moved behind a useEffect. Only the response can show that.
+      - name: Start built server
+        run: |
+          pnpm start -p 4256 &
+          echo $! > /tmp/seo-audit-server.pid
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:4256/robots.txt; then
+              echo "server up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "server did not answer /robots.txt within 60s"; exit 1
+        env:
+          # `next start` re-reads these at runtime; same structurally-valid dummies as the build.
+          NEXT_PUBLIC_FIREBASE_API_KEY: dummy
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: dummy.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: dummy
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: dummy.appspot.com
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: 123456789
+          NEXT_PUBLIC_FIREBASE_APP_ID: 1:123456789:web:abc123
+          STRIPE_SECRET_KEY: sk_test_dummy_ci_build_only
+          STRIPE_WEBHOOK_SECRET: whsec_dummy_ci_build_only
+
+      # `--sample-lessons=25` thins only the ~425 templated lesson URLs. Every distinct non-lesson
+      # page is still crawled in full, because those are the hand-authored ones where a one-off
+      # metadata defect can hide. A local run with no flag covers all of them.
+      - name: SEO audit
+        run: pnpm seo:audit --sample-lessons=25 --base-url=http://localhost:4256
+
+      - name: Upload SEO audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seo-audit-report
+          path: artifacts/seo-audit/
+          if-no-files-found: warn
+
+      - name: Stop built server
+        if: always()
+        run: kill "$(cat /tmp/seo-audit-server.pid)" 2>/dev/null || true
