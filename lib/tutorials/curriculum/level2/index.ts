@@ -458,7 +458,7 @@ The second \`sum\` sees an empty generator, not a fresh one. Also, \`next(gen)\`
     },
     {
       "label": "[line for line in lines if 'ERROR' in line][0]",
-      "feedback": "It reads correctly, which is why it slips through review. It also scans every one of the millions of lines and materialises every match before taking one, then raises IndexError on the clean run."
+      "feedback": "It reads correctly, which is why it slips through review. It also scans every one of the millions of lines and materializes every match before taking one, then raises IndexError on the clean run."
     }
   ],
   "reveal": "Two habits worth carrying out of this lesson: filter inside a generator expression so the scan stops at the first hit, and always pass next() a default when not found is a legitimate outcome."
@@ -1002,7 +1002,7 @@ For \`["hi", "go"]\` return \`["HI!", "GO!"]\`. Use \`map\` with a \`lambda\`.`,
 const closuresDecoratorsLesson: PythonLesson = {
   id: "py-l2-closures-decorators",
   title: "Scope, closures & decorators",
-  summary: "Capture state in a closure and wrap behaviour with a decorator.",
+  summary: "Capture state in a closure and wrap behavior with a decorator.",
   seoDescription:
     "A closure is an inner function plus a live link to the variables of the function that made it, and a decorator wraps a function to add behavior around it.",
   estimatedMinutes: 12,
@@ -1012,7 +1012,7 @@ const closuresDecoratorsLesson: PythonLesson = {
     estimatedMinutes: 5,
     markdown: `## Why closures and decorators are everywhere
 
-Every time you write \`@app.route\`, \`@pytest.fixture\`, or \`@functools.lru_cache\`, you are using both ideas at once. A closure lets a function carry state without a class or a global variable. A decorator lets you add behaviour (timing, retries, auth checks, caching) around a function without touching its body. In real codebases these keep cross-cutting logic in one place instead of copy-pasted into every function.
+Every time you write \`@app.route\`, \`@pytest.fixture\`, or \`@functools.lru_cache\`, you are using both ideas at once. A closure lets a function carry state without a class or a global variable. A decorator lets you add behavior (timing, retries, auth checks, caching) around a function without touching its body. In real codebases these keep cross-cutting logic in one place instead of copy-pasted into every function.
 
 ## Scope: how Python resolves a name
 
@@ -1095,7 +1095,7 @@ print(c(), c(), c())           # 1 2 3
     },
     {
       "label": "A copy of identity with the doubling patched into its body",
-      "feedback": "Nothing rewrites the original function's code, which is the whole appeal: the body you wrote stays untouched and readable. The behaviour changes by wrapping it in another function, not by editing it."
+      "feedback": "Nothing rewrites the original function's code, which is the whole appeal: the body you wrote stays untouched and readable. The behavior changes by wrapping it in another function, not by editing it."
     },
     {
       "label": "None, because a decorator does not return anything",
@@ -1308,19 +1308,19 @@ function returns, apply it to a function that returns its argument, and return t
 const classesLesson: PythonLesson = {
   id: "py-l2-classes",
   title: "Classes, __init__, methods & self",
-  summary: "Model state and behaviour together with a class.",
+  summary: "Model state and behavior together with a class.",
   estimatedMinutes: 12,
   difficulty: "medium",
   skills: ["classes", "init", "methods", "self"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Why bundle state with behaviour
+    markdown: `## Why bundle state with behavior
 
 Real systems track things that own both data and the rules for changing that data. A bank account has a balance plus rules for depositing. A shopping cart has items plus rules for adding them. You could keep a loose \`balance\` variable and pass it to standalone functions, but then nothing keeps the data and its rules together, and every caller has to remember which functions are allowed to touch it. A \`class\` ties the data and the operations that act on it into one named type, so the \`balance\` and the sanctioned way to change it travel together.
 
 ### The mental model
 
-A \`class\` is a template that describes a kind of object. Each object you build from it is an \`instance\` with its own copy of the data (its \`attributes\`). The functions defined inside the class are \`methods\`: the behaviour that acts on one instance's data.
+A \`class\` is a template that describes a kind of object. Each object you build from it is an \`instance\` with its own copy of the data (its \`attributes\`). The functions defined inside the class are \`methods\`: the behavior that acts on one instance's data.
 
 \`\`\`python
 class BankAccount:
@@ -1733,7 +1733,7 @@ Prefer composition when one thing *contains* or *uses* another. Reserve inherita
     },
     {
       "label": "Construction itself raises TypeError, because the parent's setup was skipped",
-      "feedback": "Nothing checks that you called up the chain, so nothing can raise at construction time. Python has no notion of a partially initialised object to complain about."
+      "feedback": "Nothing checks that you called up the chain, so nothing can raise at construction time. Python has no notion of a partially initialized object to complain about."
     },
     {
       "label": "self.name is quietly set to None, since the parent declares it",
@@ -1897,13 +1897,13 @@ def run(amount):
 const dunderPropertiesLesson: PythonLesson = {
   id: "py-l2-dunder-properties",
   title: "Dunder methods & properties",
-  summary: "Give classes natural behaviour with __eq__/__repr__ and computed @property values.",
+  summary: "Give classes natural behavior with __eq__/__repr__ and computed @property values.",
   estimatedMinutes: 12,
   difficulty: "medium",
   skills: ["dunder-methods", "eq", "property", "classes"],
   teach: {
     estimatedMinutes: 5,
-    markdown: `## Why give a class built-in behaviour
+    markdown: `## Why give a class built-in behavior
 
 Print a plain object and you get \`<__main__.Point object at 0x10f3c2a90>\`. Compare two of them with \`==\` in a test and the answer has nothing to do with the values you care about. That is useless in tests, logs, and debugging. Dunder methods let your class plug into the same protocols the built-in types use, so \`==\`, \`print()\`, \`len()\`, \`[]\`, and more behave the way callers expect.
 
@@ -2021,7 +2021,7 @@ print(Circle(2).area)   # 12.56636
   "options": [
     {
       "label": "Nothing else. == simply gets smarter about equal points",
-      "feedback": "Tempting, because adding one method feels like a purely additive change and the equality behaviour is all you asked for. Python quietly sets __hash__ to None at the same time, so the class stops being hashable."
+      "feedback": "Tempting, because adding one method feels like a purely additive change and the equality behavior is all you asked for. Python quietly sets __hash__ to None at the same time, so the class stops being hashable."
     },
     {
       "label": "Adding a Point to a set now raises TypeError",
@@ -2485,7 +2485,7 @@ Three small methods and \`Deck\` now behaves like a built-in collection everywhe
     },
     {
       "label": "It prints ready, and only adding __bool__ would change that",
-      "feedback": "You have the fix backwards, which is a useful thing to catch now. __bool__ is what you add to OVERRIDE the length-based answer, not what turns the behaviour on."
+      "feedback": "You have the fix backwards, which is a useful thing to catch now. __bool__ is what you add to OVERRIDE the length-based answer, not what turns the behavior on."
     }
   ]
 }
@@ -2598,7 +2598,7 @@ print(t.calls)                      # ['working', 'closed']
 - **Returning \`True\` from \`__exit__\` by accident.** A bare \`return True\`, or ending with a value that happens to be truthy, silently swallows every exception in the block. Return \`False\` (or nothing at all, since \`None\` is falsy) unless suppressing is the explicit intent.
 - **\`__len__\` returning a non-integer.** \`len()\` raises \`TypeError\` if you hand back a float or a string, even when the number is right.
 - **Forgetting that \`__len__\` drives truthiness.** An object with \`__len__\` returning \`0\` is falsy. Add \`__bool__\` if that is wrong for your type.
-- **Building a list just to iterate.** \`__iter__\` should \`yield\` rather than \`return list(...)\` when the source is large: yielding streams one item at a time instead of materialising the whole collection.
+- **Building a list just to iterate.** \`__iter__\` should \`yield\` rather than \`return list(...)\` when the source is large: yielding streams one item at a time instead of materializing the whole collection.
 
 \`\`\`cswidget
 {
@@ -3157,7 +3157,7 @@ except ZeroDivisionError:
     {
       "label": "A TypeError propagating out of safe_divide",
       "correct": true,
-      "feedback": "Right, and that is the behaviour you want. A bad argument type is a caller bug, not a divide-by-zero, and hiding it behind None would send the wrong value downstream."
+      "feedback": "Right, and that is the behavior you want. A bad argument type is a caller bug, not a divide-by-zero, and hiding it behind None would send the wrong value downstream."
     },
     {
       "label": "5.0, because Python converts the string to a number for the division",
@@ -3217,7 +3217,7 @@ finally:
     },
     {
       "label": "SyntaxError, because return is not allowed inside finally",
-      "feedback": "It is legal, which is unfortunate given how surprising the behaviour is. Linters flag it precisely because the language will not."
+      "feedback": "It is legal, which is unfortunate given how surprising the behavior is. Linters flag it precisely because the language will not."
     }
   ]
 }
@@ -3485,16 +3485,16 @@ Every CSV value comes back as a \`str\`. There is no type inference: the number 
   "prompt": "point = (1, 2). What is json.loads(json.dumps(point)) == point?",
   "options": [
     {
-      "label": "True. Serialising and parsing is a round trip, so you get the tuple back",
+      "label": "True. Serializing and parsing is a round trip, so you get the tuple back",
       "feedback": "Tempting, because round trip suggests the value survives untouched, and it does survive in the sense that the numbers are all there. JSON has no tuple type, so the shape it can express is an array, and an array parses back as a list."
     },
     {
       "label": "False. It comes back as the list [1, 2]",
       "correct": true,
-      "feedback": "Right. Anything that depends on the exact Python type after a serialise-and-parse cycle will break. Sets cannot be serialised at all, and integer dict keys come back as strings."
+      "feedback": "Right. Anything that depends on the exact Python type after a serialize-and-parse cycle will break. Sets cannot be serialized at all, and integer dict keys come back as strings."
     },
     {
-      "label": "TypeError, because json cannot serialise a tuple",
+      "label": "TypeError, because json cannot serialize a tuple",
       "feedback": "That is true of a set, which json refuses outright. A tuple is close enough to an array that json accepts it happily, which is exactly why the loss is quiet."
     },
     {
@@ -3617,7 +3617,7 @@ Every tutorial teaches \`open\` for reading, and reading has one real failure mo
 
 None of these are exotic. They are the ordinary results of the defaults, and each has a one-line fix.
 
-> The exercises here really do write files. The editor runs Python on an in-memory filesystem, so anything you create lives for the length of the run and then vanishes, which makes it a safe place to practise the real calls.
+> The exercises here really do write files. The editor runs Python on an in-memory filesystem, so anything you create lives for the length of the run and then vanishes, which makes it a safe place to practice the real calls.
 
 ### Pick the mode on purpose
 
@@ -3763,7 +3763,7 @@ def write_atomically(path, text):
       "feedback": "Nothing in the filesystem chooses between two paths on your behalf: the service opens the name it was told to open. Modification times only matter to tools that go looking for them."
     }
   ],
-  "reveal": "The rule generalises: make the new thing somewhere harmless, then move it into place in one operation. It is the same shape as a blue-green deploy or an index swap, just at file scale."
+  "reveal": "The rule generalizes: make the new thing somewhere harmless, then move it into place in one operation. It is the same shape as a blue-green deploy or an index swap, just at file scale."
 }
 \`\`\`
 
@@ -4117,7 +4117,7 @@ with open("names.csv", encoding="utf-8") as fh:
 - **Encoding can fail too.** \`"café".encode("ascii")\` raises \`UnicodeEncodeError\`, which is the same problem running the other way.
 - **A BOM is real bytes.** A file saved by some Windows tools starts with \`\\xef\\xbb\\xbf\`, and UTF-8 decodes it as an invisible character that then breaks your first column name. \`encoding="utf-8-sig"\` strips it.
 
-**Interview nuance:** the sentence to have ready is "decode at the boundary, work in \`str\`, encode on the way out." It is the same shape as the naive-versus-aware rule for datetimes, and for the same reason: a program is easiest to reason about when every value inside it is already normalised. If pressed on a real incident, name latin-1 as the codec that never raises, so the failure it causes is wrong characters in your database rather than an exception in your logs.`,
+**Interview nuance:** the sentence to have ready is "decode at the boundary, work in \`str\`, encode on the way out." It is the same shape as the naive-versus-aware rule for datetimes, and for the same reason: a program is easiest to reason about when every value inside it is already normalized. If pressed on a real incident, name latin-1 as the codec that never raises, so the failure it causes is wrong characters in your database rather than an exception in your logs.`,
     demoCode: `text = "café"
 raw = text.encode("utf-8")
 print(raw)                      # b'caf\\xc3\\xa9'
@@ -4209,7 +4209,7 @@ resulting \`str\` either way.`,
 const modulesLesson: PythonLesson = {
   id: "py-l2-modules",
   title: "Modules, imports & the standard library",
-  summary: "Organise code into modules and reach for Python's batteries-included stdlib.",
+  summary: "Organize code into modules and reach for Python's batteries-included stdlib.",
   estimatedMinutes: 11,
   difficulty: "medium",
   skills: ["modules", "imports", "standard-library", "collections"],
@@ -4417,7 +4417,7 @@ Raw text arrives messy: log lines like \`"order 12, item 345"\`, user-typed phon
   "options": [
     {
       "label": "None. Python treats the backslash the same way in both kinds of string",
-      "feedback": "Tempting, because some patterns really do survive it: an unrecognised escape like the one in a digit class is left alone, so the code appears to work. The escapes Python DOES recognise are the problem, and \\\\b is one of them."
+      "feedback": "Tempting, because some patterns really do survive it: an unrecognized escape like the one in a digit class is left alone, so the code appears to work. The escapes Python DOES recognize are the problem, and \\\\b is one of them."
     },
     {
       "label": "Python turns \\\\b into a backspace character, so the pattern looks for a literal backspace instead of a word boundary",
@@ -4426,7 +4426,7 @@ Raw text arrives messy: log lines like \`"order 12, item 345"\`, user-typed phon
     },
     {
       "label": "It is an immediate SyntaxError, so you find out at once",
-      "feedback": "That would be the kind outcome. Recognised escapes are substituted silently, and unrecognised ones only produce a SyntaxWarning in Python 3.12 and later, which is easy to miss in a noisy log."
+      "feedback": "That would be the kind outcome. Recognized escapes are substituted silently, and unrecognized ones only produce a SyntaxWarning in Python 3.12 and later, which is easy to miss in a noisy log."
     },
     {
       "label": "The re module rejects any pattern that is not a raw string",
@@ -4497,7 +4497,7 @@ re.sub(r"\\d", "#", "a1b2")      # 'a#b#'  replace every match
     },
     {
       "label": "['a', 'b'], only the first group of each match",
-      "feedback": "That is exactly the behaviour with ONE group in the pattern, so this answer is a good instinct applied one step too narrowly. With two groups, both are reported."
+      "feedback": "That is exactly the behavior with ONE group in the pattern, so this answer is a good instinct applied one step too narrowly. With two groups, both are reported."
     }
   ]
 }
@@ -4718,7 +4718,7 @@ q.popleft()       # 0
     {
       "label": "2. The lookup inserted 'b' with a fresh empty list",
       "correct": true,
-      "feedback": "Right, and the branch still did not run because the new list is falsy, so nothing looks wrong until you iterate or serialise the dict later. Use groups.get('b') to peek without mutating."
+      "feedback": "Right, and the branch still did not run because the new list is falsy, so nothing looks wrong until you iterate or serialize the dict later. Use groups.get('b') to peek without mutating."
     },
     {
       "label": "1, because the empty list is falsy and therefore discarded",
@@ -4897,7 +4897,7 @@ Reach for \`date\` when the clock genuinely does not matter (a birthday, a billi
 
 ### \`strptime\` reads text, \`strftime\` writes it
 
-Memorise them by the middle letter: \`strptime\` **p**arses a string into a datetime, \`strftime\` **f**ormats a datetime into a string. Both take the same format codes.
+Memorize them by the middle letter: \`strptime\` **p**arses a string into a datetime, \`strftime\` **f**ormats a datetime into a string. Both take the same format codes.
 
 \`\`\`python
 from datetime import datetime
@@ -4933,8 +4933,8 @@ parsed.isoformat()                     # same string, no format to mistype
   "prompt": "A vendor changes its export from 2026-03-08 to 2026/03/08 and your loader still calls datetime.strptime(text, '%Y-%m-%d'). What happens on the first row?",
   "options": [
     {
-      "label": "It parses. strptime normalises common separators",
-      "feedback": "Tempting, because any human reading both strings sees the same date and plenty of parsers do normalise separators. strptime is not one of them: the literal characters between the codes have to match the input too."
+      "label": "It parses. strptime normalizes common separators",
+      "feedback": "Tempting, because any human reading both strings sees the same date and plenty of parsers do normalize separators. strptime is not one of them: the literal characters between the codes have to match the input too."
     },
     {
       "label": "It raises ValueError and the load stops on row one",
@@ -4953,7 +4953,7 @@ parsed.isoformat()                     # same string, no format to mistype
 }
 \`\`\`
 
-The format has to match the input exactly, separators included. A mismatch raises \`ValueError\` rather than guessing, which is the behaviour you want: a loud failure at the boundary beats a silently wrong date in a report. When the text is already ISO 8601, skip the format string entirely and call \`datetime.fromisoformat\`, which is faster and impossible to mistype.
+The format has to match the input exactly, separators included. A mismatch raises \`ValueError\` rather than guessing, which is the behavior you want: a loud failure at the boundary beats a silently wrong date in a report. When the text is already ISO 8601, skip the format string entirely and call \`datetime.fromisoformat\`, which is faster and impossible to mistype.
 
 ### Subtracting two datetimes gives a \`timedelta\`
 
@@ -5047,7 +5047,7 @@ Python refuses to subtract or order a naive datetime against an aware one, becau
 - Adding \`timedelta(days=1)\` adds exactly 24 hours. Across a daylight-saving change that is not the same wall-clock time the next day, which is why "every day at 09:00" jobs drift twice a year.
 - \`fromisoformat\` returns an aware datetime when the text carries an offset like \`+00:00\` and a naive one when it does not. One function, two kinds of result, so check \`utcoffset()\` instead of assuming.
 
-**Interview nuance:** "naive or aware?" is the fastest way to sound like you have run a system in production. Say that you normalise to aware UTC at every input boundary, keep UTC in storage and in every comparison, and render local time only in the presentation layer. Then name the two failure modes you are buying your way out of: the \`TypeError\` when the two kinds meet, and the silent off-by-an-offset duration you get in any language that coerces instead of raising.`,
+**Interview nuance:** "naive or aware?" is the fastest way to sound like you have run a system in production. Say that you normalize to aware UTC at every input boundary, keep UTC in storage and in every comparison, and render local time only in the presentation layer. Then name the two failure modes you are buying your way out of: the \`TypeError\` when the two kinds meet, and the silent off-by-an-offset duration you get in any language that coerces instead of raising.`,
     demoCode: `from datetime import datetime, timedelta, timezone
 
 parsed = datetime.strptime("08/03/2026 01:59:30", "%d/%m/%Y %H:%M:%S")
@@ -5190,7 +5190,7 @@ Everything in the module returns a lazy iterator, so nothing intermediate is bui
     ["Every unordered pair", "a nested loop starting at i + 1", "combinations(items, 2)"]
   ],
   "highlightCols": ["The itertools name"],
-  "caption": "Each of these is a loop you could write by hand in four lines. The value is not the line count: a named function says what the loop is FOR, and it hands back a lazy iterator, so nothing intermediate is ever materialised."
+  "caption": "Each of these is a loop you could write by hand in four lines. The value is not the line count: a named function says what the loop is FOR, and it hands back a lazy iterator, so nothing intermediate is ever materialized."
 }
 \`\`\`
 
@@ -5247,7 +5247,7 @@ list(islice(rows, 10, 20))       # start and stop, like a slice
 
 ### \`groupby\`: runs, not groups
 
-This is the one that surprises people, because the name is borrowed from SQL and the behaviour is not. \`groupby\` walks the input once and starts a new group every time the key CHANGES. It is closer to Unix \`uniq\` than to \`GROUP BY\`.
+This is the one that surprises people, because the name is borrowed from SQL and the behavior is not. \`groupby\` walks the input once and starts a new group every time the key CHANGES. It is closer to Unix \`uniq\` than to \`GROUP BY\`.
 
 \`\`\`cswidget
 {
@@ -5361,7 +5361,7 @@ list(combinations("abc", 2))        # order does not matter, no reuse: 3 pairs
 - **\`chain(pages)\` is not \`chain.from_iterable(pages)\`.** The first treats the outer list as a single source and yields the inner lists themselves; the second flattens. It is a silent shape bug rather than an error.
 - **\`groupby\` compares keys with \`==\` on adjacent items only.** It never sorts, hashes, or reorders, so the correctness of your grouping rests entirely on the ordering you handed it.
 
-**Interview nuance:** knowing \`groupby\` groups runs rather than values is a small fact that signals you have actually used the module rather than skimmed the docs. The wider point is worth saying out loud too: \`itertools\` pipelines are lazy, so \`islice(chain.from_iterable(files), 100)\` reads only as much of the first file as it needs and never materialises anything. That is the same streaming argument that makes generators worth reaching for at all.`,
+**Interview nuance:** knowing \`groupby\` groups runs rather than values is a small fact that signals you have actually used the module rather than skimmed the docs. The wider point is worth saying out loud too: \`itertools\` pipelines are lazy, so \`islice(chain.from_iterable(files), 100)\` reads only as much of the first file as it needs and never materializes anything. That is the same streaming argument that makes generators worth reaching for at all.`,
     demoCode: `from itertools import chain, groupby, islice, product
 
 print(list(chain.from_iterable([[1, 2], [3], [], [4, 5]])))   # [1, 2, 3, 4, 5]
@@ -5388,7 +5388,7 @@ For \`[[1, 2], [3]]\` return \`[1, 2, 3]\`. Empty inner lists contribute nothing
 
 
 def flatten(chunks):
-    # Chain the inner lists into one sequence, then materialise it.
+    # Chain the inner lists into one sequence, then materialize it.
     pass`,
     hints: [
       "`chunks` is one iterable OF iterables, which is the shape `chain.from_iterable` expects.",
@@ -5493,7 +5493,7 @@ const fetchingJsonLesson: PythonLesson = {
 
 Calling an API is three steps: send a request, look at what came back, and turn the body into Python values. The sending is one line and it is the part nobody gets wrong. Everything that breaks in production lives in the other two steps, because a response can arrive perfectly well and still be a failure, and a body can arrive perfectly well and still not be the shape you expected.
 
-> This editor runs Python in your browser, which has no network, so nothing here will actually fetch. Read the call below to learn its shape, then practise the half that breaks: reading a status and parsing a body. Level 3 does the rigorous version against a real service with \`httpx\` and \`pydantic\`.
+> This editor runs Python in your browser, which has no network, so nothing here will actually fetch. Read the call below to learn its shape, then practice the half that breaks: reading a status and parsing a body. Level 3 does the rigorous version against a real service with \`httpx\` and \`pydantic\`.
 
 ### The shape of the call
 
@@ -5544,7 +5544,7 @@ Four things are doing work in those lines. \`timeout\` stops a hung server from 
   "columns": ["Status", "What it means", "What the caller should do"],
   "rows": [
     ["2xx", "the request worked", "parse the body"],
-    ["429", "you are being rate limited", "wait, then retry, honouring Retry-After"],
+    ["429", "you are being rate limited", "wait, then retry, honoring Retry-After"],
     ["other 4xx", "your request is wrong", "fix the request; retrying changes nothing"],
     ["5xx", "the other side is broken", "retry with backoff, then give up loudly"],
     ["no response at all", "a timeout or a connection error", "this is the case that raises, so catch it"]
@@ -5656,7 +5656,7 @@ Note that \`.get("owner")\` returns \`None\` both when the key is missing and wh
 ### Pitfalls
 
 - **No timeout means no limit.** \`httpx\` defaults to five seconds, but \`requests\` has no default at all, so a hung server can pin a worker forever. Always pass one explicitly and you never have to remember which library you are in.
-- **Retrying without backoff is a denial of service you aimed at yourself.** Sleep longer after every attempt, cap the number of attempts, and honour \`Retry-After\` when a 429 sends one.
+- **Retrying without backoff is a denial of service you aimed at yourself.** Sleep longer after every attempt, cap the number of attempts, and honor \`Retry-After\` when a 429 sends one.
 - **A 200 does not mean the body is right.** Plenty of APIs return errors inside a 200 envelope. Check the payload's own success field where one exists.
 
 **Interview nuance:** when you are asked to "call this API," the answer that lands is the failure taxonomy, not the request line. Say that you separate three cases: no response at all (a timeout or connection error, and the only case that raises), a response with a bad status (transient for 429 and 5xx, so retry with backoff; permanent for other 4xx, so fail loudly), and a response with a good status but an unexpected shape (validate at the boundary and reject the record, not the batch). Level 3 turns that third case into typed models with \`pydantic\`; the reasoning is the same at every scale.`,
@@ -5789,7 +5789,7 @@ export const level2: PythonLevel = {
     {
       id: "py-l2-oop-foundations",
       title: "OOP Foundations",
-      description: "Model state and behaviour with classes, inheritance, composition, and dunders.",
+      description: "Model state and behavior with classes, inheritance, composition, and dunders.",
       lessons: [
         classesLesson,
         inheritanceCompositionLesson,
