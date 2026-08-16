@@ -694,7 +694,7 @@ POST /orders   Idempotency-Key: k-42   { sku: "A1", qty: 1 }      (the client re
 
 One order exists, and the client still gets an answer instead of an error. The safety comes from the
 key being the client's and being generated before the first attempt: that is what makes the second
-request recognisable as the same request rather than a new one. A server-generated id cannot do this,
+request recognizable as the same request rather than a new one. A server-generated id cannot do this,
 because the client never received it.
 
 **Active-passive keeps one writer; active-active gives that up.** "Multi-region" is two different
@@ -1738,7 +1738,7 @@ Two multipliers people get wrong, and they get them wrong in opposite directions
 
 ### Price the lever, because the price is what decides
 
-"Consider tiering" is not a judgement, it is a gesture at one. The judgement needs a number, so carry
+"Consider tiering" is not a judgment, it is a gesture at one. The judgment needs a number, so carry
 three approximate storage prices and say out loud that they are approximate: standard cloud object
 storage is roughly 20 dollars per TB-month, archive tiers roughly 1 to 4 dollars per TB-month, and
 in-memory cache roughly 5 dollars per GB-month, which is 5,000 dollars per TB-month. The absolute
@@ -2487,7 +2487,7 @@ makes you look like you are pattern-matching, not designing.
 
 Five of those six boxes are familiar. The proximity store usually is not, so here is what earns it a
 place. Take a scooter-share fleet: every scooter reports its position every few seconds, and riders
-ask "what is within 500 metres of me". A relational store can express that query:
+ask "what is within 500 meters of me". A relational store can express that query:
 
 \`\`\`
 -- on the primary database, with the PostGIS extension
@@ -2511,7 +2511,7 @@ GEOSEARCH scooters:sf FROMLONLAT -122.41 37.77 BYRADIUS 500 m ASC COUNT 20
 \`\`\`
 
 The key name is half the design. The index is partitioned into a grid of geographic cells (a geohash
-or S2 grid, one key per cell), so a search reads the caller's cell plus its neighbours instead of
+or S2 grid, one key per cell), so a search reads the caller's cell plus its neighbors instead of
 scanning the whole fleet, and each shard owns a region. Partitioning by scooter id would not work,
 because "near this point" does not follow id ranges. An in-memory QuadTree sharded by region is the
 other common shape of the same box.
@@ -2769,7 +2769,7 @@ feed cache    500M feeds x 200 entries x ~64 B
 That ranking changes what you say in the last two minutes. Trimming precomputed feeds from 200 posts
 to 100, the change you can actually see on your own diagram, saves about 16,000 dollars a month
 against a bill near 2.6 million: a rounding error, and proposing it signals you optimized whatever you
-happened to draw. Ageing blobs past 90 days onto an archive tier attacks the top line instead, and
+happened to draw. Aging blobs past 90 days onto an archive tier attacks the top line instead, and
 since about three quarters of a year-old corpus is already older than 90 days, it moves most of that
 1.5 million into a tier costing roughly a tenth as much, paid for in restore latency on the rare old
 photo. Name the line you are attacking and roughly what it is worth, and the cost item stops being a
