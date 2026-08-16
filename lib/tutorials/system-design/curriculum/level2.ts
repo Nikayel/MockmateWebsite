@@ -1206,7 +1206,9 @@ overwritten and deleted (tombstoned) rows, which bounds how many files a read mu
 I/O and CPU, so under sustained write pressure you get **compaction stalls** and latency spikes right
 when you are busiest. "Leveled" compaction (RocksDB default) gives better read and space
 amplification but more write amplification; "size-tiered" (Cassandra default) is the reverse. Naming
-this tradeoff signals you have actually operated one.
+this tradeoff signals you have actually operated one. Cassandra 5.0 (2024) added **Unified Compaction
+Strategy (UCS)**, a single tunable spanning that tradeoff continuously: STCS remains the upstream
+default for compatibility, but UCS is recommended for new deployments.
 
 ### The third strategy: compact by time, not by size
 
