@@ -602,6 +602,18 @@ print(posixpath.normpath("docs/" + "../internal/rotation-list.md"))
 
 The base disappeared. So the check belongs on the normalized result rather than on the raw input: normalize first, then require the answer to sit under the directory you meant, and refuse it otherwise.
 
+How the fragment gets attached to the base matters too. Gluing the two strings together and calling \`posixpath.join\` agree on an ordinary fragment and part company the moment the fragment is absolute.
+
+\`\`\`python
+import posixpath
+print(posixpath.normpath("docs" + "/" + "/internal/rotation-list.md"))
+# docs/internal/rotation-list.md
+print(posixpath.normpath(posixpath.join("docs", "/internal/rotation-list.md")))
+# /internal/rotation-list.md
+\`\`\`
+
+\`join\` discards everything to the left of an argument that begins with a separator, so an absolute fragment stays absolute. Concatenation swallows that leading separator instead, and the same fragment comes back looking like it sat under the base all along.
+
 ## Pitfalls
 
 - Trusting a gutted \`__builtins__\`. It removes \`__import__\` and leaves every attribute of every literal.
