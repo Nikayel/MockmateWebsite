@@ -507,7 +507,7 @@ print(Reader.REGISTRY)   # {'csv': <class '__main__.CsvReader'>}
 
 ### Reading what a class was built from
 
-Two attributes answer that, and they are not the same question. \`cls.__bases__\` is the tuple of direct parents, exactly as written in the class statement. \`cls.__mro__\` is the full linearised lookup order Python actually searches, starting at \`cls\` and ending at \`object\`:
+Two attributes answer that, and they are not the same question. \`cls.__bases__\` is the tuple of direct parents, exactly as written in the class statement. \`cls.__mro__\` is the full linearized lookup order Python actually searches, starting at \`cls\` and ending at \`object\`:
 
 \`\`\`python
 class Base:
