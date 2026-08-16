@@ -2214,6 +2214,8 @@ COMMIT arrives
   |-- synchronous_commit = local        ack here. Local WAL fsync'd. Survives a crash+restart.
   |-- synchronous_commit = remote_write ack here. A standby RECEIVED the record and wrote it
   |                                     (its OS has it; its own fsync may still be pending).
+  |-- synchronous_commit = on           ack here. DEFAULT. A standby fsync'd it to durable
+  |                                     storage, so it survives an OS-level crash on the standby.
   |-- synchronous_commit = remote_apply ack here. A standby fsync'd AND replayed it, so a read
   |                                     on that standby already sees this transaction.
 \`\`\`
@@ -5842,7 +5844,7 @@ export const systemDesignLevel2: DesignLevel = {
               "At 20K write TPS the fsync on the WAL is the binding constraint: a single fsync costs tens of microseconds to a few milliseconds depending on the device, and one per transaction serially would cap throughput well below target. The design is about batching fsyncs without lying about durability.",
               "**Payment transactions: `synchronous_commit = on`, full stop.** Money movement must be durable before the API returns success. Lean on group commit (`commit_delay` / `commit_siblings`) so under high concurrency hundreds of in-flight commits share a single fsync: the key move that preserves per-transaction durability while amortizing the expensive fsync, which is how you hit 20K TPS without 20K fsyncs.",
               "**Non-critical writes on the same system** (audit-log rows, analytics events where losing the last few milliseconds on a crash is acceptable): set `synchronous_commit = off` per-transaction, letting those commits return before the WAL fsync. Never for the ledger.",
-              "**Replication:** run a synchronous standby (`synchronous_commit = remote_write` or `remote_apply`) so a committed payment survives loss of the primary, not just a local fsync. The cost is a network round trip on every commit, so place the sync standby region-local/AZ-adjacent to keep it under a couple of milliseconds, and keep additional replicas asynchronous.",
+              "**Replication:** run a synchronous standby with `synchronous_commit = on` (the default) so a committed payment survives loss of the primary, not just a local fsync; `remote_write` is not enough for money, since it does not guarantee the standby fsync'd the record and a standby OS crash can still lose it. Reach for `remote_apply` only if the design also needs read-your-writes off that standby, since it adds the cost of waiting for WAL replay, not just receipt. The cost is a network round trip on every commit, so place the sync standby region-local/AZ-adjacent to keep it under a couple of milliseconds, and keep additional replicas asynchronous.",
               "**The committed tradeoff:** money transactions pay full local-plus-remote durability and accept the latency; group commit keeps per-transaction fsync cost low enough for 20K TPS; only genuinely disposable writes relax synchronous_commit.",
               "Common wrong turn: globally disabling synchronous_commit to hit the throughput number, silently making the ledger lose committed payments on a crash.",
             ],
