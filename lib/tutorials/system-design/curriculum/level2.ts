@@ -1129,7 +1129,7 @@ that can be re-aggregated.
 const btreeVsLsmTeach = `
 ## Two engine families, one read-versus-write trade
 
-Every durable database is built on one of two storage engine families, and the choice is
+Most durable OLTP databases are built on one of two storage engine families, and the choice is
 fundamentally a read-versus-write tradeoff. Knowing which one sits under Postgres versus Cassandra is
 the difference between guessing at a database and reasoning about one.
 
