@@ -2177,7 +2177,7 @@ Secrets (DB passwords, API keys, signing keys, TLS private keys) are the credent
 
 ## KMS vs HSM
 
-A **KMS** is a managed key service with an API for encrypt/decrypt/sign where keys never leave the service. An **HSM** is the tamper-resistant hardware (often **FIPS 140-2 Level 3** certified) that actually holds the root keys; managed KMS is usually HSM-backed. The pattern is a **key hierarchy** with a hardware-backed **root of trust**: the HSM holds the root KEK, which wraps intermediate keys, which wrap DEKs. Nothing sensitive exists in plaintext outside the hardware boundary, and you get a single audited choke point for every key operation.
+A **KMS** is a managed key service with an API for encrypt/decrypt/sign where keys never leave the service. An **HSM** is the tamper-resistant hardware (often **FIPS 140-3 Level 3** certified, the standard that superseded FIPS 140-2, whose certificates move to NIST's historical list in September 2026) that actually holds the root keys; managed KMS is usually HSM-backed. The pattern is a **key hierarchy** with a hardware-backed **root of trust**: the HSM holds the root KEK, which wraps intermediate keys, which wrap DEKs. Nothing sensitive exists in plaintext outside the hardware boundary, and you get a single audited choke point for every key operation.
 
 ## Rent or meter: what the dedicated hardware actually costs
 
@@ -4925,14 +4925,14 @@ export const systemDesignLevel8: DesignLevel = {
           practice: {
             id: "sd-l8-secrets-kms-practice",
             prompt:
-              "Design secrets and key management for a fintech that signs 50M payment transactions per day with private signing keys that must be FIPS 140-2 Level 3 protected, operates in 3 regions, and needs an emergency key-compromise response that revokes and rotates a root signing key without halting payments. Explain the key hierarchy and the compromise runbook.",
+              "Design secrets and key management for a fintech that signs 50M payment transactions per day with private signing keys that must be FIPS 140-3 Level 3 protected, operates in 3 regions, and needs an emergency key-compromise response that revokes and rotates a root signing key without halting payments. Explain the key hierarchy and the compromise runbook.",
             thinkAbout: [
               "Why must the signing key never leave the HSM, and how do you get throughput?",
               "Why keep the root cold and sign with short-lived intermediates?",
               "How does a dual-key overlap window rotate a root without halting payments?",
             ],
             modelAnswerOutline: [
-              "Assumptions: 50M signatures/day, signing keys are the crown jewels, regulation demands **FIPS 140-2 Level 3**, so the private signing keys **never exist outside an HSM**. The app does not hold the key; it calls the HSM's sign API (CloudHSM or a dedicated appliance), so a full server compromise leaks no key material.",
+              "Assumptions: 50M signatures/day, signing keys are the crown jewels, regulation demands **FIPS 140-3 Level 3**, so the private signing keys **never exist outside an HSM**. The app does not hold the key; it calls the HSM's sign API (CloudHSM or a dedicated appliance), so a full server compromise leaks no key material.",
               "**Throughput.** At ~600 signs/sec average (higher at peak) I front the HSMs with a signing service that pools connections and batches, since HSM sign throughput is the bottleneck, and I size an HSM cluster per region for headroom.",
               "**Key hierarchy.** A **root signing key** in the HSM signs (or certifies) **intermediate signing keys**; day-to-day transaction signing uses short-lived intermediates, so the root is used rarely and stays offline/quorum-protected. Rotating an intermediate is routine, and the root almost never has to move. DEKs/KEKs for data at rest sit under the same HSM root of trust.",
               "**Three regions.** Each region has its own HSM cluster holding replicas of the intermediates (keys replicated only inside the HSM/KMS boundary via vendor-secure channels), so a regional outage does not stop signing and cross-region latency never sits in the signing path. The root is held in one hardened region under M-of-N quorum (multiple officers must approve a root operation).",
