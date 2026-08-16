@@ -896,7 +896,7 @@ The canonical set is four, from Google's SRE book. If you meet a list of five or
 
 **Interview nuance:** interviewers love to ask why you separate the latency of successful requests from the latency of failed ones. Fast failures (a validation 400 returning in 2ms) drag your aggregate latency *down* and make a struggling service look healthy; slow failures (a request that times out at 30s then 500s) can hide inside an aggregate that averages them with fast successes. Always chart success latency and error latency as separate series, or a bad deploy that fails fast will look like a latency *improvement*.
 
-## RED vs USE: which framework for what
+## RED vs USE: which one for what?
 
 RED instruments **requests**, USE instruments **resources**. Reach for RED when the thing you are watching serves calls, reach for USE when it is the CPU, pool, or queue underneath, and run both, because they answer different halves of the same question.
 
