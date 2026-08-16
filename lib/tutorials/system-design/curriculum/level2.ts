@@ -2554,13 +2554,13 @@ long tail.
     {
       "id": "cap_share",
       "label": "Share of the 16MB document cap",
-      "expr": "doc_bytes / 16000000",
+      "expr": "doc_bytes / 16777216",
       "format": "percent"
     },
     {
       "id": "headroom",
       "label": "Comments this document can hold before writes fail",
-      "expr": "floor((16000000 - base_kb * 1000) / comment_bytes)",
+      "expr": "floor((16777216 - base_kb * 1000) / comment_bytes)",
       "format": "compact",
       "unit": "comments"
     },
