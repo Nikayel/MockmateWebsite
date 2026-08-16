@@ -3261,6 +3261,76 @@ not billions of raw points.
 }
 \`\`\`
 
+### What a TSDB stores on disk, next to a row store
+
+Those three properties are easier to hold onto as one picture. A row store keeps a *measurement*
+together; a time-series engine keeps a *series* together. Every other difference falls out of that
+single swap.
+
+| | Row store (a Postgres heap table) | Time-series engine |
+| --- | --- | --- |
+| The physical unit | one row: timestamp, value and every tag, side by side | one chunk: a long run of consecutive timestamps for a single series |
+| What sits next to a timestamp | that row's value and its tags | the next timestamp of the same series |
+| So compression sees | a page of unrelated types | a run of nearly identical numbers, which is the only reason delta-of-delta and XOR work at all |
+| Tags are stored | repeated in full on every row | once, in an index mapping the tag set to a series id |
+| Dropping a month of data | DELETE across live pages, then vacuum the dead tuples | drop the blocks whose time range expired |
+| Reading one series for an hour | index lookup, then scattered page reads | seek to the block, read one contiguous chunk |
+| Adding one more tag value | one more distinct value in a column | one more SERIES, with its own index entry and its own chunk |
+
+Read that last row twice, because it decides whether the design survives. In a row store a new tag
+value is more data. In a TSDB it is more *structure*, and structure is what has to be held in memory.
+
+### The write path: WAL, an in-memory head, immutable blocks
+
+An architecture question about a TSDB is really a question about this pipeline, so be able to walk it
+end to end.
+
+A sample arrives and is appended in two places at once: a **write-ahead log** on disk, so a crash
+loses nothing, and an in-memory **head block** covering the current time window (Prometheus uses two
+hours). That head is where the "in-memory time-series database" reputation comes from, and it is not a
+cache sitting in front of the real store, it *is* the store for recent data. The last-hour dashboards
+that make up most query traffic are answered out of RAM without opening a block file.
+
+When the window closes, the head is **compacted** into an immutable on-disk block: samples encoded
+with delta-of-delta and XOR into one contiguous chunk per series, an index covering the series that
+block contains, and a small metadata file naming its time range. The write-ahead log for that window
+is then truncated, because the block is now the durable copy. A background compactor merges small
+blocks into larger ones, enforces retention by deleting whole blocks, and ships cold blocks to object
+storage.
+
+Three properties of that shape are worth naming out loud in a design:
+
+- **Blocks are immutable and time-bounded.** Retention becomes a directory delete rather than a mass
+  DELETE, and a query opens only the blocks whose metadata overlaps its range. Long retention is
+  therefore nearly free at query time, which is not true of a heap table.
+- **The index is per block, not global.** A tag value that existed only last March costs memory only
+  while March's block is being read. The number that sizes your RAM is *active* series: the ones with
+  a chunk open in the head right now.
+- **Durability has a knob.** The write-ahead log is what makes a sample survive a crash, and batching
+  or skipping it is the standard way ingest throughput gets bought. Say which you chose, because a
+  metrics system that loses the last few seconds on restart is usually fine and one that quietly
+  loses an hour is not.
+
+### Out-of-order and late-arriving points
+
+Delta-of-delta encoding assumes each timestamp is larger than the one before it, and a sealed block
+assumes its time range is finished. Both assumptions break the first time a point arrives late: an
+agent that buffered through a network partition, a device that was offline all afternoon, an importer
+backfilling a year of history, a clock that stepped backwards.
+
+Where the point lands decides what it costs. If its timestamp still falls inside the open head
+window, it can be inserted, though it arrives out of order in a structure built for appends and gives
+back some compression. If it belongs to a window already compacted and sealed, the cheap answer is to
+reject it, and rejecting late samples is the historical default. Engines that must accept them keep a
+**separate out-of-order buffer** with its own log and merge it in at compaction, which is why the
+capability appears as a configured lateness window rather than an open promise.
+
+Make lateness an explicit parameter of the design, the way you would for a stream processor: how late
+may a point be and still count, what happens to one that misses the window, and whether bulk backfill
+is a different path entirely, writing whole historical blocks directly instead of replaying years of
+samples through an ingest path built for now. Settling this after launch means choosing between
+dropping data you were told to keep and rewriting sealed blocks.
+
 ### What the retention ladder is actually buying
 
 Those tier windows look arbitrary until you cost them, and costing them moves which one you would
@@ -3299,6 +3369,19 @@ team whose postmortems genuinely need raw-resolution detail on a year-old event 
 forgetting to set a retention policy. Keep the two bills separate in your head as well. This one is disk, set
 by resolution and retention. The next one is memory, set by how many series exist at all, and it
 behaves nothing like this.
+
+### How a label query finds its series
+
+\`http_requests{region="eu", status="500"}\` is not a scan. Each block carries an **inverted index**:
+for every label key-value pair, a sorted **posting list** of the series ids that carry it. The query
+intersects the posting list for \`region="eu"\` with the one for \`status="500"\`, gets a set of
+series ids, reads those series' chunks for the requested time range, and merges them by timestamp.
+
+That one mechanism explains both of the engine's headline numbers. Query cost tracks the number of
+series matched rather than the volume of data that exists, which is why a well-labeled metric stays
+fast as it ages. And memory tracks the number of distinct series, because each one needs an index
+entry and, while it is being written to, an open chunk in the head. Which brings us to the way a TSDB
+actually falls over.
 
 ### The signature failure mode: cardinality explosion
 
@@ -3470,11 +3553,42 @@ full URL with query params, email) into labels. If you need per-user analytics, 
 OLAP store (ClickHouse) or logs, not in a metrics TSDB. Use endpoint **templates** (\`/users/:id\`)
 not raw paths.
 
-**Interview nuance:** Know the landscape. **Prometheus** is pull-based metrics with its own TSDB,
-great for infra monitoring, not for long-term high-cardinality analytics. **InfluxDB / TimescaleDB**
-(the latter is Postgres with time-series superpowers, so you keep SQL and joins) are general TSDBs.
-**ClickHouse** is a columnar OLAP database often used for high-cardinality, high-volume time-series
-analytics where you need arbitrary group-bys that would kill a label-indexed TSDB.
+### Which time-series engine, and when
+
+**Interview nuance:** know the landscape well enough to place your own choice inside it. These are
+not ranked, they are shaped, and naming the shape you need is most of the answer.
+
+| Engine | What it is | Reach for it when |
+| --- | --- | --- |
+| Prometheus | Pull-based metrics collection with its own embedded TSDB | Infrastructure and service monitoring, bounded labels, days to weeks of retention |
+| Thanos, Cortex, Mimir | Prometheus-compatible layers that keep blocks in object storage | You want the same query language and dashboards over months or years of history |
+| InfluxDB | A general-purpose TSDB with its own ingest protocol and query language | Sensor and IoT workloads that are not shaped like scrape targets |
+| TimescaleDB | Postgres with time-series superpowers: chunked hypertables, columnar compression, continuous aggregates | The series must join against relational tables, or you want to keep SQL and the tooling around it |
+| ClickHouse | A columnar OLAP database, not a label-indexed TSDB | High-cardinality, high-volume analytics with arbitrary group-bys that would kill a label index |
+
+The line worth remembering is that Prometheus is excellent at infrastructure monitoring and wrong for
+long-term high-cardinality analytics, which is exactly the boundary the last two rows exist to cross.
+
+### Common interview follow-ups
+
+- **"A point shows up an hour late. What happens to it?"** Name your lateness window and what falls
+  outside it. Accepting unbounded lateness means rewriting sealed blocks, which is why every engine
+  bounds it.
+- **"Your hosts are pods and every deploy replaces all of them. Is that a cardinality problem?"**
+  Yes, and a quiet one. Each deploy retires a set of series and mints a fresh set, so the series a
+  block must index climbs with deploy frequency even while the active count looks flat. Label with a
+  stable identity (service, deployment) and leave the pod name to logs.
+- **"Your dashboard averages a 1-minute rollup up to an hour. Is that correct?"** Only if the rollup
+  stored what re-aggregation needs. A mean cannot be averaged again across buckets holding different
+  sample counts, so rollups keep sum and count and derive the mean at read time; min and max
+  re-aggregate directly. Percentiles do not re-aggregate at all, which is why latency is stored as
+  histogram buckets rather than as a p99 number.
+- **"A query spans both the raw window and the rollup window. What do you return?"** One resolution
+  for the whole answer, chosen from the range and the chart's step. A series that changes granularity
+  halfway makes a step artifact look like an incident.
+- **"The counter dropped to zero at 03:00. Was there an outage?"** Probably a process restart. A
+  monotonic counter resets when the process owning it does, so a rate calculation has to detect the
+  reset and treat it as a jump from zero rather than as one enormous negative delta.
 
 Recap: TSDBs exploit append-only, time-ordered, columnar data with delta-of-delta and Gorilla
 compression, time-partitioning, retention tiers, and downsampling to make metrics affordable, and the
@@ -5938,12 +6052,12 @@ export const systemDesignLevel2: DesignLevel = {
           title: "Time-Series Databases",
           summary:
             "How a time-series database earns 10x compression and cheap rollups, and why one unbounded label can OOM Prometheus.",
-          estimatedMinutes: 30,
+          estimatedMinutes: 36,
           difficulty: "medium",
           skills: ["time-series", "metrics", "cardinality"],
           teach: {
             markdown: timeSeriesTeach,
-            estimatedMinutes: 12,
+            estimatedMinutes: 18,
           },
           apply: {
             id: "sd-l2-time-series-apply",
