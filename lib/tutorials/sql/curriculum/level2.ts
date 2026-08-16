@@ -591,6 +591,8 @@ const innerJoin: SqlLevel["modules"][number]["lessons"][number] = {
   id: "sql-l2-inner-join",
   title: "INNER JOIN and Join Keys",
   summary: "Combine two source tables on a matching key.",
+  seoDescription:
+    "An INNER JOIN returns only rows with a match in both tables, gluing the pair's columns into one wider row and dropping anything unmatched on either side.",
   estimatedMinutes: 30,
   difficulty: "medium",
   skills: ["INNER JOIN", "ON", "join keys", "table aliases", "qualifying columns"],
