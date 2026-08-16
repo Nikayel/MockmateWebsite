@@ -10,7 +10,9 @@
 import type { DesignLevel } from "@/lib/tutorials/types"
 
 const availabilityNinesTeach = `
-## Availability, in minutes you can feel
+## Availability nines to downtime: the table
+
+Each added nine of availability is ten times less allowed downtime: over a 30-day month, 99% (two nines) allows about 7.2 hours, 99.9% (three nines) about 43 minutes, 99.99% (four nines) about 4.3 minutes, and 99.999% (five nines) about 26 seconds.
 
 Availability is the fraction of time (or of valid requests) a service is up and serving correctly. People quote it in "nines," and the single most useful senior habit is to translate nines into minutes of allowed downtime per month, because that is what an on-call rotation actually feels.
 
@@ -88,6 +90,14 @@ The math: allowed downtime = (1 - availability) x window. For a 30-day month (43
 
 Notice the leap between each row. Going from 99.9% to 99.99% shrinks your monthly downtime budget from 43.2 minutes to 4.3 minutes. That is not "a bit better," it is a 10x reduction in the failure you are allowed, and every added nine costs roughly 10x more to achieve. The reason: the cheap failures (a bad deploy, a full disk) are gone by three nines, so the next nine forces you to attack rare, expensive causes: multi-AZ redundancy, automated failover measured in seconds, eliminating every manual step from recovery, and testing failure paths constantly. Human response time alone (someone gets paged, opens a laptop, diagnoses) blows a five-nines budget, so five nines effectively means no human in the recovery loop.
 
+Read the table as a ladder of engineering, because each nine names a different class of work rather than a tighter version of the same work:
+
+- **Two nines, 99%, about 7.2 hours a month.** One instance with someone watching it. The budget is loose enough to absorb a manual restart, a weekly maintenance window, and a slow rollback done by hand.
+- **Three nines, 99.9%, about 43 minutes a month.** Health checks that pull a sick instance from the pool, automatic restarts, deploys that roll themselves back. A human can still own one incident a month and stay inside the budget, which is why three nines is where most internal services sit.
+- **Four nines, 99.99%, about 4.3 minutes a month.** Detection and recovery both have to be automatic, because paging a human and waiting for them to open a laptop already spends most of the month. This is the rung that buys multi-AZ redundancy and failover measured in seconds.
+- **Five nines, 99.999%, about 26 seconds a month.** No human is in the recovery path at all. Redundancy spans failure domains, traffic shifts on its own, and the failover path is exercised constantly, because an untested failover is itself the outage.
+- **Six nines and beyond, 99.9999%, about 2.6 seconds a month.** Quoted far more often than it is earned. A single unlucky DNS TTL or one slow rollback exceeds the entire year's allowance, and the dependency ceiling in the next section almost always caps you first. When a stakeholder asks for six nines, the useful reply is which dependency they intend to remove. Numbers past five nines are usually *durability* claims rather than availability ones: object stores quote durability in nine, ten, or eleven nines, which is the probability an object survives, not the probability you can reach it.
+
 ## Dependencies combine
 
 **Serial dependencies multiply.** If your checkout calls auth, inventory, and payments in series and each is 99.9% available, your ceiling is 0.999^3 = 99.7%, worse than any single component. More hops means a lower ceiling. You cannot be more available than the product of everything you synchronously depend on.
@@ -154,7 +164,7 @@ Notice the leap between each row. Going from 99.9% to 99.99% shrinks your monthl
 
 ## Interview nuance: three different numbers
 
-Interviewers probe whether you distinguish three different numbers. **Measured** availability is what your telemetry actually observed last month. The **SLA** is the external contractual promise with financial penalties (service credits) if you miss it. The **SLO** is your stricter internal target, deliberately tighter than the SLA so you get warning before you breach the contract. A team runs to a 99.95% SLO to safely honor a 99.9% SLA.
+Interviewers probe whether you distinguish three different numbers: **measured** availability is what your telemetry actually observed last month, the **SLO** is the stricter internal target you run to, and the **SLA** is the looser external promise that owes the customer service credits when it is missed, which is why a team runs to a 99.95% SLO to safely honor a 99.9% SLA. That hierarchy has its own lesson, [SLI vs SLO vs SLA](/learn/system-design/reliability-ops/sd-l7-sli-slo-sla), which owns how each indicator is computed from good over valid events, why the measurement point changes the number, and what a rolling window does that a calendar month does not.
 
 Common wrong turn: chasing five nines everywhere. If your database ceiling is 99.9% and a feature earns 20 dollars a minute of downtime saved, spending a quarter's engineering to add a nine it can never reach is malpractice. Match the target to revenue impact and to the dependency ceiling.
 
