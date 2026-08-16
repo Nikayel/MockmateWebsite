@@ -578,7 +578,7 @@ The move to avoid is a branch inside the helper keyed on who is calling. It keep
   "prompt": "One caller needs rounding that contradicts the helper's documented contract. Where does that difference belong?",
   "options": [
     {
-      "label": "In that caller, or behind a new parameter that defaults to the old behavior",
+      "label": "Push it into the calling code, or add an opt-in parameter that leaves the default unchanged",
       "correct": true,
       "feedback": "Right. Both keep the promise every other caller depends on. Rounding locally is the smaller change, and a default-preserving parameter is fair when several callers will want the option."
     },
