@@ -1407,12 +1407,12 @@ Inside a method, \`balance = amount\` creates a throwaway local variable that va
   "prompt": "A method is defined as def deposit(amount): ... with no self in the parameter list. You call account.deposit(50). What do you see?",
   "options": [
     {
-      "label": "TypeError: deposit() takes 1 positional argument but 2 were given",
+      "label": "TypeError: BankAccount.deposit() takes 1 positional argument but 2 were given",
       "correct": true,
       "feedback": "Right, and the arithmetic in that message is the tell: you passed one argument, Python passed the instance too, so the method received two. The dot always hands the instance in as the first argument."
     },
     {
-      "label": "TypeError: deposit() missing 1 required positional argument: 'self'",
+      "label": "TypeError: BankAccount.deposit() missing 1 required positional argument: 'self'",
       "feedback": "This message looks like the one you would expect, which is what makes it tempting, but it says the opposite of what happened. Python is not short an argument here, it has one too many."
     },
     {
