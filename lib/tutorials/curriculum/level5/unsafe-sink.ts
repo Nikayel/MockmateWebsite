@@ -311,6 +311,7 @@ FILES = {
     "docs/guide.md": "Guide: how this team writes a runbook.",
     "docs/setup.md": "Setup: install the toolchain, then run the seed script.",
     "internal/rotation-list.md": "Internal: who carries the pager this quarter.",
+    "docs-internal/pay-bands.md": "Internal: the compensation bands for this org.",
 }
 `
 
@@ -432,6 +433,9 @@ def run_tests(record):
     def absolute_path_escape():
         never_serves("/internal/rotation-list.md")
 
+    def sibling_directory_escape():
+        refuses("../docs-internal/pay-bands.md")
+
     def dot_segment_still_resolves():
         got = fetch("./setup.md")
         assert got.startswith("Setup:"), "fetch of ./setup.md returned " + repr(got)
@@ -454,6 +458,7 @@ def run_tests(record):
     record("a parent segment is refused", parent_segment_escape)
     record("a nested parent escape is refused", nested_parent_escape)
     record("an absolute path is refused", absolute_path_escape)
+    record("a sibling directory whose name starts with docs is refused", sibling_directory_escape)
     record("a dot segment still resolves", dot_segment_still_resolves)
     record("an in-tree miss is a lookup error", in_tree_miss_is_a_lookup_error)
     record("the guide is still served", the_feature_still_works)
@@ -631,6 +636,8 @@ print(posixpath.normpath(posixpath.join("docs", "/internal/rotation-list.md")))
 \`\`\`
 
 \`join\` discards everything to the left of an argument that begins with a separator, so an absolute fragment stays absolute. Concatenation swallows that leading separator instead, and the same fragment comes back looking like it sat under the base all along.
+
+One limit worth knowing before you take this pattern to a real disk: \`normpath\` is textual, so a symlink sitting inside \`docs/\` and pointing somewhere else still normalizes to a path under \`docs/\`. Against a real filesystem the on-disk spellings are \`Path.resolve()\`, which follows symlinks, and \`Path.is_relative_to()\` for the containment test.
 
 ## Pitfalls
 
