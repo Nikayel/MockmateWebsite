@@ -2838,11 +2838,27 @@ Which methods the decorator writes depends on the flags you pass it:
     ["@dataclass", "__init__, __repr__, __eq__", "mutable, and NOT hashable"],
     ["@dataclass(frozen=True)", "the above plus __hash__", "immutable, so usable as dict keys and in sets"],
     ["@dataclass(order=True)", "the above plus __lt__, __le__, __gt__, __ge__", "sortable, compared field by field"],
-    ["@dataclass(eq=False)", "__init__ and __repr__ only", "compared by identity, like a plain class"]
+    ["@dataclass(eq=False)", "__init__ and __repr__ only", "compared by identity, like a plain class"],
+    ["@dataclass(slots=True)", "the same three, using __slots__ instead of a per-instance __dict__", "smaller and faster, and any attribute you did not declare raises AttributeError"],
+    ["@dataclass(kw_only=True)", "an __init__ that only accepts keyword arguments", "built as Point(x=1, y=2); a positional Point(1, 2) raises TypeError"]
   ],
   "highlightCols": ["Instances are"],
   "caption": "The first row is the surprise: defining __eq__ sets __hash__ to None, so a plain dataclass cannot go in a set or be a dict key. frozen=True is what gives it back, which is why value objects are usually frozen."
 }
+\`\`\`
+
+\`slots\` and \`kw_only\` (both 3.10+) are worth reaching for even outside an interview. \`slots=True\` swaps the per-instance \`__dict__\` for \`__slots__\`, which is faster, smaller, and turns a typo'd attribute into an immediate \`AttributeError\` instead of a silent new field. \`kw_only=True\` forces every field to be passed by keyword, which keeps a constructor readable once it grows past two or three fields.
+
+\`\`\`python
+from dataclasses import dataclass
+
+@dataclass(slots=True, kw_only=True)
+class Point:
+    x: int
+    y: int
+
+p = Point(x=1, y=2)   # kw_only: a positional Point(1, 2) would raise TypeError
+p.z = 3                # AttributeError: slots removed the instance __dict__
 \`\`\`
 
 ### Type hints describe intent, they do not enforce it
