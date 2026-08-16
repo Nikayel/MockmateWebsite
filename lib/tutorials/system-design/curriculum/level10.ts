@@ -4531,7 +4531,7 @@ A code execution sandbox (an online judge like LeetCode, a CI runner, or this pl
 
 ## The isolation spectrum
 
-From weakest and cheapest to strongest and heaviest: a plain OS process with rlimits is trivially escapable and unacceptable for hostile code. A container (Docker) is convenient and starts fast but shares the host kernel, so a kernel vulnerability is a full escape; a container alone is not a security boundary for hostile code. A hardened container (seccomp to whitelist syscalls, AppArmor or SELinux, non-root user, read-only filesystem, dropped capabilities) is a reasonable middle ground that shrinks the attack surface dramatically. gVisor puts a user-space kernel between the code and the host kernel, intercepting syscalls so a kernel bug is much harder to reach, at some performance cost. A microVM (Firecracker) or Kata Containers gives each submission its own tiny virtual machine with its own guest kernel and hardware-virtualization isolation, which is near-VM strength but boots in about 100ms, making it the strong default for untrusted code.
+From weakest and cheapest to strongest and heaviest: a plain OS process with rlimits is trivially escapable and unacceptable for hostile code. A container (Docker) is convenient and starts fast but shares the host kernel, so a kernel vulnerability is a full escape; a container alone is not a security boundary for hostile code. A hardened container (seccomp to whitelist syscalls, AppArmor or SELinux, non-root user, read-only filesystem, dropped capabilities) is a reasonable middle ground that shrinks the attack surface dramatically. gVisor puts a user-space kernel between the code and the host kernel, intercepting syscalls so a kernel bug is much harder to reach, at some performance cost. A microVM (Firecracker) or Kata Containers gives each submission its own tiny virtual machine with its own guest kernel and hardware-virtualization isolation, which is near-VM strength but boots in roughly 125 ms, making it the strong default for untrusted code.
 
 \`\`\`csdiagram
 {
@@ -4566,8 +4566,8 @@ From weakest and cheapest to strongest and heaviest: a plain OS process with rli
     {
       "label": "microVM (Firecracker) / Kata",
       "value": 5,
-      "display": "own guest kernel, boots ~100ms, snapshots",
-      "note": "Hardware-virtualization isolation with its own guest kernel: near-VM strength that still boots in about 100ms, the strong default for untrusted code. It can also be snapshotted: pause the guest, persist its memory and disk state, resume it in a few hundred ms."
+      "display": "own guest kernel, boots ~125 ms, snapshots",
+      "note": "Hardware-virtualization isolation with its own guest kernel: near-VM strength that still boots in roughly 125 ms, the strong default for untrusted code. It can also be snapshotted: pause the guest, persist its memory and disk state, resume it in a few hundred ms."
     }
   ],
   "caption": "Each rung up buys isolation and pays startup and performance cost. Name the spectrum and commit: Firecracker microVMs as the strong default, a hardened seccomp container as the fallback."
@@ -4578,7 +4578,7 @@ From weakest and cheapest to strongest and heaviest: a plain OS process with rli
 
 ### A microVM can be paused, not only booted
 
-The ~100ms boot is the half of Firecracker that gets quoted. The other half matters as soon as a sandbox is something a user comes back to. A microVM's entire state is a memory file plus its disk image, so the VMM can **snapshot** it: pause the guest, write its memory and device state out, and destroy the running VM. **Restoring** maps that memory file back and resumes the guest exactly where it stopped, in a few hundred milliseconds, with the process tree, the loaded interpreter, the warm page cache and whatever was installed still in place. Open TCP connections do not survive the pause, so whatever fronts the VM re-establishes them on wake.
+The ~125 ms boot is the half of Firecracker that gets quoted. The other half matters as soon as a sandbox is something a user comes back to. A microVM's entire state is a memory file plus its disk image, so the VMM can **snapshot** it: pause the guest, write its memory and device state out, and destroy the running VM. **Restoring** maps that memory file back and resumes the guest exactly where it stopped, in a few hundred milliseconds, with the process tree, the loaded interpreter, the warm page cache and whatever was installed still in place. Open TCP connections do not survive the pause, so whatever fronts the VM re-establishes them on wake.
 
 That is a different economic object from a booted VM. A running VM holds host RAM and a scheduled vCPU whether or not anyone is using it; a snapshot holds bytes on disk:
 
@@ -4655,7 +4655,7 @@ Users want to see output as it runs, so stream stdout, stderr, and per-test prog
     },
     {
       "id": "pool",
-      "label": "Warm pool of pre-booted microVMs (hides the 100ms cold start)",
+      "label": "Warm pool of pre-booted microVMs (hides the 125 ms cold start)",
       "kind": "service"
     },
     {
@@ -4769,7 +4769,7 @@ Users want to see output as it runs, so stream stdout, stderr, and per-test prog
       "feedback": "Bigger limits do not make a queued job start earlier, and loosening the bounds on hostile code is exactly the wrong direction under load."
     }
   ],
-  "reveal": "The core decision is the isolation boundary, and you name the spectrum and commit: plain process, container, hardened container with seccomp and dropped capabilities, gVisor, microVM. Firecracker is the strong default because it gives a guest kernel and hardware virtualization while still booting in about 100ms. Then bound everything: cgroups for CPU and memory, wall clock and CPU timeouts, a pids limit against fork bombs, disk quotas, and no network by default. Architecturally it is a stateless API in front of a durable queue and an autoscaling pool of workers that each build a fresh sandbox, with a warm pool for latency, streamed output with a size cap, and per user quotas for fairness."
+  "reveal": "The core decision is the isolation boundary, and you name the spectrum and commit: plain process, container, hardened container with seccomp and dropped capabilities, gVisor, microVM. Firecracker is the strong default because it gives a guest kernel and hardware virtualization while still booting in roughly 125 ms. Then bound everything: cgroups for CPU and memory, wall clock and CPU timeouts, a pids limit against fork bombs, disk quotas, and no network by default. Architecturally it is a stateless API in front of a durable queue and an autoscaling pool of workers that each build a fresh sandbox, with a warm pool for latency, streamed output with a size cap, and per user quotas for fairness."
 }
 \`\`\`
 `.trim()
@@ -8141,7 +8141,7 @@ A rejection from any layer returns 429. The concurrency layer's 429 carries \`X-
           summary:
             "Choosing an isolation boundary for hostile code: a container shares the host kernel, a Firecracker microVM does not, and a pids limit stops fork bombs.",
           seoDescription:
-            "A code execution sandbox turns on the isolation boundary: a container shares the host kernel, a Firecracker microVM gets its own and boots in about 100ms.",
+            "A code execution sandbox turns on one decision, the isolation boundary: a container shares the host kernel, a microVM boots its own in roughly 125 ms.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["sandboxing", "security", "isolation", "case-study"],
@@ -8157,7 +8157,7 @@ A rejection from any layer returns 429. The concurrency layer's 429 carries \`X-
             ],
             modelAnswerOutline: [
               "Assumptions: users submit arbitrary code in many languages, some actively hostile (fork bombs, exfiltration, escape attempts), at spiky volume around contests, and we must protect the host and other users while giving fast feedback.",
-              "**Isolation boundary (the core decision):** run each submission in a Firecracker microVM. It gives each run its own guest kernel and hardware-virtualization isolation, so a kernel exploit does not reach the host, yet it boots in about 100ms. A hardened container (seccomp syscall whitelist, AppArmor, non-root, read-only FS, dropped capabilities) is the fallback where microVMs are unavailable. I explicitly reject a plain container as the security boundary because it shares the host kernel; gVisor is a middle option that intercepts syscalls in user space at some perf cost.",
+              "**Isolation boundary (the core decision):** run each submission in a Firecracker microVM. It gives each run its own guest kernel and hardware-virtualization isolation, so a kernel exploit does not reach the host, yet it boots in roughly 125 ms. A hardened container (seccomp syscall whitelist, AppArmor, non-root, read-only FS, dropped capabilities) is the fallback where microVMs are unavailable. I explicitly reject a plain container as the security boundary because it shares the host kernel; gVisor is a middle option that intercepts syscalls in user space at some perf cost.",
               "**Resource limits:** cgroups cap CPU and memory with a hard OOM kill; a wall-clock plus CPU-time timeout kills infinite loops; a pids limit defeats fork bombs; disk quotas stop disk-fill; and networking is off by default or a strict egress allowlist to prevent exfiltration. Each submission runs in a fresh sandbox destroyed after the run, so nothing leaks between users.",
               "**Architecture:** a stateless API enqueues each submission onto a durable queue (SQS or Kafka) and returns a job id. A pool of sandboxed workers pulls jobs, runs each in a fresh microVM, and reports results. The queue absorbs contest bursts and lets workers autoscale on queue depth. A warm pool of pre-booted microVMs hides cold-start latency.",
               "**Result streaming:** stream stdout, stderr, and per-test progress over SSE or WebSocket, store the final verdict durably, and cap output size so a runaway print cannot exhaust memory. **Fairness and blast radius:** per-user rate limits and concurrency quotas, abuse monitoring, and the entire execution fleet in an isolated network segment with no path to production, treating each sandbox host as potentially compromised.",
