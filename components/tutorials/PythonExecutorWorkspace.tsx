@@ -9,7 +9,7 @@ import { ExecutorSidePanel } from "@/components/tutorials/ExecutorSidePanel"
 import { usePersistentState } from "@/components/tutorials/usePersistentState"
 import { usePythonExecutor } from "@/components/tutorials/usePythonExecutor"
 
-const STARTER_CODE = `# Free-form Python — write anything and hit Run (⌘↵).
+const STARTER_CODE = `# Free-form Python · write anything and hit Run (⌘↵).
 print("Hello from CodeSparring!")
 
 for n in range(5):
@@ -274,7 +274,7 @@ export function PythonExecutorWorkspace() {
                 )}
 
                 {!running && status === "success" && !hasOutput && (
-                  <p className="text-muted-foreground">(ran successfully — no output)</p>
+                  <p className="text-muted-foreground">(ran successfully, no output)</p>
                 )}
               </div>
             </div>
