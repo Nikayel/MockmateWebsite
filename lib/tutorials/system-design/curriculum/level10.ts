@@ -8092,6 +8092,8 @@ A rejection from any layer returns 429. The concurrency layer's 429 carries \`X-
           title: "Design a Distributed Lock (ZooKeeper, etcd, Fencing)",
           summary:
             "Why a Redis SETNX lock is unsafe at any TTL, and what consensus-backed leases plus fencing tokens add that the naive version never had.",
+          seoDescription:
+            "A distributed lock on Redis SETNX with a TTL is unsafe at any value: a paused holder wakes still believing it holds it. A fencing token is what fixes that.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["coordination", "consensus", "distributed-systems", "case-study"],
@@ -8138,6 +8140,8 @@ A rejection from any layer returns 429. The concurrency layer's 429 carries \`X-
           title: "Design a Code Execution Sandbox / Online Judge",
           summary:
             "Choosing an isolation boundary for hostile code: a container shares the host kernel, a Firecracker microVM does not, and a pids limit stops fork bombs.",
+          seoDescription:
+            "A code execution sandbox turns on the isolation boundary: a container shares the host kernel, a Firecracker microVM gets its own and boots in about 100ms.",
           estimatedMinutes: 40,
           difficulty: "hard",
           skills: ["sandboxing", "security", "isolation", "case-study"],
