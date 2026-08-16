@@ -1905,7 +1905,7 @@ const dunderPropertiesLesson: PythonLesson = {
     estimatedMinutes: 5,
     markdown: `## Why give a class built-in behaviour
 
-Print a plain object and you get \`<__main__.Point object at 0x10f3c2a90>\`. Compare two of them with \`==\` and you get \`False\` unless they are literally the same object in memory. That is useless in tests, logs, and debugging. Dunder methods let your class plug into the same protocols the built-in types use, so \`==\`, \`print()\`, \`len()\`, \`[]\`, and more behave the way callers expect.
+Print a plain object and you get \`<__main__.Point object at 0x10f3c2a90>\`. Compare two of them with \`==\` in a test and the answer has nothing to do with the values you care about. That is useless in tests, logs, and debugging. Dunder methods let your class plug into the same protocols the built-in types use, so \`==\`, \`print()\`, \`len()\`, \`[]\`, and more behave the way callers expect.
 
 ## Dunder methods: hooking into Python's protocols
 
