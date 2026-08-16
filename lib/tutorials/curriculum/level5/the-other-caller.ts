@@ -651,7 +651,7 @@ The reason yesterday's change survived review is that the neighbor had no test a
   "prompt": "Yesterday's change to the shared helper shipped with CI fully green, and it broke a caller. How?",
   "options": [
     {
-      "label": "The neighbor had no test at the boundary where the two roundings disagree",
+      "label": "Nothing asserted the one input class the two roundings disagree on",
       "correct": true,
       "feedback": "Right. Green means the tests we have passed, not that the callers we have are safe. The alerting suite only asserted exact minutes, so the one input class that changed was never checked."
     },
