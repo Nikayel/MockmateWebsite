@@ -4308,7 +4308,7 @@ dir(str)                 # every real method on str, so an invented one is absen
 "abcabc".replace("a", "")   # try it on an input where the two readings differ
 \`\`\`
 
-The last line is the one that matters, and it is the same technique as the whole level: pick an input on which the two candidate meanings give different answers, and run it. If \`strip\` removed a prefix, \`"shop".strip("https://")\` would be \`"shop"\`. It is \`"op"\`. Question settled, no documentation required.
+The last line is the one that matters, and it is the same technique as the whole level: pick an input on which the two candidate meanings give different answers, and run it. If \`strip\` removed a prefix, \`"shop".strip("https://")\` would be \`"shop"\`. It is \`"o"\`, because the trailing \`p\` is in the set as well and \`strip\` eats from both ends. Question settled, no documentation required.
 
 \`\`\`cswidget
 {
