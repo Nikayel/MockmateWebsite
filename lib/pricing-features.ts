@@ -76,7 +76,7 @@ export function buildFeatureMatrix(counts: CourseLessonCounts): PlanFeatureGroup
     {
       id: "practice",
       title: "AI interview practice",
-      note: "Metered in sessions. Starting one grants 10 re-opens of that scenario.",
+      note: "Metered in sessions. Starting one grants 10 free re-opens.",
       rows: [
         {
           label: "Full interview sessions",
