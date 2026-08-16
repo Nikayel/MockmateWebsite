@@ -1590,7 +1590,9 @@ hashing helps: it is one key, so it is one node. Mitigations, roughly in order o
   partitions (\`celebrity_id:0..K-1\`). Writes pick a random bucket; reads fan out to all K and
   merge. Use it for the few known whales, not everyone.
 - **Sub-partitioning:** split a hot partition's range into finer ranges dynamically when it exceeds a
-  load threshold (DynamoDB adaptive capacity and split-for-heat do this for you).
+  load threshold. DynamoDB's adaptive capacity and split-for-heat rebalance load this way when heat is
+  spread across many keys inside one partition, but neither can split a single partition-key value, so
+  a lone celebrity key still needs the salting bullet above.
 - **Dedicated shards for whales:** route known celebrities/mega-tenants to their own isolated nodes
   so their traffic cannot starve normal users. Common in multi-tenant SaaS.
 - **Caching + fan-out-on-read:** for a celebrity's timeline, cache aggressively and read the
