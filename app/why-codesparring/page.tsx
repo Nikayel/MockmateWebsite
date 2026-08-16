@@ -11,44 +11,52 @@ import { WebPageJsonLd } from "@/components/seo/JsonLd"
 
 // Learning science data with proper research citations - defined server-side for SEO.
 //
-// No per-principle `color`: the cards all report the same quantity (retention lift), so a
-// hue per card encoded nothing and two of the four (purple, amber) were not in the palette.
-// The section renders them in the one clay accent the landing sections use. A `visual` field
-// also used to live here naming a per-card chart ("wave", "pulse", ...) that was never read.
+// No per-principle `color`: the cards all report the same kind of claim, so a hue per card
+// encoded nothing and two of the four (purple, amber) were not in the palette. The section
+// renders them in the one clay accent the landing sections use. A `visual` field also used
+// to live here naming a per-card chart ("wave", "pulse", ...) that was never read.
+//
+// The lead line used to be a retention percentage: 10-30%, 50%, 43%, "Optimal". Those numbers
+// were presented as findings of the papers cited beneath them, and none of them can be traced
+// to the cited paper. A magnitude attached to a real citation is worse than no number at all,
+// because the citation lends it authority it never earned. What survives is the DIRECTION each
+// study established, which is what these four literatures actually agree on and what the product
+// is built to exploit. The `finding` field is named for what it now holds; `improvement` was a
+// name that only made sense while the value was a percentage lift.
 const sciencePrinciples = [
   {
     icon: "RefreshCw",
     title: "Spacing Effect",
-    improvement: "10-30%",
+    finding: "Beats cramming",
     description:
-      "Distributed practice beats cramming. Our algorithm spaces your reviews for optimal long-term retention.",
+      "The same practice spread across days is retained longer than practice packed into one sitting. Your reviews are scheduled apart instead of repeated in a block.",
     citation: "Cepeda et al., 2006",
     source: "Psychological Bulletin",
   },
   {
     icon: "BrainCircuit",
     title: "Testing Effect",
-    improvement: "50%",
+    finding: "Beats rereading",
     description:
-      "Active recall strengthens memory more than passive review. Every practice session is a retrieval opportunity.",
+      "Pulling an answer out of memory strengthens it more than looking at the answer again. Every session asks you to produce the solution, not recognize it.",
     citation: "Roediger & Karpicke, 2006",
     source: "Psychological Science",
   },
   {
     icon: "Layers",
     title: "Interleaving",
-    improvement: "43%",
+    finding: "Beats one pattern at a time",
     description:
-      "Mixing different patterns daily improves transfer to new problems. We intelligently vary your practice.",
+      "Mixing problem types feels harder in the moment and transfers better to problems you have not seen. Your queue varies the pattern rather than blocking it.",
     citation: "Rohrer & Taylor, 2007",
     source: "Instructional Science",
   },
   {
     icon: "TrendingUp",
     title: "Forgetting Curve",
-    improvement: "Optimal",
+    finding: "Memory fades without review",
     description:
-      "Review at 70-80% retention for maximum efficiency. Our algorithm knows exactly when you're about to forget.",
+      "Retention drops sharply after you first learn something, and each review flattens the curve. The scheduler aims your next review at a pattern before it fades, instead of at random.",
     citation: "Ebbinghaus, 1885",
     source: "Memory: A Contribution to Experimental Psychology",
   },

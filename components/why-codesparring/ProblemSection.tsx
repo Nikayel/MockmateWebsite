@@ -27,10 +27,15 @@ export function ProblemSection() {
             <h2 className="font-heading text-foreground mt-5 text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-bold tracking-[-0.03em]">
               The problem with traditional practice
             </h2>
+            {/* This read "you forget 80% of what you learn within a week", cited to Ebbinghaus.
+                He established that recall decays sharply and that review flattens the decay; a
+                single percentage at a single interval is not a result you can hang on him, and
+                attaching one to his name borrowed authority for a number we made up. The
+                direction is the part the research supports, so the direction is what we claim. */}
             <p className="text-muted-foreground mx-auto mt-6 max-w-xl text-lg leading-relaxed">
-              Without a system, you{" "}
-              <span className="text-accent-strong font-semibold">forget 80%</span> of what you learn
-              within a week. Random problem selection leaves weak patterns untouched.
+              Without a system, most of what you learn{" "}
+              <span className="text-accent-strong font-semibold">fades within days</span>, and
+              random problem selection leaves your weak patterns untouched.
             </p>
             <p className="text-muted-foreground mt-4 text-sm">
               Based on Ebbinghaus&apos;s forgetting curve research (1885)
@@ -138,33 +143,11 @@ export function ProblemSection() {
                   />
                 ))}
 
-                <motion.text
-                  x="385"
-                  y="125"
-                  fill="var(--destructive)"
-                  fontSize="11"
-                  fontWeight="600"
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 1.3 }}
-                >
-                  20%
-                </motion.text>
-
-                <motion.text
-                  x="385"
-                  y="50"
-                  fill="var(--neural-strong)"
-                  fontSize="11"
-                  fontWeight="600"
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 1.8 }}
-                >
-                  90%
-                </motion.text>
+                {/* The two curves used to terminate in "20%" and "90%" labels. The second one
+                    was a retention outcome for using this product, and we have measured no such
+                    thing. A shape can illustrate decay-versus-review honestly; an axis figure
+                    claims a measurement, so the figures are gone and the caption below says
+                    what the picture is. */}
               </svg>
 
               <div className="mt-4 flex flex-col justify-center gap-4 text-xs sm:flex-row sm:gap-8">
@@ -174,9 +157,12 @@ export function ProblemSection() {
                 </div>
                 <div className="flex items-center justify-center gap-2">
                   <div className="bg-neural h-0.5 w-6 rounded-full" />
-                  <span className="text-muted-foreground">With CodeSparring</span>
+                  <span className="text-muted-foreground">Reviewed on a schedule</span>
                 </div>
               </div>
+              <p className="text-muted-foreground mt-3 text-center text-xs">
+                Illustrative shape of the effect, not measured outcomes.
+              </p>
             </div>
           </div>
         </ScrollReveal>

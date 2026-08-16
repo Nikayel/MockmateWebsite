@@ -12,7 +12,7 @@ interface WhyCodesparringPageClientProps {
   sciencePrinciples: {
     icon: string
     title: string
-    improvement: string
+    finding: string
     description: string
     citation: string
     source: string

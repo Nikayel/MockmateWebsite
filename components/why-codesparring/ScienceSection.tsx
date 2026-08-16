@@ -14,7 +14,7 @@ const iconMap: { [key: string]: React.ComponentType<{ className?: string }> } = 
 interface SciencePrinciple {
   icon: string
   title: string
-  improvement: string
+  finding: string
   description: string
   citation: string
   source: string
@@ -67,12 +67,16 @@ export function ScienceSection({ sciencePrinciples }: ScienceSectionProps) {
                     <span className="bg-accent/10 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
                       <IconComponent className="text-accent h-6 w-6" />
                     </span>
-                    <div className="flex-1">
-                      <div className="text-accent-strong text-2xl font-bold">
-                        {principle.improvement}
+                    {/* The lead line holds a finding, not a figure. It was "10-30%" / "50%" /
+                        "43%" under the label "Better retention", numbers that could not be
+                        traced to the papers cited at the foot of each card. Text-xl rather
+                        than text-2xl because a phrase needs to wrap where a number did not. */}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-accent-strong text-xl leading-snug font-bold text-balance">
+                        {principle.finding}
                       </div>
-                      <div className="text-muted-foreground text-xs tracking-wider uppercase">
-                        Better retention
+                      <div className="text-muted-foreground mt-1 text-xs tracking-wider uppercase">
+                        What the research shows
                       </div>
                     </div>
                   </div>
