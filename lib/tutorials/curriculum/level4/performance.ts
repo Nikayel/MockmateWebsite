@@ -520,7 +520,7 @@ The decorator also bolts two methods onto the function it wraps, and both matter
 \`\`\`python
 fib(10)
 fib(10)
-print(fib.cache_info())    # CacheInfo(hits=1, misses=11, maxsize=None, currsize=11)
+print(fib.cache_info())    # CacheInfo(hits=9, misses=11, maxsize=None, currsize=11)
 
 fib.cache_clear()          # empty it: every entry gone, counters back to zero
 print(fib.cache_info())    # CacheInfo(hits=0, misses=0, maxsize=None, currsize=0)
