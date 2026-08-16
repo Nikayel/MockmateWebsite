@@ -5495,6 +5495,8 @@ export const systemDesignLevel5: DesignLevel = {
           title: "Leader Election, Leases, Fencing & Split-Brain",
           summary:
             "A GC pause can produce two leaders both holding valid leases, and only a fencing token checked at the storage layer stops the old one.",
+          seoDescription:
+            "A fencing token is a rising number stamped on every write, which storage rejects if it is below the highest seen. Election alone cannot stop split-brain.",
           estimatedMinutes: 35,
           difficulty: "hard",
           skills: ["leader-election", "fencing", "split-brain"],
