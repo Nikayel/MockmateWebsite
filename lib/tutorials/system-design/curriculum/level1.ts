@@ -5388,6 +5388,13 @@ exceeds it. The wrong answer is "queue it all and hope," because that quietly tr
 problem for a crash. The right answer is a deliberate overload strategy built from backpressure,
 bounded queues, and load shedding.
 
+**Backpressure** is the signal a full downstream buffer sends upstream so producers slow down, which
+stops work being created faster than it can be finished. **Load shedding** is the deliberate
+rejection of some of that work, usually a fast 429 or 503 at the front door, so the requests you do
+accept still finish inside their deadline. Backpressure slows the source and shedding drops work
+outright, and you need both because an unbounded queue only hides the overload until latency and
+memory collapse together.
+
 ### Backpressure and the unbounded-queue trap
 
 **Backpressure** is the signal that flows upstream telling producers to slow down. In a well-designed
