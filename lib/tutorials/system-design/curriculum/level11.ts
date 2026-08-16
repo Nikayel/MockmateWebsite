@@ -1062,7 +1062,7 @@ Meeting the latency budget is mostly a feature-fetch problem, not a model-math p
 const ragArchitectureTeach = `
 ## RAG grounds the model in data you control
 
-RAG is the default GenAI design because it solves two problems an LLM cannot solve alone: it does not know your private data, and it hallucinates confidently when it does not know something. RAG grounds the model by retrieving relevant passages from your own corpus at query time and stuffing them into the prompt with instructions to answer only from that context and to cite it. The model becomes a reasoning-and-phrasing engine over evidence you control, not an oracle. There are two halves: an offline ingestion pipeline and an online query path.
+Grounding a model in data you control is a design axis rather than a settled default. There are three positions on it: retrieve before inference, which is RAG; let the agent search at runtime through tools, holding only lightweight identifiers (file paths, saved queries, links) until it needs the data; or run a hybrid, which is what current guidance recommends. RAG is the pre-inference position, and it exists because an LLM does not know your private data and hallucinates confidently when it does not know something. It grounds the model by retrieving relevant passages from your own corpus at query time and stuffing them into the prompt with instructions to answer only from that context and to cite it. The model becomes a reasoning-and-phrasing engine over evidence you control, not an oracle. Increasingly that retrieval is a tool an agent calls several times inside one run rather than a single step before generation, and the pipeline below is what each of those calls runs. There are two halves: an offline ingestion pipeline and an online query path.
 
 \`\`\`cswidget
 {
@@ -1090,7 +1090,7 @@ RAG is the default GenAI design because it solves two problems an LLM cannot sol
 
 ## Ingestion (offline)
 
-You parse each source document (PDF, HTML, Confluence, tickets) into clean text, then chunk it. Chunking is where naive systems die. A chunk that is too large dilutes the embedding and wastes context budget; too small and you shred the meaning across boundaries. A common baseline is 300 to 800 tokens with 10 to 20 percent overlap so a sentence split across a boundary survives in one chunk. Better is semantic or structure-aware chunking that respects headings, tables, and paragraphs. Each chunk gets an embedding (from a model like \`text-embedding-3-large\` or an open model like \`bge\`) and is written to a vector index alongside metadata: source id, title, ACL groups, timestamp, section. When a document changes you re-embed only the affected chunks; you do not rebuild the whole index. Deletes must propagate or you serve stale, retracted content.
+You parse each source document (PDF, HTML, Confluence, tickets) into clean text, then chunk it. Chunking is where naive systems die. A chunk that is too large dilutes the embedding and wastes context budget; too small and you shred the meaning across boundaries. A common baseline is 300 to 800 tokens with 10 to 20 percent overlap so a sentence split across a boundary survives in one chunk. Better is semantic or structure-aware chunking that respects headings, tables, and paragraphs. Each chunk gets an embedding (from a model like \`text-embedding-3-large\` or an open model like \`Qwen3-Embedding\` or \`BGE-M3\`) and is written to a vector index alongside metadata: source id, title, ACL groups, timestamp, section. When a document changes you re-embed only the affected chunks; you do not rebuild the whole index. Deletes must propagate or you serve stale, retracted content.
 
 ## Query path (online)
 
@@ -1117,7 +1117,7 @@ You parse each source document (PDF, HTML, Confluence, tickets) into clean text,
 
 You never filter after generation, because the model has already seen forbidden text. You attach the user's group memberships to the query and filter candidates by the ACL metadata on each chunk before assembly, ideally as a pre-filter inside the vector query so you do not retrieve what the user cannot read. Retrieval is the security boundary.
 
-That gives three rungs, not two. A vector store holds vectors in named collections, and most stores let one collection be subdivided into **namespaces**: disjoint sets of vectors inside the index, where a query names the namespace it searches and cannot see outside it. Here is the same question asked three ways, on a corpus holding records for every patient.
+That gives three rungs, not two. A vector store holds vectors in named collections, and most stores support **multi-tenant partitioning**: disjoint subsets of vectors inside one collection, where a query names the subset it searches and cannot see outside it. The name differs by vendor. Pinecone calls them namespaces, Milvus partitions, Weaviate tenants; Qdrant has no separate object and does it with payload-based partitioning instead. Here is the same question asked three ways, on a corpus holding records for every patient.
 
 \`\`\`
 query: "what did my last lab result say", asked by patient 4471
@@ -1134,22 +1134,22 @@ query: "what did my last lab result say", asked by patient 4471
     the index still physically contains 5M patients, and the only thing keeping
     4,999,999 of them out of this answer is that one argument
 
-(c) per-tenant namespace
+(c) per-tenant partition (namespace= is Pinecone's spelling of the argument)
     hits = search(collection="records", namespace="p-4471", k=20)
-    the namespace holds this patient's vectors and no others, so there is no
+    the partition holds this patient's vectors and no others, so there is no
     predicate to omit. drop the scope and the query fails or returns nothing;
     it cannot return someone else's records
 \`\`\`
 
 Both (b) and (c) return the right chunks today. They differ in what a bug can do. Under (b) correctness rests on a predicate being present and right on every call path, including the new endpoint someone adds next quarter, the admin tool that passes \`filter=None\`, and the freshly ingested chunk whose \`patient_id\` came back null. Under (c) the query is issued against a set that contains one patient's vectors, so those same bugs return nothing instead of returning a stranger's chart. Correct by predicate versus impossible by construction is the distinction an auditor is asking about, and it is worth saying out loud in an interview.
 
-Physical partitioning is not free: each index or namespace carries fixed overhead, so five million of them is its own problem. The usual shape is to partition the corpus that is actually regulated and leave the rest shared, and to shard rather than split per user when the tenant count is huge. Hashing \`patient_id\` into a few thousand namespaces means each holds a few thousand patients, the pre-filter still runs inside the namespace, and the blast radius of a missing predicate drops from the whole corpus to one shard. The shared knowledge base of policies, which everyone may read, stays in one collection queried without any tenant scope at all.
+Physical partitioning is not free: each index or partition carries fixed overhead, so five million of them is its own problem. The usual shape is to partition the corpus that is actually regulated and leave the rest shared, and to shard rather than split per user when the tenant count is huge. Hashing \`patient_id\` into a few thousand partitions means each holds a few thousand patients, the pre-filter still runs inside the partition, and the blast radius of a missing predicate drops from the whole corpus to one shard. The shared knowledge base of policies, which everyone may read, stays in one collection queried without any tenant scope at all.
 
 Instruct the model to say "I do not know" when context is weak, and verify citations by checking each cited claim resolves to a retrieved chunk. Measure the RAG triad: context relevance (did retrieval fetch the right chunks), faithfulness (is the answer supported by context), answer relevance (did it address the question). Without this triad you cannot tell a retrieval bug from a generation bug.
 
 **Interview nuance:** when latency is probed, note that the reranker and embedding calls are the cost, not the vector search. Cache embeddings for repeated queries, run rerank on a small candidate set, and stream the answer so time-to-first-token hides generation latency.
 
-**Recap:** RAG is ingestion (parse, chunk, embed, index with ACL metadata) plus a query path of hybrid retrieval, a mandatory reranker, ACL-filtered context assembly (a pre-filter at minimum, a per-tenant namespace when a leak would be unacceptable), grounded generation with citations, and the RAG triad for eval.
+**Recap:** RAG is ingestion (parse, chunk, embed, index with ACL metadata) plus a query path of hybrid retrieval, a mandatory reranker, ACL-filtered context assembly (a pre-filter at minimum, a per-tenant partition when a leak would be unacceptable), grounded generation with citations, and the RAG triad for eval.
 
 \`\`\`cswidget
 {
@@ -3125,7 +3125,7 @@ export const systemDesignLevel11: DesignLevel = {
             ],
             modelAnswerOutline: [
               "Assumptions: two corpora. A shared knowledge base of policies and clinical guidance (readable by all) and per-patient private records (readable only by that patient). Answers may blend both but must never surface another patient's data, and citations must point to the exact document.",
-              "**Tenant isolation is the spine.** Every private chunk carries `patient_id`, and every query is scoped to the authenticated patient's id as a hard pre-filter in the vector query, not a post-filter. To eliminate cross-tenant leakage risk entirely, physically partition private embeddings by patient (or by a hashed shard) so a query can only ever touch that patient's namespace; the shared KB lives in a separate collection queried without patient scope. You retrieve from both, merge, rerank, and assemble.",
+              "**Tenant isolation is the spine.** Every private chunk carries `patient_id`, and every query is scoped to the authenticated patient's id as a hard pre-filter in the vector query, not a post-filter. To eliminate cross-tenant leakage risk entirely, physically partition private embeddings by patient (or by a hashed shard) so a query can only ever touch that patient's partition; the shared KB lives in a separate collection queried without patient scope. You retrieve from both, merge, rerank, and assemble.",
               "**Safety hardening for PHI:** the prompt must forbid revealing identifiers of anyone other than the patient, and a guardrail on the output scans for stray identifiers that do not match the session patient and blocks the response if found. Every retrieval and answer is written to an immutable audit log for HIPAA.",
               "**Grounding:** the assistant answers only from retrieved policy or record chunks, cites the exact document (policy section or record date), and falls back to 'I cannot find that in your records, here is how to reach a nurse' rather than guessing. Faithfulness and citation validity are gated in CI on a synthetic patient golden set, and any answer citing a non-retrieved source is dropped.",
               "**Latency and freshness:** records change often, so ingestion is streaming with CDC; a new lab result is retrievable within seconds.",
