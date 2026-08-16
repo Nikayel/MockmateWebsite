@@ -343,8 +343,11 @@ the ticket list shows it as Normal, so nobody picks it up.
 The escalation rule is documented in \`helpdesk/rules.py\`, the authoritative definition.
 \`helpdesk/ticket_page.py\` and \`helpdesk/ticket_list.py\` both display an escalation flag.
 
-Repair the disagreement so both views follow the documented rule. Only
-\`helpdesk/ticket_list.py\` may change.`,
+Repair the disagreement. \`helpdesk/rules.py\` and \`helpdesk/ticket_page.py\` are read-only;
+only \`helpdesk/ticket_list.py\` may change. The list must take its escalation flag from the
+module that owns the rule. Recomputing the flag in the list leaves two copies of the rule in
+place, and reading it off the ticket page ties the queue view to a screen that only happens to
+show the same answer today.`,
 })
 
 const HELPDESK_RULES = String.raw`"""Escalation rules.
@@ -443,8 +446,83 @@ def run_tests(record):
     record("a 3 hour normal ticket stays normal", three_hour_ticket_stays_normal)
 `
 
-const HELPDESK_TEST_LIST_HIDDEN = String.raw`from helpdesk.ticket_list import list_view
+/**
+ * The hidden practice suite: it asks WHERE the list gets its flag, not only what the flag is.
+ *
+ * Same device as the apply suite above, for the same reason. Value assertions pass for any list_view
+ * that produces the right booleans, including an inline copy with corrected thresholds, an inline
+ * copy that imports `rules`' constants, and a row that reads `page_view(ticket)["escalated"]`. All
+ * three are the drift this lesson is about, and the teach section names all three as wrong. So the
+ * placement tests replace the rule at runtime with a stand-in that ignores age and priority
+ * entirely, and assert the list follows it: only a list_view that asks helpdesk.rules for the answer
+ * can. A tripwire on page_view catches the third one, delegating sideways to a peer surface rather
+ * than up to the rule's owner.
+ *
+ * `_swap` also rebinds any name in the ticket_list module that IS the original object, so
+ * `from helpdesk.rules import is_escalated` and aliased imports are covered alongside
+ * module-attribute calls.
+ */
+const HELPDESK_TEST_LIST_HIDDEN = String.raw`from helpdesk import rules as rules_module
+from helpdesk import ticket_list as list_module
+from helpdesk import ticket_page as page_module
+from helpdesk.ticket_list import list_view
 from helpdesk.ticket_page import page_view
+
+STAND_IN_ESCALATED_IDS = ("X-1", "X-4")
+
+STAND_IN_TICKETS = [
+    {"id": "X-1", "priority": "normal", "age_hours": 0},
+    {"id": "X-2", "priority": "urgent", "age_hours": 30},
+    {"id": "X-3", "priority": "normal", "age_hours": 24},
+    {"id": "X-4", "priority": "urgent", "age_hours": 3},
+]
+
+
+def stand_in_is_escalated(ticket):
+    """An escalation rule this codebase never uses: it reads the id and ignores age and priority."""
+    return ticket["id"] in STAND_IN_ESCALATED_IDS
+
+
+def tripwire_page_view(ticket):
+    raise AssertionError(
+        "list_view took its escalation flag from helpdesk.ticket_page.page_view. The ticket page "
+        "is another view, not the home of the rule, so the queue now depends on a sibling screen. "
+        "Call the owner of the rule in helpdesk/rules.py instead."
+    )
+
+
+def _swap(module, attr, replacement):
+    """Install replacement as module.attr, plus any name ticket_list bound to the original object."""
+    original = getattr(module, attr)
+    setattr(module, attr, replacement)
+    rebound = [name for name, value in vars(list_module).items() if value is original]
+    for name in rebound:
+        setattr(list_module, name, replacement)
+    return (module, attr, original, rebound)
+
+
+def _restore(installed):
+    module, attr, original, rebound = installed
+    setattr(module, attr, original)
+    for name in rebound:
+        setattr(list_module, name, original)
+
+
+def _rows_under(swaps, tickets):
+    """Call list_view with the given (module, attr, replacement) swaps in place."""
+    installed = [_swap(*swap) for swap in swaps]
+    try:
+        return list_module.list_view(tickets)
+    finally:
+        for entry in reversed(installed):
+            _restore(entry)
+
+
+STAND_IN_RULE = [
+    (rules_module, "is_escalated", stand_in_is_escalated),
+    (page_module, "page_view", tripwire_page_view),
+]
+PAGE_TRIPWIRE = [(page_module, "page_view", tripwire_page_view)]
 
 SWEEP = [
     {"id": "S-1", "priority": "normal", "age_hours": 0},
@@ -486,10 +564,35 @@ def run_tests(record):
                 f"list says {row['escalated']!r}"
             )
 
+    def follows_the_rules_owner():
+        rows = _rows_under(STAND_IN_RULE, STAND_IN_TICKETS)
+        assert len(rows) == len(STAND_IN_TICKETS), (
+            f"expected {len(STAND_IN_TICKETS)} rows, got {len(rows)}"
+        )
+        for ticket, row in zip(STAND_IN_TICKETS, rows):
+            want = stand_in_is_escalated(ticket)
+            assert row["escalated"] == want, (
+                f"with the escalation rule replaced, ticket {ticket['id']} should have come back "
+                f"escalated={want!r}, got {row['escalated']!r}. list_view is still deciding "
+                "escalation itself instead of asking the module that owns the rule."
+            )
+
+    def does_not_read_the_page_surface():
+        rows = _rows_under(PAGE_TRIPWIRE, SWEEP)
+        assert len(rows) == len(SWEEP), f"expected {len(SWEEP)} rows, got {len(rows)}"
+        for ticket, row in zip(SWEEP, rows):
+            want = rules_module.is_escalated(ticket)
+            assert row["escalated"] == want, (
+                f"ticket {ticket['id']} came back escalated={row['escalated']!r} but the "
+                f"documented rule says {want!r}"
+            )
+
     record("a ticket at exactly 24 hours escalates", exactly_twenty_four_hours_escalates)
     record("an urgent ticket at exactly 4 hours escalates", urgent_exactly_four_hours_escalates)
     record("a normal ticket at 23 hours stays normal", normal_twenty_three_hours_stays_normal)
     record("the list agrees with the page across a sweep", list_agrees_with_page_on_a_sweep)
+    record("the list follows the rule's owner when the rule changes", follows_the_rules_owner)
+    record("the list does not read escalation off the ticket page", does_not_read_the_page_surface)
 `
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -820,9 +923,9 @@ read-only files. Some tests are hidden.`,
     id: "py-l5-where-the-rule-lives-practice",
     executionMode: "workspace",
     prompt: `Your helpdesk's ticket list and ticket page disagree about which tickets are escalated.
-Find the copy of the escalation rule that drifted and repair \`helpdesk/ticket_list.py\` so
-both views agree with the documented rule in \`helpdesk/rules.py\`. Start with \`README.md\` for
-the bug report. Some tests are hidden.`,
+Find the copy of the escalation rule that drifted and repair \`helpdesk/ticket_list.py\` so the
+list takes its escalation flag from \`helpdesk/rules.py\`, the module that owns the rule, rather
+than deciding it for itself. Start with \`README.md\` for the bug report. Some tests are hidden.`,
     starterCode: "",
     hints: [
       "Two views, one rule: find every place the escalation decision is computed before editing either view.",
