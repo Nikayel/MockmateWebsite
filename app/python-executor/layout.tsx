@@ -13,7 +13,8 @@ import { canonicalPageMetadata } from "@/lib/seo/page-metadata"
 export const metadata = canonicalPageMetadata({
   path: "/python-executor",
   title: "Python Executor",
-  description: "A free, open Python scratchpad — write and run any code, right in your browser.",
+  description:
+    "A free Python scratchpad that runs in your browser. Write and run any code, no account, no setup, no run limit.",
 })
 
 export default function PythonExecutorLayout({ children }: { children: ReactNode }) {
