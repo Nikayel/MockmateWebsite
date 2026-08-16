@@ -367,23 +367,30 @@ Two things to notice. Sorting or comparing the names directly would order them a
   "prompt": "catalog.py imports from cart.py while cart.py imports from catalog.py. You run the program. What do you actually see?",
   "options": [
     {
-      "label": "A clear error naming the cycle, something like 'circular import detected'",
-      "feedback": "Tempting, because that is what a helpful error would say, and linters really do report cycles by that name. Python reports the symptom instead, so the message you get names a missing attribute and says nothing about a cycle."
+      "label": "One clean line naming the cycle and nothing else, the way a linter reports one",
+      "feedback": "Close. Python has said 'most likely due to a circular import' since 3.8, so the diagnosis really is in there. What the message leads with is the symptom, and the two halves arrive together rather than one instead of the other."
     },
     {
-      "label": "An ImportError or AttributeError about a name that is plainly defined in the file",
+      "label": "An ImportError about a name that is plainly defined in the file, from a module it calls partially initialized",
       "correct": true,
-      "feedback": "Right. Whichever module loads second gets the other one half-executed, so the name it wants has not been defined yet. Chasing the missing name is a dead end. The fix is to make the dependency point one way."
+      "feedback": "Right. Whichever module loads second gets the other one half-executed, so the name it wants has not been defined yet, and the message says so along with the cycle diagnosis. Chasing the missing name is a dead end. The fix is to make the dependency point one way."
     },
     {
       "label": "Nothing. sys.modules caching turns the second import into a no-op, so it works.",
-      "feedback": "Half right, and this is exactly what makes cycles so disorienting. The partly-built module IS handed back from the cache instead of re-running, but 'partly built' is the whole problem: everything defined below the import line is still missing."
+      "feedback": "Half right, and this is exactly what makes cycles so disorienting. The partly-built module IS handed back from the cache instead of re-running, and with a plain 'import store.catalog' a cycle can stay invisible for months, as long as nothing reads a name off the half-built module until both files have finished. It is 'from store.catalog import price' that fails on the spot, because that form needs the name to exist right now."
     }
   ]
 }
 \`\`\`
 
-**Circular imports.** If \`catalog\` imports from \`cart\` while \`cart\` imports from \`catalog\`, whichever module loads second sees the first one only half-built, and you get an \`ImportError\` or \`AttributeError\`. The fix is to point dependencies one way. Here \`cart\` depends on \`catalog\`, never the reverse.
+**Circular imports.** If \`catalog\` imports from \`cart\` while \`cart\` imports from \`catalog\`, whichever module loads second sees the first one only half-built. With the \`from X import y\` form you get told immediately, and since Python 3.8 the message diagnoses the cycle for you:
+
+\`\`\`text
+ImportError: cannot import name 'price' from partially initialized module
+'store.catalog' (most likely due to a circular import) (/app/store/catalog.py)
+\`\`\`
+
+The phrase to read is "partially initialized", not the name: \`price\` is defined, just not yet. Plain \`import store.catalog\` is the quieter version, because binding a module name does not require anything inside it to exist. Such a cycle can sit there for months and only bite when some code finally reads an attribute off the half-built module while it is still half-built, and then you get an \`AttributeError\` carrying the same circular-import note. Either way the fix is the same: point dependencies one way. Here \`cart\` depends on \`catalog\`, never the reverse.
 
 \`\`\`csdiagram
 {
