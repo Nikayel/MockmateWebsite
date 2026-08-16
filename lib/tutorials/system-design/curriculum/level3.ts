@@ -2555,6 +2555,13 @@ want a pure, multi-core, evict-freely cache of opaque values; pick Redis when yo
 structures, replication, persistence, or atomic operations (counters, rate limiters, leaderboards).
 Most systems reach for Redis and scale it horizontally by running many shards.
 
+**Valkey enters the picture too.** In March 2024 Redis relicensed away from BSD (RSALv2, later SSPL),
+and the Linux Foundation forked the last BSD-3 release, Redis 7.2.4, as **Valkey** under open
+governance. Valkey stays wire- and data-structure-compatible with Redis, so every claim above still
+applies to it, and it is now the default managed engine on AWS ElastiCache and MemoryDB and the
+in-memory cache shipped by major Linux distributions. Redis-vs-Valkey is a licensing and governance
+call, not an architectural one, and knowing that split is itself the interview-relevant fact.
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -2562,6 +2569,7 @@ Most systems reach for Redis and scale it horizontally by running many shards.
   "prompt": "Which engine does each requirement point to?",
   "buckets": [
     "Redis",
+    "Valkey",
     "Memcached"
   ],
   "items": [
@@ -2584,6 +2592,11 @@ Most systems reach for Redis and scale it horizontally by running many shards.
       "label": "Surviving a restart with the cached data intact",
       "bucket": "Redis",
       "feedback": "RDB snapshots and the AOF log are Redis persistence options; Memcached is memory-only by design."
+    },
+    {
+      "label": "A BSD-3 licensed fork of Redis 7.2.4 under Linux Foundation governance, wire-compatible with Redis",
+      "bucket": "Valkey",
+      "feedback": "That is Valkey: the same protocol and data structures as Redis, but a permissive license and open governance instead of Redis's RSALv2/SSPL terms."
     }
   ]
 }
@@ -2738,10 +2751,10 @@ interviewers listen for.
 }
 \`\`\`
 
-Recap: pick Redis for structures/persistence/replication or Memcached for a lean multi-core blob
-cache, shard by hash slots so topology changes move few keys, replicate each shard with failover,
-tier L1-near plus L2-remote, keep L2 consistent via invalidate-on-write or versioned keys, and never
-bring a cold cache online under full load.
+Recap: pick Redis (or its open-governance fork Valkey) for structures/persistence/replication or
+Memcached for a lean multi-core blob cache, shard by hash slots so topology changes move few keys,
+replicate each shard with failover, tier L1-near plus L2-remote, keep L2 consistent via
+invalidate-on-write or versioned keys, and never bring a cold cache online under full load.
 
 \`\`\`cswidget
 {
