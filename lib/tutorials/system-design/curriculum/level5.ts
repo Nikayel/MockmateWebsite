@@ -2614,6 +2614,23 @@ if you tell me to, even if I crash and restart." Phase 2 (commit/abort): if all 
 coordinator writes a commit record and tells everyone to commit; if any voted no, it broadcasts
 abort. This guarantees atomicity: all commit or all abort.
 
+### 2PC vs 3PC vs consensus
+
+**2PC** is that two-round atomic commit: everyone votes, then the coordinator broadcasts one
+decision. **3PC** inserts a third round, a pre-commit, so participants can time out and finish on
+their own when the coordinator vanishes. **Consensus** (Raft, Paxos) is a different job: it gets a
+majority to agree on one value, which is why it hardens a commit protocol rather than replacing one.
+Atomic commit needs every participant to say yes, and no majority can vote on another node's behalf.
+
+| Property | 2PC | 3PC | Consensus (Raft, Paxos) |
+| --- | --- | --- | --- |
+| Who must agree | Every participant, each holding a veto | Every participant, each holding a veto | A majority of replicas, so a minority may be down |
+| Blocking | Participants block in-doubt if the coordinator dies after the vote | Non-blocking, but only while the network stays synchronous | Non-blocking while a majority is reachable |
+| Coordinator failure | Locks held until it recovers and replays its log | Participants time out and decide for themselves | A new leader is elected and the replicated log already carries the decision |
+| Message rounds, happy path | 2 (prepare and vote, then commit and ack) | 3 (vote, pre-commit, commit) | 1 to a majority, once a leader is in place |
+| Network partition | Safe but stalled: atomicity holds, progress stops | Sides can time out and decide differently, breaking atomicity | Majority side proceeds, minority side stalls |
+| Where you see it | XA inside one cluster, and Spanner or CockroachDB with the coordinator replicated | Textbooks, almost never production | etcd, ZooKeeper, and the shard groups under those same databases |
+
 \`\`\`cswidget
 {
   "type": "sequence",
@@ -2802,6 +2819,26 @@ The second problem is **throughput**. Locks are held across the *entire* protoco
 round trips plus disk forces. A single-node commit holds a lock for microseconds; a 2PC lock is held
 for milliseconds to seconds across the fleet. Contended rows serialize behind it, so 2PC caps
 concurrency hard. This is why it does not survive at internet scale.
+
+### When the coordinator dies at each phase
+
+"The coordinator crashes" is not one failure, it is five, and only one of them is the famous one. The
+rule underneath every row: the coordinator's log record is the decision, so what participants suffer
+depends entirely on whether that record was written before the crash.
+
+| Coordinator dies | Participants are | Outcome |
+| --- | --- | --- |
+| Before sending any prepare | Untouched, no locks | Nothing to undo. The client times out and retries a transaction that never began. |
+| After some prepares, before all votes | Some prepared and locked, some idle | No commit record exists, so recovery aborts. Prepared participants hold locks until they hear it. |
+| After all yes votes, before writing the commit record | All prepared, all locked | The decision was never made durable, so recovery aborts and everyone rolls back. |
+| After writing the commit record, before broadcasting | All prepared, all locked | The outcome is already commit and nobody can see it yet. This is the in-doubt window, and it lasts as long as the coordinator is down. |
+| Mid-broadcast, some told and some not | Mixed: some committed, the rest in-doubt | Atomicity still holds. Recovery replays the decision from the log; those already told stay committed, the rest finish on the retry. |
+
+Two consequences worth carrying into the interview. First, a participant that crashes after voting
+yes is not off the hook: on restart it reads its own prepare record, sees an unresolved transaction,
+and must ask the coordinator for the outcome before releasing anything. Second, "no commit record
+means abort" is a real optimization (presumed abort), and it is why the two pre-record rows above
+resolve cheaply while the post-record row is the one that hurts.
 
 \`\`\`cswidget
 {
