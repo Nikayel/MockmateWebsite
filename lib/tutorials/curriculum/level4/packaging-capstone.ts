@@ -687,7 +687,7 @@ def run_feed(env, transport):
     return Pipeline(load_settings(env), transport).run()
 \`\`\`
 
-Now \`from feedstore import run_feed, FlakyTransport\` works, and \`feedstore.pipeline\` is free to be reorganised tomorrow without breaking a single caller. That is the point of the indirection: the import path is a contract, and a submodule path is a contract you did not mean to make.
+Now \`from feedstore import run_feed, FlakyTransport\` works, and \`feedstore.pipeline\` is free to be reorganized tomorrow without breaking a single caller. That is the point of the indirection: the import path is a contract, and a submodule path is a contract you did not mean to make.
 
 \`__all__\` is a plain list of strings that does exactly two things. It is the list \`from feedstore import *\` copies, and it is the documented public surface that linters and doc tools read. It does not hide anything: \`feedstore.config\` is still importable by anyone who wants it. It is a promise about what you will keep working, not a lock.
 
