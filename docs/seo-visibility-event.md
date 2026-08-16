@@ -20,9 +20,9 @@ Daily impressions, `sc-domain:codesparring.dev`, GSC Performance report:
 Before the event the site averaged about 15 impressions a day with zero clicks (28-day brief
 workbook, July 17 to August 7). The first elevated day was August 8 itself, 168 impressions, roughly
 11x the prior floor, independently confirmed by a same-property GSC pull run for this document
-(2026-08-16, `dimensions: ["date"]`). Impressions then roughly quintupled on August 9, peaked August
-10, and by August 14 were most of the way back toward the floor, still above it but well off the
-peak.
+(2026-08-16, `dimensions: ["date"]`). Impressions then more than quadrupled on August 9 (168 to 740),
+peaked August 10, and by August 14 were most of the way back toward the floor, still above it but
+well off the peak.
 
 Read this table as a crawl and discovery surge, not growth. Google found a much larger set of URLs
 than it previously knew about, is testing them against the index, and is already receding toward the
@@ -99,8 +99,12 @@ this is tracked going forward, including a spot check below.
 ## Index quality: level-shaped, not latency-shaped
 
 Of the 549 sitemap URLs (457 lessons), about 120 pages have ever received an impression (backlog
-baseline, `seofixesbacklog.md`, captured 2026-08-13). Share of a level's lessons that have ever drawn
-an impression, 30 days to 2026-08-13, 205 of 425 lessons overall (SEO-31):
+baseline, `seofixesbacklog.md`, captured 2026-08-13). The 120 and the 205 below are different
+measurements rather than a contradiction: 120 counts URLs of every type that appeared in GSC's page
+dimension over the backlog's 28-day window, 205 counts lessons only over the 30-day window of the
+level table, and 205 is the load-bearing figure here because the finding is about which levels
+surface. Share of a level's lessons that have ever drawn an impression, 30 days to 2026-08-13, 205 of
+425 lessons overall (SEO-31):
 
 | Level | Surfaced | Level | Surfaced |
 | --- | --- | --- | --- |
@@ -126,8 +130,10 @@ tracks. Treat `scaling-compute` as a level-specific defect worth diagnosing on i
 
 Spot check for this document, `gsc_inspect_url`, 2026-08-16: `sd-l4-rate-limit-algorithms` (in
 `scaling-compute`) returns "URL is unknown to Google," matching SEO-31's finding two days later.
-`sd-l5-leader-election-fencing` (the indexed control SEO-31 uses) returns "Submitted and indexed,"
-last crawled 2026-08-15. `/labs` also returns "Submitted and indexed," last crawled 2026-08-09.
+`sd-l5-logical-clocks`, the indexed control SEO-31 actually uses, returns "Submitted and indexed,"
+last crawled 2026-08-08. `sd-l5-leader-election-fencing`, a second indexed lesson in the same level,
+returns "Submitted and indexed," last crawled 2026-08-15. `/labs` also returns "Submitted and
+indexed," last crawled 2026-08-09.
 
 ## Is the impression increase consistent with intended publication?
 
