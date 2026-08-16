@@ -41,7 +41,19 @@ import {
 
 const ENTRIES = listAllCatalogEntries()
 
-/** Top-level keys the public preview is allowed to have. Exact, not a superset. */
+/**
+ * Top-level keys the public preview is allowed to have. Exact, not a superset.
+ *
+ * Hand-registered on purpose: this list is the gating control, so a field only becomes publishable
+ * when someone types its name here. `supplied` shipped in `toPublicExercisePreview` without being
+ * added to `ALLOWED_EXERCISE_KEYS` and stayed invisible until the first lesson authored one
+ * (`b9f19500`). Add the projection and the allowlist entry in the same commit, every time.
+ *
+ * `seoDescription` is the newest entry. It is the lesson's own meta description, so publishing it is
+ * its purpose rather than a disclosure, and `toPublicLessonPreview` writes the key unconditionally
+ * so this assertion stays an equality rather than degrading to a subset check on the majority of
+ * lessons that have no value for it.
+ */
 const ALLOWED_PREVIEW_KEYS = [
   "apply",
   "courseId",
@@ -54,6 +66,7 @@ const ALLOWED_PREVIEW_KEYS = [
   "levelTagline",
   "levelTitle",
   "practice",
+  "seoDescription",
   "skills",
   "summary",
   "teach",

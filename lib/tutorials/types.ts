@@ -71,6 +71,27 @@ export interface TutorialLesson<E> {
   title: string
   /** One line, for the module list. */
   summary: string
+  /**
+   * The meta description for this lesson's public reading page, written for a searcher.
+   *
+   * Optional, and absent on most lessons. `learnLessonMetadata` falls back to {@link summary}, which
+   * is the right default: the summary is one line about the lesson and it reads acceptably in a
+   * SERP. What it is not is an answer to the query that got someone there. The summary orients a
+   * learner who is already inside the course ("this lesson covers ..."); the searcher wants the
+   * first clause to say the thing they asked about.
+   *
+   * Rules, enforced by `lib/seo/__tests__/learn-description-budget.test.ts`:
+   *
+   *  - 110 to 155 characters. Under 110 wastes the snippet; over 155 is cut by Google, often badly
+   *    enough that it discards the tag and writes its own from page text.
+   *  - Does not open with "In this lesson" or "This lesson". Those spend the first and most
+   *    valuable clause describing the page rather than answering the question.
+   *
+   * Set it only where there is search demand to write against (SEO-02 scopes this to the top pages
+   * by impressions). A guessed `seoDescription` on a page nobody searches for is worse than the
+   * summary, because the summary is at least true to the lesson.
+   */
+  seoDescription?: string
   estimatedMinutes: number
   /** Reuses the shared `"easy" | "medium" | "hard"`. */
   difficulty: DifficultyLevel

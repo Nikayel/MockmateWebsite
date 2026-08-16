@@ -161,6 +161,27 @@ export function composeLearnTitle(pageTitle: string, courseLabel: string): Metad
 }
 
 /**
+ * The snippet copy for one lesson: the authored `seoDescription` when it exists, otherwise the
+ * summary.
+ *
+ * The fallback is the summary and not something cleverer because the summary is the only other
+ * sentence that is true about the lesson. It is written to orient a learner already inside the
+ * course, though, so it tends to open with curriculum framing rather than with the answer the query
+ * asked for. `seoDescription` is the override for the pages where that costs a click (SEO-02).
+ *
+ * Both paths run through {@link truncateForDescription}. An authored `seoDescription` should never
+ * need it (`lib/seo/__tests__/learn-description-budget.test.ts` fails at 156 characters), but a
+ * clean word-boundary cut is a better production failure than a tag Google discards and rewrites.
+ *
+ * Exported because the lesson's `Article` JSON-LD describes the same page and should not describe it
+ * differently. `components/learn/PublicLessonArticle.tsx` still calls `truncateForDescription` on
+ * the summary directly and should move to this once per-lesson values land.
+ */
+export function lessonMetaDescription(preview: PublicLessonPreview): string {
+  return truncateForDescription(preview.seoDescription ?? preview.summary)
+}
+
+/**
  * `/learn/{track}/{levelSlug}/{lessonId}` — the canonical reading page.
  *
  * Takes the already-projected {@link PublicLessonPreview} rather than the authored lesson, so the
@@ -176,7 +197,7 @@ export function learnLessonMetadata(preview: PublicLessonPreview): Metadata {
   const base = headFor({
     path,
     title: `${preview.title} · Learn ${LEARN_COURSE_LABEL[preview.courseId]}`,
-    description: truncateForDescription(preview.summary),
+    description: lessonMetaDescription(preview),
   })
   return { ...base, title }
 }
