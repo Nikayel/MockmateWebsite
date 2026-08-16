@@ -1872,10 +1872,10 @@ get the whole resource) or under-fetch (you need another call).
 gRPC is contract-first RPC. You define services and messages in a Protobuf \`.proto\` file, generate
 typed clients and servers in every language, and send compact binary frames over HTTP/2 with
 multiplexing and bidirectional streaming. On an internal service mesh at high QPS this is the winner:
-a Protobuf payload is often 3 to 10 times smaller than the equivalent JSON, parsing is faster, and
-the generated stubs make cross-service calls feel like local function calls. The cost is that it is
-unfriendly to browsers (you need grpc-web plus a proxy) and to casual \`curl\` debugging, and HTTP
-caches cannot see inside a binary POST.
+a Protobuf payload is typically around 2 to 3 times smaller than the equivalent JSON (much less on
+text-heavy payloads), parsing is faster, and the generated stubs make cross-service calls feel like
+local function calls. The cost is that it is unfriendly to browsers (you need grpc-web plus a proxy)
+and to casual \`curl\` debugging, and HTTP caches cannot see inside a binary POST.
 
 ### GraphQL
 
@@ -6275,7 +6275,7 @@ export const systemDesignLevel1: DesignLevel = {
             modelAnswerOutline: [
               "Assumptions: a company with external developers, dozens of internal microservices, and a mobile app with many screens.",
               "**(a) Public developer API: REST.** External developers already know REST, want `curl`-debuggable endpoints, and benefit from HTTP caching, standard status codes, and OpenAPI-generated docs and SDKs. The chattiness cost is acceptable because you cannot dictate client behavior and ubiquity matters more than bytes. Version it (`/v1`) and document with OpenAPI.",
-              "**(b) Internal service-to-service: gRPC.** You own both ends, so contract-first Protobuf gives typed generated clients, compact binary frames over HTTP/2, and streaming. At high internal QPS the 3 to 10x payload reduction and faster parsing directly cut CPU and tail latency, and the shared `.proto` becomes the enforced contract. Browser-unfriendliness does not matter here.",
+              "**(b) Internal service-to-service: gRPC.** You own both ends, so contract-first Protobuf gives typed generated clients, compact binary frames over HTTP/2, and streaming. At high internal QPS the payload reduction (roughly 2 to 3x on mixed payloads) and faster parsing directly cut CPU and tail latency, and the shared `.proto` becomes the enforced contract. Browser-unfriendliness does not matter here.",
               "**(c) Mobile client with varied data needs: GraphQL at the edge** (often via a BFF). Mobile screens need different field combinations and mobile networks punish extra round trips, so letting the client fetch exactly what a screen needs in one request removes over/under-fetching. Add persisted queries plus query-depth and cost limits so a bad client cannot ask for the entire graph, and DataLoader batching to avoid N+1.",
               "**The unifying point:** these coexist. GraphQL or REST at the edge resolves down into gRPC calls between services. For push (a live order-status screen) add SSE or WebSocket; for async work (the confirmation email) drop an event on Kafka rather than block the request.",
               "Common wrong turn: choosing GraphQL or gRPC because they sound modern, before establishing the consumer and traffic shape. gRPC on a public browser API or GraphQL with no cost limiting both cause real production pain.",
