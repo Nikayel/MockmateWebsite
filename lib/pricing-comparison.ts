@@ -45,6 +45,37 @@ export const COMPETITOR_PRICING = {
     examples: "Interviewing.io, Pramp Pro, etc.",
     verifiedOn: "2026-08-10",
   },
+  /**
+   * Hello Interview, for /codesparring-vs-hellointerview.
+   *
+   * Their plans are ACCESS WINDOWS, not subscriptions: the checkout page states
+   * "Access expires in 1 month. Does not auto-renew." That is the structural
+   * difference the comparison page turns on, so it is recorded rather than
+   * described in prose that could drift.
+   *
+   * Two prices per plan because the pricing page was running a promotion when
+   * it was checked. `price` is what a buyer paid that day; `listPrice` is the
+   * struck-through figure. The comparison page renders both, so neither an
+   * expired sale nor a permanent markdown can make our table wrong.
+   *
+   * `covers` is their own course list, transcribed from the premium page. It is
+   * here so the comparison cannot quietly go on describing them as a
+   * system-design-only product after they shipped coding and code review.
+   */
+  helloInterview: {
+    name: "Hello Interview",
+    fullName: "Hello Interview Premium",
+    plans: {
+      month: { label: "1 month", price: 47, listPrice: 59 },
+      year: { label: "1 year", price: 79, listPrice: 99 },
+      lifetime: { label: "Lifetime", price: 279, listPrice: 349 },
+    },
+    autoRenews: false,
+    covers:
+      "System design, low-level design, concurrency, behavioral, AI coding, code review, and DSA",
+    source: "https://www.hellointerview.com/pricing",
+    verifiedOn: "2026-08-16",
+  },
 } as const
 
 /**
@@ -101,4 +132,44 @@ export function getHumanMockCostBasis(): string {
  */
 export function getLeetCodeComparisonClaim(): string {
   return `${getLeetCodeSavingsPercent()}% cheaper than ${COMPETITOR_PRICING.leetcodePremium.fullName}`
+}
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+]
+
+/**
+ * Render a `verifiedOn` date for publication, e.g. "August 16, 2026".
+ *
+ * Parsed by hand rather than through `new Date(iso)`, which reads a bare
+ * `YYYY-MM-DD` as UTC midnight and then renders the PREVIOUS day for every
+ * reader west of Greenwich. A review date that disagrees with itself by a day
+ * depending on who loads the page is exactly the kind of detail a comparison
+ * page cannot afford to get wrong.
+ */
+export function formatVerifiedOn(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number)
+  return `${MONTH_NAMES[month - 1]} ${day}, ${year}`
+}
+
+/**
+ * A competitor plan's price with its list price when the two differ, e.g.
+ * "$47 (list $59)". Promotions expire; a table that printed only the sale price
+ * would silently become wrong the day it ended.
+ */
+export function formatPlanPrice(plan: { price: number; listPrice: number }): string {
+  return plan.price === plan.listPrice
+    ? `$${plan.price}`
+    : `$${plan.price} (list $${plan.listPrice})`
 }

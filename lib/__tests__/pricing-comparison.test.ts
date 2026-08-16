@@ -15,6 +15,8 @@ import { PRICING_CONFIG } from "../config"
 import {
   COMPETITOR_PRICING,
   MOCKS_FOR_IMPACT,
+  formatPlanPrice,
+  formatVerifiedOn,
   getHumanMockCostBasis,
   getHumanMockCostMultiple,
   getHumanMockTotalCost,
@@ -64,6 +66,45 @@ describe("competitor comparison claims", () => {
     expect(PRICING_CONFIG.pro.website.monthly.price).toBeLessThan(
       COMPETITOR_PRICING.humanMock.perSessionMin
     )
+  })
+})
+
+/**
+ * /codesparring-vs-hellointerview publishes another company's prices next to a
+ * review date. Both halves are load-bearing: a price with no date is a claim
+ * about today, and a date that renders differently per reader is not a date.
+ */
+describe("competitor facts a comparison page publishes", () => {
+  it("renders a verifiedOn date without the UTC off-by-one", () => {
+    // `new Date("2026-08-16").toLocaleDateString()` reads the string as UTC
+    // midnight and prints August 15 for every reader west of Greenwich, so the
+    // published review date would disagree with itself by timezone.
+    expect(formatVerifiedOn("2026-08-16")).toBe("August 16, 2026")
+    expect(formatVerifiedOn("2026-01-01")).toBe("January 1, 2026")
+    expect(formatVerifiedOn("2026-12-31")).toBe("December 31, 2026")
+  })
+
+  it("prints a competitor's list price alongside a promotional one", () => {
+    // A table that quoted only the sale price would go quietly wrong the day
+    // the sale ended, which is the failure mode a comparison page cannot have.
+    expect(formatPlanPrice({ price: 47, listPrice: 59 })).toBe("$47 (list $59)")
+    expect(formatPlanPrice({ price: 79, listPrice: 79 })).toBe("$79")
+  })
+
+  it("keeps every Hello Interview plan sourced and dated", () => {
+    const hello = COMPETITOR_PRICING.helloInterview
+
+    expect(hello.source).toMatch(/^https:\/\/www\.hellointerview\.com\//)
+    expect(hello.verifiedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+
+    // Every plan needs both figures, because the page renders both. A plan
+    // added without a list price would render "$X (list undefined)".
+    for (const plan of Object.values(hello.plans)) {
+      expect(typeof plan.price).toBe("number")
+      expect(typeof plan.listPrice).toBe("number")
+      expect(plan.price).toBeLessThanOrEqual(plan.listPrice)
+      expect(plan.label.length).toBeGreaterThan(0)
+    }
   })
 })
 
