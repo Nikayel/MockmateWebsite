@@ -1741,7 +1741,8 @@ Two multipliers people get wrong, and they get them wrong in opposite directions
 "Consider tiering" is not a judgment, it is a gesture at one. The judgment needs a number, so carry
 three approximate storage prices and say out loud that they are approximate: standard cloud object
 storage is roughly 20 dollars per TB-month, archive tiers roughly 1 to 4 dollars per TB-month, and
-in-memory cache roughly 5 dollars per GB-month, which is 5,000 dollars per TB-month. The absolute
+in-memory cache roughly 5 dollars per GB-month self-managed, or about double that on a managed
+service, which is 5,000 dollars per TB-month. The absolute
 figures drift year to year and large customers negotiate them down, so hedge them. The ratios survive:
 memory is over 200x the price of object storage per byte, and archive is another 10x below standard.
 
