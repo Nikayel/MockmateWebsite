@@ -41,7 +41,7 @@ const COMPANY_COUNT = ALL_COMPANIES.length
 const HEADLINE_COMPANY_NAMES = ["Google", "Meta", "Amazon", "Apple"]
 
 export const metadata: Metadata = {
-  title: "Interview Prep Guides by Company | Google, Meta, Amazon & More",
+  title: `Interview Prep Guides for ${COMPANY_COUNT} Tech Companies`,
   // 143 characters, against the 155 Google shows. The previous sentence ran 232, so it was cut
   // inside the company list and the reader never reached what the guides actually contain. Every
   // number here is still derived, so adding a company cannot make the sentence wrong.
