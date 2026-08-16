@@ -4,6 +4,7 @@ import {
   getSystemDesignLevelBySlug,
   listSystemDesignLevels,
 } from "@/lib/tutorials/system-design/registry"
+import { Footer } from "@/components/footer"
 import { LevelPathView } from "@/components/tutorials/LevelPathView"
 import { toLevelListModel } from "@/lib/tutorials/level-path"
 import { learnLevelMetadata, learnTrackMetadata } from "@/lib/seo/learn-metadata"
@@ -85,6 +86,13 @@ export default async function SystemDesignLevelModulesPage({ params }: Props) {
         ]}
       />
       <LevelPathView model={toLevelListModel(level)} courseId={COURSE_ID} />
+      {/* The site footer, which `LevelPathView` deliberately does not carry: its top bar is a slim
+          breadcrumb rather than the full site nav, so before this the 23 level indexes shipped just
+          three site-wide links (home, the track, and the track again) around the lesson grid. The
+          lesson pages below them and the `/learn` hub above them both render the footer, so these
+          pages were the hole in the middle of the crawl graph as well as a dead end for a reader.
+          Only the footer is added: `Header` is `fixed`, and would sit on top of the sticky bar. */}
+      <Footer />
     </>
   )
 }
