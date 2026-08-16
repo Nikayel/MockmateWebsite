@@ -3093,7 +3093,7 @@ to 70% utilization**: 20 instances at a 70% target becomes \`20 / 0.7 = ~29\` in
   "type": "calc",
   "title": "The utilization hockey stick",
   "predictPrompt": {
-    "question": "Compared with a nearly idle system, how much longer does a request wait at 90% utilization?",
+    "question": "Compared with a nearly idle system, how much longer does a request take end to end at 90% utilization?",
     "options": [
       "About 2x",
       "About 5x",
@@ -3101,7 +3101,7 @@ to 70% utilization**: 20 instances at a 70% target becomes \`20 / 0.7 = ~29\` in
       "About 100x"
     ]
   },
-  "workedExample": "At the lesson's 70% target, 'rho' = 0.7 gives a wait multiplier of 1 / (1 - 0.7) = about 3.3x the idle-system response time, leaving 30% headroom. Slide 'rho' to 0.9 and the multiplier jumps to 10x with only 10% headroom; at 0.95 it doubles again to 20x. Watch the sparkline stay almost flat until about 0.8, then turn vertical.",
+  "workedExample": "At the lesson's 70% target, 'rho' = 0.7 gives a response-time multiplier of 1 / (1 - 0.7) = about 3.3x the idle-system response time, leaving 30% headroom. Slide 'rho' to 0.9 and the multiplier jumps to 10x with only 10% headroom; at 0.95 it doubles again to 20x. Watch the sparkline stay almost flat until about 0.8, then turn vertical.",
   "inputs": [
     {
       "kind": "slider",
@@ -3132,7 +3132,7 @@ to 70% utilization**: 20 instances at a 70% target becomes \`20 / 0.7 = ~29\` in
       "format": "percent"
     }
   ],
-  "caption": "Queueing delay grows as 1/(1-rho): gentle below 0.7, explosive past 0.8. This curve is why you size to 50 to 70%, never 100%."
+  "caption": "Response time grows as 1/(1-rho): gentle below 0.7, explosive past 0.8. This curve is why you size to 50 to 70%, never 100%."
 }
 \`\`\`
 
