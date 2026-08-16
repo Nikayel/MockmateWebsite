@@ -26,7 +26,7 @@ Authentication answers one question: who is this request from? Keep it strictly 
     },
     {
       "label": "Hash each password with SHA-256",
-      "feedback": "Tempting because SHA-256 really is one-way, but it is built for speed: GPUs test hundreds of billions of SHA-256 guesses per second, so the dumped table is crackable offline in days."
+      "feedback": "Tempting because SHA-256 really is one-way, but it is built for speed: GPUs test tens of billions per GPU, and hundreds of billions on a multi-GPU rig of SHA-256 guesses per second, so the dumped table is crackable offline in days."
     },
     {
       "label": "Hash each password with argon2id and a per-user salt",
@@ -39,7 +39,7 @@ Authentication answers one question: who is this request from? Keep it strictly 
 
 ## Store a verifier you cannot reverse
 
-The core rule: never store a password, store a verifier you cannot reverse. Use a memory-hard key derivation function: argon2id (preferred today), scrypt, or bcrypt. These are slow and memory-heavy on purpose so an attacker with your hashes cannot brute force billions of guesses per second on a GPU. A fast hash like MD5 or SHA-256 is the classic disqualifying answer: SHA-256 is designed to be fast, so a leaked SHA-256 table of 100M users is cracked at hundreds of billions of guesses per second. Tune argon2id to something like 19 MiB memory, 2 iterations, parallelism 1, then raise it until a single verify costs roughly 50 to 100 ms on your hardware. That latency is invisible per login but murders offline cracking.
+The core rule: never store a password, store a verifier you cannot reverse. Use a memory-hard key derivation function: argon2id (preferred today), scrypt, or bcrypt. These are slow and memory-heavy on purpose so an attacker with your hashes cannot brute force billions of guesses per second on a GPU. A fast hash like MD5 or SHA-256 is the classic disqualifying answer: SHA-256 is designed to be fast, so a leaked SHA-256 table of 100M users is cracked at tens of billions per GPU, and hundreds of billions on a multi-GPU rig of guesses per second. Tune argon2id to something like 19 MiB memory, 2 iterations, parallelism 1, then raise it until a single verify costs roughly 50 to 100 ms on your hardware. That latency is invisible per login but murders offline cracking.
 
 Every password gets a unique random per-user salt, stored alongside the hash. Salt defeats precomputed rainbow tables and means two users with the same password get different hashes. A pepper is an optional secret added to every hash that lives outside the database (in a KMS or app config), so a database-only dump still lacks the pepper needed to crack anything. Salt is per-user and public; pepper is global and secret.
 
