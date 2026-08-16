@@ -502,7 +502,7 @@ class Reader:
         Reader.REGISTRY[fmt] = cls
 
 class CsvReader(Reader, fmt="csv"): ...
-print(Reader.REGISTRY)   # {'csv': <class 'CsvReader'>}
+print(Reader.REGISTRY)   # {'csv': <class '__main__.CsvReader'>}
 \`\`\`
 
 ### Reading what a class was built from
@@ -518,7 +518,7 @@ class Middle(Base):
 
 class Leaf(Middle): ...
 
-print(Leaf.__bases__)    # (<class 'Middle'>,)   direct parents only
+print(Leaf.__bases__)    # (<class '__main__.Middle'>,)   direct parents only
 print(Leaf.__mro__)      # (Leaf, Middle, Base, object)
 
 # Merge what the parents declared, weakest first, then this class on top.
