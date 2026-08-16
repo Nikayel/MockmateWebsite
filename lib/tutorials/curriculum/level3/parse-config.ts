@@ -527,11 +527,15 @@ for line in text.splitlines():
     stripped = line.strip()
     if not stripped or stripped.startswith("#"):
         continue
+    if "=" not in stripped:               # no delimiter, so there is no entry here
+        continue                          # without this, the next line raises
     key, value = stripped.split("=", 1)   # maxsplit=1
     # store key.strip() -> coerce(value.strip())
 \`\`\`
 
-Given \`"# db\\nhost = localhost\\nport = 8080"\`, this produces \`{"host": "localhost", "port": 8080}\`.
+That third guard is not optional. Unpacking two names from \`split("=", 1)\` raises \`ValueError: not enough values to unpack (expected 2, got 1)\` the moment a line has no \`=\` in it, so one stray word ends the whole parse.
+
+Given \`"# db\\nhost = localhost\\nport = 8080"\`, the loop reaches the store step with \`("host", "localhost")\` and \`("port", "8080")\`. Both values are still text at that point: applying the type rule from the section above is what turns \`"8080"\` into \`8080\`, and that is the step the comment on the last line stands for.
 
 \`\`\`cswidget
 {
@@ -590,7 +594,7 @@ Given \`"# db\\nhost = localhost\\nport = 8080"\`, this produces \`{"host": "loc
     {
       "label": "DEBUG",
       "bucket": "Skipped",
-      "feedback": "There is no = anywhere in the line, so unpacking would raise. The 'if = not in stripped' guard is what keeps one malformed line from killing the whole parse."
+      "feedback": "There is no = anywhere in the line, so unpacking would raise. Testing if '=' not in stripped before the split is what keeps one malformed line from killing the whole parse."
     },
     {
       "label": "url = a=b",
