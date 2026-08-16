@@ -2244,10 +2244,11 @@ of your evolution costs zero version bumps.
 
 - **URL-path versioning** (\`/v1/orders\`, \`/v2/orders\`). Visible, trivial to route, trivial to
   test with \`curl\`, and easy for developers to reason about. This is the pragmatic default for
-  public REST APIs (Stripe, Twilio, GitHub all expose a visible version).
+  public REST APIs (Stripe and Twilio both expose a visible version in the path).
 - **Header or media-type versioning** (\`Accept: application/vnd.acme.v2+json\`). Purer from a REST
   standpoint because the resource URL is stable, but it is invisible in a browser address bar, harder
-  to test casually, and easy for a proxy to strip or ignore.
+  to test casually, and easy for a proxy to strip or ignore. GitHub does this, with a dated
+  \`X-GitHub-Api-Version\` header.
 - **Caller-pinned versioning**, where the version is a value stored against the account rather than
   written into the request at all, usually a date, with a header that overrides it for one call. The
   next section works this one, because its consequences are less obvious than the first two.
