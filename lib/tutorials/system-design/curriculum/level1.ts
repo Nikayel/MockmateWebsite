@@ -4859,14 +4859,16 @@ error budget:   100% - 99.9% = 0.1% of requests in the window may miss
                 0.1% of that is 7,257,600 requests you are allowed to fail or run slow
 \`\`\`
 
-The budget is what turns a target into something you can act on. Spending it evenly across 28 days is
-the system behaving as designed. Spending a third of it in one afternoon is an incident whether or
-not a human noticed, and that is what deserves a page. An exhausted budget is a planning input too: it
-is the argument for spending the next sprint on reliability rather than features.
+The budget is what turns a target into something you can act on. Spend it evenly across the 28 days
+and the system is behaving as designed. Spend a third of it in one afternoon and that is an incident
+worth paging for, whether or not a human noticed.
 
-Note the shape of the SLI: good events over valid events, both of them counts of requests. That is
-what makes 99.9% subtractable into a budget at all, and it is why "uptime" and "average latency" make
-poor SLIs.
+That is as far as this lesson takes the hierarchy, and it is deliberately the orientation. Where an
+SLA differs from an SLO, why the measurement point changes the number, and what a rolling window does
+that a calendar month does not all belong to
+[SLI vs SLO vs SLA, defined and compared](/learn/system-design/reliability-ops/sd-l7-sli-slo-sla).
+What matters here is that the target is written against a percentile, which is why the next section
+is about what makes that percentile harder to hold as a system grows.
 
 ### Fan-out makes the tail common
 
