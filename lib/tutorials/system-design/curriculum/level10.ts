@@ -371,6 +371,10 @@ const typeaheadTeach = `
 
 Typeahead is a latency problem wearing a data-structure costume. The user types a prefix and expects the top 10 completions to appear within about 100ms, and they fire a request on nearly every keystroke, so the read path has to be brutally fast and the load has to be cut before it ever reaches your servers.
 
+## What is typeahead?
+
+Typeahead, also called autocomplete or type-ahead search, is the feature that offers a ranked list of likely completions while a user is still typing into a search box, refreshing that list on each keystroke so they can pick a suggestion instead of finishing the query themselves. The input is whatever prefix has been typed so far and the output is the top few completions for it, ordered by how likely each one is to be what the user meant rather than alphabetically. It is not search itself: typeahead predicts the query and search answers it, which is why a typeahead index stores popular query strings rather than documents. The bar it has to clear is a ranked list back in roughly 100ms on every keystroke, and that budget is what turns a familiar UI affordance into a system design problem.
+
 ## The trie with cached top-k
 
 The core structure is a trie (prefix tree): each node is a character, and a path from the root spells a prefix. The naive trie lookup walks to the prefix node, then does a subtree traversal to find all completions and rank them, which is too slow for a hot prefix with thousands of descendants. The production trick is to cache the top-k completions at every node. When you reach the node for "ne", the 10 best completions ("netflix", "news", "nest", ...) are already stored right there, so serving is O(length of prefix), single-digit milliseconds, no subtree walk. This precomputation is done offline or incrementally, not per request.
