@@ -459,7 +459,7 @@ Python 3.12 and later write the same thing as \`def first[T](items: list[T]) -> 
     },
     {
       "label": "Yes at runtime, but a static checker would still reject it.",
-      "feedback": "Backwards, though it is a fair guess given how little Python verifies at runtime. Protocols are a static feature: the checker is the thing that verifies the shape, and at runtime nothing is verified unless you opt in with @runtime_checkable, which only ever looks for method names."
+      "feedback": "Backwards, though it is a fair guess given how little Python verifies at runtime. Protocols are a static feature: the checker is the thing that verifies the shape, and at runtime nothing is verified unless you opt in with @runtime_checkable, which only ever looks for attribute names, callable or not."
     }
   ]
 }
@@ -489,7 +489,7 @@ class LineSink(Protocol):
 isinstance(sink, LineSink)   # True if sink has a write attribute
 \`\`\`
 
-Know its limits before you lean on it: it checks that the method names exist and nothing more. Signatures, argument types, and return types are never inspected, so an object whose \`write\` takes three arguments still passes. It also only works for protocols made of methods, not ones declaring plain attributes. Treat it as a friendlier \`hasattr\`, not as verification.
+Know its limits before you lean on it: it checks that the named attributes exist and nothing more. Signatures, argument types, and return types are never inspected, so an object whose \`write\` takes three arguments still passes, and so does one whose \`write\` is the integer \`3\`. The method-only restriction people remember belongs to the other check: \`issubclass(User, Named)\` raises \`TypeError: Protocols with non-method members don't support issubclass()\`, while \`isinstance\` is happy to test a protocol declaring plain attributes. Treat it as a friendlier \`hasattr\`, not as verification.
 
 ### Pitfall: Optional is not an optional argument
 
