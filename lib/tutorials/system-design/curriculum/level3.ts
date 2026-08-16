@@ -3575,21 +3575,21 @@ to query the target cell **plus its 8 neighbors** (a 3x3 ring) so you never miss
   "rows": [
     [
       "North",
-      "9q8yw",
-      "9q8yx",
-      "9q8yz"
+      "9q8zj",
+      "9q8zn",
+      "9q8zp"
     ],
     [
       "Center",
-      "9q8yt",
+      "9q8yv",
       "9q8yy (the query cell)",
-      "9q8zn"
+      "9q8yz"
     ],
     [
       "South",
-      "9q8ym",
-      "9q8yq",
-      "9q8yr"
+      "9q8yt",
+      "9q8yw",
+      "9q8yx"
     ]
   ],
   "caption": "Two points a meter apart can straddle a cell edge and share almost no prefix, so a proximity query prefix-scans the center cell plus all eight neighbors, then does an exact-distance filter and sort on the small candidate set."
