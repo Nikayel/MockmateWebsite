@@ -2112,6 +2112,21 @@ H2 streams (Envoy balances individual streams, not just connections), or periodi
 connections** (max-connection-age) so clients re-resolve and rebalance. WebSockets have the same
 pinning problem, so plan for connection draining and rebalancing on scale events.
 
+**QUIC and HTTP/3.** Level 1's [HTTP/1.1 vs 2 vs 3 walkthrough](/learn/system-design/foundations/sd-l1-http-versions)
+covers QUIC's transport mechanics in full, including connection migration; the operational piece
+belongs here, in what it does to this lesson's load-balancing tier. QUIC folds the TLS handshake into
+the transport handshake, so there is no separate handshake for an LB to terminate, and it identifies a
+connection by a **connection ID** rather than the **4-tuple**, which is what lets the connection
+survive a client's IP changing. An L4 tier that load balances by hashing the 4-tuple misroutes a QUIC
+client the moment its address changes, so a QUIC-aware L4 tier has to route on connection ID instead.
+What QUIC does not change is the stream-pinning problem above: a QUIC connection still multiplexes
+many streams over itself, and those streams are still pinned to whichever backend was chosen when the
+connection was established, so the same three fixes (client-side load balancing, L7 per-stream
+balancing, connection-age cycling) still apply. Treat it as a material minority of edge traffic, not
+the default: HTTP/2 carries roughly half of Cloudflare's edge requests, HTTP/1.x about a quarter, and
+HTTP/3 close to a fifth, so most of the fleet still needs the TCP-based pinning fixes above even with
+QUIC in the mix.
+
 **C10k / C10M.** Holding 100K-plus concurrent connections needs **event-driven** proxies
 (epoll/kqueue, nginx/Envoy) rather than thread-per-connection, plus OS tuning (file-descriptor
 limits, ephemeral port range, TCP buffers, SO_REUSEPORT).
