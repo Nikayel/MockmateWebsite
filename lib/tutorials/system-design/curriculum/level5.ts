@@ -483,6 +483,8 @@ than globally CP or AP.
   "reveal": "In your write-up, define C as linearizability and A as every non-failing node answering, rule out CA explicitly, then defend the per-operation split by naming the user-visible consequence of each side."
 }
 \`\`\`
+
+**Sources:** [Gilbert and Lynch, CAP proof](https://users.ece.cmu.edu/~adrian/731-sp04/readings/GL-cap.pdf) · [Brewer, CAP twelve years later](https://www.infoq.com/articles/cap-twelve-years-later-how-the-rules-have-changed/) · [Kleppmann: stop calling CP or AP](https://martin.kleppmann.com/2015/05/11/please-stop-calling-databases-cp-or-ap.html)
 `.trim()
 
 const pacelcTeach = `
