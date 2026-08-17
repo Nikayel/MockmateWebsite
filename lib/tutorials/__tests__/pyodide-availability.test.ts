@@ -49,6 +49,14 @@ const UNAVAILABLE_IN_PYODIDE = [
   "typer",
   "flask",
   "django",
+  "openai",
+  "anthropic",
+  "tiktoken",
+  "transformers",
+  "torch",
+  "langchain",
+  "sentence_transformers",
+  "faiss",
 ]
 
 /** `import x`, `import x as y`, `from x import y`, `import a, x`. */
