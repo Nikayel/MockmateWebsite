@@ -555,7 +555,7 @@ An exception can carry data. \`exc.kind\` and \`exc.tokens\` are ordinary attrib
 
 ### Backoff, and why every client waits a different amount
 
-Waiting a fixed two seconds between attempts is worse than it looks. Every client that failed at the same moment retries at the same moment, so the overloaded service gets the identical spike it just shed, on a two-second cycle, forever. Exponential backoff spreads the attempts out in time (\`0.5\`, \`1\`, \`2\`, \`4\`, ...), and a cap stops the growth before a retry outlives the request that wanted it.
+Waiting a fixed two seconds between attempts is worse than it looks.
 
 \`\`\`cswidget
 {
@@ -585,6 +585,8 @@ Waiting a fixed two seconds between attempts is worse than it looks. Every clien
 }
 \`\`\`
 
+Every client that failed at the same moment retries at the same moment, so the overloaded service gets the identical spike it just shed, on a two-second cycle, forever. Exponential backoff spreads the attempts out in time (\`0.5\`, \`1\`, \`2\`, \`4\`, ...), and a cap stops the growth before a retry outlives the request that wanted it.
+
 The repair is **full jitter**: do not wait the ceiling, wait a random amount between zero and the ceiling. The ceiling still doubles; the actual waits scatter, so two clients that failed together almost never retry together.
 
 \`\`\`python
@@ -609,7 +611,7 @@ for attempt in range(5):
 
 ### A budget is not an attempt count
 
-"Retry up to five times" is a bound on attempts. Nobody is billed for attempts. The two things that actually run out are **tokens** (money) and **wall-clock seconds** (the user waiting, or the deadline of whatever called you). Track those directly, and when one is gone, stop and return what you have.
+"Retry up to five times" is the bound almost every retry loop ships with, and in most of them it is the only bound in the file.
 
 \`\`\`cswidget
 {
@@ -639,6 +641,8 @@ for attempt in range(5):
 }
 \`\`\`
 
+Nobody is billed for attempts. The two things that actually run out are **tokens** (money) and **wall-clock seconds** (the user waiting, or the deadline of whatever called you). Track those directly, and when one is gone, stop and return what you have.
+
 Aborting to a **partial result** is a design decision, not a failure to handle the error. A caller that gets back \`{"status": "partial", "text": "", "tokens": 4200}\` can decide to degrade, queue the work, or tell the user. A caller that gets an exception thrown from inside a loop learns nothing about what was spent.
 
 ### Reading the reply before you trust it
@@ -664,7 +668,7 @@ The interesting part is which bucket that failure goes in. A reply that fails th
 
 ### An idempotency key is what makes a retry safe
 
-Everything above assumes a retry is free to send. It is free only when the call has no side effect. The moment the call charges a card, sends an email, or writes a row, a retry can do the thing twice, because a timeout tells you the response was lost, not that the request was.
+Everything above assumes a retry is free to send. It is free only when the call has no side effect, and a call that charges a card, sends an email, or writes a row has one.
 
 \`\`\`cswidget
 {
@@ -694,6 +698,8 @@ Everything above assumes a retry is free to send. It is free only when the call 
   "reveal": "A retry is safe when the second request is recognizably the same operation as the first. That recognition is the idempotency key, and it has to come from the operation rather than from the attempt."
 }
 \`\`\`
+
+A timeout tells you the response was lost, not that the request was, so a side-effecting call that is retried on one can do the thing twice.
 
 An **idempotency key** is a string the client sends with the request, identifying the *operation*. The server stores the result under that key, so a second request carrying the same key returns the first result instead of doing the work again. Two rules make it work, and both are easy to break:
 
