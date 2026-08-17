@@ -198,6 +198,8 @@ Common wrong turn: chasing five nines everywhere. If your database ceiling is 99
   "reveal": "Nines are minutes: 99.9 percent buys about 43 minutes a month and 99.99 percent about 4.3. Serial dependencies multiply that ceiling down, redundancy combines it back up as 1 minus (1 minus a) to the power n, each added nine costs roughly 10x more than the last, and the number you promise externally always sits looser than the one you run to internally."
 }
 \`\`\`
+
+**Sources:** [Google SRE: embracing risk](https://sre.google/sre-book/embracing-risk/) · [Google SRE: service level objectives](https://sre.google/sre-book/service-level-objectives/) · [AWS compute SLA](https://aws.amazon.com/compute/sla/)
 `.trim()
 
 const sliSloSlaTeach = `
