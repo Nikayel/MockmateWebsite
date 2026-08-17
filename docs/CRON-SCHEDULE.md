@@ -1,22 +1,25 @@
 # Cron schedule
 
-Six background jobs exist under `app/api/cron/`. Until 2026-08-07 **none of them were declared in
-`vercel.json`**, so anything not manually registered on cron-job.org was simply never running.
-
-Five are now declared in `vercel.json`. `email-notifications` is deliberately left out because the
-owner has it registered externally already, and it is the one job where a duplicate run has a
-user-visible cost.
+Six background jobs exist under `app/api/cron/`. **All scheduling lives on cron-job.org, and
+`vercel.json` deliberately declares no `crons` block** — on the Vercel Hobby plan a `crons` block
+with sub-daily schedules rejects every production deploy (CEO directive; see
+`app/api/cron/README.md`, which is the authority on this). An earlier revision of this file claimed
+five jobs were declared in `vercel.json`; that was never true of the deployed state and the claim
+hid the real operational risk: **nothing in this repo can verify the external schedules exist.**
+Checking cron-job.org is a standing owner responsibility.
 
 ## What runs, when, and what breaks if it does not
 
-| Job | Schedule (UTC) | Scheduled by | If it never runs |
-|---|---|---|---|
-| `aggregate-usage` | `0 * * * *` hourly | `vercel.json` | `config/cost_averages` is never written, so `getAverageHourlyCost` returns 0 and the **cost-spike alarm is silently disabled**. You would not notice a runaway AI loop until the invoice. |
-| `subscription-reconcile` | `30 8 * * *` daily | `vercel.json` | A user whose checkout webhook failed **stays on Free after paying**. This job is the webhook safety net; unscheduled, there is no safety net. |
-| `subscription-expiry` | `0 9 * * *` daily | `vercel.json` | Expired yearly plans keep Pro access forever, and the 7-day / 1-day expiry reminder emails never send. |
-| `expire-referral-rewards` | `30 9 * * *` daily | `vercel.json` | Pending referral rewards never expire, so the advertised ledger drifts from the stated 90-day policy. |
-| `guest-session-cleanup` | `0 10 * * *` daily | `vercel.json` | Guest session documents (code, transcript, feedback) accumulate in Firestore forever. Cost and privacy both grow without bound. |
-| `email-notifications` | every 3 hours | **cron-job.org (external)** | Welcome, inactivity, spaced-repetition, and roadmap emails stop. |
+Every job is expected to be registered on cron-job.org with these schedules:
+
+| Job | Schedule (UTC) | If it never runs |
+|---|---|---|
+| `aggregate-usage` | `0 * * * *` hourly | `config/cost_averages` goes stale (2h TTL), so `getAverageHourlyCost` falls back to 0 and the **spike-vs-average cost alarm is silently disabled** (the absolute $50/hr threshold still fires). You would not notice a slow-burn runaway AI loop until the invoice. |
+| `subscription-reconcile` | `30 8 * * *` daily | A user whose checkout webhook failed **stays on Free after paying**. This job is the webhook safety net; unscheduled, there is no safety net. |
+| `subscription-expiry` | `0 9 * * *` daily | Expired yearly plans keep Pro access forever, and the 7-day / 1-day expiry reminder emails never send. |
+| `expire-referral-rewards` | `30 9 * * *` daily | Pending referral rewards never expire, so the advertised ledger drifts from the stated 90-day policy. |
+| `guest-session-cleanup` | `0 10 * * *` daily | Guest session documents (code, transcript, feedback) accumulate in Firestore forever. Cost and privacy both grow without bound. |
+| `email-notifications` | every 3 hours | Welcome, inactivity, spaced-repetition, and roadmap emails stop. |
 
 ## Duplicate runs are safe
 
@@ -34,18 +37,12 @@ damage:
 All six use `verifyCronRequest` (`lib/cron-auth.ts`): `Authorization: Bearer <CRON_SECRET>`,
 length-guarded and timing-safe, failing closed with a 500 when `CRON_SECRET` is unset.
 
-Vercel Cron sends exactly this header when the `CRON_SECRET` environment variable is set on the
-project, so no route changes were needed. **`CRON_SECRET` must be set in Vercel Production or every
-scheduled run will 500.**
-
-## If you are on the Vercel Hobby plan
-
-Hobby limits both the number of cron jobs and their frequency (daily only). If the deploy is
-rejected for exceeding that limit, or if the hourly `aggregate-usage` schedule is downgraded to
-daily, register the affected jobs on cron-job.org instead using the schedules in the table above and
-remove them from `vercel.json`. The routes are identical either way; only the scheduler differs.
+Configure the cron-job.org job to send exactly that header. **`CRON_SECRET` must be set in Vercel
+Production or every scheduled run will 500.**
 
 ## Checking that they actually ran
 
-Vercel logs each cron invocation under the project's Cron Jobs tab. A run that returns 401 means
-`CRON_SECRET` does not match; 500 with "Server misconfiguration" means it is unset.
+cron-job.org records each execution's status code on the job's history page. A run that returns 401
+means the configured `CRON_SECRET` header does not match; 500 with "Server misconfiguration" means
+the env var is unset in Vercel. For `aggregate-usage` specifically, a fresh
+`config/cost_averages.calculatedAt` in Firestore is the ground truth that the hourly job is alive.

@@ -19,6 +19,7 @@ import {
   getUserServiceBreakdown,
   getGranularUsageBreakdown,
   getDailyUsageTrends,
+  utcMonthStart,
   BUDGET_CAPS,
   DEEPGRAM_COSTS,
   EMBEDDING_COSTS,
@@ -136,7 +137,9 @@ export async function GET(request: NextRequest) {
  */
 async function buildOverview() {
   const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  // UTC, matching the summary writer and every other money boundary — a local
+  // construction here would count a different month than the ledger bills.
+  const startOfMonth = utcMonthStart(now)
 
   const [stats, cacheStats, serviceBreakdown, granularBreakdown, dailyTrends, sessionsCounted] =
     await Promise.all([
@@ -175,6 +178,10 @@ async function buildOverview() {
     topUsers: stats.userStats.slice(0, 20),
     budgetCaps: BUDGET_CAPS,
     services: serviceBreakdown.byService,
+    // Per product-service spend (lib/usage/services.ts ids), the dimension the
+    // llm/voice/embeddings triple above is too coarse to answer: WHICH surface
+    // is burning the money.
+    byServiceId: serviceBreakdown.byServiceId,
     providers: serviceBreakdown.byProvider,
     granular: {
       byPattern: granularBreakdown.byPattern,
