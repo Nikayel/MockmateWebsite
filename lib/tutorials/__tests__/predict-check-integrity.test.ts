@@ -53,56 +53,19 @@ const MIN_RUN = 8
 const MIN_WHOLE_OPTION = 6
 
 /**
- * Pre-existing violations, each with the reason it is tolerated rather than repaired.
+ * Violations tolerated rather than repaired, each with the reason it is defensible.
  *
- * Every entry below predates this file and was found by it on first run (2026-08-16). None was
- * repaired here: this change repairs the two spoilers it was written for (sd-l5-leader-election-
- * fencing and sd-l10-distributed-lock, both of which pass without an entry) and files the rest for
- * a content pass rather than editing seven unrelated lessons under an SEO ticket.
+ * Empty, and meant to stay that way. Seven entries were filed here when this file first ran
+ * (2026-08-16) under an SEO ticket that had no business editing seven unrelated lessons; the
+ * content pass that followed reworded every one of those options, so the list emptied on its own.
  *
- * The common shape is a cumulative end-of-teach check whose correct option restates the clause the
- * lesson just taught. That placement is sanctioned by the widget's own design notes ("one
- * cumulative check at teach end"), and the closure rule requires the FACT to live in teach prose,
- * so the fix is to reword the option rather than to delete the teaching. Add an entry only with a
- * note saying why the duplication is defensible, never to get a red build green.
+ * The shape they all shared: a cumulative end-of-teach check whose correct option restated the
+ * clause the lesson had just taught. That placement is sanctioned by the widget's own design notes
+ * ("one cumulative check at teach end"), and the closure rule requires the FACT to live in teach
+ * prose, so the fix is always to reword the option rather than to delete the teaching. Add an entry
+ * only with a note saying why the duplication is defensible, never to get a red build green.
  */
-const ALLOWED: { lessonId: string; promptStartsWith: string; why: string }[] = [
-  {
-    lessonId: "py-l2-dunder-properties",
-    promptStartsWith: "Your Point class worked fine as a dict key",
-    why: "The teach recap states the __hash__ = None rule verbatim. It is a closure-rule fact and has to live in prose; the option should be reworded instead.",
-  },
-  {
-    lessonId: "py-l5-shrink",
-    promptStartsWith: "For apply_ops above with ops",
-    why: "The walkthrough above names the growing-prefix strategy in the same words the option uses. The check is retrieval of a strategy the section demonstrates.",
-  },
-  {
-    lessonId: "py-l5-the-other-caller",
-    promptStartsWith: "One caller needs rounding that contradicts",
-    why: "The prose states the rule ('the difference belongs in that caller or behind a new parameter') and the option repeats the clause.",
-  },
-  {
-    lessonId: "py-l5-the-other-caller",
-    promptStartsWith: "Yesterday's change to the shared helper",
-    why: "Same lesson: 'the neighbor had no test at the boundary' is the section's own sentence, reused as the correct option.",
-  },
-  {
-    lessonId: "sd-l6-consumer-groups",
-    promptStartsWith: "A 12-partition topic is falling behind",
-    why: "Kafka's one-consumer-per-partition guarantee is stated 16 lines above the check in the same words. The guarantee must stay in prose; the option needs rewording.",
-  },
-  {
-    lessonId: "sd-l8-sessions-tokens",
-    promptStartsWith: "Last call before the design write",
-    why: "Explicitly a cumulative recap check, and its option is the recap sentence. Re-asking the taught answer is the intent here, so this one may be correct as authored.",
-  },
-  {
-    lessonId: "sd-l9-table-formats-cdc",
-    promptStartsWith: "With a transactional outbox plus Debezium",
-    why: "The 'Interview nuance' paragraph gives the delivery guarantee in the option's exact words. Cumulative check; reword the option, keep the nuance.",
-  },
-]
+const ALLOWED: { lessonId: string; promptStartsWith: string; why: string }[] = []
 
 interface PredictCheck {
   lessonId: string
