@@ -56,14 +56,14 @@ const PINS = {
  *
  * Unlike the pins above, this one moves UP as batches land.
  */
-const MINIMUM_TOTAL_CHECKS = 524
+const MINIMUM_TOTAL_CHECKS = 536
 
 describe("system design coverage ratchet", () => {
   const coverage = buildSystemDesignCoverage()
 
   it("walks the real curriculum, so a pin cannot pass vacuously", () => {
     // Every assertion below is an upper bound, so an empty corpus would satisfy all of them.
-    expect(coverage.totals.lessonCount).toBe(212)
+    expect(coverage.totals.lessonCount).toBe(218)
     expect(coverage.totals.levelCount).toBe(12)
     expect(coverage.totals.checks).toBeGreaterThan(300)
   })

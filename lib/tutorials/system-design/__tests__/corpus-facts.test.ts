@@ -104,7 +104,7 @@ describe("system design corpus facts", () => {
   const lessons = listAllSystemDesignLessons()
 
   it("walks a real corpus, so the bans cannot pass vacuously", () => {
-    expect(lessons.length).toBe(212)
+    expect(lessons.length).toBe(218)
     const totalText = lessons.flatMap(readableText).reduce((n, block) => n + block.text.length, 0)
     expect(totalText).toBeGreaterThan(1_000_000)
   })

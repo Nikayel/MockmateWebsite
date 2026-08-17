@@ -4082,13 +4082,1188 @@ Query patterns you must support: time-range scans, tag filters (served by an inv
 \`\`\`
 `.trim()
 
+const chunkingStrategyTeach = `
+## A chunk is a standalone claim, not a slice of a document
+
+The RAG architecture lesson gave you the working baseline: split at 300 to 800 tokens with 10 to 20 percent overlap, embed each piece, index it. That baseline is a starting point, and underneath it sits the decision that sets your ceiling. A chunk plays two roles at once. It is the **retrieval unit**, so it has to be findable by a query written by someone who has never seen the document. It is also the **context-budget unit**, so eight of them have to fit in a prompt with room left over for an answer. Those two roles pull opposite ways: retrievability wants each chunk to carry enough surrounding detail to identify itself, and the budget wants each chunk small and dense. Every technique in this lesson is a different way to buy the first without paying for it in the second.
+
+## The orphaned claim
+
+Here is the failure, on one real-shaped paragraph.
+
+\`\`\`
+document: "Q3 2025 investor letter, Northwind Logistics" (heading, page 1)
+
+  ... freight volumes recovered through the summer as port
+  congestion eased. Revenue grew 3% that quarter, and operating
+  margin held at 11.2% ...
+
+fixed split at 600 tokens, no overlap:
+
+  chunk 41 ends   "... as port congestion eased."
+  chunk 42 begins "Revenue grew 3% that quarter, and operating
+                   margin held at 11.2%."
+
+query: "how much did Northwind revenue grow in Q3 2025"
+
+  chunk 42 contains no "Northwind", no "Q3", no "2025".
+  its embedding lands in the region of the space where every
+  company's revenue sentence lands, and nothing in the chunk
+  pulls it toward this company or this quarter.
+\`\`\`
+
+The chunk is not badly written and it is not too long. It is unretrievable, because the words that identify it are in the heading four hundred tokens above it. Call this an orphaned claim: a true statement that no query can reach, because the query has to name the subject and the chunk does not.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "overlap-and-the-orphan",
+  "prompt": "A teammate raises the overlap from 0 to 20 percent so that chunk 42 now begins with the tail of chunk 41. Does that make chunk 42 findable by the query above?",
+  "options": [
+    {
+      "label": "Yes, the copied tail carries the company name forward",
+      "feedback": "It carries the tail of the previous chunk, which is a sentence about port congestion. Overlap copies whatever is adjacent, and adjacency is not the same as identity."
+    },
+    {
+      "label": "No, what is missing sits far outside the copied window",
+      "correct": true,
+      "feedback": "Right. Overlap fixes exactly one defect, a sentence cut in half at a boundary. The identifying words here live in a page-one heading, and no overlap fraction anyone would pay for reaches back that far."
+    },
+    {
+      "label": "No, because overlap only helps queries that happen to match the duplicated text",
+      "feedback": "The duplicated text does get a second chance at matching, so this is not wrong about the mechanism. It is the wrong reason for this chunk: the query names the company and the quarter, and neither appears in the copied region either."
+    }
+  ]
+}
+\`\`\`
+
+## Overlap is a guess, and a narrow one
+
+Overlap exists to survive a boundary that lands mid-thought. It duplicates the last N tokens of each chunk into the front of the next, so a sentence cut in half appears whole in at least one chunk. That is worth having and it is cheap in engineering. It is not cheap in index size: 20 percent overlap is 20 percent more chunks, 20 percent more vectors, and 20 percent more candidates competing for your top-k. And it fixes only local damage. The orphaned claim is not a boundary problem. The context that would have made chunk 42 findable was never adjacent to it.
+
+## Structure-aware splitting: split where the document already splits
+
+The next lever costs nothing at query time. Documents already carry their own boundaries, and a splitter that reads them makes better chunks than one counting tokens. Split on headings, and every chunk can inherit its heading path as a prefix. Keep a fenced code block whole, because half a function is not a smaller function, it is a syntax error with an embedding. Element-based chunking (splitting on the structural elements a document-understanding model annotates, rather than on paragraphs or a token count) is measured to improve RAG results on financial reports, and it reaches a good chunk size without tuning one.
+
+Tables deserve their own rule, and it is not the obvious one. A table split across two chunks is worse than a table truncated at a chunk boundary. Truncated, you lose rows and keep the header binding, so what survives is still true. Split, the second chunk is a grid of numbers whose column meanings are in a chunk it will never be retrieved with, and the model that reads it will confidently attach the wrong header to the right number. Prefer to keep a table whole, and when it will not fit, repeat the header row into each piece.
+
+## Contextual retrieval: spend a generation at ingestion
+
+The 2024 answer to the orphaned claim was more overlap. The current answer is to write the missing context onto the chunk before embedding it. At ingestion, for each chunk, you send the whole document plus that chunk to a model and ask for one or two sentences situating the chunk in the document. You prepend the result to the chunk text, then embed the combined string and index it in BM25 as well.
+
+\`\`\`
+the ingestion-time prompt, run once per chunk, with the whole document in view:
+
+  <document>
+  {{WHOLE_DOCUMENT}}
+  </document>
+  Here is the chunk we want to situate within the whole document
+  <chunk>
+  {{CHUNK_CONTENT}}
+  </chunk>
+  Please give a short succinct context to situate this chunk within the
+  overall document for the purposes of improving search retrieval of the
+  chunk. Answer only with the succinct context and nothing else.
+
+what gets embedded, before:
+
+  "Revenue grew 3% that quarter, and operating margin held at 11.2%."
+
+what gets embedded, after (the generated context is 50 to 100 tokens):
+
+  "This chunk is from Northwind Logistics' Q3 2025 investor letter, in
+   the section reporting consolidated results for the quarter ending
+   September 30, 2025.
+   Revenue grew 3% that quarter, and operating margin held at 11.2%."
+\`\`\`
+
+The chunk is now a standalone claim. The query names Northwind, Q3 and 2025, and so does the text being embedded. Anthropic published the measurement on a top-20 retrieval evaluation, and the arithmetic is worth doing rather than reading, because it tells you which stage to buy next.
+
+\`\`\`
+top-20 chunk retrieval failure rate, same corpus, same eval set
+
+  baseline: embeddings + BM25                   5.7%
+  contextual embeddings                         3.7%   (5.7 - 3.7) / 5.7 = 35% fewer failures
+  contextual embeddings + contextual BM25       2.9%   (5.7 - 2.9) / 5.7 = 49% fewer failures
+  the same, then rerank top 150 down to top 20  1.9%   (5.7 - 1.9) / 5.7 = 67% fewer failures
+
+what the ingestion pass costs, at the published $1.02 per million document tokens
+(the whole document rides in the prompt for every chunk, so prompt caching is what
+makes that figure attainable rather than a per-chunk re-read)
+
+  200,000 documents x 4,000 tokens = 800,000,000 document tokens
+  800 x $1.02 = $816 once, plus a re-run for each document that later changes
+\`\`\`
+
+Two things fall out of that table. The reranker and the chunking work are not competing; they stack, and the last row is the first three techniques together. And the cost is a one-time ingestion charge measured per million document tokens, which means it is a capital expense you can compute exactly before committing, unlike a query-time technique whose bill grows with traffic forever.
+
+## Late chunking: one forward pass instead of one call per chunk
+
+There is a cheaper way to get a chunk embedding that has seen the whole document, and it changes the order of two operations you already know. A transformer embedding model produces one vector per token and then pools them into a single vector. Naive chunking splits first and pools within each chunk, so no token ever attends outside its own chunk. Late chunking runs the long-context model over the whole document first, then pools per chunk afterward.
+
+\`\`\`
+naive chunking
+  split -> embed(chunk 1), embed(chunk 2), ...
+  the forward pass for chunk 42 sees 600 tokens and nothing else
+
+late chunking
+  embed(whole document) -> token vectors t1 ... tN     one forward pass
+  pool(t1    ... t600)  = chunk 1 vector
+  pool(t601  ... t1200) = chunk 2 vector
+  ...
+  every pooled vector is built from token states that attended
+  to the heading on page 1, so "revenue grew 3%" is already
+  colored by "Northwind" and "Q3 2025"
+\`\`\`
+
+One forward pass per document instead of one generation per chunk, and no extra training. The constraint is that the model has to be a long-context embedding model, and the document has to fit its window; beyond that window you are back to splitting, just at a coarser grain.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Approach", "Ingestion work per document", "What one chunk embedding has seen", "What it costs"],
+  "rows": [
+    ["Fixed-size split", "one pass, no model call", "its own tokens only", "cheapest; orphaned claims survive"],
+    ["Overlap", "one pass, no model call", "its own tokens plus an adjacent margin", "index grows by the overlap fraction"],
+    ["Structure-aware split", "one pass plus layout parsing", "its own tokens plus its heading path", "parser quality becomes a dependency"],
+    ["Contextual retrieval", "one generation per chunk", "a generated summary of the whole document", "$1.02 per million document tokens"],
+    ["Late chunking", "one long-context forward pass", "every token of the document", "one embedding call; document must fit the window"]
+  ],
+  "highlightCols": ["What one chunk embedding has seen"],
+  "caption": "The middle column is the one that predicts retrieval failure. The rows are ordered by how much of the document a single chunk embedding is allowed to know about, and the cost column is what each step of that ladder is priced at."
+}
+\`\`\`
+
+## What the measurements actually say
+
+Both advanced strategies are real, and neither dominates. A 2026 evaluation compared them directly against fixed-size chunking and found contextual retrieval better at holding a document's meaning together but substantially more expensive in compute, while late chunking was the more efficient of the two and gave back some relevance and some completeness in exchange. That is the honest shape: a trade, measured, not a winner.
+
+This matters more than it looks, because chunking is the stage where teams adopt a technique on reputation. Semantic chunking, which splits at points where the embedding of consecutive sentences shifts, is the upgrade most teams reach for first, and the published comparisons in this area are between fixed-size splitting, late chunking and contextual retrieval. Adopt a chunker because you measured it on your corpus, at your k, against your queries.
+
+**Interview nuance:** name the measurement, not the technique. "We would use semantic chunking" is a preference. "Our top-20 failure rate is 5.7%, contextual retrieval takes it to 3.7% for a one-time $816 on this corpus, and a reranker on top takes it to 1.9%" is an engineering answer, and the second half of it, that these stack, is what shows you have run the experiment rather than read the blog post.
+
+**Recap:** a chunk is both a retrieval unit and a context-budget unit, and the orphaned claim is what happens when you optimize only the second. Overlap fixes boundaries and nothing else. Structure-aware splitting is free and keeps tables and code intact. Contextual retrieval buys the largest measured drop in retrieval failure for a one-time per-million-document-token charge, late chunking buys most of the same effect for one forward pass, and the two are measured trades rather than a ranking.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "which-lever-moves-it",
+  "prompt": "Four retrieval complaints arrive from the same corpus. Sort each by whether the chunking stage is where you would spend to fix it.",
+  "buckets": [
+    "Chunking stage",
+    "Somewhere else"
+  ],
+  "items": [
+    {
+      "label": "A figure caption is retrievable but the paragraph explaining it never is",
+      "bucket": "Chunking stage",
+      "feedback": "The paragraph has no words tying it to the figure. That is an orphaned claim, and prepending generated context or pooling late is what gives it those words."
+    },
+    {
+      "label": "Numbers come back attached to the wrong column headers",
+      "bucket": "Chunking stage",
+      "feedback": "A table was cut between its header row and its body. Keeping a table whole, or repeating the header into each piece, is the ingestion-side answer."
+    },
+    {
+      "label": "The right chunk is retrieved in the top 100 but never in the top 8",
+      "bucket": "Somewhere else",
+      "feedback": "Recall already happened. Getting from the top 100 to the right top 8 is what the reranker is for, and no chunk rewrite improves an ordering that already contains the answer."
+    },
+    {
+      "label": "The right chunk reaches the prompt and the answer contradicts it",
+      "bucket": "Somewhere else",
+      "feedback": "The evidence was present and the model left it. That is a grounding and citation problem in the generation half, which the RAG architecture lesson separates out for exactly this reason."
+    }
+  ],
+  "reveal": "Chunking sets your ceiling, and the ceiling is set by what one chunk embedding is allowed to know about. Fixed-size splitting produces orphaned claims, overlap repairs only boundaries, structure-aware splitting inherits headings and protects tables and code, contextual retrieval prepends a generated situating sentence for a one-time per-million-token charge, and late chunking gets most of that from a single long-context forward pass. What none of them do is reorder a candidate list or ground a generation, so the strong interview answer states which stage a symptom belongs to before naming a technique for it."
+}
+\`\`\`
+
+**Sources:** [Anthropic, Contextual Retrieval](https://www.anthropic.com/engineering/contextual-retrieval) · [Late chunking](https://arxiv.org/abs/2409.04701) · [Financial report chunking](https://arxiv.org/abs/2402.05131) · [Evaluating advanced chunking strategies](https://arxiv.org/abs/2504.19754)
+`.trim()
+
+const documentParsingTeach = `
+## Everything upstream of the embedder
+
+Trace the RAG pipeline backwards. The reranker orders chunks, the chunks came from a splitter, the splitter was handed text, and the text came from a parser. On a corpus of clean HTML that last step is invisible. On a corpus of PDFs it is the single largest source of error in the system, and it is the only stage with no downstream check on it: a parse error becomes a chunk, the chunk gets an embedding, the embedding gets retrieved or does not, and no later stage can tell that the words it is ranking were never in that order on the page.
+
+The previous lesson optimized how a document becomes chunks. This one is about the stage before it, where the document becomes text at all.
+
+## Reading order
+
+A PDF is not a document. It is a set of drawing instructions that place glyphs at coordinates. There is no paragraph, no column, no reading order. An extractor reconstructs those, and on a two-column page the naive reconstruction fails in a way that is easy to miss because the output is still fluent English.
+
+\`\`\`
+one page of a 10-K, two columns, as a human reads it:
+
+  +-------------------------------+-------------------------------+
+  | Item 7. Management's          | Segment results. Logistics    |
+  | Discussion and Analysis       | revenue rose 3% on higher     |
+  |                               | freight volumes, while        |
+  | Consolidated revenue for the  | Warehousing revenue fell 8%   |
+  | year was $4.11B, an increase  | on the loss of two contracts. |
+  | of 2% over the prior year.    |                               |
+  +-------------------------------+-------------------------------+
+
+an extractor that walks text runs top to bottom, left to right,
+without a column model, emits them in this order:
+
+  Item 7. Management's / Segment results. Logistics / Discussion and
+  Analysis / revenue rose 3% on higher / freight volumes, while /
+  Consolidated revenue for the / Warehousing revenue fell 8% / year
+  was $4.11B, an increase / on the loss of two contracts. / of 2%
+  over the prior year.
+
+what the splitter hands the embedder:
+
+  "Item 7. Management's Segment results. Logistics Discussion and
+   Analysis revenue rose 3% on higher freight volumes, while
+   Consolidated revenue for the Warehousing revenue fell 8% year was
+   $4.11B, an increase on the loss of two contracts. of 2% over the
+   prior year."
+\`\`\`
+
+Read the last block as a retrieval engine would. "Consolidated revenue for the Warehousing revenue fell 8%" is a sentence, it embeds fine, and it is false. Nothing in the corpus says it; the page never said it; the parser wrote it. This is why ColPali's authors describe text extraction from visually rich documents as running "through lengthy and brittle processes": the brittleness is not the OCR character error rate, it is the layout reconstruction.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "reranker-cannot-unread",
+  "prompt": "The page above is already indexed as that interleaved chunk. A cross-encoder reranker is added over the top 150 candidates, which reads the query and each chunk together. What does it do for queries against this page?",
+  "options": [
+    {
+      "label": "It recovers the passage, since a cross-encoder reads far more of the chunk than an embedding summarizes",
+      "feedback": "A cross-encoder is genuinely sharper than a bi-encoder at judging a chunk against a query, which is why this is tempting. It judges the chunk it is given, and the chunk it is given is the interleaved one."
+    },
+    {
+      "label": "Nothing useful, because the text it scores is the interleaved text",
+      "correct": true,
+      "feedback": "Right. Every stage downstream of the parser operates on the parser's output, so none of them can recover information the parser destroyed. This is the one failure in the pipeline that a better ranker cannot reach."
+    },
+    {
+      "label": "It ranks the page lower, which at least suppresses a wrong answer",
+      "feedback": "Sometimes, and that is the good case rather than the rule. The interleaved text is fluent and topical, so it scores respectably against a topical query and arrives in the prompt looking like evidence."
+    }
+  ]
+}
+\`\`\`
+
+## Tables lose their header binding
+
+Reading order is the visible failure. Tables are the expensive one, because the output looks fine and the meaning is gone. A merged corner cell and a two-row header encode a relation: this number is Logistics, 2024, margin. Flattening to text drops the encoding and keeps the digits.
+
+\`\`\`
+the table on the page:
+
+  +-----------+---------------------+---------------------+
+  |           |        2025         |        2024         |
+  | Segment   +----------+----------+----------+----------+
+  |           | Revenue  | Margin   | Revenue  | Margin   |
+  +-----------+----------+----------+----------+----------+
+  | Logistics |  2,940   |  11.2%   |  2,854   |  10.9%   |
+  | Warehouse |  1,170   |   6.4%   |  1,272   |   7.1%   |
+  +-----------+----------+----------+----------+----------+
+
+serialization A, flatten to text (what a naive extractor emits):
+
+  Segment 2025 2024 Revenue Margin Revenue Margin
+  Logistics 2,940 11.2% 2,854 10.9%
+  Warehouse 1,170 6.4% 1,272 7.1%
+
+  ask "what was the Logistics margin in 2024" and all four numbers on
+  the Logistics row are equally reachable. nothing in this text binds
+  10.9% to 2024 rather than to 2025, so a model reading it has to guess
+  from column order that is no longer present.
+
+serialization B, one row per fact, header binding preserved:
+
+  | Segment   | Year | Revenue | Margin |
+  | Logistics | 2025 | 2,940   | 11.2%  |
+  | Logistics | 2024 | 2,854   | 10.9%  |
+  | Warehouse | 2025 | 1,170   | 6.4%   |
+  | Warehouse | 2024 | 1,272   | 7.1%   |
+
+  every cell now travels with the keys that identify it, so a single
+  retrieved row is true on its own.
+\`\`\`
+
+Serialization B is the same information written so that it survives being retrieved alone, which is the chunking lesson's standalone-claim rule applied one stage earlier. Element-based parsing, which annotates the structural elements of a document with a document-understanding model and chunks on those, is measured to improve RAG results on financial reports, and it reaches a workable chunk size without anyone tuning one.
+
+## The error cascade
+
+Put the stages in a line and the property that makes this hard is visible.
+
+\`\`\`csdiagram
+{
+  "type": "pipeline",
+  "title": "Ingestion, from page to index",
+  "stages": [
+    { "label": "Render / OCR", "note": "glyphs at coordinates become characters" },
+    { "label": "Layout", "note": "columns, headings, tables, reading order" },
+    { "label": "Serialize", "note": "elements become text, with or without their keys" },
+    { "label": "Chunk", "note": "split the text it was handed" },
+    { "label": "Embed", "note": "one vector per chunk, whatever the chunk says" },
+    { "label": "Index", "note": "the vector is now the corpus" }
+  ],
+  "highlight": ["Layout", "Serialize"],
+  "caption": "No stage can validate the one before it. The chunker cannot tell that reading order was wrong, the embedder cannot tell that a header binding was dropped, and the index cannot tell that a number now sits under the wrong year. The two highlighted stages are where the information is destroyed and the only place it can be recovered."
+}
+\`\`\`
+
+That is the argument for treating parsing as an engineering surface with its own tests rather than as a library call. It is also the argument for the fork below, which removes the two highlighted stages entirely.
+
+## The visual fork: stop parsing
+
+The 2024 answer to a bad parse was a better parser. There is a second answer, and it is a genuine architectural fork rather than an upgrade: do not extract text at all. Render each page to an image, embed the image directly with a vision-language model that emits one vector per image patch, and retrieve pages. When a page is retrieved, hand the page image to a vision model to read.
+
+ColPali is the reference design: a vision-language model trained to produce multi-vector embeddings from images of document pages, matched with the late-interaction scoring the next lesson covers. Its authors introduced the ViDoRe benchmark alongside it precisely because page-level retrieval over visually rich documents had no shared measurement, and report that the approach outperforms text-extraction pipelines while being simpler and end-to-end trainable.
+
+What it removes is the entire left half of that pipeline. There is no OCR step to produce a character error, no layout detector to confuse a sidebar with an abstract, no serializer to drop a header binding. What it adds is a multi-vector index, which is the next lesson's subject, and a storage bill.
+
+## What the fork costs
+
+\`\`\`
+corpus: 500,000 filings, 40 pages each = 20,000,000 pages
+
+text path, one vector per chunk
+  3 chunks per page x 20M pages       = 60,000,000 chunks
+  1,024 dims x 4 bytes (float32)      = 4,096 bytes per vector
+  60,000,000 x 4,096                  = 245.76 GB
+
+page-image path, one vector per patch
+  assume the encoder emits 1,024 patch vectors per page at 128 dims
+  20,000,000 x 1,024                  = 20,480,000,000 vectors
+  128 dims x 4 bytes                  = 512 bytes per vector
+  20,480,000,000 x 512                = 10,485.76 GB, or 42.7x the text index
+
+  the same vectors under 2-bit residual compression against a centroid,
+  plus a 4-byte centroid id
+  128 x 2 bits = 32 bytes, plus 4     = 36 bytes per vector
+  20,480,000,000 x 36                 = 737.28 GB, or 3.0x the text index
+\`\`\`
+
+Two readings of that block, and the second one is the useful one. Uncompressed, the visual index is out of the question at this corpus size for most budgets. Compressed with the standard residual scheme, it is three times the text index, which is an ordinary infrastructure conversation rather than an architectural veto. Compression is what moves this technique from a paper to a product, and it is why the cost question and the late-interaction question are the same question.
+
+## What teams actually ship: route, then measure
+
+The hybrid is the answer, and it is not a compromise. Most corpora are mostly documents that parse cleanly. Route by document type: born-digital text PDFs and HTML take the parse path, scanned or dense-layout documents take the page-image path, and one field on each document records which path it took so the split is visible and reversible.
+
+Routing needs a signal, and the signal is a parse-quality score computed at ingestion rather than a guess: does the page have an embedded text layer, what fraction of characters land inside detected columns, does the extracted text contain the words the page's own headings contain. A production parsing framework reports 96% or better on visual element detection and 93% on associating captions with their elements, which is the shape of number this stage should have. If you cannot say what yours is, you cannot route on it.
+
+**Interview nuance:** the strong answer names a parsing evaluation, not a parser. Parser vendors and vision models both change quarterly, and an answer that names one is dated within a year. An answer that says "we hold out 200 pages sampled across document types, score reading order, table-cell recovery and caption association against a hand-labeled ground truth, and gate a parser change on it" is a system, and it is also the only way to tell a retrieval regression from a parser regression when both landed the same week.
+
+**Recap:** parsing is the upstream dependency of every retrieval technique and the one stage no downstream stage can check. Reading order fails silently into fluent, false sentences, and flattened tables lose the header binding that made a number mean something. The architectural fork is to render pages and embed patches, which deletes OCR and layout from the pipeline and buys a multi-vector index whose bill is 43x uncompressed and about 3x with residual compression. Production systems route by document type on a measured parse-quality signal and hold a parsing evaluation the way they hold a retrieval evaluation.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "retire-the-parser",
+  "prompt": "A teammate proposes routing every document through the page-image pipeline and deleting the parser. Using the arithmetic above, what is the strongest argument against it?",
+  "options": [
+    {
+      "label": "Page images cannot carry the ACL metadata that the retrieval pre-filter needs",
+      "feedback": "Metadata lives on the index record beside the vector, not inside it, so a page-image record carries an ACL field exactly like a text chunk does. The security boundary is unaffected by this choice."
+    },
+    {
+      "label": "It pays a 43x index for every page, including the pages that parsed cleanly",
+      "correct": true,
+      "feedback": "Right, and the compressed figure does not rescue the argument: even at 3x it is a bill paid on the whole corpus to fix the fraction of it that was failing. That is what makes routing the answer rather than a hedge."
+    },
+    {
+      "label": "A vision model would run on every query, so retrieval slows",
+      "feedback": "The page encoder runs at ingestion, once per page, so retrieval itself does not call a vision model. A vision model does read the retrieved page during generation, which is a real cost, but it is a generation cost and it applies to the retrieved pages only."
+    }
+  ],
+  "reveal": "Parsing is the stage the rest of the pipeline is built on top of and cannot inspect. Reading order fails into fluent false text; flattened tables keep the digits and lose the keys; and no reranker, no better embedding model and no larger k recovers either, because the loss happened before the vector existed. The fork that removes the stage is to render and patch-embed the page, which costs a multi-vector index at roughly 43x uncompressed and 3x compressed. The shippable answer is neither purity nor the fork: it is a route decided by a measured parse-quality signal, with a parsing evaluation that can tell a parser regression from a retrieval regression."
+}
+\`\`\`
+
+**Sources:** [ColPali](https://arxiv.org/abs/2407.01449) · [ViDoRe leaderboard](https://huggingface.co/spaces/vidore/vidore-leaderboard) · [Production PDF element parsing](https://arxiv.org/abs/2604.23276) · [Element-based chunking](https://arxiv.org/abs/2402.05131)
+`.trim()
+
+const queryUnderstandingTeach = `
+## The query is not a good search key
+
+The RAG architecture lesson's query path starts at "embed query". That first box hides an assumption: that what the user typed is a usable search key. It usually is not, and the reason is structural rather than a matter of users being careless.
+
+\`\`\`
+what the user typed:
+  "why did checkout 500 after the migration"            7 tokens
+
+the passage in the runbook that answers it:
+  "Following the 2025-11 datastore cutover, the order service began
+   returning HTTP 500 on POST /v1/orders whenever the idempotency
+   key lookup timed out against the replica. Operators should ..."
+                                                       about 45 tokens
+
+words the two share:  500
+
+  not "checkout"  (the passage says "order service", "POST /v1/orders")
+  not "migration" (the passage says "cutover")
+  not "why"       (the passage is a statement, the query is a question)
+
+both become one vector in the same space. the embedding model is being
+asked to bridge a length gap of six to one, a vocabulary gap, and a
+register gap (interrogative against declarative) with no help at all.
+\`\`\`
+
+Query understanding is the stage that closes those gaps before the index sees anything. It is entirely a design surface: every technique here is optional, each one costs something, and the interesting engineering is deciding which query gets which.
+
+## Conversational rewriting, the cheapest one
+
+In a multi-turn assistant, a large share of turns are not standalone questions at all. They are fragments that refer to earlier turns, and an embedding of a fragment is an embedding of the wrong thing.
+
+\`\`\`
+turn 1  user: "how do I rotate the signing key"
+turn 2  user: "and what about the second one"
+
+what goes to the index today:
+  embed("and what about the second one")
+  nearest neighbors: chunks about second attempts, second factors,
+  a second-level cache. nothing about signing keys, and no amount of
+  reranking fixes a candidate set that never contained the answer.
+
+what goes to the index after a rewrite against the last three turns:
+  embed("how do I rotate the second signing key")
+\`\`\`
+
+One short model call, a standalone query out, and the whole downstream pipeline works on a well-formed key. This is the highest ratio of value to cost in the lesson and the one production teams most often skip, because the demo was single-turn.
+
+## HyDE: search with a hallucination
+
+The most counterintuitive technique in retrieval is also the most instructive, because it takes the asymmetry above seriously. If queries are the wrong shape and documents are the right shape, then turn the query into a document before searching.
+
+\`\`\`
+query:  "why did checkout 500 after the migration"
+
+step 1  ask a model to answer it, with no retrieval at all
+        "After the datastore migration, checkout requests returned
+         HTTP 500 because the order service could not reach the
+         idempotency store; the connection pool was sized for the
+         old cluster and was exhausted by retry traffic."
+
+        the model has never seen this codebase. this text may be
+        wrong in every specific.
+
+step 2  embed the generated text, not the question
+        v = encode(pseudo_document)
+
+step 3  search the real index with v, and throw the generated text away
+        what comes back are real corpus documents, ranked by v
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "hyde-wrong-and-useful",
+  "prompt": "The pseudo-document above is invented. Suppose the real cause was a schema default and had nothing to do with connection pools. Why would searching with that vector still beat searching with the question?",
+  "options": [
+    {
+      "label": "It would not, and this is why HyDE is only safe on questions the model already knows the answer to",
+      "feedback": "That restriction would make the technique useless, since a question the model can already answer needs no retrieval. The published evaluations run it on questions the model has not seen."
+    },
+    {
+      "label": "The encoder keeps the vocabulary and register and loses the invented specifics",
+      "correct": true,
+      "feedback": "Right. A fixed-length vector cannot store the whole passage, so what survives compression is the general region: incident prose about an order service failing after a cutover. That region is where the real runbook lives, whatever the invented cause was."
+    },
+    {
+      "label": "The generated answer is checked against the corpus and dropped if wrong",
+      "feedback": "There is no such check. Nothing verifies the pseudo-document, and adding a verification step would need the retrieval that has not happened yet."
+    }
+  ]
+}
+\`\`\`
+
+The pseudo-document is document-shaped: long, declarative, and full of the vocabulary a runbook uses. The encoder's lossy bottleneck is doing the work. It cannot preserve the invented specifics, so what the vector carries is the neighborhood, and the neighborhood is right even when the sentences are false. HyDE's authors describe exactly this: an unsupervised contrastive encoder filters out the incorrect details of the hypothetical document, and the resulting vector retrieves real documents by similarity. In the ARAGOG comparison of RAG techniques, HyDE was one of two changes that significantly improved retrieval precision.
+
+## What HyDE costs, and the shape of its failure
+
+The cost is a generation on the critical path. Retrieval is not a stage users wait for on its own; it is the front half of a latency budget that ends in a streamed answer, and a 300ms-plus generation added before the index is even queried spends a large share of it before any evidence exists.
+
+The failure shape is narrower and worth naming precisely. The vector lands wherever the pseudo-document points, so a confident hallucination about an unfamiliar domain drags the search into a coherent, plausible, wrong region, and unlike an under-specified query it does not come back with a weak candidate set that a confidence threshold could catch. It comes back with a strong one. That makes HyDE a technique to gate rather than default: run the cheap first-pass retrieval, and only spend the generation when the first pass came back thin.
+
+## Inverted HyDE: pay at ingestion instead
+
+Now invert the idea, and the cost moves off the query path entirely. If the problem is that the space is populated with document-shaped text while queries are question-shaped, generate questions for each chunk at ingestion and embed those alongside it.
+
+\`\`\`
+at ingestion, once per chunk:
+  chunk: "Following the 2025-11 datastore cutover, the order service
+          began returning HTTP 500 on POST /v1/orders whenever the
+          idempotency key lookup timed out against the replica..."
+
+  generate 3 questions this chunk answers:
+    "why did the order service return 500 after the cutover"
+    "what caused idempotency key lookups to time out"
+    "which endpoint failed during the 2025-11 datastore migration"
+
+  index each question vector pointing at the same chunk
+
+at query time:
+  embed("why did checkout 500 after the migration")
+  this is now a question-to-question comparison, and the two sides
+  finally have the same shape, length and register
+\`\`\`
+
+One generation per chunk at ingestion, the same order of spend as contextual retrieval in the chunking lesson, and zero milliseconds added to any request. The trade is that ingestion-time questions are guesses about what will be asked, so they help most where the query distribution is stable and least where users ask things nobody anticipated.
+
+## Decomposition, and an honest negative result
+
+Some questions are two questions. "Which of our regions missed the availability target last quarter, and what did we change in the one that missed it worst" cannot be answered by any single passage, because no passage contains both halves. Decomposition splits the question, retrieves per sub-question, and synthesizes.
+
+It is not a free upgrade, and the measurements say so in two independent places. A 2026 study of agent-orchestrated adaptive RAG found query decomposition gave consistent gains in a structured domain (overall score +0.04, MRR +0.17 on a DevOps knowledge base) and degraded ranking precision on a multi-hop reasoning benchmark. In the ARAGOG comparison, multi-query approaches underperformed the naive baseline outright. Decomposition earns its place on structured domains and on genuinely compound questions; applied to every query it costs latency and can cost precision.
+
+## Routing is the answer, not any single technique
+
+Stack all of the above on every request and the budget is gone before retrieval begins. The design that ships is a cheap classifier in front, and the arithmetic is what makes the case.
+
+\`\`\`
+one pipeline, measured (p95, per stage)
+
+  router classifier (a small encoder, no generation)    12 ms
+  embed query                                           25 ms
+  hybrid retrieve                                       70 ms
+  rerank top 100 down to 8                             145 ms
+  assemble context                                      20 ms
+                                              baseline 260 ms
+
+  plain turn                  12 + 260                        = 272 ms
+  conversational rewrite      272 + 110                        = 382 ms
+  HyDE                        272 + 340                        = 612 ms
+  decompose into 3, rerank 100 per branch, branches in parallel
+                              272 + 150 (split) + 30 (merge)   = 452 ms
+  decompose into 3, rerank 40 per branch
+                              rerank falls 145 -> 70, so
+                              272 + 180 - 75                   = 377 ms
+
+  budget: 400 ms p95
+\`\`\`
+
+Read the last two lines together, because that is the lesson. Decomposition does not fit the budget at full rerank depth and does fit at reduced depth, which turns "should we decompose" into "what do we give back to afford it". HyDE does not fit on the synchronous path at all under this budget, which is exactly why the inverted, ingestion-time version of it exists.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Technique", "Where the model call happens", "Added p95 on the query path", "What it fixes"],
+  "rows": [
+    ["Conversational rewrite", "query time, short", "110 ms", "fragments that refer to earlier turns"],
+    ["HyDE", "query time, long", "340 ms", "the query and document shape mismatch"],
+    ["Inverted HyDE", "ingestion, once per chunk", "0 ms", "the same mismatch, from the other side"],
+    ["Decomposition", "query time, plus fan-out", "105 to 180 ms", "questions no single passage answers"],
+    ["Router", "query time, no generation", "12 ms", "spending any of the above on queries that do not need it"]
+  ],
+  "highlightCols": ["Where the model call happens", "Added p95 on the query path"],
+  "caption": "The first column is the technique everyone names in an interview. The second column is the one that decides whether it ships, and it is the same column for both rows that mention HyDE."
+}
+\`\`\`
+
+The router itself needs a fallback, because a classifier is a model and models are wrong. The safe default is the plain path: a misrouted compound question returns a partial answer, which is recoverable, while a misrouted fragment sent through decomposition burns the budget and returns nothing. Route on the cheap side and let the abstention instruction catch the rest.
+
+**Interview nuance:** name the router and its fallback, not the trick. "We would use HyDE" is a technique. "A small classifier tags each turn as standalone, follow-up or compound, follow-ups get a rewrite for 110ms, compound questions get a three-way decomposition paid for by dropping rerank depth to 40, everything else goes straight through, and an unconfident classification falls back to the plain path" is a design, and it is the only version of this answer that can be held to a latency number.
+
+**Recap:** queries and documents live in one space with different shapes, lengths and registers. Conversational rewriting is the cheapest fix and the most commonly skipped. HyDE crosses the gap by generating a document and keeping only its vector, which works because the encoder discards the invented specifics, and it costs a generation before retrieval. Inverted HyDE buys the same effect at ingestion for nothing per request. Decomposition helps on structured and genuinely compound questions and is measured to hurt ranking precision on some multi-hop benchmarks. The shippable design is a router with a cheap fallback, defended with the latency arithmetic rather than with a preference.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "route-these-turns",
+  "prompt": "Five turns arrive at the assistant described above. Send each down the path you would route it to.",
+  "buckets": [
+    "Rewrite",
+    "Decompose",
+    "Send as typed"
+  ],
+  "items": [
+    {
+      "label": "and the staging one? asked right after a question about a production certificate",
+      "bucket": "Rewrite",
+      "feedback": "A fragment whose subject is two turns back. Cheapest possible fix, and without it the embedding is of the word 'staging' alone."
+    },
+    {
+      "label": "which services missed their SLO last quarter and who owns the worst one",
+      "bucket": "Decompose",
+      "feedback": "No single passage holds both halves: one is a metrics question and the other is an ownership question. This is the compound case decomposition exists for."
+    },
+    {
+      "label": "what is the retention period for audit logs",
+      "bucket": "Send as typed",
+      "feedback": "Standalone, specific, and full of index vocabulary. Anything added here is pure latency."
+    },
+    {
+      "label": "error CS-4471 on deploy",
+      "bucket": "Send as typed",
+      "feedback": "A rare exact token is the case where the sparse half of hybrid retrieval already wins. Rewriting it risks paraphrasing away the one string that matches."
+    },
+    {
+      "label": "can you explain that in the context of our multi-region setup",
+      "bucket": "Rewrite",
+      "feedback": "'That' is unresolvable and the rest is a qualifier. The rewrite carries the referent forward and keeps the qualifier, which is what makes the retrieved chunks change."
+    }
+  ],
+  "reveal": "Query understanding is a routing problem wearing a technique's clothes. The asymmetry is real: short interrogative queries against long declarative passages, in one space, with no help. Rewriting resolves references for about 110ms. HyDE crosses the gap by generating a document and keeping only its vector, and the encoder's compression is why an invented answer still lands in the right region. Inverted HyDE moves that same call to ingestion and pays nothing per request. Decomposition is measured to help on structured domains and to hurt ranking precision on some multi-hop benchmarks, so it is routed rather than defaulted. The answer that survives an interview names the classifier, the per-path latency, and what happens when the classifier is wrong."
+}
+\`\`\`
+
+**Sources:** [HyDE](https://arxiv.org/abs/2212.10496) · [Survey of query optimization in LLMs](https://arxiv.org/abs/2412.17558) · [ARAGOG, comparing RAG techniques](https://arxiv.org/abs/2404.01037) · [Agent-orchestrated adaptive RAG](https://arxiv.org/abs/2606.05658)
+`.trim()
+
+const lateInteractionTeach = `
+## The third paradigm
+
+The corpus has taught you two ways to score a document against a query. Sparse retrieval scores one number per matching term against an inverted index. A dense bi-encoder compresses the whole document into one vector, compresses the query into one vector, and scores their similarity. There is a third, it has held state of the art on retrieval benchmarks for years, and almost nobody deploys it.
+
+The axis that organizes all four options is when the interaction between query and document is allowed to happen.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Paradigm", "Precomputed before the query arrives", "Computed per query", "Indexable"],
+  "rows": [
+    ["Sparse (BM25)", "term postings and statistics", "a sum over matched terms", "yes, inverted index"],
+    ["Dense bi-encoder", "one vector per document", "one dot product per candidate", "yes, ANN index"],
+    ["Late interaction", "one vector per document token", "a max-similarity per query token", "yes, with work"],
+    ["Cross-encoder", "nothing at all", "a full transformer pass per pair", "no, rerank only"]
+  ],
+  "highlightCols": ["Precomputed before the query arrives", "Indexable"],
+  "caption": "Reading down the first column is reading down a ladder of how much the model is allowed to know about the query when it looks at the document. The cross-encoder knows everything and can therefore precompute nothing, which is exactly why it is a reranker over a short list rather than a search index."
+}
+\`\`\`
+
+Sparse and bi-encoder are early interaction: the document representation is finished before your query exists. The cross-encoder is fully late and therefore unindexable, which is why the RAG architecture lesson could only ever put it over a candidate list. Late interaction is the middle rung, and the middle rung is where the engineering is.
+
+## MaxSim, computed rather than described
+
+Keep one vector per token, for the query and for the document. Score a document as the sum, over query tokens, of that token's best match against any document token. That operation is MaxSim.
+
+\`\`\`
+query tokens (3):    q1 = "error"   q2 = "code"   q3 = "E4711"
+document A tokens (5), from a troubleshooting page for that code
+
+similarity matrix (cosine, query rows against document columns)
+
+           d1     d2     d3     d4     d5      row max
+  q1     0.31   0.62   0.18   0.44   0.22       0.62
+  q2     0.27   0.71   0.35   0.29   0.19       0.71
+  q3     0.12   0.15   0.09   0.11   0.88       0.88
+                                              -------
+                              score(A) = 0.62 + 0.71 + 0.88 = 2.21
+
+document B, a general page about error handling, same first two rows
+
+  q1 row max 0.62
+  q2 row max 0.71
+  q3 row max 0.21     nothing in B is that identifier
+                                              -------
+                              score(B) = 0.62 + 0.71 + 0.21 = 1.54
+
+  2.21 - 1.54 = 0.67, and 0.88 - 0.21 = 0.67
+  the entire difference between the two documents is one row
+\`\`\`
+
+Three properties fall out of that block. The score is a sum of per-query-token maxima, so one query token that matches nothing contributes near zero rather than dragging the whole score down. Each query token gets to pick its own best match independently, so a document does not have to be about the query on average, it has to contain the right pieces. And the difference between a document that has the rare identifier and one that does not is one row of a matrix, which is the property the next section is about.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "why-pooling-loses-e4711",
+  "prompt": "Document A is 500 tokens and mentions E4711 twice. A bi-encoder pools those 500 token vectors into one 1024-float vector. Why does the identifier stop being findable?",
+  "options": [
+    {
+      "label": "The identifier is out of vocabulary, so the model has no representation for it and encodes noise",
+      "feedback": "Subword tokenization gives every string a representation, and a rare identifier usually gets a distinctive one. The representation exists; the question is what survives pooling."
+    },
+    {
+      "label": "Two token positions out of 500 barely move the pooled average",
+      "correct": true,
+      "feedback": "Right. Pooling is an average over positions, so a signal present in 2 of 500 positions contributes about 0.4 percent of the result. The vector ends up describing what the page is mostly about, and the rare term is what the query cared about."
+    },
+    {
+      "label": "1024 floats cannot hold 500 tokens, so detail is lost",
+      "feedback": "Capacity is genuinely the constraint, but the loss is not random. Pooling loses whatever is rare and keeps whatever is repeated, which is precisely the wrong bias for a query naming an error code."
+    }
+  ]
+}
+\`\`\`
+
+## Recovering the rare term
+
+The RAG architecture lesson gave you this failure already: queries naming a rare error code come back with paraphrases about error handling, and the fix offered there was the sparse half of hybrid retrieval. That fix works and it has a limit. BM25 finds E4711 when the query spells E4711, and misses when the user typed a variant, or when the identifier appears in a table cell the tokenizer split, or when the match needs to be semantic and exact at once ("the timeout error on the payments callback" against a page that names the code and never uses the word timeout).
+
+Late interaction covers that case without a second index, because the exact-match behavior is emergent rather than bolted on. The q3 row above is a semantic match against a specific token, so a near-variant of the identifier still scores high on that row while a page about error handling in general does not. This is the honest form of the argument for it: not that it beats hybrid retrieval everywhere, but that it puts the rare-term behavior and the semantic behavior in the same representation instead of in two systems whose scores you then have to fuse.
+
+## The storage bill
+
+Now the reason nobody uses it. One vector per token is a lot of vectors.
+
+\`\`\`
+corpus: 10,000,000 passages, 120 tokens each = 1,200,000,000 token vectors
+
+dense bi-encoder, one vector per passage
+  1,024 dims x 4 bytes            = 4,096 bytes
+  10,000,000 x 4,096              = 40.96 GB
+
+late interaction, one vector per token, 128 dims, float16
+  128 dims x 2 bytes              = 256 bytes
+  1,200,000,000 x 256             = 307.2 GB
+
+  307.2 / 40.96                   = 7.5x the bi-encoder index
+
+late interaction, 2-bit residual compression against a centroid,
+plus a 4-byte centroid id per vector
+  128 x 2 bits = 32 bytes, plus 4 = 36 bytes
+  1,200,000,000 x 36              = 43.2 GB
+
+  307.2 / 43.2                    = 7.1x smaller than uncompressed
+  43.2 / 40.96                    = 1.05x the bi-encoder index
+\`\`\`
+
+That last line is the one worth carrying out of this lesson. Compressed, a late-interaction index over this corpus is five percent larger than the single-vector index it replaces, and the 7.1x reduction the arithmetic produces sits inside the 6 to 10x that ColBERTv2 reports for its residual compression scheme. The technique is not expensive. Uncompressed late interaction is expensive, and the two get conflated constantly.
+
+You will also hear that late interaction costs 50 to 100 times a single-vector index, and that number is not wrong so much as it is a different comparison. It holds when both sides use the same dimension: a 128-dim bi-encoder index over this corpus is 10,000,000 x 512 bytes = 5.12 GB, and 307.2 / 5.12 = 60x. Production bi-encoders run at 768 to 3072 dims while token vectors run at 128, so the dimension gap absorbs most of the token-count gap before compression is applied at all. When someone quotes a multiplier, ask which two indexes are being compared.
+
+## PLAID: not loading what you do not need
+
+Compression solves storage. It does not solve the scoring loop, which is naively a nested loop: every query token against every token of every candidate document. PLAID's move is to notice that the centroid ids are already there, and that they are enough to throw most documents away.
+
+\`\`\`
+each document token vector is stored as (centroid id, 2-bit residual)
+
+stage 1  represent each document as its BAG OF CENTROID IDS only
+         score the query against centroids, not against residuals
+         this is a cheap approximation: no residual is decompressed,
+         and most of the index is never read
+
+stage 2  keep the top candidates from stage 1, and only for those
+         reconstruct token vectors from (centroid + residual)
+
+stage 3  run full MaxSim on what survived
+\`\`\`
+
+PLAID's authors call stage 1 centroid interaction, and sparsifying that bag of centroids centroid pruning. The reported effect is up to 7x faster on GPU and up to 45x on CPU against vanilla ColBERTv2 without impacting quality, reaching tens of milliseconds on GPU at 140M passages. The successor engine WARP reports a further 3x over the ColBERTv2 and PLAID engine, and 41x over the reference implementation of a related multi-vector retriever, again while maintaining retrieval quality.
+
+Notice what that stage 1 is. It is the coarse quantizer from the ANN lesson, in a different costume: a cheap first pass over centroids that decides what the expensive pass is ever allowed to look at, with the same consequence that a bad first pass caps your recall no matter how much work stage 3 does.
+
+## Where it fits, and where it does not
+
+Two places in a real pipeline. As a middle stage, between cheap first-pass recall and an expensive cross-encoder, cutting the candidate list the cross-encoder has to read. Or as a replacement for the cross-encoder, when reranking latency is the binding constraint: MaxSim over precomputed vectors is arithmetic, while a cross-encoder is a transformer forward pass per pair, and that is the gap that lets a late-interaction stage hold a tight latency cap at a candidate depth a cross-encoder could not.
+
+**Interview nuance:** the honest verdict is that for most systems this is over-engineering. A bi-encoder plus a cross-encoder over the top 100 is the right answer for the overwhelming majority of RAG products, and an interviewer who hears late interaction proposed for a 200,000-document internal wiki will read it as a technique looking for a problem. Two situations flip that. A recall requirement high enough that first-stage misses are the dominant failure, where per-token representations recover what pooling averaged away. And multimodal page retrieval, where the page-image models from the parsing lesson emit patch vectors natively, so you are already holding a multi-vector index and late interaction is simply how you score it.
+
+**Recap:** late interaction stores one vector per token and scores a document as the sum over query tokens of the best match against any document token, which is why a rare identifier survives when pooling would average it away. Uncompressed it is many times a single-vector index; with 2-bit residual compression against centroids it lands near parity, and the multiplier you hear quoted depends entirely on which two indexes are being compared. PLAID makes the scoring loop affordable by scoring centroid bags first and decompressing only survivors. It belongs between recall and a cross-encoder, or in place of one under a hard latency cap, and it is the wrong answer for an ordinary corpus.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "wiki-does-not-need-this",
+  "prompt": "A team runs search over a 200,000-document internal wiki on a bi-encoder plus a cross-encoder, and clears its recall target with room to spare. They propose migrating to a late-interaction index. What is the strongest response?",
+  "options": [
+    {
+      "label": "Agree, since this paradigm has held state of the art on retrieval benchmarks for years",
+      "feedback": "The benchmark standing is real, and it is a statement about a metric on a shared dataset rather than about this corpus. A system already clearing its target has no measured gap for the change to close."
+    },
+    {
+      "label": "Push back, because the failure it recovers is not the failure they have",
+      "correct": true,
+      "feedback": "Right. Per-token representations pay for themselves where pooling was averaging something away, and a system at target is not losing anything to pooling. The question to ask back is which measured failure the migration is aimed at."
+    },
+    {
+      "label": "Push back on the index size, which is why the technique stays rare",
+      "feedback": "Storage is the usual objection, and the arithmetic above weakens it: compressed, the index lands near parity with the single-vector one. Leading with cost also concedes that the change would be right if it were cheaper, which here it would not be."
+    }
+  ],
+  "reveal": "Late interaction is the middle rung of the interaction ladder: one vector per token, precomputed, scored at query time as a sum of per-query-token maxima. That structure is why a rare identifier survives, since a token that matches nothing contributes near zero instead of being averaged into a pooled summary. The cost is vector count, and 2-bit residual compression against centroids brings a corpus-scale index to roughly parity with the single-vector index beside it, while centroid-bag scoring keeps the loop affordable by never decompressing most of it. The verdict an interviewer is listening for is the restraint: this belongs where recall is the binding failure or where the model already emits patch vectors, and it is over-engineering everywhere else."
+}
+\`\`\`
+
+**Sources:** [ColBERT](https://arxiv.org/abs/2004.12832) · [ColBERTv2](https://arxiv.org/abs/2112.01488) · [PLAID](https://arxiv.org/abs/2205.09707) · [WARP](https://arxiv.org/abs/2501.17788)
+`.trim()
+
+const graphRetrievalTeach = `
+## Some questions have no answer to retrieve
+
+Every technique in this module so far answers the same kind of question: the answer exists in some passage, go find it. Chunking decides whether that passage is findable, parsing decides whether it survived ingestion, query understanding decides whether the search key reaches it, and late interaction decides how precisely it is scored. All of it assumes the answer is in there somewhere.
+
+A whole class of real question breaks that assumption, and it breaks it structurally rather than by degree.
+
+\`\`\`
+three questions asked of one corpus: 3,000 incident postmortems
+
+Q1  "what caused the March 14 checkout outage"
+    is the answer inside some chunk?  YES, one postmortem contains it
+    a top-8 retrieval can return it   LOCAL
+
+Q2  "which services has the schema registry taken down"
+    is the answer inside some chunk?  PARTLY, spread across ~20 reports
+    a top-8 retrieval returns a slice LOCAL, at the edge
+
+Q3  "what are the recurring failure themes across these reports"
+    is the answer inside some chunk?  NO
+                                      no postmortem states a theme.
+                                      the answer is a property of the
+                                      set, not of any member of it
+    a top-8 retrieval cannot return it   GLOBAL
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "raise-k-for-global",
+  "prompt": "For Q3 above, an engineer proposes raising k from 8 to 200 and letting a long-context model read all of it. Does that produce a trustworthy answer about recurring themes?",
+  "options": [
+    {
+      "label": "Yes, at k=200 the sample is large enough for a model to generalize from it",
+      "feedback": "A larger sample does read better, which is what makes this the common first attempt. It is still a sample chosen by similarity to the question, and a theme's evidence includes reports that never use the question's words."
+    },
+    {
+      "label": "No, because ranking by similarity to the question selects the wrong 200",
+      "correct": true,
+      "feedback": "Right. Retrieval returns what resembles the query, and a question about themes resembles reports that talk about themes, which is not the same set as the reports the themes are made of. The selection is biased in a way more of it does not fix."
+    },
+    {
+      "label": "No, since 200 chunks will not fit in the context window",
+      "feedback": "Window size is a real constraint and not the binding one here. The same failure shows up at k=20 in a window with room to spare, because the defect is in how the 20 were chosen."
+    }
+  ]
+}
+\`\`\`
+
+## Why top-k cannot reach a global answer
+
+Retrieval ranks by similarity to the query. For a local question that is exactly right: the passage that answers "what caused the March 14 outage" is the passage that most resembles that question. For a global question the ranking selects on the wrong property. "Recurring failure themes" resembles documents that discuss themes, retrospectives, and postmortem process, and the actual evidence for a theme is three hundred ordinary incident reports that each describe one instance and never name the pattern.
+
+This is not a k problem, a chunking problem, or a reranking problem. It is a mismatch between what retrieval optimizes (resemblance to the query) and what the question requires (coverage of the corpus). No amount of the first buys the second, which is why the answer is a different index rather than a better one.
+
+## The GraphRAG index
+
+The construction is four stages, and each one is an ordinary thing you already know applied to text.
+
+1. **Extract.** An LLM reads each chunk and emits entities and the relations between them. "The schema registry rejected a malformed Avro record, which stalled the ingest pipeline" becomes nodes and a typed edge.
+2. **Build.** Merge those across the corpus into one graph, so an entity mentioned in forty reports is one node with forty pieces of evidence attached.
+3. **Partition.** Run Leiden community detection, recursively: detect communities, then detect sub-communities inside each, down to leaves that cannot be partitioned further. Every level of the resulting hierarchy is a partition of the graph that is mutually exclusive and collectively exhaustive, which is the property that makes divide-and-conquer summarization sound.
+4. **Summarize.** Generate a summary for every community at every level. A leaf community summarizes its entities and relations; a parent summarizes its children rather than the raw text, so the hierarchy is summaries of summaries.
+
+\`\`\`
+entities and relations from 3,000 incident reports, partitioned by
+Leiden, recursively
+
+  level 0, root communities
+     C0  "payments platform"          C1  "data platform"
+      |                                |
+  level 1, sub-communities             |
+     C0.0 "card authorization"        C1.0 "ingest pipeline"
+     C0.1 "settlement batch"          C1.1 "warehouse queries"
+     C0.2 "fraud scoring"             C1.2 "schema registry"
+
+  every node carries a generated summary. C0's summary is written from
+  the summaries of C0.0, C0.1 and C0.2, not from the source chunks, so
+  reading the level-0 row is reading the whole corpus at one resolution.
+
+  choosing a level chooses a resolution: level 0 is a handful of broad
+  summaries, level 1 is more of them and more specific, and the leaves
+  are close to the reports themselves.
+\`\`\`
+
+## Two query modes over one index
+
+**Global search** is a map-reduce. Pick a community level, hand every summary at that level to the model in parallel with the question, collect the partial answers, and reduce them into one. Nothing is retrieved by similarity, because every community at that level participates. That is what buys coverage.
+
+**Local search** starts from the entities the question mentions, walks their neighborhood in the graph, and pulls the connected entities, relations and source chunks. That is the mode for "what caused the March 14 outage" if you route a local question here at all, and for most systems you would not.
+
+The published evaluation makes the efficiency argument concretely: answering with root-level community summaries took 26,657 context tokens on one dataset against 1,014,611 for summarizing the source texts directly, roughly 2.6 percent of the context, because the hierarchy has already compressed the corpus once at indexing time.
+
+## The cost cliff
+
+Which is where the bill arrives. Look at what stage 1 and stage 4 above actually are: an LLM call per chunk, plus an LLM call per community.
+
+\`\`\`
+corpus: 3,000 incident reports x 4,000 tokens = 12,000,000 tokens
+chunked at 600 tokens                          = 20,000 chunks
+
+rates used in this example (stated here, not quoted from a vendor):
+  $0.25 per million input tokens, $1.25 per million output tokens
+  $0.02 per million tokens embedded
+
+entity and relation extraction, one call per chunk
+  input   600 chunk + 400 instruction = 1,000 tokens
+  20,000 x 1,000 = 20,000,000 input   -> 20 x $0.25 = $5.00
+  20,000 x 500   = 10,000,000 output  -> 10 x $1.25 = $12.50
+
+community summarization, say 1,400 communities across all levels
+  1,400 x 3,000 =  4,200,000 input    -> 4.2 x $0.25 = $1.05
+  1,400 x 400   =    560,000 output   -> 0.56 x $1.25 = $0.70
+
+  full GraphRAG indexing                        = $19.25
+
+the same corpus, embeddings only, for a vector index
+  12,000,000 tokens x $0.02 per million         = $0.24
+
+  19.25 / 0.24 = about 80x the indexing cost of the vector pipeline
+\`\`\`
+
+Two things about that number. It is small here because the corpus is small, and it is linear in corpus size, so the same 80x on 300,000 reports is roughly $1,925 against $24, and on a corpus that is re-indexed whenever documents change it is a recurring bill rather than a one-time one. And it is a multiplier on the stage that vector RAG made almost free, which is why teams pilot GraphRAG successfully and then fail to fund it.
+
+## LazyGraphRAG: defer the calls
+
+The lever is that stage 1 and stage 4 are the only expensive stages, and neither is needed until a query asks. LazyGraphRAG builds the graph without an LLM at all, using noun-phrase extraction to pull out concepts and their co-occurrences, then runs the same community detection over that cheap graph. No summaries are generated at indexing time. When a global query arrives, the LLM work happens then: refining the query, judging relevance, and generating the answer over the communities that matter for that question.
+
+Microsoft reports the indexing cost of this design as identical to vector RAG, and 0.1 percent of the cost of full GraphRAG. The trade is exactly what the name says: query cost rises, and it rises only for the global queries that need it, while local traffic never touches the graph at all.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Design", "LLM calls at indexing", "LLM calls at query", "Answers global questions"],
+  "rows": [
+    ["Vector RAG", "none", "one generation per query", "no, structurally"],
+    ["Vector RAG, large k", "none", "one generation over more chunks", "no, the sample is still similarity-ranked"],
+    ["Full GraphRAG", "one per chunk, one per community", "map over community summaries, then reduce", "yes"],
+    ["LazyGraphRAG", "none, noun phrases and graph statistics", "query refinement, relevance judging, generation", "yes"]
+  ],
+  "highlightCols": ["LLM calls at indexing", "Answers global questions"],
+  "caption": "The first and last rows are the interesting pair: the same indexing cost, and a capability gap between them. Everything in the middle is either paying at indexing for what the last row defers, or trying to reach the last column with a knob that cannot get there."
+}
+\`\`\`
+
+**Interview nuance:** the strong answer is a router, not a religion. In almost every product, the overwhelming majority of traffic is local and belongs on the hybrid pipeline the RAG architecture lesson already built, which is cheaper, faster and better at it. The graph exists for the minority of questions that are global, so the design question an interviewer is actually asking is how a query gets classified into the right path, and what happens when the classifier is wrong. A misrouted local question sent to global search is slow and expensive; a misrouted global question sent to top-k returns a confident answer built from eight documents out of three thousand, which is the worse failure because it looks like an answer.
+
+**Recap:** a global question is one whose answer is a property of the corpus rather than of any passage in it, so similarity ranking selects on the wrong property and no k fixes it. GraphRAG answers it by extracting an entity graph, partitioning it with recursive Leiden community detection into a hierarchy of mutually exclusive levels, summarizing every community, and map-reducing over the summaries at a chosen level. That costs an LLM call per chunk and per community, which lands around 80x vector-RAG indexing on the stated example. LazyGraphRAG builds the graph from noun-phrase co-occurrence and defers every LLM call to query time, reported at vector-RAG indexing cost. The shippable design routes local traffic to the existing pipeline and reserves the graph for the questions that need coverage.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "route-local-or-global",
+  "prompt": "Five questions arrive at an assistant over the incident corpus. Send each to the path that can actually answer it.",
+  "buckets": [
+    "Hybrid pipeline",
+    "Graph path"
+  ],
+  "items": [
+    {
+      "label": "Why did the checkout service page on-call at 03:12 on March 14",
+      "bucket": "Hybrid pipeline",
+      "feedback": "One postmortem contains this. Sending it to a map-reduce over community summaries is slow, expensive, and less precise than the answer sitting in a single document."
+    },
+    {
+      "label": "What kinds of failure have become more common since we adopted the new deploy tool",
+      "bucket": "Graph path",
+      "feedback": "The answer is a shift in a distribution over the whole corpus. No report states it, and reports that resemble the question are the ones discussing the deploy tool, not the ones that constitute the trend."
+    },
+    {
+      "label": "Which runbook covers a stuck settlement batch",
+      "bucket": "Hybrid pipeline",
+      "feedback": "A lookup with a named target. This is what BM25 and a dense index do well and cheaply."
+    },
+    {
+      "label": "Which teams keep appearing together in the same incidents",
+      "bucket": "Graph path",
+      "feedback": "Co-occurrence across the corpus is a graph property. It is also the kind of question the cheap noun-phrase graph can answer without any indexing-time generation."
+    },
+    {
+      "label": "What did we change after the schema registry incident in July",
+      "bucket": "Hybrid pipeline",
+      "feedback": "A specific document, specifically named. The presence of an entity in the question is not by itself a reason to enter the graph."
+    }
+  ],
+  "reveal": "The taxonomy is the lesson. A local question has its answer inside some passage, and everything earlier in this module is about finding that passage. A global question has an answer that is a property of the set, so similarity ranking selects on the wrong criterion and more k, better chunks and sharper reranking all miss for the same reason. GraphRAG buys coverage by pre-partitioning an entity graph into a hierarchy of communities and map-reducing over their summaries, at the price of an LLM call per chunk and per community. LazyGraphRAG keeps the capability and moves the calls to query time, reported at vector-RAG indexing cost. What an interviewer is grading is not whether you know the technique; it is whether you routed to it, and what your system does when the router guesses wrong."
+}
+\`\`\`
+
+**Sources:** [From local to global: a graph RAG approach](https://arxiv.org/abs/2404.16130) · [LazyGraphRAG](https://www.microsoft.com/en-us/research/blog/lazygraphrag-setting-a-new-standard-for-quality-and-cost/) · [Microsoft GraphRAG](https://github.com/microsoft/graphrag) · [Leiden community detection](https://arxiv.org/abs/1810.08473)
+`.trim()
+
+const embeddingLifecycleTeach = `
+## Two models' vectors are not merely different, they are incomparable
+
+The ANN lesson called re-embedding "the migration nobody plans for" and then moved on. This lesson is the plan, and the lever that pays for it.
+
+Start with the fact that makes the migration unavoidable, stated precisely enough that it cannot be hand-waved. Two embedding models trained separately produce two different spaces. Not two views of one space with a rotation between them, and not one space where one model is noisier. Each model learned its own arrangement of meaning across its own axes, and the number that comes out of a cosine similarity between a vector from model A and a vector from model B is arithmetically well-formed and semantically meaningless. It is not a worse score. It is not a score.
+
+That is why a model upgrade is a full corpus rebuild rather than a config change, and it is why the only thing that makes the rebuild survivable is that you planned the cutover before you needed it.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "truncate-across-models",
+  "prompt": "A team moves from a 1536-dimension model to a 1024-dimension one and proposes truncating the stored 1536-dim vectors to their first 1024 values so old and new records can be searched together during the migration. What happens?",
+  "options": [
+    {
+      "label": "It works, as long as both models were trained with Matryoshka representation learning",
+      "feedback": "This is the most common conflation in the area. Matryoshka training makes a prefix of one model's vector usable in place of that model's full vector. It says nothing about two models, and there is no training trick that makes separately trained spaces interchangeable."
+    },
+    {
+      "label": "The vectors match in shape and stay meaningless when compared",
+      "correct": true,
+      "feedback": "Right, and the danger is that nothing fails. The dimensions line up, cosine similarity returns numbers in the usual range, results come back ranked, and the ranking is noise. A shape check cannot catch this, so the guard has to be a version field."
+    },
+    {
+      "label": "Recall drops by a few points until the backfill finishes",
+      "feedback": "That describes a degradation, and this is a category error. A gradual, recoverable-looking metric is exactly what you would report if you shipped this, which is what makes it expensive to diagnose."
+    }
+  ]
+}
+\`\`\`
+
+## The migration is a blue-green deploy
+
+You already have the pattern. Level 7's deployment-strategies lesson gave you blue-green: stand the new thing up beside the old one, move traffic when you have evidence, keep the old one warm long enough to go back. A re-embedding migration is that pattern applied to an index instead of a service, and treating it as a transfer rather than as new machinery is most of the answer.
+
+\`\`\`
+state          reads served by   writes go to      rollback move
+-----------    ---------------   ---------------   ----------------
+1 build        index A           A                 nothing to undo
+2 dual-write   index A           A and B           drop B
+3 backfill     index A           A and B           drop B
+4 validate     index A           A and B           drop B
+5 flip alias   index B           A and B           point alias at A
+6 retain       index B           A and B           point alias at A
+7 retire       index B           B                 rebuild A from source
+
+  the alias is the only thing the application knows about. it never
+  names an index directly, which is what makes step 5 and its inverse
+  a metadata change rather than a deploy.
+
+  dual-write starts BEFORE the backfill, not after. a document that
+  changes during a multi-day backfill has to land in both indexes, or
+  B is quietly stale in exactly the documents that were most active.
+\`\`\`
+
+The step teams skip is 4, and the step teams get wrong is the ordering of 2 and 3.
+
+## Validate against your corpus, not against a leaderboard
+
+"The new model scores higher on the benchmark" is not evidence about your corpus. Benchmarks are averages over public datasets whose query distribution, document length and vocabulary are not yours, and the whole reason your retrieval system exists is that your corpus is not public data.
+
+So step 4 is a labeled query set of your own: a few hundred to a few thousand queries with known-relevant documents, drawn from real traffic and judged by people who know the domain. Run it against A and against B at the same k, and compare recall and whatever ranking metric you gate on. Compare per-slice as well as overall, because a new model that is better on prose and worse on identifiers will look like a modest improvement in aggregate and like a regression to the half of your users who search for part numbers. The cutover criterion is written down before the run, not chosen after seeing it.
+
+## The lever that pays for all of this: you do not need float32
+
+Now the half that changes the economics. The ANN lesson framed the index-family choice as a memory budget question. Two techniques move that budget by orders of magnitude, and they compose.
+
+**Matryoshka representation learning** is a training objective that makes prefixes work. A model trained this way packs the coarsest information into the earliest dimensions, so the first 256 values of a 1024-dimension vector are themselves a usable embedding rather than a fragment of one. The paper's claim is that these nested prefixes are at least as accurate as independently trained low-dimensional representations, and it reports up to 14x smaller embeddings at the same accuracy on its benchmark, with no additional cost at inference. Truncation becomes a slice rather than a re-embed.
+
+**Quantization** shrinks each dimension that remains. int8 stores each value in one byte. Binary quantization stores each value in one bit, keeping only its sign.
+
+\`\`\`
+one vector, 1024 dimensions
+
+  float32          1024 x 4 bytes                 = 4,096 bytes
+  int8             1024 x 1 byte                  = 1,024 bytes    4x
+  binary           1024 bits / 8                  =   128 bytes   32x
+  MRL to 128 dims, then binary
+                    128 bits / 8                  =    16 bytes  256x
+
+an index of 100,000,000 vectors
+
+  float32          100,000,000 x 4,096            = 409.6 GB
+  int8             100,000,000 x 1,024            = 102.4 GB
+  binary           100,000,000 x 128              =  12.8 GB
+  MRL-128 + binary 100,000,000 x 16               =   1.6 GB
+\`\`\`
+
+Those two levers are independent, which is why they multiply: 8x from the dimension cut times 32x from the bit width is the 256x on the last row. And the size of the number is the point. A corpus that needed a distributed HNSW cluster at 409.6 GB fits in one machine's RAM at 12.8 GB, which changes not just the bill but which index family is available to you.
+
+The honest part: the size arithmetic above is exact, and the quality cost is not something anyone can quote for your corpus. MRL's degradation curve is measured per model and per dataset, so the dimension you truncate to is an experiment you run on your own labeled set, not a number you copy. That is the same discipline as the previous section, applied to a different knob.
+
+## Rescoring: get the quality back for almost nothing
+
+Binary quantization keeps one bit per dimension, so it loses resolution and recall falls. The recovery is a two-pass search, and it is cheap because the second pass runs over a shortlist rather than the corpus.
+
+\`\`\`
+top_k = 20, rescore_multiplier = 4
+
+pass 1  search the BINARY index for 4 x 20 = 80 candidates
+        distance is a Hamming-style comparison over 128-byte vectors,
+        so this pass is both small in memory and fast
+
+pass 2  take those 80 document vectors in full precision (or int8),
+        score them against the FLOAT query vector, sort, keep 20
+
+  the binary index is what lives in RAM and answers the search.
+  the full-precision vectors only need to be reachable, which means
+  they can sit on disk or in object storage: 80 reads per query,
+  not 100,000,000.
+\`\`\`
+
+The reported retention numbers are worth carrying: binary quantization alone preserves roughly 92.5 percent of retrieval performance, and with rescoring that rises to about 96 percent, while int8 with a rescore multiplier of 4 reaches around 99 percent. Measured speedups run about 3.7x for int8 and about 25x on average for binary. So the design is a memory decision with a latency bonus and a small, measurable quality cost that you buy back with a shortlist pass.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Configuration", "Bytes per vector at 1024 dims", "Index of 100M vectors", "Reported retrieval retention"],
+  "rows": [
+    ["float32", "4,096", "409.6 GB", "baseline"],
+    ["int8", "1,024", "102.4 GB", "about 99% with rescoring at 4x"],
+    ["binary", "128", "12.8 GB", "about 92.5% alone"],
+    ["binary plus float rescoring", "128 in RAM, full precision on disk", "12.8 GB resident", "about 96%"],
+    ["MRL to 128 dims plus binary", "16", "1.6 GB", "measure on your own corpus"]
+  ],
+  "highlightCols": ["Index of 100M vectors"],
+  "caption": "The last row deliberately does not carry a published retention number. Truncation quality depends on the model and the corpus, so that cell is an experiment rather than a citation, and treating it as one is the difference between a plan and a hope."
+}
+\`\`\`
+
+## What is not a model change
+
+Not every reason to rebuild is a new model, and confusing them wastes a migration.
+
+**Corpus drift.** Your documents change over time: new products, new vocabulary, new document types. The model has not moved, and its output for a given input is fixed forever, so this is not model drift. It is your corpus moving away from the queries the model was good at, and it shows up as slice-level regressions rather than as an overall decline.
+
+**Query drift.** Users start asking about things the corpus covers thinly. That is a content problem wearing a retrieval problem's clothes, and re-embedding will not fix it.
+
+**Index decay.** The ANN lesson's tombstones: deletes mark nodes rather than stitching them out, the graph degrades, and recall drifts down with no code change. That is a compaction and rebuild schedule, not an embedding question.
+
+The monitoring that separates them is the same labeled query set from step 4, re-run on a schedule and reported per slice, plus a distribution check on incoming documents and queries. A rebuild you scheduled because a number moved is cheap. A rebuild you scheduled because users complained is a quarter of firefighting.
+
+**Interview nuance:** version the embedding model in the vector metadata, from day one. Every record carries the model id and the dimension it was written with, and every query path asserts on it. Without that field, a corpus that has taken writes from two model generations is unrecoverable except by a full rebuild, because nothing distinguishes the two populations: they have the same shape, they return the same kind of number, and the only symptom is that some results are inexplicably bad. With the field, the same situation is a filtered backfill you can run at your convenience. It costs four bytes per record and it is the difference between an incident and a chore.
+
+**Recap:** vectors from two models are not comparable, so a model upgrade is a corpus rebuild, and the safe shape is the blue-green pattern you already know: build, dual-write before backfilling, validate on your own labeled query set rather than a leaderboard, flip an alias, retain, retire. Matryoshka training makes prefix truncation a slice instead of a re-embed, quantization takes 4x at int8 and 32x at binary, the two compose to 256x, and a rescoring pass over a shortlist buys most of the quality back while keeping only the small vectors resident. Drift, vocabulary shift and tombstone decay are separate diagnoses with separate fixes, and a model version on every record is what keeps a half-finished migration from becoming a rebuild.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "binary-recall-recovery",
+  "prompt": "You switch the index to binary quantization for the 32x memory win and recall@20 falls by 4 points on the labeled set. Before reverting, which single change is most likely to recover it?",
+  "options": [
+    {
+      "label": "Re-embed the corpus with a model trained for binary output and rebuild the index from scratch",
+      "feedback": "There are models trained with quantization in mind and that is a real long-term option, but it is a full rebuild to test one hypothesis. Try the change that costs a config edit before the one that costs a migration."
+    },
+    {
+      "label": "Oversample with the binary index, then rescore that shortlist in full precision",
+      "correct": true,
+      "feedback": "Right. The binary pass is a coarse filter and it does not have to be the final ranking. Pulling several times k and reordering the survivors against the float query vector is the recipe that takes retention from roughly 92.5 percent to about 96 percent."
+    },
+    {
+      "label": "Raise ef_search so the graph walk visits more nodes",
+      "feedback": "A genuine recall knob, and the wrong one for this cause. The walk is already finding the nearest neighbors under the distance it was given; the loss happened when the distance lost resolution, so exploring more of the same space does not restore it."
+    }
+  ],
+  "reveal": "An embedding index has a lifecycle, and both halves of it are budget decisions. Changing models is a corpus rebuild because two spaces are incomparable rather than merely different, so the cutover is blue-green: dual-write before backfilling, validate on a labeled set from your own traffic instead of a public benchmark, flip an alias, keep the old index warm. Paying for it is the compression half: Matryoshka prefixes cut dimensions by slicing, int8 and binary cut bit width by 4x and 32x, the two multiply, and a rescoring pass over a shortlist recovers most of what binary gave up while leaving only the small vectors in memory. Everything else that looks like model decay is corpus drift, query drift, or tombstones, and each has its own fix."
+}
+\`\`\`
+
+**Sources:** [Matryoshka representation learning](https://arxiv.org/abs/2205.13147) · [Binary and scalar embedding quantization](https://huggingface.co/blog/embedding-quantization) · [Vespa: Matryoshka with binary quantization](https://blog.vespa.ai/combining-matryoshka-with-binary-quantization-using-embedder/) · [Operational advice for dense and sparse retrievers](https://arxiv.org/abs/2409.06464)
+`.trim()
+
 export const systemDesignLevel11: DesignLevel = {
   id: 11,
   slug: "specialized-systems",
   title: "Level 11: Specialized & Frontier Systems",
   tagline:
     "The frontier: ML systems, LLM and GenAI infrastructure, real-time analytics and globally consistent data, and IoT, edge, and time-series.",
-  estimatedHours: 12,
+  estimatedHours: 16,
   modules: [
     {
       id: "sd-l11-m1",
@@ -5119,6 +6294,668 @@ export const systemDesignLevel11: DesignLevel = {
               "**Keeping 100M series alive:** cardinality is the whole game at this scale. I enforce **per-tenant active-series limits** and per-metric label budgets, reject writes past quota (with a clear error, not silent drop), and run automatic label-cardinality detection to flag a customer who just shipped `user_id` as a label. The inverted index (postings lists from label -> series) is sharded per tenant and kept in memory only for the hot window; cold blocks carry their own on-disk index in S3. This bounds index RAM regardless of total historical series.",
               "**Query and retention:** a query frontend **splits** long ranges by time, **caches** results, and enforces per-tenant concurrency/cost limits so one heavy query cannot starve dashboards. Recent-hour p99 < 1s is met from in-memory/SSD ingester data with the hot index; 15-month queries transparently route to **downsampled rollups** (5m/1h) in S3 rather than scanning raw. Retention is tiered per plan: raw for weeks, rollups for 15 months, then chunk-drop by time.",
               "Multi-tenancy runs through every layer: quotas, isolation by shard key, and per-tenant retention, so cost and blast radius track each customer independently. Common wrong turn: a single shared index with global cardinality, where one customer shipping a high-cardinality label melts the index for all thousands of tenants.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l11-m5",
+      title: "Retrieval Engineering",
+      description:
+        "Go under the RAG box. The architecture lesson gave you ingestion, hybrid retrieval, a reranker, and an ACL filter; this module is the engineering inside each of those stages: how a document becomes chunks without losing the context that made it answerable, what to do when the document is a PDF full of tables, how a user's question becomes a query the index can answer, the third retrieval paradigm the two-vector view leaves out, when a graph beats a vector index and what it costs, and how you change embedding models without a multi-day outage.",
+      lessons: [
+        {
+          id: "sd-l11-chunking-strategy",
+          title: "Chunking Strategy and Contextual Retrieval",
+          summary:
+            "A chunk has to be findable without its neighbors, so ingestion buys retrieval quality: contextual retrieval, late chunking, and what each measures.",
+          estimatedMinutes: 40,
+          difficulty: "hard",
+          skills: ["rag", "chunking", "ingestion"],
+          teach: { markdown: chunkingStrategyTeach, estimatedMinutes: 15 },
+          apply: {
+            id: "sd-l11-chunking-strategy-apply",
+            prompt:
+              "Write the ingestion and chunking design for 200,000 engineering design documents that mix headings, tables, and fenced code, where top-20 retrieval failure must fall under 3% and an edit to one document must not trigger a corpus rebuild.",
+            thinkAbout: [
+              "What does a chunk have to carry so a query that never saw the document can still reach it?",
+              "Which ingestion-time spend buys the largest drop in retrieval failure, and what does it cost once?",
+              "What makes re-ingestion incremental when a chunk's embedding depends on the whole document?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 200,000 documents averaging 4,000 tokens, so roughly 800M document tokens and, at 600-token chunks, roughly 1.3M chunks. Corpus is engineering design docs: heading hierarchies, specification tables, and code blocks. Target is top-20 retrieval failure under 3%, measured on a labeled query set, and edits arrive continuously.",
+              "**Parse and split on structure, not on a token count.** Element-aware splitting first: headings define chunk boundaries and every chunk inherits its heading path as a prefix, fenced code blocks are never cut, and a table is kept whole or, if oversized, split with its header row repeated into each piece. Fall back to a 600-token target with 10 percent overlap only inside long unstructured prose, since overlap repairs a cut sentence and nothing more.",
+              "**Buy contextual retrieval at ingestion.** For each chunk, one generation with the whole document in the prompt returns 50 to 100 tokens situating the chunk, which is prepended before embedding and before BM25 indexing. On the published measurement this takes top-20 failure from 5.7% to 3.7% alone and to 2.9% when the BM25 side is contextualized too. At $1.02 per million document tokens the whole corpus is roughly 800 x $1.02 = $816 once. Prompt caching over the shared document is what keeps that from being a per-chunk re-read of a 4,000-token document.",
+              "**Then rerank, because the stages stack.** A cross-encoder over the top 150 candidates, keeping 20, took the same pipeline to 1.9% in that evaluation, which is the only configuration that clears a 3% target with margin. Order of spend: structure-aware splitting (free), contextual retrieval (one-time), reranker (per query). Validate each step on the labeled set rather than shipping all three and attributing the win to the last one added.",
+              "**Incremental re-ingestion is a document-scoped rebuild, not a corpus one.** The context generated for a chunk depends on its own document only, so the unit of invalidation is the document: on an edit, re-chunk that document, regenerate context for its chunks, re-embed, upsert by a stable (document id, chunk ordinal) key, and tombstone chunks that no longer exist. Content-hash each chunk so an edit to page 9 does not pay to re-embed page 1. A model or prompt version field on every chunk lets a future contextualizer change be a backfill rather than a flag day.",
+              "**What I would measure:** top-20 recall on a labeled query set per document type, since tables and code fail differently from prose; the share of chunks whose text contains no proper noun (a direct proxy for orphaned claims); and cost per re-ingested document. Common wrong turn: raising overlap to 30 percent to chase the failure rate. That inflates the index and the candidate pool while leaving every orphaned claim exactly as unretrievable as it was.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-chunking-strategy-practice",
+            prompt:
+              "Read the retrieval audit note below and choose how to spend the stated ingestion budget: contextual retrieval, late chunking, or a reranker upgrade. Defend the choice arithmetically against the 9% top-20 failure rate, and say what you would measure to know the spend worked.",
+            thinkAbout: [
+              "Which of the three candidates is charged once per corpus and which is charged on every query, and how does that change the comparison?",
+              "The corpus is 40% scanned manuals with no heading structure. Which candidate depends on structure that this corpus does not have?",
+              "What would you have to see in the labeled query set to conclude the spend failed rather than that the budget was too small?",
+            ],
+            modelAnswerOutline: [
+              "Restating the constraint in one line: 120M document tokens, a $250 one-time ingestion budget, 9% top-20 failure, and a p95 query budget already at 380ms of a 400ms cap, which is the number that decides most of this.",
+              "**Contextual retrieval fits the budget with room to spare.** 120 x $1.02 = $122.40 against a $250 budget, and it is charged once. On the published measurement it is the single largest reducer of retrieval failure available at ingestion time (5.7% to 3.7% alone, 5.7% to 2.9% with the BM25 side contextualized), and it adds nothing at all to query latency, which is where this system has no headroom left.",
+              "**Late chunking is cheaper still, and is the wrong pick here for a reason that is about this corpus rather than the technique.** It costs one long-context forward pass per document instead of a generation per chunk, and it needs no structure. But 4,000-token support articles are near or past the window of many long-context embedding models, and the measured trade is that late chunking gives back some relevance and completeness relative to contextual retrieval. With budget available, buying the more effective one is the right call; late chunking is what I would choose if the budget were a tenth of this.",
+              "**The reranker upgrade is the tempting answer and the one the latency budget rules out.** A cross-encoder is charged per query and would land on a p95 already at 380ms of a 400ms cap. It also stacks with contextual retrieval rather than substituting for it, so the sequencing is: buy the ingestion-side fix now, then make the case for latency headroom separately with the reranker's own measured gain (2.9% to 1.9% in the published run) as the evidence for that ask.",
+              "**Not on the list, and free: the 40% of the corpus that is scanned manuals.** Those documents have no heading structure to inherit and are the most likely home of orphaned claims, so I would measure the failure rate separately for them before and after. A single corpus-wide 9% can hide a 4% on wiki pages and a 16% on manuals, and a technique that fixes the wiki pages will look like it worked.",
+              "**How I would know it worked:** re-run the same labeled query set at the same k on a held-out slice, report top-20 failure per document type, and treat a corpus-wide improvement with a flat manuals number as a failed spend rather than a partial win. Common wrong turn: spending the whole budget on all three at once, which lands somewhere better and leaves nobody able to say which stage bought it or what to do next quarter.",
+            ],
+            supplied: {
+              label: "Retrieval audit note: SupportKB pipeline",
+              body: `**System.** SupportKB answers customer questions over 30,000 published support articles and vendor equipment manuals. Roughly 60% are authored in the CMS with a heading hierarchy; the other 40% are scanned PDF manuals run through OCR, which arrive as unbroken prose with no headings.
+
+**Corpus.** 30,000 documents, averaging 4,000 tokens, so about 120M document tokens. Split at 600 tokens with 15% overlap gives roughly 230,000 chunks.
+
+**Current pipeline.** Fixed-size split, 15% overlap, one embedding per chunk, dense top-20 unioned with BM25 top-20, no reranker. Retrieval is a pre-filter on product line, then top-8 into the prompt.
+
+**Measurements, last 30 days.**
+
+| Signal | Value |
+| --- | --- |
+| Top-20 retrieval failure, labeled query set (1,400 queries) | 9.0% |
+| Top-8 retrieval failure, same set | 17.2% |
+| Retrieval p95, embed plus hybrid search plus assembly | 380ms |
+| Product-wide p95 budget for the retrieval stage | 400ms |
+| Chunks whose text contains no product name | 44% |
+| Answers escalated to a human | 12.5% |
+
+**Budget.** Finance approved a one-time ingestion spend of $250 for this corpus and no recurring increase. Two engineer-weeks are available. Re-ingestion of the whole corpus takes 6 hours on the existing job.
+
+**Options on the table.** Contextual retrieval at ingestion; late chunking with a long-context embedding model; or adding a cross-encoder reranker over the top 150 candidates.`,
+            },
+            rubric: [
+              {
+                name: "One-time versus per-query cost",
+                weak: "Compares the three options on retrieval quality alone and never separates a one-time ingestion charge from a charge that recurs on every request.",
+                adequate:
+                  "Notes that the reranker is a per-query cost but does not connect it to the 380ms of 400ms already spent.",
+                strong:
+                  "Rules the reranker out on the retrieval p95 sitting at 380ms against a 400ms cap, and prices contextual retrieval as 120 x $1.02 = $122.40 charged once.",
+              },
+              {
+                name: "Fit to this corpus",
+                weak: "Picks a technique on its general reputation without using the 40% of documents that arrive from OCR with no heading structure.",
+                adequate:
+                  "Mentions that 40% of the corpus is scanned manuals but draws no consequence for which technique to buy or how to measure it.",
+                strong:
+                  "Splits the 9% failure rate by document type before choosing, and treats a flat manuals number after the change as a failed spend rather than a partial win.",
+              },
+              {
+                name: "Arithmetic against the budget",
+                weak: "Asserts that the chosen option is affordable without computing anything against the $250 figure.",
+                adequate:
+                  "Computes one option's cost correctly but leaves the other two unpriced, so the comparison rests on assertion.",
+                strong:
+                  "Prices each candidate against 120M document tokens and the $250 budget, and states what the remaining headroom would buy.",
+              },
+              {
+                name: "Evidence the spend worked",
+                weak: "Ends at the recommendation with no measurement named, or proposes to watch the escalation rate alone.",
+                adequate:
+                  "Names re-running the 1,400-query labeled set but not the k, the slice, or what a failure would look like.",
+                strong:
+                  "Re-runs the labeled set at the same k on a held-out slice, reports failure per document type, and states in advance which result would count as the spend having failed.",
+              },
+            ],
+          },
+        },
+        {
+          id: "sd-l11-document-parsing",
+          title: "Document Parsing and Multimodal Retrieval",
+          summary:
+            "Reading order and merged cells destroy information before the embedder ever runs, and no reranker recovers it. The fork is to stop parsing at all.",
+          estimatedMinutes: 40,
+          difficulty: "hard",
+          skills: ["rag", "document-parsing", "multimodal-retrieval"],
+          teach: { markdown: documentParsingTeach, estimatedMinutes: 15 },
+          apply: {
+            id: "sd-l11-document-parsing-apply",
+            prompt:
+              "Lay out the ingestion path for a corpus of 500,000 financial filings, roughly 80% of which carry tables or multi-column layout, where a number attached to the wrong year in an answer is unacceptable.",
+            thinkAbout: [
+              "Which stage of ingestion can destroy a fact in a way no later stage can detect, and what does that imply about where the tests go?",
+              "What has to travel with a number so that a single retrieved row is still true on its own?",
+              "What would you have to measure before you could route a document down one path rather than the other?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 500,000 filings averaging 40 pages, so about 20M pages; roughly 80% carry tables or two-column layout; a mix of born-digital PDFs and scanned exhibits. The correctness bar is that a retrieved number carries its own keys, because a wrong number cited confidently is worse here than an abstention.",
+              "**Route at ingestion on a measured signal, not a guess.** For each page compute a parse-quality score: does an embedded text layer exist, what fraction of characters fall inside detected column boxes, does the extracted text contain the tokens of the page's own detected headings. Pages that score well take the parse path; scanned and dense-layout pages take the page-image path. Record the chosen path and the score on every document so the split is inspectable and a document can be re-routed later without a full rebuild.",
+              "**Parse path: element-based, and tables get their own serializer.** A layout model produces typed elements (heading, paragraph, table, figure, caption) and chunks follow those elements rather than a token count, which is the configuration measured to improve RAG results on financial reports. Tables are unpivoted to one row per fact so each row carries segment, year and measure alongside the number, and a table is never split between its header and its body. Every chunk inherits the heading path and the filing's identifiers (company, form type, period) as a prefix, which is the standalone-claim rule from the chunking lesson.",
+              "**Image path: render, patch-embed, retrieve pages.** Pages that fail the parse-quality gate are rendered and embedded as page images with a vision-language model producing patch vectors, indexed as a multi-vector index, and at answer time the retrieved page image goes to a vision model to read. Storage is the constraint: at 1,024 patch vectors per page and 128 dims, this corpus is 10,485.76 GB in float32 and 737.28 GB under 2-bit residual compression against centroids, so compression is a requirement rather than an optimization.",
+              "**Numeric correctness, since that is the stated bar.** Numbers are extracted with their keys and stored as structured metadata beside the chunk, not only as prose. At answer time each cited figure is checked back against the retrieved row (segment, year, measure, value) and an answer whose number does not match a retrieved record is blocked rather than shipped. Citations point at the page and the table row, so a reviewer can verify in one click.",
+              "**Evaluation, both halves.** A held-out set of 200 pages sampled across document types, hand-labeled for reading order, table-cell recovery and caption association, gates any parser or router change; a labeled query set gates retrieval. Keeping them separate is what lets you attribute a regression. Common wrong turn: buying a better embedding model or a reranker to fix numeric errors. Both operate downstream of the loss, so the metric moves a little and the wrong-year answers keep shipping.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-document-parsing-practice",
+            prompt:
+              "Read the field report below on a RAG product that answers well on wiki pages and badly on one customer's scanned manuals. Say where the loss is occurring and how you know, propose the architecture that fixes it, and name what you would measure before and after the change.",
+            thinkAbout: [
+              "Retrieval and generation metrics both look healthy on the failing corpus. Which stage do those metrics not cover?",
+              "What single experiment separates a parsing failure from a retrieval failure without changing the product?",
+              "The failing corpus is 6% of documents and 31% of complaints. What does that ratio argue for architecturally?",
+            ],
+            modelAnswerOutline: [
+              "**Where the loss is.** Upstream of every metric on the dashboard. The retrieval metrics are computed over the indexed text, so they score how well the system finds the text it stored, and the text it stored for Meridian's manuals is what the OCR and layout stage produced. Groundedness at 0.94 says the answers match the retrieved chunks faithfully, which is exactly what you would see when the chunks themselves are wrong: the model is grounded in bad evidence.",
+              "**How I know, in one experiment that touches no production code.** Take 50 pages from the failing corpus, hand-label reading order and table cells, and score the current extractor against them. Then take the same 50 pages, hand-transcribe them correctly, index the transcription in a shadow collection, and re-run the same failing queries. If the shadow index answers them, the retrieval and generation halves are fine and the loss is at parse. The 0.02% embedded-text-layer figure in the report already predicts the outcome, since it means essentially every page in that corpus is going through OCR and layout reconstruction rather than reading a text layer.",
+              "**The architecture.** Route by document type on a measured parse-quality score computed at ingestion (text layer present, characters inside detected columns, extracted text containing the page's own heading tokens). Documents that pass keep the current cheap path. Documents that fail, which is Meridian's whole corpus and the scanned exhibits elsewhere, go to a page-image path: render, patch-embed with a vision-language model, retrieve pages, and hand the page image to a vision model to read at answer time. Store the route and the score per document so it is inspectable and re-routable.",
+              "**Why not simply buy a better parser.** It is the cheaper first move and worth trying on the same 50-page harness, but the failure profile here is scanned pages with rotated multi-column layout and merged-cell tables, which is the case where the fork earns its cost. The report's own numbers make the fork affordable: 6% of documents means the multi-vector index is paid on 6% of the corpus, not on all of it, which is the whole argument for routing rather than converting everything.",
+              "**What I measure, before and after.** Before: parse quality on the 50-page labeled set (reading-order accuracy, table-cell recovery, caption association), plus retrieval failure and complaint rate split by corpus so the 31% is tracked separately from the aggregate. After: the same numbers on the same sets, plus index size and cost per document on the image path, and the share of documents routed each way. Reporting one corpus-wide number is how this got missed for a quarter: an aggregate that mixes a 6% slice into a healthy 94% moves too little to alarm anyone.",
+              "Common wrong turn: raising k, swapping the embedding model, or adding a reranker. Every one of those operates on text the parser produced, so each buys a small aggregate improvement and leaves the wrong-number answers intact, which is the expensive failure the customer is actually reporting.",
+            ],
+            supplied: {
+              label: "Field report: Meridian manuals",
+              body: `**Product.** A RAG assistant over each customer's own document set. Ingestion is one pipeline for everyone: PDF text extraction, 600-token chunks with 15% overlap, one embedding per chunk, hybrid retrieval, cross-encoder reranker, top-8 into the prompt.
+
+**The complaint.** Meridian Equipment reports that answers about their service manuals are "confidently wrong, especially torque specs and part numbers." Answers over their wiki pages are rated good. Meridian is 6% of indexed documents across the fleet and 31% of support complaints this quarter.
+
+**Corpus composition.**
+
+| Signal | Fleet average | Meridian |
+| --- | --- | --- |
+| Documents with an embedded text layer | 91% | 0.02% |
+| Pages with two or more text columns | 12% | 68% |
+| Pages containing at least one table | 19% | 74% |
+| Tables with merged cells or multi-row headers | 8% | 61% |
+| Pages arriving rotated 90 degrees | 0.1% | 9% |
+
+**Dashboards, last 30 days, Meridian traffic only.**
+
+| Signal | Value |
+| --- | --- |
+| Top-20 retrieval failure, labeled query set | 4.1% |
+| Reranker score of the top chunk, median | 0.81 |
+| Groundedness (answer supported by retrieved chunks) | 0.94 |
+| Citation validity (cited chunk was retrieved) | 0.99 |
+| Answers rated wrong by the customer's own reviewers | 22% |
+
+**Two sampled answers.** Asked for the torque spec on a pump housing bolt, the assistant answered "42 Nm" and cited a chunk reading "Pump housing 42 Nm 18 Nm Cover plate M8 M12 Nm Torque". Asked which part number supersedes 44-118, it answered with a number that appears in the same table two rows below the correct one.
+
+**Constraints.** No change to the customer-facing product this quarter. Infrastructure spend can rise if it is attributable to a customer.`,
+            },
+            rubric: [
+              {
+                name: "Which stage the loss is in",
+                weak: "Settles on the embedding model, the value of k, or the reranker, and proposes to tune one of them.",
+                adequate:
+                  "Places the loss in ingestion but does not say why healthy retrieval and groundedness numbers are consistent with it.",
+                strong:
+                  "Puts the loss upstream of every dashboard metric and reads groundedness 0.94 as the model faithfully repeating bad evidence rather than as a healthy signal.",
+              },
+              {
+                name: "Evidence that separates the halves",
+                weak: "Asserts a diagnosis with no experiment, or proposes to ship a change and watch the complaint rate.",
+                adequate:
+                  "Proposes labeling some pages but stops short of an experiment that isolates parsing from retrieval.",
+                strong:
+                  "Indexes a hand-transcribed sample in a shadow collection and re-runs the failing queries, and cites the 0.02% text-layer figure as the predictor of the result.",
+              },
+              {
+                name: "Architecture proposed",
+                weak: "Converts the whole fleet to a page-image pipeline, or replaces the parser without saying how a document is routed.",
+                adequate:
+                  "Proposes routing by document type but leaves the routing signal unmeasured, so the split rests on a hand-maintained list.",
+                strong:
+                  "Routes on a parse-quality score computed at ingestion, sends only the failing 6% down the page-image path, and stores the route and score per document.",
+              },
+              {
+                name: "Measurement before and after",
+                weak: "Names retrieval failure and the complaint rate only, both already on the dashboard and both already looking healthy.",
+                adequate:
+                  "Adds a parsing evaluation but reports results as one fleet-wide number that mixes Meridian into the other 94%.",
+                strong:
+                  "Holds a labeled page set scored on reading order, table-cell recovery and captions, and reports every number split by corpus alongside index size and cost per routed document.",
+              },
+            ],
+          },
+        },
+        {
+          id: "sd-l11-query-understanding",
+          title: "Query Rewriting, Decomposition and HyDE",
+          summary:
+            "The user's question is a poor search key. Rewriting, HyDE, and decomposition each fix that, and each costs latency, so the design is a router.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["rag", "query-understanding", "retrieval"],
+          teach: { markdown: queryUnderstandingTeach, estimatedMinutes: 14 },
+          apply: {
+            id: "sd-l11-query-understanding-apply",
+            prompt:
+              "Specify the query-understanding stage for a multi-turn support assistant where 40% of turns are follow-ups and 15% are compound questions, holding p95 retrieval latency under 400ms.",
+            thinkAbout: [
+              "Which techniques can be moved off the request path entirely, and what do you give up by moving them?",
+              "What does the classifier have to decide, and what happens on every path when it decides wrong?",
+              "Where does the latency for a compound question come from, and what would you trade to afford it?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: multi-turn chat over an internal knowledge base, 40% of turns are follow-ups that refer to earlier turns, 15% are compound questions needing evidence from more than one document, and the retrieval stage has a 400ms p95 budget ending at the first generated token. Baseline pipeline is embed 25ms, hybrid retrieve 70ms, rerank 100 to 8 at 145ms, assemble 20ms, so 260ms with 140ms of headroom.",
+              "**A classifier in front, and it is not a generation.** A small encoder-based classifier over the last three turns tags each turn standalone, follow-up, or compound, at roughly 12ms. It is trained on labeled traffic, and it emits a confidence; below threshold the turn takes the standalone path, because the cheap path degrades gracefully and the expensive paths do not.",
+              "**Follow-up path: conversational rewriting.** One short generation against the last three turns produces a standalone query, roughly 110ms, landing at 382ms. This is the highest-value single addition here: at 40% of turns, the current system is embedding fragments like 'and what about the second one' for two turns in five, and no reranker recovers a candidate set that never contained the answer.",
+              "**Compound path: decomposition, paid for rather than added.** Split into at most three sub-questions with one call (150ms), fan out the retrievals in parallel so the branches cost one retrieval of wall clock rather than three, merge and dedupe (30ms). At full rerank depth this lands at 452ms and misses the budget, so the branches rerank 40 candidates instead of 100, which returns 75ms and lands at 377ms. That trade is the answer: shallower reranking on each branch buys the extra evidence a compound question needs.",
+              "**HyDE goes to ingestion, not to the request.** A 340ms generation before retrieval puts the plain path at 612ms, so the synchronous version is out under this budget. The same effect is available at ingestion: generate three questions per chunk and index those vectors alongside the chunk, so the query-shaped side of the space is populated once instead of per request. Cost is one generation per chunk at ingestion and zero on the request path; the limitation is that it helps most where the query distribution is stable.",
+              "**Caching and eval.** Cache rewritten queries keyed on the conversation-tail hash so a repeated follow-up skips the rewrite, and cache the router's decision per turn. Evaluate the router itself as its own component (per-class precision and recall on labeled traffic), separately from retrieval quality, because a retrieval regression caused by a router regression is otherwise indistinguishable from a retrieval regression. Common wrong turn: applying rewriting, HyDE and decomposition to every query. It reads as thorough, triples the latency, and on the measured comparisons multi-query expansion applied indiscriminately underperformed the plain baseline.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-query-understanding-practice",
+            prompt:
+              "Using the query log sample and constraints below, specify the query-understanding stage for a legal research tool where a single question routinely needs evidence from three unrelated documents and a missed clause is worse than a slow answer.",
+            thinkAbout: [
+              "This budget inverts the support assistant's. Which techniques become affordable, and which are still not worth their cost?",
+              "The queries in the log are long, formal, and already document-shaped. What does that do to the case for HyDE?",
+              "A missed clause is the expensive failure. Where in the pipeline do you spend to reduce misses rather than to improve ordering?",
+            ],
+            modelAnswerOutline: [
+              "**Read the budget first, because it inverts the usual design.** 8 seconds of p95 against a 260ms baseline is roughly thirty times the headroom of an interactive assistant, and the stated failure cost is a missed clause rather than a slow answer. That makes recall the objective function and latency a loose constraint, which flips almost every default in the lesson.",
+              "**Decomposition becomes the default path, not a routed exception.** The log shows compound questions are the norm rather than the 15% case: item 3 asks about assignment, change of control, and governing law in one sentence, and no single clause answers it. I decompose aggressively (up to 5 sub-questions), fan out in parallel, and rerank deeply per branch (top 200 to 20) because there is budget for it. The measured warning that decomposition can degrade ranking precision on multi-hop benchmarks is about precision, and precision is the metric I am deliberately trading away.",
+              "**HyDE earns its 340ms here and would still not be my first spend.** The queries in the log are already long, formal and declarative in register, which is most of the gap HyDE exists to close, so its expected gain on this distribution is smaller than on short conversational queries. I would run it as a second pass gated on a thin first pass (fewer than N candidates above a score floor) rather than on every query, and I would A/B it on the labeled clause set rather than assume the published gain transfers.",
+              "**Where I actually spend for recall.** Union rather than choose: run the original query, the rewritten query, and each sub-question, and take the union of candidates before a single deep rerank over the merged set. Raise first-stage k substantially, since a missed clause at first stage is unrecoverable and a wide candidate set is exactly what an 8-second budget buys. Keep the sparse half weighted for defined terms and section numbers, which the log shows are common and which dense retrieval smears.",
+              "**Abstention and coverage reporting, because a missed clause has to be visible.** The answer reports which sub-questions found supporting evidence and which did not, rather than silently synthesizing over a partial set. A sub-question with no candidate above the score floor produces an explicit gap in the output. This is the difference between a tool a lawyer can rely on and one that is confidently incomplete, and it costs nothing but design.",
+              "**Evaluation:** a labeled set of questions with every clause that should have been retrieved, scored on recall at the final k rather than on nDCG, plus a per-sub-question coverage metric. Common wrong turn: importing the interactive assistant's router wholesale, which optimizes away the fan-out that this product exists to perform.",
+            ],
+            supplied: {
+              label: "Query log sample and constraints",
+              body: `**Product.** A research tool over 4M litigation and contract documents. Current query path: embed the question, hybrid retrieve, cross-encoder rerank top 100 to 8, assemble, generate. No rewriting, no decomposition, no routing.
+
+**Sampled queries, drawn at random from one week of traffic.**
+
+1. "Does the indemnity in the Kestrel MSA survive termination, and is it capped?"
+2. "Find every agreement where we granted exclusivity in the EU after 2023."
+3. "What are the assignment, change of control, and governing law provisions in the Voss acquisition documents?"
+4. "Is the non-compete in Schedule 4 enforceable in California?"
+5. "and in Texas?"
+6. "Which of our supplier contracts lack a force majeure clause covering epidemics?"
+7. "Summarize the differences between the 2022 and 2024 versions of the standard NDA."
+8. "What did the court hold in Brennan v. Aldridge about consequential damages?"
+
+**Measured traffic characteristics, last 30 days.**
+
+| Signal | Value |
+| --- | --- |
+| Median query length | 19 tokens |
+| Queries containing a defined term or section number | 61% |
+| Queries whose answer requires clauses from 2 or more documents | 54% |
+| Turns that are fragments referring to an earlier turn | 22% |
+| Recall at final k on a labeled clause set (200 questions) | 0.62 |
+| Retrieval p95 today | 260ms |
+
+**Constraints.** Product p95 budget for retrieval is 8 seconds; users expect research to take time and a progress indicator is already in the UI. Ingestion runs nightly and has spare capacity. A reviewer signs off on every answer, and reviewers report that the expensive failure is a clause the tool never surfaced, not a slow response.`,
+            },
+            rubric: [
+              {
+                name: "Reading the budget",
+                weak: "Carries over an interactive latency posture and rules out techniques on cost, without engaging the 8 second figure.",
+                adequate:
+                  "Notes that the budget is generous but does not change which techniques are default versus routed as a result.",
+                strong:
+                  "Treats recall as the objective and latency as a loose constraint, and says which defaults from the interactive case are inverted by the 8 second budget.",
+              },
+              {
+                name: "Fit to this query distribution",
+                weak: "Proposes the same technique stack it would propose for any product, with no reference to the sampled queries.",
+                adequate:
+                  "Observes that queries are long and formal but draws no consequence for the expected value of HyDE here.",
+                strong:
+                  "Uses the 19-token median, the 61% carrying defined terms, and the 54% spanning documents to argue technique by technique, including a reduced expected gain for HyDE.",
+              },
+              {
+                name: "Spending for recall",
+                weak: "Improves ordering (a better reranker, a different fusion) and leaves first-stage candidate generation as it is.",
+                adequate:
+                  "Raises k or unions a rewritten query in, but does not connect it to a miss at first stage being unrecoverable downstream.",
+                strong:
+                  "Unions original, rewritten and decomposed queries into one deep rerank, raises first-stage k, and keeps sparse weight for section numbers and defined terms.",
+              },
+              {
+                name: "Making a miss visible",
+                weak: "Returns a synthesized answer whether or not every sub-question found evidence, so a gap looks identical to a covered question.",
+                adequate:
+                  "Mentions abstention in general terms without saying what the output shows per sub-question.",
+                strong:
+                  "Reports per-sub-question coverage and emits an explicit gap when no candidate clears the score floor, and evaluates on recall against a labeled clause set rather than on ranking quality.",
+              },
+            ],
+          },
+        },
+        {
+          id: "sd-l11-late-interaction",
+          title: "Late Interaction and Multi-Vector Retrieval",
+          summary:
+            "One vector per token, scored by MaxSim, recovers the rare term a pooled vector averages away. The bill is storage, and compression mostly pays it.",
+          estimatedMinutes: 40,
+          difficulty: "hard",
+          skills: ["retrieval", "late-interaction", "colbert"],
+          teach: { markdown: lateInteractionTeach, estimatedMinutes: 15 },
+          apply: {
+            id: "sd-l11-late-interaction-apply",
+            prompt:
+              "Propose a retrieval service for a 10M-passage technical documentation corpus where queries are full of exact identifiers, recall@10 must clear 0.95, and the reranking stage is capped at 80ms p95.",
+            thinkAbout: [
+              "Which stage is responsible for a recall number, and which stage cannot improve it however good it is?",
+              "What does the index cost at one vector per token, and what does compression do to that figure?",
+              "What can a cross-encoder do inside an 80ms cap, and at what candidate depth?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 10M passages averaging 120 tokens, queries carrying error codes, API symbols and version strings, recall@10 above 0.95 measured on a labeled query set, and an 80ms p95 cap on the reranking stage specifically. Raw arithmetic first: a single-vector index at 1,024 dims is 10,000,000 x 4,096 = 40.96 GB, and one vector per token at 128 dims in float16 is 1,200,000,000 x 256 = 307.2 GB.",
+              "**Recall is a first-stage property, so spend there.** A reranker can only reorder what it is given, so recall@10 above 0.95 is won or lost in candidate generation. I run hybrid first-stage retrieval, dense plus BM25, unioned, at a candidate depth tuned on the labeled set rather than guessed. The sparse half is not optional on this corpus: exact identifiers are the query distribution.",
+              "**Late interaction as the reranking stage, because of the 80ms cap.** A cross-encoder is a transformer forward pass per query-document pair, so inside 80ms it reaches a shallow candidate depth. MaxSim over precomputed token vectors is arithmetic over stored data, so the same budget reaches a much deeper list. Deeper reranking on a corpus whose failures are rare-term misses is worth more than a sharper score over a shorter list.",
+              "**Making the index affordable.** Store each token vector as a centroid id plus a 2-bit residual: 128 x 2 bits = 32 bytes plus a 4-byte centroid id is 36 bytes, so 1,200,000,000 x 36 = 43.2 GB, which is 7.1x smaller than the uncompressed 307.2 GB and about 1.05x the single-vector index it sits beside. Query time uses centroid-bag scoring first and decompresses residuals only for survivors, which is the same coarse-quantizer-then-refine shape as IVF from the ANN lesson.",
+              "**Serving and knobs.** Shard by document id with scatter-gather and a merge, replicate for throughput. The dials are first-stage candidate depth, the number of centroids probed in the centroid-bag stage, and how many survivors get full MaxSim. Tune them against recall@10 on the labeled set, then fix the ones that hold the 80ms cap. Track recall and p95 together, since every dial here trades one for the other.",
+              "**Where I would not use it.** If the labeled set shows first-stage recall already above 0.98 and the failures are ordering failures, a cross-encoder over the top 100 is the cheaper and better answer and the multi-vector index is unjustified. Common wrong turn: adopting late interaction for the storage-agnostic reason that it benchmarks well, then discovering at rollout that the uncompressed index is 307.2 GB and that nobody costed compression as a requirement rather than an optimization.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-late-interaction-practice",
+            prompt:
+              "Read the pipeline card below and decide whether to replace the cross-encoder reranker with a late-interaction index. Defend the decision on storage, recall, and latency together, and say what evidence would reverse it.",
+            thinkAbout: [
+              "Which of the two reported failure classes can a reranker fix, and which one is decided before it runs?",
+              "What does the multi-vector index cost on this corpus, compressed and uncompressed, and against which baseline?",
+              "What experiment separates a ranking problem from a candidate-generation problem without shipping anything?",
+            ],
+            modelAnswerOutline: [
+              "**The decision turns on which failure dominates, and the card reports both.** Recall@100 at first stage is 0.981 and recall@10 after reranking is 0.943, so about 3.8 points of the loss happens between the candidate list and the final ten, and roughly 1.9 points were never in the candidate list at all. That split says the reranker is the larger loss and a stronger reranker is the on-target intervention, which is the case for late interaction here rather than against it.",
+              "**Storage, computed against the right baseline.** 40M passages at 90 tokens is 3.6 billion token vectors. At 128 dims in float16 that is 3,600,000,000 x 256 = 921.6 GB, which is not fundable against the current 4.9 TB of RAM budget conversation. Under 2-bit residual compression plus a 4-byte centroid id, 3,600,000,000 x 36 = 129.6 GB, against a current single-vector index of 40,000,000 x 3,072 = 122.88 GB at 768 dims. That is 1.05x the index they already run, and it is the number the decision should be made on.",
+              "**Latency is where it actually wins.** The card shows the cross-encoder at 210ms p95 for 100 candidates and a product budget of 250ms for the whole retrieval stage, which is why candidate depth is pinned at 100 and cannot rise. MaxSim over precomputed vectors is arithmetic rather than a forward pass per pair, so the same budget reranks a far deeper list. Deeper reranking is what converts first-stage recall@100 of 0.981 into a better recall@10 than 0.943.",
+              "**My decision: replace it, with the compressed index and a staged rollout.** Build the multi-vector index beside the live one, run both rerankers on shadow traffic, and compare recall@10 on the labeled 5,000-query set and p95 at matched candidate depth. Flip only when the shadow numbers clear the current ones. Keep the cross-encoder deployable behind a flag, since the failure mode of a new index is a quality regression that a rollback has to be able to undo in minutes.",
+              "**What would reverse the decision.** If the shadow run shows the gain concentrated in queries carrying exact identifiers and those are a small share of traffic, the cheaper fix is to reweight the sparse half of the existing hybrid and keep the cross-encoder. If compression measurably costs recall on this corpus (the 2-bit scheme is not free everywhere), the uncompressed 921.6 GB is not fundable and the answer becomes no. And if a rerun of the recall split shows first-stage misses dominating instead, the money belongs in candidate generation, where no reranker of any kind can help.",
+              "Common wrong turn: arguing the case on the benchmark standings of late interaction. The pipeline card contains the two numbers that decide it, and neither of them is a leaderboard position.",
+            ],
+            supplied: {
+              label: "Pipeline card: docs search, current state",
+              body: `**Corpus.** 40M passages of product documentation, API references and support tickets, averaging 90 tokens. Queries carry error codes, API symbols and version strings at high rates.
+
+**Current pipeline.** Hybrid first stage (dense HNSW over 768-dim embeddings, unioned with BM25), top 100 candidates, cross-encoder reranker, top 10 into the prompt.
+
+**Measured, last 30 days, on a labeled set of 5,000 queries.**
+
+| Signal | Value |
+| --- | --- |
+| Recall@100, first stage, before reranking | 0.981 |
+| Recall@10, after reranking | 0.943 |
+| Recall@10 target agreed with the product team | 0.970 |
+| Cross-encoder p95, 100 candidates | 210ms |
+| Full retrieval stage p95 | 244ms |
+| Product budget for the retrieval stage | 250ms |
+| Queries containing at least one exact identifier | 58% |
+| Recall@10 on the identifier-bearing subset | 0.901 |
+| Recall@10 on the remaining queries | 0.999 |
+
+**Infrastructure.** The single-vector index is 122.88 GB and is replicated three times across the serving fleet. Finance has approved index growth up to roughly 1.5x the current footprint without a new review; anything larger goes to a capacity committee that meets quarterly.
+
+**Constraints.** No change to the 250ms retrieval budget. A rollback path is required for any index change. The team has one engineer for six weeks.`,
+            },
+            rubric: [
+              {
+                name: "Which failure dominates",
+                weak: "Argues from the general standing of late interaction on benchmarks without using the two recall numbers on the card.",
+                adequate:
+                  "Notes that recall@10 is below target but does not separate the loss at first stage from the loss at reranking.",
+                strong:
+                  "Splits the loss using recall@100 of 0.981 against recall@10 of 0.943, and concludes that reranking is the larger of the two losses.",
+              },
+              {
+                name: "Storage arithmetic and baseline",
+                weak: "Cites a multiplier such as 50x or 100x with no computation and no statement of what it is a multiple of.",
+                adequate:
+                  "Computes the uncompressed multi-vector index but omits the compressed figure or the index it is being compared against.",
+                strong:
+                  "Computes 3.6 billion token vectors at both 256 and 36 bytes, and compares 129.6 GB against the 122.88 GB index already running.",
+              },
+              {
+                name: "Why latency favors the change",
+                weak: "Treats late interaction as simply faster, or does not mention the 250ms budget at all.",
+                adequate:
+                  "Notes the 210ms cross-encoder cost but does not connect it to candidate depth being pinned at 100.",
+                strong:
+                  "Contrasts a forward pass per pair with arithmetic over precomputed vectors, and says the win is depth reached inside the same budget rather than raw speed.",
+              },
+              {
+                name: "Rollout and what would reverse it",
+                weak: "Commits to the change with no shadow comparison, or leaves no path back once the new index is serving.",
+                adequate:
+                  "Proposes a shadow run but states no condition under which the answer flips to no.",
+                strong:
+                  "Runs both rerankers on shadow traffic against the 5,000-query set, keeps the cross-encoder behind a flag, and names the results that would reverse the decision.",
+              },
+            ],
+          },
+        },
+        {
+          id: "sd-l11-graph-retrieval",
+          title: "GraphRAG and the Global Question Problem",
+          summary:
+            "Some answers are a property of the corpus, not of any chunk in it. That is what a graph index buys, and LazyGraphRAG is what makes it affordable.",
+          estimatedMinutes: 40,
+          difficulty: "hard",
+          skills: ["rag", "graphrag", "retrieval"],
+          teach: { markdown: graphRetrievalTeach, estimatedMinutes: 15 },
+          apply: {
+            id: "sd-l11-graph-retrieval-apply",
+            prompt:
+              "Plan the retrieval system for five years of company incident postmortems that answers both 'what caused the March outage' and 'what are our recurring failure themes', on an indexing budget of $500 per full rebuild.",
+            thinkAbout: [
+              "Which of those two questions has its answer inside a passage, and what follows for the index each one needs?",
+              "Where does an indexing bill come from in a graph pipeline, and which stages can be deferred?",
+              "How does a query reach the right path, and which misrouting is the expensive one?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: five years of postmortems, roughly 6,000 documents at 4,000 tokens, so about 24M tokens and 40,000 chunks at 600 tokens. Traffic is overwhelmingly local (find the incident, find the runbook) with a small, high-value stream of global questions from engineering leadership. Budget is $500 per full rebuild, and rebuilds happen when the corpus or the extraction prompt changes.",
+              "**Two indexes, one router.** The hybrid pipeline from the RAG architecture lesson stays exactly as it is and serves the local majority: chunk, embed, hybrid retrieve, rerank, ACL filter, generate with citations. Beside it sits a graph index for global questions. They share ingestion (the same parsed, chunked text feeds both) and they share ACL metadata, which matters because a community summary can otherwise leak the contents of documents the asker may not read.",
+              "**Build the graph the cheap way first.** Full GraphRAG extraction is one LLM call per chunk plus one per community. On 40,000 chunks at 1,000 input and 500 output tokens each, that is 40M input and 20M output tokens before any summarization, which at ordinary rates is the whole budget on the first stage alone. So I build the LazyGraphRAG shape: noun-phrase extraction and co-occurrence to construct the graph, Leiden run recursively to produce the community hierarchy, and no summaries generated until a query asks for them. Indexing cost lands at roughly the embedding cost of the vector index, well inside $500.",
+              "**Query paths.** Local questions go to hybrid retrieval, unchanged. Global questions trigger a map-reduce: choose a community level, generate or reuse summaries for the communities at that level, answer in parallel, reduce to one answer with citations back to constituent reports. Cache generated community summaries keyed by (community id, graph version) so the second global question is much cheaper than the first, and invalidate on rebuild.",
+              "**Routing and the failure that matters.** A small classifier tags each question local or global on cheap signals: does it name a specific entity or date, does it ask for a count, a trend, a theme or a comparison across the corpus. Route to local on low confidence, because the expensive failure is the other direction: a global question answered from eight documents out of six thousand returns a fluent, confident, unsupported summary, and nothing in the output distinguishes it from a good answer. The global path therefore reports coverage (how many communities contributed) alongside the answer.",
+              "**Cost controls and eval.** Cap global queries per user per day, since each one is a map-reduce; meter them separately in the LLM budget so they are visible. Evaluate the two paths separately: the local path on the RAG triad against a labeled set, the global path on whether the themes it names are supported by the reports it cites and whether it misses themes a human analyst found. Common wrong turn: building full GraphRAG because it is the named technique, blowing the indexing budget on extraction, and discovering that 97 percent of traffic was local and never needed the graph.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-graph-retrieval-practice",
+            prompt:
+              "Read the pilot cost review below and rework the design so the global-question capability survives at roughly vector-RAG indexing cost. State what you give up, and what you would put in front of the finance team as the new numbers.",
+            thinkAbout: [
+              "Which indexing stages produce the bill, and which of them is needed before a query has been asked?",
+              "The pilot's own usage numbers are in the review. What do they say about how much of the index was ever read?",
+              "What gets worse under your redesign, and who notices first?",
+            ],
+            modelAnswerOutline: [
+              "**Where the $41,000 comes from, stage by stage.** Two LLM stages, both at indexing: entity and relation extraction at one call per chunk over 380,000 chunks, and community summarization at one call per community over 26,400 communities. The review's own breakdown puts extraction at the overwhelming share. Neither stage answers a question; both produce material that is only read when a query happens to touch it.",
+              "**The usage numbers are the argument.** 1,900 global queries in the pilot quarter against 26,400 pre-generated community summaries, with the review reporting that 71% of summaries were never read once. That is the definition of work done too early. The pilot paid to summarize the entire corpus at every level of the hierarchy on the chance that a query would need each piece.",
+              "**The redesign: build the graph without an LLM, defer every generation to query time.** Extract concepts and co-occurrences with noun-phrase extraction rather than an LLM pass, build the graph from those, and run Leiden recursively exactly as before to get the same community hierarchy. Generate no summaries at indexing. When a global query arrives, refine it, judge which communities are relevant, generate summaries for those on demand, and map-reduce over them. Microsoft reports this shape at indexing cost identical to vector RAG and 0.1% of full GraphRAG's, which is the claim I would be putting my name behind and would validate on a sample before committing.",
+              "**Cache, because the second query should not pay the first one's price.** Community summaries generated at query time are cached keyed on (community id, graph version) and invalidated on rebuild. With 1,900 queries a quarter concentrated on a minority of communities, the steady-state cost approaches a small fraction of full pre-generation while keeping latency acceptable after warmup.",
+              "**What I give up, stated plainly.** First-touch latency on a global query rises, because summaries are generated in the request rather than read. Answers may vary slightly between runs where full GraphRAG's frozen summaries were stable, which matters if leadership quotes them. And the co-occurrence graph is less semantically precise than an LLM-extracted one, so relation quality drops; I would measure that on a labeled set of global questions rather than assume it is acceptable.",
+              "**Numbers for the finance conversation.** Indexing falls from $41,000 per rebuild to roughly the embedding cost of the corpus, which the review already gives as $1,850, plus a query-time line that scales with global usage instead of with corpus size. That reframes the ask: the recurring, corpus-sized bill becomes a metered, usage-sized one that caps naturally, and it is the shape finance rejected the pilot for lacking. Common wrong turn: keeping full extraction and cutting the community hierarchy to one level. That saves the smaller of the two stages and degrades the capability that justified the project.",
+            ],
+            supplied: {
+              label: "Pilot cost review: GraphRAG on postmortems",
+              body: `**Pilot.** A GraphRAG index over 12 years of engineering postmortems and incident tickets, built to answer questions leadership could not previously ask, such as "what failure classes are growing" and "which teams keep appearing in the same incidents together".
+
+**Corpus and index.**
+
+| Signal | Value |
+| --- | --- |
+| Source documents | 47,000 |
+| Chunks at 600 tokens | 380,000 |
+| Entities after merge | 214,000 |
+| Communities across all hierarchy levels | 26,400 |
+| Community summaries pre-generated | 26,400 |
+
+**Indexing spend, one full build.**
+
+| Stage | Cost |
+| --- | --- |
+| Entity and relation extraction, one call per chunk | $34,200 |
+| Community summarization, one call per community | $6,800 |
+| Embeddings for the co-located vector index | $1,850 |
+| Total per full rebuild | $42,850 |
+
+**Usage, pilot quarter.**
+
+| Signal | Value |
+| --- | --- |
+| Global queries served | 1,900 |
+| Local queries served through the existing hybrid pipeline | 412,000 |
+| Community summaries never read during the quarter | 71% |
+| Median global query latency | 11s |
+| Rebuilds required (prompt revisions and corpus growth) | 3 |
+
+**Finance decision.** The committee approved the pilot and declined the production budget, noting that the indexing line scales with corpus size rather than with usage and recurs on every rebuild. They asked for a proposal where the recurring cost tracks how much the capability is used. The capability itself was rated valuable by every leadership user surveyed.`,
+            },
+            rubric: [
+              {
+                name: "Which stage produces the bill",
+                weak: "Proposes to shrink the corpus, cut the hierarchy, or negotiate rates without separating the two indexing-time LLM stages.",
+                adequate:
+                  "Names extraction and summarization as the costs but does not say which of them is needed before a query exists.",
+                strong:
+                  "Identifies both stages as work done in advance of any query, and uses the $34,200 extraction line as the dominant term.",
+              },
+              {
+                name: "Use of the pilot's own usage data",
+                weak: "Argues from the technique in general and never cites a number from the usage table.",
+                adequate:
+                  "Mentions that global queries were rare relative to local ones without connecting it to what was pre-generated.",
+                strong:
+                  "Sets 1,900 global queries against 26,400 pre-generated summaries and the 71% never read, and calls that work performed too early.",
+              },
+              {
+                name: "The redesign and its caching",
+                weak: "Removes the graph, or keeps summaries pre-generated and hopes a smaller hierarchy is enough.",
+                adequate:
+                  "Defers summary generation to query time but leaves every query paying full price, so cost tracks usage badly.",
+                strong:
+                  "Builds the graph from noun-phrase co-occurrence with Leiden unchanged, defers generation, and caches summaries keyed on community and graph version.",
+              },
+              {
+                name: "What is given up",
+                weak: "Presents the redesign as strictly better, with no cost named on latency, stability, or relation quality.",
+                adequate:
+                  "Concedes that first queries get slower but does not raise answer variability or the weaker co-occurrence graph.",
+                strong:
+                  "Names higher first-touch latency, answers that can vary between runs where frozen summaries were stable, and lower relation precision to be measured rather than assumed.",
+              },
+            ],
+          },
+        },
+        {
+          id: "sd-l11-embedding-lifecycle",
+          title: "Embedding Lifecycle: Reindexing and Compression",
+          summary:
+            "Two models' vectors are incomparable, so an upgrade is a blue-green rebuild. Matryoshka prefixes and binary quantization are what pay for it.",
+          estimatedMinutes: 40,
+          difficulty: "hard",
+          skills: ["vector-db", "embeddings", "migration"],
+          teach: { markdown: embeddingLifecycleTeach, estimatedMinutes: 15 },
+          apply: {
+            id: "sd-l11-embedding-lifecycle-apply",
+            prompt:
+              "Write the migration plan that moves a 300M-chunk index from a 1536-dimension embedding model to a new one with no search downtime and a rollback path that survives discovering the regression a week after cutover.",
+            thinkAbout: [
+              "Why can the two indexes not serve one query between them during the backfill?",
+              "Which comes first, dual-writing or backfilling, and what breaks if you get the order wrong?",
+              "What evidence would justify the flip, and what evidence would justify flipping back?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 300M chunks, a 1536-dimension incumbent model, a candidate replacement, continuous ingestion of new and edited documents, and a search product with no maintenance window. Re-embedding 300M chunks is days of throughput-bound work, so the plan has to be correct while running for days.",
+              "**Why this is a rebuild and not an upgrade.** The two models produce different spaces, so a similarity between a vector from one and a vector from the other is meaningless rather than degraded. That rules out serving one query from both indexes, ruling out any incremental cutover at the query level, which is what forces the blue-green shape: whole-index switchover, never a blend.",
+              "**The state machine.** Build index B empty with the new model's dimension. Start dual-writing every insert, update and delete to A and B before any backfill begins, because a multi-day backfill that starts first leaves B stale in exactly the documents that changed most. Backfill from the source of truth in stable id order with a checkpoint, so a failed worker resumes rather than restarts. Reads continue from A throughout, via an alias the application resolves rather than a hardcoded index name.",
+              "**Validation before the flip, on our corpus.** A labeled query set of a few thousand real queries with judged relevant documents, run against A and B at the same k, compared on recall and the ranking metric we gate on, reported per slice (document type, query length, identifier-bearing versus prose) as well as overall. The pass criterion is written down before the run. A benchmark score for the new model is not evidence here, because the benchmark's corpus is not ours.",
+              "**Flip and retain.** The flip is an alias update, which is a metadata change and reversible in seconds. Dual-writing continues after the flip, which is what makes the rollback path survive the week: at day seven, A is still current, so flipping back is another alias update rather than a rebuild. Retire A only after a defined soak (a full business cycle, so weekly and monthly query patterns are represented), and take a snapshot before deleting anything.",
+              "**Cost control and the version field.** Embedding 300M chunks is the dominant cost, so batch aggressively, use the ingestion path's idle capacity, and checkpoint so a failure does not repay work. Every record in both indexes carries the model id and dimension, and the query path asserts on it; without that field a partially backfilled index is indistinguishable from a complete one. Common wrong turn: backfilling first and dual-writing second, which produces an index that passes a spot check, fails silently on active documents, and is discovered after the alias has already moved.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-embedding-lifecycle-practice",
+            prompt:
+              "Read the index cost card below and cut the resident memory bill by at least 8x without dropping recall@20 below its current 0.947. Say how you would prove the recall claim before the cutover, not after.",
+            thinkAbout: [
+              "Which lever cuts dimensions and which cuts bit width, and what do you get when you apply both?",
+              "If the small vectors answer the search, what still has to be reachable, and where can it live?",
+              "The card gives a recall floor rather than a target. What does that change about the order of your experiments?",
+            ],
+            modelAnswerOutline: [
+              "**Today's bill, computed.** 200M vectors at 1,024 dimensions in float32 is 200,000,000 x 4,096 = 819.2 GB resident, and at the card's $4.50 per GB-month that is $3,686.40. An 8x cut means landing at or under 102.4 GB, which is $460.80.",
+              "**Two independent levers, and the cheaper one first.** int8 quantization alone is exactly 4x, taking the index to 204.8 GB, which misses the target. Binary quantization is 32x, taking it to 25.6 GB and $115.20, which clears the 8x requirement with a wide margin. Matryoshka truncation is the other lever and cuts dimensions rather than bit width; the card says the model is MRL-trained, so 1,024 to 256 dimensions is a slice rather than a re-embed and multiplies with whichever quantization I choose.",
+              "**What I would actually ship: binary resident, full precision reachable, rescoring on.** The binary index answers the search at 25.6 GB. Full-precision or int8 vectors move to disk or object storage, where they are read only for the shortlist: at top_k 20 and a rescore multiplier of 4, that is 80 reads per query rather than a scan. Reported retention is roughly 92.5 percent for binary alone and about 96 percent with rescoring, and int8 with 4x rescoring reaches around 99 percent, so rescoring is the mechanism that makes the aggressive memory cut compatible with a recall floor.",
+              "**Order of experiments, driven by the floor.** A floor rather than a target means I need the configuration with the most headroom that still meets it, not the smallest index I can build. So I sweep in order of increasing aggression on the labeled 3,000-query set: int8 with rescoring, binary with rescoring at multipliers of 2, 4 and 8, then MRL-256 plus binary with rescoring. I stop at the first configuration that clears 0.947 with margin, rather than taking the 256x row because the arithmetic is impressive.",
+              "**Proving it before the cutover.** Build the quantized index beside the live one and run the labeled set against both at the same k, reporting recall@20 overall and per slice. Then shadow production traffic through the new index without serving its results, and compare the top-20 sets against the live index on real queries, which catches distribution effects a curated labeled set misses. Cut over by alias only after both agree, keep the float index warm for a defined soak, and hold the rollback as an alias flip.",
+              "**What I would tell the team not to do.** Do not quote the MRL truncation quality from the paper: the published figure is on its own benchmark, and the dimension to truncate to is an experiment on our corpus. And do not delete the full-precision vectors after the cutover, because they are what the rescoring pass reads and what a future migration re-quantizes from. Common wrong turn: taking binary at 32x with no rescoring pass, watching recall fall below the floor, and concluding that quantization does not work here.",
+            ],
+            supplied: {
+              label: "Index cost card: search platform",
+              body: `**Index.** 200M chunk embeddings serving product search and an internal RAG assistant. One HNSW index, float32, replicated three times across the serving fleet.
+
+**Configuration.**
+
+| Property | Value |
+| --- | --- |
+| Vectors | 200,000,000 |
+| Dimensions | 1,024 |
+| Storage type | float32 |
+| Embedding model | current generation, trained with Matryoshka representation learning |
+| Index family | HNSW, in memory |
+| Replicas | 3 |
+
+**Cost.**
+
+| Line | Value |
+| --- | --- |
+| Resident index size, one replica | 819.2 GB |
+| Blended RAM price used by finance | $4.50 per GB-month |
+| Monthly cost, one replica | $3,686.40 |
+| Share of the AI infrastructure budget | 41% |
+
+**Quality, measured on a labeled set of 3,000 queries with judged relevant documents.**
+
+| Signal | Value |
+| --- | --- |
+| Recall@20 | 0.947 |
+| Recall@100 | 0.982 |
+| Query p95 | 22ms |
+
+**Constraints.** Finance has asked for at least an 8x reduction in the resident memory line before the next budget cycle. Product will not accept recall@20 below its current value. Object storage and local NVMe are both available and are charged at a small fraction of the RAM rate. A rollback path is required. The labeled query set is refreshed quarterly and is considered representative by the search team.`,
+            },
+            rubric: [
+              {
+                name: "Arithmetic on the two levers",
+                weak: "Names quantization or truncation without computing bytes per vector or the resulting index size.",
+                adequate:
+                  "Computes one configuration correctly but does not show that dimension cuts and bit-width cuts multiply.",
+                strong:
+                  "Computes 819.2 GB today, rules out int8 alone at 204.8 GB against the 102.4 GB bar, and lands binary at 25.6 GB while noting MRL truncation composes with it.",
+              },
+              {
+                name: "What stays reachable for rescoring",
+                weak: "Replaces the float vectors with quantized ones and keeps nothing that a second pass could score against.",
+                adequate:
+                  "Mentions rescoring but does not say where the full-precision vectors live or how many are read per query.",
+                strong:
+                  "Keeps binary resident and full precision on disk or object storage, and quantifies the second pass as reading a shortlist of 80 rather than the corpus.",
+              },
+              {
+                name: "Reading the floor rather than a target",
+                weak: "Takes the most aggressive configuration available because its compression number is the largest.",
+                adequate:
+                  "Acknowledges the recall floor but proposes a single configuration rather than an ordered sweep against it.",
+                strong:
+                  "Sweeps configurations in increasing aggression and stops at the first that clears 0.947 with margin, treating headroom as the thing being bought.",
+              },
+              {
+                name: "Proving recall before the cutover",
+                weak: "Ships the change and watches production recall or user complaints afterward.",
+                adequate:
+                  "Runs the labeled 3,000-query set against the new index but reports one aggregate number and no shadow comparison.",
+                strong:
+                  "Runs the labeled set per slice against both indexes and shadows live traffic comparing top-20 sets, then cuts over by alias with the float index kept warm.",
+              },
             ],
           },
         },
