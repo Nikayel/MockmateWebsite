@@ -42,6 +42,7 @@ import {
 } from "lucide-react"
 import { SpendHealthPanel } from "./_components/SpendHealthPanel"
 import { getProviderCostInfo, AI_BUDGET_CAPS } from "@/lib/pricing"
+import { usageServiceLabel, UNATTRIBUTED_SERVICE } from "@/lib/usage/services"
 import { logger } from "@/lib/logger"
 
 // Types
@@ -159,6 +160,12 @@ interface AIUsageData {
     embeddings: { requests: number; cost: number; tokens: number; characterCount: number }
   }
   providers?: Record<string, { requests: number; cost: number; tokens: number }>
+  /**
+   * Spend per product surface, keyed by the ids in lib/usage/services.ts. The
+   * read-side "unattributed" bucket also appears here, for rows written before
+   * the service field existed.
+   */
+  byServiceId?: Record<string, { requests: number; tokens: number; cost: number }>
   granular?: {
     byPattern: Record<string, PatternUsage>
     byDifficulty: Record<string, { requests: number; tokens: number; cost: number }>
@@ -585,6 +592,12 @@ export default function AIUsagePage() {
     (message): message is string => Boolean(message)
   )
 
+  // Costliest surface first: this panel exists to answer "what is burning the
+  // money", and that answer is the top row.
+  const serviceSpend = Object.entries(aiUsage?.byServiceId ?? {})
+    .map(([id, totals]) => ({ id, ...totals }))
+    .sort((a, b) => b.cost - a.cost)
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -744,13 +757,64 @@ export default function AIUsagePage() {
                 <SpendHealthPanel health={aiUsage.health} coverage={aiUsage.coverage} />
               )}
 
+              {/* Which product surface spent the money. The llm/voice/embeddings
+                  split below is too coarse to act on: it cannot tell the five
+                  LLM calls behind one feedback request apart from each other. */}
+              {serviceSpend.length > 0 && (
+                <Card className="border-gray-800 bg-gray-900/50">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg text-white">
+                      <Target className="h-5 w-5 text-[#c4703f]" />
+                      Cost by product service
+                    </CardTitle>
+                    <CardDescription className="text-gray-400">
+                      This month, costliest surface first
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {serviceSpend.map((service) => (
+                        <div
+                          key={service.id}
+                          className="flex items-center justify-between gap-4 rounded bg-gray-800/30 p-2"
+                        >
+                          <span className="min-w-0 truncate text-sm text-white">
+                            {usageServiceLabel(service.id)}
+                          </span>
+                          <div className="flex shrink-0 items-center gap-4">
+                            <span className="w-20 text-right text-xs text-gray-400">
+                              {service.requests.toLocaleString()} calls
+                            </span>
+                            <span className="w-16 text-right text-xs text-gray-400">
+                              {formatTokens(service.tokens || 0)}
+                            </span>
+                            <span className="w-16 text-right font-mono text-sm text-green-400">
+                              {formatCost(service.cost)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Rows written before the service field existed cannot be
+                        assigned a surface retroactively, and guessing one would
+                        put made-up money against a real product area. */}
+                    {serviceSpend.some((service) => service.id === UNATTRIBUTED_SERVICE) && (
+                      <p className="mt-3 text-xs text-gray-500">
+                        &quot;unattributed&quot; is legacy rows recorded before spend carried a
+                        service; they stay unassigned rather than being guessed into a surface.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Service Breakdown - Compact */}
               {aiUsage.services && (
                 <Card className="border-gray-800 bg-gray-900/50">
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-lg text-white">
                       <Zap className="h-5 w-5 text-[#c4703f]" />
-                      Cost by Service
+                      Cost by service type
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
