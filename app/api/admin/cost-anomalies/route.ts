@@ -4,22 +4,19 @@
  * Endpoints for viewing and managing cost anomaly alerts.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from "next/server"
 import {
   getRecentAnomalies,
   getAnomalyStats,
   acknowledgeAnomaly,
   updateAnomalyConfig,
+  parseAnomalyConfigUpdate,
   checkHourlyCostAnomaly,
-} from '@/lib/cost-anomaly-detection'
-import {
-  requirePermission,
-  errorResponse,
-  unauthorizedResponse,
-} from '@/lib/admin/middleware'
-import { PERMISSIONS } from '@/lib/admin/rbac'
-import { parseBoundedInt } from '@/lib/admin/query-params'
-import { logAdminAction } from '@/lib/admin/audit'
+} from "@/lib/cost-anomaly-detection"
+import { requirePermission, errorResponse, unauthorizedResponse } from "@/lib/admin/middleware"
+import { PERMISSIONS } from "@/lib/admin/rbac"
+import { parseBoundedInt } from "@/lib/admin/query-params"
+import { logAdminAction } from "@/lib/admin/audit"
 
 /**
  * GET /api/admin/cost-anomalies
@@ -37,9 +34,9 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url)
-  const view = searchParams.get('view') || 'overview'
+  const view = searchParams.get("view") || "overview"
   // Reaches a Firestore .limit(); parseInt("abc") is NaN, which is no bound.
-  const limitParam = parseBoundedInt(searchParams.get('limit'), {
+  const limitParam = parseBoundedInt(searchParams.get("limit"), {
     min: 1,
     max: 200,
     fallback: 50,
@@ -51,7 +48,7 @@ export async function GET(request: NextRequest) {
 
   try {
     switch (view) {
-      case 'overview': {
+      case "overview": {
         const [stats, recentAnomalies] = await Promise.all([
           getAnomalyStats(),
           getRecentAnomalies(20),
@@ -66,7 +63,7 @@ export async function GET(request: NextRequest) {
         })
       }
 
-      case 'alerts': {
+      case "alerts": {
         const anomalies = await getRecentAnomalies(limit)
 
         return NextResponse.json({
@@ -79,8 +76,8 @@ export async function GET(request: NextRequest) {
         return errorResponse(`Unknown view: ${view}`, 400)
     }
   } catch (error) {
-    console.error('[Admin Cost Anomalies API] Error:', error)
-    return errorResponse('Failed to fetch anomaly data', 500)
+    console.error("[Admin Cost Anomalies API] Error:", error)
+    return errorResponse("Failed to fetch anomaly data", 500)
   }
 }
 
@@ -105,43 +102,47 @@ export async function POST(request: NextRequest) {
     const { action } = body
 
     switch (action) {
-      case 'acknowledge': {
+      case "acknowledge": {
         const { anomalyId } = body
         if (!anomalyId) {
-          return errorResponse('anomalyId is required', 400)
+          return errorResponse("anomalyId is required", 400)
         }
 
         await acknowledgeAnomaly(anomalyId, adminContext.userId)
 
-        await logAdminAction(adminContext.userId, 'acknowledge_cost_anomaly', {
+        await logAdminAction(adminContext.userId, "acknowledge_cost_anomaly", {
           anomalyId,
         })
 
         return NextResponse.json({
           success: true,
-          message: 'Anomaly acknowledged',
+          message: "Anomaly acknowledged",
         })
       }
 
-      case 'update_config': {
-        const { config } = body
-        if (!config || typeof config !== 'object') {
-          return errorResponse('config object is required', 400)
+      case "update_config": {
+        // Validated BEFORE anything is written or audited. These numbers are
+        // the comparison inside every alarm: a non-numeric threshold disarms a
+        // detector silently, and a field nothing reads is knob theater the
+        // admin would reasonably believe changed the platform.
+        const parsedConfig = parseAnomalyConfigUpdate(body.config)
+        if (!parsedConfig.ok) {
+          return errorResponse(parsedConfig.error, 400)
         }
 
-        await updateAnomalyConfig(config)
+        await updateAnomalyConfig(parsedConfig.value)
 
-        await logAdminAction(adminContext.userId, 'update_cost_anomaly_config', {
-          config,
+        await logAdminAction(adminContext.userId, "update_cost_anomaly_config", {
+          config: parsedConfig.value,
         })
 
         return NextResponse.json({
           success: true,
-          message: 'Config updated',
+          message: "Config updated",
         })
       }
 
-      case 'check_now': {
+      case "check_now": {
         const anomaly = await checkHourlyCostAnomaly()
 
         return NextResponse.json({
@@ -157,7 +158,7 @@ export async function POST(request: NextRequest) {
         return errorResponse(`Unknown action: ${action}`, 400)
     }
   } catch (error) {
-    console.error('[Admin Cost Anomalies API] Error:', error)
-    return errorResponse('Failed to perform action', 500)
+    console.error("[Admin Cost Anomalies API] Error:", error)
+    return errorResponse("Failed to perform action", 500)
   }
 }

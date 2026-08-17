@@ -8,7 +8,8 @@
  *
  * Alerts:
  * - Single request cost > $1 (per request, on the AI path)
- * - Hourly cost > budget, or > 3x the 7-day average (swept automatically)
+ * - Cost rate over the window since the last sweep, in dollars per hour, above
+ *   the hourly budget or 3x the 7-day average (swept automatically)
  *
  * Per-user cost spikes are no longer detected here. They are ENFORCED instead,
  * by the daily spend cap in lib/quota-enforcement.ts, which reads one
@@ -19,6 +20,7 @@
 import { adminDb } from "./firebase-admin"
 import { FieldValue } from "firebase-admin/firestore"
 import { logger } from "./logger"
+import { readNumber } from "./usage/event-totals"
 
 // Query limits to prevent Firestore cost explosion
 const QUERY_LIMITS = {
@@ -26,9 +28,17 @@ const QUERY_LIMITS = {
   weeklyEvents: 10000, // Max events for 7-day average calculation
 } as const
 
+const MS_PER_HOUR = 60 * 60 * 1000
+
 // How often the hourly sweep may run, platform-wide.
-const HOURLY_SWEEP_INTERVAL_MS = 60 * 60 * 1000
+const HOURLY_SWEEP_INTERVAL_MS = MS_PER_HOUR
 const HOURLY_SWEEP_CLAIM_DOC = "cost_anomaly_hourly_sweep"
+
+// Longest span one sweep will scan. The window normally runs from the previous
+// sweep so no minutes go unscanned, but after a long quiet period "since the
+// last sweep" could be days, and the query would spend a limit's worth of reads
+// on a period the daily surfaces already cover.
+const MAX_SWEEP_WINDOW_MS = 6 * MS_PER_HOUR
 
 // Per-instance throttle. Cheap first gate so the overwhelming majority of AI
 // calls cost nothing at all to filter; the Firestore claim below is what makes
@@ -52,11 +62,13 @@ export interface CostAnomaly {
   type:
     | "high_single_request"
     | "hourly_spike"
-    | "daily_budget_exceeded"
-    // No longer written. Retained so anomalies already stored in Firestore
-    // still parse, and so getAnomalyStats can bucket them.
+    // No longer written. Retained on the same standard as any other stored
+    // shape: anomalies already in Firestore carry it, so the type has to parse
+    // them and getAnomalyStats has to bucket them. Nothing here advertises
+    // writing it. "daily_budget_exceeded" and "unusual_pattern" were declared
+    // alongside it but never written by any version of this file, so no stored
+    // document can carry them and they are gone.
     | "user_cost_spike"
-    | "unusual_pattern"
   severity: "warning" | "critical"
   description: string
   cost: number
@@ -77,10 +89,17 @@ export interface CostAnomaly {
   acknowledgedAt?: Date
 }
 
+/**
+ * Runtime-tunable thresholds. Every field here must be read by a detector: a
+ * settable knob that nothing reads is worse than no knob, because an admin who
+ * turns it believes the platform changed. `dailyBudget` was exactly that, and
+ * its default of $500 was twice the real ceiling
+ * (COST_PROTECTION.GLOBAL_DAILY_SPEND_CEILING_USD, enforced in
+ * lib/quota-enforcement.ts, which is where daily spend is actually stopped).
+ */
 export interface CostAnomalyConfig {
   singleRequestThreshold: number // Alert if single request costs more than this
-  hourlyBudget: number // Alert if hourly cost exceeds this
-  dailyBudget: number // Alert if daily cost exceeds this
+  hourlyBudget: number // Alert if the cost rate exceeds this per hour
   spikeMultiplier: number // Alert if cost is X times the average
 }
 
@@ -96,8 +115,89 @@ export interface CostAverages {
 const DEFAULT_CONFIG: CostAnomalyConfig = {
   singleRequestThreshold: 1.0, // $1 per request is suspicious
   hourlyBudget: 50.0, // $50/hour max
-  dailyBudget: 500.0, // $500/day max
   spikeMultiplier: 3, // 3x normal is a spike
+}
+
+/** The fields an admin may set, and the only ones read back off the document. */
+const CONFIG_FIELDS: ReadonlyArray<keyof CostAnomalyConfig> = [
+  "singleRequestThreshold",
+  "hourlyBudget",
+  "spikeMultiplier",
+]
+
+export type AnomalyConfigUpdate =
+  | { ok: true; value: Partial<CostAnomalyConfig> }
+  | { ok: false; error: string }
+
+/**
+ * Validate an admin-supplied config patch before it is written.
+ *
+ * These numbers are the comparison in every alarm. `hourlyBudget: "banana"`
+ * makes `rate > budget` false forever and disarms the detector silently;
+ * `hourlyBudget: null` makes it true for any spend at all and alarms on every
+ * sweep. Neither failure is visible on the admin screen, so the write is the
+ * place to refuse them.
+ */
+export function parseAnomalyConfigUpdate(input: unknown): AnomalyConfigUpdate {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    return { ok: false, error: "config must be an object" }
+  }
+
+  const raw = input as Record<string, unknown>
+  const unknownField = Object.keys(raw).find(
+    (key) => !CONFIG_FIELDS.includes(key as keyof CostAnomalyConfig)
+  )
+  if (unknownField) {
+    return {
+      ok: false,
+      error: `unknown config field: ${unknownField}. Settable fields: ${CONFIG_FIELDS.join(", ")}`,
+    }
+  }
+
+  const value: Partial<CostAnomalyConfig> = {}
+  for (const field of CONFIG_FIELDS) {
+    if (!(field in raw)) continue
+    const candidate = raw[field]
+    if (typeof candidate !== "number" || !Number.isFinite(candidate) || candidate <= 0) {
+      return { ok: false, error: `${field} must be a number greater than 0` }
+    }
+    value[field] = candidate
+  }
+
+  if (Object.keys(value).length === 0) {
+    return { ok: false, error: `config must set at least one of: ${CONFIG_FIELDS.join(", ")}` }
+  }
+
+  return { ok: true, value }
+}
+
+/**
+ * Apply a stored config document over the defaults, dropping values a detector
+ * could not use. The write path validates, but the document is older than the
+ * validation and a console edit bypasses it entirely.
+ */
+function sanitizeStoredConfig(stored: Record<string, unknown> | undefined): CostAnomalyConfig {
+  const config = { ...DEFAULT_CONFIG }
+  if (!stored) return config
+
+  const rejected: string[] = []
+  for (const field of CONFIG_FIELDS) {
+    const candidate = stored[field]
+    if (candidate === undefined) continue
+    if (typeof candidate !== "number" || !Number.isFinite(candidate) || candidate <= 0) {
+      rejected.push(field)
+      continue
+    }
+    config[field] = candidate
+  }
+
+  if (rejected.length > 0) {
+    logger.warn("Stored cost anomaly config has unusable values; using defaults for them", {
+      fields: rejected,
+    })
+  }
+
+  return config
 }
 
 /**
@@ -154,34 +254,85 @@ export async function checkRequestCostAnomaly(params: {
 }
 
 /**
- * Check hourly costs for anomalies (run every hour or on each request)
+ * Check the aggregate cost rate over a window for anomalies.
+ *
+ * `since` defaults to the trailing hour; the sweep passes the previous sweep's
+ * claim time instead, so consecutive sweeps tile the timeline with no unscanned
+ * minutes (the old fixed trailing-hour window combined with a ">= 1 hour"
+ * throttle meant sweeps at 10:00 and 11:30 left 10:00-10:30 unexamined by
+ * anything, forever).
+ *
+ * The comparison is PRORATED: dollars per hour over the window, not the raw
+ * window total, so a 3-hour window of perfectly normal spend does not alarm
+ * simply for being long. The divisor is floored at one hour so a short window
+ * is never extrapolated into a scary rate.
  */
-export async function checkHourlyCostAnomaly(): Promise<CostAnomaly | null> {
+export async function checkHourlyCostAnomaly(options?: {
+  since?: Date
+  now?: Date
+}): Promise<CostAnomaly | null> {
   const config = await getAnomalyConfig()
 
   try {
-    const now = new Date()
-    const hourAgo = new Date(now.getTime() - 60 * 60 * 1000)
+    const now = options?.now ?? new Date()
+    const since = options?.since ?? new Date(now.getTime() - MS_PER_HOUR)
+    const windowHours = Math.max(0, now.getTime() - since.getTime()) / MS_PER_HOUR
+    // Floor the rate divisor at one hour: 15 minutes of ordinary spend is not
+    // an $80/hour emergency.
+    const rateDivisorHours = Math.max(1, windowHours)
 
-    // Get costs from last hour (with limit to prevent cost explosion)
+    // Get costs for the window (with limit to prevent cost explosion)
     const eventsSnapshot = await adminDb
       .collection("usage_events")
-      .where("createdAt", ">=", hourAgo)
+      .where("createdAt", ">=", since)
       .orderBy("createdAt", "desc")
       .limit(QUERY_LIMITS.hourlyEvents)
       .get()
 
-    let hourlyCost = 0
+    let windowCost = 0
     for (const doc of eventsSnapshot.docs) {
-      hourlyCost += doc.data().cost || 0
+      // readNumber, not `|| 0`: one stored NaN would turn the whole sum into
+      // NaN, and `NaN > budget` is false — a single bad document silently
+      // disarming the alarm.
+      windowCost += readNumber(doc.data().cost)
     }
 
-    if (hourlyCost > config.hourlyBudget) {
+    // At the query limit the sum is a FLOOR over the newest N events — and a
+    // window busy enough to truncate is exactly the runaway this detector
+    // exists for. Alarm on the truncation itself, loudly, regardless of how
+    // small the visible total is.
+    if (eventsSnapshot.size >= QUERY_LIMITS.hourlyEvents) {
+      logger.error("Hourly cost sweep hit its query limit; the window total is a floor", {
+        limit: QUERY_LIMITS.hourlyEvents,
+        costFloor: windowCost,
+        since: since.toISOString(),
+        now: now.toISOString(),
+      })
       const anomaly: Omit<CostAnomaly, "id" | "timestamp"> = {
         type: "hourly_spike",
-        severity: hourlyCost > config.hourlyBudget * 2 ? "critical" : "warning",
-        description: `Hourly cost $${hourlyCost.toFixed(2)} exceeds budget of $${config.hourlyBudget.toFixed(2)}`,
-        cost: hourlyCost,
+        severity: "critical",
+        description:
+          `Cost floor: at least $${windowCost.toFixed(2)} across ≥${QUERY_LIMITS.hourlyEvents} events ` +
+          `over ${windowHours.toFixed(1)}h — the sweep hit its query limit, so real spend is higher`,
+        cost: windowCost,
+        threshold: config.hourlyBudget,
+        context: {},
+        acknowledged: false,
+      }
+      await recordAnomaly(anomaly)
+      return { ...anomaly, timestamp: new Date() }
+    }
+
+    const hourlyRate = windowCost / rateDivisorHours
+
+    if (hourlyRate > config.hourlyBudget) {
+      const anomaly: Omit<CostAnomaly, "id" | "timestamp"> = {
+        type: "hourly_spike",
+        severity: hourlyRate >= config.hourlyBudget * 2 ? "critical" : "warning",
+        description:
+          `Cost rate $${hourlyRate.toFixed(2)}/h exceeds budget $${config.hourlyBudget.toFixed(2)}/h: ` +
+          `$${windowCost.toFixed(2)} across ${eventsSnapshot.size} events over ${windowHours.toFixed(1)}h`,
+        cost: hourlyRate,
         threshold: config.hourlyBudget,
         context: {},
         acknowledged: false,
@@ -193,12 +344,12 @@ export async function checkHourlyCostAnomaly(): Promise<CostAnomaly | null> {
 
     // Also check for spikes compared to average
     const avgHourlyCost = await getAverageHourlyCost()
-    if (avgHourlyCost > 0 && hourlyCost > avgHourlyCost * config.spikeMultiplier) {
+    if (avgHourlyCost > 0 && hourlyRate > avgHourlyCost * config.spikeMultiplier) {
       const anomaly: Omit<CostAnomaly, "id" | "timestamp"> = {
         type: "hourly_spike",
         severity: "warning",
-        description: `Hourly cost $${hourlyCost.toFixed(2)} is ${(hourlyCost / avgHourlyCost).toFixed(1)}x the average ($${avgHourlyCost.toFixed(2)})`,
-        cost: hourlyCost,
+        description: `Cost rate $${hourlyRate.toFixed(2)}/h is ${(hourlyRate / avgHourlyCost).toFixed(1)}x the average ($${avgHourlyCost.toFixed(2)}/h)`,
+        cost: hourlyRate,
         threshold: avgHourlyCost * config.spikeMultiplier,
         context: {},
         acknowledged: false,
@@ -222,21 +373,29 @@ export async function checkHourlyCostAnomaly(): Promise<CostAnomaly | null> {
  * config doc read+write in a transaction is a rounding error against that, and
  * it turns N scans an hour into one.
  */
-async function claimHourlySweep(nowMs: number): Promise<boolean> {
+async function claimHourlySweep(
+  nowMs: number
+): Promise<{ claimed: boolean; previousRunAtMs?: number }> {
   const claimRef = adminDb.collection("config").doc(HOURLY_SWEEP_CLAIM_DOC)
 
   return adminDb.runTransaction(async (transaction) => {
     const doc = await transaction.get(claimRef)
     const lastRunAtMs = doc.data()?.lastRunAtMs
     if (typeof lastRunAtMs === "number" && nowMs - lastRunAtMs < HOURLY_SWEEP_INTERVAL_MS) {
-      return false
+      return { claimed: false }
     }
     transaction.set(
       claimRef,
       { lastRunAtMs: nowMs, updatedAt: FieldValue.serverTimestamp() },
       { merge: true }
     )
-    return true
+    // The previous claim time is the start of the window this sweep owes: the
+    // last sweep covered everything up to it, so scanning from there tiles the
+    // timeline with no gaps.
+    return {
+      claimed: true,
+      previousRunAtMs: typeof lastRunAtMs === "number" ? lastRunAtMs : undefined,
+    }
   })
 }
 
@@ -262,8 +421,16 @@ export async function maybeRunHourlyCostSweep(now: Date = new Date()): Promise<v
   lastLocalSweepAttemptMs = nowMs
 
   try {
-    if (!(await claimHourlySweep(nowMs))) return
-    await checkHourlyCostAnomaly()
+    const claim = await claimHourlySweep(nowMs)
+    if (!claim.claimed) return
+    // Scan from the previous sweep so no minutes are ever left unexamined,
+    // bounded at MAX_SWEEP_WINDOW_MS so a long quiet period does not buy one
+    // enormous query. First sweep ever: the trailing hour.
+    const sinceMs = Math.max(
+      claim.previousRunAtMs ?? nowMs - MS_PER_HOUR,
+      nowMs - MAX_SWEEP_WINDOW_MS
+    )
+    await checkHourlyCostAnomaly({ since: new Date(sinceMs), now })
   } catch (error) {
     logger.error("Hourly cost sweep failed", { error })
   }
@@ -442,7 +609,9 @@ async function getAnomalyConfig(): Promise<CostAnomalyConfig> {
     const configDoc = await adminDb.collection("config").doc("cost_anomaly").get()
 
     if (configDoc.exists) {
-      config = { ...DEFAULT_CONFIG, ...configDoc.data() } as CostAnomalyConfig
+      // Sanitized, not spread-and-cast: a stored "banana" or null threshold
+      // would otherwise ride into every comparison (see sanitizeStoredConfig).
+      config = sanitizeStoredConfig(configDoc.data())
     }
   } catch (error) {
     logger.error("Failed to get anomaly config, using defaults", { error })
@@ -459,10 +628,18 @@ async function getAnomalyConfig(): Promise<CostAnomalyConfig> {
  * Update anomaly config
  */
 export async function updateAnomalyConfig(config: Partial<CostAnomalyConfig>): Promise<void> {
+  // Revalidated here as well as in the admin route: this is the last writer
+  // before Firestore, and a future caller that skips the route must not be
+  // able to store a threshold no detector can compare against.
+  const parsed = parseAnomalyConfigUpdate(config)
+  if (!parsed.ok) {
+    throw new Error(`Invalid cost anomaly config: ${parsed.error}`)
+  }
+
   await adminDb
     .collection("config")
     .doc("cost_anomaly")
-    .set({ ...config, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+    .set({ ...parsed.value, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
 
   // Invalidate the cache so the new thresholds take effect immediately
   cachedAnomalyConfig = null
@@ -538,16 +715,27 @@ export async function getAnomalyStats(): Promise<{
       if (!data.acknowledged) stats.unacknowledged++
 
       stats.byType[data.type] = (stats.byType[data.type] || 0) + 1
-      stats.bySeverity[data.severity as "warning" | "critical"]++
+      // Only the two known keys. The old cast incremented an absent key, and
+      // `undefined + 1` is NaN, which then rendered as the admin panel's
+      // critical count. An unrecognized severity still counts in total and
+      // byType; it just cannot poison the severity split.
+      const severity: unknown = data.severity
+      if (severity === "warning" || severity === "critical") {
+        stats.bySeverity[severity]++
+      }
 
       const timestamp = data.timestamp?.toDate() || new Date()
       if (timestamp >= twentyFourHoursAgo) {
         stats.last24Hours++
       }
 
-      // Estimated loss = sum of costs that exceeded thresholds
-      if (data.cost > data.threshold) {
-        stats.estimatedLoss += data.cost - data.threshold
+      // Estimated loss = sum of costs that exceeded thresholds. Coerced first:
+      // one stored NaN or string would otherwise turn the whole figure into
+      // NaN in the admin panel.
+      const anomalyCost = readNumber(data.cost)
+      const anomalyThreshold = readNumber(data.threshold)
+      if (anomalyCost > anomalyThreshold) {
+        stats.estimatedLoss += anomalyCost - anomalyThreshold
       }
     }
   } catch (error) {
