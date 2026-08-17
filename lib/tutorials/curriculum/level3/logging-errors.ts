@@ -370,7 +370,7 @@ def run_tests(record):
             handler.detach()
         summaries = handler.messages(logging.INFO)
         assert len(summaries) == 1, (
-            f"expected one info line summarising the run, got {summaries!r}"
+            f"expected one info line summarizing the run, got {summaries!r}"
         )
         assert "2" in summaries[0] and "1" in summaries[0], (
             f"expected 2 imported and 1 skipped named in {summaries[0]!r}"
