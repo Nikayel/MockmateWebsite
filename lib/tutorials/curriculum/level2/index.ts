@@ -5107,7 +5107,9 @@ Python refuses to subtract or order a naive datetime against an aware one, becau
 - Adding \`timedelta(days=1)\` adds exactly 24 hours. Across a daylight-saving change that is not the same wall-clock time the next day, which is why "every day at 09:00" jobs drift twice a year.
 - \`fromisoformat\` returns an aware datetime when the text carries an offset like \`+00:00\` and a naive one when it does not. One function, two kinds of result, so check \`utcoffset()\` instead of assuming.
 
-**Interview nuance:** "naive or aware?" is the fastest way to sound like you have run a system in production. Say that you normalize to aware UTC at every input boundary, keep UTC in storage and in every comparison, and render local time only in the presentation layer. Then name the two failure modes you are buying your way out of: the \`TypeError\` when the two kinds meet, and the silent off-by-an-offset duration you get in any language that coerces instead of raising.`,
+**Interview nuance:** "naive or aware?" is the fastest way to sound like you have run a system in production. Say that you normalize to aware UTC at every input boundary, keep UTC in storage and in every comparison, and render local time only in the presentation layer. Then name the two failure modes you are buying your way out of: the \`TypeError\` when the two kinds meet, and the silent off-by-an-offset duration you get in any language that coerces instead of raising.
+
+**Sources:** [datetime module](https://docs.python.org/3/library/datetime.html) · [PEP 615, IANA time zone support](https://peps.python.org/pep-0615/) · [IANA Time Zone Database](https://www.iana.org/time-zones)`,
     demoCode: `from datetime import datetime, timedelta, timezone
 
 parsed = datetime.strptime("08/03/2026 01:59:30", "%d/%m/%Y %H:%M:%S")
