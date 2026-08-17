@@ -28,3 +28,4 @@ Current jobs (see each route header for details):
 | `expire-referral-rewards`        | daily                                |
 | `guest-session-cleanup`          | daily                                |
 | `email-notifications`            | see route header                     |
+| `redis-keepalive`                | daily — failure notifications ON (fail-loud health check; see route header) |
