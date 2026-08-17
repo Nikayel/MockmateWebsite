@@ -3367,6 +3367,8 @@ and webhooks for server-to-server async.
   "reveal": "The menu to carry into the design write: choose by direction, latency, per-connection cost, and delivery guarantee. Short-poll for lazy counters, long-poll as the universal fallback, SSE for one-way streaming, WebSocket for true duplex plus its pub/sub scaling tax, and webhooks for server-to-server with retries, HMAC signing, and dedupe."
 }
 \`\`\`
+
+**Sources:** [WHATWG Server-Sent Events spec](https://html.spec.whatwg.org/multipage/server-sent-events.html) · [RFC 6455, WebSocket protocol](https://www.rfc-editor.org/rfc/rfc6455.html) · [MDN, using server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
 `.trim()
 
 const httpSemanticsTeach = `
