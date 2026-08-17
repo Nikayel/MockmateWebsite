@@ -167,6 +167,16 @@ interface AIUsageData {
   }
 }
 
+/**
+ * One sentence naming the panel whose data never arrived. The view name is in
+ * the message because this dashboard loads four views independently: "failed to
+ * load" alone leaves the operator guessing which numbers to distrust.
+ */
+function describeLoadFailure(view: string, status?: number): string {
+  const suffix = status ? ` (HTTP ${status})` : ""
+  return `${view} failed to load${suffix}. This is a failed request, not an empty month.`
+}
+
 export default function AIUsagePage() {
   const { firebaseUser } = useAuth()
   const [activeTab, setActiveTab] = useState("overview")
@@ -187,6 +197,12 @@ export default function AIUsagePage() {
   const [settingBudget, setSettingBudget] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionSuccess, setActionSuccess] = useState<string | null>(null)
+  // Load failures used to be swallowed (the overview had no `else` at all, the
+  // two tables only logged), so an outage and a quiet month rendered the same
+  // empty panels. Each loader now records why it has nothing to show.
+  const [overviewError, setOverviewError] = useState<string | null>(null)
+  const [sessionsError, setSessionsError] = useState<string | null>(null)
+  const [scenariosError, setScenariosError] = useState<string | null>(null)
 
   const providerCosts = getProviderCostInfo()
 
@@ -199,15 +215,20 @@ export default function AIUsagePage() {
       const response = await fetch("/api/admin/usage?view=overview", {
         headers: { Authorization: `Bearer ${token}` },
       })
+      // The 500 path returns JSON, but a proxy or auth redirect need not, so
+      // parsing is allowed to fail without taking the error branch with it.
+      const data = await response.json().catch(() => null)
 
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          setAiUsage(data.data)
-        }
+      if (response.ok && data?.success) {
+        setAiUsage(data.data)
+        setOverviewError(null)
+      } else {
+        logger.error("Overview API returned no data", { status: response.status })
+        setOverviewError(describeLoadFailure("Overview", response.status))
       }
     } catch (error) {
       logger.error("Error loading AI usage", { error })
+      setOverviewError(describeLoadFailure("Overview"))
     } finally {
       setLoading(false)
     }
@@ -224,14 +245,17 @@ export default function AIUsagePage() {
         headers: { Authorization: `Bearer ${token}` },
       })
 
-      const data = await response.json()
-      if (data.success && data.data?.sessions) {
+      const data = await response.json().catch(() => null)
+      if (response.ok && data?.success && data.data?.sessions) {
         setSessions(data.data.sessions)
+        setSessionsError(null)
       } else {
-        logger.warn("Sessions API returned no data", { data })
+        logger.warn("Sessions API returned no data", { status: response.status, data })
+        setSessionsError(describeLoadFailure("Session costs", response.status))
       }
     } catch (error) {
       logger.error("Error loading sessions", { error })
+      setSessionsError(describeLoadFailure("Session costs"))
     } finally {
       setLoadingSessions(false)
     }
@@ -248,14 +272,17 @@ export default function AIUsagePage() {
         headers: { Authorization: `Bearer ${token}` },
       })
 
-      const data = await response.json()
-      if (data.success && data.data?.scenarios) {
+      const data = await response.json().catch(() => null)
+      if (response.ok && data?.success && data.data?.scenarios) {
         setScenarios(data.data.scenarios)
+        setScenariosError(null)
       } else {
-        logger.warn("Scenarios API returned no data", { data })
+        logger.warn("Scenarios API returned no data", { status: response.status, data })
+        setScenariosError(describeLoadFailure("Problem costs", response.status))
       }
     } catch (error) {
       logger.error("Error loading scenarios", { error })
+      setScenariosError(describeLoadFailure("Problem costs"))
     } finally {
       setLoadingScenarios(false)
     }
@@ -552,6 +579,12 @@ export default function AIUsagePage() {
     },
   ]
 
+  // Every view that failed, named, so the banner reports an outage in the tab
+  // the operator is not currently looking at.
+  const loadErrors = [overviewError, sessionsError, scenariosError].filter(
+    (message): message is string => Boolean(message)
+  )
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -611,6 +644,23 @@ export default function AIUsagePage() {
           >
             Dismiss
           </Button>
+        </div>
+      )}
+      {/* Not dismissible, unlike the action errors above: these say the numbers
+          on screen are incomplete, and that stays true until a load succeeds. */}
+      {loadErrors.length > 0 && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-900/20 p-3"
+        >
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" aria-hidden="true" />
+          <div className="space-y-1">
+            {loadErrors.map((message) => (
+              <p key={message} className="text-sm text-red-300">
+                {message}
+              </p>
+            ))}
+          </div>
         </div>
       )}
 
@@ -846,6 +896,7 @@ export default function AIUsagePage() {
             searchable
             searchPlaceholder="Search sessions..."
             emptyMessage="No sessions found"
+            error={sessionsError}
           />
         </TabsContent>
 
@@ -863,6 +914,7 @@ export default function AIUsagePage() {
             searchable
             searchPlaceholder="Search problems..."
             emptyMessage="No scenario data found"
+            error={scenariosError}
           />
         </TabsContent>
 

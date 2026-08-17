@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search, RefreshCw, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
+import { Search, RefreshCw, Loader2, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react"
 import { ReactNode, useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 import { sortRows, type SortDirection } from "@/lib/admin/table-sort"
@@ -46,6 +46,13 @@ interface DataTableProps<T> {
     onPageChange: (page: number) => void
   }
   emptyMessage?: string
+  /**
+   * Why the table has no rows, when the reason is a failed load rather than an
+   * empty result. Rendered as a fault instead of `emptyMessage`, because a 500
+   * that reads "No sessions found" is a dashboard telling a lie: the operator
+   * concludes nobody used the product when the query never ran.
+   */
+  error?: string | null
   actions?: ReactNode
   rowClassName?: (row: T) => string
   /**
@@ -72,6 +79,7 @@ export function DataTable<T>({
   refreshing = false,
   pagination,
   emptyMessage = "No data found",
+  error = null,
   actions,
   rowClassName,
   onSort,
@@ -150,12 +158,26 @@ export function DataTable<T>({
       )}
 
       <CardContent>
+        {/* Shown above the rows too: a refresh can fail after a good load, and
+            silently leaving the stale rows on screen is the same lie. */}
+        {error && (
+          <div
+            role="alert"
+            className="mb-4 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-900/20 p-3"
+          >
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" aria-hidden="true" />
+            <span className="text-sm text-red-300">{error}</span>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-[#c4703f]" />
           </div>
         ) : data.length === 0 ? (
-          <div className="py-12 text-center text-gray-400">{emptyMessage}</div>
+          error ? null : (
+            <div className="py-12 text-center text-gray-400">{emptyMessage}</div>
+          )
         ) : (
           <>
             <div className="overflow-x-auto">
