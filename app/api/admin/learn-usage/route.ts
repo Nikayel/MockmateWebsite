@@ -30,7 +30,9 @@ const ALL_TIME_DAY_FLOOR = "0000-00-00"
  *
  * Base gate is view_analytics (matches the nav entry). The per-user branch additionally
  * requires view_user_details, same as the user-profile drawer it feeds — an analyst who can
- * see platform totals cannot page through individual learners.
+ * see platform totals cannot page through individual learners. The platform view's
+ * `learners` rows sit behind the same inline tier: they are computed (and cached) only for
+ * callers holding view_user_details, so the cache key must carry the tier.
  */
 export const GET = withPermission(
   PERMISSIONS.VIEW_ANALYTICS,
@@ -49,13 +51,17 @@ export const GET = withPermission(
       return successResponse({ user })
     }
 
-    const cacheKey = getCacheKey("learn-usage", { timeRange })
+    const includeLearners = context.permissions.includes(PERMISSIONS.VIEW_USER_DETAILS)
+    const cacheKey = getCacheKey("learn-usage", {
+      timeRange,
+      learners: includeLearners ? "1" : "0",
+    })
     const cached = adminCache.get<PlatformLearnUsageView>(cacheKey)
     if (cached) {
       return successResponse({ platform: cached, cached: true })
     }
 
-    const platform = await getPlatformLearnUsageView(sinceDayKey)
+    const platform = await getPlatformLearnUsageView(sinceDayKey, { includeLearners })
     adminCache.set(cacheKey, platform, CACHE_TTL.USAGE)
     return successResponse({ platform })
   }
