@@ -425,19 +425,42 @@ False
 }
 \`\`\`
 
-The demo below returns \`object | None\`, so the caller loses the element type. A generic keeps the link between the input type and the output type. \`TypeVar\` is the placeholder that stands in for "whatever type came in":
+The demo below returns \`object | None\`, so the caller loses the element type. A generic keeps the link between the input type and the output type. The placeholder that stands in for "whatever type came in" is a **type parameter**, and since Python 3.12 you declare it in square brackets on the function itself, with nothing to import:
 
 \`\`\`python
-from typing import TypeVar
-T = TypeVar("T")
-
-def first(items: list[T]) -> T | None:
+def first[T](items: list[T]) -> T | None:
     return items[0] if items else None
 
 first([10, 20])   # a checker infers int | None, not object | None
 \`\`\`
 
-Python 3.12 and later write the same thing as \`def first[T](items: list[T]) -> T | None:\` with no import.
+The same brackets go on a class, and \`type\` declares an alias that takes its own parameters:
+
+\`\`\`python
+class Box[T]:
+    def __init__(self, item: T) -> None:
+        self.item = item
+
+    def get(self) -> T:
+        return self.item
+
+type Pair[T] = tuple[T, T]
+\`\`\`
+
+Before 3.12 the placeholder had to be built by hand with \`TypeVar\`, and you will meet that spelling in
+every codebase older than the syntax:
+
+\`\`\`python
+from typing import TypeVar
+T = TypeVar("T")
+
+def first(items: list[T]) -> T | None:   # the pre-3.12 spelling of the same function
+    return items[0] if items else None
+\`\`\`
+
+A checker reads the two identically. What the bracket form buys you is scope: \`T\` belongs to the one
+function or class that declares it, where a module-level \`T = TypeVar("T")\` is a single shared
+placeholder that unrelated functions quietly reuse.
 
 ### Protocols (structural typing)
 
