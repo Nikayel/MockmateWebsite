@@ -299,7 +299,7 @@ export const pandasDataframesLesson: PythonLesson = {
     estimatedMinutes: 8,
     markdown: `## A DataFrame is a dict of columns
 
-Stop picturing a spreadsheet and picture a dict. A \`DataFrame\` maps column names to columns, and each column is a \`Series\`: a numpy array of one dtype, plus a labelled **index** that lines its values up with every other column. Everything from the numpy lesson still applies, one column at a time. The index is the piece that has no list equivalent, and it is what makes rows line up after a filter, a join or a sort.
+Stop picturing a spreadsheet and picture a dict. A \`DataFrame\` maps column names to columns, and each column is a \`Series\`: a numpy array of one dtype, plus a labeled **index** that lines its values up with every other column. Everything from the numpy lesson still applies, one column at a time. The index is the piece that has no list equivalent, and it is what makes rows line up after a filter, a join or a sort.
 
 ## Loading from a string buffer
 
@@ -446,7 +446,7 @@ df.groupby("region")["amount"].sum()
   "prompt": "Your sales frame has 6 rows. One row has a blank region, which read_csv turned into NaN. You run df.groupby('region')['amount'].sum(). How much of the data reaches the totals?",
   "options": [
     {
-      "label": "All 6 rows. The blank becomes its own group, labelled NaN.",
+      "label": "All 6 rows. The blank becomes its own group, labeled NaN.",
       "feedback": "Tempting, because that is precisely what you get by passing dropna=False, and grouping does feel like it ought to partition everything it was given. The default is the opposite: rows with a missing key are dropped before any grouping happens."
     },
     {
