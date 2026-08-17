@@ -66,6 +66,20 @@ describe("SystemDesignPath", () => {
     expect(levelHrefs).toHaveLength(levels.length)
   })
 
+  /**
+   * The arcs collapse, so "every level is linked" has to hold in the COLLAPSED case or it holds by
+   * accident. A client-state accordion would render only the open arc's list and quietly drop nine
+   * of the twelve links from the server HTML; `<details>` keeps them all. This asserts the setup the
+   * link assertions above depend on, so making every arc default-open cannot silently turn those
+   * assertions into a test of nothing.
+   */
+  it("renders most arcs collapsed, which is the case the link guard has to survive", () => {
+    const total = (html.match(/<details\b/g) ?? []).length
+    const open = (html.match(/<details\b[^>]*\bopen\b/g) ?? []).length
+    expect(total).toBe(SYSTEM_DESIGN_SECTIONS.length)
+    expect(open).toBeLessThan(total)
+  })
+
   it("carries each level's title and tagline as real text, not as a hydration payload", () => {
     for (const level of levels) {
       expect(html).toContain(level.title)
