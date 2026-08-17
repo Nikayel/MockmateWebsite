@@ -86,6 +86,11 @@ export const TICKETS: readonly TicketEntry[] = [
   { id: "CS-030", lesson: "py-l5-pin-the-seam", slot: "practice" },
   { id: "CS-031", lesson: "py-l5-unsafe-sink", slot: "apply" },
   { id: "CS-032", lesson: "py-l5-unsafe-sink", slot: "practice" },
+
+  // Python L4 — AI engineering plumbing
+  { id: "CS-033", lesson: "py-l4-retry-budget", slot: "practice" },
+  { id: "CS-034", lesson: "py-l4-streaming-decode", slot: "practice" },
+  { id: "CS-035", lesson: "py-l4-chunk-score-fuse", slot: "practice" },
 ]
 
 /** `CS-` followed by at least three digits. The shape the enforcement test pins. */
