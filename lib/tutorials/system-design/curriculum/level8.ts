@@ -971,6 +971,8 @@ Enterprise SSO: SAML is the older XML-based standard still dominant in enterpris
   "reveal": "In the design write, be the candidate who names things: the four roles, a specific grant per client type (auth code plus PKCE for user apps, client credentials for M2M, device flow for TVs and CLIs), and the hardening set of scope, audience, state and nonce, exact redirect URIs, and DPoP or mTLS for high-value tokens."
 }
 \`\`\`
+
+**Sources:** [OAuth 2.1 draft](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1) · [RFC 7636, PKCE](https://www.rfc-editor.org/rfc/rfc7636.html) · [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html)
 `.trim()
 
 const sessionsTokensTeach = `
