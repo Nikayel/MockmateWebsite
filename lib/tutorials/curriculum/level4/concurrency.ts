@@ -539,6 +539,34 @@ with ThreadPoolExecutor(max_workers=4) as executor:
 
 That dict is the whole trick. If the caller wants results in **input order**, map each future to its *position* instead of its value, size a result list up front, and write into it by index. Appending as futures complete gives you completion order, which is the bug this pattern exists to prevent.
 
+### Splitting the work into batches: \`itertools.batched\`
+
+Sizing a pool answers how many run at once. The other half of a large fan-out is how much you hand
+it at a time: 50000 rows is one commit, one request body or one retry that is far too big, so you
+send it in fixed-size groups. The loop everyone writes for this,
+\`for i in range(0, len(rows), 500)\` plus a slice, only works on something you can index and length,
+which rules out a cursor, a file, or a generator.
+
+\`itertools.batched(iterable, n)\` (Python 3.12) is the stdlib version, and it works on any iterable:
+
+\`\`\`python
+from itertools import batched
+
+list(batched("ABCDEFG", 3))   # [('A', 'B', 'C'), ('D', 'E', 'F'), ('G',)]
+list(batched(range(4), 2))    # [(0, 1), (2, 3)]
+list(batched([], 3))          # []
+
+for chunk in batched(rows, 500):
+    executor.submit(write_all, chunk)      # 500 rows per task, however many rows there are
+\`\`\`
+
+Three details to have straight. It yields **tuples**, not lists or slices of the original. The last
+batch is **short** rather than padded, which is the case a hand-rolled loop usually gets wrong by one.
+And it is lazy: it pulls \`n\` items at a time, so it batches a generator or a database cursor without
+ever holding the whole sequence in memory, which is the reason to prefer it over the slice loop.
+\`n\` must be at least 1, or it raises \`ValueError: n must be at least one\`. Before 3.12 this was the
+\`islice\` recipe in the \`itertools\` docs rather than a function you could import.
+
 ### Retrying without retrying forever
 
 Concurrent work fails piecemeal: one call in fifty times out while the other forty-nine succeed. The first question to answer is whether a failure is **transient** (a timeout, a dropped connection, a 503, something a second attempt could fix) or **permanent** (a 404, a malformed request, a missing credential, something no number of attempts will fix). Retrying a permanent failure just multiplies the load on a service that already told you no, and it hides a real bug behind a slow one.
