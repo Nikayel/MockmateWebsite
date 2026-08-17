@@ -460,7 +460,7 @@ It is wrong. \`ordered[1]\` is the second **smallest**. With three distinct valu
 }
 \`\`\`
 
-## The boundary catalogue
+## The boundary catalog
 
 Reviewing well is mostly recall. Keep a short list and walk it against the contract every time.
 
@@ -515,7 +515,7 @@ Nothing on that list is clever. It is a checklist, and a checklist is what makes
 }
 \`\`\`
 
-## Turning the catalogue into a probe
+## Turning the catalog into a probe
 
 Reading a boundary list is one thing. The skill that gets you hired is turning it into code that answers a yes or no question about someone else's function.
 
@@ -794,7 +794,7 @@ const failureSignaturesLesson: PythonLesson = {
     estimatedMinutes: 10,
     markdown: `## Bugs come in shapes
 
-Reviewing gets fast when you stop looking for "a bug" and start looking for known shapes. Code written quickly by anyone, human or model, fails in a small number of recognisable ways. Seven of them cover most of what you will actually find.
+Reviewing gets fast when you stop looking for "a bug" and start looking for known shapes. Code written quickly by anyone, human or model, fails in a small number of recognizable ways. Seven of them cover most of what you will actually find.
 
 ### 1. Off by one at a boundary
 
@@ -2506,7 +2506,7 @@ def shortest_failing_length(ops):
       "feedback": "A reasonable heuristic that often works on numeric data, and it does happen to point at -500 here. It gives you no evidence about why, and it fails whenever the trigger is not the extreme value."
     },
     {
-      "label": "Sort the operations first, so the shape of the input is normalised",
+      "label": "Sort the operations first, so the shape of the input is normalized",
       "feedback": "Reordering changes the very thing under test, since this function's behavior depends on the order. A shrunk input has to remain a valid input for the original question."
     }
   ]
@@ -3347,7 +3347,7 @@ def scan_steps(nums):
     prompt: `Your nightly export builds a CSV in memory with \`report = report + row + "\\n"\` inside a
 loop, and it has started missing its window. Before you change anything you want a number to put in
 the ticket, because "string concatenation is slow" has already been dismissed once as premature
-optimisation.
+optimization.
 
 Write a function \`rows_within_budget(row_length, budget)\` that returns the largest number of rows
 the loop can append before the total characters it has copied would exceed \`budget\`.
@@ -3528,7 +3528,7 @@ def call_with_retry(client, prompt, attempts=3):
 
 A retry sends the same request again, which is fine when the call only reads. It is not fine when the call causes something.
 
-If the model call is one step in a flow that also charges a card, sends an email, or writes a row, ask what happens when step three fails after step two succeeded. The answer is usually that the retry must not repeat step two, which means the write needs an idempotency key or the retry has to be scoped to just the model call. An idempotency key is an id you generate for the attempt and send with the write, so the receiver recognises a repeat and performs the work once. Note it is a different thing from the idempotence property you asserted earlier: that was a claim about a function, this is a token you pass to a service to make one become true. This is the same reasoning you would apply to any external write, and generated code almost never includes it, because nothing in the prompt mentioned it.
+If the model call is one step in a flow that also charges a card, sends an email, or writes a row, ask what happens when step three fails after step two succeeded. The answer is usually that the retry must not repeat step two, which means the write needs an idempotency key or the retry has to be scoped to just the model call. An idempotency key is an id you generate for the attempt and send with the write, so the receiver recognizes a repeat and performs the work once. Note it is a different thing from the idempotence property you asserted earlier: that was a claim about a function, this is a token you pass to a service to make one become true. This is the same reasoning you would apply to any external write, and generated code almost never includes it, because nothing in the prompt mentioned it.
 
 \`\`\`cswidget
 {
@@ -3710,7 +3710,7 @@ def call_with_retry(script):
   practice: {
     id: "py-l5-model-dependency-practice",
     executionMode: "single-file",
-    prompt: `Your support tool summarises each ticket in a queue with a model. Last week a provider
+    prompt: `Your support tool summarizes each ticket in a queue with a model. Last week a provider
 incident turned a nightly batch into a retry storm that ran for six hours and produced an invoice
 nobody had approved, so every batch now has to run under a hard cap on how many calls it may make.
 
@@ -4097,7 +4097,7 @@ def parse_review(raw):
         description: "the score is a string rather than a number",
       },
       {
-        input: { raw: "I was unable to analyse that ticket." },
+        input: { raw: "I was unable to analyze that ticket." },
         expected: null,
         description: "no object in the response at all",
       },
@@ -4584,7 +4584,7 @@ Imports, methods, keyword arguments, version-specific behavior. Loud failures ar
     },
     {
       "label": "Because the contract is where most bugs are",
-      "feedback": "Ambiguous contracts do cause a great deal of trouble, so the instinct is sound. Most individual defects live in the body, and it is the contract that lets you recognise them as defects."
+      "feedback": "Ambiguous contracts do cause a great deal of trouble, so the instinct is sound. Most individual defects live in the body, and it is the contract that lets you recognize them as defects."
     },
     {
       "label": "Because reading the body first biases you towards approving it",
