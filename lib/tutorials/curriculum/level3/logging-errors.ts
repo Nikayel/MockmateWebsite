@@ -541,6 +541,40 @@ def reading(row):
 
 \`from err\` sets \`__cause__\` on the new exception to the original one, so nothing is lost. The traceback then prints both, oldest first, joined by the line "The above exception was the direct cause of the following exception". Callers get your type; whoever reads the log still sees the \`KeyError\` and the line that raised it. Drop the \`from err\` and Python still chains it implicitly, as \`__context__\`, under the vaguer wording "During handling of the above exception, another exception occurred"; being explicit says you meant the translation. Use \`from None\` when the original really is noise and you want it suppressed.
 
+### Adding context without translating: \`add_note\`
+
+Translating is the right move when callers should handle *your* error type. Often you want less than
+that: the exception is already the right one, you just know something the raising code did not, like
+which row you were on. Wrapping it in a new class to carry that fact changes the type every caller
+catches, for the sake of a string.
+
+\`Exception.add_note()\` (Python 3.11, PEP 678) attaches the string to the exception you already have:
+
+\`\`\`python
+def import_batch(rows):
+    for number, text in enumerate(rows, start=1):
+        try:
+            parse_row(text)
+        except ValueError as err:
+            err.add_note(f"while parsing row {number}: {text!r}")
+            err.add_note("source: meters-2026-08.csv")
+            raise                      # same exception, same type, more context
+\`\`\`
+
+The notes are printed by the traceback machinery, after the exception message, one per line:
+
+\`\`\`text
+  File "ingest/record.py", line 3, in parse_row
+ValueError: invalid literal for int() with base 10: 'nope'
+while parsing row 3: 'nope'
+source: meters-2026-08.csv
+\`\`\`
+
+Notes accumulate rather than replace, so each layer that catches and re-raises can add what it knows,
+and they are readable programmatically as \`err.__notes__\`. Choosing between the two is
+straightforward: change the type with \`raise ... from err\` when callers should catch something
+different, and add a note when the type is already right and only the message was missing a detail.
+
 ### Cleanup that runs on both exits
 
 A function that opens something has to close it whether the work succeeded or blew up. \`except\` runs only when an exception arrives; \`finally\` runs on every way out of the block, including a \`return\` and including an exception you are not catching:
