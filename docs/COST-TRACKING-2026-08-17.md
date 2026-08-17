@@ -29,8 +29,8 @@ inflated every "requests" aggregate 2–3x (R5); and there was no service dimens
 | A3 | BLOCKER | `referral_rewards (status ==, orderBy processedAt)` unindexed → whole payments route 500s | FIXED | composite `referral_rewards (status ASC, processedAt DESC)` |
 | V1/R4 | BLOCKER | Edge providers discard vendor `usage`/`usageMetadata`; cost estimated from response text; reasoning tokens invisible (≤1.5x under-count into ledger, caps, kill-switch) | FIXED | Edge rungs parse measured usage; `EdgeAIResponse` carries `tokensIn/tokensOut`; feedback/stream passes them to the reporter |
 | R2 | BLOCKER | Node feedback aux calls (validation, extraction, transcript analysis, constitutional ×2) run with no `userId` → no ledger record | FIXED | userId/sessionId + service threaded through all five helpers from `app/api/generate-feedback` |
-| R1 | BLOCKER | RAG query-side + bulk vectorization embeddings entirely untracked (`generateTextEmbedding`, direct `getHybridProvider()` calls) | FIXED | tracking moved INTO `generateTextEmbedding`; direct provider calls routed through it; unattributed calls recorded under the reserved `system` user |
-| R3 | BLOCKER | Deepgram usage reported only in `stopRecording()`; unmount/navigation loses the record | FIXED | shared reporter used by both stop path and unmount cleanup, `keepalive: true` |
+| R1 | BLOCKER | RAG query-side + bulk vectorization embeddings entirely untracked (`generateTextEmbedding`, direct `getHybridProvider()` calls) | FIXED | attribution `{service, userId?}` is a REQUIRED argument on `generateTextEmbedding(s)`; retrieval/profile/v2-route bill the real user, vectorization jobs and seeding bill `system`; provider cache hits (`isCached`) and the free TF-IDF fallback record nothing; zero direct `.generateEmbedding()` calls remain outside the seam |
+| R3 | BLOCKER | Deepgram usage reported only in `stopRecording()`; unmount/navigation loses the record | FIXED | shared reporter used by stop path, unmount cleanup AND the 180s max-duration auto-stop (which previously had no reporting exit at all), `keepalive: true`, one report per session. Caveat: a hard tab-kill is still best-effort — the report awaits an auth token before the fetch is issued; SPA navigation (the dominant case) is reliable |
 | R5 | BUG | `lib/session-metrics.ts` writes zero-cost rows with the same eventTypes into `usage_events` → requests inflated 2–3x in admin aggregates | FIXED | telemetry rows tagged `service: session-telemetry`; aggregates bucket by service (legacy rows: no provider+no cost+not cached = telemetry) |
 | V2 | BUG | edge-reporter `estimatedTokens` flag (`=== undefined`) disagrees with resolution (`Number.isFinite`) | FIXED | flag derived from the actual resolution |
 | V3/A10 | BUG | Monthly money key + `startOfMonth` readers use LOCAL time; everything else UTC (dormant: Vercel runs UTC) | FIXED | shared UTC month helpers used by writer and every reader |
@@ -43,8 +43,8 @@ inflated every "requests" aggregate 2–3x (R5); and there was no service dimens
 | R6 | GAP | conversation extraction runs as sentinel userId `system-extraction` even when a real user exists | FIXED | real userId threaded from `/api/chat`; sentinel replaced by reserved `system` constant |
 | R8 | GAP | no service/feature identifier; 5 feedback sub-calls indistinguishable | FIXED | `lib/usage/services.ts` registry; `service` REQUIRED at every funnel entry; per-service rollups + admin panel |
 | V4 | GAP | `CostAnomalyConfig.dailyBudget` settable, read by nothing; `daily_budget_exceeded`/`unusual_pattern` never written; 500 > the real 250 ceiling | FIXED | dead field + dead anomaly types removed from type, defaults, and admin write path |
-| V5 | GAP | hourly sweep truncates at 5,000 events silently (exactly the runaway case) + raw `cost \|\| 0` NaN hazard | FIXED | `readNumber`, truncation surfaced in the anomaly description + log |
-| V6 | GAP | sweep windows leave unscanned gaps (fixed trailing 60min vs ≥1h throttle) | FIXED | window runs from the previous sweep claim, rate compared prorated |
+| V5 | GAP | hourly sweep truncates at 5,000 events silently (exactly the runaway case) + raw `cost \|\| 0` NaN hazard | FIXED | `readNumber`; hitting the limit is itself a CRITICAL anomaly whose description says the figure is a floor, logged at error |
+| V6 | GAP | sweep windows leave unscanned gaps (fixed trailing 60min vs ≥1h throttle) | FIXED | window runs from the previous sweep's claim (capped at 6h), compared as prorated dollars-per-hour with the divisor floored at 1h; 30 new tests pin the sweep math and config guards |
 | V7 | GAP | anonymous LLM spend visible to kill-switch but absent from `usage_events` | FIXED | funnel records unattributed spend under reserved `system` user (events + rollups) |
 | V8 | GAP | anomaly config write/read unvalidated ("banana" threshold silently disarms alarm) | FIXED | numeric validation on write, sanitize on read |
 | V10 | SMELL | `getAnomalyStats` NaN on unknown severity | FIXED | guarded |
@@ -82,10 +82,22 @@ inflated every "requests" aggregate 2–3x (R5); and there was no service dimens
   embeddings (R1), voice+embeddings in Spend health (A7), `system`-attributed spend (V7).
 - `global_usage` daily totals rise accordingly; the $250 ceiling now sees true spend.
 
+## Expected admin-visible changes from the anomaly rework
+
+- The hourly alarm now fires on RATE ($/hour over the scanned window), so its `cost`
+  field is a rate, not a window total; long windows say so ("over 3.0h").
+- A sweep that hits its 5,000-event limit files a CRITICAL `hourly_spike` whose
+  description begins "Cost floor:" — that alarm means "too busy to even count",
+  not a computed overspend.
+- `dailyBudget` is gone from the anomaly config (it was read by nothing); writes
+  naming it are refused with a 400.
+
 ## Owner actions still owed (cannot be done from the repo)
 
-1. `firebase deploy --only firestore:indexes` if the in-repo deploy attempt failed (see
-   commit trailer notes) — A1/A2/A3 are only fixed in prod once indexes build.
+1. ~~`firebase deploy --only firestore:indexes`~~ DONE 2026-08-17 from this repo:
+   deployed successfully to danuxx-42bf3 (one pre-existing remote index not in the
+   file was deliberately left un-deleted). A1/A2/A3 are live once the builds finish.
 2. Verify the cron-job.org job for `/api/cron/aggregate-usage` exists and fires hourly
    (V9): if it lapses >2h, the spike-vs-average anomaly branch silently disables
-   (absolute $50/hr threshold still active).
+   (absolute $50/hr threshold still active). Ground truth: `config/cost_averages
+   .calculatedAt` in Firestore stays fresh.
