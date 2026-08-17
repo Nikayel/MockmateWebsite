@@ -4177,7 +4177,9 @@ with open("names.csv", encoding="utf-8") as fh:
 - **Encoding can fail too.** \`"café".encode("ascii")\` raises \`UnicodeEncodeError\`, which is the same problem running the other way.
 - **A BOM is real bytes.** A file saved by some Windows tools starts with \`\\xef\\xbb\\xbf\`, and UTF-8 decodes it as an invisible character that then breaks your first column name. \`encoding="utf-8-sig"\` strips it.
 
-**Interview nuance:** the sentence to have ready is "decode at the boundary, work in \`str\`, encode on the way out." It is the same shape as the naive-versus-aware rule for datetimes, and for the same reason: a program is easiest to reason about when every value inside it is already normalized. If pressed on a real incident, name latin-1 as the codec that never raises, so the failure it causes is wrong characters in your database rather than an exception in your logs.`,
+**Interview nuance:** the sentence to have ready is "decode at the boundary, work in \`str\`, encode on the way out." It is the same shape as the naive-versus-aware rule for datetimes, and for the same reason: a program is easiest to reason about when every value inside it is already normalized. If pressed on a real incident, name latin-1 as the codec that never raises, so the failure it causes is wrong characters in your database rather than an exception in your logs.
+
+**Sources:** [Unicode HOWTO](https://docs.python.org/3/howto/unicode.html) · [RFC 3629, UTF-8](https://www.rfc-editor.org/rfc/rfc3629.html)`,
     demoCode: `text = "café"
 raw = text.encode("utf-8")
 print(raw)                      # b'caf\\xc3\\xa9'
