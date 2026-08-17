@@ -415,6 +415,42 @@ print(Rectangle(3, 4).describe())     # Rectangle covers 12
 
 That inherited \`describe\` is the whole reason to prefer an ABC when you own the hierarchy: a Protocol can insist a method exists, but it has no body to hand anyone. A class that conforms structurally gets nothing for free.
 
+### \`@override\`: the decorator that catches a rename
+
+Inheritance has one failure that neither an ABC nor a test suite reliably catches. Someone renames a
+method on the base, every subclass keeps its old spelling, and nothing complains: the old name is now
+just a new method that overrides nothing, and the base's version silently wins at every call site.
+
+\`\`\`python
+class Exporter(ABC):
+    def render_rows(self, rows):      # renamed from render() during a refactor
+        return "base:" + str(len(rows))
+
+class CsvExporter(Exporter):
+    def render(self, rows):           # still the OLD name, so it overrides nothing
+        return "csv:" + str(len(rows))
+
+CsvExporter().render_rows([1, 2])     # 'base:2'  -- the CSV version is never called
+\`\`\`
+
+No exception, no warning, and the abstract-method guard does not help because \`render_rows\` is
+concrete. \`typing.override\` (PEP 698, Python 3.12) is the declaration that closes it: you state that
+a method is meant to override something, and a checker fails the build when it does not.
+
+\`\`\`python
+from typing import override
+
+class CsvExporter(Exporter):
+    @override
+    def render(self, rows):           # mypy/pyright: does not override anything in Exporter
+        return "csv:" + str(len(rows))
+\`\`\`
+
+At runtime the decorator does almost nothing: it sets \`__override__ = True\` on the function and hands
+it back unchanged, so it costs nothing and changes no behavior. All the value is static, which puts
+it in the same family as \`Protocol\`: a contract a tool checks before you ship rather than a gate the
+interpreter enforces. On Python 3.11 and earlier, import it from \`typing_extensions\`.
+
 ### Protocols: conform by shape
 
 A \`Protocol\` flips the rule. Any object with a matching \`area()\` method qualifies, with no inheritance and no import of your type:
