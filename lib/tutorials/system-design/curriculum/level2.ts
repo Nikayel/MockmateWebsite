@@ -1409,6 +1409,8 @@ and remember that between two LSM engines the tail latency argument is about the
   "reveal": "In your design write, lead with the workload's read/write mix, then name the engine and the amplification you accept: 'write-heavy ingest, so LSM, and I will watch compaction' beats naming a database brand."
 }
 \`\`\`
+
+**Sources:** [The Log-Structured Merge-Tree paper](https://www.cs.umb.edu/~poneil/lsmtree.pdf) · [RocksDB overview](https://github.com/facebook/rocksdb/wiki/RocksDB-Overview) · [PostgreSQL index types](https://www.postgresql.org/docs/current/indexes-types.html)
 `.trim()
 
 const indexingCostTeach = `
