@@ -777,7 +777,7 @@ For \`"alice: 45\\nnonsense\\nalice: 15\\n"\` return
     // the report shape, the empty directory) is stated in the README rather than discovered.
     // Dropping pyproject.toml would leave the packaging lesson grading no packaging, and
     // dropping cli.py would leave nothing that composes the other two, so the file count is the
-    // capstone's licence being used rather than volume for its own sake. What the review DID
+    // capstone's license being used rather than volume for its own sake. What the review DID
     // change is the run-up: the Apply now does one file of this job on a string, so none of the
     // parsing arrives new here.
     estimatedMinutes: 34,
