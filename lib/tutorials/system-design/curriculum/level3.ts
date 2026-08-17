@@ -2275,6 +2275,8 @@ cache is defensible, not just present.
   "reveal": "In your design write, never say 'add a cache' alone: name the read pattern, the write policy, the TTL with jitter, and the consistency window you are promising the reader."
 }
 \`\`\`
+
+**Sources:** [AWS ElastiCache caching strategies](https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Strategies.html) · [Redis eviction policies](https://redis.io/docs/latest/develop/reference/eviction/)
 `.trim()
 
 const cacheStampedeHotkeyTeach = `
