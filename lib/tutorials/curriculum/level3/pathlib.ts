@@ -319,7 +319,7 @@ Once you have a \`Path\`, its parts are attributes rather than string surgery:
 
 ## Walking a tree, and describing what you found
 
-Real export folders are not flat. \`glob\` searches one directory level, \`rglob\` searches every level below the path you call it on, and both take a filename pattern rather than a suffix:
+Real export folders are not flat. \`glob\` searches one directory level, \`rglob\` searches that directory and every level below it, and both take a filename pattern rather than a suffix:
 
 \`\`\`python
 from pathlib import Path
