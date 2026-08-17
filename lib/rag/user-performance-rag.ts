@@ -11,7 +11,7 @@
  */
 
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
-import { getHybridProvider } from "./embeddings/hybrid-provider"
+import { generateTextEmbedding } from "./services/embeddings"
 import { vectorDB } from "./vectordb"
 import { adminDb } from "@/lib/firebase-admin"
 import { Timestamp } from "firebase-admin/firestore"
@@ -104,8 +104,6 @@ export interface PersonalizedRecommendation {
  * User Performance RAG Service
  */
 export class UserPerformanceRAG {
-  private embeddingProvider = getHybridProvider()
-
   /**
    * Get or create user performance profile
    */
@@ -629,7 +627,10 @@ Trend: ${profile.recentTrend}
 Pattern proficiencies: ${profile.patternProficiency.map((p) => `${p.pattern}:${p.proficiencyLevel}`).join(", ")}
       `.trim()
 
-      const embedding = await this.embeddingProvider.generateEmbedding(profileText)
+      const embedding = await generateTextEmbedding(profileText, {
+        service: "rag-indexing",
+        userId: profile.userId,
+      })
 
       const vectorDoc: VectorDocument = {
         id: `user-performance-${profile.userId}`,
@@ -668,7 +669,10 @@ Weaknesses: ${profile.weaknesses.join(", ")}
 Learning pace: ${profile.learningPace}
       `.trim()
 
-      const embedding = await this.embeddingProvider.generateEmbedding(profileText)
+      const embedding = await generateTextEmbedding(profileText, {
+        service: "rag-query-embeddings",
+        userId,
+      })
 
       const results = await vectorDB.query(embedding, {
         topK: limit + 1,

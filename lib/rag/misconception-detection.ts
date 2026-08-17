@@ -17,7 +17,6 @@ import { adminDb } from "@/lib/firebase-admin"
 import { Timestamp } from "firebase-admin/firestore"
 import type { DetectedMisconception, MisconceptionType } from "./enhanced-user-profile"
 import { getAdvancedRetriever } from "./retrieval/advanced-retrieval"
-import { generateTextEmbedding } from "./index"
 
 // ============================================================================
 // TYPES

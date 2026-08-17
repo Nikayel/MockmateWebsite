@@ -9,7 +9,7 @@
  * - Personalized retrieval based on user history
  */
 
-import { getHybridProvider } from "../embeddings/hybrid-provider"
+import { generateTextEmbedding } from "../services/embeddings"
 import { vectorDB } from "../vectordb"
 import type { QueryResult, VectorContentType } from "../types"
 import { RETRIEVAL_CONFIG } from "../config"
@@ -106,8 +106,6 @@ type RetrievalCandidate = QueryResult & {
  * Advanced RAG Retriever
  */
 export class AdvancedRetriever {
-  private embeddingProvider = getHybridProvider()
-
   /**
    * Perform advanced retrieval
    */
@@ -320,7 +318,10 @@ export class AdvancedRetriever {
     for (const query of queries) {
       let embedding: number[]
       try {
-        embedding = await this.embeddingProvider.generateEmbedding(query)
+        embedding = await generateTextEmbedding(query, {
+          service: "rag-query-embeddings",
+          userId: options.userId,
+        })
       } catch (error) {
         // Semantic search is best-effort. When the embedding provider is
         // unavailable, or its output cannot be queried against the configured

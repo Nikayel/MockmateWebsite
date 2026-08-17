@@ -7,10 +7,10 @@ const mocks = vi.hoisted(() => ({
   recordRetrieval: vi.fn(),
 }))
 
-vi.mock("../embeddings/hybrid-provider", () => ({
-  getHybridProvider: () => ({
-    generateEmbedding: mocks.generateEmbedding,
-  }),
+// Retrieval embeds through the tracked seam, not the raw provider, so that
+// every query embedding lands in usage_events.
+vi.mock("../services/embeddings", () => ({
+  generateTextEmbedding: mocks.generateEmbedding,
 }))
 
 vi.mock("../vectordb", () => ({
