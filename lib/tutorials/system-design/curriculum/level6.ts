@@ -1135,6 +1135,8 @@ tiered storage govern cost and replay; and KRaft removed ZooKeeper by making met
   "reveal": "No per-message delete, no random insert, no in-place update: that one data model gives you the fast sequential write path and the retained, offset-addressable history at the same time."
 }
 \`\`\`
+
+**Sources:** [Kafka design internals](https://kafka.apache.org/documentation/#design) · [Kafka producer configs](https://kafka.apache.org/documentation/#producerconfigs) · [Apache Kafka 4.0 release announcement](https://kafka.apache.org/blog/2025/03/18/apache-kafka-4.0.0-release-announcement/)
 `.trim()
 
 const partitioningOrderingTeach = `
