@@ -627,6 +627,35 @@ await asyncio.gather(*(fetch_bounded(n) for n in range(50)))
 
 Two details make or break a hand-rolled version. The slot has to be released in a \`finally\`, or one exception leaks a slot and the gate slowly closes forever. And the wait for a free slot must contain an \`await\`: scheduling is cooperative, so a loop that spins without yielding never lets the task holding the slot run far enough to give it back, and the whole service deadlocks.
 
+### Deadlines: \`asyncio.timeout\`
+
+Bounding how much runs at once still says nothing about how long any one of them may take. A call
+that never returns holds its slot forever, and a bounded fan-out with one stuck task drains down to
+nothing. \`asyncio.timeout(seconds)\` (Python 3.11) is the deadline, and like \`TaskGroup\` it is a
+block rather than an argument you thread through every call:
+
+\`\`\`python
+async def main():
+    try:
+        async with asyncio.timeout(0.05):
+            return await fetch_one(1)     # this one sleeps a whole second
+    except TimeoutError:
+        return "gave up"
+
+asyncio.run(main())   # 'gave up'
+\`\`\`
+
+The mechanism is worth knowing, because it is what makes the deadline safe: on expiry the block
+**cancels** whatever is running inside it, and the \`CancelledError\` that unwinds it is converted into
+a \`TimeoutError\` at the \`async with\` line. So the slow work is actually stopped rather than abandoned
+to keep running behind your back. Anything inside gets a chance to clean up in a \`finally\` on the way
+out, and everything nested in the block shares the one deadline, so you write it once at the level
+that owns the request instead of on every call beneath it.
+
+Two neighbors are worth naming. \`asyncio.wait_for(coro, timeout)\` is the older per-call spelling of
+the same idea. And since 3.11 \`asyncio.TimeoutError\` is just the builtin \`TimeoutError\`, so there is
+only one name left to catch.
+
 ### Why this sandbox uses a helper
 
 \`asyncio.run\` refuses to start when a loop is already running and raises \`RuntimeError\`. This sandbox runs your code *inside* a loop, so the exercises hand you a stand-in for it. The warm-up ships a driver called \`run_all(coros)\` that drives every coroutine you give it together on a simulated tick clock, so sleeps overlap the way real I/O would. The workspace exercise ships a slightly larger read-only loop, \`pipeline/kernel.py\`, with \`sleep\`, \`spawn\` and \`wait_all\` standing in for \`asyncio.sleep\`, \`asyncio.create_task\` and awaiting a \`gather\`. Either way you are writing real coroutines; only the door into the loop changes.
