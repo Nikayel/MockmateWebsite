@@ -1610,6 +1610,1226 @@ Quantization shrinks the model weights so more of the GPU is left over and the m
 \`\`\`
 `.trim()
 
+const prefillDecodeSplitTeach = `
+## Prefill and decode are two different machines
+
+A request to a transformer runs in two phases that share hardware and share weights and have almost nothing else in common. **Prefill** reads the whole prompt in one pass and writes the KV cache for it, so every weight the model holds is reused across every prompt token in that pass. **Decode** then emits one token at a time, and each step reads the entire set of weights again to produce that single token. Same GPU, same weights, opposite bottleneck.
+
+The number that separates them is **arithmetic intensity**: the floating point operations a kernel performs per byte it pulls out of memory. Every accelerator has a **ridge point**, the intensity at which its peak compute and its peak memory bandwidth are exactly balanced. Below the ridge the math units wait on memory and the kernel is memory-bandwidth-bound; above it memory keeps up and the kernel is compute-bound. Work the two phases out on the same card and they land on opposite sides of it.
+
+\`\`\`
+one weight matrix, 2 bytes per element, W bytes total, on a fixed model
+
+prefill of a 512-token prompt
+  bytes moved   W            the weights are read once for the whole prompt
+  FLOPs         512 x W      each of 512 tokens is multiplied through them
+  intensity     ~512 FLOP per byte read
+
+decode, one sequence, one step
+  bytes moved   W            the same weights, read again
+  FLOPs         1 x W        to produce exactly one token
+  intensity     ~1 FLOP per byte read
+
+A100 80GB ridge point
+  312 TFLOP/s dense BF16 / 2.04 TB/s HBM = ~153 FLOP per byte
+
+  512 is far above 153  ->  prefill runs into the compute ceiling
+    1 is far below 153  ->  decode runs into the bandwidth ceiling
+\`\`\`
+
+That is not a toy result. DistServe measures the same crossing on a real model: for a 13B model, prefilling a 512-token sequence is already enough to put an A100 near compute-bound, while the decode steps for that same request sit at the far end of the bandwidth side.
+
+## Two SLOs, and one pool has one knob
+
+Because the phases are different machines, they answer to different service levels. **Time to first token (TTFT)** is prefill's number and scales with prompt length. **Time per output token (TPOT)**, the same quantity the serving lesson calls inter-token latency, is decode's number and is what streaming feels like. A single pool has one scheduler and one batch policy, so tuning it for throughput fills the batch with prefill work and misses TTFT, while tuning it for TTFT admits prompts eagerly and leaves the GPU underfed.
+
+The metric that makes that decidable is **goodput**: the maximum request rate a fleet sustains while still meeting its SLO attainment target, for example ninety percent of requests meeting both TTFT and TPOT. Raw requests per second counts requests you served badly. Goodput counts only the ones you served inside the contract, which is why a change can raise throughput and lower goodput at the same time, and why the fleet you size on throughput is the wrong fleet.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "long-prompt-joins-the-batch",
+  "prompt": "Sixty sequences are streaming tokens on one GPU when a 32k-token prompt is admitted into the running batch. What do those sixty users see?",
+  "options": [
+    {
+      "label": "Nothing much, since the batch only grew by one sequence",
+      "feedback": "That is the intuition continuous batching sells, and it holds for another decode sequence. This arrival is not another decode sequence: it is one enormous step of a different kind of work."
+    },
+    {
+      "label": "Their token streams pause for as long as that prompt takes to read",
+      "correct": true,
+      "feedback": "Right. The scheduler runs one batch step at a time, and this step is spent reading 32k tokens instead of advancing sixty sequences by one token each. Every stream freezes for the whole of it, which is a TPOT failure caused entirely by someone else's TTFT."
+    },
+    {
+      "label": "Slower tokens for the tail of the batch, while the head of the batch keeps streaming at its old rate",
+      "feedback": "There is no head and tail here. A batch step advances every sequence in it together, so whatever that step spends its time on is spent on behalf of all of them equally."
+    }
+  ]
+}
+\`\`\`
+
+## They interfere, and chunking only spreads the interference
+
+Continuous batching admits a queued request the instant a slot frees, which is exactly right when the arriving work is another decode stream. When the arriving work is a long prefill, the batch step it occupies is a step that would otherwise have advanced every running sequence by one token.
+
+\`\`\`
+one 32k prefill arrives while 60 sequences are decoding
+
+no chunking
+  t=0ms      decode  decode  decode      every stream advances one token per step
+  t=90ms     [==== 32k prefill owns the batch step, ~1.2s ====]
+  t=1290ms   decode  decode               the 60 streams resume
+             new request TTFT: excellent. everyone else's TPOT: 1.2s of nothing
+
+chunked prefill, 512-token chunks
+  t=90ms     [chunk][decode][chunk][decode][chunk][decode] ...
+             each step carries one slice of prefill alongside the decodes
+             no stream pauses longer than one chunk, so TPOT stays smooth
+             the prefill now finishes later, so its own TTFT is worse
+\`\`\`
+
+**Chunked prefill**, introduced by Sarathi, is the colocated mitigation: split a long prompt into fixed-size pieces and piggyback each piece onto a decode step so no single step is enormous. It works, and it is the right first move. It is a mitigation rather than a fix because both phases still share one pool and one scheduler, so the chunk size is a single knob with the two SLOs tied to opposite ends of it. Raise the chunk size and prefill completes sooner while decode stutters; lower it and decode smooths out while TTFT slides. You can choose a point on that curve. You cannot leave the curve.
+
+## Disaggregation: two fleets, two scaling laws
+
+Disaggregation leaves the curve by giving each phase its own machines. A prefill pool runs prompts and produces KV cache; a decode pool receives that cache and streams tokens. The pools scale independently, can sit on different GPU types, and no longer contend for the same batch step, so a burst of long prompts cannot reach an in-flight stream at all.
+
+The published results are worth carrying because they are stated against baselines. DistServe reports serving 7.4x more requests, or holding SLOs 12.6x tighter, at over ninety percent SLO attainment compared with the serving systems it measures against. Splitwise reports 1.4x more throughput at twenty percent lower cost by splitting the phases across machine types.
+
+## What it costs: the KV cache has to move
+
+The obvious objection is that the KV cache produced by prefill is exactly what decode needs, so a split forces it across a wire. Put numbers on it before deciding whether that is fatal.
+
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Is Moving the KV Cache Cheaper Than Recomputing It",
+  "predictPrompt": {
+    "question": "An 8k-token request finishes prefill on one pool and must decode on another, so its KV cache crosses the fabric first. Against the prefill that just produced it, what does that copy cost?",
+    "options": [
+      "More than the prefill, since the whole cache has to move",
+      "A small fraction of it over NVLink or InfiniBand, and most of it over TCP",
+      "The same either way, because bytes are bytes and the fabric is not the bottleneck"
+    ]
+  },
+  "workedExample": "The initial values are an 8,192 token sequence at 0.3 MB of KV per token, which is 2.4 GB to move, against a prefill measured at 12,000 tokens per second, which is 683ms of work. Over a 50 GB/s InfiniBand fabric the copy is about 48ms, roughly seven percent of the prefill it saves. Now drag the fabric down to a 3 GB/s TCP link and watch the copy overtake the prefill entirely, which is why multi-node disaggregation is an RDMA design and not a networking detail.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "seqlen",
+      "label": "Sequence length prefilled",
+      "min": 512,
+      "max": 131072,
+      "scale": "log",
+      "initial": 8192,
+      "unit": "tokens"
+    },
+    {
+      "kind": "slider",
+      "id": "kvpertoken",
+      "label": "KV cache per token",
+      "min": 0.02,
+      "max": 2.5,
+      "scale": "linear",
+      "step": 0.005,
+      "initial": 0.3,
+      "unit": "MB"
+    },
+    {
+      "kind": "select",
+      "id": "fabric",
+      "label": "Fabric between the pools",
+      "options": [
+        { "label": "TCP over 25 GbE (~3 GB/s)", "value": 3 },
+        { "label": "InfiniBand NDR 400 (~50 GB/s)", "value": 50 },
+        { "label": "NVLink inside one node (~900 GB/s)", "value": 900 }
+      ],
+      "initial": 1
+    },
+    {
+      "kind": "slider",
+      "id": "prefillrate",
+      "label": "Measured prefill throughput per node",
+      "min": 1000,
+      "max": 60000,
+      "scale": "log",
+      "initial": 12000,
+      "unit": "tokens/sec"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "kvbytes",
+      "label": "KV cache to move",
+      "expr": "seqlen * kvpertoken / 1024",
+      "format": "number",
+      "unit": "GB"
+    },
+    {
+      "id": "transferms",
+      "label": "Time to move it",
+      "expr": "kvbytes / fabric * 1000",
+      "format": "number",
+      "unit": "ms"
+    },
+    {
+      "id": "prefillms",
+      "label": "Time the prefill itself took",
+      "expr": "seqlen / prefillrate * 1000",
+      "format": "number",
+      "unit": "ms"
+    },
+    {
+      "id": "share",
+      "label": "Transfer as a share of that prefill",
+      "expr": "transferms / prefillms",
+      "format": "percent"
+    }
+  ],
+  "caption": "The transfer is a fixed tax proportional to the KV bytes; the prefill it replaces is proportional to the token count. Which one wins is decided by the fabric, so the fabric is a design input rather than an implementation detail."
+}
+\`\`\`
+
+Splitwise cuts the tax further by overlapping the copy layer by layer, sending each layer's KV as soon as that layer has produced it, so most of the transfer hides behind prefill compute that was being paid for anyway. Measured that way the overhead stays under seven percent, with a constant non-overlapped component of roughly 8ms on A100 and 5ms on H100 over InfiniBand. Multi-node disaggregation therefore assumes RDMA. A TCP fallback is not a fallback, and the widget above is the argument: at 3 GB/s the copy costs more than the work it was meant to save.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "which-pool-owns-the-symptom",
+  "prompt": "A disaggregated fleet is missing its numbers. Sort each reading by which pool you would resize first.",
+  "buckets": [
+    "Prefill pool",
+    "Decode pool"
+  ],
+  "items": [
+    {
+      "label": "Time to first token doubled while inter-token latency held flat",
+      "bucket": "Prefill pool",
+      "feedback": "First-token time is the prefill pool's number by construction, and a flat inter-token latency says the other pool is fine."
+    },
+    {
+      "label": "Inter-token latency went from 20ms to 60ms with first tokens still on time",
+      "bucket": "Decode pool",
+      "feedback": "Streaming speed is what the decode pool sells. Nothing here points upstream."
+    },
+    {
+      "label": "Prompt tokens processed per second is pinned at the node's measured ceiling",
+      "bucket": "Prefill pool",
+      "feedback": "That ceiling is the prefill pool's throughput, so the queue behind it is a prefill capacity problem."
+    },
+    {
+      "label": "KV cache blocks in use sit at 95 percent and new sequences are queueing",
+      "bucket": "Decode pool",
+      "feedback": "KV cache lives with the sequences being decoded, so running out of blocks caps decode concurrency."
+    },
+    {
+      "label": "Summarization requests wait minutes before any token appears, chat requests do not",
+      "bucket": "Prefill pool",
+      "feedback": "One tenant's prompts are far longer, so they queue against prefill capacity while short prompts sail through."
+    }
+  ]
+}
+\`\`\`
+
+## Ratio planning: the pool shape follows the workload shape
+
+Two pools means a second sizing question: how many of each. The prefill-to-decode replica ratio follows the ratio of prefill work to decode work, and those follow prompt length and output length once you divide by each phase's measured per-node rate. The consequence is that two products running the same model on the same hardware want differently shaped fleets.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Workload", "Prompt", "Output", "Prefill work", "Decode occupancy", "Implied shape"],
+  "rows": [
+    ["Interactive chat", "300 tokens", "500 tokens", "300 token-passes", "500 steps, ~15s of a slot", "decode-heavy, most replicas decode"],
+    ["Document summarization", "20,000 tokens", "400 tokens", "20,000 token-passes", "400 steps, ~12s of a slot", "prefill-heavy, most replicas prefill"]
+  ],
+  "highlightCols": ["Prefill work", "Implied shape"],
+  "caption": "Both rows stream for about the same length of time, so decode demand is nearly identical. Prefill demand differs by a factor of 66, and that factor is the whole reason one fleet cannot be copied onto the other product."
+}
+\`\`\`
+
+Compute the ratio from measurements, not from the token counts alone: prefill and decode consume a node at different rates, so the numbers above become replica counts only after dividing by a measured prefill rate in tokens per second and a measured decode capacity in concurrent sequences.
+
+## The beat that keeps this honest
+
+vLLM's own documentation is blunt about what disaggregated prefilling is for: it does not improve throughput. What it buys is the ability to tune TTFT and inter-token latency separately, and to keep tail inter-token latency under control. If your problem statement is "we want more tokens per dollar", this is the wrong lever and the serving lesson's levers are the right ones.
+
+TaiChi draws the boundary more precisely still. Aggregation wins when TTFT is tight and TPOT is relaxed, because a colocated pool can spend whole batch steps on prefill the moment a prompt lands. Disaggregation wins when TPOT is strict and TTFT is relaxed, because an isolated decode pool is never interrupted. Under balanced SLOs neither shape is optimal on its own, which is an uncomfortable finding and the most useful one in the lesson: there are regimes where the correct answer is a hybrid, or a measurement.
+
+**Interview nuance:** name the regime, not the technique. Disaggregation loses on small models, short prompts, low concurrency, and any cluster without a fast KV fabric, and saying so unprompted is what separates someone who has run it from someone who has read about it. State the SLO shape first, derive the topology from it, and say which number you would watch to know you chose wrong.
+
+**Recap:** prefill is compute-bound and decode is memory-bandwidth-bound, so they answer to different SLOs and interfere inside one pool; chunked prefill spreads that interference along a single knob, disaggregation removes it by giving each phase its own fleet at the price of a KV transfer that is cheap over RDMA and ruinous over TCP; size the two pools from measured rates rather than token counts; and remember that the split buys SLO separability, not throughput.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "which-regime-is-this",
+  "prompt": "A chat product must put the first token on screen inside 300ms, and its users are happy with a leisurely 60ms between tokens after that. A colleague proposes splitting the fleet into prefill and decode pools. What is the honest answer?",
+  "options": [
+    {
+      "label": "Split it, since two pools scale independently",
+      "feedback": "Independent scaling is real and it is not free. Here the tight number belongs to the phase that a colocated pool can serve immediately, and the split adds a transfer in front of it."
+    },
+    {
+      "label": "Keep one pool, because this is the SLO shape aggregation wins",
+      "correct": true,
+      "feedback": "Right. A tight first-token target with a relaxed per-token target is the regime where a colocated pool can drop everything and prefill, and where the transfer a split would add lands directly on the number you are trying to protect."
+    },
+    {
+      "label": "Split it, but only once the fabric between the two pools is RDMA rather than a TCP link",
+      "feedback": "The fabric condition is correct and it is the second question. The first is whether the split helps this SLO shape at all, and a fast fabric does not change that answer."
+    }
+  ],
+  "reveal": "The lesson is one decision with three inputs. First, the phases are physically different: prefill is compute-bound, decode is bandwidth-bound, and one pool has a single scheduler for both. Second, the SLO shape decides the topology: tight first-token with relaxed per-token favors keeping them together, strict per-token with relaxed first-token favors splitting them apart, and balanced targets favor neither cleanly. Third, if you split, the KV cache moves, so the fabric is part of the design and RDMA is the assumption. Say goodput rather than throughput when you talk about any of it, because that is the number all three inputs are trying to move."
+}
+\`\`\`
+
+**Sources:** [DistServe: disaggregating prefill and decoding](https://arxiv.org/abs/2401.09670) · [Splitwise: phase splitting](https://arxiv.org/abs/2311.18677) · [vLLM disaggregated prefilling](https://docs.vllm.ai/en/latest/features/disagg_prefill/) · [TaiChi: aggregation or disaggregation](https://arxiv.org/abs/2508.01989)
+`.trim()
+
+const promptCacheEconomicsTeach = `
+## One token, three prices
+
+The serving lesson teaches prefix caching as a latency lever and the gateway lesson teaches token metering as a cost control. What falls between them is that on a hosted API the same token costs three different amounts depending on what the provider had to do with it. It can be read fresh, it can be written into a cache, or it can be read back out of one, and those are three separate line items on the bill.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Provider and tier", "Uncached input", "Cache write", "Cache read", "Ongoing storage"],
+  "rows": [
+    ["Anthropic, 5-minute TTL", "1x", "1.25x", "0.1x", "none"],
+    ["Anthropic, 1-hour TTL", "1x", "2x", "0.1x", "none"],
+    ["OpenAI, automatic caching", "1x", "no separate write tier", "0.1x", "none"],
+    ["Google Gemini, explicit cache", "1x", "no separate write tier", "discounted", "charged per token per hour"]
+  ],
+  "highlightCols": ["Cache write", "Ongoing storage"],
+  "caption": "Multipliers as published in August 2026; check the current price page before quoting one. The ratios are what this lesson is about, and the two highlighted columns are where the providers stop agreeing with each other."
+}
+\`\`\`
+
+A cache write costs **more** than an uncached read on Anthropic, which is the fact that makes this a decision rather than a switch. A cache read costs a tenth, which is the fact that makes the decision easy. OpenAI applies the same 0.1x discount to cached input with a 1,024-token minimum and no separate write tier, and lets you steer which entry a request lands on with a \`prompt_cache_key\`.
+
+\`\`\`
+one request's input, priced in multiples of the uncached rate
+
+no caching      request 1: 1.00   request 2: 1.00   ->  2.00 for two
+5-minute tier   request 1: 1.25   request 2: 0.10   ->  1.35 for two
+1-hour tier     request 1: 2.00   request 2: 0.10   ->  2.10 for two
+
+three requests: 3.00 uncached, 1.45 on the 5-minute tier, 2.20 on the 1-hour tier
+
+the 5-minute write has paid for itself by the SECOND request
+the 1-hour write has paid for itself by the THIRD
+\`\`\`
+
+Two requests is a low bar. Any multi-turn conversation, any agent loop, any assistant that a user asks a follow-up question clears it in seconds, which is why prefix caching is close to unconditionally correct on those providers rather than being a tuning option.
+
+## The provider whose model is shaped differently
+
+Google's explicit context caching adds a term the other two do not have: storage, charged per token per hour for as long as the cache lives. That is rent rather than a purchase, and rent changes which caches are worth holding.
+
+\`\`\`
+a 200,000-token cached prefix, held for 8 hours, hit twice an hour
+
+no storage term
+  write   200k x the write multiplier, paid once
+  reads   16 x 200k x the read multiplier
+  idle    free. an unhit hour costs nothing at all
+
+with a per-token-per-hour storage term
+  write   200k x the write multiplier, paid once
+  reads   16 x 200k x the read multiplier
+  rent    200k x 8 hours x the hourly rate, paid whether anyone hits or not
+
+the rent term does not care about your hit rate, so a big cache that is
+rarely hit can cost more than never caching it. "cache everything" belongs
+to one pricing structure and is wrong under the other
+\`\`\`
+
+Gemini also runs implicit caching on by default on recent models, so on that provider you may already be receiving a discount you have not accounted for, and a cost model that assumes every input token is billed at full rate will not reconcile.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "name-in-the-system-prompt",
+  "prompt": "A prompt template interpolates the user's display name into the first line of the system prompt, ahead of a 12k-token policy corpus. Cache hit rate is zero and no error is ever raised. What is happening?",
+  "options": [
+    {
+      "label": "The corpus sits below the provider's minimum cacheable length",
+      "feedback": "A 12k-token block is comfortably above every published minimum. Something is stopping the corpus from being reused rather than stopping it from qualifying."
+    },
+    {
+      "label": "Nothing after the first differing token can be reused, which here is everything",
+      "correct": true,
+      "feedback": "Right. A cache entry is keyed on the token sequence from position zero, so the match ends at the first token that differs. Put a per-user value at position three and the 12k tokens behind it are re-read at full price on every request, silently, because a miss is not an error."
+    },
+    {
+      "label": "The entries are written correctly but expire before the next request in the session ever arrives",
+      "feedback": "Expiry is a real failure mode and it produces an intermittent hit rate, not a flat zero. A rate of exactly zero says the entries are never matching in the first place."
+    }
+  ]
+}
+\`\`\`
+
+## Why the prefix has to be a prefix
+
+A cache entry is keyed on the exact token sequence starting at position zero. Not a hash of the content, not a set of blocks: an ordered prefix. The match runs forward from the first token and ends at the first token that differs, and everything after that point is uncached work.
+
+\`\`\`
+layout A   [ "Hello Ana, you are a support agent" ][ 12k policy corpus ][ user turn ]
+             ^ differs per user
+           first difference at token ~3
+           cacheable prefix: 3 tokens. effectively nothing.
+
+layout B   [ "You are a support agent" ][ 12k policy corpus ][ "Ana asks:" + user turn ]
+             ^ byte-identical on every request
+           first difference at token ~12,030
+           cacheable prefix: ~12,030 tokens, read at 0.1x from the second request on
+
+the minimum cacheable prefix is per-model and NOT monotonic across generations.
+on Anthropic it ranges from 512 to 4,096 tokens depending on the model, so a
+3k-token prompt caches on one model and silently does not on its successor.
+the failure reports zero cache-creation tokens. it never raises.
+\`\`\`
+
+## The ordering rule, and the budget on it
+
+The rule falls straight out of that picture: order the prompt from most stable to least stable. System instructions and tool definitions first, because they change on deploy. A shared corpus next, because it changes weekly. Retrieved RAG chunks late, because they are chosen per question and are therefore volatile, with one exception worth naming: if a small hot corpus is attached to nearly every request, it is stable and belongs early. The user's turn goes last, always.
+
+You are not annotating freely. On Anthropic you get at most four explicit \`cache_control\` breakpoints per request, so you are choosing four boundaries in the prompt and everything between two boundaries is one cacheable unit. There is also a coupling that catches people: changing \`tool_choice\` invalidates cached message blocks, so a routing decision made per request can quietly cost the cache on a prompt whose text never moved.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "stable-or-volatile",
+  "prompt": "You are laying out the prompt for a support assistant. Sort each block by where it belongs.",
+  "buckets": [
+    "Stable, goes early",
+    "Volatile, goes late"
+  ],
+  "items": [
+    {
+      "label": "The 3k-token tool schema, unchanged since the last deploy",
+      "bucket": "Stable, goes early",
+      "feedback": "Deploy-frequency change is the definition of stable here. It also tends to be large, which is exactly what you want inside the cached region."
+    },
+    {
+      "label": "The shared policy corpus attached to every request",
+      "bucket": "Stable, goes early",
+      "feedback": "Identical across requests and large. This is the block the whole strategy exists to move onto the cheap tier."
+    },
+    {
+      "label": "Chunks retrieved for this particular question",
+      "bucket": "Volatile, goes late",
+      "feedback": "Chosen per question, so they differ on nearly every request. Placed early they would truncate the cacheable prefix at their first token."
+    },
+    {
+      "label": "A wall-clock timestamp the template injects",
+      "bucket": "Volatile, goes late",
+      "feedback": "The most expensive single character in prompt engineering when it lands early: it differs on literally every request, so it caps the prefix wherever it sits."
+    },
+    {
+      "label": "The user's current turn",
+      "bucket": "Volatile, goes late",
+      "feedback": "Obvious, and worth stating because a template that greets the user by name inside the system block has moved this to the front without meaning to."
+    }
+  ]
+}
+\`\`\`
+
+## The clock starts earlier than you think
+
+The cache lifetime is measured from the **start** of the request that writes or reads the entry, not from the end of the response. Generation time is spent out of the TTL, so a long answer eats its own cache window.
+
+\`\`\`
+5-minute tier, TTL measured from the start of the request
+
+14:00:00   request 1 arrives, writes the prefix. the 5-minute clock starts HERE
+14:00:04   first token
+14:04:10   last token of a long streamed answer
+14:05:00   the entry expires
+14:05:30   the user's follow-up arrives  ->  MISS, and the prefix is rewritten
+
+the user waited 80 seconds. the cache saw a gap of five and a half minutes.
+
+a read refreshes the TTL at no extra charge, so a chatty session stays warm,
+while a session with one long generation per turn can miss on every turn
+\`\`\`
+
+## Why an agent needs this rather than benefits from it
+
+The other half of the bill is structural. An agent resends the whole conversation as input on every turn, so turn N carries everything from turns 1 through N. The input token count over a run is therefore proportional to the sum of 1 through N, which is quadratic in the number of turns rather than linear.
+
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "What a 40-Turn Agent Actually Bills for Input",
+  "predictPrompt": {
+    "question": "A 40-turn agent run adds about 800 tokens per turn, and the whole conversation is resent as input on every turn. Roughly how many input tokens does the run bill in total?",
+    "options": [
+      "About 32,000, the size of the conversation at the end",
+      "About 656,000, because every turn resends everything before it",
+      "About 320,000, one turn's worth per turn plus some overhead"
+    ]
+  },
+  "workedExample": "The initial values are 40 turns adding 800 tokens each, so the final turn alone carries 32,000 tokens of input and the run bills 656,000 across all forty. Turn on caching at a 0.1x read and a 1.25x write and the same run bills about 102,000 units, removing roughly 84 percent of the input spend. Now drag the turn count up: the uncached number grows with the square of the turns while the cached number grows nearly linearly, so the gap widens the longer the agent runs.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "turns",
+      "label": "Turns in the run",
+      "min": 2,
+      "max": 120,
+      "scale": "linear",
+      "step": 1,
+      "initial": 40,
+      "unit": "turns"
+    },
+    {
+      "kind": "slider",
+      "id": "tokensperturn",
+      "label": "Tokens added per turn",
+      "min": 100,
+      "max": 5000,
+      "scale": "linear",
+      "step": 50,
+      "initial": 800,
+      "unit": "tokens"
+    },
+    {
+      "kind": "slider",
+      "id": "readmult",
+      "label": "Cache read multiplier",
+      "min": 0.05,
+      "max": 1,
+      "scale": "linear",
+      "step": 0.05,
+      "initial": 0.1,
+      "unit": "x base"
+    },
+    {
+      "kind": "slider",
+      "id": "writemult",
+      "label": "Cache write multiplier",
+      "min": 1,
+      "max": 2.5,
+      "scale": "linear",
+      "step": 0.05,
+      "initial": 1.25,
+      "unit": "x base"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "lastturn",
+      "label": "Input tokens on the final turn alone",
+      "expr": "tokensperturn * turns",
+      "format": "compact",
+      "unit": "tokens"
+    },
+    {
+      "id": "totaltokens",
+      "label": "Input tokens billed across the run, uncached",
+      "expr": "tokensperturn * turns * (turns + 1) / 2",
+      "format": "compact",
+      "unit": "tokens"
+    },
+    {
+      "id": "cachedunits",
+      "label": "Equivalent units billed with caching",
+      "expr": "tokensperturn * turns * (turns - 1) / 2 * readmult + tokensperturn * turns * writemult",
+      "format": "compact",
+      "unit": "units"
+    },
+    {
+      "id": "saved",
+      "label": "Share of input spend removed",
+      "expr": "1 - cachedunits / totaltokens",
+      "format": "percent"
+    }
+  ],
+  "caption": "The uncached curve is quadratic in turns and the cached curve is close to linear, which is why caching is a prerequisite for a long-running agent rather than an optimization of one, and why context compaction is a cost lever and not only a context-window lever."
+}
+\`\`\`
+
+## The self-hosted mirror image
+
+Nothing above is unique to hosted APIs; it is the same mechanism with the price tag removed. On a self-hosted engine the equivalent is automatic prefix caching over the KV cache. SGLang's RadixAttention keeps the cached prefixes in a radix tree so the shared prefix across requests is **discovered** rather than declared, with LRU eviction on the tree's leaves. vLLM hashes fixed-size blocks into a global table and caches only complete blocks, and ships it on by default because the measured cost when the hit rate is zero is under one percent of throughput. Real hit rates are not marginal: DeepSeek published a production breakdown in which 56.3 percent of input tokens over twenty-four hours were served from KV cache.
+
+**Interview nuance:** prefix caching and semantic caching are different levers and candidates blur them. A prefix cache is a discount on work you still perform: the model still runs, it just skips recomputing KV for tokens it has seen. A semantic cache skips the call entirely and returns a stored answer. Say which one you mean. Then answer the isolation question before it is asked: a cross-request prefix cache is shared state, and the concrete control is a per-tenant salt on the cache key, which vLLM exposes directly as \`cache_salt\`, so a prefix produced under one tenant can never be reused under another.
+
+**Recap:** a token has three prices, so prompt assembly is a financial decision; order blocks from most stable to least stable within your four breakpoints; remember that the match ends at the first differing token and the minimum prefix varies per model; the TTL runs from the start of the request rather than the end of the response; an agent's input cost is quadratic in turns, which is what makes caching a prerequisite; and a shared prefix cache is shared state that wants a per-tenant salt.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "which-cache-lever",
+  "prompt": "Your bill is dominated by input tokens on a 40-turn research agent whose users all ask different questions. A colleague proposes turning on semantic caching. What do you say?",
+  "options": [
+    {
+      "label": "Agreed, since a hit skips the provider call entirely",
+      "feedback": "Skipping the call is the strongest possible saving when it applies. It applies to repeated questions, and this workload's questions are all different, so the hit rate would be near zero."
+    },
+    {
+      "label": "Wrong lever: what repeats here is a prefix, not a question",
+      "correct": true,
+      "feedback": "Right. Every turn resends the same conversation head, which is a prefix-cache hit, while the questions themselves never repeat, which is a semantic-cache miss. Naming which kind of repetition you have is the whole diagnosis."
+    },
+    {
+      "label": "Only after tightening the similarity threshold so that paraphrases stop matching the wrong stored answer",
+      "feedback": "That is the right worry about semantic caching and the reason the gateway lesson tunes the threshold. It does not rescue it here, because near-duplicate questions are not what this workload produces."
+    }
+  ],
+  "reveal": "Prompt caching is arithmetic, not a setting. Three prices for one token means a cache write is an investment that repays on the second request at the short TTL and the third at the long one. The entry is keyed on an exact prefix, so the layout of the prompt decides the hit rate, and the ordering rule is most stable first inside a budget of four breakpoints. Two details do most of the silent damage: the minimum cacheable prefix moves between models, and the TTL runs from the start of the request rather than the end of the response. Underneath all of it, an agent resends its whole conversation every turn, so input cost grows with the square of the turn count and caching is what flattens it. Finally, a prefix cache is shared state: salt the key per tenant."
+}
+\`\`\`
+
+**Sources:** [Anthropic prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) · [OpenAI prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching) · [Gemini context caching](https://ai.google.dev/gemini-api/docs/caching) · [vLLM automatic prefix caching](https://docs.vllm.ai/en/stable/design/prefix_caching/)
+`.trim()
+
+const constrainedDecodingTeach = `
+## Reject and retry is a bet, and you pay for the losses
+
+The eval and guardrail lesson's answer to a malformed JSON response is a validator that rejects it and a retry that tries again. That answer works, and it has a price with three parts: you pay for the tokens of the generation that failed, you pay again for the generation that replaces it, and the request's latency is now a coin flip instead of a distribution. Put numbers on it before deciding whether the price is acceptable, because the number that matters is not the failure rate, it is the failure rate multiplied by your traffic.
+
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "What Reject-and-Retry Costs at Volume",
+  "predictPrompt": {
+    "question": "A service extracting typed fields at 2,000 requests per second sees 8 percent of generations fail validation, each about 600 output tokens. Roughly how many output tokens per second are spent on generations that get thrown away?",
+    "options": [
+      "About 9,600, since 8 percent of 2,000 requests fail",
+      "About 104,000, once you count that a failure still has to be replaced",
+      "Nothing measurable, because a failed generation is not billed"
+    ]
+  },
+  "workedExample": "The initial values are an 8 percent failure rate on 600-token outputs at 2,000 requests per second. Each successful response needs about 1.09 generations, so about 52 tokens per success are thrown away, which is roughly 104,000 wasted output tokens every second across the fleet. Then look at the last output: with a cap of three attempts, about 0.05 percent of requests exhaust the cap, and at this traffic that is one hard failure every second. Drag the failure rate up and watch both numbers move, the second one much faster than the first.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "failrate",
+      "label": "Generations that fail validation",
+      "min": 0.01,
+      "max": 0.5,
+      "scale": "linear",
+      "step": 0.01,
+      "initial": 0.08,
+      "unit": "share"
+    },
+    {
+      "kind": "slider",
+      "id": "outtokens",
+      "label": "Output tokens per generation",
+      "min": 50,
+      "max": 4000,
+      "scale": "linear",
+      "step": 50,
+      "initial": 600,
+      "unit": "tokens"
+    },
+    {
+      "kind": "slider",
+      "id": "rps",
+      "label": "Requests per second",
+      "min": 10,
+      "max": 5000,
+      "scale": "log",
+      "initial": 2000,
+      "unit": "req/sec"
+    },
+    {
+      "kind": "slider",
+      "id": "attemptcap",
+      "label": "Attempts before giving up",
+      "min": 1,
+      "max": 5,
+      "scale": "linear",
+      "step": 1,
+      "initial": 3,
+      "unit": "attempts"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "attempts",
+      "label": "Generations per successful response",
+      "expr": "1 / (1 - failrate)",
+      "format": "number",
+      "unit": "generations"
+    },
+    {
+      "id": "wasted",
+      "label": "Output tokens thrown away per success",
+      "expr": "outtokens * failrate / (1 - failrate)",
+      "format": "number",
+      "unit": "tokens"
+    },
+    {
+      "id": "wastedrate",
+      "label": "Wasted output tokens across the fleet",
+      "expr": "wasted * rps",
+      "format": "compact",
+      "unit": "tokens/sec"
+    },
+    {
+      "id": "unresolved",
+      "label": "Requests still failing after the attempt cap",
+      "expr": "pow(failrate, attemptcap)",
+      "format": "percent"
+    }
+  ],
+  "caption": "Retries convert a correctness problem into a cost and tail-latency problem, and they never convert it into zero. The residual after the cap is small as a percentage and is a steady stream of hard failures once you multiply it by traffic."
+}
+\`\`\`
+
+## The mechanism: a mask over the logits
+
+Constrained decoding removes the bet. At every decoding step the model produces a logit for each token in its vocabulary and a sampler picks one from that distribution. Constrained decoding inserts one operation between those two: a grammar compiled from your schema reports which tokens could legally come next given everything emitted so far, and the logit of every other token is set to negative infinity before the sampler runs. The illegal token is not rejected after the fact. It has no probability of being sampled at all.
+
+\`\`\`
+schema  { "name": string, "age": integer }
+emitted { "name": "ada", "age":
+grammar state: expecting the first character of an integer
+
+vocabulary (a toy 8 tokens)      logit     legal here?     masked logit
+  the token 0                      2.1        yes              2.1
+  the token 1                      3.4        yes              3.4
+  the token 9                      1.2        yes              1.2
+  the token -                      0.7        yes              0.7
+  a single space                   4.9        yes              4.9
+  a double quote                   5.8        no              -inf
+  a closing brace                  4.1        no              -inf
+  the token ' null'                3.9        no              -inf
+
+the model WANTED the double quote: 5.8 was the highest logit in the set.
+it cannot have it, because that token is no longer in the distribution the
+sampler sees. no validator ran, no output was parsed, nothing was retried.
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "where-the-mask-costs",
+  "prompt": "That mask has to be produced once per generated token, for every request in the batch. Before reading on: which cost does a system designer have to plan around?",
+  "options": [
+    {
+      "label": "More output tokens, since the structure has to be emitted too",
+      "feedback": "The braces and keys are real tokens and they are a real cost, but they are the same tokens the unconstrained model was emitting when it got the format right. Nothing new appears here."
+    },
+    {
+      "label": "A per-step decision over the whole vocabulary, sitting on the critical path",
+      "correct": true,
+      "feedback": "Right. Deciding legality naively means asking the grammar about every token in a vocabulary of roughly 128,000 entries, once per generated token, between the forward pass and the sampler. That is the cost the whole engineering of this field exists to remove."
+    },
+    {
+      "label": "Extra prompt tokens, because the schema has to be sent along with every single request",
+      "feedback": "Some APIs do include a schema in the request, and that is a small fixed cost that a prefix cache handles. It is not what makes constrained decoding hard to implement quickly."
+    }
+  ]
+}
+\`\`\`
+
+## Why the naive implementation is too slow, and what fixed it
+
+A vocabulary is on the order of 128,000 tokens. Testing each one against the grammar at each step is the obvious implementation and it is quadratic in all the wrong places: the test runs once per generated token, for every sequence in the batch, on the path between the forward pass and the sampler.
+
+Outlines' contribution is to move that work offline. Compile the schema into a finite state machine, then precompute, for each state of that machine, the set of vocabulary tokens legal from it. At decode time the engine looks up the current state and receives the allowed set, so the average per-step cost is a lookup rather than a scan.
+
+\`\`\`
+one decoding step, vocabulary of ~128,000 tokens
+
+naive
+  for each of 128,000 tokens: would the grammar accept it here?
+  128,000 grammar tests per generated token, per sequence in the batch
+  runs between the forward pass and the sampler, so it is on the critical path
+
+precomputed index (the Outlines approach)
+  build time  for each FSM state, store the set of token ids legal from it
+  decode time look up the current state, take the set. constant on average
+  the work has moved into build time and into memory
+
+what changed is not the total work. it is WHERE the work is, and an index
+built once per schema is amortized across every token of every request that
+uses that schema. which is why a compiled-schema cache is part of the design
+\`\`\`
+
+The measured result is that a good engine is not the bottleneck. llguidance reports on the order of 50 microseconds of CPU per token on a 128k tokenizer, against roughly 1.5ms for a full unoptimized JSON-schema mask, and states that it can sustain batch sizes in the thousands against a 10ms forward pass without becoming the limiting factor. The design consequence is worth stating plainly: a well-built grammar engine disappears into the noise, and a badly built one becomes your serving bottleneck, so this is a component you benchmark rather than assume.
+
+## FSM, pushdown, and the problem with subword tokens
+
+A regular expression compiles to a finite state machine, and so does a flat schema with fixed keys and typed values. Nesting does not. Matching arbitrarily deep objects and arrays means counting how many braces are open, and counting is exactly what a finite state machine cannot do, so a nested schema needs a **pushdown automaton**: a state machine plus a stack. That is why engines differ in which schema features they accept. A feature list is really a statement about which class of automaton the engine implements.
+
+Then the problem that makes this harder than it looks on paper. The grammar is defined over characters, and the model emits **tokens**, and one token can span a grammar boundary. A tokenizer will happily contain a single token for the two characters that close a string and open the next key. The compiler therefore cannot map grammar transitions onto tokens one for one; it has to treat each token as a short string that drives the automaton through several transitions at once, and exclude any token whose character sequence would drive it into a dead end partway through.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "guaranteed-or-yours",
+  "prompt": "A claims extractor runs with a compiled JSON schema constraining every field. Sort each failure by whether the grammar rules it out or leaves it to you.",
+  "buckets": [
+    "Ruled out by the grammar",
+    "Still your problem"
+  ],
+  "items": [
+    {
+      "label": "A missing closing brace",
+      "bucket": "Ruled out by the grammar",
+      "feedback": "The automaton tracks open structures, so the tokens that would end the output early are masked until every one is closed."
+    },
+    {
+      "label": "A string where the schema declares an integer",
+      "bucket": "Ruled out by the grammar",
+      "feedback": "Type is part of the compiled grammar, so at that position only the tokens that can start an integer survive the mask."
+    },
+    {
+      "label": "A value outside the enum the schema lists",
+      "bucket": "Ruled out by the grammar",
+      "feedback": "An enum compiles to a small alternation, so the only legal continuations are the listed values."
+    },
+    {
+      "label": "A required field left out entirely",
+      "bucket": "Ruled out by the grammar",
+      "feedback": "A required key is a transition the automaton has to take before it will accept the closing brace."
+    },
+    {
+      "label": "An invoice total that does not match its line items",
+      "bucket": "Still your problem",
+      "feedback": "Both numbers are well-formed. The grammar has no notion of arithmetic between fields, so this needs a semantic validation pass of your own."
+    },
+    {
+      "label": "A correctly formatted date that is simply the wrong year",
+      "bucket": "Still your problem",
+      "feedback": "A date regex constrains shape, never truth. This is the class of error a retry cannot fix either, since the model will confidently produce it again."
+    },
+    {
+      "label": "A tool called with well-formed but wrong arguments",
+      "bucket": "Still your problem",
+      "feedback": "The call parses and the tool runs. Constrained decoding guarantees a well-formed call, never a correct one, and confusing the two is the most common misreading of this technique."
+    }
+  ]
+}
+\`\`\`
+
+## Who pays for compilation
+
+Compiling a schema into an automaton and its token index is real work, and where that work happens changes the architecture. A service with five fixed schemas compiles at startup, caches the indexes forever, and never thinks about it again. A service with thousands of tenant-defined schemas that change daily has moved compilation onto the request path for every schema it has not seen before.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Question", "Five fixed schemas", "Thousands of tenant schemas"],
+  "rows": [
+    ["When does compilation happen", "Once, at process start", "On first sight of a schema, on the request path"],
+    ["Where does the index live", "Memory, for the life of the process", "An LRU cache with a memory bound and an eviction policy"],
+    ["What does a cold start cost", "Nothing a user sees", "The p95 you will be asked to defend"],
+    ["What do you monitor", "Very little", "Compile time, cache hit rate, index memory per schema"],
+    ["What does neglect look like", "Not applicable", "One tenant saves a pathological schema and stalls a serving node"]
+  ],
+  "highlightCols": ["Thousands of tenant schemas"],
+  "caption": "Same technique, two different systems. The right-hand column is a caching and admission-control problem wearing a structured-output costume, which is why schema validation at save time belongs in the design."
+}
+\`\`\`
+
+Hosted providers solve the same problem on their side of the API, which is why Anthropic documents a cache of compiled schemas held for twenty-four hours.
+
+## The engine default that is not an engine
+
+vLLM's default structured-output backend is \`auto\`, and \`auto\` is a dispatcher rather than an implementation. It tries XGrammar first, falls back to llguidance, and routes to Outlines for specific cases such as certain tokenizers and schema features the faster engines do not support. So "vLLM uses XGrammar" is wrong as a flat statement, and the documentation says the dispatch behavior may change between releases.
+
+The transferable lesson is about defaults in general. A dispatching default exists for compatibility, which means it optimizes for your request succeeding rather than for it succeeding the same way twice. If you need reproducible latency or a fixed answer to "which schema features do we support", pin the backend explicitly and treat a change to it as a release event.
+
+## Quality effects, and the bridge to tool calling
+
+Constraining the output shape is not neutral with respect to the content. Forcing the model to begin emitting structure immediately takes away the free-text span it would otherwise use to work through the problem, and the standard mitigation is to let it reason in an unconstrained span and constrain only the final answer span. That costs tokens and buys accuracy on anything that needs a chain of steps before the answer.
+
+A tool call is this same mechanism behind a different API. The provider compiles your tool's argument schema and constrains generation against it, which is exactly why a well-formed tool call is guaranteed and a correct one is not.
+
+**Interview nuance:** name the forcing controls and their side effects, because those are what an interviewer probes next. Forcing a specific tool suppresses the natural-language preamble the model would otherwise produce, which matters if anything downstream was reading it. Turning parallel tool calls off guarantees at most one call per turn, which simplifies your executor and serializes work that could have run together. Both are behavior changes disguised as configuration.
+
+**Recap:** reject-and-retry pays for the bad generation, the replacement, and a tail, and never reaches zero; constrained decoding masks every illegal token at each step so malformed output cannot be sampled; the naive mask is a scan of a 128k vocabulary per token, and precomputing an index per automaton state is what moved that cost offline; nested schemas need a pushdown automaton and subword tokens straddle grammar boundaries; compilation cost is a caching problem once schemas are tenant-defined; pin the backend if you need reproducibility; and well-formed is not correct.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "first-minute-spike",
+  "prompt": "A tenant saves a new 40-field schema at 09:00. For about a minute, requests from that tenant show a p99 spike, then it settles back to baseline and stays there all day. Which part of the system produced the spike?",
+  "options": [
+    {
+      "label": "The sampler, which now has more tokens to reject",
+      "feedback": "The sampler's work does not change: it draws from a distribution whose illegal entries are already at negative infinity. Rejecting is what the design removed."
+    },
+    {
+      "label": "Grammar compilation, paid on first sight and cached afterward",
+      "correct": true,
+      "feedback": "Right, and the shape of the curve is the tell: a one-off cost followed by a flat baseline is a cache filling, not a steady-state cost. This is the whole reason a tenant-schema system compiles on save rather than on first request."
+    },
+    {
+      "label": "The forward pass, which slows down as the constrained output grows longer",
+      "feedback": "Output length does raise total latency, but the schema's field count is not new here and it would not settle back to baseline after a minute. A transient that resolves on its own is a warm-up."
+    }
+  ],
+  "reveal": "Constrained decoding is one idea with three engineering consequences. The idea: mask the logits of every token the compiled grammar cannot accept, so malformed output is not merely rejected but unsamplable. The first consequence is performance, because the naive mask is a scan over a 128k vocabulary per token, and the fix is to precompute allowed-token sets per automaton state so the cost moves into build time and memory. The second is that build time then has to live somewhere, which turns a system with tenant-authored schemas into a compiled-schema cache with admission control on the schemas themselves. The third is a limit: the grammar guarantees shape, not truth, so a well-formed tool call with wrong arguments is exactly as likely as before and needs semantic validation you write yourself."
+}
+\`\`\`
+
+**Sources:** [Outlines: efficient guided generation](https://arxiv.org/abs/2307.09702) · [XGrammar](https://arxiv.org/abs/2411.15100) · [llguidance](https://github.com/guidance-ai/llguidance) · [vLLM structured outputs](https://docs.vllm.ai/en/latest/features/structured_outputs.html)
+`.trim()
+
+const gpuCapacityEconomicsTeach = `
+## A different unit, and a bottleneck that moves
+
+Level 4 sizes a fleet from queries per second and a per-core service time, and Level 9 allocates cloud spend once the fleet exists. Neither answers the question an AI team is actually asked, which is how many GPUs, and whether self-hosting beats the API. The arithmetic is different for two reasons. The unit is tokens per second per GPU rather than requests per second per core, and the binding constraint moves between phases: FLOPs during prefill, memory bandwidth during decode, and HBM capacity for the KV cache that both of them depend on.
+
+Every number in this lesson is a ratio you can recompute. Prices and card specifications are stated as of August 2026 and will drift; the ridge point, the KV bytes per token and the dollars per unit of bandwidth will not.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "the-headline-flops-number",
+  "prompt": "You are sizing from an accelerator's product page and the tensor-core throughput figure is the largest number on it. Before you divide anything by it: what does that figure assume?",
+  "options": [
+    {
+      "label": "Nothing special, it is simply the peak",
+      "feedback": "It is a peak, but not of the operation you are about to size. Vendors quote the most favorable configuration the silicon supports, and the page tells you which one in small print."
+    },
+    {
+      "label": "Structured sparsity, so the dense figure is half of it",
+      "correct": true,
+      "feedback": "Right. The headline tensor-core numbers are quoted with structured sparsity, and inference on ordinary dense weights gets half. Miss the footnote and every derived number after it, including your ridge point and your node count, is out by a factor of two."
+    },
+    {
+      "label": "A precision and a batch size that the page names in a footnote further down the sheet",
+      "feedback": "Precision is stated, and you do have to match it to what you will actually run. It is not the assumption that silently doubles your answer, though, and batch size does not appear in a peak-throughput figure at all."
+    }
+  ]
+}
+\`\`\`
+
+## Read the spec sheet, then find the ridge point
+
+\`\`\`
+H100 SXM, as published (figures as of August 2026)
+
+  BF16 tensor core     1,979 TFLOP/s   quoted WITH structured sparsity
+  dense equivalent       989 TFLOP/s   halve it
+  HBM3 bandwidth          3.35 TB/s    per GPU
+  NVLink                   900 GB/s    GPU to GPU. NOT memory bandwidth
+
+ridge point, dense
+  989 TFLOP/s / 3.35 TB/s = ~295 FLOP per byte
+
+  the two ways to get this wrong, and what they cost
+    using the sparse figure          ~591 FLOP per byte   out by 2x
+    using NVLink as the bandwidth  ~1,100 FLOP per byte   out by nearly 4x
+
+where decode sits on that line
+  at batch 1 each weight is read once and used in one multiply-add,
+  which is 2 FLOPs for a 2-byte weight, so ~1 FLOP per byte
+  1 against a ridge of 295 is about a third of one percent of peak compute
+\`\`\`
+
+Batching is what walks decode up that line. Two sequences read the same weights once and do twice the math, four sequences do four times, so arithmetic intensity rises roughly with the batch size and throughput is nearly free until the batch approaches the ridge. Past it you are on the compute wall and each additional sequence costs what it looks like it costs. One caveat keeps this honest: attention over the KV cache does **not** amortize across the batch, because every sequence has its own cache to read, so long contexts push the true crossover to the left of where the weight arithmetic alone would put it.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "one-user-says-its-slow",
+  "prompt": "One user says tokens stream too slowly. The fleet sits at 20 percent utilization, the batch is nowhere near full, and there is no queue. What actually raises that user's token rate?",
+  "options": [
+    {
+      "label": "Add nodes, since the fleet has spare capacity",
+      "feedback": "Spare capacity is real and irrelevant to this complaint. Another node serves other users; it does nothing for a sequence that is already running alone on a card."
+    },
+    {
+      "label": "Cut the bytes read per forward pass, or move to a faster card",
+      "correct": true,
+      "feedback": "Right. One sequence advances one token per forward pass, and a forward pass has to read the resident model out of memory, so its speed is bandwidth divided by resident bytes. Quantizing the weights or using a card with more bandwidth are the only two levers on that ratio."
+    },
+    {
+      "label": "Raise the batch size, because a fuller batch raises the tokens per second the node reports",
+      "feedback": "It raises the node's aggregate number and leaves this user's rate flat or slightly worse. Fleet throughput and per-user speed are different quantities, and the dashboard usually shows only the first one."
+    }
+  ]
+}
+\`\`\`
+
+\`\`\`
+the per-sequence speed limit
+
+  one sequence advances one token per forward pass
+  a forward pass reads the resident model out of HBM
+
+  a 70B model at FP8 is ~70 GB resident
+  3.35 TB/s / 70 GB = ~48 forward passes per second
+
+  so ~48 tokens/sec for ONE sequence, on that card, at that precision.
+  no batch size, scheduler or autoscaler changes that number.
+  batching raises tokens/sec for the FLEET. it never raises it for the user
+\`\`\`
+
+## The attention architecture is a line in the budget
+
+Now the arithmetic that decides cost per token more than any other single choice, and which lives on the model card rather than in your infrastructure.
+
+\`\`\`
+KV bytes per token = 2 (K and V) x layers x kv_heads x head_dim x bytes_per_element
+
+a 70B-class model with grouped-query attention
+  2 x 80 layers x 8 kv heads x 128 head dim x 2 bytes
+    = 327,680 bytes = 320 KiB per token
+
+the same shape with full multi-head attention, 64 kv heads instead of 8
+  2 x 80 x 64 x 128 x 2 = 2,621,440 bytes = 2.5 MiB per token   (8x more)
+
+one 8-GPU node, 640 GB of HBM, weights at FP8 take 70 GB -> ~570 GB for KV
+  at 8,192 tokens per sequence
+    grouped-query   8,192 x 320 KiB = 2.5 GiB  ->  ~228 concurrent sequences
+    multi-head      8,192 x 2.5 MiB =  20 GiB  ->   ~28 concurrent sequences
+\`\`\`
+
+Eight times the concurrency on identical silicon, decided by one integer on a model card. Below the ridge point, throughput rises roughly with concurrency, so 8x the concurrent sequences is close to an 8x cut in cost per token. A model's KV-head count is not an architecture detail you note in passing; it is a budget line, and it belongs in the model-selection conversation next to quality.
+
+## Mixture of experts breaks the naive calculation
+
+A dense model has one parameter count and it sets everything. A mixture-of-experts model has two, and they set different things: you provision **memory** for the total parameter count, because every expert has to be resident somewhere before a router can choose it, and you provision **compute** for the active parameter count, because only the selected experts run for a given token.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Model", "Total parameters", "Active per token", "Experts", "Memory sized on", "Compute sized on"],
+  "rows": [
+    ["A dense 70B", "70B", "70B", "none", "70B", "70B"],
+    ["Qwen3-235B-A22B", "235B", "22B", "128", "235B", "22B"],
+    ["Kimi K2", "1T", "32B", "384", "1T", "32B"]
+  ],
+  "highlightCols": ["Memory sized on", "Compute sized on"],
+  "caption": "Total-to-active ratios of 1 to 1, roughly 11 to 1, and roughly 31 to 1. Model card figures as of August 2026. A fleet sized on either column alone is wrong in a predictable direction: size on total and you buy compute nobody uses, size on active and the weights do not fit."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "total-or-active",
+  "prompt": "You are planning capacity for a model with 22B active parameters out of 235B total. Sort each number by which parameter count sets it.",
+  "buckets": [
+    "Set by total parameters",
+    "Set by active parameters"
+  ],
+  "items": [
+    {
+      "label": "HBM the weights occupy once loaded",
+      "bucket": "Set by total parameters",
+      "feedback": "Every expert has to be resident before the router can pick it, so all 235B are in memory whether or not a given token touches them."
+    },
+    {
+      "label": "The minimum number of GPUs before the model will load at all",
+      "bucket": "Set by total parameters",
+      "feedback": "The floor on GPU count is a memory floor, and memory follows the total."
+    },
+    {
+      "label": "Memory left over for the KV cache once weights are resident",
+      "bucket": "Set by total parameters",
+      "feedback": "It is whatever the total leaves behind, which is why a high total-to-active ratio squeezes concurrency even while it looks cheap on compute."
+    },
+    {
+      "label": "FLOPs spent generating one token",
+      "bucket": "Set by active parameters",
+      "feedback": "Only the routed experts run, so the math per token is set by the active count."
+    },
+    {
+      "label": "Peak compute you have to provision for a traffic spike",
+      "bucket": "Set by active parameters",
+      "feedback": "Compute demand scales with per-token FLOPs times token rate, and per-token FLOPs follow the active count."
+    },
+    {
+      "label": "Why a token is cheaper here than on a dense model of the same total size",
+      "bucket": "Set by active parameters",
+      "feedback": "That is the entire trade: pay memory once for the total, pay compute per token on a fraction of it."
+    }
+  ]
+}
+\`\`\`
+
+Expert parallelism is how the memory side is made survivable: experts are spread across GPUs rather than replicated, which needs a fat fabric because routing produces an all-to-all exchange every layer, and which frees per-GPU memory that the KV cache then grows into. So expert placement is a concurrency decision as well as a compute one, and a cluster without the interconnect for it cannot run the model the spreadsheet said it could.
+
+## Sizing a fleet end to end
+
+\`\`\`
+a support-summarization tool, sized in five steps
+
+1  demand       900 requests/minute = 15 requests/sec
+2  token rate   15 x 250 output tokens  = ~3,750 decode tokens/sec
+                15 x 1,200 prompt tokens = ~18,000 prefill tokens/sec
+3  divide by MEASURED per-node throughput at a batch that meets the SLO
+                decode   3,750 / 2,500  = 1.5 nodes
+                prefill 18,000 / 12,000 = 1.5 nodes
+4  peak-to-average from real arrival data, say 3x   ->  9 nodes
+5  one spare per failure domain                     -> 10 nodes
+
+step 3 says MEASURED, and that is the step people skip. A throughput derived
+from FLOPs and bandwidth is an upper bound nothing reaches, and sizing on it
+is how a fleet ends up at half the capacity it needed.
+
+step 4 usually costs more than every quantization project on the roadmap saves
+\`\`\`
+
+## Utilization is the hidden variable, and it decides everything
+
+A reserved GPU bills at one hundred percent whether or not you are using it. An API bills at zero percent when you are idle. That single asymmetry is why the self-host crossover is not a price, it is a duty cycle.
+
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "The Self-Host Crossover Is a Utilization Number",
+  "predictPrompt": {
+    "question": "A fleet of 8 GPUs at 3 dollars per GPU-hour can sustain 2,500 tokens per second at full load. Your workload keeps it busy about 30 percent of the time. What does a million tokens cost you?",
+    "options": [
+      "About 2.70 dollars, the cost at full load, since idle GPUs produce nothing to charge for",
+      "About 8.90 dollars, because the idle 70 percent is billed and produces nothing",
+      "It cannot be computed without knowing the model's parameter count"
+    ]
+  },
+  "workedExample": "The initial values are 8 GPUs at 3 dollars per GPU-hour, which is 24 dollars an hour, against a fleet that sustains 2,500 tokens per second at full load but is only busy 30 percent of the time, so it actually produces 750 tokens per second. That is about 8.90 dollars per million tokens against an API at 3, which is roughly three times the price. Now drag utilization toward 1 and watch the crossover arrive: the same hardware and the same API price flip the answer somewhere near 90 percent sustained. Nothing about the silicon changed.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "gpuhour",
+      "label": "Rental cost per GPU-hour",
+      "min": 0.5,
+      "max": 20,
+      "scale": "linear",
+      "step": 0.1,
+      "initial": 3,
+      "unit": "dollars"
+    },
+    {
+      "kind": "slider",
+      "id": "gpus",
+      "label": "GPUs in the fleet",
+      "min": 1,
+      "max": 128,
+      "scale": "linear",
+      "step": 1,
+      "initial": 8,
+      "unit": "GPUs"
+    },
+    {
+      "kind": "slider",
+      "id": "peaktokens",
+      "label": "Tokens/sec the fleet sustains at full load",
+      "min": 200,
+      "max": 40000,
+      "scale": "log",
+      "initial": 2500,
+      "unit": "tokens/sec"
+    },
+    {
+      "kind": "slider",
+      "id": "util",
+      "label": "Sustained utilization",
+      "min": 0.05,
+      "max": 1,
+      "scale": "linear",
+      "step": 0.05,
+      "initial": 0.3,
+      "unit": "share"
+    },
+    {
+      "kind": "slider",
+      "id": "apiprice",
+      "label": "API price per million tokens",
+      "min": 0.1,
+      "max": 40,
+      "scale": "linear",
+      "step": 0.1,
+      "initial": 3,
+      "unit": "dollars"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "fleethour",
+      "label": "Fleet cost per hour",
+      "expr": "gpuhour * gpus",
+      "format": "number",
+      "unit": "dollars/hour"
+    },
+    {
+      "id": "efftokens",
+      "label": "Tokens/sec you actually produce",
+      "expr": "peaktokens * util",
+      "format": "number",
+      "unit": "tokens/sec"
+    },
+    {
+      "id": "costper",
+      "label": "Self-hosted cost per million tokens",
+      "expr": "fleethour / (efftokens * 3600) * 1000000",
+      "format": "number",
+      "unit": "dollars"
+    },
+    {
+      "id": "ratio",
+      "label": "Self-hosted cost against the API",
+      "expr": "costper / apiprice",
+      "format": "number",
+      "unit": "x the API price"
+    }
+  ],
+  "caption": "Every input except utilization is a property of hardware or a price list. Utilization is a property of your traffic, and it is the one that moves the answer the furthest, which is why a break-even quoted without it is not an answer."
+}
+\`\`\`
+
+Two facts to attach to that widget. First, identical silicon rents across roughly a three to four times range depending on the vendor and the commitment, so shopping is worth real money before any engineering is. Second, for a decode-heavy workload the ranking metric is not dollars per hour but dollars per terabyte per second of memory bandwidth per hour, and ranking a vendor list that way reorders it, because the cards with the best headline compute are not always the ones with the best bandwidth per dollar.
+
+Then the levers that move the numerator without touching the fleet: a provider's batch tier at roughly half price for anything that tolerates a delay, cached input from the previous lesson for anything with a stable prefix, spot capacity at a discount that you pay for in eviction handling, and the engineers a self-hosted fleet needs, who are a real line in a real budget and are missing from every comparison that concludes self-hosting is cheaper.
+
+**Interview nuance, and the honest conclusion.** Published self-host break-even estimates disagree with one another by about two orders of magnitude, and that disagreement is itself the finding: each of them buried a utilization assumption. The senior answer states a threshold rather than a verdict ("above roughly this sustained utilization, for this model, against this API price, self-hosting wins"), names the non-cost reasons that usually decide it anyway (data residency, custom or fine-tuned weights, guaranteed capacity during a provider incident, a latency floor you cannot get from a shared endpoint), and does not claim self-hosting is cheaper.
+
+**Recap:** halve the sparse headline figure and divide by real HBM bandwidth to get a ridge point; decode at batch 1 sits far below it, batching walks it up, and attention over the KV cache does not amortize; one sequence's token rate is bandwidth over resident bytes and no batch changes it; KV bytes per token comes from layers, KV heads, head dimension and dtype, so a model card's KV-head count is a cost line; an MoE is sized on total parameters for memory and active parameters for compute; size fleets from measured per-node throughput, then peak-to-average, then a spare; and the self-host crossover is a sustained-utilization threshold rather than a price comparison.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "the-missing-sentence",
+  "prompt": "A colleague reports that self-hosting works out at 8.90 dollars per million tokens against an API at 3, and concludes that buying wins. What is the missing sentence?",
+  "options": [
+    {
+      "label": "That the API price will probably fall again next quarter",
+      "feedback": "Prices do fall, and building a decision on a forecast is how you end up defending it later. The number in front of you is already incomplete for a reason that has nothing to do with the future."
+    },
+    {
+      "label": "At what sustained utilization that 8.90 dollars was computed",
+      "correct": true,
+      "feedback": "Right. The same fleet and the same API price produce 8.90 at thirty percent and under 3 near full load, so the figure is meaningless without the duty cycle behind it. This is exactly why published break-even estimates disagree by two orders of magnitude."
+    },
+    {
+      "label": "Which vendor was priced, given that identical silicon rents across a three to four times band",
+      "feedback": "A genuine and useful question that is worth asking second. It moves the number by a few times; the assumption the sentence is missing moves it by more, and moves it in a direction nobody checked."
+    }
+  ],
+  "reveal": "Sizing an AI fleet is four pieces of arithmetic and one honest sentence. Read the spec sheet correctly, halving the sparse figure and using HBM rather than interconnect bandwidth, to get a ridge point. Place your workload against it: prefill above, decode far below, batching walking decode up, and a per-sequence ceiling of bandwidth over resident bytes that no scheduler changes. Compute KV bytes per token, because the KV-head count buys concurrency and concurrency is cost per token. Size from measured per-node throughput, then peak-to-average, then a spare, and remember an MoE takes memory from its total and compute from its active parameters. The honest sentence is the last one: the crossover between self-hosting and buying is a sustained-utilization threshold, and any break-even quoted without it has hidden its most important assumption."
+}
+\`\`\`
+
+**Sources:** [NVIDIA H100 product page](https://www.nvidia.com/en-us/data-center/h100/) · [Efficiently scaling transformer inference](https://arxiv.org/abs/2211.05102) · [Kimi K2 model card](https://huggingface.co/moonshotai/Kimi-K2-Instruct) · [Qwen3-235B-A22B model card](https://huggingface.co/Qwen/Qwen3-235B-A22B)
+`.trim()
+
 const llmAgentsTeach = `
 ## An agent is a bounded loop
 
@@ -2868,7 +4088,7 @@ export const systemDesignLevel11: DesignLevel = {
   title: "Level 11: Specialized & Frontier Systems",
   tagline:
     "The frontier: ML systems, LLM and GenAI infrastructure, real-time analytics and globally consistent data, and IoT, edge, and time-series.",
-  estimatedHours: 8,
+  estimatedHours: 12,
   modules: [
     {
       id: "sd-l11-m1",
@@ -3372,6 +4592,197 @@ export const systemDesignLevel11: DesignLevel = {
                 strong:
                   "Puts the volatile header after the stable file body and expects prefilled tokens/sec back near 1.4M and TTFT p95 near 180ms.",
               },
+            ],
+          },
+        },
+        {
+          id: "sd-l11-prefill-decode-split",
+          title: "Prefill and Decode Disaggregation",
+          summary:
+            "Prefill is compute-bound and decode is bandwidth-bound, so one pool cannot hold both SLOs. Splitting them buys separability, not throughput.",
+          estimatedMinutes: 40,
+          difficulty: "hard",
+          skills: ["llm-inference", "gpu", "goodput"],
+          teach: { markdown: prefillDecodeSplitTeach, estimatedMinutes: 15 },
+          apply: {
+            id: "sd-l11-prefill-decode-split-apply",
+            prompt:
+              "Propose the serving topology for a self-hosted document-summarization product where prompts average 20k tokens and outputs average 400 tokens, holding TTFT p95 under 2s and inter-token latency under 40ms.",
+            thinkAbout: [
+              "Which phase does 98 percent of this workload's token work, and what does that do to the pool shape?",
+              "How long does one 20k-token prefill block an in-flight stream, and how does that compare to the 40ms inter-token budget?",
+              "What does the KV cache for a 20k-token request weigh, and which fabrics can move it inside the TTFT budget?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a 70B-class model on 8-GPU nodes, prompts of 20,000 tokens and outputs of 400, TTFT p95 under 2s and inter-token latency under 40ms. Measured rates I would insist on before sizing anything: prefill throughput per node in tokens/sec, and decode capacity per node in concurrent sequences at an inter-token latency that clears 40ms.",
+              "**The workload is prefill-dominated by 50 to 1 in tokens, and that is the design.** One request is 20,000 token-passes of prefill against 400 decode steps. At a measured 12,000 prefill tokens/sec per node, a single request is 1.67 node-seconds of prefill, which is most of the 2s TTFT budget before any queueing. Meanwhile each stream occupies a decode slot for 400 tokens times 30ms, about 12 seconds, so decode demand is set by concurrency rather than by tokens.",
+              "**Why I disaggregate here rather than chunk.** Colocated, one 20k prefill owns a batch step for well over a second, and every stream sharing that step sees a gap 40x its inter-token budget. Chunked prefill spreads that gap, but with 98 percent of the tokens on the prefill side the chunk size becomes a direct trade of TTFT against ITL and there is no setting that clears both. Two pools remove the coupling: prefill replicas sized for arrival rate and the 2s budget, decode replicas sized for concurrent streams and the 40ms budget.",
+              "**Ratio and sizing.** At R requests/sec, prefill needs R x 1.67 nodes and decode needs R x 12 concurrent slots divided by measured slots per node (say 128), which is R x 0.094 nodes. That is roughly 18 prefill nodes per decode node, so the fleet is almost entirely prefill. I add a peak-to-average multiplier from real arrival data and one spare node per failure domain, and I autoscale prefill on queue depth and decode on KV cache utilization rather than on GPU utilization percent, which pins near 100 during decode and stops discriminating.",
+              "**The transfer.** 20,000 tokens at roughly 0.3 MB of KV per token is about 6 GB per request. Over a 50 GB/s RDMA fabric that is ~120ms, and Splitwise-style per-layer overlap hides most of it behind the 1.67s prefill, leaving single-digit milliseconds against a 2s budget. Over a 3 GB/s TCP link the same copy is 2 seconds and blows the SLO by itself, so RDMA between the pools is a hard requirement, not a preference.",
+              "**What I would measure to know I chose right:** goodput per class, meaning the request rate at which 90 percent of requests meet both TTFT and TPOT, not raw requests/sec. If goodput does not beat a well-tuned colocated pool with chunked prefill, the split is not earning its transfer.",
+              "Common wrong turn: sizing one undifferentiated pool on average tokens/sec and calling disaggregation a throughput upgrade. vLLM's own documentation says disaggregated prefilling does not improve throughput. It buys separable TTFT and TPOT, which is the reason to reach for it here, and quoting it as a throughput win is the answer an interviewer will push back on.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-prefill-decode-split-practice",
+            prompt:
+              "Choose and defend a serving topology for a fleet that carries an interactive chat product with 300-token prompts alongside a nightly batch enrichment job with 60k-token prompts, where the chat latency SLO must hold while the batch job runs.",
+            thinkAbout: [
+              "Where does a 60k-token prefill actually hurt the chat product, and which pool is that?",
+              "Which phase can the two workloads share safely, and which one cannot be shared at any chunk size?",
+              "What does the batch job's relaxed TTFT let you do that the chat product's does not?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: one model, one fleet budget, chat with 300-token prompts and a strict interactive feel (TTFT under 500ms, inter-token latency under 50ms), and a nightly job pushing 60k-token prompts whose only real requirement is that it finishes by morning. The two SLO shapes are opposites, which is the whole problem.",
+              "**Name the interference precisely.** A 60k prefill is 200x the chat prefill. Colocated, it owns batch steps for seconds at a time and every chat stream freezes for the whole of it. Chunked prefill spreads that into many smaller stalls but does not remove them, and the chunk size that keeps chat inter-token latency smooth is small enough that the batch job's own progress collapses. One knob, two SLO shapes that want opposite ends of it.",
+              "**The split I would make is by phase first, then by class inside the phase.** Prefill is where the interference lives, so the batch job gets its own prefill capacity and never shares a batch step with chat prefill. Decode is where the two workloads are actually similar: batch decode is throughput work with no latency contract, so it can share the decode pool provided admission is capped and preemptible. That is one isolated resource rather than two duplicate fleets, which is what keeps this from being 'just run two clusters'.",
+              "**Scheduling policy, since topology alone does not finish the job.** Batch requests run at low priority with preemption: if chat prefill queue depth rises, batch prefill is evicted and resumed rather than allowed to hold capacity. Batch work is admitted with a large chunk size (its TTFT is irrelevant, so chunking costs it nothing that matters) while chat prefill is admitted immediately. Overnight, when chat traffic is a fraction of daytime, the priority split naturally hands the fleet to the batch job without any manual reshaping.",
+              "**The alternative I would name and reject.** Two entirely separate fleets is the simplest correct answer and I would say so, then reject it on cost: the batch job needs peak capacity for a few hours and would idle the rest of the day, and the chat fleet's decode capacity is idle overnight. Sharing decode while isolating prefill captures most of the isolation for a fraction of the hardware.",
+              "**Measurement:** goodput reported separately per class, chat measured against both TTFT and TPOT attainment, batch measured against a completion deadline. A single fleet-wide latency dashboard will look fine while chat is being ruined, because the batch job's requests dominate the token counts and drag every percentile toward its own behavior.",
+              "Common wrong turn: one pool, chunked prefill, one chunk size, and a rate limit on the batch job. It satisfies neither class: the chunk size that protects chat inter-token latency starves the batch job, and the rate limit bounds requests rather than prefill tokens, so a single 60k-token request slips through and stalls every stream anyway.",
+            ],
+          },
+        },
+        {
+          id: "sd-l11-prompt-cache-economics",
+          title: "Prompt Cache Economics and Prefix Ordering",
+          summary:
+            "A token has three prices, so prompt order is a financial decision. The cache TTL also runs from the request start, not from the end of the response.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["prompt-caching", "llm-cost", "multi-tenancy"],
+          teach: { markdown: promptCacheEconomicsTeach, estimatedMinutes: 14 },
+          apply: {
+            id: "sd-l11-prompt-cache-economics-apply",
+            prompt:
+              "Write the prompt assembly and caching strategy for a customer support assistant whose every request carries a 12k-token policy corpus, a 3k-token tool schema, and a 200-token user turn, cutting input spend by at least half without changing the model.",
+            thinkAbout: [
+              "Which blocks are stable across requests, and what does that imply about their order?",
+              "What does one steady-state request cost in multiples of the uncached rate, before and after?",
+              "Which TTL tier fits this traffic pattern, and what would make the other one right?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 15.2k input tokens per request (12k policy corpus, 3k tool schema, 200-token user turn), steady daytime traffic of several requests per second, a policy corpus that changes weekly and a tool schema that changes on each deploy. Target is at least a 50 percent cut in input spend with the same model.",
+              "**Layout, most stable first.** System instructions, then the 12k policy corpus (weekly), then the 3k tool schema (per deploy), then the user turn. The corpus goes ahead of the schema because it changes less often, and a change in an earlier block invalidates everything behind it regardless of where the breakpoints sit. Nothing per-request goes above the corpus: no user name, no timestamp, no session id, because a single differing token at the front caps the cacheable prefix at that point.",
+              "**The arithmetic, in multiples of the uncached rate.** Uncached, each request bills 15,200 units. With a 5-minute cache write at 1.25x, the first request bills 15,000 x 1.25 + 200 = 18,950, and every request after it bills 15,000 x 0.1 + 200 = 1,700. That is an 89 percent cut in steady state, well past the 50 percent bar, and the write is repaid by the second request.",
+              "**Breakpoints and TTL.** Two of the four available \`cache_control\` breakpoints: one after the corpus, one after the tool schema, so a deploy that changes the schema still reuses the corpus prefix. The 5-minute tier is right for this traffic because reads refresh the TTL at no charge and requests arrive continuously, so the entry never goes cold. The 1-hour tier at a 2x write would be the choice if traffic were bursty per agent with long idle gaps, where a 5-minute entry would expire between conversations and be rewritten repeatedly.",
+              "**Traps I would design out.** No wall-clock timestamp in the system block. No greeting the user by name above the corpus. A pinned model id, because the minimum cacheable prefix is per-model and a silent model upgrade can drop a prompt below it with no error, only zero cache-creation tokens. And a fixed \`tool_choice\` for the common path, since changing it invalidates cached message blocks even when the prompt text is byte-identical.",
+              "**Proof it works:** the cache-read and cache-creation token counters on every response, plotted as a ratio, not the total bill. Expect cache-read tokens to be roughly 15,000 per request and cache-creation tokens to be near zero in steady state; a rising cache-creation count is the alarm that something volatile has drifted to the front of the prompt.",
+              "Common wrong turn: turning caching on and declaring victory without reordering the prompt. The corpus sits behind a per-request greeting, the hit rate is zero, nothing errors, and the only visible signal is a bill that did not move.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-prompt-cache-economics-practice",
+            prompt:
+              "Propose a prefix-caching strategy for a multi-tenant assistant whose prompts embed per-tenant policy documents, reaching a high hit rate without any tenant's cached prefix being reachable from another tenant's request, and say what you would measure to prove both halves.",
+            thinkAbout: [
+              "Which part of the prompt can be shared across all tenants, and which part cannot?",
+              "On a self-hosted engine, what makes a prefix cache cross-tenant shared state, and what bounds it?",
+              "Why does a fleet-wide hit rate hide the failure that actually costs you money here?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: thousands of tenants, each with its own policy document of a few thousand tokens, one shared system block and tool schema, and traffic that is heavily skewed so a handful of tenants send most requests and the long tail sends a few per hour. Both halves of the requirement matter: hit rate and isolation, and the naive fix for one breaks the other.",
+              "**Three-layer prompt.** Layer 1 is the global system block plus the tool schema, byte-identical for every tenant, so it caches once and is reused across the whole fleet. Layer 2 is the tenant policy document, which is per-tenant and therefore a per-tenant cache entry. Layer 3 is the user turn. Two breakpoints, after layer 1 and after layer 2. This is the most sharing that is safe: layer 1 is common knowledge, layer 2 never is.",
+              "**Isolation on a hosted API** is mostly a property of the account scope, so the real risk is your own assembly code mixing tenants, and the control is that the tenant document is fetched by the authenticated tenant id on the request path rather than passed in by the caller. **Isolation on a self-hosted engine is the harder half:** automatic prefix caching hashes blocks into one global table shared by every request on the node, so two tenants whose prompts happen to share a block share a cache entry. The concrete control is a per-tenant salt on the cache key (vLLM exposes this as \`cache_salt\`), which changes every block hash for that tenant, so a block produced under tenant A cannot be matched by tenant B even if the bytes are identical.",
+              "**Hit rate for the long tail, which is where the money is.** The busy tenants stay warm on the 5-minute tier because reads refresh the TTL. The tail does not: a tenant sending one request every twenty minutes rewrites its prefix every single time, paying 1.25x forever and never reaching a read. Options: put tail tenants on the 1-hour tier so a rewrite is amortized across more requests, or accept the miss for tenants under a traffic threshold, or keep the tail's policy documents short enough that the write premium is small. I would route by measured per-tenant arrival rate rather than picking one tier for everyone.",
+              "**What I would measure, in two parts.** For hit rate: cache-read against cache-creation tokens per tenant, plus the share of tenants whose read ratio is above a threshold. A fleet-wide average is useless here because the busy tenants dominate the counters and hide a tail that never hits once. For isolation: a canary phrase unique to each tenant inside its policy layer, and a scheduled probe that issues a request under tenant B's credentials designed to elicit tenant A's canary, asserting it never appears and that the request records no cache read it should not have. The salt configuration is asserted in a startup check so a config regression fails the deploy rather than the audit.",
+              "Common wrong turn: one shared prefix containing every tenant's policy document, with an instruction telling the model to answer only from the requesting tenant's section. The hit rate is superb and the model has read every tenant's policy on every request, which is the same mistake as filtering after retrieval instead of before it.",
+            ],
+          },
+        },
+        {
+          id: "sd-l11-constrained-decoding",
+          title: "Structured Output and Constrained Decoding",
+          summary:
+            "Reject and retry pays for the bad generation twice. Masking every illegal token at each decoding step makes malformed output impossible to sample.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["structured-output", "constrained-decoding", "tool-calling"],
+          teach: { markdown: constrainedDecodingTeach, estimatedMinutes: 14 },
+          apply: {
+            id: "sd-l11-constrained-decoding-apply",
+            prompt:
+              "Define the output layer for a service that extracts 14 typed fields from unstructured insurance claims at 2,000 requests per second, where a single malformed record fails a downstream batch job.",
+            thinkAbout: [
+              "What does a validator-plus-retry loop cost at this traffic, and what does it leave behind after the retry cap?",
+              "Which of the 14 fields can the schema itself constrain, and which need a check you write?",
+              "Where should the model be allowed to reason in free text, and where must it not be?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 14 fields spanning dates, currency amounts, a claim-type enum, a policy number with a fixed format, and two free-text summaries. 2,000 requests per second. The downstream batch job aborts on a malformed record, so the requirement is not a low malformed rate, it is zero. That requirement is what rules out the retry design before any cost argument.",
+              "**Constrained decoding at the serving layer, one fixed schema.** The schema is compiled once at process start into a grammar and its token index, and held in memory for the life of the process, because 14 fields and one schema is the easy end of this problem. Every field is typed in the schema rather than described in the prompt: an enum for claim type, a regex for the policy number and the dates, integers for counts, a bounded string for the summaries. Anything expressed only as prose instruction is a field the grammar cannot enforce.",
+              "**Why not the retry loop, in numbers.** At an 8 percent validation failure rate and 600-token outputs, 2,000 requests per second throws away on the order of 100,000 output tokens every second, and a cap of three attempts still leaves roughly 0.05 percent of requests unresolved, which at this traffic is about one hard failure per second. One hard failure per second against a batch job that aborts on a malformed record is an outage schedule, not an error rate.",
+              "**Reasoning span, then constrained span.** Forcing the structure from the first token removes the model's opportunity to work through an ambiguous claim before committing to values, which shows up as accuracy loss on exactly the hard fields. I let it emit a short unconstrained rationale, then constrain only the final object, and only the constrained span is passed downstream. The rationale is retained for audit and never parsed.",
+              "**Well-formed is not correct, so there is a second validation layer.** The grammar guarantees 14 fields of the right shape. It cannot know that the claim total should equal the sum of the line items, that a treatment date must fall inside the policy period, or that the enum value is consistent with the claim type. Those are semantic checks I write, and their failures route to a human review queue rather than to a retry, because a retry does not repair a value that was well-formed and wrong.",
+              "**Capacity and verification.** A good grammar engine costs tens of microseconds of CPU per token against a forward pass measured in milliseconds, so it should vanish into the noise, but I benchmark it rather than assuming: a pathological regex in one field is enough to make the mask the bottleneck. I pin the backend explicitly rather than accepting a dispatching default, so the latency profile and the supported schema features are the same on every release.",
+              "Common wrong turn: a prompt that says 'respond only with JSON', a validator, and three retries. It pays for every failure twice, keeps a residual failure rate no cap removes, and puts that residual in front of a downstream job whose failure mode is to abort the whole batch.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-constrained-decoding-practice",
+            prompt:
+              "Write the structured-output design for an agent that must choose among 300 tools whose schemas are tenant-defined and change daily, keeping added p95 latency under 50ms.",
+            thinkAbout: [
+              "Which two costs are hiding behind the phrase 'added latency', and do they have the same fix?",
+              "What happens to compile time and mask time if you constrain over all 300 tool schemas at once?",
+              "A tenant-authored schema is untrusted input. Where does it get validated, and what does that protect?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 300 tools per tenant, schemas authored by tenants and edited daily, so the set of compiled grammars never reaches a steady state. The 50ms budget covers everything constrained decoding adds, and it hides two costs with different fixes: compile time, paid once per distinct schema, and mask time, paid per generated token.",
+              "**Move compilation off the request path entirely.** Compile on save, not on first use: when a tenant saves a schema, a background worker compiles it, stores the index in a cache keyed on a hash of the schema text, and reports failures back to the tenant in the editor. Cache is LRU with a hard memory bound and per-tenant accounting. The cold path still exists for a cache miss after eviction, and it compiles with a timeout and falls back to unconstrained generation plus validate-and-retry for that one request, because a slow correct answer beats a stalled worker.",
+              "**Do not constrain over all 300 tools at once, which is the design decision that makes the budget reachable.** A grammar over the union of 300 schemas is far more expensive to compile and to mask than a grammar over one, and it has to be rebuilt whenever any of the 300 changes. Instead, shortlist first: a retrieval or routing step picks a handful of candidate tools for this turn, and the grammar is built over the shortlist. The union of five schemas is cheap, the shortlist grammar can itself be cached on the shortlist's fingerprint, and tool-selection quality improves as a side effect.",
+              "**Tenant schemas are untrusted input and get admission control at save time.** Bound nesting depth, field count, string lengths, enum sizes, and regex complexity, and reject unsupported features outright. Validating at save means a pathological schema fails the tenant's save with a clear message, instead of failing an inference node at request time where the blast radius is every tenant sharing that node.",
+              "**Pin the engine rather than taking a dispatching default.** With tenant-authored schemas, the question 'which schema features do we support' is a contract you publish, and a default that silently reroutes between engines between releases can turn a tenant's working schema into an incident. Pinning makes the supported feature set a decision rather than a consequence.",
+              "**Measurement, split the way the costs are split:** p95 of compile-wait and p95 of mask-time reported separately, compiled-schema cache hit rate, index memory per tenant, schemas rejected at save, and shortlist size distribution. Report the tail per tenant, since the worst case is one tenant editing 300 schemas every morning and the fleet average will not show it.",
+              "Common wrong turn: one grammar compiled over all 300 tool schemas and rebuilt whenever any tenant edits any of them. Compile time grows with the corpus, the cache invalidates constantly, and one tenant's routine edit spends every other tenant's latency budget.",
+            ],
+          },
+        },
+        {
+          id: "sd-l11-gpu-capacity-economics",
+          title: "GPU Fleet Sizing and the Self-Host Crossover",
+          summary:
+            "Sizing runs in tokens per second per GPU, not QPS per core, and the self-host crossover is a sustained utilization threshold rather than a unit price.",
+          estimatedMinutes: 40,
+          difficulty: "hard",
+          skills: ["gpu", "capacity-planning", "llm-cost"],
+          teach: { markdown: gpuCapacityEconomicsTeach, estimatedMinutes: 15 },
+          apply: {
+            id: "sd-l11-gpu-capacity-economics-apply",
+            prompt:
+              "Size the GPU fleet for an internal coding assistant with 4,000 daily active users, 40 requests per user per day, 8k-token prompts and 600-token outputs, and say whether to self-host or buy.",
+            thinkAbout: [
+              "What are the prefill and decode token rates, and which one sets the node count here?",
+              "What duty cycle does an internal tool used in working hours actually sustain?",
+              "Which lever from the previous lesson changes the API side of the comparison before any hardware is bought?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions and demand: 4,000 users times 40 requests is 160,000 requests per day, about 1.85 per second averaged over 24 hours. At 600 output tokens that is roughly 1,100 decode tokens/sec; at 8,000 prompt tokens it is roughly 14,800 prefill tokens/sec. A coding assistant on an 8-GPU node with a mid-size model, measured (not derived) at 2,500 decode tokens/sec and 12,000 prefill tokens/sec at an SLO-satisfying batch.",
+              "**The fleet.** Decode needs 1,100 / 2,500 = 0.44 nodes, prefill needs 14,800 / 12,000 = 1.23 nodes, so this workload is prefill-dominated and prefill sets the count. That is 1.67 nodes of average demand. An internal tool concentrates its traffic into working hours in one or two time zones, so I apply a peak-to-average multiplier of about 4 from real arrival data rather than a guess, giving 6.7 nodes, and one spare per failure domain takes it to 8 nodes, 64 GPUs.",
+              "**Then the number that decides the question.** Those 64 GPUs bill 24 hours a day. The workload runs in an 8-hour band, 5 days a week, and is bursty inside it, so sustained utilization is somewhere around 15 to 25 percent even before accounting for the peak-to-average headroom I just bought. At 3 dollars per GPU-hour, 64 GPUs cost about 192 dollars an hour, and dividing by the tokens actually produced puts self-hosted cost per million tokens several times the API price at that duty cycle.",
+              "**So my answer is buy, and the reasoning generalizes.** The crossover for this fleet, this model and this API price sits near full utilization, and an internal working-hours tool cannot get near it. I would say that as a threshold, not a verdict: above roughly the utilization the model produces, self-hosting wins, and this workload is nowhere close.",
+              "**Before buying anything, I change the API side.** These prompts are 8k tokens of repository context that is largely identical between requests from the same developer, so ordering the stable repository prefix first and the cursor context last converts most of that input to the cached tier at a tenth of the price. That single change moves the API bill more than any fleet-sizing decision would, and it moves the crossover further away, not closer.",
+              "**What would flip it:** source code that cannot leave the network, which is a residency decision and not a cost one; a custom fine-tune on internal code, which is a capability decision; or growth that fills the off-peak hours with a batch workload, which raises utilization and is the only cost argument that would actually work. I would name all three rather than pretending the decision is purely arithmetic.",
+              "Common wrong turn: sizing the fleet from a FLOPs-and-bandwidth calculation instead of measured node throughput, then comparing its cost per million tokens at 100 percent utilization against the API list price. That comparison always favors self-hosting and it describes a fleet nobody operates.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-gpu-capacity-economics-practice",
+            prompt:
+              "Decide which of three features to move from a frontier API onto a self-hosted mixture-of-experts model and which to leave: a document classifier running at a steady rate 24 hours a day, an interactive assistant with a 300ms first-token target used only in working hours, and a nightly report generator that runs for 90 minutes. Defend the split on sustained utilization rather than on unit price.",
+            thinkAbout: [
+              "What duty cycle does each of the three features sustain, and which one is the only candidate on that basis?",
+              "How does an MoE model change what you provision for memory and what you provision for compute?",
+              "What could you do with the nightly job that raises a fleet's utilization instead of adding a second fleet?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: one shared budget, an MoE model in the range of 235B total and 22B active, rented GPUs rather than owned, and an API price for the frontier model the three features use today. I decide each feature on its duty cycle first, then check the non-cost reasons, and I say the threshold out loud rather than quoting a verdict.",
+              "**The classifier moves.** A steady 24-hour workload is the one shape that keeps a reserved GPU near full utilization, which is the only condition under which self-hosting is a cost win. It also has no interactive latency contract, so I can run large batches and sit at the throughput end of the curve instead of holding capacity back for a tail. This is the feature the fleet exists for, and the other two are decided relative to it.",
+              "**The interactive assistant stays.** Working hours only, bursty inside them, and a 300ms first-token target means sizing for peak and idling through the trough, so sustained utilization lands somewhere in the teens or twenties. At that duty cycle the same hardware costs several times the API price per million tokens, and the reserved capacity bills through the night regardless. I would move it only if a non-cost reason decided it: data residency, custom weights, or guaranteed capacity during a provider incident, and I would call that out as a capability purchase rather than a saving.",
+              "**The nightly job does not get a fleet, it gets a window.** Ninety minutes a day is a six percent duty cycle, which is the worst possible case for reserved capacity. Two options beat buying for it: run it on the provider's batch tier at roughly half price, or run it inside the classifier's fleet overnight while throttling the classifier, which raises the classifier fleet's utilization instead of adding a second one. The second option is the better answer because it improves the number that decides every other question here.",
+              "**Sizing the MoE fleet, since that is the part the model choice changes.** Memory is provisioned for the 235B total, because every expert must be resident before the router can select it, and compute is provisioned for the 22B active. So the GPU floor is a memory floor, and the compute headroom on top of that floor is generous, which is exactly why a large MoE is attractive for a steady batch workload. Expert parallelism spreads experts across GPUs, which needs a fabric that can carry the per-layer all-to-all and which frees per-GPU memory the KV cache then uses, so expert placement is a concurrency decision as well as a compute one.",
+              "**What I would measure to know I chose right:** sustained utilization of the self-hosted fleet reported weekly, not peak; cost per million tokens computed on tokens actually produced rather than on capacity; and the API side recomputed with cached input and the batch tier applied, because an unoptimized API bill makes self-hosting look better than it is.",
+              "Common wrong turn: computing self-hosted cost per million tokens at 100 percent utilization, comparing it against the API list price, and moving all three features. That is the comparison that produces published break-even estimates two orders of magnitude apart, and every one of them hid the same assumption.",
             ],
           },
         },

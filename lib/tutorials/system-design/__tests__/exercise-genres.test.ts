@@ -99,7 +99,7 @@ describe("system design exercise genres", () => {
     // Genre conversion rewrites exercises in place. Exercise ids are the persistence keys for
     // `user_design_answers`, so a sweep that adds or drops one has done something other than what
     // it was asked to do.
-    expect(exercises.length).toBe(416)
-    expect(new Set(exercises.map((e) => e.exercise.id)).size).toBe(416)
+    expect(exercises.length).toBe(424)
+    expect(new Set(exercises.map((e) => e.exercise.id)).size).toBe(424)
   })
 })
