@@ -467,7 +467,7 @@ Reviewing well is mostly recall. Keep a short list and walk it against the contr
 | Boundary | The input to try | What it catches |
 | --- | --- | --- |
 | Empty | \`[]\`, \`""\`, \`{}\` | indexing, division by length, \`max\` on nothing |
-| One | \`[x]\` | anything that compares neighbours or takes a pair |
+| One | \`[x]\` | anything that compares neighbors or takes a pair |
 | Two versus many | \`[a, b]\` versus \`[a, b, c, d]\` | index confusion that a short example hides |
 | Duplicates | \`[5, 5]\` | uniqueness assumptions, tie-breaking |
 | All equal | \`[3, 3, 3]\` | ranges, spreads, second-place logic |
@@ -4300,7 +4300,7 @@ Nothing on that list is exotic and every row is a bug somebody shipped this mont
 
 ## Verifying in ten seconds
 
-You do not need to memorise the table. You need the habit of checking, and Python makes it cheap.
+You do not need to memorize the table. You need the habit of checking, and Python makes it cheap.
 
 \`\`\`python
 help(str.strip)          # the docstring says "characters to be removed", not "prefix"
