@@ -919,7 +919,7 @@ const syntaxShorthandsLesson: PythonLesson = {
     estimatedMinutes: 5,
     markdown: `## Three shorthands you will read before you write
 
-Nothing in this lesson is a new idea. Each piece is a shorter way to say something you can already say with \`if\`. That is exactly why it matters: all three turn up in the first real codebase you open, and code you cannot read is code you cannot safely change. The judgement worth learning is when the short form is genuinely clearer and when it is merely shorter.
+Nothing in this lesson is a new idea. Each piece is a shorter way to say something you can already say with \`if\`. That is exactly why it matters: all three turn up in the first real codebase you open, and code you cannot read is code you cannot safely change. The judgment worth learning is when the short form is genuinely clearer and when it is merely shorter.
 
 ## A conditional expression: \`a if cond else b\`
 
