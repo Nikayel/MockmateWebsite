@@ -1,10 +1,14 @@
 import { describe, it, expect, vi } from "vitest"
 
-// learn-usage-views pulls in the Firestore/Auth clients transitively; the function under
-// test is pure over already-scanned rows, so the admin SDK never has to initialize.
+// learn-usage-views pulls in the Firestore/Auth clients transitively; the functions under
+// test are pure over already-scanned rows, so the admin SDK never has to initialize.
 vi.mock("@/lib/firebase-admin", () => ({ adminDb: {}, adminAuth: {} }))
 
-import { aggregateLearnerRows } from "../learn-usage-views"
+import {
+  aggregateLearnerRows,
+  paginateLearnerDirectory,
+  type LearnerDirectoryRow,
+} from "../learn-usage-views"
 import type { LearnDailyUsage } from "@/lib/tutorials/learn-time"
 
 function dailyRow(overrides: Partial<LearnDailyUsage>): LearnDailyUsage {
@@ -90,5 +94,85 @@ describe("aggregateLearnerRows", () => {
     expect(learner.activeMs).toBe(0)
     expect(learner.opens).toBe(0)
     expect(learner.byCourseMs).toEqual({ "system-design": 45_000 })
+  })
+})
+
+function directoryRow(overrides: Partial<LearnerDirectoryRow>): LearnerDirectoryRow {
+  return {
+    userId: "uid-1",
+    email: "a@example.com",
+    fullName: null,
+    joinedAt: "2026-08-01T00:00:00.000Z",
+    activeMs: 60_000,
+    opens: 1,
+    activeDays: 1,
+    byCourseMs: { python: 60_000 },
+    lastActiveDay: "2026-08-15",
+    ...overrides,
+  }
+}
+
+describe("paginateLearnerDirectory", () => {
+  const rows = [
+    directoryRow({ userId: "u1", email: "alice@example.com", activeMs: 300_000 }),
+    directoryRow({ userId: "u2", email: "bob@example.com", activeMs: 0, lastActiveDay: null }),
+    directoryRow({ userId: "u3", email: null, fullName: "Casey Smith", activeMs: 120_000 }),
+    directoryRow({ userId: "u4", email: "dana@example.com", activeMs: 500_000 }),
+  ]
+
+  it("defaults to most-engaged first", () => {
+    const result = paginateLearnerDirectory(rows, { page: 1, limit: 10 })
+    expect(result.rows.map((r) => r.userId)).toEqual(["u4", "u1", "u3", "u2"])
+    expect(result.totalFiltered).toBe(4)
+    expect(result.totalPages).toBe(1)
+  })
+
+  it("paginates and clamps out-of-range pages instead of returning nothing", () => {
+    const secondPage = paginateLearnerDirectory(rows, { page: 2, limit: 3 })
+    expect(secondPage.rows.map((r) => r.userId)).toEqual(["u2"])
+    expect(secondPage.totalPages).toBe(2)
+
+    const clamped = paginateLearnerDirectory(rows, { page: 99, limit: 3 })
+    expect(clamped.page).toBe(2)
+    expect(clamped.rows).toHaveLength(1)
+  })
+
+  it("searches email, name, and uid, case-insensitively", () => {
+    expect(
+      paginateLearnerDirectory(rows, { page: 1, limit: 10, search: "ALICE" }).rows.map(
+        (r) => r.userId
+      )
+    ).toEqual(["u1"])
+    expect(
+      paginateLearnerDirectory(rows, { page: 1, limit: 10, search: "casey" }).rows.map(
+        (r) => r.userId
+      )
+    ).toEqual(["u3"])
+    expect(
+      paginateLearnerDirectory(rows, { page: 1, limit: 10, search: "u2" }).rows.map((r) => r.userId)
+    ).toEqual(["u2"])
+  })
+
+  it("sinks nulls to the bottom in both sort directions", () => {
+    const asc = paginateLearnerDirectory(rows, {
+      page: 1,
+      limit: 10,
+      sort: "lastActiveDay",
+      dir: "asc",
+    })
+    expect(asc.rows[asc.rows.length - 1].userId).toBe("u2")
+
+    const desc = paginateLearnerDirectory(rows, {
+      page: 1,
+      limit: 10,
+      sort: "lastActiveDay",
+      dir: "desc",
+    })
+    expect(desc.rows[desc.rows.length - 1].userId).toBe("u2")
+  })
+
+  it("sorts numerically in the requested direction", () => {
+    const asc = paginateLearnerDirectory(rows, { page: 1, limit: 10, sort: "activeMs", dir: "asc" })
+    expect(asc.rows.map((r) => r.activeMs)).toEqual([0, 120_000, 300_000, 500_000])
   })
 })

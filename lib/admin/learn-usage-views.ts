@@ -55,19 +55,6 @@ export interface PlatformLearnDayRow {
   byCourseMs: Partial<Record<CourseId, number>>
 }
 
-export interface PlatformLearnerRow {
-  userId: string
-  /** Null when the auth record is gone (deleted account with surviving telemetry). */
-  email: string | null
-  fullName: string | null
-  activeMs: number
-  opens: number
-  /** Distinct UTC days with any active time inside the window. */
-  activeDays: number
-  byCourseMs: Partial<Record<CourseId, number>>
-  lastActiveDay: string
-}
-
 export interface PlatformLearnUsageView {
   /** Oldest first, for charting. */
   days: PlatformLearnDayRow[]
@@ -75,17 +62,64 @@ export interface PlatformLearnUsageView {
   topLessons: Array<{ lessonId: string; activeMs: number; users: number }>
   totals: { activeMs: number; opens: number; activeUsers: number }
   coverage: ScanCoverage
-  /**
-   * Most-active learners in the window. Present only when the request carried
-   * VIEW_USER_DETAILS — the aggregate view above stays readable by analytics-only
-   * admins, who must not be able to page through individual learners.
-   */
-  learners?: PlatformLearnerRow[]
+}
+
+/**
+ * One row per signed-up account in the learner directory — including accounts with no
+ * learn activity, because "who is NOT engaging" is half of what the directory is for.
+ * Activity fields are zeros/nulls for them rather than absent, so the table can sort on
+ * them uniformly.
+ */
+export interface LearnerDirectoryRow {
+  userId: string
+  /** Null on telemetry-only rows whose auth account was deleted. */
+  email: string | null
+  fullName: string | null
+  /** Auth account creation time (ISO); null for deleted-account rows. */
+  joinedAt: string | null
+  activeMs: number
+  opens: number
+  /** Distinct UTC days with any active time inside the window. */
+  activeDays: number
+  byCourseMs: Partial<Record<CourseId, number>>
+  lastActiveDay: string | null
+}
+
+export const LEARNER_DIRECTORY_SORT_KEYS = [
+  "activeMs",
+  "activeDays",
+  "opens",
+  "lastActiveDay",
+  "joinedAt",
+  "email",
+] as const
+export type LearnerDirectorySortKey = (typeof LEARNER_DIRECTORY_SORT_KEYS)[number]
+
+export interface LearnerDirectoryQuery {
+  page: number
+  limit: number
+  search?: string
+  sort?: LearnerDirectorySortKey
+  dir?: "asc" | "desc"
+}
+
+export interface LearnerDirectoryView {
+  rows: LearnerDirectoryRow[]
+  page: number
+  totalPages: number
+  /** Accounts matching the search (all accounts when the search is empty). */
+  totalFiltered: number
+  /** All signed-up accounts, regardless of learn activity or search. */
+  totalUsers: number
+  /** Accounts with any active learn time inside the window. */
+  activeUsers: number
+  coverage: ScanCoverage
 }
 
 const TOP_LESSONS_LIMIT = 50
-/** Also the bound on the identity lookup; adminAuth.getUsers accepts at most 100. */
-const TOP_LEARNERS_LIMIT = 50
+/** Same bounds as the admin users list: Firebase pages at 1000, capped to avoid timeouts. */
+const DIRECTORY_AUTH_BATCH = 1000
+const DIRECTORY_MAX_AUTH_USERS = 5000
 
 function addCourseMs(
   target: Partial<Record<CourseId, number>>,
@@ -140,15 +174,19 @@ export async function getUserLearnUsageView(
   }
 }
 
+/** The per-user activity slice of a directory row, before identity is joined on. */
+export type LearnerActivityRollup = Pick<
+  LearnerDirectoryRow,
+  "userId" | "activeMs" | "opens" | "activeDays" | "byCourseMs"
+> & { lastActiveDay: string }
+
 /**
  * Rank learners by active time within the scanned window. Pure so the shape of the
  * rollup (day counting, course merging, ordering) is unit-testable without Firestore.
  * `learn_daily` holds one doc per user per day, so each row is a distinct active day.
  */
-export function aggregateLearnerRows(
-  rows: LearnDailyUsage[]
-): Array<Omit<PlatformLearnerRow, "email" | "fullName">> {
-  const byUser = new Map<string, Omit<PlatformLearnerRow, "email" | "fullName">>()
+export function aggregateLearnerRows(rows: LearnDailyUsage[]): LearnerActivityRollup[] {
+  const byUser = new Map<string, LearnerActivityRollup>()
   for (const row of rows) {
     if (!row.user_id || !row.day) continue
     let user = byUser.get(row.user_id)
@@ -172,33 +210,116 @@ export function aggregateLearnerRows(
   return [...byUser.values()].sort((a, b) => b.activeMs - a.activeMs)
 }
 
+/** Every auth account, same pagination/cap discipline as the admin users list. */
+async function listAllAuthUsers(): Promise<import("firebase-admin/auth").UserRecord[]> {
+  const users: import("firebase-admin/auth").UserRecord[] = []
+  let pageToken: string | undefined
+  do {
+    const result = await adminAuth.listUsers(DIRECTORY_AUTH_BATCH, pageToken)
+    users.push(...result.users)
+    pageToken = result.pageToken
+    if (users.length >= DIRECTORY_MAX_AUTH_USERS) break
+  } while (pageToken)
+  return users
+}
+
+function compareNullableStrings(a: string | null, b: string | null, dir: "asc" | "desc"): number {
+  // Nulls sink to the bottom in BOTH directions: "never active" and "no email" are
+  // absences, not extremes, and flipping the sort should not surface them first.
+  if (a === null && b === null) return 0
+  if (a === null) return 1
+  if (b === null) return -1
+  return dir === "asc" ? a.localeCompare(b) : b.localeCompare(a)
+}
+
 /**
- * Same email precedence as the admin users list (auth record first). A failed lookup
- * degrades to uid-only rows rather than failing the whole platform view: identity is
- * decoration here, the time data is the point.
+ * Search + sort + slice for the learner directory. Pure and exported so pagination
+ * boundaries and null-sinking are unit-tested without Firestore or Auth.
  */
-async function resolveLearnerIdentities(
-  userIds: string[]
-): Promise<Map<string, { email: string | null; fullName: string | null }>> {
-  const identities = new Map<string, { email: string | null; fullName: string | null }>()
-  if (userIds.length === 0) return identities
-  try {
-    const result = await adminAuth.getUsers(userIds.map((uid) => ({ uid })))
-    for (const user of result.users) {
-      identities.set(user.uid, {
-        email: user.email ?? null,
-        fullName: user.displayName ?? null,
-      })
+export function paginateLearnerDirectory(
+  rows: LearnerDirectoryRow[],
+  query: LearnerDirectoryQuery
+): { rows: LearnerDirectoryRow[]; page: number; totalPages: number; totalFiltered: number } {
+  const search = query.search?.trim().toLowerCase()
+  const filtered = search
+    ? rows.filter(
+        (row) =>
+          row.email?.toLowerCase().includes(search) ||
+          row.fullName?.toLowerCase().includes(search) ||
+          row.userId.toLowerCase().includes(search)
+      )
+    : rows
+
+  const sortKey: LearnerDirectorySortKey = query.sort ?? "activeMs"
+  const dir = query.dir ?? "desc"
+  const sorted = [...filtered].sort((a, b) => {
+    let primary: number
+    if (sortKey === "lastActiveDay" || sortKey === "joinedAt" || sortKey === "email") {
+      primary = compareNullableStrings(a[sortKey], b[sortKey], dir)
+    } else {
+      primary = dir === "asc" ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]
     }
-  } catch (error) {
-    console.error("[learn-usage] learner identity lookup failed", error)
+    if (primary !== 0) return primary
+    // Stable, meaningful tiebreak: most-engaged first, then alphabetical.
+    if (b.activeMs !== a.activeMs) return b.activeMs - a.activeMs
+    return compareNullableStrings(a.email, b.email, "asc")
+  })
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / query.limit))
+  const page = Math.min(Math.max(1, query.page), totalPages)
+  return {
+    rows: sorted.slice((page - 1) * query.limit, page * query.limit),
+    page,
+    totalPages,
+    totalFiltered: sorted.length,
   }
-  return identities
+}
+
+/**
+ * All signed-up accounts joined with their learn activity in the window. Telemetry rows
+ * whose auth account no longer exists still get a line (the time was really spent); they
+ * are excluded from `totalUsers`, which counts signed-up accounts.
+ */
+export async function getLearnerDirectory(
+  sinceDayKey: string,
+  query: LearnerDirectoryQuery
+): Promise<LearnerDirectoryView> {
+  const [{ rows: dailyRows, coverage }, authUsers] = await Promise.all([
+    scanLearnDailySince(sinceDayKey),
+    listAllAuthUsers(),
+  ])
+
+  const activity = new Map(aggregateLearnerRows(dailyRows).map((row) => [row.userId, row]))
+
+  const allRows: LearnerDirectoryRow[] = authUsers.map((user) => {
+    const rollup = activity.get(user.uid)
+    activity.delete(user.uid)
+    return {
+      userId: user.uid,
+      email: user.email ?? null,
+      fullName: user.displayName ?? null,
+      joinedAt: user.metadata?.creationTime
+        ? new Date(user.metadata.creationTime).toISOString()
+        : null,
+      activeMs: rollup?.activeMs ?? 0,
+      opens: rollup?.opens ?? 0,
+      activeDays: rollup?.activeDays ?? 0,
+      byCourseMs: rollup?.byCourseMs ?? {},
+      lastActiveDay: rollup?.lastActiveDay ?? null,
+    }
+  })
+  const totalUsers = allRows.length
+  for (const orphan of activity.values()) {
+    allRows.push({ ...orphan, email: null, fullName: null, joinedAt: null })
+  }
+
+  const activeUsers = allRows.filter((row) => row.activeMs > 0).length
+  const pageResult = paginateLearnerDirectory(allRows, query)
+  return { ...pageResult, totalUsers, activeUsers, coverage }
 }
 
 export async function getPlatformLearnUsageView(
-  sinceDayKey: string,
-  options?: { includeLearners?: boolean }
+  sinceDayKey: string
 ): Promise<PlatformLearnUsageView> {
   const { rows, coverage } = await scanLearnDailySince(sinceDayKey)
 
@@ -242,7 +363,7 @@ export async function getPlatformLearnUsageView(
     }
   }
 
-  const view: PlatformLearnUsageView = {
+  return {
     days: [...byDay.values()]
       .map(({ userIds, ...day }) => ({ ...day, activeUsers: userIds.size }))
       .sort((a, b) => a.day.localeCompare(b.day)),
@@ -253,16 +374,4 @@ export async function getPlatformLearnUsageView(
     totals: { ...totals, activeUsers: allUsers.size },
     coverage,
   }
-
-  if (options?.includeLearners) {
-    const ranked = aggregateLearnerRows(rows).slice(0, TOP_LEARNERS_LIMIT)
-    const identities = await resolveLearnerIdentities(ranked.map((row) => row.userId))
-    view.learners = ranked.map((row) => ({
-      ...row,
-      email: identities.get(row.userId)?.email ?? null,
-      fullName: identities.get(row.userId)?.fullName ?? null,
-    }))
-  }
-
-  return view
 }
