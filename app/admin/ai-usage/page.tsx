@@ -395,10 +395,15 @@ export default function AIUsagePage() {
     return tokens.toString()
   }
 
-  const formatCost = (cost: number) => {
-    if (cost >= 1) return `$${cost.toFixed(2)}`
-    if (cost >= 0.01) return `$${cost.toFixed(3)}`
-    return `$${cost.toFixed(4)}`
+  // A truncated aggregate or an older API shape can leave a money field absent,
+  // and `.toFixed` on undefined throws out of render and blanks the whole tab.
+  // The sibling token counters already guarded with `|| 0`; this does the same
+  // for every cost the page prints.
+  const formatCost = (cost: number | null | undefined) => {
+    const amount = typeof cost === "number" && Number.isFinite(cost) ? cost : 0
+    if (amount >= 1) return `$${amount.toFixed(2)}`
+    if (amount >= 0.01) return `$${amount.toFixed(3)}`
+    return `$${amount.toFixed(4)}`
   }
 
   const getDifficultyColor = (difficulty: string) => difficultyColorClass(difficulty)
