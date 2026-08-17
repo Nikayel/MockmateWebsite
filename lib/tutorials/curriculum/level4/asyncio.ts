@@ -563,6 +563,52 @@ asyncio.run(main())   # [10, 20, 30] after ~0.1s total, not 0.3s
 }
 \`\`\`
 
+### TaskGroup: the structured replacement for a bare gather
+
+\`gather\` is still the quickest way to say "run these three together", and it has a failure story that
+catches people out: when one coroutine raises, \`gather\` hands you that exception and the *other* tasks
+carry on unsupervised, with nothing waiting on them. \`asyncio.TaskGroup\` (Python 3.11) is the
+structured version. It is an \`async with\` block that owns every task started inside it, waits for all
+of them before it exits, and cancels the siblings when one of them fails.
+
+\`\`\`python
+import asyncio
+
+async def fetch_one(n):
+    await asyncio.sleep(0.01)
+    return n * 10
+
+async def main():
+    async with asyncio.TaskGroup() as group:
+        a = group.create_task(fetch_one(1))
+        b = group.create_task(fetch_one(2))
+    # the block does not exit until both have finished
+    return [a.result(), b.result()]
+
+asyncio.run(main())   # [10, 20]
+\`\`\`
+
+Two things change with it. Tasks go in with \`group.create_task(...)\` rather than being awaited one by
+one, and you read their values off the task objects *after* the block. And when several tasks fail,
+the group refuses to pick one exception to show you: it raises an **\`ExceptionGroup\`** carrying all of
+them, which is the other half of the same 3.11 change.
+
+An \`ExceptionGroup\` is not caught by an ordinary \`except ValueError\`, because the group is not a
+\`ValueError\` even when it contains one. The syntax that matches it is \`except*\`, which runs once per
+exception *type* present in the group and hands you a sub-group holding just the matching ones:
+
+\`\`\`python
+try:
+    raise ExceptionGroup("two failed", [ValueError("bad row"), TypeError("bad column")])
+except* ValueError as group:
+    print("value errors:", len(group.exceptions))     # value errors: 1
+except* TypeError as group:
+    print("type errors:", len(group.exceptions))      # type errors: 1
+\`\`\`
+
+Both clauses run, and that is the point. With a group, "handled" is decided per exception instead of
+per \`try\`, so one partial failure no longer makes you discard everything that did succeed.
+
 ### Capping how much runs at once
 
 \`gather\` has no brakes. Hand it 5000 keys and it starts 5000 reads, which is how you exhaust a connection pool, trip a rate limit, or hold 5000 partial responses in memory at once. Real services therefore fan out *bounded*: start everything, but never let more than N of them be in flight.
