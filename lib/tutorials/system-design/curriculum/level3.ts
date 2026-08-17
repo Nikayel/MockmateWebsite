@@ -3827,6 +3827,8 @@ per-cell caps, separate sharding, and caching.
   "reveal": "You now hold the full toolkit: encode 2D points into cell keys so proximity becomes a range query, ring-query neighbors to beat boundary misses, size cells to the typical query radius, keep moving points in a fast store with a short TTL, and defuse hot cells deliberately. In your design write, name the scheme you pick and why, the neighbor-ring query, and your hot-cell plan."
 }
 \`\`\`
+
+**Sources:** [H3 (Uber) documentation](https://h3geo.org/docs/) · [S2 (Google) documentation](https://s2geometry.io/)
 `.trim()
 
 const denormFanoutTeach = `
