@@ -26,9 +26,10 @@ const FUSE_README = buildBrief({
   headline: "hybrid search sends the wrong passage to the model",
   body: `The answer quality drop traces to the reranker, not the model. Hybrid search runs two retrievers over
 the same query and merges them by adding their scores together. The dense retriever returns cosine
-similarity, which lives between 0 and 1. The keyword retriever returns BM25, which has no upper
-bound and routinely returns 12 or 18 on this corpus. Adding them means the keyword retriever decides
-every ranking on its own, and the dense retriever contributes a rounding error.
+similarity, which lives between -1 and 1, and on this corpus every score happens to be positive. The
+keyword retriever returns BM25, which has no upper bound and routinely returns 12 or 18 on the same
+passages. Adding them means the keyword retriever decides every ranking on its own, and the dense
+retriever contributes a rounding error.
 
 There is a second defect in the same merge. A passage that only one retriever returned is dropped
 entirely, because the merge walks the passages the two lists have in common.
@@ -80,7 +81,8 @@ returning it last. A document neither retriever returned fuses to \`0.0\` with t
 
 const FUSE_CORPUS = String.raw`"""Read-only. What the two retrievers returned for one query, each in its own units."""
 
-# The embedding retriever. Cosine similarity, so every score sits between 0 and 1.
+# The embedding retriever. Cosine similarity, which sits between -1 and 1, and on this
+# corpus every score happens to be positive.
 DENSE_SCORES = {"p1": 0.81, "p2": 0.79, "p3": 0.78, "p5": 0.40}
 
 # The keyword retriever. BM25, which has no upper bound and is not comparable to the above.
@@ -437,7 +439,7 @@ Production retrieval runs at least two retrievers over the same query: a dense o
 The obvious merge is to add each document's two scores together. Look at what the two retrievers actually return:
 
 \`\`\`python
-dense   = {"p1": 0.81, "p2": 0.79, "p3": 0.78}   # cosine, always between 0 and 1
+dense   = {"p1": 0.81, "p2": 0.79, "p3": 0.78}   # cosine, between -1 and 1, positive throughout here
 keyword = {"p2": 18.4, "p4": 12.1, "p1": 3.2}    # BM25, no upper bound at all
 \`\`\`
 
