@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react"
 import { User as FirebaseUser, onAuthStateChanged, Auth } from "firebase/auth"
+import posthog from "posthog-js"
 import { User as UserType } from "./types"
 import { convertFirebaseUser } from "./auth"
 
@@ -29,6 +30,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true
     let authStateResolved = false
     let unsubscribe: (() => void) | null = null
+    // Whether the previous auth callback carried a user. posthog.reset() may
+    // only run on a real sign-out: the initial "no user" callback fires for
+    // every anonymous visitor, and resetting there would hand each page load
+    // a fresh anonymous id, inflating every visitor count.
+    let hadUser = false
 
     // Lazily initialize Firebase Auth
     const initAuth = async () => {
@@ -40,33 +46,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!mounted) return
 
         // Single auth state listener for the entire app
-        unsubscribe = onAuthStateChanged(auth, (fbUser) => {
-          if (!mounted) return
+        unsubscribe = onAuthStateChanged(
+          auth,
+          (fbUser) => {
+            if (!mounted) return
 
-          authStateResolved = true
+            authStateResolved = true
 
-          setFirebaseUser(fbUser)
+            setFirebaseUser(fbUser)
 
-          if (fbUser) {
-            const convertedUser = convertFirebaseUser(fbUser)
-            setUser(convertedUser)
-            // Set auth indicator cookie for middleware (server-side route protection)
-            document.cookie = `firebase-auth-token=1; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
-          } else {
-            setUser(null)
-            // Clear auth indicator cookie on logout
-            document.cookie = 'firebase-auth-token=; path=/; max-age=0; SameSite=Lax'
+            if (fbUser) {
+              const convertedUser = convertFirebaseUser(fbUser)
+              setUser(convertedUser)
+              // Set auth indicator cookie for middleware (server-side route protection)
+              document.cookie = `firebase-auth-token=1; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
+              // Tie PostHog to the Firebase uid so product analytics joins to
+              // Firestore profiles on the same key. __loaded guards the no-key
+              // deploys where instrumentation-client never initialized PostHog.
+              if (posthog.__loaded) {
+                posthog.identify(fbUser.uid, { email: fbUser.email ?? undefined })
+              }
+              hadUser = true
+            } else {
+              setUser(null)
+              // Clear auth indicator cookie on logout
+              document.cookie = "firebase-auth-token=; path=/; max-age=0; SameSite=Lax"
+              if (hadUser && posthog.__loaded) {
+                posthog.reset()
+              }
+              hadUser = false
+            }
+
+            setLoading(false)
+            setInitialized(true)
+          },
+          () => {
+            if (!mounted) return
+            // Auth state change error - continue anyway
+            authStateResolved = true
+            setLoading(false)
+            setInitialized(true)
           }
-
-          setLoading(false)
-          setInitialized(true)
-        }, () => {
-          if (!mounted) return
-          // Auth state change error - continue anyway
-          authStateResolved = true
-          setLoading(false)
-          setInitialized(true)
-        })
+        )
       } catch {
         // Failed to initialize Firebase Auth
         if (mounted) {
