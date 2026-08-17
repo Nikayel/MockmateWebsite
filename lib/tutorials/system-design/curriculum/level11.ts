@@ -4425,9 +4425,9 @@ That is the argument for treating parsing as an engineering surface with its own
 
 The 2024 answer to a bad parse was a better parser. There is a second answer, and it is a genuine architectural fork rather than an upgrade: do not extract text at all. Render each page to an image, embed the image directly with a vision-language model that emits one vector per image patch, and retrieve pages. When a page is retrieved, hand the page image to a vision model to read.
 
-ColPali is the reference design: a vision-language model trained to produce multi-vector embeddings from images of document pages, matched with the late-interaction scoring the next lesson covers. Its authors introduced the ViDoRe benchmark alongside it precisely because page-level retrieval over visually rich documents had no shared measurement, and report that the approach outperforms text-extraction pipelines while being simpler and end-to-end trainable.
+ColPali is the reference design: a vision-language model trained to produce multi-vector embeddings from images of document pages, matched with the scoring the late-interaction lesson covers. Its authors introduced the ViDoRe benchmark alongside it precisely because page-level retrieval over visually rich documents had no shared measurement, and report that the approach outperforms text-extraction pipelines while being simpler and end-to-end trainable.
 
-What it removes is the entire left half of that pipeline. There is no OCR step to produce a character error, no layout detector to confuse a sidebar with an abstract, no serializer to drop a header binding. What it adds is a multi-vector index, which is the next lesson's subject, and a storage bill.
+What it removes is the entire left half of that pipeline. There is no OCR step to produce a character error, no layout detector to confuse a sidebar with an abstract, no serializer to drop a header binding. What it adds is a multi-vector index, which is the late-interaction lesson's subject, and a storage bill.
 
 ## What the fork costs
 
