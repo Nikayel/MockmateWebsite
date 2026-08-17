@@ -2802,7 +2802,7 @@ A reserved GPU bills at one hundred percent whether or not you are using it. An 
 
 Two facts to attach to that widget. First, identical silicon rents across roughly a three to four times range depending on the vendor and the commitment, so shopping is worth real money before any engineering is. Second, for a decode-heavy workload the ranking metric is not dollars per hour but dollars per terabyte per second of memory bandwidth per hour, and ranking a vendor list that way reorders it, because the cards with the best headline compute are not always the ones with the best bandwidth per dollar.
 
-Then the levers that move the numerator without touching the fleet: a provider's batch tier at roughly half price for anything that tolerates a delay, cached input from the previous lesson for anything with a stable prefix, spot capacity at a discount that you pay for in eviction handling, and the engineers a self-hosted fleet needs, who are a real line in a real budget and are missing from every comparison that concludes self-hosting is cheaper.
+Then the levers that move the numerator without touching the fleet: a provider's batch tier at roughly half price for anything that tolerates a delay, cached input from the prompt-cache lesson for anything with a stable prefix, spot capacity at a discount that you pay for in eviction handling, and the engineers a self-hosted fleet needs, who are a real line in a real budget and are missing from every comparison that concludes self-hosting is cheaper.
 
 **Interview nuance, and the honest conclusion.** Published self-host break-even estimates disagree with one another by about two orders of magnitude, and that disagreement is itself the finding: each of them buried a utilization assumption. The senior answer states a threshold rather than a verdict ("above roughly this sustained utilization, for this model, against this API price, self-hosting wins"), names the non-cost reasons that usually decide it anyway (data residency, custom or fine-tuned weights, guaranteed capacity during a provider incident, a latency floor you cannot get from a shared endpoint), and does not claim self-hosting is cheaper.
 
@@ -7427,7 +7427,7 @@ export const systemDesignLevel11: DesignLevel = {
             thinkAbout: [
               "What are the prefill and decode token rates, and which one sets the node count here?",
               "What duty cycle does an internal tool used in working hours actually sustain?",
-              "Which lever from the previous lesson changes the API side of the comparison before any hardware is bought?",
+              "Which lever from the prompt-cache lesson changes the API side of the comparison before any hardware is bought?",
             ],
             modelAnswerOutline: [
               "Assumptions and demand: 4,000 users times 40 requests is 160,000 requests per day, about 1.85 per second averaged over 24 hours. At 600 output tokens that is roughly 1,100 decode tokens/sec; at 8,000 prompt tokens it is roughly 14,800 prefill tokens/sec. A coding assistant on an 8-GPU node with a mid-size model, measured (not derived) at 2,500 decode tokens/sec and 12,000 prefill tokens/sec at an SLO-satisfying batch.",
