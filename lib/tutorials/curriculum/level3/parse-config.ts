@@ -613,7 +613,45 @@ Given \`"# db\\nhost = localhost\\nport = 8080"\`, the loop reaches the store st
   ],
   "reveal": "Every guard in that loop exists because some real config file broke a parser that lacked it. Your Practice reader has to survive all six of these lines, and the hidden tests check the awkward ones."
 }
-\`\`\``,
+\`\`\`
+
+## Matching a shape instead of testing it
+
+Once a value has been parsed, the next job is usually to branch on what shape it turned out to be,
+and a chain of \`if isinstance(...) and "type" in ...\` gets unreadable fast. \`match\`/\`case\` (Python 3.10,
+PEP 634) tests the shape and pulls the pieces out in one step:
+
+\`\`\`python
+def describe(event):
+    match event:
+        case {"type": "set", "key": str(key), "value": value}:
+            return f"set {key} to {value!r}"
+        case {"type": "delete", "key": str(key)}:
+            return f"delete {key}"
+        case {"type": "reload"}:
+            return "reload everything"
+        case {"type": kind}:                       # any other event that has a type
+            return f"unknown event type {kind!r}"
+        case _:                                     # the catch-all
+            return "not an event"
+
+describe({"type": "set", "key": "port", "value": 8080})   # "set port to 8080"
+describe({"type": "reload", "at": "now"})                 # "reload everything"
+describe({"type": "rotate"})                              # "unknown event type 'rotate'"
+describe(["set", "port", 8080])                           # "not an event"
+\`\`\`
+
+Three things are happening at once in each case. A mapping pattern matches on the keys it names and
+**ignores extra keys**, which is why the \`reload\` event still matches with an \`"at"\` it did not ask
+about. \`str(key)\` is a class pattern: it checks the type *and* binds the value to \`key\`. And the
+first matching case wins, so order the specific patterns above the general ones.
+
+The gotcha worth carrying into an interview: a bare name in a pattern is a **capture**, not a
+comparison. \`case PORT:\` does not test whether the value equals your \`PORT\` constant, it matches
+anything and rebinds \`PORT\` to it. To compare against a constant, use a dotted name such as
+\`case Keys.PORT:\`. CPython catches the loud version of this mistake at compile time, with
+\`SyntaxError: name capture 'PORT' makes remaining patterns unreachable\`, but only when there is a
+later pattern for it to shadow.`,
   },
   apply: {
     id: "py-l3-parse-config-apply",
