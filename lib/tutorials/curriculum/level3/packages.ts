@@ -218,7 +218,7 @@ def run_tests(record):
         assert result == expected, f"expected {expected!r}, got {result!r}"
 
     def counts_are_ordered_worst_first():
-        lines = ["DEBUG a", "ERROR b", "WARNING c", "totally unlabelled"]
+        lines = ["DEBUG a", "ERROR b", "WARNING c", "totally unlabeled"]
         keys = list(reportkit.build_report(lines)["counts"])
         expected = ["ERROR", "WARNING", "DEBUG", "UNKNOWN"]
         assert keys == expected, f"expected counts keyed {expected!r}, got {keys!r}"
