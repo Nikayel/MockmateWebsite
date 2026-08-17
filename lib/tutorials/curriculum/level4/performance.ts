@@ -600,7 +600,9 @@ total = sum(x * x for x in range(10_000_000))   # no 10M-element list
   ],
   "reveal": "Two separate costs hide behind one decorator. Time drops from exponential to linear because there are only n distinct inputs, but you now hold n results in memory and the first call still recurses n frames deep. Naming all three is the difference between using lru_cache and understanding it."
 }
-\`\`\``,
+\`\`\`
+
+**Sources:** [functools.lru_cache](https://docs.python.org/3/library/functools.html) · [profile and cProfile](https://docs.python.org/3/library/profile.html) · [Python Time Complexity](https://wiki.python.org/moin/TimeComplexity)`,
     demoCode: `from functools import lru_cache
 
 
