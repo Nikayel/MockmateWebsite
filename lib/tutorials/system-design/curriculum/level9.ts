@@ -3284,6 +3284,8 @@ Because delivery is **at-least-once** (a connector can replay after a crash), do
   "reveal": "Table formats turn a directory of Parquet into a table: ACID through an atomic metadata swap, schema and partition evolution, time travel, and hidden partitioning, coordinated by a catalog so several engines agree on what a table is. Log-based CDC on the WAL or binlog captures every change including deletes, in commit order, at low cost. The outbox makes the business write and the event one transaction, and idempotent consumers turn at-least-once delivery into an effectively exactly-once result."
 }
 \`\`\`
+
+**Sources:** [Apache Iceberg table spec](https://iceberg.apache.org/spec/) · [Debezium architecture](https://debezium.io/documentation/reference/stable/architecture.html) · [Apache Hudi overview](https://hudi.apache.org/docs/overview)
 `.trim()
 
 const batchStreamingTeach = `
