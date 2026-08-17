@@ -1191,6 +1191,8 @@ Instruct the model to say "I do not know" when context is weak, and verify citat
   "reveal": "RAG is two halves you debug separately. Ingestion and retrieval decide what evidence exists in the prompt: chunking, hybrid dense plus sparse, a reranker, and an ACL pre-filter that makes retrieval the security boundary. Generation decides what is done with that evidence: ground it, cite it, abstain when it is weak. The triad exists so you can tell those halves apart instead of guessing, and in an interview naming the reranker and the ACL stage is what separates a real design from a demo."
 }
 \`\`\`
+
+**Sources:** [RAG for knowledge-intensive NLP](https://arxiv.org/abs/2005.11401) · [Dense Passage Retrieval](https://arxiv.org/abs/2004.04906) · [Retrieval-augmented generation survey](https://arxiv.org/abs/2312.10997)
 `.trim()
 
 const vectorDbAnnTeach = `
