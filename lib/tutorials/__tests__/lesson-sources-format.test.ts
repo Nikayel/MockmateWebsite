@@ -95,8 +95,12 @@ const FENCE = /```([a-zA-Z0-9_-]*)[^\n]*\n([\s\S]*?)\n```/g
  * Zero until the sourcing wave lands, then raised to the shipped count in the same commit that
  * finishes it. Without a floor every assertion above passes forever after someone deletes every
  * block, which is the failure a format guard is least able to notice on its own.
+ *
+ * The wave landed on 2026-08-16: 72 lessons carry a block, measured with the detector below
+ * against the live corpus, 60 in System Design and 12 in Python. Raise this number when a later
+ * wave adds blocks; never lower it, because the only thing that lowers it is a deletion.
  */
-const SOURCED_LESSON_FLOOR = 0
+const SOURCED_LESSON_FLOOR = 72
 
 /** One rule breach. The letter is the rule id from the verifier spec, so failures name their rule. */
 interface Violation {
@@ -334,9 +338,8 @@ describe("lesson sources block format", () => {
   })
 
   it("keeps a coverage floor, so the guard cannot survive every block being deleted", () => {
-    // Rule L. Zero today because the corpus has no blocks yet; raised to the shipped count by the
-    // commit that finishes the sourcing wave. Do not delete this: a format guard over zero blocks
-    // is indistinguishable from a format guard that has been switched off.
+    // Rule L. Pinned at the count the sourcing wave shipped. Do not delete this: a format guard
+    // over zero blocks is indistinguishable from a format guard that has been switched off.
     const withSources = ENTRIES.filter((entry) => sourcesBlockOf(entry.lesson.teach.markdown))
     expect(withSources.length).toBeGreaterThanOrEqual(SOURCED_LESSON_FLOOR)
   })
