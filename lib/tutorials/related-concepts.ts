@@ -1176,6 +1176,10 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
         id: "sd-l1-tls-https",
         anchor: "The TLS 1.3 handshake, and why the token never travels in the clear",
       },
+      {
+        id: "sd-l11-tool-protocol-mcp",
+        anchor: "Model Context Protocol tool servers, and the authorization they delegate",
+      },
     ],
     cta: {
       href: "/system-design-interview-practice",
@@ -1619,6 +1623,136 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
     cta: {
       href: "/system-design-interview-practice",
       label: "Practice a design round on swapping an embedding model with the index still serving",
+    },
+  },
+
+  // ---------------------------------------------------------------------------------------------
+  // System Design: agent platforms and tool boundaries (Level 11 module 6, shipped 2026-08-16)
+  // ---------------------------------------------------------------------------------------------
+  "sd-l11-llm-agents": {
+    related: [
+      {
+        id: "sd-l11-tool-protocol-mcp",
+        anchor: "Tool servers as a versioned protocol, billing tokens on every single turn",
+      },
+      {
+        id: "sd-l11-agent-memory",
+        anchor: "Context compaction, and a durable store the user is allowed to correct",
+      },
+      {
+        id: "sd-l11-multi-agent-fanout",
+        anchor: "The token multiplier a fan-out buys, and the trigger worth stating out loud",
+      },
+      {
+        id: "sd-l11-injection-safe-design",
+        anchor: "The lethal trifecta, and the authority limit that belongs inside the tool",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label:
+        "Practice a design round where the agent loop has to terminate and you say what bounds it",
+    },
+  },
+
+  "sd-l11-tool-protocol-mcp": {
+    related: [
+      {
+        id: "sd-l11-llm-agents",
+        anchor: "The loop above the tools, and the bounds it needs in code rather than in a prompt",
+      },
+      {
+        id: "sd-l11-injection-safe-design",
+        anchor: "The lethal trifecta, and why the tool boundary is where authority is enforced",
+      },
+      {
+        id: "sd-l11-agent-memory",
+        anchor: "Context compaction, once every connected tool costs tokens on every turn",
+      },
+      {
+        id: "sd-l8-oauth-oidc",
+        anchor: "OAuth 2.1 and OpenID Connect, the handshake a tool server delegates to",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label: "Practice a design round on a tool surface an untrusted model is allowed to call",
+    },
+  },
+
+  "sd-l11-agent-memory": {
+    related: [
+      {
+        id: "sd-l11-llm-agents",
+        anchor: "The agent loop that re-reads this working set on every single turn",
+      },
+      {
+        id: "sd-l11-prompt-cache-economics",
+        anchor: "Prefix ordering, so a compaction pass does not invalidate the cache",
+      },
+      {
+        id: "sd-l11-multi-agent-fanout",
+        anchor: "Splitting the context that made the plan coherent, and what that costs",
+      },
+      {
+        id: "sd-l11-chunking-strategy",
+        anchor: "Cutting a durable store so a fact stays findable without its neighbors",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label:
+        "Practice a design round where the context window fills and the agent still has to work",
+    },
+  },
+
+  "sd-l11-multi-agent-fanout": {
+    related: [
+      {
+        id: "sd-l11-llm-agents",
+        anchor: "The single-agent loop that is the default a fan-out has to beat",
+      },
+      {
+        id: "sd-l11-agent-memory",
+        anchor: "Compaction and context editing, the cheaper fix to try before fanning out",
+      },
+      {
+        id: "sd-l11-agent-tracing",
+        anchor: "A trace tree over the loop, with token counts on every node",
+      },
+      {
+        id: "sd-l11-gpu-capacity-economics",
+        anchor: "Tokens per second per GPU, the unit a fan-out multiplies",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label: "Practice a design round where you justify a second agent instead of a longer prompt",
+    },
+  },
+
+  "sd-l11-injection-safe-design": {
+    related: [
+      {
+        id: "sd-l11-tool-protocol-mcp",
+        anchor: "Tool servers, their auth story, and the threat model that arrives with them",
+      },
+      {
+        id: "sd-l11-llm-agents",
+        anchor: "The loop that treats every byte of tool output as attacker-controlled",
+      },
+      {
+        id: "sd-l8-authz-rbac-rebac",
+        anchor: "RBAC, ABAC and ReBAC, where an authority limit is actually enforced",
+      },
+      {
+        id: "sd-l11-llm-eval-guardrails",
+        anchor: "Golden-set gates, and the output filter no answer is allowed to skip",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label: "Practice a design round on an agent that reads untrusted text and holds real secrets",
     },
   },
 
