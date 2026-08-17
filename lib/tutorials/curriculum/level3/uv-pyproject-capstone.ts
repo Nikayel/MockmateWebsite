@@ -499,6 +499,37 @@ The \`[build-system]\` table names the tool that turns this source tree into an 
 
 Your capstone project is laid out this way: a \`shiftlog/\` package directory holds one module per job, with \`pyproject.toml\` at the root naming the package and pointing its console script at the function that runs the command.
 
+### Reading TOML back: \`tomllib\`
+
+TOML is a format you read as often as you write, and since Python 3.11 the reader is in the standard
+library. \`tomllib\` parses; there is deliberately no writer, so nothing in the stdlib will reformat
+your \`pyproject.toml\` behind your back.
+
+\`\`\`python
+import tomllib
+from pathlib import Path
+
+with open("pyproject.toml", "rb") as handle:     # binary mode, always
+    data = tomllib.load(handle)
+
+data["project"]["name"]           # 'shiftlog'
+data["project"]["scripts"]        # {'shiftlog': 'shiftlog.cli:main'}
+data["project"]["dependencies"]   # ['httpx>=0.27']
+
+tomllib.loads(Path("pyproject.toml").read_text())   # the from-a-string form
+\`\`\`
+
+Two details bite people. The file must be opened in **binary** mode: hand \`tomllib.load\` a text
+handle and it raises \`TypeError: File must be opened in binary mode\`, because TOML is defined as
+UTF-8 and the parser decodes it itself. And a table name with a dot in it, like \`[project.scripts]\`,
+is nesting rather than a key: it arrives as \`data["project"]["scripts"]\`, not as a top-level
+\`"project.scripts"\`. Malformed input raises \`tomllib.TOMLDecodeError\`.
+
+This is how tooling reads your project: a linter looking for its \`[tool.*]\` table, a release script
+reading \`version\`, CI checking \`requires-python\`. It beats a regex over the text for exactly the
+reason parsing usually does, and the hidden test in this capstone uses a regex only because it is
+checking one declaration rather than reading the file for real.
+
 ### \`uv\`: resolve, lock, run
 
 \`uv\` is a fast package manager that replaces \`pip\`, \`virtualenv\`, and \`pip-tools\` with one tool. The day-to-day loop:
