@@ -2068,7 +2068,7 @@ Rounded, order-of-magnitude, the numbers that matter:
       "label": "Read 1 MB sequentially from RAM",
       "value": 50000,
       "display": "~50 us",
-      "note": "Sequential RAM reads stay in the tens of microseconds even for a full megabyte."
+      "note": "Sequential RAM reads stay in the tens of microseconds even for a full megabyte, assuming roughly 20 GB/s of single-threaded bandwidth. Older tables say 250 us; modern hardware is faster."
     },
     {
       "label": "SSD random read",
