@@ -19,7 +19,7 @@ import { buildRunner, EMPTY_INIT } from "../workspace-runner"
 // which is the axis decision and the missing-value rule the practice is built on. It is still a
 // different function from every one of the practice's seven.
 //
-// ── Practice workspace: a 2D measurement table, modelled over lists of lists ──
+// ── Practice workspace: a 2D measurement table, modeled over lists of lists ──
 // numpy is unavailable here (see the note above), so the practice grades the mechanics
 // of array programming (shape checks, per-column broadcasting, axis=0 vs axis=1
 // aggregation, boolean masks, missing values that keep the shape) by hand.
