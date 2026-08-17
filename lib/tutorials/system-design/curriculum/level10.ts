@@ -3497,6 +3497,8 @@ Membership uses gossip: nodes periodically exchange state so the cluster learns 
   "reveal": "Four internals, and the answer touches all four. Partitioning is consistent hashing with virtual nodes, with a replication factor N defining each key's preference list. Consistency is tunable through R and W, which buy freshness, not linearizability. Conflicts are inevitable because both sides of a partition accept writes, so you either take last write wins and silently drop one, or track causality with vector clocks and hand back siblings, then reconcile drift with read-repair and Merkle tree anti-entropy. Writes go through an LSM: commit log, memtable, SSTable flush, bloom filters and compaction, with gossip membership and hinted handoff keeping the cluster available."
 }
 \`\`\`
+
+**Sources:** [Dynamo, SOSP 2007](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf) · [DynamoDB internals, USENIX ATC 22](https://www.usenix.org/conference/atc22/presentation/elhemali) · [DynamoDB partition key design](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-design.html)
 `.trim()
 
 const objectStoreS3Teach = `
