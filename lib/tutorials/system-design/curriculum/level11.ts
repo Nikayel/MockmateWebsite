@@ -2211,8 +2211,8 @@ Level 11's eval and guardrail lesson later formalizes this, and the short versio
   "predictPrompt": {
     "question": "A service extracting typed fields at 2,000 requests per second sees 8 percent of generations fail validation, each about 600 output tokens. Roughly how many output tokens per second are spent on generations that get thrown away?",
     "options": [
-      "About 9,600, since 8 percent of 2,000 requests fail",
-      "About 104,000, once you count that a failure still has to be replaced",
+      "About 96,000, since 8 percent of 2,000 requests fail",
+      "About 104,000, because a failure still has to be replaced",
       "Nothing measurable, because a failed generation is not billed"
     ]
   },
