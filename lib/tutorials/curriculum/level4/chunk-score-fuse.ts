@@ -505,7 +505,7 @@ The fused score has no meaning on its own. It is not a probability, not a simila
   "type": "check",
   "kind": "predict",
   "id": "rrf-damping-constant",
-  "prompt": "Someone sets the fusion constant to 0, arguing that it is an arbitrary magic number and removing it makes the maths cleaner. What changes?",
+  "prompt": "Someone sets the fusion constant to 0, arguing that it is an arbitrary magic number and removing it makes the math cleaner. What changes?",
   "options": [
     {
       "label": "Nothing meaningful, since every document's score shifts by the same amount",
