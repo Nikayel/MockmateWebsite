@@ -199,7 +199,9 @@ name = "Ada"
 cur.execute(f"SELECT id FROM users WHERE name = '{name}'")   # WRONG
 \`\`\`
 
-It works. It keeps working. It ships. Then a customer named O'Brien signs up, and the statement the database receives is \`WHERE name = 'O'Brien'\`, which closes the string literal after the \`O\` and fails to parse. The same hole that an apostrophe trips by accident is the hole an attacker types on purpose: a \`name\` of \`'; DROP TABLE users; --\` ends your statement early and starts a new one.
+It works. It keeps working. It ships. Then a customer named O'Brien signs up, and the statement the database receives is \`WHERE name = 'O'Brien'\`, which closes the string literal after the \`O\` and fails to parse. The same hole that an apostrophe trips by accident is the hole an attacker types on purpose. A \`name\` of \`' OR 1=1 --\` makes the statement read \`WHERE name = '' OR 1=1 --'\`, which matches every row in the table: the filter you wrote is gone, and so is anything that rested on it.
+
+The stacked payload everyone quotes, \`'; DROP TABLE users; --\`, does **not** work through this driver. \`sqlite3\`'s \`execute\` refuses more than one statement and raises \`ProgrammingError: You can only execute one statement at a time.\`, so the table survives. Do not mistake that for a defense: \`executescript\` runs the whole string and really does drop the table, and plenty of other drivers accept stacked statements. Single-statement injection like \`' OR 1=1 --\`, or a \`UNION SELECT\` that staples on rows from another table, needs no stacking at all.
 
 \`\`\`cswidget
 {
@@ -350,7 +352,7 @@ def build_lookup(name):
     return "SELECT id FROM users WHERE name = ?", (name,)
 
 
-for candidate in ["Ada", "O'Brien", "'; DROP TABLE users; --"]:
+for candidate in ["Ada", "O'Brien", "' OR 1=1 --"]:
     sql, params = build_lookup(candidate)
     print(sql, "|", params)`,
   },
@@ -392,10 +394,10 @@ values in that order. The SQL text is a constant: it must not change when the ar
         description: "an apostrophe leaves the SQL text untouched",
       },
       {
-        input: { email: "'; DROP TABLE users; --", min_age: 18 },
+        input: { email: "' OR 1=1 --", min_age: 18 },
         expected: {
           sql: "SELECT id, name FROM users WHERE email = ? AND age >= ?",
-          params: ["'; DROP TABLE users; --", 18],
+          params: ["' OR 1=1 --", 18],
         },
         description: "an injection payload stays a plain value",
       },
