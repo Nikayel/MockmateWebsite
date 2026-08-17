@@ -724,6 +724,8 @@ tying the L-vs-C choice to a concrete latency SLO.
   "reveal": "That is the staff-level move to reuse in the design write: place each store on the spectrum, name the round trips behind its posture, and tie the L-versus-C choice to a concrete latency number."
 }
 \`\`\`
+
+**Sources:** [Abadi, PACELC paper](https://www.cs.umd.edu/~abadi/papers/abadi-pacelc.pdf) · [Google Cloud: Spanner and CAP](https://cloud.google.com/blog/products/databases/inside-cloud-spanner-and-the-cap-theorem) · [Jepsen consistency models](https://jepsen.io/consistency)
 `.trim()
 
 const consistencySpectrumTeach = `
