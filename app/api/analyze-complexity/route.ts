@@ -117,6 +117,7 @@ export async function POST(request: NextRequest) {
     const aiResponse = await generateAIResponse(systemPrompt, userPrompt, [], {
       complexity: "simple", // Fast response for simple analysis
       userId, // verified user for cost attribution
+      service: "complexity-analysis",
       eventType: "chat_message",
     })
     const response = aiResponse.text

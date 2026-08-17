@@ -249,6 +249,7 @@ export async function checkClarifyingQuestions(
       userId: options?.userId,
       sessionId: options?.sessionId,
       scenarioId: options?.scenarioId,
+      service: "feedback-clarifying-questions",
       eventType: "chat_message", // Categorize as chat for cost tracking
       skipCache: true, // Don't cache this - each interview is unique
     })

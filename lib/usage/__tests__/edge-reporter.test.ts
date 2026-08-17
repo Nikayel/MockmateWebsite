@@ -19,6 +19,7 @@ vi.mock("../../logger", () => ({
 const REPORT = {
   userId: "user-1",
   eventType: "feedback_generation" as const,
+  service: "feedback-generation" as const,
   provider: "openai",
   promptText: "prompt",
   responseText: "response",
@@ -100,5 +101,39 @@ describe("reportEdgeUsage failure visibility", () => {
     const { reportEdgeUsageInBackground } = await import("../edge-reporter")
 
     expect(() => reportEdgeUsageInBackground(REPORT)).not.toThrow()
+  })
+
+  it("sends measured tokens as measured, service included", async () => {
+    const fetchSpy = vi.fn(async () => ({ ok: true, status: 200 }))
+    vi.stubGlobal("fetch", fetchSpy)
+    const { reportEdgeUsage } = await import("../edge-reporter")
+
+    await reportEdgeUsage({ ...REPORT, inputTokens: 6000, outputTokens: 2048 })
+
+    const parsed = JSON.parse(
+      ((fetchSpy.mock.calls[0] as unknown[])[1] as { body: string }).body
+    ) as Record<string, unknown>
+    expect(parsed.inputTokens).toBe(6000)
+    expect(parsed.outputTokens).toBe(2048)
+    expect(parsed.service).toBe("feedback-generation")
+    expect(parsed.estimatedTokens).toBe(false)
+  })
+
+  it("flags a malformed vendor count as estimated, matching what it actually sent", async () => {
+    // NaN is not undefined: the old flag used `=== undefined` while the value
+    // resolution used Number.isFinite, so a NaN fell back to the estimate but
+    // the row was stamped exact — an estimate dressed as a measurement.
+    const fetchSpy = vi.fn(async () => ({ ok: true, status: 200 }))
+    vi.stubGlobal("fetch", fetchSpy)
+    const { reportEdgeUsage } = await import("../edge-reporter")
+
+    await reportEdgeUsage({ ...REPORT, inputTokens: Number.NaN, outputTokens: 2048 })
+
+    const parsed = JSON.parse(
+      ((fetchSpy.mock.calls[0] as unknown[])[1] as { body: string }).body
+    ) as Record<string, unknown>
+    // The NaN was replaced by the text estimate, so the row must say estimated.
+    expect(Number.isFinite(parsed.inputTokens as number)).toBe(true)
+    expect(parsed.estimatedTokens).toBe(true)
   })
 })

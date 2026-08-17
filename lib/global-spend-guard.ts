@@ -204,10 +204,23 @@ export function __resetSpendReadingForTests(): void {
 }
 
 /**
- * Atomically add an LLM call's cost to today's aggregate counter.
+ * Atomically add one tracked call's cost to today's aggregate counter.
  * Fire-and-forget safe: never throws (cost tracking must not break a request).
+ *
+ * Called from INSIDE trackUsageEvent (the single funnel) since 2026-08-17, so
+ * every tracked dollar — LLM, voice, embeddings — reaches the ceiling exactly
+ * once. Do not call this from a path that also calls trackUsageEvent, or the
+ * dollar counts twice.
+ *
+ * `service` (a lib/usage/services.ts id) adds a per-service split alongside the
+ * day's total, so the admin Spend health panel can say WHERE today's burn is
+ * coming from without scanning usage_events.
  */
-export async function recordGlobalSpend(cost: number, now: Date = new Date()): Promise<void> {
+export async function recordGlobalSpend(
+  cost: number,
+  service?: string,
+  now: Date = new Date()
+): Promise<void> {
   if (!Number.isFinite(cost) || cost <= 0) return
   try {
     await adminDb
@@ -216,6 +229,7 @@ export async function recordGlobalSpend(cost: number, now: Date = new Date()): P
       .set(
         {
           totalCost: FieldValue.increment(cost),
+          ...(service ? { byService: { [service]: FieldValue.increment(cost) } } : {}),
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true }

@@ -55,6 +55,7 @@ export async function generateTrackedEmbedding(text: string, userId: string): Pr
 
   trackEmbeddingUsageAccurate({
     userId,
+    service: "rag-indexing",
     texts: [prepared.text],
     model,
     provider,
@@ -97,6 +98,7 @@ export async function generateTrackedEmbeddings(
 
   trackEmbeddingUsageAccurate({
     userId,
+    service: "rag-indexing",
     texts: preparedTexts,
     model,
     provider,

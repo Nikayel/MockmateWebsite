@@ -139,6 +139,7 @@ export async function generateCaseLabFeedback(
 ): Promise<CaseLabFeedback> {
   const { system, user } = buildCaseLabFeedbackPrompt(run)
   const response = await generateFeedbackResponse(system, user, [], {
+    service: "labs-feedback",
     userId: options.userId,
     scenarioId: run.caseLabId,
   })

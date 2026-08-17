@@ -77,6 +77,9 @@ type ConversationTrackerWithExtraction = ConversationTracker & {
 
 type ConversationExtractionJob = {
   sessionId?: string
+  /** Real user behind the interview, so the extraction LLM call bills to them
+   * instead of the reserved system identity. */
+  userId?: string
   recentMessages: Array<{ role: string; content: string }>
   currentTracker: ConversationTracker
   messageCount: number
@@ -101,6 +104,8 @@ function runConversationExtractionAfterResponse(job: ConversationExtractionJob |
           lastExtractionAt: job.lastExtractionAt,
           currentMessage: job.currentMessage,
           optimalComplexity: job.optimalComplexityContext,
+          userId: job.userId,
+          sessionId: job.sessionId,
         })
 
         if (result.didRun) {
@@ -120,7 +125,8 @@ function runConversationExtractionAfterResponse(job: ConversationExtractionJob |
       const extractionUpdates = await extractConversationState(
         job.recentMessages,
         job.currentTracker,
-        job.optimalComplexityContext
+        job.optimalComplexityContext,
+        { userId: job.userId, sessionId: job.sessionId }
       )
 
       if (Object.keys(extractionUpdates).length > 0) {
@@ -228,6 +234,7 @@ export async function POST(request: NextRequest) {
       ENABLE_LLM_EXTRACTION && role === "interviewer" && conversationTracker && context && message
         ? {
             sessionId,
+            userId,
             recentMessages: (context as Array<{ type: string; message: string }>)
               .slice(-10)
               .map((m) => ({
@@ -688,6 +695,7 @@ GROUNDING RULES (prevent hallucination):
       preferredProvider,
       userId,
       sessionId,
+      service: "interview-chat",
       eventType: "chat_message",
       // PERF-S4: this route already ran checkRateLimit + startRequestTracking
       // above, so skip the redundant per-user rate-limit read inside the provider.
@@ -789,6 +797,7 @@ Generate a compliant response NOW:`
             complexity,
             userId,
             sessionId,
+            service: "interview-chat",
             eventType: "chat_message",
             skipCache: true, // Regeneration must bypass the response cache
             // PERF-S4: same already-throttled request as the primary call above.
@@ -846,6 +855,7 @@ Generate a compliant response NOW:`
             complexity: "simple",
             userId,
             sessionId,
+            service: "interview-chat",
             eventType: "chat_message",
           })
           return { text: result.text }

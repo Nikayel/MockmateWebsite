@@ -20,7 +20,12 @@ import { getDefaultValidation } from "./validation-defaults"
 export async function validateConversationWithAI(
   transcript: Array<{ role: string; content: string }>,
   code: string,
-  actualComplexity: { time: string; space: string } | null
+  actualComplexity: { time: string; space: string } | null,
+  // Required so the caller cannot forget it: this call spends real money, and
+  // without attribution it never reached the per-user ledger or budget cap —
+  // the exact invisible-spend bug the Edge feedback path was fixed for while
+  // this Node mirror was not.
+  attribution: { userId?: string; sessionId?: string }
 ): Promise<ConversationValidation> {
   const candidateMessages = transcript.filter((m) => m.role === "candidate" || m.role === "user")
   const heuristicResult = detectApproachHeuristically(candidateMessages)
@@ -168,7 +173,14 @@ Return ONLY the JSON object, nothing else.`
       "You are a technical interview evaluator. Return only valid JSON, no markdown.",
       validationPrompt,
       [],
-      { complexity: "standard", temperature: 0.1 }
+      {
+        complexity: "standard",
+        temperature: 0.1,
+        service: "feedback-validation",
+        eventType: "feedback_generation",
+        userId: attribution.userId,
+        sessionId: attribution.sessionId,
+      }
     )
 
     logger.info("[AI Validation] Raw response from AI", {

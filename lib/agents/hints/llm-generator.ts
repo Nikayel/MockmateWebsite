@@ -291,6 +291,7 @@ export async function generateLLMHint(request: LLMHintRequest): Promise<Generate
       complexity: "simple", // Uses Gemini for cost efficiency
       temperature: 0.7,
       skipCache: false,
+      service: "interview-hints",
       eventType: "hint_request",
       userId: request.userId,
     })
@@ -345,6 +346,7 @@ export async function generateLLMHintsForLevels(
         complexity: "simple",
         temperature: 0.7,
         skipCache: false,
+        service: "interview-hints",
         eventType: "hint_request",
         userId: request.userId,
       }

@@ -119,10 +119,7 @@ function validateEvidenceAgainstScores(
   // floor keys on, so without this guard the floor would hard-set communication
   // to 50-80 for the sessions the integrity caps just pushed down to 25-45.
   // Quotes are evidence that words were said, not that they were honest.
-  if (
-    integrity &&
-    (integrity.isCoherent === false || integrity.responsesRelevant === false)
-  ) {
+  if (integrity && (integrity.isCoherent === false || integrity.responsesRelevant === false)) {
     return {
       shouldEnforceFloor: false,
       minScore: 10,
@@ -168,6 +165,9 @@ export async function critiqueScores(
     }
     // NEW: Pass actual conversation for ground-truth verification
     conversationTranscript?: Array<{ role: string; content: string }>
+    // Required: this critique is a paid LLM call that previously ran with no
+    // per-user attribution (invisible to the ledger and the budget cap).
+    attribution: { userId?: string; sessionId?: string }
   }
 ): Promise<ScoreCritiqueAdjustment> {
   const silentSolution = "silentSolution" in scores ? scores.silentSolution : false
@@ -359,6 +359,10 @@ If no issues found, return:
       {
         complexity: "critique",
         temperature: 0.2,
+        service: "feedback-constitutional",
+        eventType: "feedback_generation",
+        userId: context.attribution.userId,
+        sessionId: context.attribution.sessionId,
       }
     )
 
@@ -512,6 +516,8 @@ export async function critiqueFeedbackText(
     extractedEvidence?: ExtractedEvidence
     // Raw transcript for ground-truth verification (in case extraction failed)
     conversationTranscript?: Array<{ role: string; content: string }>
+    // Required: paid LLM call; see critiqueScores.
+    attribution: { userId?: string; sessionId?: string }
   }
 ): Promise<FeedbackCritiqueAdjustment> {
   // Build evidence summary if available
@@ -642,6 +648,10 @@ If no issues:
       {
         complexity: "critique",
         temperature: 0.2,
+        service: "feedback-constitutional",
+        eventType: "feedback_generation",
+        userId: context.attribution.userId,
+        sessionId: context.attribution.sessionId,
       }
     )
 

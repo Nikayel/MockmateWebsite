@@ -1,4 +1,5 @@
 import { generateStructuredAIResponse } from "@/lib/ai/structured-output"
+import { SYSTEM_USER_ID } from "@/lib/usage/services"
 import { logger } from "@/lib/logger"
 import type { ConversationTracker } from "@/lib/interview/interview-phases"
 import { formatConversationForExtraction } from "./formatter"
@@ -33,9 +34,13 @@ export async function extractConversationState(
       schema: extractionResultSchema,
       schemaName: "ConversationExtractionResult",
       jsonExample: EXTRACTION_JSON_EXAMPLE,
+      service: "interview-extraction",
       complexity: "simple",
       temperature: 0.1,
-      userId: options.userId || "system-extraction",
+      // The chat route threads the real user through since 2026-08-17; the
+      // reserved system id only covers callers that genuinely have no user,
+      // instead of the old invented "system-extraction" identity.
+      userId: options.userId ?? SYSTEM_USER_ID,
       sessionId: options.sessionId,
       maxParseAttempts: 2,
     })

@@ -30,11 +30,15 @@ import { estimateTokensFromText } from "./token-estimate"
 // only path from this runtime to Sentry. console.* here landed in a
 // short-retention Edge log and nowhere else.
 import { logger } from "../logger"
+import type { UsageServiceId } from "./services"
 
 /** One AI call to report. */
 export interface EdgeUsageReport {
   userId: string
   eventType: "feedback_generation" | "chat_message" | "hint_request"
+  /** Product surface making the call (lib/usage/services.ts). Required so the
+   * five LLM calls behind one feedback request stay distinguishable. */
+  service: UsageServiceId
   provider: string
   /** Prompt text, used to estimate input tokens when the provider reports none. */
   promptText?: string
@@ -86,14 +90,16 @@ export async function reportEdgeUsage(report: EdgeUsageReport): Promise<boolean>
     return false
   }
 
-  const inputTokens =
+  const hasMeasuredInput =
     typeof report.inputTokens === "number" && Number.isFinite(report.inputTokens)
-      ? report.inputTokens
-      : estimateTokensFromText(report.promptText)
-  const outputTokens =
+  const hasMeasuredOutput =
     typeof report.outputTokens === "number" && Number.isFinite(report.outputTokens)
-      ? report.outputTokens
-      : estimateTokensFromText(report.responseText)
+  const inputTokens = hasMeasuredInput
+    ? (report.inputTokens as number)
+    : estimateTokensFromText(report.promptText)
+  const outputTokens = hasMeasuredOutput
+    ? (report.outputTokens as number)
+    : estimateTokensFromText(report.responseText)
 
   try {
     const response = await fetch(`${origin}/api/internal/usage`, {
@@ -105,6 +111,7 @@ export async function reportEdgeUsage(report: EdgeUsageReport): Promise<boolean>
       body: JSON.stringify({
         userId: report.userId,
         eventType: report.eventType,
+        service: report.service,
         provider: report.provider,
         inputTokens,
         outputTokens,
@@ -114,9 +121,11 @@ export async function reportEdgeUsage(report: EdgeUsageReport): Promise<boolean>
         pattern: report.pattern,
         difficulty: report.difficulty,
         scenarioTitle: report.scenarioTitle,
-        // Marks the record as coming from the Edge path so a reconciliation
-        // can tell measured spend from estimated spend.
-        estimatedTokens: report.inputTokens === undefined || report.outputTokens === undefined,
+        // Marks estimated spend so a reconciliation can tell it from measured.
+        // Derived from the SAME predicate that chose between measurement and
+        // estimate above: the old `=== undefined` check disagreed with it on
+        // NaN/Infinity, flagging an estimated row as exact.
+        estimatedTokens: !hasMeasuredInput || !hasMeasuredOutput,
       }),
     })
 

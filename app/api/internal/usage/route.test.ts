@@ -175,27 +175,49 @@ describe("POST /api/internal/usage", () => {
       const recorded = trackUsageEvent.mock.calls[0][0] as { metadata: { source: string } }
       expect(recorded.metadata.source).toBe("edge")
     })
+
+    it("passes a registered service id through to the ledger", async () => {
+      await POST(makeRequest({ ...validBody, service: "feedback-validation" }, `Bearer ${SECRET}`))
+      const recorded = trackUsageEvent.mock.calls[0][0] as { service: string }
+      expect(recorded.service).toBe("feedback-validation")
+    })
+
+    it("maps a service-less report (older deploy in flight) by its eventType", async () => {
+      await POST(makeRequest(validBody, `Bearer ${SECRET}`))
+      const recorded = trackUsageEvent.mock.calls[0][0] as { service: string }
+      expect(recorded.service).toBe("feedback-generation")
+    })
+
+    it("rejects an unregistered service rather than minting a new cost bucket", async () => {
+      const response = await POST(
+        makeRequest({ ...validBody, service: "made-up-service" }, `Bearer ${SECRET}`)
+      )
+      expect(response.status).toBe(400)
+      expect(trackUsageEvent).not.toHaveBeenCalled()
+    })
   })
 
   describe("global daily kill-switch", () => {
-    it("increments the aggregate counter with the cost it just computed", async () => {
-      // recordGlobalSpend's only caller was the Node path, so Edge spend — every
-      // scenario type except system design — never reached the $250/day ceiling.
+    it("does not call recordGlobalSpend directly — the funnel owns the ceiling feed", async () => {
+      // Since 2026-08-17 trackUsageEvent increments global_usage itself, so
+      // every tracked dollar (LLM, voice, embeddings; Node or Edge) reaches
+      // the ceiling exactly once. A direct call here on top of the funnel's
+      // would double-count all Edge spend against the $250/day ceiling.
       await POST(makeRequest(validBody, `Bearer ${SECRET}`))
-      const recorded = trackUsageEvent.mock.calls[0][0] as { cost: number }
-      expect(recordGlobalSpend).toHaveBeenCalledTimes(1)
-      // The ceiling counter must see exactly the dollars the ledger booked.
-      expect(recordGlobalSpend).toHaveBeenCalledWith(recorded.cost)
+      expect(trackUsageEvent).toHaveBeenCalledTimes(1)
+      expect(recordGlobalSpend).not.toHaveBeenCalled()
     })
 
     it("does not record spend for an unauthorised caller", async () => {
       await POST(makeRequest(validBody, "Bearer wrong-secret-value"))
       expect(recordGlobalSpend).not.toHaveBeenCalled()
+      expect(trackUsageEvent).not.toHaveBeenCalled()
     })
 
     it("does not record spend for a rejected body", async () => {
       await POST(makeRequest({ ...validBody, provider: undefined }, `Bearer ${SECRET}`))
       expect(recordGlobalSpend).not.toHaveBeenCalled()
+      expect(trackUsageEvent).not.toHaveBeenCalled()
     })
   })
 

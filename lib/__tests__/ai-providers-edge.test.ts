@@ -271,4 +271,54 @@ describe("edge usage sink", () => {
     expect(result.provider).toBe("openai")
     expect(result.text).toBe("the answer")
   })
+
+  it("carries vendor-measured tokens through the response and the sink", async () => {
+    // This runtime runs OpenAI at high reasoning effort: completion_tokens
+    // includes reasoning tokens, which produce no visible text. Estimating
+    // from the returned text under-books exactly those calls (~1.5x at the
+    // 2048-token cap), into the ledger, the caps and the kill-switch at once.
+    mockFetchByHost({
+      openai: () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: "short visible answer" } }],
+          usage: { prompt_tokens: 6000, completion_tokens: 2048 },
+        }),
+      }),
+    })
+    const { generateAIResponseEdge } = await import("../ai-providers-edge")
+    const onUsage = vi.fn()
+
+    const result = await generateAIResponseEdge("sys", "user", { onUsage })
+
+    expect(result.tokensIn).toBe(6000)
+    expect(result.tokensOut).toBe(2048)
+    const record = onUsage.mock.calls[0][0] as { tokensIn?: number; tokensOut?: number }
+    expect(record.tokensIn).toBe(6000)
+    expect(record.tokensOut).toBe(2048)
+  })
+
+  it("omits token fields entirely when the vendor reports none or garbage", async () => {
+    mockFetchByHost({
+      openai: () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: "answer" } }],
+          usage: { prompt_tokens: Number.NaN, completion_tokens: 2048 },
+        }),
+      }),
+    })
+    const { generateAIResponseEdge } = await import("../ai-providers-edge")
+    const onUsage = vi.fn()
+
+    const result = await generateAIResponseEdge("sys", "user", { onUsage })
+
+    // Absent, not invented: the reporter downstream falls back to its estimate
+    // and stamps the row estimated.
+    expect(result.tokensIn).toBeUndefined()
+    expect(result.tokensOut).toBeUndefined()
+    const record = onUsage.mock.calls[0][0] as { tokensIn?: number; tokensOut?: number }
+    expect(record.tokensIn).toBeUndefined()
+    expect(record.tokensOut).toBeUndefined()
+  })
 })

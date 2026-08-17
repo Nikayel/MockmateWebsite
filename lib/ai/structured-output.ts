@@ -6,6 +6,7 @@ import {
   type TaskComplexity,
 } from "@/lib/ai-providers"
 import type { RateLimitTier } from "@/lib/rate-limiter"
+import type { UsageServiceId } from "@/lib/usage/services"
 
 export interface GenerateStructuredAIResponseOptions<T> {
   systemPrompt: string
@@ -14,6 +15,9 @@ export interface GenerateStructuredAIResponseOptions<T> {
   schema: z.ZodType<T>
   schemaName: string
   jsonExample: string
+  /** Product surface spending this call (lib/usage/services.ts). Required and
+   * forwarded to the AI funnel — this helper is generic, its callers are not. */
+  service: UsageServiceId
   complexity?: TaskComplexity
   preferredProvider?: AIProvider
   maxProviderRetries?: number
@@ -98,6 +102,7 @@ export async function generateStructuredAIResponse<T>(
     schema,
     schemaName,
     jsonExample,
+    service,
     complexity = "simple",
     preferredProvider,
     maxProviderRetries,
@@ -140,6 +145,7 @@ ${jsonExample}`
       : userMessage
 
     lastResponse = await generateAIResponse(structuredSystemPrompt, prompt, history, {
+      service,
       complexity,
       preferredProvider,
       maxRetries: maxProviderRetries,

@@ -26,7 +26,7 @@ import {
 } from "./ai/model-ids"
 import { generateCacheKey, getCachedResponse, setCachedResponse } from "./ai-cache"
 import { trackUsageEvent, calculateCost } from "./usage-tracking"
-import { recordGlobalSpend } from "./global-spend-guard"
+import { SYSTEM_USER_ID, type UsageServiceId } from "./usage/services"
 import { checkRequestCostAnomaly } from "./cost-anomaly-detection"
 import {
   checkRateLimit,
@@ -431,12 +431,19 @@ async function callGemini(
         promptTokens: usageMetadata?.promptTokenCount,
       })
     }
+    // candidatesTokenCount EXCLUDES thought tokens on this SDK, and the flash
+    // pin always thinks (thinkingBudget above). Thought tokens bill as output,
+    // so leaving them out under-books every Gemini call by its thinking spend.
+    const thoughtTokens = (usageMetadata as { thoughtsTokenCount?: number } | undefined)
+      ?.thoughtsTokenCount
     const usage: ProviderTokenUsage | undefined =
       typeof usageMetadata?.promptTokenCount === "number" &&
       typeof usageMetadata?.candidatesTokenCount === "number"
         ? {
             inputTokens: usageMetadata.promptTokenCount,
-            outputTokens: usageMetadata.candidatesTokenCount,
+            outputTokens:
+              usageMetadata.candidatesTokenCount +
+              (typeof thoughtTokens === "number" ? thoughtTokens : 0),
           }
         : undefined
     return { text: response.text(), usage }
@@ -780,11 +787,19 @@ export async function generateAIResponse(
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }> = [],
   options: {
+    /**
+     * WHICH product surface is spending this money. Required: every LLM call
+     * must name its service (lib/usage/services.ts) so the cost ledger can
+     * answer "where is the spend" below eventType granularity. Making it
+     * required is the enforcement — a call site without a service does not
+     * compile.
+     */
+    service: UsageServiceId
     complexity?: TaskComplexity
     preferredProvider?: AIProvider
     maxRetries?: number
     temperature?: number // Override default temperature (0.0-1.0)
-    // New options for tracking and caching
+    // Options for tracking and caching
     userId?: string
     userTier?: RateLimitTier
     sessionId?: string
@@ -792,9 +807,10 @@ export async function generateAIResponse(
     eventType?: "chat_message" | "feedback_generation" | "hint_request"
     skipCache?: boolean
     skipRateLimit?: boolean
-  } = {}
+  }
 ): Promise<AIResponse> {
   const {
+    service,
     complexity = "standard",
     preferredProvider,
     maxRetries = MAX_RETRIES,
@@ -830,19 +846,20 @@ export async function generateAIResponse(
 
     const cached = await getCachedResponse(cacheKey)
     if (cached.hit && cached.response) {
-      // Track cached usage (no cost) - fire-and-forget
-      if (userId) {
-        trackUsageEvent({
-          userId,
-          eventType,
-          cached: true,
-          sessionId,
-          scenarioId,
-          latencyMs: Date.now() - startTime,
-        }).catch(() => {
-          // Usage tracking failure is non-critical - silent fail
-        })
-      }
+      // Track cached usage (no cost) - fire-and-forget. Unattributed calls
+      // record under the reserved system user so cache-hit rates stay honest
+      // for every caller, not only signed-in ones.
+      trackUsageEvent({
+        userId: userId ?? SYSTEM_USER_ID,
+        eventType,
+        service,
+        cached: true,
+        sessionId,
+        scenarioId,
+        latencyMs: Date.now() - startTime,
+      }).catch(() => {
+        // Usage tracking failure is non-critical - silent fail
+      })
 
       return {
         text: cached.response,
@@ -967,11 +984,6 @@ export async function generateAIResponse(
         const totalTokens = inputTokens + outputTokens
         const cost = calculateCost(inputTokens, outputTokens, provider)
 
-        // Always feed the global daily spend ceiling, even if the call is not
-        // attributed to a user — this is the aggregate cost kill-switch and
-        // must see every dollar of LLM spend. Fire-and-forget (never throws).
-        void recordGlobalSpend(cost)
-
         // Flag single-request cost anomalies (runaway calls, abuse) without
         // blocking the response. Strictly fire-and-forget: never awaited, so it
         // adds zero latency and can never fail the request path. recordAnomaly
@@ -984,36 +996,40 @@ export async function generateAIResponse(
           model: PROVIDERS[provider].model,
           tokens: totalTokens,
           endpoint: eventType,
+          service,
         }).catch(() => {
           // Cost anomaly detection is best-effort - never block the request path
         })
 
-        // 4. Track usage
+        // 4. Track usage. ALWAYS — an unattributed call records under the
+        // reserved system user, so the ledger, the anomaly sweep and the admin
+        // dashboards see every dollar, not only the signed-in ones. The global
+        // daily kill-switch is fed from inside trackUsageEvent (do not add a
+        // recordGlobalSpend call here: it would double-count the dollar).
         if (userId) {
           updateTokenCount(userId, totalTokens)
-          if (userId && shouldTrackConcurrency) recordRequestEnd(userId)
-
-          // Fire-and-forget usage tracking - errors are non-critical
-          trackUsageEvent({
-            userId,
-            eventType,
-            provider,
-            model: PROVIDERS[provider].model,
-            inputTokens,
-            outputTokens,
-            totalTokens,
-            cost,
-            latencyMs,
-            cached: false,
-            sessionId,
-            scenarioId,
-            // Lets a reconciliation separate measured rows from estimated ones
-            // without re-deriving which providers report usage.
-            isExactTokenCount: measuredUsage !== undefined,
-          }).catch(() => {
-            // Usage tracking failure is non-critical - silent fail
-          })
+          if (shouldTrackConcurrency) recordRequestEnd(userId)
         }
+        trackUsageEvent({
+          userId: userId ?? SYSTEM_USER_ID,
+          eventType,
+          service,
+          provider,
+          model: PROVIDERS[provider].model,
+          inputTokens,
+          outputTokens,
+          totalTokens,
+          cost,
+          latencyMs,
+          cached: false,
+          sessionId,
+          scenarioId,
+          // Lets a reconciliation separate measured rows from estimated ones
+          // without re-deriving which providers report usage.
+          isExactTokenCount: measuredUsage !== undefined,
+        }).catch(() => {
+          // Usage tracking failure is non-critical - silent fail
+        })
 
         // 5. Cache the response (skip chat_message events since context changes constantly)
         if (!skipCache && eventType !== "chat_message") {
@@ -1141,27 +1157,9 @@ export async function generateAIResponse(
   throw new Error(errorMessage)
 }
 
-/**
- * Convenience function for chat messages (simple complexity)
- */
-export async function generateChatResponse(
-  systemPrompt: string,
-  userMessage: string,
-  history: Array<{ role: "user" | "model"; content: string }> = []
-): Promise<AIResponse> {
-  return generateAIResponse(systemPrompt, userMessage, history, { complexity: "simple" })
-}
-
-/**
- * Convenience function for interview interactions (standard complexity)
- */
-export async function generateInterviewResponse(
-  systemPrompt: string,
-  userMessage: string,
-  history: Array<{ role: "user" | "model"; content: string }> = []
-): Promise<AIResponse> {
-  return generateAIResponse(systemPrompt, userMessage, history, { complexity: "standard" })
-}
+// generateChatResponse and generateInterviewResponse were deleted 2026-08-17:
+// zero live callers, and keeping unattributable entry points around would have
+// meant service-less holes in the required-service contract above.
 
 /**
  * Convenience function for feedback generation (complex - needs quality)
@@ -1171,7 +1169,8 @@ export async function generateFeedbackResponse(
   systemPrompt: string,
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }> = [],
-  options?: {
+  options: {
+    service: UsageServiceId
     userId?: string
     sessionId?: string
     scenarioId?: string
@@ -1180,9 +1179,10 @@ export async function generateFeedbackResponse(
   return generateAIResponse(systemPrompt, userMessage, history, {
     complexity: "complex",
     temperature: 0.3, // Lower temperature for consistent, data-driven feedback
-    userId: options?.userId,
-    sessionId: options?.sessionId,
-    scenarioId: options?.scenarioId,
+    service: options.service,
+    userId: options.userId,
+    sessionId: options.sessionId,
+    scenarioId: options.scenarioId,
     eventType: "feedback_generation",
   })
 }

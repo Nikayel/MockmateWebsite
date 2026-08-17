@@ -135,6 +135,7 @@ Return JSON:
       complexity: "simple",
       temperature: 0.2,
       skipCache: false,
+      service: "interview-hints",
       eventType: "hint_request",
       userId: request.userId,
     })

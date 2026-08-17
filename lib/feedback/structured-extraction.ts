@@ -108,13 +108,16 @@ export async function extractConversationEvidence(
     optimalTimeComplexity: string
     optimalSpaceComplexity: string
     criticalEdgeCases: string[]
-  }
+  },
+  // Required: the semantic pass below is a paid LLM call that ran without any
+  // per-user attribution (invisible to the ledger and the budget cap).
+  attribution: { userId?: string; sessionId?: string }
 ): Promise<ExtractedEvidence> {
   // First, do algorithmic extraction for things we can detect programmatically
   const algorithmicEvidence = extractAlgorithmically(transcript, problemContext)
 
   // Then, use AI for semantic extraction that requires understanding
-  const semanticEvidence = await extractSemantically(transcript, problemContext)
+  const semanticEvidence = await extractSemantically(transcript, problemContext, attribution)
 
   // Merge both, preferring algorithmic evidence where available
   return mergeEvidence(algorithmicEvidence, semanticEvidence)
@@ -413,7 +416,8 @@ async function extractSemantically(
     optimalTimeComplexity: string
     optimalSpaceComplexity: string
     criticalEdgeCases: string[]
-  }
+  },
+  attribution: { userId?: string; sessionId?: string }
 ): Promise<Partial<ExtractedEvidence>> {
   // Deduplicate voice transcription artifacts before building transcript text
   // This prevents truncation from cutting off important later messages
@@ -521,7 +525,14 @@ RULES:
       "You are a transcript analyzer. Return only valid JSON, no markdown.",
       extractionPrompt,
       [],
-      { complexity: "critique", temperature: 0.1 }
+      {
+        complexity: "critique",
+        temperature: 0.1,
+        service: "feedback-extraction",
+        eventType: "feedback_generation",
+        userId: attribution.userId,
+        sessionId: attribution.sessionId,
+      }
     )
 
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)

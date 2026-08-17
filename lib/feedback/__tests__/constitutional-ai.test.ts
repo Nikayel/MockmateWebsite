@@ -61,6 +61,7 @@ function critiqueContext(scenarioType = "dsa") {
     passRate: 80,
     scenarioType,
     aiValidation: aiValidation(),
+    attribution: { userId: "user-1", sessionId: "session-1" },
   }
 }
 
@@ -165,7 +166,6 @@ describe("critiqueScores adjustedScores handling", () => {
   })
 })
 
-
 /**
  * The evidence floor hard-sets communication to 50-80 whenever the transcript
  * yields any communication / approach / complexity quote. A keyword-stuffed or
@@ -224,16 +224,14 @@ describe("critiqueScores evidence floor integrity guard", () => {
     mockCritiqueResponse({ critiques: [], reasoning: "fine", madeChanges: false })
   })
 
-  function contextWith(
-    overrides: Partial<ConversationValidation>,
-    keywordStuffing = false
-  ) {
+  function contextWith(overrides: Partial<ConversationValidation>, keywordStuffing = false) {
     return {
       passRate: 100,
       scenarioType: "dsa",
       aiValidation: aiValidation(overrides),
       keywordStuffing,
       extractedEvidence: evidenceWithQuotes(),
+      attribution: { userId: "user-1", sessionId: "session-1" },
     }
   }
 

@@ -47,7 +47,7 @@ import {
   buildEvidenceSummary,
 } from "@/lib/feedback/edge-utils"
 import { analyzeTranscriptForMistakesEdge } from "@/lib/feedback/transcript-analysis-edge"
-import { reportEdgeUsageInBackground } from "@/lib/usage/edge-reporter"
+import { reportEdgeUsageInBackground, type EdgeUsageReport } from "@/lib/usage/edge-reporter"
 // lib/logger has zero imports and touches no Node builtins, so it is safe in the
 // Edge runtime. This route previously used console.* only, which meant every
 // failure on the path that scores DSA, bugfix, optimization, security, and
@@ -664,19 +664,27 @@ export async function POST(request: NextRequest) {
       //
       // The sink is built per call so each one is attributed to the provider
       // that actually answered it, which after a fallback is not the provider
-      // the chain started on.
+      // the chain started on — and to the SERVICE that made it, so the five
+      // LLM calls behind one feedback request stay distinguishable in the
+      // ledger instead of collapsing into one undifferentiated bucket.
       const trackEdgeSpend =
-        (): EdgeUsageSink =>
+        (service: EdgeUsageReport["service"]): EdgeUsageSink =>
         (record): void => {
           reportEdgeUsageInBackground({
             userId: authenticatedUserId,
             // These are part of generating this session's feedback, so they
-            // belong to the same event type as the main call. Splitting them out
-            // would make the per-session cost harder to reconcile, not easier.
+            // belong to the same event type as the main call. The service id
+            // carries the finer distinction.
             eventType: "feedback_generation",
+            service,
             provider: record.provider,
             promptText: record.promptText,
             responseText: record.responseText,
+            // Vendor-measured counts when the Edge rung captured them; the
+            // reporter only falls back to the text-length estimate (which
+            // cannot see reasoning tokens) when these are absent.
+            inputTokens: record.tokensIn,
+            outputTokens: record.tokensOut,
             latencyMs: record.latencyMs,
             sessionId,
             scenarioId,
@@ -720,7 +728,7 @@ export async function POST(request: NextRequest) {
                       space: efficiencyMetrics.estimatedSpaceComplexity,
                     }
                   : null,
-                trackEdgeSpend()
+                trackEdgeSpend("feedback-validation")
               ).catch((error) => {
                 // A degraded provider silently swaps in neutral defaults, which
                 // changes the score the user is shown. Without a log this is
@@ -736,7 +744,7 @@ export async function POST(request: NextRequest) {
             ? extractConversationEvidenceEdge(
                 transcriptMessages,
                 problemContext,
-                trackEdgeSpend()
+                trackEdgeSpend("feedback-extraction")
               ).catch((error) => {
                 logger.error("[Streaming Feedback] Evidence extraction failed", {
                   scenarioType,
@@ -753,7 +761,7 @@ export async function POST(request: NextRequest) {
                   content: m.content,
                 })),
                 problemContext,
-                trackEdgeSpend()
+                trackEdgeSpend("feedback-transcript-analysis")
               ).catch((error) => {
                 // Degrades the feedback rather than the score, so warn rather than
                 // error, but it still needs to leave the Edge log.
@@ -789,7 +797,7 @@ export async function POST(request: NextRequest) {
                       .join("\n\n")
                   ),
                 },
-                trackEdgeSpend()
+                trackEdgeSpend("bugfix-scoring")
               ).catch((error) => {
                 // NEUTRAL is reserved for "the scorer itself was unavailable", which
                 // is exactly this branch. Log it so a persistently broken scorer is
@@ -936,9 +944,14 @@ export async function POST(request: NextRequest) {
       reportEdgeUsageInBackground({
         userId: authenticatedUserId,
         eventType: "feedback_generation",
+        service: "feedback-generation",
         provider: aiResponse.provider,
         promptText: `${systemInstruction}\n${prompt}`,
         responseText: feedback,
+        // Vendor-measured counts (reasoning tokens included) when the Edge
+        // rung captured them; absent means the reporter estimates from text.
+        inputTokens: aiResponse.tokensIn,
+        outputTokens: aiResponse.tokensOut,
         latencyMs: aiResponse.latencyMs,
         sessionId,
         scenarioId,

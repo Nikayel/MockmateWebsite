@@ -91,7 +91,10 @@ describe("cost ledger uses measured provider usage", () => {
     })
     const { generateAIResponse } = await import("../ai-providers")
 
-    const result = await generateAIResponse("system", "message", [], { userId: "user-1" })
+    const result = await generateAIResponse("system", "message", [], {
+      userId: "user-1",
+      service: "interview-chat",
+    })
 
     expect(mocks.calculateCost).toHaveBeenCalledWith(1500, 8000, "gemini")
     expect(result.tokensUsed).toBe(9500)
@@ -102,7 +105,7 @@ describe("cost ledger uses measured provider usage", () => {
     expect(tracked.totalTokens).toBe(9500)
     expect(tracked.isExactTokenCount).toBe(true)
 
-    // The kill-switch and the anomaly detector see the same measured figure,
+    // The ledger and the anomaly detector see the same measured figure,
     // priced PER DIRECTION and asserted as a literal dollar amount.
     //
     // 1500 x $1.50/1M + 8000 x $7.50/1M = $0.062250. The blended formula this
@@ -110,8 +113,14 @@ describe("cost ledger uses measured provider usage", () => {
     // UNDERCOUNT, because this is an output-heavy reasoning call. The blended
     // error is not a uniform overcharge, and it ran the wrong way on exactly
     // the calls the $250/day kill-switch exists to catch.
-    expect(mocks.recordGlobalSpend).toHaveBeenCalledWith(0.06225)
-    expect(mocks.recordGlobalSpend).not.toHaveBeenCalledWith(0.04275)
+    expect(tracked.cost).toBe(0.06225)
+    expect(tracked.cost).not.toBe(0.04275)
+
+    // The kill-switch is fed from INSIDE trackUsageEvent since 2026-08-17 (so
+    // voice and embedding spend reach it too). The provider layer calling
+    // recordGlobalSpend AS WELL would double-count every LLM dollar against
+    // the daily ceiling.
+    expect(mocks.recordGlobalSpend).not.toHaveBeenCalled()
 
     const anomaly = mocks.checkRequestCostAnomaly.mock.calls[0][0] as Record<string, unknown>
     expect(anomaly.tokens).toBe(9500)
@@ -124,7 +133,7 @@ describe("cost ledger uses measured provider usage", () => {
     })
     const { generateAIResponse } = await import("../ai-providers")
 
-    await generateAIResponse("sys", "msg", [], { userId: "user-1" })
+    await generateAIResponse("sys", "msg", [], { userId: "user-1", service: "interview-chat" })
 
     const [inputTokens, outputTokens] = mocks.calculateCost.mock.calls[0] as unknown as number[]
     expect(outputTokens).toBe(2)
@@ -145,7 +154,10 @@ describe("cost ledger uses measured provider usage", () => {
     })
     const { generateAIResponse } = await import("../ai-providers")
 
-    const result = await generateAIResponse("sys", "msg", [], { userId: "user-1" })
+    const result = await generateAIResponse("sys", "msg", [], {
+      userId: "user-1",
+      service: "interview-chat",
+    })
 
     const [inputTokens, outputTokens] = mocks.calculateCost.mock.calls[0] as unknown as number[]
     expect(Number.isFinite(inputTokens)).toBe(true)

@@ -108,6 +108,7 @@ export async function generateCaseLabChatReply(params: CaseLabChatParams): Promi
 
   const response = await generateAIResponse(system, userMessage, priorHistory, {
     userId: params.userId,
+    service: "labs-chat",
     eventType: "chat_message",
     complexity: "standard",
   })

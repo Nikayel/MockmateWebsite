@@ -26,6 +26,29 @@ export interface EdgeAIResponse {
   text: string
   provider: "openai" | "gemini" | "deepseek"
   latencyMs: number
+  /**
+   * Provider-REPORTED token usage, present only when the vendor returned both
+   * halves as finite non-negative numbers. Never estimated here. This matters
+   * because this runtime runs reasoning configurations (OpenAI at "high"
+   * effort, Gemini with a thinking budget): reasoning tokens bill as output
+   * while producing no visible text, so the 4-chars-per-token estimate the
+   * reporter falls back to cannot see them and under-books the call by up to
+   * ~1.5x — into the ledger, the per-user caps and the daily kill-switch at
+   * once. The Node path (lib/ai-providers.ts) has captured measured usage
+   * since 2026-08; this is the same fix for the Edge rungs.
+   */
+  tokensIn?: number
+  tokensOut?: number
+}
+
+/** Accept vendor-reported usage only when both halves are real numbers. */
+function normalizeEdgeUsage(
+  inputTokens: unknown,
+  outputTokens: unknown
+): { tokensIn: number; tokensOut: number } | undefined {
+  const isValid = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0
+  if (!isValid(inputTokens) || !isValid(outputTokens)) return undefined
+  return { tokensIn: inputTokens, tokensOut: outputTokens }
 }
 
 /**
@@ -40,10 +63,13 @@ export interface EdgeAIResponse {
  */
 export interface EdgeAICallRecord {
   provider: EdgeAIResponse["provider"]
-  /** Full prompt as sent, for input-token estimation. */
+  /** Full prompt as sent, for input-token estimation when the vendor reported none. */
   promptText: string
   responseText: string
   latencyMs: number
+  /** Vendor-reported counts; absent when the vendor returned none (see EdgeAIResponse). */
+  tokensIn?: number
+  tokensOut?: number
 }
 
 /**
@@ -118,6 +144,7 @@ async function generateDeepSeekResponseEdge(
 
   const data = (await response.json()) as {
     choices?: Array<{ message?: { content?: string } }>
+    usage?: { prompt_tokens?: number; completion_tokens?: number }
   }
   const text = data.choices?.[0]?.message?.content
   if (!text) {
@@ -128,6 +155,7 @@ async function generateDeepSeekResponseEdge(
     text,
     provider: "deepseek",
     latencyMs: Date.now() - startTime,
+    ...normalizeEdgeUsage(data.usage?.prompt_tokens, data.usage?.completion_tokens),
   }
 }
 
@@ -173,6 +201,9 @@ async function generateOpenAIResponseEdge(
 
   const data = (await response.json()) as {
     choices?: Array<{ message?: { content?: string }; finish_reason?: string }>
+    // completion_tokens INCLUDES reasoning tokens, which is the whole point:
+    // they bill as output and leave no text to estimate from.
+    usage?: { prompt_tokens?: number; completion_tokens?: number }
   }
   const text = data.choices?.[0]?.message?.content
   if (!text) {
@@ -188,6 +219,7 @@ async function generateOpenAIResponseEdge(
     text,
     provider: "openai",
     latencyMs: Date.now() - startTime,
+    ...normalizeEdgeUsage(data.usage?.prompt_tokens, data.usage?.completion_tokens),
   }
 }
 
@@ -226,10 +258,25 @@ async function generateGeminiResponseEdge(
 
   const result = await model.generateContent(userMessage)
 
+  // usageMetadata carries the measured counts; candidatesTokenCount excludes
+  // thought tokens on this SDK, so add thoughtsTokenCount when present — the
+  // thinking budget above bills as output.
+  const usageMetadata = result.response.usageMetadata as
+    | { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number }
+    | undefined
+  const outputTokens =
+    typeof usageMetadata?.candidatesTokenCount === "number"
+      ? usageMetadata.candidatesTokenCount +
+        (typeof usageMetadata.thoughtsTokenCount === "number"
+          ? usageMetadata.thoughtsTokenCount
+          : 0)
+      : undefined
+
   return {
     text: result.response.text(),
     provider: "gemini",
     latencyMs: Date.now() - startTime,
+    ...normalizeEdgeUsage(usageMetadata?.promptTokenCount, outputTokens),
   }
 }
 
@@ -293,6 +340,10 @@ export async function generateAIResponseEdge(
             promptText: `${systemPrompt}\n${userMessage}`,
             responseText: response.text,
             latencyMs: response.latencyMs,
+            // Measured usage when the vendor reported it; the reporter only
+            // estimates from text when these are absent.
+            tokensIn: response.tokensIn,
+            tokensOut: response.tokensOut,
           })
         } catch {
           // Losing a usage record costs accounting accuracy. Losing the user's

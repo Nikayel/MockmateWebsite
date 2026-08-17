@@ -219,7 +219,8 @@ export async function POST(request: NextRequest) {
                 time: efficiencyMetrics.estimatedTimeComplexity || "unknown",
                 space: efficiencyMetrics.estimatedSpaceComplexity || "unknown",
               }
-            : null
+            : null,
+          { userId, sessionId }
         ).catch((err) => {
           logger.warn("[Feedback API] AI validation failed, using defaults", { error: err })
           return getDefaultValidation()
@@ -229,12 +230,16 @@ export async function POST(request: NextRequest) {
     // Create promise for structured extraction (only if transcript exists)
     const extractionPromise =
       transcriptMessages.length > 0
-        ? extractConversationEvidence(transcriptMessages, {
-            title: scenarioTitle,
-            optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
-            optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
-            criticalEdgeCases: ["empty input", "single element", "null values"],
-          }).catch((err) => {
+        ? extractConversationEvidence(
+            transcriptMessages,
+            {
+              title: scenarioTitle,
+              optimalTimeComplexity: efficiencyMetrics?.optimalTimeComplexity || "O(n)",
+              optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
+              criticalEdgeCases: ["empty input", "single element", "null values"],
+            },
+            { userId, sessionId }
+          ).catch((err) => {
             logger.warn("[Feedback API] Structured extraction failed", { error: err })
             return undefined
           })
@@ -616,6 +621,7 @@ export async function POST(request: NextRequest) {
           optimalSpaceComplexity: efficiencyMetrics?.optimalSpaceComplexity || "O(1)",
         },
         conversationTranscript: normalizeTranscriptForCritique(conversationTranscript),
+        attribution: { userId, sessionId },
       })
     }
 
@@ -686,6 +692,7 @@ export async function POST(request: NextRequest) {
             // correctly. Mirrors the streaming route.
             candidateCode: code,
           },
+          { userId, sessionId },
           extractedEvidence
         )
 
@@ -977,7 +984,7 @@ CRITICAL INSTRUCTIONS:
       enhancedSystemInstruction,
       prompt,
       [], // No history needed for feedback
-      { userId, sessionId, scenarioId } // Pass for usage tracking
+      { service: "feedback-generation", userId, sessionId, scenarioId } // Pass for usage tracking
     )
 
     const feedback = aiResponse.text

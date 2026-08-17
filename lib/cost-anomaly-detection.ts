@@ -67,6 +67,8 @@ export interface CostAnomaly {
     endpoint?: string
     provider?: string
     model?: string
+    /** Product surface (lib/usage/services.ts id) that made the flagged call. */
+    service?: string
     tokens?: number
   }
   timestamp: Date
@@ -109,34 +111,46 @@ export async function checkRequestCostAnomaly(params: {
   model?: string
   tokens: number
   endpoint?: string
+  service?: string
 }): Promise<CostAnomaly | null> {
-  const { cost, userId, sessionId, provider, model, tokens, endpoint } = params
-  const config = await getAnomalyConfig()
+  const { cost, userId, sessionId, provider, model, tokens, endpoint, service } = params
 
-  // Check 1: Single request cost too high
-  if (cost > config.singleRequestThreshold) {
-    // Omit undefined fields: Firestore rejects undefined values on write.
-    const context: CostAnomaly["context"] = { provider, tokens }
-    if (userId !== undefined) context.userId = userId
-    if (sessionId !== undefined) context.sessionId = sessionId
-    if (model !== undefined) context.model = model
-    if (endpoint !== undefined) context.endpoint = endpoint
+  // Guarded internally: this runs fire-and-forget on the AI request path, and
+  // recordAnomaly deliberately rethrows (its direct callers own the decision).
+  // A new caller that forgets `.catch()` must get a null, not an unhandled
+  // rejection on the money path.
+  try {
+    const config = await getAnomalyConfig()
 
-    const anomaly: Omit<CostAnomaly, "id" | "timestamp"> = {
-      type: "high_single_request",
-      severity: cost > config.singleRequestThreshold * 5 ? "critical" : "warning",
-      description: `Single request cost $${cost.toFixed(4)} exceeds threshold of $${config.singleRequestThreshold.toFixed(2)}`,
-      cost,
-      threshold: config.singleRequestThreshold,
-      context,
-      acknowledged: false,
+    // Check 1: Single request cost too high
+    if (cost > config.singleRequestThreshold) {
+      // Omit undefined fields: Firestore rejects undefined values on write.
+      const context: CostAnomaly["context"] = { provider, tokens }
+      if (userId !== undefined) context.userId = userId
+      if (sessionId !== undefined) context.sessionId = sessionId
+      if (model !== undefined) context.model = model
+      if (endpoint !== undefined) context.endpoint = endpoint
+      if (service !== undefined) context.service = service
+
+      const anomaly: Omit<CostAnomaly, "id" | "timestamp"> = {
+        type: "high_single_request",
+        severity: cost > config.singleRequestThreshold * 5 ? "critical" : "warning",
+        description: `Single request cost $${cost.toFixed(4)} exceeds threshold of $${config.singleRequestThreshold.toFixed(2)}`,
+        cost,
+        threshold: config.singleRequestThreshold,
+        context,
+        acknowledged: false,
+      }
+
+      await recordAnomaly(anomaly)
+      return { ...anomaly, timestamp: new Date() }
     }
 
-    await recordAnomaly(anomaly)
-    return { ...anomaly, timestamp: new Date() }
+    return null
+  } catch (error) {
+    logger.error("[Cost Anomaly] Single-request check failed", { error, provider, cost })
+    return null
   }
-
-  return null
 }
 
 /**

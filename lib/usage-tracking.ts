@@ -19,6 +19,14 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { countTokens } from "./token-counter"
 import { logger } from "./logger"
 import { maybeRunHourlyCostSweep } from "./cost-anomaly-detection"
+import { recordGlobalSpend } from "./global-spend-guard"
+import {
+  LEGACY_EVENT_TYPE_SERVICE,
+  SYSTEM_USER_ID,
+  UNATTRIBUTED_SERVICE,
+  isUsageServiceId,
+  type UsageServiceId,
+} from "./usage/services"
 import {
   AI_BUDGET_CAPS,
   AI_PROVIDER_COSTS,
@@ -88,10 +96,12 @@ export const EMBEDDING_COSTS = {
  */
 export const BUDGET_CAPS = AI_BUDGET_CAPS
 
+// "code_execution" was removed from this union 2026-08-17: it was declared for
+// Piston server-side execution, which is deprecated and free, and no call site
+// ever wrote it — a dead value that implied execution cost was tracked.
 export type UsageEventType =
   | "chat_message"
   | "feedback_generation"
-  | "code_execution"
   | "hint_request"
   | "session_start"
   | "session_end"
@@ -102,6 +112,14 @@ export interface UsageEvent {
   id?: string
   userId: string
   eventType: UsageEventType
+  /**
+   * WHICH product surface spent this. Required so "where is the money going"
+   * is answerable below eventType granularity — the five LLM calls behind one
+   * feedback request each carry their own id. Registered vocabulary only; see
+   * lib/usage/services.ts. Rows written before 2026-08-17 lack the field and
+   * are bucketed by LEGACY_EVENT_TYPE_SERVICE on the read side.
+   */
+  service: UsageServiceId
   provider?: string
   model?: string
   inputTokens?: number
@@ -181,6 +199,16 @@ export async function trackUsageEvent(
     await updateUserAggregateUsage(event)
     await updateUserDailyUsage(event)
 
+    // Feed the global daily kill-switch from the funnel itself, so EVERY
+    // tracked dollar — LLM, voice, embeddings, Node or Edge, attributed or
+    // system — counts against the ceiling exactly once. The Node AI path and
+    // the Edge ingest used to call recordGlobalSpend themselves, which meant
+    // voice and embedding spend never reached the ceiling at all: the Spend
+    // health bar showed a "today" figure that structurally excluded categories
+    // rendered as non-zero two panels below it. Callers must NOT also call
+    // recordGlobalSpend or the dollar counts twice. Never throws.
+    await recordGlobalSpend(event.cost ?? 0, event.service)
+
     // Drive the aggregate cost detector from here, because this is the single
     // funnel every AI cost passes through — both the Node path and the Edge
     // path's ingest reach it — which is exactly what an automatic detector
@@ -196,12 +224,46 @@ export async function trackUsageEvent(
     logger.error("Failed to track usage event", {
       error,
       eventType: event.eventType,
+      service: event.service,
       userId: event.userId,
       cost: event.cost,
     })
+    // The ledger write failed, but the kill-switch must still see the dollar:
+    // fail-open here is how a Firestore incident and a runaway spend loop
+    // could otherwise coincide invisibly. Best-effort, never throws.
+    void recordGlobalSpend(event.cost ?? 0, event.service)
     // Don't throw - usage tracking failures shouldn't break the app
     return false
   }
+}
+
+// =============================================================================
+// UTC MONTH BOUNDARY
+// =============================================================================
+//
+// Every money key in this system is UTC — utcDayKey below, global_usage in
+// lib/global-spend-guard.ts — EXCEPT the monthly period key, which was built
+// from local-time components. Dormant on Vercel (process TZ is UTC), but one
+// TZ env var away from billing a call to the previous month's budget while the
+// daily cap had already rolled over: at 2026-09-01T03:00Z under
+// America/Los_Angeles the local key is still "2026-08". These helpers make the
+// month boundary explicit UTC everywhere — the summary writer, the per-user
+// reader, and every admin aggregation must all use them so writer and readers
+// can never disagree.
+
+/** UTC month key, e.g. "2026-08". Pairs with utcDayKey. */
+export function utcMonthKey(now: Date = new Date()): string {
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`
+}
+
+/** First instant of the current UTC month. */
+export function utcMonthStart(now: Date = new Date()): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+}
+
+/** Last day of the current UTC month (same day-granularity the old local code used). */
+export function utcMonthEnd(now: Date = new Date()): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0))
 }
 
 /**
@@ -211,9 +273,9 @@ async function updateUserAggregateUsage(
   event: Omit<UsageEvent, "id" | "createdAt">
 ): Promise<void> {
   const now = new Date()
-  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+  const periodStart = utcMonthStart(now)
+  const periodEnd = utcMonthEnd(now)
+  const periodKey = utcMonthKey(now)
 
   const usageSummaryRef = adminDb
     .collection("users")
@@ -235,6 +297,9 @@ async function updateUserAggregateUsage(
         totalRequests: 1,
         requestsByType: { [event.eventType]: 1 },
         requestsByProvider: event.provider ? { [event.provider]: 1 } : {},
+        // Per-service spend, keyed by lib/usage/services.ts ids. Only dollars:
+        // zero-cost events (telemetry, cache hits) never churn the map.
+        costByService: event.cost ? { [event.service]: event.cost } : {},
         cacheHits: event.cached ? 1 : 0,
         cacheMisses: event.cached ? 0 : 1,
         totalLatencyMs: event.latencyMs || 0,
@@ -257,6 +322,11 @@ async function updateUserAggregateUsage(
         totalRequests: FieldValue.increment(1),
         requestsByType,
         requestsByProvider,
+        // Dotted field path is safe: service ids are kebab-case with no dots,
+        // enforced by the registry test.
+        ...(event.cost
+          ? { [`costByService.${event.service}`]: FieldValue.increment(event.cost) }
+          : {}),
         cacheHits: FieldValue.increment(event.cached ? 1 : 0),
         cacheMisses: FieldValue.increment(event.cached ? 0 : 1),
         totalLatencyMs: FieldValue.increment(event.latencyMs || 0),
@@ -337,6 +407,9 @@ async function updateUserDailyUsage(event: Omit<UsageEvent, "id" | "createdAt">)
         totalCost: FieldValue.increment(event.cost || 0),
         totalTokens: FieldValue.increment(event.totalTokens || 0),
         totalRequests: FieldValue.increment(1),
+        ...(event.cost
+          ? { costByService: { [event.service]: FieldValue.increment(event.cost) } }
+          : {}),
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }
@@ -369,7 +442,7 @@ export async function getUserDailyCost(userId: string, now: Date = new Date()): 
 export async function getUserUsageSummary(userId: string): Promise<UserUsageSummary | null> {
   try {
     const now = new Date()
-    const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+    const periodKey = utcMonthKey(now)
 
     // Get usage summary
     const summaryDoc = await adminDb
@@ -385,8 +458,8 @@ export async function getUserUsageSummary(userId: string): Promise<UserUsageSumm
     const budgetCap = resolveBudgetCap(profileDoc.data())
 
     if (!summaryDoc.exists) {
-      const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-      const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      const periodStart = utcMonthStart(now)
+      const periodEnd = utcMonthEnd(now)
 
       return {
         userId,
@@ -563,6 +636,9 @@ export async function trackVoiceUsage(params: {
   await trackUsageEvent({
     userId,
     eventType: "voice_transcription",
+    // Voice STT is one product surface; the service is intrinsic to this
+    // tracker rather than a caller decision.
+    service: "voice-transcription",
     provider: "deepgram",
     model,
     cost,
@@ -580,13 +656,14 @@ export async function trackVoiceUsage(params: {
  */
 export async function trackEmbeddingUsage(params: {
   userId: string
+  service: UsageServiceId
   characterCount: number
   embeddingCount: number
   model: keyof typeof EMBEDDING_COSTS
   provider: "gemini" | "openai"
   latencyMs?: number
 }): Promise<void> {
-  const { userId, characterCount, embeddingCount, model, provider, latencyMs } = params
+  const { userId, service, characterCount, embeddingCount, model, provider, latencyMs } = params
   // Estimate tokens from character count for backwards compatibility
   const estimatedTokens = Math.ceil(characterCount / 4)
   const cost = calculateEmbeddingCostFromTokens(estimatedTokens, model)
@@ -594,6 +671,7 @@ export async function trackEmbeddingUsage(params: {
   await trackUsageEvent({
     userId,
     eventType: "embedding_generation",
+    service,
     provider,
     model,
     totalTokens: estimatedTokens,
@@ -614,6 +692,7 @@ export async function trackEmbeddingUsage(params: {
  */
 export async function trackEmbeddingUsageAccurate(params: {
   userId: string
+  service: UsageServiceId
   texts: string[] // The actual texts being embedded
   model: keyof typeof EMBEDDING_COSTS
   provider: "gemini" | "openai" | "tfidf"
@@ -625,6 +704,7 @@ export async function trackEmbeddingUsageAccurate(params: {
 }): Promise<{ totalTokens: number; cost: number }> {
   const {
     userId,
+    service,
     texts,
     model,
     provider,
@@ -659,6 +739,7 @@ export async function trackEmbeddingUsageAccurate(params: {
   await trackUsageEvent({
     userId,
     eventType: "embedding_generation",
+    service,
     provider,
     model,
     totalTokens,
@@ -710,7 +791,7 @@ export async function getAdminUsageStats(options?: {
   // rather than N individual reads.
   const summariesSnapshot = await adminDb
     .collectionGroup("usage_summaries")
-    .where("periodStart", ">=", new Date(now.getFullYear(), now.getMonth(), 1))
+    .where("periodStart", ">=", utcMonthStart(now))
     .limit(USER_SUMMARY_SCAN_LIMIT)
     .get()
 
@@ -764,7 +845,15 @@ export async function getAdminUsageStats(options?: {
     if (summary.totalCost > 0 || summary.totalRequests > 0) {
       userStats.push({
         userId,
-        email: typeof profile?.email === "string" && profile.email ? profile.email : "Unknown",
+        // The reserved system user carries platform spend that no signed-in
+        // user caused (extraction, anonymous retrieval); label it so the admin
+        // table doesn't present it as an unidentified account.
+        email:
+          userId === SYSTEM_USER_ID
+            ? "Platform (system)"
+            : typeof profile?.email === "string" && profile.email
+              ? profile.email
+              : "Unknown",
         tier: resolveTier(profile),
         cost: summary.totalCost,
         requests: summary.totalRequests,
@@ -789,6 +878,43 @@ export async function getAdminUsageStats(options?: {
 }
 
 /**
+ * Which product service a usage_events row belongs to.
+ *
+ * Rows written since 2026-08-17 carry `service` explicitly. Older rows are
+ * derived: session lifecycle rows and the zero-cost chat/hint telemetry rows
+ * written by lib/session-metrics.ts (no provider, no cost, not a cache hit)
+ * belong to session-telemetry — before this distinction they were counted as
+ * LLM requests, inflating every "requests" aggregate 2-3x per chat turn —
+ * and everything else maps by eventType. Shapes this function cannot place
+ * land in the read-side "unattributed" bucket rather than polluting a real
+ * service's numbers.
+ */
+export function resolveEventService(event: {
+  service?: unknown
+  eventType?: unknown
+  provider?: unknown
+  cached?: unknown
+  cost?: unknown
+}): UsageServiceId | typeof UNATTRIBUTED_SERVICE {
+  if (isUsageServiceId(event.service)) {
+    return event.service
+  }
+  const eventType = event.eventType as UsageEventType | undefined
+  if (!eventType || !(eventType in LEGACY_EVENT_TYPE_SERVICE)) {
+    return UNATTRIBUTED_SERVICE
+  }
+  if (eventType === "session_start" || eventType === "session_end") {
+    return "session-telemetry"
+  }
+  const isZeroCostTelemetry =
+    readNumber(event.cost) === 0 && !event.provider && event.cached !== true
+  if (isZeroCostTelemetry && (eventType === "chat_message" || eventType === "hint_request")) {
+    return "session-telemetry"
+  }
+  return LEGACY_EVENT_TYPE_SERVICE[eventType]
+}
+
+/**
  * Get usage breakdown by service type for admin dashboard
  */
 export async function getServiceBreakdown(): Promise<{
@@ -797,6 +923,9 @@ export async function getServiceBreakdown(): Promise<{
     voice: { requests: number; cost: number; durationSeconds: number }
     embeddings: { requests: number; cost: number; tokens: number; characterCount: number }
   }
+  /** Per product-service totals, keyed by lib/usage/services.ts ids (plus the
+   * read-side "unattributed" bucket for unclassifiable legacy rows). */
+  byServiceId: Record<string, UsageTotals>
   byProvider: Record<string, UsageTotals>
   coverage: ScanCoverage
 }> {
@@ -808,6 +937,7 @@ export async function getServiceBreakdown(): Promise<{
       voice: { requests: 0, cost: 0, durationSeconds: 0 },
       embeddings: { requests: 0, cost: 0, tokens: 0, characterCount: 0 },
     },
+    byServiceId: {} as Record<string, UsageTotals>,
     byProvider: {} as Record<string, UsageTotals>,
     coverage: describeCoverage(0, USAGE_EVENT_SCAN_LIMIT),
   }
@@ -816,7 +946,7 @@ export async function getServiceBreakdown(): Promise<{
     // Bounded scan: an unbounded read of usage_events is itself a Firestore
     // cost. `coverage` reports whether the cap was hit, so a partial month is
     // never presented as a complete total.
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const startOfMonth = utcMonthStart(now)
     const eventsSnapshot = await adminDb
       .collection("usage_events")
       .where("createdAt", ">=", startOfMonth)
@@ -831,6 +961,21 @@ export async function getServiceBreakdown(): Promise<{
       const eventType = event.eventType as UsageEventType
       const cost = readNumber(event.cost)
       const tokens = readNumber(event.totalTokens)
+      const service = resolveEventService(event)
+
+      // Every row lands in exactly one product-service bucket, telemetry
+      // included — that is what keeps it OUT of the money buckets below.
+      if (!result.byServiceId[service]) {
+        result.byServiceId[service] = emptyUsageTotals()
+      }
+      accumulateUsageEvent(result.byServiceId[service], event)
+
+      // Zero-cost session telemetry shares the collection but is not AI
+      // activity; counting it here inflated "LLM requests" 2-3x per chat turn
+      // and dropped a meaningless "unattributed" row into the provider table.
+      if (service === "session-telemetry") {
+        continue
+      }
 
       // Aggregate by provider. Cached hits are recorded without a provider (no
       // upstream call was made), so they land in their own bucket rather than
@@ -896,7 +1041,7 @@ export async function getUserServiceBreakdown(userId: string): Promise<{
   // Get detailed breakdown from usage_events
   try {
     const now = new Date()
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const startOfMonth = utcMonthStart(now)
 
     // Limit per-user query to prevent abuse or runaway reads
     const eventsSnapshot = await adminDb
@@ -911,6 +1056,12 @@ export async function getUserServiceBreakdown(userId: string): Promise<{
       const eventType = event.eventType as UsageEventType
       const cost = event.cost || 0
       const tokens = event.totalTokens || 0
+
+      // Session telemetry is not AI usage; counting it made the user-facing
+      // request totals overstate actual AI activity.
+      if (resolveEventService(event) === "session-telemetry") {
+        continue
+      }
 
       result.total.requests++
       result.total.cost += cost
@@ -968,40 +1119,6 @@ export async function logUserActivity(
 }
 
 // =============================================================================
-// ACCURATE TOKEN COUNTING HELPERS
-// =============================================================================
-
-/**
- * Count tokens accurately using js-tiktoken
- * Use this before tracking events to get accurate token counts
- */
-export function countTokensAccurate(text: string): { tokens: number; isExact: boolean } {
-  const result = countTokens(text)
-  return { tokens: result.tokens, isExact: result.isExact }
-}
-
-/**
- * Calculate accurate cost from text content
- */
-export function calculateCostFromText(
-  inputText: string,
-  outputText: string,
-  provider: string
-): { inputTokens: number; outputTokens: number; totalTokens: number; cost: number } {
-  const input = countTokens(inputText)
-  const output = countTokens(outputText)
-  const totalTokens = input.tokens + output.tokens
-  const cost = calculateCost(input.tokens, output.tokens, provider)
-
-  return {
-    inputTokens: input.tokens,
-    outputTokens: output.tokens,
-    totalTokens,
-    cost,
-  }
-}
-
-// =============================================================================
 // GRANULAR USAGE TRACKING - BY PATTERN, SCENARIO, DIFFICULTY
 // =============================================================================
 
@@ -1044,7 +1161,7 @@ export async function getGranularUsageBreakdown(options?: {
   limit?: number
 }): Promise<GranularUsageBreakdown> {
   const now = new Date()
-  const startOfMonth = options?.startDate || new Date(now.getFullYear(), now.getMonth(), 1)
+  const startOfMonth = options?.startDate || utcMonthStart(now)
   const limit = options?.limit || 50
 
   const result: GranularUsageBreakdown = {
@@ -1074,6 +1191,11 @@ export async function getGranularUsageBreakdown(options?: {
 
     for (const doc of eventsSnapshot.docs) {
       const event = doc.data()
+      // This is an AI-cost dashboard; zero-cost session telemetry would add
+      // phantom "unknown"-pattern request rows to every aggregate.
+      if (resolveEventService(event) === "session-telemetry") {
+        continue
+      }
       const pattern = event.pattern || event.metadata?.pattern || "unknown"
       const difficulty = event.difficulty || event.metadata?.difficulty || "unknown"
       const scenarioId = event.scenarioId || "unknown"
@@ -1206,9 +1328,13 @@ export async function getDailyUsageTrends(days: number = 30): Promise<{
   totals: { requests: number; tokens: number; cost: number; uniqueUsers: number }
   coverage: ScanCoverage
 }> {
-  const startDate = new Date()
-  startDate.setDate(startDate.getDate() - days)
-  startDate.setHours(0, 0, 0, 0)
+  // UTC midnight, matching every other money boundary in this module — the
+  // per-day keys below come from toISOString(), so a local-time cutoff would
+  // truncate the first day of the range on any non-UTC process.
+  const rangeAnchor = new Date(Date.now() - days * 86_400_000)
+  const startDate = new Date(
+    Date.UTC(rangeAnchor.getUTCFullYear(), rangeAnchor.getUTCMonth(), rangeAnchor.getUTCDate())
+  )
 
   const result = {
     daily: [] as Array<{
@@ -1241,6 +1367,11 @@ export async function getDailyUsageTrends(days: number = 30): Promise<{
 
     for (const doc of eventsSnapshot.docs) {
       const event = doc.data()
+      // AI usage trends: session telemetry has no cost or tokens and would
+      // only inflate the per-day request counts.
+      if (resolveEventService(event) === "session-telemetry") {
+        continue
+      }
       const date = event.createdAt?.toDate()?.toISOString().split("T")[0] || "unknown"
       const userId = event.userId
 
@@ -1279,69 +1410,4 @@ export async function getDailyUsageTrends(days: number = 30): Promise<{
   }
 
   return result
-}
-
-/**
- * Track LLM usage with accurate token counting
- * Enhanced version that includes pattern/scenario context
- */
-export async function trackLLMUsageAccurate(params: {
-  userId: string
-  inputText: string
-  outputText: string
-  provider: string
-  model?: string
-  eventType?: UsageEventType
-  sessionId?: string
-  scenarioId?: string
-  scenarioTitle?: string
-  pattern?: string
-  difficulty?: string
-  latencyMs?: number
-  cached?: boolean
-}): Promise<void> {
-  const {
-    userId,
-    inputText,
-    outputText,
-    provider,
-    model,
-    eventType = "chat_message",
-    sessionId,
-    scenarioId,
-    scenarioTitle,
-    pattern,
-    difficulty,
-    latencyMs,
-    cached = false,
-  } = params
-
-  // Calculate accurate tokens
-  const inputCount = countTokens(inputText)
-  const outputCount = countTokens(outputText)
-  const totalTokens = inputCount.tokens + outputCount.tokens
-  const cost = calculateCost(inputCount.tokens, outputCount.tokens, provider)
-
-  await trackUsageEvent({
-    userId,
-    eventType,
-    provider,
-    model,
-    inputTokens: inputCount.tokens,
-    outputTokens: outputCount.tokens,
-    totalTokens,
-    cost,
-    latencyMs,
-    cached,
-    sessionId,
-    scenarioId,
-    pattern,
-    difficulty,
-    isExactTokenCount: inputCount.isExact && outputCount.isExact,
-    metadata: {
-      scenarioTitle,
-      inputCharacters: inputText.length,
-      outputCharacters: outputText.length,
-    },
-  })
 }

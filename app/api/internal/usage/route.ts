@@ -19,7 +19,11 @@ import { verifyCronRequest } from "@/lib/cron-auth"
 import { logger } from "@/lib/logger"
 import { trackUsageEvent, calculateCost, type UsageEventType } from "@/lib/usage-tracking"
 import {
-  recordGlobalSpend,
+  LEGACY_EVENT_TYPE_SERVICE,
+  isUsageServiceId,
+  type UsageServiceId,
+} from "@/lib/usage/services"
+import {
   isGlobalCeilingExceeded,
   getGlobalDailyCeiling,
   getGlobalDailySpend,
@@ -42,6 +46,7 @@ const MAX_REPORTED_TOKENS = 2_000_000
 interface ParsedUsageReport {
   userId: string
   eventType: UsageEventType
+  service: UsageServiceId
   provider: string
   inputTokens: number
   outputTokens: number
@@ -86,11 +91,25 @@ function parseUsageReport(
   const provider = readString(raw.provider)
   if (!provider) return { ok: false, error: "provider is required" }
 
+  // Service is validated against the registry: an arbitrary string here would
+  // mint a new cost bucket in every rollup map. Absent means an in-flight
+  // request from a deploy that predates the field — map it by eventType
+  // rather than rejecting spend that was already made.
+  const rawService = readString(raw.service, 64)
+  if (rawService !== undefined && !isUsageServiceId(rawService)) {
+    return { ok: false, error: `service must be a registered usage service id` }
+  }
+  const service: UsageServiceId =
+    rawService !== undefined && isUsageServiceId(rawService)
+      ? rawService
+      : LEGACY_EVENT_TYPE_SERVICE[eventType as UsageEventType]
+
   return {
     ok: true,
     report: {
       userId,
       eventType: eventType as UsageEventType,
+      service,
       provider,
       inputTokens: readTokenCount(raw.inputTokens),
       outputTokens: readTokenCount(raw.outputTokens),
@@ -143,6 +162,7 @@ export async function POST(request: NextRequest) {
     recorded = await trackUsageEvent({
       userId: report.userId,
       eventType: report.eventType,
+      service: report.service,
       provider: report.provider,
       inputTokens: report.inputTokens,
       outputTokens: report.outputTokens,
@@ -179,22 +199,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to record usage" }, { status: 500 })
   }
 
-  // Feed the aggregate daily kill-switch. This was the ONE thing this endpoint
-  // did not do: it wrote the usage_event (so per-user budgets saw the spend) but
-  // never incremented global_usage/{day}, whose only writer was the Node path in
-  // lib/ai-providers.ts. The Edge feedback route serves every scenario type
-  // except system design, so the busiest AI path on the platform contributed
-  // nothing to the $250/day ceiling and the ceiling could never be reached by
-  // the traffic most likely to run it up.
-  //
-  // Awaited, unlike the Node path's fire-and-forget call: nothing is waiting on
-  // this response (the Edge caller already returned to the user), so there is no
-  // latency to protect, and an awaited increment is one that Vercel cannot freeze
-  // out from under us. recordGlobalSpend never throws.
-  await recordGlobalSpend(cost)
+  // The aggregate daily kill-switch is fed from INSIDE trackUsageEvent since
+  // 2026-08-17 — one funnel, every tracked dollar counted exactly once. A
+  // direct recordGlobalSpend call here would double-count Edge spend.
 
   logger.info("[Internal Usage] Recorded Edge AI usage", {
     eventType: report.eventType,
+    service: report.service,
     provider: report.provider,
     totalTokens,
     estimated: report.estimatedTokens,

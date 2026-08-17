@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server"
 import { enforceQuota } from "@/lib/quota-enforcement"
+import { SYSTEM_USER_ID } from "@/lib/usage/services"
 import {
   checkRateLimit,
   startRequestTracking,
@@ -41,10 +42,14 @@ export async function enforceMeteredAiRequest(
   }
 
   const tier = (quotaResult.tier || "free") as RateLimitTier
-  const userId = quotaResult.userId || "anonymous"
+  // Currently unreachable (every caller sets requireAuth, which 401s before
+  // this line), but if a future route reuses this helper without auth, spend
+  // lands under the reserved system identity the ledger already understands
+  // rather than a second invented one.
+  const userId = quotaResult.userId || SYSTEM_USER_ID
   let trackingStarted = false
 
-  if (userId !== "anonymous") {
+  if (userId !== SYSTEM_USER_ID) {
     const tierRateCheck = await checkRateLimit(userId, tier, opts.estimatedTokens)
     if (!tierRateCheck.allowed) {
       return { response: buildRateLimitResponse(tierRateCheck) }

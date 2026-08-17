@@ -45,6 +45,9 @@ export type { TranscriptMessage, ProblemContext, AnalysisResult }
 export async function analyzeTranscriptForMistakes(
   transcript: TranscriptMessage[],
   problemContext: ProblemContext,
+  // Required: the semantic pass is a paid LLM call that previously ran with
+  // no per-user attribution (invisible to the ledger and the budget cap).
+  attribution: { userId?: string; sessionId?: string },
   existingEvidence?: ExtractedEvidence
 ): Promise<AnalysisResult> {
   const silentNotes: SilentNote[] = []
@@ -85,7 +88,8 @@ export async function analyzeTranscriptForMistakes(
       const semanticNotes = await detectMistakesSemantically(
         normalizedTranscript,
         problemContext,
-        algorithmicNotes // Pass existing notes to avoid duplicates
+        algorithmicNotes, // Pass existing notes to avoid duplicates
+        attribution
       )
       silentNotes.push(...semanticNotes)
       semanticDetections = semanticNotes.length
@@ -500,7 +504,8 @@ function detectConfusedApproach(userMessage: string): SilentNote | null {
 async function detectMistakesSemantically(
   transcript: TranscriptMessage[],
   problemContext: ProblemContext,
-  existingNotes: SilentNote[]
+  existingNotes: SilentNote[],
+  attribution: { userId?: string; sessionId?: string }
 ): Promise<SilentNote[]> {
   const transcriptText = transcript
     .filter((m) => m.role === "user" || m.role === "interviewer")
@@ -516,7 +521,14 @@ async function detectMistakesSemantically(
       "You are a technical interview analyst. Return only valid JSON array.",
       prompt,
       [],
-      { complexity: "critique", temperature: 0.1 }
+      {
+        complexity: "critique",
+        temperature: 0.1,
+        service: "feedback-transcript-analysis",
+        eventType: "feedback_generation",
+        userId: attribution.userId,
+        sessionId: attribution.sessionId,
+      }
     )
     return parseSemanticAnalysisResponse(response.text, Date.now())
   } catch (error) {

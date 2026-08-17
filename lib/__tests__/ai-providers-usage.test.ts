@@ -76,7 +76,9 @@ describe("generateAIResponse provider-reported token usage", () => {
     })
     const { generateAIResponse } = await import("../ai-providers")
 
-    const result = await generateAIResponse("system prompt", "user message")
+    const result = await generateAIResponse("system prompt", "user message", [], {
+      service: "interview-chat",
+    })
 
     expect(result.provider).toBe("gemini")
     expect(result.text).toBe("gemini reply")
@@ -92,7 +94,9 @@ describe("generateAIResponse provider-reported token usage", () => {
     })
     const { generateAIResponse } = await import("../ai-providers")
 
-    const result = await generateAIResponse("system prompt", "user message")
+    const result = await generateAIResponse("system prompt", "user message", [], {
+      service: "interview-chat",
+    })
 
     expect(result.text).toBe("no usage attached")
     expect("tokensIn" in result).toBe(false)
@@ -111,7 +115,9 @@ describe("generateAIResponse provider-reported token usage", () => {
     })
     const { generateAIResponse } = await import("../ai-providers")
 
-    const result = await generateAIResponse("system prompt", "user message")
+    const result = await generateAIResponse("system prompt", "user message", [], {
+      service: "interview-chat",
+    })
 
     expect(result.provider).toBe("deepseek-chat")
     expect(result.text).toBe("deepseek reply")

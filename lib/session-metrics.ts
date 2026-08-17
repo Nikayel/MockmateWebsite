@@ -193,10 +193,14 @@ export async function initSessionMetrics(params: {
   // Store in memory
   activeSessions.set(params.sessionId, state)
 
-  // Track session start event
+  // Track session start event. session-telemetry marks these rows as
+  // zero-cost lifecycle telemetry: they share usage_events with real AI spend,
+  // and before the service tag every admin aggregate counted them as LLM
+  // requests (2-3 phantom "requests" per chat turn).
   await trackUsageEvent({
     userId: params.userId,
     eventType: "session_start",
+    service: "session-telemetry",
     sessionId: params.sessionId,
     scenarioId: params.scenarioId,
     metadata: {
@@ -426,6 +430,7 @@ export async function trackChatMessage(params: {
   trackUsageEvent({
     userId: state.userId,
     eventType: "chat_message",
+    service: "session-telemetry",
     sessionId: params.sessionId,
     metadata: {
       chatType: params.chatType,
@@ -464,6 +469,7 @@ export async function trackHintReveal(params: {
   await trackUsageEvent({
     userId: state.userId,
     eventType: "hint_request",
+    service: "session-telemetry",
     sessionId: params.sessionId,
     metadata: {
       hintIndex: params.hintIndex,
@@ -752,6 +758,7 @@ export async function completeSessionMetrics(params: {
   await trackUsageEvent({
     userId: state.userId,
     eventType: "session_end",
+    service: "session-telemetry",
     sessionId: params.sessionId,
     metadata: {
       durationMinutes,

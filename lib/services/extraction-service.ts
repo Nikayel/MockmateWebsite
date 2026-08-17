@@ -28,6 +28,9 @@ export interface ExtractionRequest {
   currentMessage: string
   // Optional: Optimal complexity for real-time validation of user claims
   optimalComplexity?: OptimalComplexityContext
+  /** Attribution for the extraction LLM call's cost record. */
+  userId?: string
+  sessionId?: string
 }
 
 export interface ExtractionResponse {
@@ -66,7 +69,10 @@ export async function extractionService(req: ExtractionRequest): Promise<Extract
   }
 
   // Run extraction with optimal complexity for real-time validation
-  const updates = await extractConversationState(messages, currentTracker, optimalComplexity)
+  const updates = await extractConversationState(messages, currentTracker, optimalComplexity, {
+    userId: req.userId,
+    sessionId: req.sessionId,
+  })
 
   // Calculate confidence based on what was extracted
   const confidence = calculateConfidence(updates)
