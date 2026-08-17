@@ -148,6 +148,7 @@ function buildHintRequest(
 ): HintGenerationRequest {
   return {
     userId: params.userId,
+    sessionId: params.sessionId,
     problemId: params.problemId,
     problemTitle: params.problemTitle,
     problemText: params.problemText,

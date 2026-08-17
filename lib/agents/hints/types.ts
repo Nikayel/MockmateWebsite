@@ -61,6 +61,8 @@ export interface StruggleMetrics {
 
 export interface HintGenerationRequest {
   userId: string
+  /** Interview session doc id, threaded into usage tracking. */
+  sessionId?: string
   problemId: string
   problemTitle: string
   problemText: string

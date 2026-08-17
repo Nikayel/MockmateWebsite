@@ -17,6 +17,8 @@ export interface UsePostInterviewDiscussionOptions {
   user: User | null
   usageLimit: { used?: number } | null
   experienceLevel: string
+  /** Interview session doc id, so the debrief turn's cost bills to the session. */
+  currentSessionId: string | null
 
   // Page state reads
   selectedScenario: Scenario | null
@@ -146,6 +148,8 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
           message: discussionPrompt,
           context: opts.interviewerMessages,
           role: "interviewer",
+          // Cost attribution: the debrief is part of the session's spend.
+          sessionId: opts.currentSessionId ?? undefined,
           userContext: userProfile
             ? {
                 email: opts.user?.email,

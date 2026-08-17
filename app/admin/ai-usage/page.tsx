@@ -1330,6 +1330,37 @@ export default function AIUsagePage() {
                   {/* Sessions */}
                   <div>
                     <h3 className="mb-2 text-sm font-medium text-gray-400">Recent Sessions</h3>
+                    {/* The month total above counts EVERY usage event; the rows
+                        below only sum events stamped with that session's id.
+                        Spend without a session stamp (hints and chat recorded
+                        before session stamping shipped 2026-08-17, plus any
+                        out-of-session activity) would otherwise look like a
+                        total that doesn't add up — say where it lives instead. */}
+                    {(() => {
+                      const sessionsCost = (userDetails.sessions ?? []).reduce(
+                        (sum: number, s: { cost?: number }) =>
+                          sum + (Number.isFinite(s.cost) ? (s.cost as number) : 0),
+                        0
+                      )
+                      const unattributed = (userDetails.usage?.totalCost || 0) - sessionsCost
+                      if (unattributed <= 0.0005) return null
+                      return (
+                        <div className="mb-2 rounded-lg border border-gray-800 bg-gray-800/20 p-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-400">
+                              Not attributed to a session
+                            </span>
+                            <span className="font-mono text-sm text-yellow-400">
+                              {formatCost(unattributed)}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-xs text-gray-500">
+                            Mostly hints and chat turns recorded before per-session stamping
+                            (2026-08-17), or made outside the listed sessions.
+                          </div>
+                        </div>
+                      )
+                    })()}
                     <div className="space-y-2">
                       {userDetails.sessions?.length > 0 ? (
                         userDetails.sessions.map((session: any) => (

@@ -480,6 +480,11 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             message: userMessage + additionalContext,
             context: messages,
             role: isInterviewer ? "interviewer" : "partner",
+            // Stamps every chat turn's usage_events row with the interview
+            // session, so the admin per-session cost rows include chat spend.
+            // Without it the monthly total accumulated while every session
+            // row read $0.0000.
+            sessionId: currentSessionId ?? undefined,
             userContext: userProfile
               ? {
                   email: user?.email,

@@ -26,6 +26,8 @@ import { logger } from "@/lib/logger"
 
 interface UseHintAgentOptions {
   userId: string
+  /** Interview session doc id, so hint spend bills to the session. */
+  sessionId?: string | null
   problemId: string
   problemTitle: string
   problemText: string
@@ -62,6 +64,7 @@ interface UseHintAgentReturn {
 export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
   const {
     userId,
+    sessionId,
     problemId,
     problemTitle,
     problemText,
@@ -109,6 +112,9 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
   const buildBasePayload = useCallback(
     () => ({
       userId,
+      // Omitted rather than null: the payload is JSON and the API's optional
+      // field expects string-or-absent.
+      ...(sessionId ? { sessionId } : {}),
       problemId,
       problemTitle,
       problemText,
@@ -119,7 +125,7 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
       struggleMetrics: struggleMetricsRef.current,
       testResults: testResultsRef.current,
     }),
-    [userId, problemId, problemTitle, problemText, problemPattern, difficulty]
+    [userId, sessionId, problemId, problemTitle, problemText, problemPattern, difficulty]
   )
 
   // Timer for elapsed time

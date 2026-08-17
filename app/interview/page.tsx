@@ -238,11 +238,18 @@ function InterviewPageContent() {
     return firebaseUser.getIdToken()
   }, [firebaseUser])
 
+  // Declared before the voice/hint hooks below, which stamp it onto their
+  // usage reports for per-session cost attribution.
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+
   const interviewerVoice = useVoiceInput({
     fallbackToWebSpeech: true,
     autoSendEnabled: true,
     autoSendDelayMs: 500,
     getAuthToken: getVoiceAuthToken,
+    // Bills the Deepgram minutes to the session (the hook reads the CURRENT
+    // value at report time, so starting a session mid-recording still tags).
+    sessionId: currentSessionId ?? undefined,
     onTranscript: (transcript, _isFinal) => {
       setInterviewerInput(transcript)
     },
@@ -259,6 +266,7 @@ function InterviewPageContent() {
     autoSendEnabled: true,
     autoSendDelayMs: 500,
     getAuthToken: getVoiceAuthToken,
+    sessionId: currentSessionId ?? undefined,
     onTranscript: (transcript, _isFinal) => {
       setChatInput(transcript)
     },
@@ -277,6 +285,7 @@ function InterviewPageContent() {
   const [isAIPartnerExpanded, setIsAIPartnerExpanded] = useState(false) // Collapsed by default
   const hintAgent = useHintAgent({
     userId: user?.id || "",
+    sessionId: currentSessionId,
     problemId: selectedScenario?.id || "",
     problemTitle: selectedScenario?.title || "",
     problemText: selectedScenario?.problemStatement || "",
@@ -358,7 +367,6 @@ function InterviewPageContent() {
   const [proactiveTimer, setProactiveTimer] = useState<NodeJS.Timeout | null>(null)
   const [cachedUserProfile, setCachedUserProfile] = useState<Profile | null>(null)
   const userProfileRequestRef = useRef<Promise<Profile | null> | null>(null)
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
 
   const getBugfixExpectedTouchedFiles = useCallback(
     (scenario: Scenario | null = selectedScenario): string[] => {
@@ -1327,6 +1335,7 @@ function InterviewPageContent() {
     user,
     usageLimit,
     experienceLevel,
+    currentSessionId,
     selectedScenario,
     code,
     selectedLanguage,

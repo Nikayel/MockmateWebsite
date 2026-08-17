@@ -30,6 +30,8 @@ export interface LLMHintRequest {
 
   // Optional context
   userId?: string
+  /** Interview session doc id, threaded into usage tracking. */
+  sessionId?: string
   existingHints?: string[]
   testFailures?: string[]
 
@@ -294,6 +296,7 @@ export async function generateLLMHint(request: LLMHintRequest): Promise<Generate
       service: "interview-hints",
       eventType: "hint_request",
       userId: request.userId,
+      sessionId: request.sessionId,
     })
 
     // Parse response
@@ -349,6 +352,7 @@ export async function generateLLMHintsForLevels(
         service: "interview-hints",
         eventType: "hint_request",
         userId: request.userId,
+        sessionId: request.sessionId,
       }
     )
 

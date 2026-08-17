@@ -138,6 +138,7 @@ Return JSON:
       service: "interview-hints",
       eventType: "hint_request",
       userId: request.userId,
+      sessionId: request.sessionId,
     })
 
     const diagnosis = parseDiagnosis(response.text)

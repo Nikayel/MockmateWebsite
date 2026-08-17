@@ -16,6 +16,9 @@ export interface HintComplexityTarget {
 
 export interface BaseHintRequestPayload {
   userId: string
+  /** Interview session doc id, so hint LLM spend bills to the session. Hints
+   * were the largest per-user cost with NO session attribution at all. */
+  sessionId?: string
   problemId: string
   problemTitle: string
   problemText: string

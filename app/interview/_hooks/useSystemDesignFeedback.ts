@@ -416,6 +416,8 @@ export function useSystemDesignFeedback(
           message: finalMessage,
           context: opts.interviewerMessages,
           role: "interviewer",
+          // Cost attribution: the closing summary bills to the session too.
+          sessionId: opts.currentSessionId ?? undefined,
           userContext: opts.user
             ? {
                 email: opts.user.email,
