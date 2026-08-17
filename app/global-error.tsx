@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { attemptChunkErrorRecovery } from "@/components/monitoring/chunk-reload"
 import { reportClientError } from "@/components/monitoring/report-client-error"
 
 /**
@@ -17,6 +18,8 @@ export default function GlobalError({
   reset: () => void
 }) {
   useEffect(() => {
+    // Stale-deploy chunk errors get one automatic reload instead of a report.
+    if (attemptChunkErrorRecovery(error.message)) return
     // Fire-and-forget: funnels the crash into the server logger -> Sentry.
     reportClientError({
       message: error.message || "Root layout error",

@@ -10,6 +10,7 @@
  */
 
 import { useEffect } from "react"
+import { attemptChunkErrorRecovery } from "./chunk-reload"
 import { reportClientError } from "./report-client-error"
 
 function describeRejectionReason(reason: unknown): { message: string; stack?: string } {
@@ -31,6 +32,8 @@ function describeRejectionReason(reason: unknown): { message: string; stack?: st
 export function ClientErrorReporter() {
   useEffect(() => {
     const onWindowError = (event: ErrorEvent) => {
+      // Stale-deploy chunk failures get one automatic reload instead of a report.
+      if (attemptChunkErrorRecovery(event.message)) return
       reportClientError({
         message: event.message || "Unknown window error",
         stack: event.error instanceof Error ? event.error.stack : undefined,
@@ -40,6 +43,8 @@ export function ClientErrorReporter() {
 
     const onUnhandledRejection = (event: PromiseRejectionEvent) => {
       const { message, stack } = describeRejectionReason(event.reason)
+      // Failed dynamic import()s surface here as rejections; same recovery applies.
+      if (attemptChunkErrorRecovery(message)) return
       reportClientError({
         message: message || "Unhandled promise rejection",
         stack,
