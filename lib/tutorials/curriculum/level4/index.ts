@@ -19,6 +19,9 @@ import { performanceLesson } from "./performance"
 import { configLoggingLesson } from "./config-logging"
 import { testingToolingLesson } from "./testing-tooling"
 import { packagingCapstoneLesson } from "./packaging-capstone"
+import { retryBudgetLesson } from "./retry-budget"
+import { streamingDecodeLesson } from "./streaming-decode"
+import { chunkScoreFuseLesson } from "./chunk-score-fuse"
 
 export const level4: PythonLevel = {
   id: 4,
@@ -57,6 +60,13 @@ export const level4: PythonLevel = {
       title: "Quality, Packaging & Capstone",
       description: "Mock dependencies, use modern tooling, and ship a typed, tested package.",
       lessons: [testingToolingLesson, packagingCapstoneLesson],
+    },
+    {
+      id: "py-l4-ai-engineering",
+      title: "AI Engineering Plumbing",
+      description:
+        "Write the glue around a model call: retries with a real budget, streaming that survives a chunk boundary, and retrieval you can rank by hand.",
+      lessons: [retryBudgetLesson, streamingDecodeLesson, chunkScoreFuseLesson],
     },
   ],
 }
