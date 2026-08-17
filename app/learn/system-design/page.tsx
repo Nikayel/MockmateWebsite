@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRight, BookOpen, Timer } from "lucide-react"
+import { Timer } from "lucide-react"
 import { listSystemDesignLevels } from "@/lib/tutorials/system-design/registry"
 import { learnTrackMetadata } from "@/lib/seo/learn-metadata"
 import { learnCourseSchemaInput } from "@/lib/seo/learn-course-schema"
@@ -8,7 +8,7 @@ import { Footer } from "@/components/footer"
 import { listCourseEntries } from "@/lib/tutorials/course-catalog"
 import { LEARN_HUB_PATH, publicLessonPath, trackPath } from "@/lib/tutorials/lesson-routes"
 import { BreadcrumbJsonLd, CourseJsonLd, LessonListJsonLd } from "@/components/seo/JsonLd"
-import { firstPublishedLesson, toPathLevelSummary } from "@/lib/tutorials/level-path"
+import { toPathLevelSummary } from "@/lib/tutorials/level-path"
 import { LearnPathTopBar } from "@/components/tutorials/LearnPathTopBar"
 import { SystemDesignDrills } from "@/components/tutorials/SystemDesignDrills"
 import { SystemDesignPath } from "@/components/tutorials/SystemDesignPath"
@@ -21,18 +21,15 @@ export const metadata: Metadata = learnTrackMetadata({
     "Free system design course taught the way interviews test it: read a concept, write your own design answer, then drill a timed round with an AI interviewer.",
 })
 
-const LOOP_PHASES = ["Read", "Design"]
-
 /**
  * Screen 1 — the System-Design Path. Server Component: static content from `listSystemDesignLevels()`.
  *
  * Public, and nothing here reads auth or progress, so the page is the same clean index for a first
- * time visitor as for a returning learner. The "Start with" link gives that visitor one obvious way
- * in (and gives a crawler a deep link into the corpus instead of only level indexes).
+ * time visitor as for a returning learner. The way in is the path itself: the first arc renders
+ * open, so the first level is on screen without a second CTA pointing at it.
  */
 export default function LearnSystemDesignPage() {
   const levels = listSystemDesignLevels()
-  const firstLesson = firstPublishedLesson(levels)
   // Project to the lean Path summary so the authored 208-lesson corpus (teach markdown, model
   // answers, rubrics) never serializes into the client bundle — the Path only needs ids, headings,
   // and counts.
@@ -71,56 +68,24 @@ export default function LearnSystemDesignPage() {
             answer and self-compare against a model answer. No code to run, just the reasoning that
             wins rounds.
           </p>
-          <div className="mt-6 flex items-center justify-center gap-2">
-            {LOOP_PHASES.map((phase, i) => (
-              <span key={phase} className="flex items-center gap-2">
-                <span className="border-accent/30 bg-accent/10 text-accent-strong rounded-full border px-3 py-1 text-sm font-medium">
-                  {phase}
-                </span>
-                {i < LOOP_PHASES.length - 1 && (
-                  <span className="text-accent/60" aria-hidden="true">
-                    →
-                  </span>
-                )}
-              </span>
-            ))}
-          </div>
+          {/* One quiet link, no pill chrome.
 
-          {/* Two quiet entry hints rather than one loud button.
-              The filled accent CTA that used to sit here answered "where should I start?" at the
-              volume of a signup button, which is the wrong weight for a course whose actual entry
-              point is the level you pick below: it pulled the eye past twelve levels to a single
-              lesson chosen for you. Both routes are now the same secondary-pill treatment
-              `/learn/python` uses, so they read as hints for the two visitors who want one (never
-              done this; done it and want the timed round) and the path stays the page. */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-            {firstLesson && (
-              <Link
-                href={publicLessonPath(
-                  "system-design",
-                  firstLesson.levelSlug,
-                  firstLesson.lessonId
-                )}
-                className="border-accent/30 text-accent-strong hover:bg-accent/10 focus-visible:ring-accent/50 group inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
-              >
-                <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
-                New to this? Start with {firstLesson.lessonTitle}
-                <ArrowRight
-                  className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
-                  aria-hidden="true"
-                />
-              </Link>
-            )}
+              The "Read -> Design" phase row that used to sit above this is gone, and so is the
+              "Start with <first lesson>" hint. Both were saying something the page already said
+              better: the row was a lossy compression of the sentence directly above it (and at two
+              chips it is a label, not a process, unlike the three-phase row its sibling tracks
+              earn), and the first lesson is the first card inside the first arc, so pointing at it
+              from the hero was a second route to somewhere already on screen.
 
-            {/* Drills live at the foot of the page because they are the applied end of the course,
-                not a shortcut past it. This pill is the one concession to that placement, so a
-                returning learner who came back to drill is not made to scroll the whole level list
-                to find them. */}
+              What is left is the one hint a visitor cannot infer, aimed at the one visitor it is
+              for. It sheds the border and padding as well as the emphasis, because the request was
+              for less weight AND less space, and a bordered pill spends both. */}
+          <div className="mt-5 flex justify-center">
             <Link
               href="#drills"
-              className="border-border text-muted-foreground hover:border-accent/30 hover:text-foreground focus-visible:ring-accent/50 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-accent/50 inline-flex items-center gap-1.5 rounded-sm text-xs underline-offset-4 transition-colors hover:underline focus-visible:ring-2 focus-visible:outline-none"
             >
-              <Timer className="h-3.5 w-3.5" aria-hidden="true" />
+              <Timer className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               Already know this? Jump to the interview drills
             </Link>
           </div>
