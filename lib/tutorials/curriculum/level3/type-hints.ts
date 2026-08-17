@@ -332,7 +332,7 @@ A **type hint** is a note you attach to a name saying what kind of value belongs
     },
     {
       "label": "Nowhere. The hint coerces the strings to floats on the way in.",
-      "feedback": "Tempting, because pydantic and several web frameworks really do coerce from annotations, so you may have seen this behaviour. Plain Python never coerces: no conversion, no validation, no warning."
+      "feedback": "Tempting, because pydantic and several web frameworks really do coerce from annotations, so you may have seen this behavior. Plain Python never coerces: no conversion, no validation, no warning."
     },
     {
       "label": "At import time, because the annotation does not match how the function is used.",
@@ -584,7 +584,7 @@ ignores columns the class does not declare, and falls back to a field's default 
 missing it. In \`catalog/report.py\`, implement \`group_by_destination\`, \`heaviest_first\`, and
 \`count_heavier_than\` over a list of shipments, and annotate them.
 
-\`README.md\` has the field table and the exact behaviour of each function. The tests read your
+\`README.md\` has the field table and the exact behavior of each function. The tests read your
 annotations as well as your results, so correct code with no hints still fails. Some tests are
 hidden.`,
     starterCode: "",
