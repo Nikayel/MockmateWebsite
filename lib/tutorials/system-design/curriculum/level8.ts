@@ -623,6 +623,8 @@ Two enrolled authenticators is the consumer answer to device loss. An enterprise
   "reveal": "In the design write, name the moving parts: public-key credentials so the server holds nothing stealable, origin binding for phishing resistance, synced passkeys plus a required second authenticator for device loss, and progressive enrollment as the migration path off passwords."
 }
 \`\`\`
+
+**Sources:** [W3C WebAuthn Level 3](https://www.w3.org/TR/webauthn-3/) · [FIDO Alliance specifications](https://fidoalliance.org/specifications/) · [NIST SP 800-63B](https://pages.nist.gov/800-63-3/sp800-63b.html)
 `.trim()
 
 const oauthOidcTeach = `
