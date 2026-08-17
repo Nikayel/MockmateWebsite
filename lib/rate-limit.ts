@@ -142,6 +142,34 @@ class InMemoryRateLimitStore implements RateLimitStore {
 }
 
 /**
+ * Atomic fixed-window increment, executed inside Redis via EVAL.
+ *
+ * The entry shape matches RateLimitEntry ({count, resetTime}) so the stored JSON stays
+ * readable by get(). An expired or malformed entry starts a fresh window. PX keys the
+ * entry's lifetime to the window end (+1s slack), so abandoned buckets expire themselves.
+ */
+const UPSTASH_INCREMENT_SCRIPT = `
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local interval = tonumber(ARGV[2])
+
+local count = 1
+local resetTime = now + interval
+
+local raw = redis.call('GET', key)
+if raw then
+  local ok, parsed = pcall(cjson.decode, raw)
+  if ok and type(parsed) == 'table' and tonumber(parsed.resetTime) and tonumber(parsed.resetTime) > now then
+    count = tonumber(parsed.count or 0) + 1
+    resetTime = tonumber(parsed.resetTime)
+  end
+end
+
+redis.call('SET', key, cjson.encode({ count = count, resetTime = resetTime }), 'PX', math.ceil(resetTime - now) + 1000)
+return cjson.encode({ count = count, resetTime = resetTime })
+`
+
+/**
  * Upstash Redis Rate Limit Store
  * Production-ready distributed rate limiting using Upstash Redis
  * Requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN env vars
@@ -155,7 +183,7 @@ class UpstashRateLimitStore implements RateLimitStore {
     this.token = process.env.UPSTASH_REDIS_REST_TOKEN || ""
   }
 
-  private async redis(command: string[]): Promise<any> {
+  private async redis(command: string[]): Promise<unknown> {
     const response = await fetch(`${this.baseUrl}`, {
       method: "POST",
       headers: {
@@ -177,7 +205,7 @@ class UpstashRateLimitStore implements RateLimitStore {
     try {
       const result = await this.redis(["GET", key])
       if (!result) return null
-      return JSON.parse(result) as RateLimitEntry
+      return JSON.parse(String(result)) as RateLimitEntry
     } catch (error) {
       logger.error("Upstash get error", { key, error })
       return null
@@ -192,71 +220,33 @@ class UpstashRateLimitStore implements RateLimitStore {
     }
   }
 
+  /**
+   * One atomic EVAL per request. The previous implementation did GET-then-SET from
+   * Node, which raced under concurrent serverless instances: two requests could read
+   * the same count and both write count+1, undercounting exactly when the limit
+   * mattered. The script runs the read-modify-write inside Redis, and halves the
+   * error noise of a dead endpoint as a side effect (one failed call, not two).
+   */
   async increment(key: string, config: RateLimitConfig): Promise<RateLimitResult> {
     const now = Date.now()
 
     try {
-      // Use Lua script for atomic increment operation
-      // This ensures consistency in distributed environments
-      const luaScript = `
-        local key = KEYS[1]
-        local now = tonumber(ARGV[1])
-        local interval = tonumber(ARGV[2])
-        local maxRequests = tonumber(ARGV[3])
-
-        local data = redis.call('GET', key)
-        local count = 1
-        local resetTime = now + interval
-
-        if data then
-          local parsed = cjson.decode(data)
-          if parsed.resetTime > now then
-            count = parsed.count + 1
-            resetTime = parsed.resetTime
-          end
-        end
-
-        local entry = cjson.encode({count = count, resetTime = resetTime})
-        local ttl = math.ceil((resetTime - now) / 1000) + 1
-        redis.call('SET', key, entry, 'EX', ttl)
-
-        return cjson.encode({count = count, resetTime = resetTime, maxRequests = maxRequests})
-      `
-
-      // For simplicity, we'll use a simpler approach with GET + SET
-      // A production implementation should use EVAL with Lua script above
-      const entry = await this.get(key)
-
-      if (!entry || entry.resetTime < now) {
-        const newEntry = {
-          count: 1,
-          resetTime: now + config.interval,
-        }
-        await this.set(key, newEntry, config.interval + 1000)
-        return {
-          allowed: true,
-          remaining: config.maxRequests - 1,
-          resetTime: newEntry.resetTime,
-        }
-      }
-
-      if (entry.count >= config.maxRequests) {
-        return {
-          allowed: false,
-          remaining: 0,
-          resetTime: entry.resetTime,
-          retryAfter: Math.ceil((entry.resetTime - now) / 1000),
-        }
-      }
-
-      entry.count++
-      const ttl = entry.resetTime - now + 1000
-      await this.set(key, entry, ttl)
+      const raw = await this.redis([
+        "EVAL",
+        UPSTASH_INCREMENT_SCRIPT,
+        "1",
+        key,
+        String(now),
+        String(config.interval),
+      ])
+      const state = JSON.parse(String(raw)) as { count: number; resetTime: number }
+      const allowed = state.count <= config.maxRequests
 
       return {
-        allowed: true,
-        remaining: config.maxRequests - entry.count,
-        resetTime: entry.resetTime,
+        allowed,
+        remaining: Math.max(0, config.maxRequests - state.count),
+        resetTime: state.resetTime,
+        retryAfter: allowed ? undefined : Math.ceil((state.resetTime - now) / 1000),
       }
     } catch (error) {
       logger.error("Upstash increment error, falling back to allow", { key, error })
@@ -319,7 +309,7 @@ class FirestoreRateLimitStore implements RateLimitStore {
     const now = Date.now()
 
     try {
-      const { adminDb, FieldValue } = await import("./firebase-admin")
+      const { adminDb } = await import("./firebase-admin")
       const docRef = adminDb.collection("rate_limits").doc(key)
 
       // Use transaction for atomic increment
@@ -723,4 +713,4 @@ export const promoCodeRateLimit = rateLimit({
 
 // Export types and utilities for testing
 export type { RateLimitConfig, RateLimitEntry, RateLimitResult, RateLimitStore }
-export { InMemoryRateLimitStore, getClientIdentifier }
+export { InMemoryRateLimitStore, UpstashRateLimitStore, getClientIdentifier }
