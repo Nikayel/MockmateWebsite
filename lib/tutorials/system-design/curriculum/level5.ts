@@ -1569,6 +1569,8 @@ it meets a value inside it, which is where commodity hardware pays what Spanner 
   "reveal": "This is your decision axis for the design write: HLC by default on commodity cloud, a TrueTime-style bounded interval plus commit-wait when you own the hardware and need global external consistency, and never bare wall-clock LWW."
 }
 \`\`\`
+
+**Sources:** [Spanner paper (OSDI 2012)](https://research.google/pubs/spanner-googles-globally-distributed-database/) · [TrueTime external consistency](https://cloud.google.com/spanner/docs/true-time-external-consistency) · [Lamport: Time, Clocks, Ordering](https://lamport.azurewebsites.net/pubs/time-clocks.pdf)
 `.trim()
 
 const smrTotalOrderTeach = `
