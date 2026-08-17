@@ -441,7 +441,7 @@ That last line is the pattern the pandas lesson leans on: \`a > 1\` builds an ar
     },
     {
       "label": "The total is precomputed when the array is built and simply read back.",
-      "feedback": "Tempting, because caching a result is a real optimisation and it would neatly explain a large speedup. Nothing is precomputed here: every call genuinely visits every element, just far more cheaply per element."
+      "feedback": "Tempting, because caching a result is a real optimization and it would neatly explain a large speedup. Nothing is precomputed here: every call genuinely visits every element, just far more cheaply per element."
     }
   ]
 }
