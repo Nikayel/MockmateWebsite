@@ -43,80 +43,60 @@ const PATTERN_GROUPS = [
     patterns: ["arrays-hashing"] as DSAPattern[],
     icon: Hash,
     color: "from-cyan-500/60 to-blue-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Two Pointers",
     patterns: ["two-pointers"] as DSAPattern[],
     icon: GitBranch,
     color: "from-emerald-500/60 to-green-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Sliding Window",
     patterns: ["sliding-window"] as DSAPattern[],
     icon: Layers,
     color: "from-amber-500/60 to-orange-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Stack",
     patterns: ["stack", "monotonic-stack"] as DSAPattern[],
     icon: List,
     color: "from-purple-500/60 to-pink-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Binary Search",
     patterns: ["binary-search"] as DSAPattern[],
     icon: Binary,
     color: "from-rose-500/60 to-red-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Linked List",
     patterns: ["linked-list"] as DSAPattern[],
     icon: Repeat,
     color: "from-indigo-500/60 to-violet-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Trees",
     patterns: ["trees", "binary-tree", "binary-search-tree"] as DSAPattern[],
     icon: TreeDeciduous,
     color: "from-emerald-500/60 to-teal-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Tries",
     patterns: ["trie"] as DSAPattern[],
     icon: Network,
     color: "from-sky-500/60 to-cyan-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Heap / Priority Queue",
     patterns: ["heap", "priority-queue", "heap-priority-queue"] as DSAPattern[],
     icon: BarChart3,
     color: "from-amber-500/60 to-yellow-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Backtracking",
     patterns: ["backtracking"] as DSAPattern[],
     icon: Repeat,
     color: "from-fuchsia-500/60 to-purple-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Graphs",
@@ -130,56 +110,42 @@ const PATTERN_GROUPS = [
     ] as DSAPattern[],
     icon: Network,
     color: "from-blue-500/60 to-indigo-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Dynamic Programming",
     patterns: ["dp-1d", "dp-2d", "dp-knapsack", "dp-lcs", "dp-tree"] as DSAPattern[],
     icon: Cpu,
     color: "from-orange-500/60 to-red-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Greedy",
     patterns: ["greedy"] as DSAPattern[],
     icon: Zap,
     color: "from-lime-500/60 to-green-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Intervals",
     patterns: ["intervals"] as DSAPattern[],
     icon: Box,
     color: "from-teal-500/60 to-cyan-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Math & Geometry",
     patterns: ["math", "geometry", "math-geometry"] as DSAPattern[],
     icon: Calculator,
     color: "from-pink-500/60 to-rose-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Bit Manipulation",
     patterns: ["bit-manipulation"] as DSAPattern[],
     icon: Binary,
     color: "from-slate-500/60 to-muted/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
   {
     name: "Matrix",
     patterns: ["matrix"] as DSAPattern[],
     icon: Grid3X3,
     color: "from-violet-500/60 to-purple-500/60",
-    bgColor: "bg-slate-900/60",
-    borderColor: "border-slate-700/70",
   },
 ]
 
@@ -315,8 +281,16 @@ function inferPattern(scenario: Scenario): DSAPattern | null {
   return "arrays-hashing" // Default fallback
 }
 
+/**
+ * `badgeOnLight`, not `softBadge`. These pills sit on the pattern card, which now renders on the
+ * `bg-card` the primitive supplies rather than the hardcoded dark slab it used to override it with.
+ * `softBadge` is documented in `difficulty-colors.ts` as a DARK-surface pill and its -300 text
+ * measures 1.33-1.66:1 on a white card, so the counts would have been invisible in light mode: the
+ * slab was the only thing that had ever made them legible, and removing it is what made this a
+ * required change rather than a nicety.
+ */
 const getDifficultyColor = (difficulty: DifficultyLevel) =>
-  difficultyColorClass(difficulty, "softBadge")
+  difficultyColorClass(difficulty, "badgeOnLight")
 
 export const PatternBrowser = memo(function PatternBrowser({
   onStartInterview,
@@ -385,7 +359,16 @@ export const PatternBrowser = memo(function PatternBrowser({
           return (
             <Card
               key={group.name}
-              className={`${group.bgColor} ${group.borderColor} hover:border-border/80 cursor-pointer border transition-all duration-300 ${
+              // No background or border override here on purpose. Every one of the seventeen groups
+              // used to carry an identical `bg-slate-900/60` + `border-slate-700/70`, which painted
+              // a near-black slab over the `Card` primitive's own `bg-card` in BOTH themes. In dark
+              // mode that reads as a slightly darker card and looks deliberate; in light mode it
+              // puts this card's `text-foreground` heading, its muted sub-text and its chevron,
+              // all of which are dark in light mode, on top of a dark grey panel. That is the
+              // "hard to see" report, and it was never a per-pattern colour: the two fields held
+              // the same literal seventeen times, so they distinguished nothing and are now gone.
+              // Pattern identity lives in the gradient icon tile below, which is theme-neutral.
+              className={`hover:border-accent/50 cursor-pointer transition-colors duration-300 ${
                 isExpanded ? "col-span-full" : ""
               }`}
               onClick={(e) => {
@@ -460,8 +443,12 @@ export const PatternBrowser = memo(function PatternBrowser({
                           >
                             <div className="flex items-center gap-3">
                               {isCompleted ? (
-                                <div className="rounded-full bg-green-500/20 p-1">
-                                  <Check className="h-4 w-4 text-green-400" />
+                                // Theme-paired for the same reason as the badges above: `green-400`
+                                // on a `green-500/20` pill measured 1.47:1 once the row sat on a
+                                // light card, and this tick is the only positive signal that a
+                                // problem is already solved.
+                                <div className="rounded-full bg-emerald-100 p-1 dark:bg-emerald-500/20">
+                                  <Check className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
                                 </div>
                               ) : (
                                 <div className="bg-muted rounded-full p-1">
