@@ -720,6 +720,10 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
         id: "sd-l11-late-interaction",
         anchor: "Late interaction, one vector per token scored by MaxSim",
       },
+      {
+        id: "py-l4-chunk-score-fuse",
+        anchor: "Write the cosine scorer and the rank fusion yourself, in Python",
+      },
     ],
     cta: {
       href: "/system-design-interview-practice",
@@ -748,6 +752,10 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
       {
         id: "sd-l1-http-versions",
         anchor: "HTTP/1.1, HTTP/2 and HTTP/3 over QUIC",
+      },
+      {
+        id: "py-l4-streaming-decode",
+        anchor: "Buffering the partial line, because a chunk is a byte count and nothing more",
       },
     ],
     cta: {
@@ -1018,6 +1026,10 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
       {
         id: "sd-l7-chaos-engineering",
         anchor: "Chaos engineering and fault injection, how you prove the retry budget holds",
+      },
+      {
+        id: "py-l4-retry-budget",
+        anchor: "Write that loop in Python: jittered backoff, a budget, and an idempotency key",
       },
     ],
     cta: {
@@ -2499,6 +2511,10 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
         id: "sd-l1-latency-percentiles",
         anchor: "Little's law, throughput and tail latency for a worker pool",
       },
+      {
+        id: "py-l4-retry-budget",
+        anchor: "Jittered backoff, a real budget, and the key that makes a retry safe",
+      },
     ],
     cta: {
       href: "/ai-coding-interview-practice",
@@ -2519,10 +2535,96 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
         id: "sd-l1-realtime-comms",
         anchor: "WebSocket, SSE and long polling, the connections an event loop holds open",
       },
+      {
+        id: "py-l4-streaming-decode",
+        anchor: "Decoding a chunked byte stream without splitting a multi-byte character",
+      },
     ],
     cta: {
       href: "/ai-coding-interview-practice",
       label: "Practice a coding round on concurrent API calls and defend your cancellation story",
+    },
+  },
+
+  // ---------------------------------------------------------------------------------------------
+  // Python: the AI glue-code lessons (Level 4, shipped 2026-08-16)
+  // ---------------------------------------------------------------------------------------------
+  "py-l4-retry-budget": {
+    related: [
+      {
+        id: "sd-l11-model-gateway",
+        anchor: "Provider failover and per-team token budgets, the same loop one tier up",
+      },
+      {
+        id: "sd-l7-timeouts-retries",
+        anchor: "Retry storms, and the timeout budget a recovery is allowed to spend",
+      },
+      {
+        id: "sd-l1-idempotency-retries",
+        anchor: "Idempotency keys, and the request id that makes a repeat safe to send",
+      },
+      {
+        id: "py-l4-asyncio",
+        anchor: "async, await and the event loop those backoff sleeps run on",
+      },
+      {
+        id: "py-l4-streaming-decode",
+        anchor: "Consuming a chunked response without corrupting it, once the call succeeds",
+      },
+    ],
+    cta: {
+      href: "/ai-coding-interview-practice",
+      label: "Practice a coding round where the API is flaky and every attempt costs real money",
+    },
+  },
+
+  "py-l4-streaming-decode": {
+    related: [
+      {
+        id: "py-l4-asyncio",
+        anchor: "async, await and the event loop reading the socket underneath",
+      },
+      {
+        id: "py-l2-generators",
+        anchor: "Generators and yield, so a partial line never leaves the buffer",
+      },
+      {
+        id: "sd-l1-realtime-comms",
+        anchor: "Server-sent events, WebSocket and long polling, the transports that chunk",
+      },
+      {
+        id: "py-l4-retry-budget",
+        anchor: "Jittered backoff and a real budget, for when a stream dies mid-response",
+      },
+    ],
+    cta: {
+      href: "/ai-coding-interview-practice",
+      label: "Practice a coding round on a streamed response that arrives in the wrong places",
+    },
+  },
+
+  "py-l4-chunk-score-fuse": {
+    related: [
+      {
+        id: "sd-l11-chunking-strategy",
+        anchor: "Contextual retrieval and late chunking, the ingestion end of this pipeline",
+      },
+      {
+        id: "sd-l11-late-interaction",
+        anchor: "MaxSim over per-token vectors, for when one vector loses the rare term",
+      },
+      {
+        id: "sd-l11-query-understanding",
+        anchor: "Query rewriting, HyDE and decomposition, run before the scorer ever sees it",
+      },
+      {
+        id: "sd-l3-vector-hybrid-search",
+        anchor: "Hybrid retrieval, the system this rank fusion belongs inside",
+      },
+    ],
+    cta: {
+      href: "/ai-coding-interview-practice",
+      label: "Practice a coding round where you merge two rankings and justify the fusion rule",
     },
   },
 
