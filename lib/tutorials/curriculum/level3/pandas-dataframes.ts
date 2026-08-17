@@ -315,7 +315,7 @@ east,Sam,250
 west,Mo,50
 """
 df = pd.read_csv(StringIO(text))
-df.dtypes      # region object, rep object, amount int64
+df.dtypes      # region str, rep str, amount int64  (pandas 3.0 made str the default for text)
 df.head()      # the first rows
 df.shape       # (3, 3)
 \`\`\`
@@ -414,14 +414,14 @@ Two rules for combining masks: use \`&\` and \`|\` rather than \`and\` and \`or\
       "feedback": "Right, and this is the classic chained-assignment trap. Select and assign in one step instead: df.loc[df['amount'] > 100, 'amount'] = 0 hands both the row mask and the column to a single indexer."
     },
     {
-      "label": "Nothing, and the SettingWithCopyWarning it raises stops the script.",
-      "feedback": "Half right, since that warning genuinely is emitted in many versions and it is pandas trying to tell you. A warning is not an exception though: the script carries on as if the write worked, which is why this bug reaches production."
+      "label": "Nothing, and the ChainedAssignmentError it raises stops the script.",
+      "feedback": "Half right, and pandas does try to tell you: under Copy-on-Write it emits a ChainedAssignmentError warning saying the write landed nowhere. Despite the name it is a warning, not an exception, so the script carries on as if the write worked, which is why this bug reaches production. Older pandas called it SettingWithCopyWarning, and that class is gone in 3.0."
     }
   ]
 }
 \`\`\`
 
-Reading through two selections is fine. **Writing** through two selections is not, because the first one may hand you a copy. Do the whole thing in one indexer:
+Reading through two selections is fine. **Writing** through two selections is not. Under Copy-on-Write, which is the only mode in pandas 3.0, the first selection always hands you a copy, so a chained write never reaches the original frame. Do the whole thing in one indexer:
 
 \`\`\`python
 df.loc[df["amount"] > 100, "amount"] = 0     # one step, writes into df
@@ -506,7 +506,10 @@ print("group:", totals)`,
     id: "py-l3-pandas-dataframes-apply",
     executionMode: "single-file",
     estimatedMinutes: 6,
-    prompt: `Warm-up: implement \`infer_dtype(cells)\`, the rule \`read_csv\` uses to pick a column's dtype.
+    prompt: `Warm-up: implement \`infer_dtype(cells)\`, a simplified stand-in for the dtype decision a CSV reader
+makes over one column of raw text. The three names below are numpy's dtype vocabulary; real
+\`read_csv\` has more cases than this, and since pandas 3.0 it labels a text column \`str\` rather than
+\`object\`.
 
 \`cells\` is the list of raw text values for one column. Return \`"int64"\` when every cell is
 integer-looking (digits with an optional leading \`-\`) and none is blank, \`"float64"\` when the
