@@ -3384,8 +3384,10 @@ Safe means read-only (no server state change): \`GET\` and \`HEAD\`. Idempotent 
 lands the same final state: \`GET\`, \`HEAD\`, \`PUT\`, \`DELETE\`. \`POST\` is neither safe nor
 idempotent, \`PATCH\` generally is not idempotent. This directly drives retry behavior: an
 intermediary or client can safely auto-retry \`GET\`/\`PUT\`/\`DELETE\` after a network blip, but
-must not blindly auto-retry \`POST\` (that is what idempotency keys are for). Safe methods are also
-the cacheable ones.
+must not blindly auto-retry \`POST\` (that is what idempotency keys are for). Safety and
+cacheability are related but not the same property: \`GET\` and \`HEAD\` are the reliably cacheable
+methods, while \`OPTIONS\` and \`TRACE\` are safe but not cacheable, and \`POST\` is cacheable only
+when the response carries explicit freshness information.
 
 \`\`\`cswidget
 {
