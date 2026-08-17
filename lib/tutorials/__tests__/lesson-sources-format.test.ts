@@ -1,11 +1,12 @@
 /**
  * Format guard for the `**Sources:**` block that lesson teach prose may carry.
  *
- * The corpus contains **zero** external markdown links today, so this file lands before the
- * sourcing wave rather than after it, per CLAUDE.md's "build the verifier before the sweep". Every
- * corpus assertion below therefore passes vacuously right now, and that is the point: the wave adds
- * 53 blocks written by concurrent agents against one written pattern, and the only thing that can
- * keep 53 hand-authored citation lines identical in shape is a test that fails on the first drift.
+ * This file landed before the sourcing wave rather than after it, per CLAUDE.md's "build the
+ * verifier before the sweep": at that moment the corpus contained zero external markdown links, so
+ * every corpus assertion passed vacuously, and the wave then added its blocks (72 lessons carry one
+ * as of 2026-08-16, floor-pinned below) written by concurrent agents against one written pattern.
+ * The only thing that keeps that many hand-authored citation lines identical in shape is a test
+ * that fails on the first drift.
  *
  * ## The one legal shape
  *
