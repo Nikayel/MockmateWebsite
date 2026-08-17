@@ -5024,6 +5024,8 @@ instead of running the fleet hot.
   "reveal": "The lesson in three moves for the design exercise: quote 'p50', 'p99', and 'p99.9' instead of averages because fan-out turns rare tails into the common case, size pools with Little's Law (concurrency equals QPS times latency), and trust only measurements that dodge coordinated omission by timing from intended send time and aggregating with histograms."
 }
 \`\`\`
+
+**Sources:** [The Tail at Scale](https://research.google/pubs/the-tail-at-scale/) · [Prometheus histogram best practices](https://prometheus.io/docs/practices/histograms/) · [Brendan Gregg, the USE Method](https://www.brendangregg.com/usemethod.html)
 `.trim()
 
 const resiliencePrimitivesTeach = `
