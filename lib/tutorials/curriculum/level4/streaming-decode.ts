@@ -363,6 +363,19 @@ def run_tests(record):
         assert result["truncated"] is True, f"expected truncated True, got {result!r}"
         assert result["done"] is False, f"a cut-off stream is not done: {result!r}"
 
+    def the_sentinel_seals_the_rest_of_its_own_chunk():
+        whole = (
+            'data: {"delta": "kept"}\n'
+            "data: [DONE]\n"
+            'data: {"delta": "never read"}\n'
+        )
+        result = collect(ByteStream([whole.encode("utf-8")]))
+        assert result["text"] == "kept", f"expected 'kept', got {result['text']!r}"
+        assert result["events"] == 1, (
+            f"a line after the sentinel was still parsed: {result['events']} events"
+        )
+        assert result["done"] is True, f"expected done True, got {result!r}"
+
     def a_broken_payload_still_closes_the_stream():
         source = ByteStream(chunked('data: {"delta": "ok"}\ndata: {oops}\n', 9))
         try:
@@ -375,6 +388,7 @@ def run_tests(record):
     record("one giant chunk reads the same", one_giant_chunk_reads_the_same)
     record("lines that are not data are ignored", lines_that_are_not_data_are_ignored)
     record("a truncated stream keeps what arrived", a_truncated_stream_keeps_what_arrived)
+    record("the sentinel seals the rest of its own chunk", the_sentinel_seals_the_rest_of_its_own_chunk)
     record("a broken payload still closes the stream", a_broken_payload_still_closes_the_stream)
 `
 
