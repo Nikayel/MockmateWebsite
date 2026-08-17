@@ -33,9 +33,10 @@ import { buildSystemDesignCoverage, isBareLesson } from "../coverage"
  * - `lessonsWithoutChecks`: every lesson now asks the learner at least one question.
  * - `lessonsWithoutDiagramOrSim`: the visual gap. Was 105 when this file landed; the CUR-07
  *   conversion sweep and CUR-08 widget deployment took it to 3, with ten of the twelve levels
- *   now at zero. The remainder are lessons where the two deliberately-unconverted shapes live
- *   (decision branches, and nodes whose content is an ordered list), so this is close to its floor
- *   rather than merely improved.
+ *   now at zero, and the 2026-08-16 Level 11 wave took it to 2. The remainder are
+ *   `sd-l11-llm-agents` and `sd-l11-finetune-rag-prompting`, where the two
+ *   deliberately-unconverted shapes live (decision branches, and nodes whose content is an
+ *   ordered list), so this is close to its floor rather than merely improved.
  *
  * The first two reached zero on 2026-08-13, so they are no longer ratchets but floors: there is
  * nowhere left to descend, and any movement at all is a regression.
@@ -43,7 +44,7 @@ import { buildSystemDesignCoverage, isBareLesson } from "../coverage"
 const PINS = {
   bareLessons: 0,
   lessonsWithoutChecks: 0,
-  lessonsWithoutDiagramOrSim: 3,
+  lessonsWithoutDiagramOrSim: 2,
 } as const
 
 /**
