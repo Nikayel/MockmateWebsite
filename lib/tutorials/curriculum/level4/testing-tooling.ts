@@ -705,7 +705,9 @@ When a collaborator cannot be injected, the fallback is \`unittest.mock.patch\`,
   ],
   "reveal": "Each tool in the stack answers one narrow question. Coverage says which lines ran, mypy says which types cannot line up, and only your assertions say whether the answers were right. They catch different bugs, and none of the three substitutes for another."
 }
-\`\`\``,
+\`\`\`
+
+**Sources:** [unittest.mock](https://docs.python.org/3/library/unittest.mock.html) · [Ruff](https://docs.astral.sh/ruff/) · [pytest documentation](https://docs.pytest.org/en/stable/)`,
     demoCode: `from unittest.mock import Mock
 
 
