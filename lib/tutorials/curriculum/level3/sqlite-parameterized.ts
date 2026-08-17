@@ -18,12 +18,21 @@ build_insert(["name", "email"], ["Ada", "ada@example.com"])
 \`\`\`
 
 The column names come from the app's own schema constant, never from a request, so they are
-interpolated. Values never are.
+interpolated. Values never are. Model that rather than assuming it: check each column against a
+module-level allowlist of the users table's columns before interpolating, and raise \`ValueError\`
+for anything else. A placeholder cannot stand in for an identifier, so the allowlist is the only
+thing making that interpolation safe.
 
 **\`flag_unsafe(sources)\`** is the audit the review asked for. Each item is the source line a
 teammate wrote for a query. Return the ones that build the SQL text instead of fixing it, using
 these four markers: a \`{\` (an f-string hole), \` + \` (concatenation, with a space either side),
 a \`%\` (percent formatting), or the text \`.format(\`. Keep the original order.
+
+Those four markers are a smell heuristic, not a security tool, and they cut both ways. \`build_insert\`
+above trips the \` + \` marker itself, because stitching a statement together out of names your own
+code owns is fine. And psycopg's parameterized spelling, \`cur.execute("... email = %s", (email,))\`,
+carries a \`%\` while being exactly the safe form. A marker means read the line, not that the line is
+a bug.
 
 **\`rows_to_dicts(columns, rows)\`** turns the driver's tuples into dicts, since \`fetchall\` hands
 back \`(1, "Ada")\` and the rest of your program wants \`{"id": 1, "name": "Ada"}\`.`,
@@ -49,8 +58,15 @@ def rows_to_dicts(columns, rows):
 
 const DBKIT_QUERIES_REFERENCE = String.raw`UNSAFE_MARKERS = ("{", " + ", "%", ".format(")
 
+# A placeholder can never stand in for an identifier, so the only thing that makes
+# interpolating a column name safe is an allowlist this module owns.
+USER_COLUMNS = ("id", "name", "email", "age")
+
 
 def build_insert(columns, values):
+    unknown = [column for column in columns if column not in USER_COLUMNS]
+    if unknown:
+        raise ValueError("not a users column: " + ", ".join(unknown))
     placeholders = ", ".join("?" for _ in columns)
     column_list = ", ".join(columns)
     sql = "INSERT INTO users (" + column_list + ") VALUES (" + placeholders + ")"
