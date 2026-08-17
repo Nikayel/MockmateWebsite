@@ -4833,7 +4833,7 @@ plus a 4-byte centroid id per vector
 
 That last line is the one worth carrying out of this lesson. Compressed, a late-interaction index over this corpus is five percent larger than the single-vector index it replaces, and the 7.1x reduction the arithmetic produces sits inside the 6 to 10x that ColBERTv2 reports for its residual compression scheme. The technique is not expensive. Uncompressed late interaction is expensive, and the two get conflated constantly.
 
-You will also hear that late interaction costs 50 to 100 times a single-vector index, and that number is not wrong so much as it is a different comparison. It holds when both sides use the same dimension: a 128-dim bi-encoder index over this corpus is 10,000,000 x 512 bytes = 5.12 GB, and 307.2 / 5.12 = 60x. Production bi-encoders run at 768 to 3072 dims while token vectors run at 128, so the dimension gap absorbs most of the token-count gap before compression is applied at all. When someone quotes a multiplier, ask which two indexes are being compared.
+You will also hear that late interaction costs 50 to 100 times a single-vector index, and that number is not wrong so much as it is a different comparison. It is the comparison you get when both sides use the same dimension and the same precision: a 128-dim bi-encoder index over this corpus at float16 is 10,000,000 x 256 bytes = 2.56 GB, and 307.2 / 2.56 = 120x, which is the token-count ratio and nothing else. Production bi-encoders run at 768 to 3072 dims while token vectors run at 128, so the dimension gap absorbs most of the token-count gap before compression is applied at all. When someone quotes a multiplier, ask which two indexes are being compared.
 
 ## PLAID: not loading what you do not need
 
