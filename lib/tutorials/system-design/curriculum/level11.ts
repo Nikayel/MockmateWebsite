@@ -5318,7 +5318,7 @@ An older HTTP plus SSE transport, which used one endpoint for a long-lived event
 The current revision is \`2026-07-28\`. Two things in it change how you build a client, and both are the kind of fact that has to be shown rather than named.
 
 \`\`\`
-1. Discovery is a required RPC, not a convention:
+1. Discovery is an RPC every server must implement, not a convention:
 
 --> {"jsonrpc":"2.0","id":1,"method":"server/discover"}
 <-- {"jsonrpc":"2.0","id":1,"result":{ ...capabilities, and the revisions
@@ -5338,7 +5338,7 @@ The current revision is \`2026-07-28\`. Two things in it change how you build a 
                 ^^^^^ both keys are required per request, not once at connect
 \`\`\`
 
-Version negotiation moved out of the initialization handshake and into a per-request \`_meta\` field carrying two required keys, the revision the client speaks and the capabilities it offers back, and \`server/discover\` became mandatory. The consequence for your design is that a session is no longer pinned to whatever the two sides agreed at connect time: a proxy can route on the revision without replaying a handshake, and a long-lived session can shift revisions without being torn down. The spec documents a compatibility path back to \`2025-11-25\` and earlier, so a client that implements both eras has a defined path to an older server; a modern-only client does not. What you must not do is infer the revision from behavior, which is how clients quietly break on a server upgrade.
+Version negotiation moved out of the initialization handshake and into a per-request \`_meta\` field carrying two required keys, the revision the client speaks and the capabilities it offers back, and \`server/discover\` became mandatory: every server must implement it; a client may skip it and handle \`UnsupportedProtocolVersionError\` inline. The consequence for your design is that a session is no longer pinned to whatever the two sides agreed at connect time: a proxy can route on the revision without replaying a handshake, and a long-lived session can shift revisions without being torn down. The spec documents a compatibility path back to \`2025-11-25\` and earlier, so a client that implements both eras has a defined path to an older server; a modern-only client does not. What you must not do is infer the revision from behavior, which is how clients quietly break on a server upgrade.
 
 ## Authorization: the server is a resource server
 
@@ -5523,7 +5523,7 @@ The result to carry out of this section: an **adaptively selected short list of 
 }
 \`\`\`
 
-**Sources:** [MCP specification, revision 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28) · [MCP authorization](https://modelcontextprotocol.io/specification/draft/basic/authorization) · [Code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) · [LongFuncEval](https://arxiv.org/abs/2505.10570)
+**Sources:** [MCP specification, revision 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28) · [How many tools should an LLM agent see](https://arxiv.org/abs/2605.24660) · [Code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) · [LongFuncEval](https://arxiv.org/abs/2505.10570)
 `.trim()
 
 const agentMemoryTeach = `
