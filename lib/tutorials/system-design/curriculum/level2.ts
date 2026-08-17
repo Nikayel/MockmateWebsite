@@ -795,6 +795,8 @@ Serializable or targeted locking prevents.
   "reveal": "In your design write, name the anomaly before naming the fix: 'this is a lost update, so I lock the row' or 'this is write skew, so snapshot isolation is not enough.' Never just 'use transactions.'"
 }
 \`\`\`
+
+**Sources:** [A Critique of ANSI SQL Isolation Levels](https://www.microsoft.com/en-us/research/publication/a-critique-of-ansi-sql-isolation-levels/) · [PostgreSQL transaction isolation](https://www.postgresql.org/docs/current/transaction-iso.html) · [Jepsen, consistency models](https://jepsen.io/consistency)
 `.trim()
 
 const mvccLockingTeach = `
