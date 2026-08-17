@@ -17,7 +17,7 @@ import { buildPytestRunner } from "./pytest-runner"
 //
 // Deliberately smaller than `py-l4-testing-tooling`: no mocks, no shared mutable state, no call
 // history. Three broken builds, each of which only one basic testing habit catches:
-//   _always_flat   ignores express and the free threshold -> forces a test per behaviour
+//   _always_flat   ignores express and the free threshold -> forces a test per behavior
 //   _never_raises  returns 0 instead of raising           -> forces the raises test
 //   _charges_at_the_threshold  the bug that shipped       -> forces the boundary case
 // The third build is the code in cart/shipping.py, so the learner also makes one small repair.
@@ -27,7 +27,7 @@ const SHIPPING_README = buildBrief({
   lesson: "py-l3-pytest-basics",
   kind: "ticket",
   headline: "Write the tests for the shipping rule",
-  body: `\`cart/shipping.py\` charges shipping on a cart subtotal. Four behaviours are documented, and one
+  body: `\`cart/shipping.py\` charges shipping on a cart subtotal. Four behaviors are documented, and one
 of them is wrong in the code:
 
 1. A standard order under 5000 cents pays 500 cents of shipping.
@@ -37,10 +37,10 @@ of them is wrong in the code:
 
 Two things to do:
 
-1. Write one test per behaviour in \`tests/test_shipping.py\`, plus the zero-subtotal edge case.
+1. Write one test per behavior in \`tests/test_shipping.py\`, plus the zero-subtotal edge case.
    Call the function as \`shipping.shipping_cost(...)\` so the grader can run your suite against
    other builds of the module.
-2. Fix the behaviour that is wrong in \`cart/shipping.py\`.
+2. Fix the behavior that is wrong in \`cart/shipping.py\`.
 
 This sandbox has no \`pytest\` installed, so \`tests/pytest_shim.py\` provides a \`raises\` context
 manager that behaves like \`pytest.raises\`. Everything else is ordinary pytest: functions named
@@ -91,7 +91,7 @@ STANDARD_CENTS = 500
 EXPRESS_CENTS = 1500
 
 
-# TODO: one of the four behaviours README.md documents is wrong in this module.
+# TODO: one of the four behaviors README.md documents is wrong in this module.
 # Your tests decide which one.
 
 
@@ -138,9 +138,9 @@ def test_standard_order_under_the_threshold_pays_500():
     assert got == 500, f"expected 500 cents under the threshold, got {got}"
 
 
-# TODO: add one test for each remaining documented behaviour, plus the zero-subtotal case.
+# TODO: add one test for each remaining documented behavior, plus the zero-subtotal case.
 # Give each test a name that says what it asserts, and assert on the value the function
-# returned rather than on whether it is truthy. One behaviour per test.
+# returned rather than on whether it is truthy. One behavior per test.
 `
 
 const SHIPPING_TEST_REFERENCE = String.raw`# Your test suite for cart/shipping.py.
@@ -185,7 +185,7 @@ def test_a_negative_subtotal_raises_value_error():
 const SHIPPING_TEST_HIDDEN = String.raw`"""Hidden grader for the suite you wrote, plus checks on the repaired module.
 
 The first four tests run YOUR tests/test_shipping.py against frozen builds of shipping_cost.
-A suite that only checks one behaviour, or that asserts nothing specific, passes on a broken
+A suite that only checks one behavior, or that asserts nothing specific, passes on a broken
 build and is reported here by name.
 """
 
@@ -260,7 +260,7 @@ def _assert_catches(build, label, missing):
 def test_your_suite_has_a_test_per_behaviour():
     found = [name for name, _ in _learner_tests()]
     assert len(found) >= 5, (
-        f"expected at least 5 tests in tests/test_shipping.py (four behaviours plus the "
+        f"expected at least 5 tests in tests/test_shipping.py (four behaviors plus the "
         f"zero-subtotal case), got {len(found)}: {found}"
     )
 
@@ -384,7 +384,7 @@ def test_mixed_transactions():
 
 ### Testing the error path
 
-Some behaviour is a raise, not a return value, and you cannot assert on a call that never comes back. \`pytest.raises\` is a context manager for that case: it runs the block, and the test passes only if the block raises the exception you named.
+Some behavior is a raise, not a return value, and you cannot assert on a call that never comes back. \`pytest.raises\` is a context manager for that case: it runs the block, and the test passes only if the block raises the exception you named.
 
 \`\`\`python
 import pytest
@@ -423,7 +423,7 @@ else:
 
 The \`else\` branch is the part people forget, and it is the one that catches the bug: it runs only when the call came back normally, which is exactly the failure you are looking for.
 
-Test-driven development runs this loop backwards: write the failing test first (red), then write the smallest code that makes it pass (green). The Apply warm-up asks the question a suite exists to answer: given a documented rule and a build of the code, which documented behaviours does that build get wrong? The Practice is the same job written as a real suite, and a hidden grader decides whether your tests would actually catch a broken build.
+Test-driven development runs this loop backwards: write the failing test first (red), then write the smallest code that makes it pass (green). The Apply warm-up asks the question a suite exists to answer: given a documented rule and a build of the code, which documented behaviors does that build get wrong? The Practice is the same job written as a real suite, and a hidden grader decides whether your tests would actually catch a broken build.
 
 ## Pitfall: a test that never runs still "passes"
 
@@ -492,10 +492,10 @@ print("all good")`,
     executionMode: "single-file",
     // Budget: 12 min. To read: ~15 lines of prompt plus the 4 builds in the starter, ~35 lines.
     // To write: ~12 lines. This is the Practice's job with the harness removed: pick an input
-    // per documented behaviour, including a boundary and the error path, and report what fails.
+    // per documented behavior, including a boundary and the error path, and report what fails.
     // Writing it as a suite (names, asserts, a raises block) is the step Practice adds.
     estimatedMinutes: 12,
-    prompt: `Warm-up (one file): a library charges a late fee. Four behaviours are documented, and the
+    prompt: `Warm-up (one file): a library charges a late fee. Four behaviors are documented, and the
 starter holds four builds of \`late_fee(days_late, member=False)\`, only one of which is correct.
 
 1. \`"none"\`: nothing is owed on a book returned 0 days late.
@@ -542,9 +542,9 @@ def wrong_behaviours(build):
     # Exercise BUILDS[build] and return the sorted labels it gets wrong.
     pass`,
     hints: [
-      "One behaviour at a time. Each one needs an input you choose and a value you already know is right, and a build is wrong on that behaviour when the two disagree.",
-      "Pick the inputs that can tell the behaviours apart: a member far enough past the cap that the cap has to bite, and 0 days for the behaviour that says nothing is owed.",
-      "The fourth behaviour has no return value to compare, so run the call in a `try` and put the failure in the `else` branch: reaching `else` means it came back instead of raising. Collect the labels in a list and `return sorted(...)`.",
+      "One behavior at a time. Each one needs an input you choose and a value you already know is right, and a build is wrong on that behavior when the two disagree.",
+      "Pick the inputs that can tell the behaviors apart: a member far enough past the cap that the cap has to bite, and 0 days for the behavior that says nothing is owed.",
+      "The fourth behavior has no return value to compare, so run the call in a `try` and put the failure in the `else` branch: reaching `else` means it came back instead of raising. Collect the labels in a list and `return sorted(...)`.",
     ],
     referenceSolution: `def _correct(days_late, member=False):
     if days_late < 0:
@@ -620,7 +620,7 @@ def wrong_behaviours(build):
     // Lesson total is teach 7 + apply 12 + practice 21 = 40.
     estimatedMinutes: 21,
     prompt: `Write the test suite for \`cart/shipping.py\` in \`tests/test_shipping.py\`, then fix the
-one documented behaviour the module gets wrong. \`README.md\` lists what shipping is supposed to
+one documented behavior the module gets wrong. \`README.md\` lists what shipping is supposed to
 cost: a flat charge under the free-shipping threshold, free at or above it, a fixed express charge
 at any subtotal, and a \`ValueError\` on a negative subtotal.
 
@@ -628,8 +628,8 @@ Call the function as \`shipping.shipping_cost(...)\`. A hidden grader runs your 
 broken builds of the module and names the ones it still lets through. Some tests are hidden.`,
     starterCode: "",
     hints: [
-      "Work down the list in `README.md` one line at a time. Each documented behaviour is one test, named for what it asserts, and each test compares the returned number against the number you expect.",
-      "The grader's broken builds each break exactly one behaviour, so a suite that tests only the standard charge passes three of them. Cover express and the free threshold at the boundary value itself, not a comfortable distance away from it.",
+      "Work down the list in `README.md` one line at a time. Each documented behavior is one test, named for what it asserts, and each test compares the returned number against the number you expect.",
+      "The grader's broken builds each break exactly one behavior, so a suite that tests only the standard charge passes three of them. Cover express and the free threshold at the boundary value itself, not a comfortable distance away from it.",
       "The error path needs the `raises` context manager already imported from `tests/pytest_shim.py`, because a call that raises can never be compared to a return value. For the fix, the bug is an off-by-one at the boundary: pick the subtotal the README calls out by name, work out what the module returns for exactly that number, and the wrong comparison names itself.",
     ],
     workspace: {
@@ -647,7 +647,7 @@ broken builds of the module and names the ones it still lets through. Some tests
           role: "editable",
           language: "python",
           content: SHIPPING_STARTER,
-          description: "The module under test. One documented behaviour is wrong here",
+          description: "The module under test. One documented behavior is wrong here",
         },
         {
           path: "tests/__init__.py",
