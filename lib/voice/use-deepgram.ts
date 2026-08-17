@@ -98,6 +98,44 @@ export interface UseDeepgramReturn {
   isConfigured: boolean
 }
 
+/** Body of a single POST to /api/usage/voice. */
+export interface VoiceUsagePayload {
+  sessionId?: string
+  durationSeconds: number
+  model: string
+  transcriptLength: number
+}
+
+/**
+ * Build the usage report for one recording session, or null when there is nothing worth
+ * reporting.
+ *
+ * Duration is clamped to the recording ceiling the service enforces on itself
+ * (`setMaxDuration`): a session that ended on its own (max duration reached, socket dropped) is
+ * only discovered when the component unmounts, and the wall clock since it started is not what
+ * Deepgram actually streamed.
+ */
+export function buildVoiceUsagePayload(params: {
+  startedAt: number
+  endedAt: number
+  transcript: string
+  sessionId?: string
+  model?: string
+}): VoiceUsagePayload | null {
+  const elapsedSeconds = (params.endedAt - params.startedAt) / 1000
+  const durationSeconds = Math.min(elapsedSeconds, VOICE.MAX_RECORDING_SECONDS)
+
+  // Written as a negated comparison so NaN (a corrupt start time) fails closed.
+  if (!(durationSeconds >= 1)) return null
+
+  return {
+    sessionId: params.sessionId,
+    durationSeconds,
+    model: params.model || DEFAULT_DEEPGRAM_MODEL,
+    transcriptLength: params.transcript.length,
+  }
+}
+
 /**
  * Hook for using Deepgram real-time transcription
  */
@@ -125,6 +163,61 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
   onTranscriptRef.current = options.onTranscript
   onMaxDurationRef.current = options.onMaxDuration
   getAuthTokenRef.current = options.getAuthToken
+
+  // One report per recording session. `stopRecording` and the unmount cleanup can both run for
+  // the same audio (stop, then navigate away), and Deepgram must not be billed twice for it.
+  const usageReportedRef = useRef(false)
+
+  /**
+   * Report the session's Deepgram minutes.
+   *
+   * Held in a ref rather than being a `useCallback` because the unmount cleanup runs the closure
+   * captured at mount: reading through the ref means a session ended by navigation or a closed tab
+   * reports the CURRENT sessionId and model. Before this existed the report lived only inside
+   * `stopRecording`, so every session that ended any other way streamed real audio and recorded
+   * nothing.
+   */
+  const reportUsageRef = useRef<(finalTranscript: string) => void>(() => {})
+  reportUsageRef.current = (finalTranscript: string) => {
+    const startedAt = recordingStartTimeRef.current
+    if (usageReportedRef.current || !startedAt || !getAuthTokenRef.current) return
+
+    const payload = buildVoiceUsagePayload({
+      startedAt,
+      endedAt: Date.now(),
+      transcript: finalTranscript,
+      sessionId: options.sessionId,
+      model: options.model,
+    })
+    if (!payload) return
+
+    // Claimed before the await so a synchronous second caller cannot slip through.
+    usageReportedRef.current = true
+
+    // Resolve the token at report time rather than capturing one: a long interview can outlive
+    // the token that was current when recording started.
+    void (async () => {
+      try {
+        const authToken = await getAuthTokenRef.current?.()
+        if (!authToken) return
+        await fetch("/api/usage/voice", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          // The unmount path fires while the page may already be tearing down, and keepalive lets
+          // the request outlive the document. sendBeacon cannot be used instead: the route
+          // requires an Authorization header and beacons cannot carry one.
+          keepalive: true,
+          body: JSON.stringify(payload),
+        })
+      } catch (err) {
+        // Non-critical - log but don't throw
+        logger.warn("[Voice Usage] Failed to track usage", { error: err })
+      }
+    })()
+  }
 
   // Initialize service on mount
   useEffect(() => {
@@ -196,6 +289,10 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
       logger.info("[useDeepgram] Max duration reached, auto-stopping")
       setStatus("idle")
       setIsRecording(false)
+      // The service stops itself right after this callback and callers gate `stopRecording` on
+      // `isRecording`, so this is the only exit this session gets.
+      reportUsageRef.current(text)
+      recordingStartTimeRef.current = null
       onMaxDurationRef.current?.(text)
     })
 
@@ -234,7 +331,10 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
       if (countdownTimerRef.current) {
         clearTimeout(countdownTimerRef.current)
       }
-      serviceRef.current?.stopTranscription()
+      const finalTranscript = serviceRef.current?.stopTranscription() ?? ""
+      // Fire and forget: a cleanup cannot await, and the POST is keepalive so it survives the
+      // navigation that triggered this.
+      reportUsageRef.current(finalTranscript)
     }
   }, [])
 
@@ -246,6 +346,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
     setError(null)
     setStatus("connecting")
     recordingStartTimeRef.current = Date.now()
+    usageReportedRef.current = false
 
     try {
       await serviceRef.current.startTranscription()
@@ -268,43 +369,11 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
     setIsRecording(false)
 
     // Track voice usage if we have a valid recording session
-    if (recordingStartTimeRef.current && getAuthTokenRef.current) {
-      const durationSeconds = (Date.now() - recordingStartTimeRef.current) / 1000
-
-      // Only track if recording was at least 1 second
-      if (durationSeconds >= 1) {
-        const sessionId = options.sessionId
-        const model = options.model || DEFAULT_DEEPGRAM_MODEL
-        // Resolve the token at report time rather than capturing one: a long interview can outlive
-        // the token that was current when recording started.
-        void (async () => {
-          try {
-            const authToken = await getAuthTokenRef.current?.()
-            if (!authToken) return
-            await fetch("/api/usage/voice", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${authToken}`,
-              },
-              body: JSON.stringify({
-                sessionId,
-                durationSeconds,
-                model,
-                transcriptLength: finalTranscript.length,
-              }),
-            })
-          } catch (err) {
-            // Non-critical - log but don't throw
-            logger.warn("[Voice Usage] Failed to track usage", { error: err })
-          }
-        })()
-      }
-    }
+    reportUsageRef.current(finalTranscript)
 
     recordingStartTimeRef.current = null
     return finalTranscript
-  }, [options.sessionId, options.model])
+  }, [])
 
   const resetTranscript = useCallback(() => {
     serviceRef.current?.resetTranscript()
