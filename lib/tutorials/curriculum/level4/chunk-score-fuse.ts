@@ -494,7 +494,7 @@ That is the whole algorithm. Three properties are worth naming because each is d
 
 - **\`dict.get(doc, 0.0)\`** starts a document at zero the first time it is seen, so a document in one list only is scored rather than dropped. The "merge the documents both lists agree on" version of this loop is the second bug in the practice.
 - **\`position + 1\`** makes ranks count from one. Off by one here and the top result of every list divides by \`k\` instead of \`k + 1\`, which is survivable, but the rank-zero document gets an outsized share.
-- **\`k\`**, conventionally 60, damps the top. Without it the first result scores 1.0 and the second 0.5, so one retriever's favorite wins outright. With it the gap between rank 1 and rank 2 is \`1/61\` against \`1/62\`, tiny enough that agreement between retrievers matters more than any single retriever's confidence. That is the entire design goal.
+- **\`k\`**, conventionally 60, damps the top. It sits in the denominator, so it sets how steeply a document's contribution falls off from one rank to the next: at 60 the gap between rank 1 and rank 2 is \`1/61\` against \`1/62\`, tiny enough that agreement between retrievers matters more than any single retriever's confidence. That is the entire design goal, and the size of the constant is what buys it.
 
 The fused score has no meaning on its own. It is not a probability, not a similarity, and not comparable between queries. It exists to order one result set, and that is all it is for.
 
