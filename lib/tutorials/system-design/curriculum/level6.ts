@@ -2509,6 +2509,8 @@ Where the ack sits is the whole game: commit-before-process is at-most-once, pro
   "reveal": "Two ideas combine: redelivery duplicates are inherent to at-least-once, and Kafka EOS neutralizes them only for offsets and records inside Kafka. Any effect that leaves Kafka, an email, a charge, a non-transactional write, needs its own idempotency."
 }
 \`\`\`
+
+**Sources:** [Kafka exactly-once semantics](https://kafka.apache.org/documentation/#semantics) · [Transactional outbox pattern](https://microservices.io/patterns/data/transactional-outbox.html)
 `.trim()
 
 const idempotencyDedupTeach = `
