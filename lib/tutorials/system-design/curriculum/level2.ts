@@ -5206,6 +5206,8 @@ player switch renditions per segment.
   "reveal": "That split is the whole lesson: bytes in object storage, metadata plus the key in the database, presigned URLs and multipart upload so file bodies bypass your servers, lifecycle tiering for cost, and a CDN in front for read latency. Walk that path end to end in the design exercise."
 }
 \`\`\`
+
+**Sources:** [S3 storage class tiers](https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html) · [Amazon S3 user guide](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html)
 `.trim()
 
 const choosingDbPolyglotTeach = `
