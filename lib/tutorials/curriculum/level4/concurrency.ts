@@ -596,12 +596,12 @@ You met the reusable version of this in **Decorators with arguments & functools.
   "options": [
     {
       "label": "Somewhere under 1000000, and a different number on each run",
-      "feedback": "True through Python 3.9, and still what most write-ups say. Since 3.10 the interpreter only looks for a thread switch after a call and at the top of each loop iteration, so the read, add, store triple in a bare counter += 1 finishes uninterrupted and nothing is lost."
+      "feedback": "True through Python 3.9, and still what most write-ups say. Since 3.10 the interpreter looks for a thread switch at far fewer points, and by 3.11 a call to a Python function is no longer one of them, so the read, add, store triple in a bare counter += 1 finishes uninterrupted and nothing is lost."
     },
     {
       "label": "Exactly 1000000 on CPython 3.10+, under 1000000 on older versions, which is why you must never rely on either",
       "correct": true,
-      "feedback": "Right. The clean total is an accident of where one interpreter version checks for a thread switch, not a promise about your invariants. Put a call in the middle of the update, counter += one(), and the lost updates come straight back on 3.12: four threads bumping 200000 times each finish short of 800000, by a different amount on every run."
+      "feedback": "Right. The clean total is an accident of where one interpreter version checks for a thread switch, not a promise about your invariants. Putting a call in the middle no longer buys the switch back on 3.12, but anything that releases the interpreter lock does: read into current, call time.sleep(0) or wait on any I/O, then write current + 1, and four threads bumping 20000 times each land nowhere near 80000, on a total that moves from run to run."
     },
     {
       "label": "Exactly 500000, since the second thread overwrites everything the first one did",
@@ -617,7 +617,7 @@ You met the reusable version of this in **Decorators with arguments & functools.
 
 ### Pitfall: threads sharing state
 
-Independent tasks are safe to parallelize. Shared mutable state is not. \`count += 1\` is read, add, write: three steps with no lock of your own around them. Whether the interpreter switches threads in the middle depends on where that version happens to check, and the moment a call joins the update (\`count += fee(row)\`, or a lookup then a store two statements apart) the switch becomes possible again and increments start vanishing. The GIL does not make your code thread-safe. Fix it with a \`Lock\`, or better, design the work so tasks never touch shared state (as \`double\` does here).
+Independent tasks are safe to parallelize. Shared mutable state is not. \`count += 1\` is read, add, write: three steps with no lock of your own around them. Whether the interpreter switches threads in the middle depends on where that version happens to check, and on 3.12 nothing inside a bare bump is one of those places. That is a fact about one release rather than a property of your code: put anything that releases the interpreter lock between the read and the write, a \`sleep\` or any wait on I/O, and the increments start vanishing again. On a free-threaded build, where no interpreter lock serializes bytecode at all, even the bare bump can lose them. The GIL does not make your code thread-safe. Fix it with a \`Lock\`, or better, design the work so tasks never touch shared state (as \`double\` does here).
 
 ### Running where there are no threads
 
