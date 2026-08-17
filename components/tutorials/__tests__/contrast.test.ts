@@ -12,41 +12,7 @@
  * to a shade that fails, which reading the shade back from the class string could not do.
  */
 import { describe, expect, it } from "vitest"
-
-type Rgb = [number, number, number]
-
-function parseHex(hex: string): Rgb {
-  const h = hex.replace("#", "")
-  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as Rgb
-}
-
-function channelLuminance(value: number): number {
-  const srgb = value / 255
-  return srgb <= 0.04045 ? srgb / 12.92 : Math.pow((srgb + 0.055) / 1.055, 2.4)
-}
-
-function relativeLuminance([r, g, b]: Rgb): number {
-  return 0.2126 * channelLuminance(r) + 0.7152 * channelLuminance(g) + 0.0722 * channelLuminance(b)
-}
-
-/** WCAG 2.1 contrast ratio, 1..21. */
-export function contrastRatio(fg: string, bg: string): number {
-  const [lighter, darker] = [relativeLuminance(parseHex(fg)), relativeLuminance(parseHex(bg))].sort(
-    (a, b) => b - a
-  )
-  return (lighter + 0.05) / (darker + 0.05)
-}
-
-/** What a `bg-<colour>/<alpha>` tint actually paints over a surface. */
-export function composite(fg: string, alpha: number, bg: string): string {
-  const [fr, fg_, fb] = parseHex(fg)
-  const [br, bg_, bb] = parseHex(bg)
-  const mix = (f: number, b: number) => Math.round(f * alpha + b * (1 - alpha))
-  return (
-    "#" +
-    [mix(fr, br), mix(fg_, bg_), mix(fb, bb)].map((c) => c.toString(16).padStart(2, "0")).join("")
-  )
-}
+import { composite, contrastRatio } from "@/lib/ui/wcag-contrast"
 
 const AA_NORMAL = 4.5
 
