@@ -445,25 +445,29 @@ export default function AIUsagePage() {
     {
       key: "status",
       label: "Status",
-      render: (value) => renderBadge(value, getStatusColor(value) as any),
+      render: (value: string) => renderBadge(value, getStatusColor(value) as any),
     },
     {
       key: "tokens",
       label: "Tokens",
       align: "right",
-      render: (value) => <span className="font-mono text-[#c4703f]">{formatTokens(value)}</span>,
+      render: (value: number) => (
+        <span className="font-mono text-[#c4703f]">{formatTokens(value)}</span>
+      ),
     },
     {
       key: "cost",
       label: "Cost",
       align: "right",
-      render: (value) => <span className="font-mono text-green-400">{formatCost(value)}</span>,
+      render: (value: number) => (
+        <span className="font-mono text-green-400">{formatCost(value)}</span>
+      ),
     },
     {
       key: "createdAt",
       label: "Date",
       align: "right",
-      render: (value) => (
+      render: (value: string) => (
         <span className="text-sm text-gray-400">{new Date(value).toLocaleDateString()}</span>
       ),
     },
@@ -492,7 +496,7 @@ export default function AIUsagePage() {
       key: "sessionCount",
       label: "Sessions",
       align: "center",
-      render: (value) => <span className="text-white">{value || 0}</span>,
+      render: (value: number | undefined) => <span className="text-white">{value || 0}</span>,
     },
     {
       key: "uniqueUsers",
@@ -509,31 +513,37 @@ export default function AIUsagePage() {
       key: "requests",
       label: "API Calls",
       align: "right",
-      render: (value) => <span className="text-gray-300">{value.toLocaleString()}</span>,
+      render: (value: number) => <span className="text-gray-300">{value.toLocaleString()}</span>,
     },
     {
       key: "tokens",
       label: "Total Tokens",
       align: "right",
-      render: (value) => <span className="font-mono text-[#c4703f]">{formatTokens(value)}</span>,
+      render: (value: number) => (
+        <span className="font-mono text-[#c4703f]">{formatTokens(value)}</span>
+      ),
     },
     {
       key: "avgTokensPerRequest",
       label: "Avg/Request",
       align: "right",
-      render: (value) => <span className="text-gray-400">{formatTokens(value)}</span>,
+      render: (value: number) => <span className="text-gray-400">{formatTokens(value)}</span>,
     },
     {
       key: "cost",
       label: "Total Cost",
       align: "right",
-      render: (value) => <span className="font-mono text-green-400">{formatCost(value)}</span>,
+      render: (value: number) => (
+        <span className="font-mono text-green-400">{formatCost(value)}</span>
+      ),
     },
     {
       key: "avgCostPerSession",
       label: "Avg/Session",
       align: "right",
-      render: (value) => <span className="text-gray-400">{value ? formatCost(value) : "-"}</span>,
+      render: (value: number | undefined) => (
+        <span className="text-gray-400">{value ? formatCost(value) : "-"}</span>
+      ),
     },
   ]
 

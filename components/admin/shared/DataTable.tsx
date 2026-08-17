@@ -14,7 +14,16 @@ export interface Column<T> {
   label: string
   width?: string
   align?: "left" | "center" | "right"
-  render?: (value: any, row: T) => ReactNode
+  /**
+   * First argument is the CELL VALUE (`row[key]`), second is the row. Method syntax +
+   * `unknown` on purpose: an untyped `render: (row) => row.field` used to compile under
+   * `any` and silently received the value — which is exactly how both learn admin pages
+   * shipped tables whose every duration read "0s". Now the untyped param infers `unknown`
+   * and property access fails to compile, while a deliberately annotated param (e.g.
+   * `(value: string) => …`) is still accepted via method bivariance. Ignore the value
+   * with `(_, row)` when you want the row.
+   */
+  render?(value: unknown, row: T): ReactNode
   sortable?: boolean
 }
 

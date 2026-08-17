@@ -205,7 +205,7 @@ export default function AuditLogPage() {
       key: "timestamp",
       label: "Time",
       width: "160px",
-      render: (value) => (
+      render: (value: string) => (
         <span className="text-sm whitespace-nowrap text-gray-300">
           {new Date(value).toLocaleString()}
         </span>
@@ -215,7 +215,7 @@ export default function AuditLogPage() {
       key: "action",
       label: "Action",
       width: "150px",
-      render: (value) => {
+      render: (value: string) => {
         const color = actionColors[value] || "default"
         return renderBadge(value.replace(/_/g, " ").toUpperCase(), color)
       },
@@ -223,7 +223,7 @@ export default function AuditLogPage() {
     {
       key: "adminEmail",
       label: "Admin",
-      render: (value, row) => (
+      render: (value: string | undefined, row) => (
         <div className="flex flex-col">
           <span className="text-sm text-white">{value || "System"}</span>
           <span className="text-xs text-gray-500">{row.adminId.substring(0, 12)}...</span>
@@ -233,13 +233,17 @@ export default function AuditLogPage() {
     {
       key: "details",
       label: "Details",
-      render: (value) => <span className="text-sm text-gray-400">{formatDetails(value)}</span>,
+      render: (value: Record<string, unknown>) => (
+        <span className="text-sm text-gray-400">{formatDetails(value)}</span>
+      ),
     },
     {
       key: "ip",
       label: "IP",
       width: "120px",
-      render: (value) => <span className="font-mono text-xs text-gray-500">{value || "N/A"}</span>,
+      render: (value: string | undefined) => (
+        <span className="font-mono text-xs text-gray-500">{value || "N/A"}</span>
+      ),
     },
   ]
 

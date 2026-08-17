@@ -259,7 +259,7 @@ export default function ScoringPage() {
       key: "timestamp",
       label: "Time",
       align: "right",
-      render: (value) => (
+      render: (value: Date | string) => (
         <span className="text-sm text-gray-400">{new Date(value).toLocaleDateString()}</span>
       ),
     },
@@ -270,7 +270,7 @@ export default function ScoringPage() {
     {
       key: "scenarioTitle",
       label: "Problem",
-      render: (value) => <span className="text-sm text-white">{value}</span>,
+      render: (value: string) => <span className="text-sm text-white">{value}</span>,
     },
     {
       key: "conflictType",
@@ -291,7 +291,7 @@ export default function ScoringPage() {
       key: "delta",
       label: "Score Change",
       align: "center",
-      render: (value, row) => (
+      render: (value: number, row) => (
         <div className="flex items-center justify-center gap-2">
           <span className={value > 0 ? "text-green-400" : "text-red-400"}>
             {value > 0 ? (
@@ -310,7 +310,7 @@ export default function ScoringPage() {
     {
       key: "description",
       label: "Reason",
-      render: (value) => (
+      render: (value: string) => (
         <span className="block max-w-xs truncate text-sm text-gray-400">{value}</span>
       ),
     },

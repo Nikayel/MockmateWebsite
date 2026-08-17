@@ -88,7 +88,7 @@ export default function BugfixQualityPage() {
     {
       key: "title",
       label: "Scenario",
-      render: (value, row) => (
+      render: (value: string, row) => (
         <div>
           <p className="font-medium text-white">{value}</p>
           <p className="font-mono text-xs text-gray-500">{row.scenarioId}</p>
@@ -99,7 +99,7 @@ export default function BugfixQualityPage() {
       key: "issueCount",
       label: "Issues",
       width: "100px",
-      render: (value) => (
+      render: (value: number) => (
         <span className={value > 0 ? "text-red-400" : "text-emerald-400"}>{value}</span>
       ),
     },

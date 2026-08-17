@@ -1020,7 +1020,7 @@ export default function ResearchDashboard() {
                 {
                   key: "algorithm",
                   label: "Algorithm",
-                  render: (value) =>
+                  render: (value: string | undefined) =>
                     renderBadge(
                       value?.toUpperCase() || "N/A",
                       value === "fsrs" ? "default" : "default"
@@ -1029,14 +1029,14 @@ export default function ResearchDashboard() {
                 {
                   key: "pattern",
                   label: "Pattern",
-                  render: (value) => (
+                  render: (value: string | undefined) => (
                     <span className="capitalize">{(value || "unknown").replace(/_/g, " ")}</span>
                   ),
                 },
                 {
                   key: "difficulty",
                   label: "Difficulty",
-                  render: (value) =>
+                  render: (value: string | undefined) =>
                     renderBadge(
                       value || "medium",
                       value === "easy" ? "success" : value === "medium" ? "warning" : "error"
@@ -1046,7 +1046,7 @@ export default function ResearchDashboard() {
                   key: "score",
                   label: "Score",
                   align: "right",
-                  render: (value) => (
+                  render: (value: number) => (
                     <span
                       className={
                         value >= 70
@@ -1095,7 +1095,7 @@ export default function ResearchDashboard() {
                 {
                   key: "timestamp",
                   label: "Time",
-                  render: (value) =>
+                  render: (value: string | undefined) =>
                     value ? (
                       <span className="text-xs text-gray-400">
                         {new Date(value).toLocaleDateString()}{" "}
