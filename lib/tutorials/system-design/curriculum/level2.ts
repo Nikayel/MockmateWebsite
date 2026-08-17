@@ -3631,6 +3631,8 @@ failure mode you must design against is cardinality explosion from unbounded tag
   "reveal": "This is the whole lesson in one decision: TSDBs win through append-only columnar storage, compression, chunked retention, and rollups, but only while the series count stays bounded. In the design exercise, name your labels explicitly and defend the cardinality of each one."
 }
 \`\`\`
+
+**Sources:** [Prometheus storage internals](https://prometheus.io/docs/prometheus/latest/storage/) · [Gorilla, Facebook's TSDB paper](https://www.vldb.org/pvldb/vol8/p1816-teller.pdf) · [TimescaleDB hypertables](https://docs.timescale.com/use-timescale/latest/hypertables/)
 `.trim()
 
 const vectorEmbeddingsTeach = `
