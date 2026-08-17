@@ -535,6 +535,39 @@ Adding a \`vip\` tier is one new function plus one dict entry. \`price_for\` its
 }
 \`\`\`
 
+### Naming the keys: \`StrEnum\`
+
+A dispatch table keyed on bare strings has one weakness: \`"member"\` is typed out in the table, in
+every caller, and in the tests, and a typo in any of them is a silent fallback to the default rather
+than an error. \`enum.StrEnum\` (Python 3.11) gives those keys a home without giving up the fact that
+they are strings:
+
+\`\`\`python
+from enum import StrEnum
+
+class Tier(StrEnum):
+    REGULAR = "regular"
+    MEMBER = "member"
+
+STRATEGIES = {Tier.REGULAR: regular, Tier.MEMBER: member}
+
+Tier.MEMBER == "member"        # True: it IS a str
+STRATEGIES["member"]           # the plain-string key still finds it
+f"{Tier.MEMBER}"               # 'member', not 'Tier.MEMBER'
+json.dumps({"tier": Tier.MEMBER})   # '{"tier": "member"}'
+\`\`\`
+
+That last pair is the reason to use \`StrEnum\` rather than a plain \`Enum\` for this job. A plain
+\`Enum\` member is not equal to its value, formats as \`Tier.MEMBER\`, and raises
+\`TypeError: Object of type Tier is not JSON serializable\`. So a plain \`Enum\` forces \`.value\` at
+every boundary, while a \`StrEnum\` passes straight through JSON, logs and existing string keys.
+
+You get two things back for the one line. \`list(Tier)\` is the set of valid keys, which is what you
+want in a validator, an error message, or an argparse \`choices\`. And \`Tier("gold")\` raises
+\`ValueError: 'gold' is not a valid Tier\`, which turns an unknown code into a real failure at the
+boundary instead of a quiet default four layers in. Before 3.11 the same effect needed
+\`class Tier(str, Enum)\`, which is the older spelling you will still meet.
+
 ### Two traps interns hit
 
 Store the function, not its result. \`{"member": member}\` stores the callable; \`{"member": member(100)}\` calls it immediately and stores the number \`90.0\`, so a later \`strategy(amount)\` raises \`TypeError: 'float' object is not callable\`.
