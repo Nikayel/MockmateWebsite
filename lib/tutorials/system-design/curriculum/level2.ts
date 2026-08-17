@@ -1133,7 +1133,7 @@ Most durable OLTP databases are built on one of two storage engine families, and
 fundamentally a read-versus-write tradeoff. Knowing which one sits under Postgres versus Cassandra is
 the difference between guessing at a database and reasoning about one.
 
-### B+tree: in-place pages, fast reads and ranges
+### B+tree: page-granular writes, fast reads and ranges
 
 A **B+tree** (Postgres, MySQL/InnoDB, most SQL engines) keeps index entries in fixed-size pages,
 typically 8KB or 16KB, arranged as a balanced tree with entries linked in sorted leaf pages. What sits
