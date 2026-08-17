@@ -807,6 +807,8 @@ routing plus health checks steer users to the nearest healthy region before a re
   "reveal": "The division of labor to carry into your design write: DNS steers users to the nearest healthy region in minutes, best effort; a real load balancer handles per-request health and failover in milliseconds from there."
 }
 \`\`\`
+
+**Sources:** [RFC 1034, DNS concepts and facilities](https://www.rfc-editor.org/rfc/rfc1034.html) · [RFC 8767, serving stale DNS answers](https://www.rfc-editor.org/rfc/rfc8767.html) · [Route 53 routing policies](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy.html)
 `.trim()
 
 const tcpUdpTeach = `
