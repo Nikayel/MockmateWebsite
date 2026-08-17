@@ -128,7 +128,7 @@ const LINES_STARTER = String.raw`from settings.spec import COMMENT_CHAR, QUOTE_C
 
 def split_entries(text):
     """Return (key, raw_value) tuples in file order (see README.md)."""
-    # TODO: skip blanks, comments, keyless lines; split on the first "="; honour
+    # TODO: skip blanks, comments, keyless lines; split on the first "="; honor
     # quoted values and inline comments.
     return []
 `
