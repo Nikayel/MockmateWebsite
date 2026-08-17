@@ -40,6 +40,7 @@ export const USAGE_SERVICES = [
   { id: "labs-feedback", label: "Case-lab feedback" },
   { id: "voice-transcription", label: "Voice transcription" },
   { id: "rag-indexing", label: "RAG indexing embeddings" },
+  { id: "rag-query-embeddings", label: "RAG query embeddings" },
   { id: "session-telemetry", label: "Session telemetry (no cost)" },
 ] as const
 

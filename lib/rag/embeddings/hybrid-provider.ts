@@ -150,6 +150,25 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
   }
 
   /**
+   * Cache key for a single-text embedding. The mode is part of it because the
+   * same text embeds to different vectors under different modes.
+   */
+  private cacheKey(text: string): string {
+    return `${this.mode}:${text}`
+  }
+
+  /**
+   * Whether generateEmbedding(text) would be served from the local cache, and
+   * so cost nothing. Cost tracking at the call seam asks this before recording
+   * a spend row, otherwise a cache hit double-books the tokens the first call
+   * already paid for.
+   */
+  isCached(text: string): boolean {
+    if (!this.cacheEnabled) return false
+    return embeddingCache.has(this.cacheKey(text))
+  }
+
+  /**
    * Generate embedding for a single text
    */
   async generateEmbedding(text: string): Promise<number[]> {
@@ -160,7 +179,7 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
 
     // Check cache first
     if (this.cacheEnabled) {
-      const cacheKey = `${this.mode}:${text}`
+      const cacheKey = this.cacheKey(text)
       const cachedEmbedding = embeddingCache.get(cacheKey)
       if (cachedEmbedding) {
         this.recordMetrics("combined", cachedEmbedding.length, Date.now() - startTime, true)
@@ -258,8 +277,7 @@ export class HybridEmbeddingProvider implements EmbeddingProvider {
 
       // Cache the result
       if (this.cacheEnabled) {
-        const cacheKey = `${this.mode}:${text}`
-        embeddingCache.set(cacheKey, embedding)
+        embeddingCache.set(this.cacheKey(text), embedding)
       }
 
       this.recordMetrics(provider, embedding.length, Date.now() - startTime, cached)

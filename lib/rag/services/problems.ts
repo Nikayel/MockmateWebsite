@@ -10,9 +10,13 @@ export async function getSimilarProblems(
     limit?: number
     excludeProblemId?: string
     difficulty?: string
+    userId?: string
   } = {}
 ): Promise<SimilarResult[]> {
-  const queryVector = await generateTextEmbedding(problemText)
+  const queryVector = await generateTextEmbedding(problemText, {
+    service: "rag-query-embeddings",
+    userId: options.userId,
+  })
 
   const results = await findSimilarTexts(queryVector, {
     type: "problem",
@@ -34,7 +38,8 @@ export async function embedAndStoreProblem(
     tags: string[]
   }
 ): Promise<string> {
-  const vector = await generateTextEmbedding(problemText)
+  // Catalog content, not a user's work: no signed-in user to bill it to.
+  const vector = await generateTextEmbedding(problemText, { service: "rag-indexing" })
 
   const embedding: TextEmbedding = {
     text: problemText,
@@ -87,6 +92,7 @@ export async function getRecommendedNextProblems(
   const similarProblems = await getSimilarProblems(currentProblemText, {
     limit: 15,
     excludeProblemId: currentProblemId,
+    userId,
   })
 
   const unsolvedProblems: SimilarResult[] = []

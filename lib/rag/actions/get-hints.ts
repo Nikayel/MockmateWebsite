@@ -46,7 +46,7 @@ export async function handleGetHints(params: {
     bugCategory
   )
 
-  const storedHints = await getRelevantHints(problemText, userCode, { limit })
+  const storedHints = await getRelevantHints(problemText, userCode, { limit, userId })
 
   const ragEnhancedHints: { level: number; hint: string; source: string }[] = []
   let patternInsights: {

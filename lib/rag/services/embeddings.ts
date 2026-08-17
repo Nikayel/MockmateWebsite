@@ -1,5 +1,6 @@
 import { getHybridProvider } from "../embeddings/hybrid-provider"
 import { EMBEDDING_COSTS, trackEmbeddingUsageAccurate } from "../../usage-tracking"
+import { SYSTEM_USER_ID, type UsageServiceId } from "../../usage/services"
 import { prepareTextForEmbedding } from "../utils/sanitize"
 
 const embeddingProvider = getHybridProvider({
@@ -9,6 +10,23 @@ const embeddingProvider = getHybridProvider({
   openaiDimensions: 1536,
   cacheEnabled: true,
 })
+
+/**
+ * Who a paid embedding is billed to.
+ *
+ * Required at every call site: an embedding is a real charge on the Gemini or
+ * OpenAI bill, and the only way it reaches `usage_events` is if the caller says
+ * which product surface asked for it. Making this a required argument means a
+ * new call site that forgets does not compile.
+ *
+ * `userId` is optional because plenty of embeddings have no signed-in user
+ * (bulk vectorization, knowledge-base seeding, anonymous retrieval). Those land
+ * on SYSTEM_USER_ID: recorded and visible in admin, never budget-enforced.
+ */
+export interface EmbeddingAttribution {
+  service: UsageServiceId
+  userId?: string
+}
 
 export function getActiveEmbeddingProvider(): ReturnType<typeof getHybridProvider> {
   return embeddingProvider
@@ -31,53 +49,78 @@ export function getEmbeddingUsageMetadata(): {
   return { model: model as keyof typeof EMBEDDING_COSTS, provider }
 }
 
-export async function generateTextEmbedding(text: string): Promise<number[]> {
-  const prepared = prepareTextForEmbedding(text, { context: "generateTextEmbedding" })
-
-  if (!prepared.valid) {
-    throw new Error(`Invalid text for embedding: ${prepared.error}`)
-  }
-
-  return embeddingProvider.generateEmbedding(prepared.text)
-}
-
-export async function generateTrackedEmbedding(text: string, userId: string): Promise<number[]> {
-  const prepared = prepareTextForEmbedding(text, { context: `generateTrackedEmbedding:${userId}` })
-
-  if (!prepared.valid) {
-    throw new Error(`Invalid text for embedding: ${prepared.error}`)
-  }
-
-  const startTime = Date.now()
-  const embedding = await embeddingProvider.generateEmbedding(prepared.text)
-  const latencyMs = Date.now() - startTime
+/**
+ * Fire-and-forget spend row for embeddings that actually hit a paid API.
+ * Tracking never blocks or fails the retrieval it is measuring.
+ */
+function recordEmbeddingSpend(params: {
+  texts: string[]
+  attribution: EmbeddingAttribution
+  latencyMs: number
+  dimensions: number
+}): void {
+  const { texts, attribution, latencyMs, dimensions } = params
   const { model, provider } = getEmbeddingUsageMetadata()
 
+  // The TF-IDF fallback is computed locally and costs nothing. A $0 row for it
+  // would add fake volume to the per-service breakdown, so record nothing.
+  if (provider === "tfidf") return
+
   trackEmbeddingUsageAccurate({
-    userId,
-    service: "rag-indexing",
-    texts: [prepared.text],
+    userId: attribution.userId ?? SYSTEM_USER_ID,
+    service: attribution.service,
+    texts,
     model,
     provider,
     latencyMs,
-    dimensions: embedding.length,
+    dimensions,
   }).catch((err) => {
     console.warn("[RAG] Failed to track embedding usage:", err)
   })
+}
+
+export async function generateTextEmbedding(
+  text: string,
+  attribution: EmbeddingAttribution
+): Promise<number[]> {
+  const prepared = prepareTextForEmbedding(text, {
+    context: `generateTextEmbedding:${attribution.service}`,
+  })
+
+  if (!prepared.valid) {
+    throw new Error(`Invalid text for embedding: ${prepared.error}`)
+  }
+
+  // A provider cache hit costs nothing; billing it again would double-book the
+  // tokens the first call already paid for. The provider owns the cache key, so
+  // this asks it rather than rebuilding one.
+  const servedFromCache = embeddingProvider.isCached(prepared.text)
+
+  const startTime = Date.now()
+  const embedding = await embeddingProvider.generateEmbedding(prepared.text)
+
+  if (!servedFromCache) {
+    recordEmbeddingSpend({
+      texts: [prepared.text],
+      attribution,
+      latencyMs: Date.now() - startTime,
+      dimensions: embedding.length,
+    })
+  }
 
   return embedding
 }
 
-export async function generateTrackedEmbeddings(
+export async function generateTextEmbeddings(
   texts: string[],
-  userId: string
+  attribution: EmbeddingAttribution
 ): Promise<number[][]> {
   if (texts.length === 0) return []
 
   const preparedTexts = texts
     .map((text, idx) => {
       const prepared = prepareTextForEmbedding(text, {
-        context: `generateTrackedEmbeddings:${userId}:${idx}`,
+        context: `generateTextEmbeddings:${attribution.service}:${idx}`,
       })
       if (!prepared.valid) {
         console.warn(`[RAG] Skipping invalid text at index ${idx}: ${prepared.error}`)
@@ -91,22 +134,30 @@ export async function generateTrackedEmbeddings(
     throw new Error("No valid texts for embedding after sanitization")
   }
 
+  // No cache check here: the batch provider path talks to the API directly and
+  // never consults the local cache, so every batch call is a real charge.
   const startTime = Date.now()
   const embeddings = await embeddingProvider.generateEmbeddings(preparedTexts)
-  const latencyMs = Date.now() - startTime
-  const { model, provider } = getEmbeddingUsageMetadata()
 
-  trackEmbeddingUsageAccurate({
-    userId,
-    service: "rag-indexing",
+  recordEmbeddingSpend({
     texts: preparedTexts,
-    model,
-    provider,
-    latencyMs,
+    attribution,
+    latencyMs: Date.now() - startTime,
     dimensions: embeddings[0]?.length || 0,
-  }).catch((err) => {
-    console.warn("[RAG] Failed to track embedding usage:", err)
   })
 
   return embeddings
+}
+
+/** Indexing embedding for a signed-in user (their solution, hint, onboarding answer). */
+export async function generateTrackedEmbedding(text: string, userId: string): Promise<number[]> {
+  return generateTextEmbedding(text, { service: "rag-indexing", userId })
+}
+
+/** Batch indexing embeddings for a signed-in user. */
+export async function generateTrackedEmbeddings(
+  texts: string[],
+  userId: string
+): Promise<number[][]> {
+  return generateTextEmbeddings(texts, { service: "rag-indexing", userId })
 }

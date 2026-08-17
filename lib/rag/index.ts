@@ -8,8 +8,10 @@ console.log(
 
 export {
   generateTextEmbedding,
+  generateTextEmbeddings,
   generateTrackedEmbedding,
   generateTrackedEmbeddings,
+  type EmbeddingAttribution,
 } from "./services/embeddings"
 export { storeTextEmbedding } from "./services/storage"
 export { findSimilarTexts } from "./services/similarity"

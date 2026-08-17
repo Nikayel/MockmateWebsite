@@ -11,7 +11,10 @@ export async function getSimilarSolutions(
     problemType?: string
   } = {}
 ): Promise<SimilarResult[]> {
-  const queryVector = await generateTextEmbedding(problemText)
+  const queryVector = await generateTextEmbedding(problemText, {
+    service: "rag-query-embeddings",
+    userId,
+  })
 
   const results = await findSimilarTexts(queryVector, {
     type: "solution",

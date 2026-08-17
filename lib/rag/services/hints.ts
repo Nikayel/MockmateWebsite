@@ -1,6 +1,6 @@
 import type { SimilarResult, TextEmbedding } from "../types"
 import { vectorDB } from "../vectordb"
-import { generateTextEmbedding, generateTrackedEmbedding } from "./embeddings"
+import { generateTextEmbedding } from "./embeddings"
 import { enrichResultsWithText, findSimilarTexts } from "./similarity"
 import { storeTextEmbedding } from "./storage"
 
@@ -9,10 +9,14 @@ export async function getRelevantHints(
   userCode: string,
   options: {
     limit?: number
+    userId?: string
   } = {}
 ): Promise<SimilarResult[]> {
   const combinedText = `${problemText}\n\nUser's current approach:\n${userCode}`
-  const queryVector = await generateTextEmbedding(combinedText)
+  const queryVector = await generateTextEmbedding(combinedText, {
+    service: "rag-query-embeddings",
+    userId: options.userId,
+  })
 
   const results = await findSimilarTexts(queryVector, {
     type: "hint",
@@ -43,9 +47,10 @@ Hint Level ${hintLevel}: ${hintText}
 Category: ${metadata.category || "approach"}
 `.trim()
 
-  const vector = metadata.userId
-    ? await generateTrackedEmbedding(enrichedText, metadata.userId)
-    : await generateTextEmbedding(enrichedText)
+  const vector = await generateTextEmbedding(enrichedText, {
+    service: "rag-indexing",
+    userId: metadata.userId,
+  })
 
   const allTags = [
     ...(metadata.tags || []),
@@ -105,7 +110,9 @@ ${userCode.substring(0, 500)}
 Pattern: ${options.pattern || "unknown"}
 `.trim()
 
-  const queryVector = await generateTextEmbedding(queryText)
+  const queryVector = await generateTextEmbedding(queryText, {
+    service: "rag-query-embeddings",
+  })
 
   const results = await findSimilarTexts(queryVector, {
     type: "hint",
@@ -153,7 +160,9 @@ export async function getPatternHintsFromRAG(
   }>
 > {
   const queryText = `${pattern} pattern hints coding interview`
-  const queryVector = await generateTextEmbedding(queryText)
+  const queryVector = await generateTextEmbedding(queryText, {
+    service: "rag-query-embeddings",
+  })
 
   const results = await vectorDB.query(queryVector, {
     topK: options.limit || 5,
