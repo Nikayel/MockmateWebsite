@@ -5282,15 +5282,15 @@ What standardizing buys beyond the schema is the part worth designing against. A
     ["Tools", "client calls server", "The model", "Actions with effects: query a system, write a record, send a message"],
     ["Resources", "client calls server", "The host application", "Read-only context the application chooses to attach"],
     ["Prompts", "client calls server", "The user", "Templated workflows the user picks, like a slash command"],
-    ["Sampling", "server calls client", "The server, asking your model to complete something", "Letting a server reason without shipping its own model or its own key"],
-    ["Elicitation", "server calls client", "The server, asking your user for a value", "Getting a missing input mid-operation, such as a confirmation"]
+    ["Sampling", "server requests it, client re-sends", "The server, asking your model to complete something", "Letting a server reason without shipping its own model or its own key"],
+    ["Elicitation", "server requests it, client re-sends", "The server, asking your user for a value", "Getting a missing input mid-operation, such as a confirmation"]
   ],
   "highlightCols": ["Direction", "Who decides to invoke it"],
   "caption": "Most summaries flatten these into ways of giving a model context. The columns that matter are direction and who decides, because those are what a security review is actually about."
 }
 \`\`\`
 
-Read that table down the third column. Exactly one row is invoked by the model, and that is the row an attacker who controls your input can reach. Resources and prompts are chosen by your application and your user, so a sentence buried in a retrieved document cannot cause one to fire. The two reverse-direction rows are the ones summaries drop and the ones that surprise people in review: sampling spends your tokens and your model on a third party's request, and elicitation puts a third party's question in front of your user with your product's face on it.
+Read that table down the third column. Exactly one row is invoked by the model, and that is the row an attacker who controls your input can reach. Resources and prompts are chosen by your application and your user, so a sentence buried in a retrieved document cannot cause one to fire. Note what the last two rows no longer say: revision \`2026-07-28\` removed server-initiated requests entirely and replaced them with Multi Round-Trip Requests, where a server that needs sampling or elicitation answers with an \`InputRequiredResult\` rather than a result, and the client re-sends the same call carrying an \`inputResponses\` field, which is a breaking change against every earlier revision. The two rows that turn a call around this way are the ones summaries drop and the ones that surprise people in review: sampling spends your tokens and your model on a third party's request, and elicitation puts a third party's question in front of your user with your product's face on it.
 
 ## Transports: local pipe, remote stream
 
