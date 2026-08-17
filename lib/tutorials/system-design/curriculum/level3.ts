@@ -3619,12 +3619,12 @@ to query the target cell **plus its 8 neighbors** (a 3x3 ring) so you never miss
 
 The cell scan hands you candidates, not an answer: cells are rectangles and your query is a circle,
 so something has to measure the real distance and cut. That something is the **haversine formula**,
-which takes two lat/lng pairs and returns metres along the great circle. Treating lat/lng as a flat
+which takes two lat/lng pairs and returns meters along the great circle. Treating lat/lng as a flat
 plane is the tempting shortcut, and it is wrong by a factor of \`cos(latitude)\` on the east-west
 axis, because a degree of longitude narrows as you leave the equator.
 
 \`\`\`
-haversine(lat1, lng1, lat2, lng2) -> metres, with R = 6371000 (mean Earth radius)
+haversine(lat1, lng1, lat2, lng2) -> meters, with R = 6371000 (mean Earth radius)
 
   dLat = radians(lat2 - lat1)
   dLng = radians(lng2 - lng1)
@@ -3641,19 +3641,19 @@ driver (37.7849, -122.4094)   0.01 degrees north, 0.01 degrees east
       = 0.79042 * 0.79032 * 7.6154e-9           = 4.7572e-9
   a                                             = 1.23727e-8
   c    = 2 * atan2(sqrt(a), sqrt(1 - a))        = 2.2247e-4
-  d    = 6371000 * 2.2247e-4                    = 1417 metres
+  d    = 6371000 * 2.2247e-4                    = 1417 meters
 
 flat-plane shortcut, for comparison:
-  sqrt(0.01^2 + 0.01^2) * 111320                = 1574 metres
+  sqrt(0.01^2 + 0.01^2) * 111320                = 1574 meters
 
-  157 metres too far, an 11 percent error, because at latitude 37.8 one degree of
-  longitude spans 111320 * cos(37.8) = about 88000 metres, not 111320.
+  157 meters too far, an 11 percent error, because at latitude 37.8 one degree of
+  longitude spans 111320 * cos(37.8) = about 88000 meters, not 111320.
 \`\`\`
 
 So a proximity query is three steps, and only the first one is the index: prefix-scan the center
 cell plus its 8 neighbors, run haversine on every candidate against the query point, then sort and
 cut at the radius. The cell key narrows the set; haversine is what actually answers "within 2 km".
-A 1417-metre answer and a 1574-metre answer are the difference between offering a driver and not.
+A 1417-meter answer and a 1574-meter answer are the difference between offering a driver and not.
 
 ### Quadtree, S2, and H3
 
