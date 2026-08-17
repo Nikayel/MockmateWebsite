@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { Check } from "lucide-react"
+import { Check, ChevronDown } from "lucide-react"
 import { SystemDesignLevelPreview } from "./SystemDesignLevelPreview"
 import { useCompletedLessons } from "./useCompletedLessons"
 import { groupSystemDesignLevels } from "@/lib/tutorials/system-design/sections"
@@ -13,8 +13,16 @@ import type { PathLevelSummary } from "@/lib/tutorials/level-path"
 /**
  * Screen 1 — the System Design Path (HANDOFF-LearnPython §B, ported to this course).
  *
- * A connected vertical spine of the twelve levels on the left, grouped under their arcs, and a
- * sticky preview on the right that reacts to the level under the pointer or the keyboard focus.
+ * A sticky level preview on the left, and on the right the twelve levels grouped into five
+ * collapsible arcs, each a numbered spine. The preview reacts to the level under the pointer or the
+ * keyboard focus.
+ *
+ * ## Why the arcs are a native <details> and not a client-state accordion
+ *
+ * Because the level links have to survive being collapsed. An accordion that renders its list only
+ * when open would take twelve `<a href>`s out of the server HTML on a page whose entire job is to be
+ * the index for those twelve levels and the 208 lessons under them. `<details>` keeps the whole list
+ * in the DOM, works with no JavaScript, and is keyboard- and screen-reader-native for free.
  *
  * ## Why the node is a LINK and the preview follows hover, rather than §B's click-to-select
  *
@@ -69,37 +77,53 @@ export function SystemDesignPath({ levels }: { levels: PathLevelSummary[] }) {
 
   if (!active) return null
 
-  // A running index across arcs, so the spine knows which node is the last one on the whole path.
-  let position = 0
-  const lastPosition = levels.length - 1
-
   return (
-    <div className="grid items-start gap-8 lg:grid-cols-[1fr_minmax(340px,400px)] lg:gap-10">
-      <div>
+    // Preview LEFT, levels RIGHT, and the preview is also first in the DOM so reading order and
+    // focus order agree with what the eye sees (WCAG 2.4.3). Below `lg` the preview is not rendered
+    // at all, so the levels are the first thing on a phone either way.
+    <div className="grid items-start gap-8 lg:grid-cols-[minmax(340px,400px)_1fr] lg:gap-10">
+      {/* Desktop only. Below `lg` there is no hover to drive it and no column to park it in, and
+          every fact it carries is already on the card. */}
+      <div className="hidden lg:sticky lg:top-24 lg:block">
+        <SystemDesignLevelPreview
+          level={active}
+          href={entryHref(active)}
+          completedCount={completedIn(active)}
+        />
+      </div>
+
+      <div className="flex flex-col gap-3">
         {arcs.map(({ section, levels: arcLevels }, arcIndex) => (
-          <section key={section.id} aria-labelledby={`arc-${section.id}`}>
-            {/* The spine runs THROUGH the arc heading rather than restarting at each one, so the
-                twelve levels still read as one path that has been annotated, not as five lists. */}
-            <div className="flex gap-4">
-              <div className="flex w-9 shrink-0 justify-center" aria-hidden="true">
-                {arcIndex > 0 && <span className="bg-border w-px" />}
-              </div>
-              <div className="min-w-0 flex-1 pt-1 pb-4">
-                <h2
-                  id={`arc-${section.id}`}
-                  className="text-accent-strong text-xs font-semibold tracking-[0.18em] uppercase"
-                >
+          // A native <details>, not a client-state accordion, and that is the load-bearing choice:
+          // the twelve level links stay in the server HTML whether or not the arc is open, so a
+          // crawler and a JS-disabled reader still get the whole course. Conditionally rendering the
+          // list would delete those links from the initial HTML, which is the one regression this
+          // page cannot afford (and which system-design-path.test.tsx fails on).
+          <details
+            key={section.id}
+            open={arcIndex === 0}
+            className="group border-border bg-card/40 rounded-xl border"
+          >
+            <summary className="hover:bg-accent/[0.03] focus-visible:ring-accent/50 flex cursor-pointer list-none items-start gap-3 rounded-xl p-5 transition-colors marker:content-none focus-visible:ring-2 focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+              <ChevronDown
+                className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none"
+                aria-hidden="true"
+              />
+              <div className="min-w-0 flex-1">
+                <h2 className="text-accent-strong text-xs font-semibold tracking-[0.18em] uppercase">
                   {section.title}
                 </h2>
-                <p className="text-muted-foreground mt-1.5 max-w-xl text-sm text-pretty">
-                  {section.blurb}
+                <p className="text-muted-foreground mt-1.5 text-sm text-pretty">{section.blurb}</p>
+                <p className="text-muted-foreground mt-2 text-xs">
+                  {arcLevels.length} {arcLevels.length === 1 ? "level" : "levels"}
+                  {" · "}
+                  {arcLevels.reduce((total, level) => total + level.lessons.length, 0)} lessons
                 </p>
               </div>
-            </div>
+            </summary>
 
-            <ol>
-              {arcLevels.map((level) => {
-                const index = position++
+            <ol className="px-5 pb-5">
+              {arcLevels.map((level, indexInArc) => {
                 const lessonCount = level.lessons.length
                 const doneCount = completedIn(level)
                 const isComplete = lessonCount > 0 && doneCount === lessonCount
@@ -121,7 +145,10 @@ export function SystemDesignPath({ levels }: { levels: PathLevelSummary[] }) {
                       >
                         {level.id}
                       </span>
-                      {index < lastPosition && (
+                      {/* The spine now runs WITHIN an arc, not across all twelve. Once an arc can be
+                          closed there is no line to continue into, so a cross-arc connector would be
+                          drawing a path to something that is not on screen. */}
+                      {indexInArc < arcLevels.length - 1 && (
                         <span
                           className={[
                             "my-2 w-px flex-1 transition-colors",
@@ -190,18 +217,8 @@ export function SystemDesignPath({ levels }: { levels: PathLevelSummary[] }) {
                 )
               })}
             </ol>
-          </section>
+          </details>
         ))}
-      </div>
-
-      {/* Desktop only. Below `lg` there is no hover to drive it and no column to park it in, and
-          every fact it carries is already on the card. */}
-      <div className="hidden lg:sticky lg:top-24 lg:block">
-        <SystemDesignLevelPreview
-          level={active}
-          href={entryHref(active)}
-          completedCount={completedIn(active)}
-        />
       </div>
     </div>
   )
