@@ -1731,6 +1731,8 @@ Two things fall out of those numbers. **The crossover is a utilization figure, n
   "reveal": "FaaS trades capacity management for instant scale and per-invocation billing, which is a genuine win for spiky event-driven glue. The bill comes back as cold starts on the p99 tail, a hard execution limit, no durable local state, and a cost model that inverts under high steady load. The failure interviewers probe for is scale a downstream cannot absorb: bound it with reserved concurrency and a connection proxy, and orchestrate multi-step work with Step Functions instead of one long function."
 }
 \`\`\`
+
+**Sources:** [Firecracker: Lightweight Virtualization (NSDI 20)](https://www.usenix.org/conference/nsdi20/presentation/agache) · [Firecracker microVM docs](https://firecracker-microvm.github.io/)
 `.trim()
 
 const edgeWasmTeach = `
