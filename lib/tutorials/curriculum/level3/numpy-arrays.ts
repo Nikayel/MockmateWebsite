@@ -484,6 +484,32 @@ np.array([[1], [2], [3]]) + np.array([[10, 20, 30, 40]])
 }
 \`\`\`
 
+## Reducing along an axis
+
+\`a.sum()\` and \`a.max()\` on a 2D array collapse the whole thing to one number. The \`axis\` argument
+says which direction to collapse instead, and it is the argument people get backwards, so read it as
+"the axis that disappears". \`axis=0\` collapses down the rows and leaves one value **per column**;
+\`axis=1\` collapses across the columns and leaves one value **per row**.
+
+\`\`\`python
+grid = np.array([[10, 5], [30, 5], [20, 9]])
+grid.shape                          # (3, 2): three rows, two columns
+grid.max(axis=0)                    # array([30,  9])      one per COLUMN
+grid.max(axis=1)                    # array([10, 30, 20])  one per ROW
+grid.max()                          # 30                   no axis, one number
+grid.max(axis=0) - grid.min(axis=0) # array([20,  4])      per-column range
+\`\`\`
+
+One thing \`max\` does not do is skip gaps. Missing numeric data in numpy is \`np.nan\`, and \`nan\`
+poisons an ordinary reduction: any column containing one comes back \`nan\`. The functions that
+ignore it are the \`nan\`-prefixed ones.
+
+\`\`\`python
+gappy = np.array([[10.0, np.nan], [30.0, 7.0], [20.0, np.nan]])
+gappy.max(axis=0)          # array([30., nan])   one gap poisons the whole column
+np.nanmax(gappy, axis=0)   # array([30.,  7.])   this is the one that skips
+\`\`\`
+
 ## The cost of a fixed dtype
 
 \`\`\`cswidget
@@ -539,7 +565,8 @@ print("int column stores 3.7 as", int(3.7))`,
     // (a gap in a column, a column that is nothing but gaps).
     estimatedMinutes: 8,
     prompt: `Implement \`column_ranges(table)\`, the pure-Python version of what
-\`arr.max(axis=0) - arr.min(axis=0)\` gives you in numpy.
+\`arr.max(axis=0) - arr.min(axis=0)\` gives you in numpy, except that yours skips the gaps and
+numpy's does not.
 
 A **table** is a list of rows, every row the same length. Return one number per **column**: the
 largest value in that column minus the smallest.
