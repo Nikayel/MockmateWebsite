@@ -2202,7 +2202,7 @@ Nothing above is unique to hosted APIs; it is the same mechanism with the price 
 const constrainedDecodingTeach = `
 ## Reject and retry is a bet, and you pay for the losses
 
-The eval and guardrail lesson's answer to a malformed JSON response is a validator that rejects it and a retry that tries again. That answer works, and it has a price with three parts: you pay for the tokens of the generation that failed, you pay again for the generation that replaces it, and the request's latency is now a coin flip instead of a distribution. Put numbers on it before deciding whether the price is acceptable, because the number that matters is not the failure rate, it is the failure rate multiplied by your traffic.
+Level 11's eval and guardrail lesson later formalizes this, and the short version is that the standard answer to a malformed JSON response is a validator that rejects it and a retry that tries again. That answer works, and it has a price with three parts: you pay for the tokens of the generation that failed, you pay again for the generation that replaces it, and the request's latency is now a coin flip instead of a distribution. Put numbers on it before deciding whether the price is acceptable, because the number that matters is not the failure rate, it is the failure rate multiplied by your traffic.
 
 \`\`\`cswidget
 {
