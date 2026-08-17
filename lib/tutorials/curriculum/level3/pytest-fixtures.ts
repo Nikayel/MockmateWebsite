@@ -76,8 +76,11 @@ This sandbox has no pytest installed, so the three pieces you need live here ins
     minipytest.param(*values, raises=ValueError)
         A row that is expected to raise instead of returning a value.
 
-The names and the behavior match pytest closely enough that what you write here transfers.
-Only the machinery is smaller.
+The concepts match pytest one for one, but two of these three names are minipytest's own.
+Real pytest spells the decorator @pytest.mark.parametrize, and pytest.param has no raises=
+argument at all: its signature is (*values, marks=..., id=...). There you either use
+pytest.raises inside the test body, or attach marks=pytest.mark.xfail(raises=ValueError) to
+the row. @pytest.fixture is the one name that carries over unchanged.
 """
 
 import inspect
@@ -788,6 +791,7 @@ Scope decides how often that whole cycle repeats:
     ["function (default)", "every test", "the value is mutable and tests must not leak into each other"],
     ["class", "test class", "a group of tests shares expensive but read-only setup"],
     ["module", "test file", "one connection or server serves every test in the file"],
+    ["package", "test package", "every test under one directory shares the setup, and the package is the natural boundary"],
     ["session", "whole test run", "the setup is very expensive and genuinely immutable"]
   ],
   "highlightCols": ["scope="],
@@ -814,7 +818,7 @@ Two rows means two independent results, so a failure names the row instead of ju
 
 Some rows in a table are not "these inputs give that answer", they are "these inputs are rejected". \`pytest.param(..., marks=...)\` is how pytest attaches an expectation to a single row rather than to the whole table.
 
-This sandbox has no \`pytest\` installed, so the Practice ships \`minipytest\`, a small read-only stand-in offering the three pieces under the same names: \`@fixture\` with \`yield\` teardown, \`@parametrize\`, and \`param(..., raises=...)\`, which is the spelling that marks the rejected row. Written against it, the whole shape looks like this:
+This sandbox has no \`pytest\` installed, so the Practice ships \`minipytest\`, a small read-only stand-in offering the three pieces: \`@fixture\` with \`yield\` teardown, \`@parametrize\`, and \`param(..., raises=...)\`, which is the spelling that marks the rejected row. Learn the shape here, but leave with the real spellings, because two of those three names are minipytest's own: pytest writes the decorator as \`@pytest.mark.parametrize\`, and \`pytest.param\` is \`(*values, marks=..., id=...)\` with no \`raises=\` on it. A row that must raise is either \`pytest.raises\` inside the test body or \`marks=pytest.mark.xfail(raises=ValueError)\` on the row. \`@pytest.fixture\` transfers unchanged. Written against \`minipytest\`, the whole shape looks like this:
 
 \`\`\`python
 import minipytest
