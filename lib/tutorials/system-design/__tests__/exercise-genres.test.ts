@@ -58,7 +58,7 @@ const withSupplied = exercises.filter((e) => e.exercise.supplied)
 const GENERATION_OPENER_PIN = 285
 
 /** Exercises handing the learner a read-only artifact. Ratchets UP only. */
-const SUPPLIED_FLOOR = 26
+const SUPPLIED_FLOOR = 27
 
 describe("system design exercise genres", () => {
   it("keeps shrinking the share of exercises that open by asking for a design", () => {
@@ -99,7 +99,7 @@ describe("system design exercise genres", () => {
     // Genre conversion rewrites exercises in place. Exercise ids are the persistence keys for
     // `user_design_answers`, so a sweep that adds or drops one has done something other than what
     // it was asked to do.
-    expect(exercises.length).toBe(436)
-    expect(new Set(exercises.map((e) => e.exercise.id)).size).toBe(436)
+    expect(exercises.length).toBe(444)
+    expect(new Set(exercises.map((e) => e.exercise.id)).size).toBe(444)
   })
 })
