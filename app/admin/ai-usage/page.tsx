@@ -38,6 +38,7 @@ import {
   Target,
   FileText,
   ChevronRight,
+  TrendingUp,
   X,
 } from "lucide-react"
 import { SpendHealthPanel } from "./_components/SpendHealthPanel"
@@ -166,6 +167,18 @@ interface AIUsageData {
    * the service field existed.
    */
   byServiceId?: Record<string, { requests: number; tokens: number; cost: number }>
+  /** 30 days of daily spend, ascending by date. The API pays a Firestore scan
+   *  for this on every load, so it is rendered rather than discarded. */
+  trends?: {
+    daily: Array<{
+      date: string
+      requests: number
+      tokens: number
+      cost: number
+      uniqueUsers: number
+    }>
+    totals: { requests: number; tokens: number; cost: number; uniqueUsers: number }
+  }
   granular?: {
     byPattern: Record<string, PatternUsage>
     byDifficulty: Record<string, { requests: number; tokens: number; cost: number }>
@@ -440,6 +453,18 @@ export default function AIUsagePage() {
     return `$${amount.toFixed(4)}`
   }
 
+  // "2026-08-17" -> "Aug 17", read in UTC because that is how the day keys were
+  // bucketed. Rows whose createdAt never made it to Firestore arrive as
+  // "unknown" and are shown that way rather than parsed into a wrong date.
+  const formatTrendDate = (date: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return date
+    return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    })
+  }
+
   const getDifficultyColor = (difficulty: string) => difficultyColorClass(difficulty)
 
   const getStatusColor = (status: string) => {
@@ -597,6 +622,11 @@ export default function AIUsagePage() {
   const serviceSpend = Object.entries(aiUsage?.byServiceId ?? {})
     .map(([id, totals]) => ({ id, ...totals }))
     .sort((a, b) => b.cost - a.cost)
+
+  const trendDays = aiUsage?.trends?.daily ?? []
+  // Bars are scaled to the worst day, not to a fixed dollar figure: at this
+  // scale a fixed axis would render every day as an invisible sliver.
+  const peakDailyCost = trendDays.reduce((peak, day) => Math.max(peak, day.cost), 0)
 
   if (loading) {
     return (
@@ -855,6 +885,50 @@ export default function AIUsagePage() {
                           {formatTokens(aiUsage.services.embeddings.tokens || 0)} tokens
                         </div>
                       </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Daily spend. The API pays a 30-day Firestore scan to build
+                  this on every load, so leaving it unrendered was buying the
+                  data and throwing it away. */}
+              {trendDays.length > 0 && (
+                <Card className="border-gray-800 bg-gray-900/50">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg text-white">
+                      <TrendingUp className="h-5 w-5 text-[#c4703f]" />
+                      Daily cost, last 30 days
+                    </CardTitle>
+                    <CardDescription className="text-gray-400">
+                      {formatCost(aiUsage.trends?.totals.cost)} over{" "}
+                      {(aiUsage.trends?.totals.requests || 0).toLocaleString()} requests, peak day{" "}
+                      {formatCost(peakDailyCost)}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-1">
+                      {trendDays.map((day) => (
+                        <div key={day.date} className="flex items-center gap-3">
+                          <span className="w-14 shrink-0 text-xs text-gray-500">
+                            {formatTrendDate(day.date)}
+                          </span>
+                          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-800">
+                            <div
+                              className="h-full rounded-full bg-[#c4703f]"
+                              style={{
+                                width: `${peakDailyCost > 0 ? (day.cost / peakDailyCost) * 100 : 0}%`,
+                              }}
+                            />
+                          </div>
+                          <span className="w-16 shrink-0 text-right font-mono text-xs text-green-400">
+                            {formatCost(day.cost)}
+                          </span>
+                          <span className="w-20 shrink-0 text-right text-xs text-gray-500">
+                            {day.requests.toLocaleString()} calls
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
