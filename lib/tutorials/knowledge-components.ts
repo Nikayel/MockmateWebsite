@@ -409,6 +409,24 @@ const SKILL_TO_KC: Record<string, KnowledgeComponent> = {
   // same competence the review lessons assess.
   naming: "py.code-review",
   comments: "py.code-review",
+
+  // ---- L4 AI engineering plumbing ----
+  // The domain is new; the competence each lesson grades is not, so these fold into the
+  // component that already collects that competence rather than earning new ones.
+  backoff: "py.errors",
+  idempotency: "py.http-and-apis",
+  budgets: "py.performance",
+  // Holding bytes that are not yet a character is the encoding competence, which is
+  // where `encoding`, `unicode` and `bytes` already live.
+  "incremental-decoding": "py.strings",
+  streaming: "py.io-and-files",
+  buffering: "py.io-and-files",
+  // Windowing, scoring and ranking are all sequence work: slicing, zip, and a sort with
+  // a tie-break. The retrieval vocabulary is the domain, not the skill being observed.
+  chunking: "py.sequences",
+  "cosine-similarity": "py.sequences",
+  "rank-fusion": "py.sequences",
+  retrieval: "py.sequences",
 }
 
 /** Lowercase, and collapse spaces/underscores to hyphens, so synonyms resolve. */
