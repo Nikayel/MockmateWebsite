@@ -4702,7 +4702,7 @@ Every technique in this level is one answer to that question.
 - Read for cost, which no test result will show you.
 - Wrap unreliable dependencies, validate what they return, verify the APIs are real.
 
-None of this is anti-AI. Generated code is a draft from a fast collaborator who does not know your codebase, has not read your contract, and will not be on call when it fails. Judging that draft accurately, and proving your judgement with a test, is the part of the job that got more valuable, not less.
+None of this is anti-AI. Generated code is a draft from a fast collaborator who does not know your codebase, has not read your contract, and will not be on call when it fails. Judging that draft accurately, and proving your judgment with a test, is the part of the job that got more valuable, not less.
 
 **Interview nuance:** if an interviewer hands you a function and asks what you think, the pass in this lesson is your answer, spoken out loud. Contract, boundaries, error paths, mutation, cost, dependencies. You will find something almost every time, because the code was chosen to have something in it, and you will find it in a visibly repeatable way rather than by luck.
 
