@@ -3757,6 +3757,8 @@ Background health: every shard is checksummed on write and periodically scrubbed
   "reveal": "This is a durability engineering problem, and cost is the axis. Erasure coding stores k data plus m parity shards so any k reconstruct the object, giving more tolerance than 3x replication at roughly 1.4x overhead, paid for in encode CPU and degraded read amplification. The metadata index is the other half of the system: bucket plus key partitioned across a scalable store, sorted and range partitioned so prefix listing does not touch every shard, and committed durably before the ack, which is where strong read-after-write comes from. Multipart upload and range GET make huge objects practical, and checksums plus scrubbing plus reconstruction keep the eleven nines true over years."
 }
 \`\`\`
+
+**Sources:** [S3 strong read-after-write consistency](https://aws.amazon.com/blogs/aws/amazon-s3-update-strong-read-after-write-consistency/) · [S3 storage classes](https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html) · [Amazon S3 user guide](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html)
 `.trim()
 
 const messageQueueTeach = `
