@@ -1332,6 +1332,8 @@ For tens of millions of vectors with existing Postgres, \`pgvector\` 0.8+ is gen
   "reveal": "The whole lesson is one budget surface with four corners: recall, latency, memory, and cost. HNSW buys recall and latency with RAM, IVF-PQ buys memory back with quantization, DiskANN buys cost back with a few milliseconds on NVMe, and exact search is only a reranker over a small candidate set. Cutting across all of them, quantizing the vectors the search walks and rescoring an oversampled candidate set is what decides the memory column now. Then the operational half decides whether it survives: selective filters pushed into the index, tombstoned space reclaimed by compaction you tune, offline builds hot-swapped in, and versioned embeddings so a model upgrade is a planned migration instead of a surprise."
 }
 \`\`\`
+
+**Sources:** [HNSW: hierarchical navigable small world graphs](https://arxiv.org/abs/1603.09320) · [DiskANN](https://microsoft.github.io/DiskANN/) · [pgvector](https://github.com/pgvector/pgvector)
 `.trim()
 
 const modelGatewayTeach = `
