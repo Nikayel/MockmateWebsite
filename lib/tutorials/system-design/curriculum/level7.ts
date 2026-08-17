@@ -526,6 +526,8 @@ Two lessons pick the target up from here. Translating an availability objective 
   "reveal": "The indicator measures, the objective adds a target and a window, and the agreement adds money. Keep the objective stricter than the agreement so your own alerting fires before the credits do, say where you measured (load balancer, server, or client) whenever you quote a number, and set latency objectives on percentiles because averages hide the tail."
 }
 \`\`\`
+
+**Sources:** [Google SRE: service level objectives](https://sre.google/sre-book/service-level-objectives/) · [Google SRE workbook: alerting on SLOs](https://sre.google/workbook/alerting-on-slos/) · [AWS reliability pillar](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html)
 `.trim()
 
 const errorBudgetsTeach = `
