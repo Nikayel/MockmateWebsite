@@ -5607,10 +5607,15 @@ turn 41   context = [ preamble | goal + constraints | t1 t2 ... t40 ]   184k tok
                     summarize(t1 ... t34) with a prompt YOU wrote
                                              |
                                              v
-turn 42   context = [ preamble | goal + constraints | S | t35 ... t40 ]  17k tokens
+turn 42   context = [ preamble | goal + constraints | S | t35 ... t40 ]  30.6k tokens
                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^   ^
                        re-attached verbatim, never     the summary,
                        part of what got summarized     about 3k tokens
+
+  check the second number rather than trusting it: 184k over 40 turns is
+  ~4.6k a turn, so six surviving turns plus a 3k summary is 3 + 6 x 4.6
+  = 30.6k. compaction buys about 6x here, not the 10x the round number
+  suggests, and the tail length is what decides which
 \`\`\`
 
 Three parameters make that a design rather than a trick. The **threshold** decides how often you pay for a summarization call and how much rot you tolerate between them. The **tail** (how many recent turns survive uncompacted) decides whether the model can still see the thing it was in the middle of doing. And the **summarization prompt** decides what survives, which is the parameter people forget they own.
