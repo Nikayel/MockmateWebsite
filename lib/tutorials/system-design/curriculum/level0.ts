@@ -2230,6 +2230,8 @@ always translate a number into a design decision.
   "reveal": "In the design write, quote each constant within an order of magnitude and immediately convert it into a decision: cache hot reads in memory, avoid random seeks, keep chatty sequences inside one region, and turn QPS into a server or shard count using the single-machine ceilings."
 }
 \`\`\`
+
+**Sources:** [Latency numbers every programmer should know](https://colin-scott.github.io/personal_website/research/interactive_latency.html) · [Dean's LADIS 2009 keynote](https://www.cs.cornell.edu/projects/ladis2009/talks/dean-keynote-ladis2009.pdf)
 `.trim()
 
 const phasedDeliveryClockTeach = `
