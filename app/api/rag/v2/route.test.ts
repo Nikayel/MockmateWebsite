@@ -36,6 +36,13 @@ vi.mock("@/lib/rag/embeddings/hybrid-provider", () => ({
   }),
 }))
 
+// The route embeds through the tracked seam, never the raw provider: that is
+// what puts the spend in usage_events under a named user.
+vi.mock("@/lib/rag/services/embeddings", () => ({
+  generateTextEmbedding: mocks.generateEmbedding,
+  generateTextEmbeddings: mocks.generateEmbeddings,
+}))
+
 vi.mock("@/lib/rag/knowledge-base/seeder", () => ({
   seedKnowledgeBase: mocks.seedKnowledgeBase,
   isKnowledgeBaseSeeded: mocks.isKnowledgeBaseSeeded,
@@ -147,7 +154,10 @@ describe("/api/rag/v2", () => {
     const response = await POST(createRequest({ action: "generate-embedding", text: "two sum" }))
 
     expect(response.status).toBe(200)
-    expect(mocks.generateEmbedding).toHaveBeenCalledWith("two sum")
+    expect(mocks.generateEmbedding).toHaveBeenCalledWith("two sum", {
+      service: "rag-query-embeddings",
+      userId: "user-1",
+    })
     expect(response.data).toMatchObject({
       embedding: [0.1, 0.2, 0.3],
       dimensions: 3,

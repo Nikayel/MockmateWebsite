@@ -24,6 +24,7 @@ import { getEnhancedProfileService } from "@/lib/rag/enhanced-user-profile"
 import { getSmartRecommendationService } from "@/lib/rag/smart-recommendations"
 import { getMisconceptionTracker, analyzeCode } from "@/lib/rag/misconception-detection"
 import { getHybridProvider } from "@/lib/rag/embeddings/hybrid-provider"
+import { generateTextEmbedding, generateTextEmbeddings } from "@/lib/rag/services/embeddings"
 import {
   seedKnowledgeBase,
   isKnowledgeBaseSeeded,
@@ -156,7 +157,7 @@ export async function POST(request: NextRequest) {
         return handleAnalyzeCode(userId, validation.data)
 
       case "generate-embedding":
-        return handleGenerateEmbedding(validation.data)
+        return handleGenerateEmbedding(validation.data, userId)
 
       case "seed-knowledge-base": {
         const adminCheck = await verifyAdminAccess(request)
@@ -496,18 +497,23 @@ async function handleGetRecommendations(userId: string) {
 /**
  * Handle generate embedding
  */
-async function handleGenerateEmbedding(params: { text?: string; texts?: string[] }) {
+async function handleGenerateEmbedding(
+  params: { text?: string; texts?: string[] },
+  userId: string
+) {
   const { text, texts } = params
 
   if (!text && !texts) {
     return NextResponse.json({ error: "Text or texts array is required" }, { status: 400 })
   }
 
+  // The caller is authenticated, so this spend belongs to them by name.
+  const attribution = { service: "rag-query-embeddings", userId } as const
   const provider = getHybridProvider()
   const startTime = Date.now()
 
   if (texts) {
-    const embeddings = await provider.generateEmbeddings(texts)
+    const embeddings = await generateTextEmbeddings(texts, attribution)
     return NextResponse.json({
       embeddings,
       count: embeddings.length,
@@ -516,7 +522,7 @@ async function handleGenerateEmbedding(params: { text?: string; texts?: string[]
       provider: provider.getActiveProvider(),
     })
   } else {
-    const embedding = await provider.generateEmbedding(text!)
+    const embedding = await generateTextEmbedding(text!, attribution)
     return NextResponse.json({
       embedding,
       dimensions: embedding.length,
