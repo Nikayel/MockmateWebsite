@@ -583,7 +583,7 @@ User(id=int(raw["id"]), name=str(raw["name"]), active=bool(raw["active"]))
   "options": [
     {
       "label": "KeyError, so you find out about the change immediately.",
-      "feedback": "That is what raw['active'] would do, and it is the behaviour you want at a boundary. .get is specifically the version that refuses to raise: it hands back None for a key that is not there."
+      "feedback": "That is what raw['active'] would do, and it is the behavior you want at a boundary. .get is specifically the version that refuses to raise: it hands back None for a key that is not there."
     },
     {
       "label": "active silently becomes False, and the damage shows up somewhere else entirely.",
