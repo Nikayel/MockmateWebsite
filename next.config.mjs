@@ -50,6 +50,26 @@ const nextConfig = {
       },
     ]
   },
+  // PostHog reverse proxy. The browser talks to first-party /ingest/*, which
+  // Vercel rewrites to PostHog's US cloud: ad blockers (ubiquitous in our
+  // developer audience) block *.posthog.com but not same-origin paths, and CSP
+  // connect-src/script-src 'self' already cover it, so the policy above needs
+  // no loosening. The recorder script lives on a separate assets host, hence
+  // the first rule. The trailingSlash 308s are harmless here: PostHog answers
+  // its endpoints with and without the slash (verified 2026-08-17), so the
+  // SEO redirect behavior stays exactly as it is.
+  async rewrites() {
+    return [
+      {
+        source: '/ingest/static/:path*',
+        destination: 'https://us-assets.i.posthog.com/static/:path*',
+      },
+      {
+        source: '/ingest/:path*',
+        destination: 'https://us.i.posthog.com/:path*',
+      },
+    ]
+  },
   // Security headers
   async headers() {
     return [
