@@ -521,13 +521,13 @@ Treat a whitespace-only cell as blank.`,
     pass`,
     hints: [
       "Strip every cell first, then split them into the blank ones and the filled ones.",
-      '`value.lstrip("-").isdigit()` is the integer-looking test: it allows one leading minus and then digits only.',
+      '`value.removeprefix("-").isdigit()` is the integer-looking test: it drops one leading minus and then requires digits only, where `lstrip("-")` would take a character set and let `--5` through.',
       'If any filled cell fails that test, return `"object"`. Otherwise a blank means `"float64"` and no blank means `"int64"`.',
     ],
     referenceSolution: `def infer_dtype(cells):
     values = [cell.strip() for cell in cells]
     filled = [value for value in values if value]
-    if not all(value.lstrip("-").isdigit() for value in filled):
+    if not all(value.removeprefix("-").isdigit() for value in filled):
         return "object"
     if len(filled) < len(values):
         return "float64"
