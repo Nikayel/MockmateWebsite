@@ -1,21 +1,17 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRight, Network, Timer } from "lucide-react"
+import { ArrowRight, BookOpen, Timer } from "lucide-react"
 import { listSystemDesignLevels } from "@/lib/tutorials/system-design/registry"
 import { learnTrackMetadata } from "@/lib/seo/learn-metadata"
 import { learnCourseSchemaInput } from "@/lib/seo/learn-course-schema"
 import { Footer } from "@/components/footer"
 import { findCatalogEntry, listCourseEntries } from "@/lib/tutorials/course-catalog"
-import {
-  LEARN_HUB_PATH,
-  levelPath,
-  publicLessonPath,
-  trackPath,
-} from "@/lib/tutorials/lesson-routes"
+import { LEARN_HUB_PATH, publicLessonPath, trackPath } from "@/lib/tutorials/lesson-routes"
 import { BreadcrumbJsonLd, CourseJsonLd, LessonListJsonLd } from "@/components/seo/JsonLd"
-import { firstPublishedLesson } from "@/lib/tutorials/level-path"
+import { firstPublishedLesson, toPathLevelSummary } from "@/lib/tutorials/level-path"
 import { LearnPathTopBar } from "@/components/tutorials/LearnPathTopBar"
 import { SystemDesignDrills } from "@/components/tutorials/SystemDesignDrills"
+import { SystemDesignPath } from "@/components/tutorials/SystemDesignPath"
 
 export const metadata: Metadata = learnTrackMetadata({
   courseId: "system-design",
@@ -59,6 +55,10 @@ export default function LearnSystemDesignPage() {
   const tourStops = DEMO_TOUR.filter((stop) =>
     Boolean(findCatalogEntry("system-design", stop.levelSlug, stop.lessonId))
   )
+  // Project to the lean Path summary so the authored 208-lesson corpus (teach markdown, model
+  // answers, rubrics) never serializes into the client bundle — the Path only needs ids, headings,
+  // and counts.
+  const pathLevels = levels.map((level) => toPathLevelSummary(level))
 
   return (
     <>
@@ -79,9 +79,9 @@ export default function LearnSystemDesignPage() {
           { name: "System Design", url: trackPath("system-design") },
         ]}
       />
-      <LearnPathTopBar label="Learn System Design" containerClass="max-w-4xl" />
-      <div className="mx-auto max-w-4xl px-4 py-12 sm:py-16">
-        <header className="mb-10 text-center">
+      <LearnPathTopBar label="Learn System Design" />
+      <div className="mx-auto max-w-6xl px-4 py-12 sm:py-16">
+        <header className="mb-12 text-center">
           <p className="text-accent-strong text-xs font-semibold tracking-[0.18em] uppercase">
             Learn System Design
           </p>
@@ -108,30 +108,36 @@ export default function LearnSystemDesignPage() {
             ))}
           </div>
 
-          {firstLesson && (
-            <div className="mt-6 flex justify-center">
+          {/* Two quiet entry hints rather than one loud button.
+              The filled accent CTA that used to sit here answered "where should I start?" at the
+              volume of a signup button, which is the wrong weight for a course whose actual entry
+              point is the level you pick below: it pulled the eye past twelve levels to a single
+              lesson chosen for you. Both routes are now the same secondary-pill treatment
+              `/learn/python` uses, so they read as hints for the two visitors who want one (never
+              done this; done it and want the timed round) and the path stays the page. */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+            {firstLesson && (
               <Link
                 href={publicLessonPath(
                   "system-design",
                   firstLesson.levelSlug,
                   firstLesson.lessonId
                 )}
-                className="bg-accent text-accent-foreground hover:bg-accent/90 focus-visible:ring-accent/50 group inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                className="border-accent/30 text-accent-strong hover:bg-accent/10 focus-visible:ring-accent/50 group inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
               >
-                Start with {firstLesson.lessonTitle}
+                <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+                New to this? Start with {firstLesson.lessonTitle}
                 <ArrowRight
-                  className="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+                  className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
                   aria-hidden="true"
                 />
               </Link>
-            </div>
-          )}
+            )}
 
-          {/* Drills live at the foot of the page because they are the applied end of the course, not
-              a shortcut past it. This pill is the one concession to that placement: the same
-              secondary-link treatment `/learn/python` uses for the executor, so a returning learner
-              who came back to drill is not made to scroll the whole level list to find them. */}
-          <div className="mt-4 flex justify-center">
+            {/* Drills live at the foot of the page because they are the applied end of the course,
+                not a shortcut past it. This pill is the one concession to that placement, so a
+                returning learner who came back to drill is not made to scroll the whole level list
+                to find them. */}
             <Link
               href="#drills"
               className="border-border text-muted-foreground hover:border-accent/30 hover:text-foreground focus-visible:ring-accent/50 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
@@ -167,41 +173,7 @@ export default function LearnSystemDesignPage() {
           </nav>
         )}
 
-        <ol className="flex flex-col gap-4">
-          {levels.map((level) => {
-            const lessonCount = level.modules.reduce((total, mod) => total + mod.lessons.length, 0)
-            const comingSoon = lessonCount === 0
-            return (
-              <li key={level.id}>
-                <Link
-                  href={levelPath("system-design", level.slug)}
-                  className="group border-border bg-card hover:border-accent/40 hover:bg-accent/[0.03] flex items-start gap-4 rounded-xl border p-5 transition-colors"
-                >
-                  <span
-                    className="border-accent/30 text-accent-strong bg-accent/10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold"
-                    aria-hidden="true"
-                  >
-                    {level.id}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-foreground flex items-center gap-2 font-semibold">
-                      <Network className="text-accent h-4 w-4 shrink-0" aria-hidden="true" />
-                      {level.title}
-                    </h2>
-                    <p className="text-muted-foreground mt-1 text-sm">{level.tagline}</p>
-                    <p className="text-muted-foreground mt-2 text-xs">
-                      {comingSoon
-                        ? "Lessons coming soon"
-                        : `${lessonCount} ${lessonCount === 1 ? "lesson" : "lessons"}`}{" "}
-                      · ~{level.estimatedHours}h
-                    </p>
-                  </div>
-                  <ArrowRight className="text-muted-foreground group-hover:text-foreground mt-1 h-5 w-5 shrink-0 transition-transform group-hover:translate-x-0.5" />
-                </Link>
-              </li>
-            )
-          })}
-        </ol>
+        <SystemDesignPath levels={pathLevels} />
 
         {/* Below the levels on purpose. The levels are the course; a drill is the round you take
             once you can hold the concepts, so it reads as the end of the page rather than a rival
