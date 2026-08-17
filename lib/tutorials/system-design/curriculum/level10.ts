@@ -4503,6 +4503,8 @@ Level 5 works the same mechanism from the other side, where the thing being held
   "reveal": "A coordination service exists because a cluster cannot build these primitives safely on its own. Put lock state behind a consensus protocol (Raft in etcd and Consul, Zab in ZooKeeper) so it is linearizable and a minority partition becomes unavailable rather than wrong. Auto release through session leases and heartbeats so a dead client does not deadlock the cluster. Hand out a monotonic fencing token with every grant and have the protected resource reject stale ones, because that is the only defence against a paused holder. Use watches instead of polling, and elect leaders with ordered ephemeral keys where each candidate watches only its predecessor, so a failover wakes one node rather than a herd."
 }
 \`\`\`
+
+**Sources:** [Kleppmann on distributed locking](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html) · [Redis distributed locks](https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/) · [The Chubby lock service](https://research.google/pubs/the-chubby-lock-service-for-loosely-coupled-distributed-systems/)
 `.trim()
 
 const codeSandboxTeach = `
