@@ -1185,6 +1185,14 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
       { id: "sd-l11-online-serving-rollout", anchor: "Online model serving and rollout" },
       { id: "sd-l11-rag-architecture", anchor: "RAG architecture, end to end" },
       { id: "sd-l11-llm-eval-guardrails", anchor: "LLM evaluation and guardrails before rollout" },
+      {
+        id: "sd-l11-prefill-decode-split",
+        anchor: "Splitting prefill from decode so one pool stops carrying two conflicting SLOs",
+      },
+      {
+        id: "sd-l11-gpu-capacity-economics",
+        anchor: "Sizing a GPU fleet in tokens per second, and the self-host crossover point",
+      },
     ],
     cta: {
       href: "/system-design-interview-practice",
@@ -1209,11 +1217,129 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
         id: "sd-l11-rag-architecture",
         anchor: "RAG architecture, the retrieval tier a gateway fronts",
       },
+      {
+        id: "sd-l11-prompt-cache-economics",
+        anchor:
+          "The three prices of a token, and the prefix ordering that decides which one you pay",
+      },
+      {
+        id: "sd-l11-constrained-decoding",
+        anchor: "Masking every illegal token as it decodes, so malformed output cannot be sampled",
+      },
     ],
     cta: {
       href: "/system-design-interview-practice",
       label:
         "Practice a design round on routing traffic across model providers under a cost ceiling",
+    },
+  },
+
+  // ---------------------------------------------------------------------------------------------
+  // System Design: LLM serving economics (Level 11 module 2, shipped 2026-08-16)
+  // ---------------------------------------------------------------------------------------------
+  "sd-l11-prefill-decode-split": {
+    related: [
+      {
+        id: "sd-l11-llm-inference-serving",
+        anchor: "Why KV cache memory rather than compute caps how many requests one GPU holds",
+      },
+      {
+        id: "sd-l11-gpu-capacity-economics",
+        anchor: "Fleet sizing in tokens per second per GPU, not QPS per core",
+      },
+      {
+        id: "sd-l11-prompt-cache-economics",
+        anchor: "Prefix ordering, and the three prices one token can be billed at",
+      },
+      {
+        id: "sd-l7-sli-slo-sla",
+        anchor: "Turning a latency signal into an SLI and then an SLO you can be paged on",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label:
+        "Practice a design round where time to first token and time per output token are separate SLOs",
+    },
+  },
+
+  "sd-l11-prompt-cache-economics": {
+    related: [
+      {
+        id: "sd-l11-prefill-decode-split",
+        anchor:
+          "Prefill is compute-bound and decode is bandwidth-bound, so one pool serves neither",
+      },
+      {
+        id: "sd-l11-constrained-decoding",
+        anchor: "Constrained decoding, instead of paying for a rejected generation twice",
+      },
+      {
+        id: "sd-l11-model-gateway",
+        anchor:
+          "Semantic caching and per-team token budgets at the chokepoint above every provider",
+      },
+      {
+        id: "sd-l3-caching-patterns",
+        anchor: "Cache-aside, write-through and the TTL question underneath any cache",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label:
+        "Practice a design round where the prompt layout is the cost decision you have to defend",
+    },
+  },
+
+  "sd-l11-constrained-decoding": {
+    related: [
+      {
+        id: "sd-l11-llm-eval-guardrails",
+        anchor: "Golden-set gates before a prompt ships, and the filter every output passes",
+      },
+      {
+        id: "sd-l11-tool-protocol-mcp",
+        anchor: "Tool calls as a versioned protocol, with an auth story and a threat model",
+      },
+      {
+        id: "sd-l11-llm-agents",
+        anchor: "The agent loop, and the hard bounds it needs in your code rather than the prompt",
+      },
+      {
+        id: "sd-l11-prompt-cache-economics",
+        anchor: "The three prices of a token, so a rejected generation is billed twice",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label:
+        "Practice a design round where the model has to return JSON a downstream service can parse",
+    },
+  },
+
+  "sd-l11-gpu-capacity-economics": {
+    related: [
+      {
+        id: "sd-l11-llm-inference-serving",
+        anchor: "PagedAttention and continuous batching, the reason a GPU holds more requests",
+      },
+      {
+        id: "sd-l11-prefill-decode-split",
+        anchor: "Two pools with separate SLOs, once prefill and decode stop sharing a queue",
+      },
+      {
+        id: "sd-l4-capacity-planning",
+        anchor: "Capacity planning and headroom for a fleet still measured in QPS per core",
+      },
+      {
+        id: "sd-l9-cloud-finops",
+        anchor: "Cloud FinOps, unit economics and the commitment discount you have to justify",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label:
+        "Practice a design round where you size a GPU fleet and defend buying rather than renting",
     },
   },
 
