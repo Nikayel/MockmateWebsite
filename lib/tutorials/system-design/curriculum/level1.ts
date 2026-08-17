@@ -1608,6 +1608,8 @@ keep stable internal RPC on H2/gRPC.
   "reveal": "Each version pushed the head-of-line problem down one layer until QUIC dissolved it. The topology to carry into your design write: H3 with H2 fallback at the lossy mobile edge, H2/gRPC for stable internal RPC."
 }
 \`\`\`
+
+**Sources:** [RFC 9113, HTTP/2](https://www.rfc-editor.org/rfc/rfc9113.html) · [RFC 9114, HTTP/3](https://www.rfc-editor.org/rfc/rfc9114.html) · [RFC 9000, QUIC transport](https://www.rfc-editor.org/rfc/rfc9000.html)
 `.trim()
 
 const requestLifecycleTeach = `
