@@ -378,6 +378,8 @@ Defend against credential stuffing (attackers replaying passwords leaked from ot
   "reveal": "In your design write, cover the full survivability stack the recap names: argon2id with per-user salt and a KMS pepper so the dump is dead, phishing-resistant MFA with SMS demoted to last resort, recovery flows as strong as the login itself, and enumeration-safe errors with throttling and breach checks."
 }
 \`\`\`
+
+**Sources:** [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) · [RFC 9106, Argon2](https://www.rfc-editor.org/rfc/rfc9106.html) · [NIST SP 800-63B](https://pages.nist.gov/800-63-3/sp800-63b.html)
 `.trim()
 
 const passkeysWebauthnTeach = `
