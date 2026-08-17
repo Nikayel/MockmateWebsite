@@ -192,45 +192,32 @@ function emDashes(text: string): string[] {
 }
 
 /**
- * British spellings per file as measured on 2026-08-16, AFTER comment stripping and after the
- * contract exemptions above. A ratchet: every file may only ever go down, and a file absent from
- * this map must be at zero.
+ * British spellings per file, AFTER comment stripping and after the contract exemptions above. A
+ * ratchet: every file may only ever go down, and a file absent from this map must be at zero.
  *
- * These are the audit's HIGH-WATER MARK, not a live reading. The fix wave was running as this was
- * written and five of the files below went to zero between the census and the commit, which is the
- * mechanism working as intended: a count that has already fallen is still under its baseline, and a
- * fix that has to be reverted does not turn the guard red on its way back.
+ * Recomputed 2026-08-16 at the end of the spelling sweep, with this file's own detector over the
+ * corpus as it then stood, so every number below is a LIVE reading rather than the audit's original
+ * high-water mark. The first census recorded 153 hits across 23 files; 26 across 8 files remain, and
+ * fifteen files left the map entirely. Recompute the same way after any further sweep: a count-based
+ * baseline that sits above the truth cannot tell a fixed instance plus a new one from no change, so
+ * an entry left high is a hole in the guard for that one file.
  *
- * Recompute and lower these when the spelling sweep lands. `lib/tutorials/curriculum/level3/cli.ts`
- * and `level4/config-logging.ts` will not reach zero by a copy edit alone: their hits are `--colour`
- * and `{"colour": "red"}`, deliberate not-in-the-spec tokens the graded assertions match on, so
- * changing them means changing the exercise contract in one commit across prompt, starter,
- * reference and tests.
+ * Two of the eight will not reach zero by a copy edit alone. `level3/cli.ts` (8) and
+ * `level4/config-logging.ts` (5) are all `--colour` and `{"colour": "red"}`, deliberate
+ * not-in-the-spec tokens the graded assertions match on, so changing them means changing the
+ * exercise contract in one commit across prompt, starter, reference and tests. The other six are
+ * ordinary prose the sweep did not reach: `metre`/`metres` in system-design level 3 (8), and one
+ * each of `judgement`, `honour`, `behaviour`, `judgement` and `practise` in the rest.
  */
 const BRITISH_BASELINE: ReadonlyMap<string, number> = new Map([
-  ["lib/tutorials/curriculum/level1/index.ts", 5],
-  ["lib/tutorials/curriculum/level2/index.ts", 44],
+  ["lib/tutorials/curriculum/level1/index.ts", 1],
   ["lib/tutorials/curriculum/level3/cli.ts", 8],
-  ["lib/tutorials/curriculum/level3/logging-errors.ts", 1],
-  ["lib/tutorials/curriculum/level3/numpy-arrays.ts", 1],
-  ["lib/tutorials/curriculum/level3/packages.ts", 5],
-  ["lib/tutorials/curriculum/level3/pandas-dataframes.ts", 2],
-  ["lib/tutorials/curriculum/level3/parse-config.ts", 2],
-  ["lib/tutorials/curriculum/level3/pytest-basics.ts", 21],
-  ["lib/tutorials/curriculum/level3/rest-pydantic.ts", 1],
-  ["lib/tutorials/curriculum/level3/type-hints.ts", 2],
-  ["lib/tutorials/curriculum/level4/abc-protocols.ts", 1],
-  ["lib/tutorials/curriculum/level4/concurrency.ts", 4],
+  ["lib/tutorials/curriculum/level3/parse-config.ts", 1],
+  ["lib/tutorials/curriculum/level3/pytest-basics.ts", 1],
   ["lib/tutorials/curriculum/level4/config-logging.ts", 5],
-  ["lib/tutorials/curriculum/level4/packaging-capstone.ts", 1],
-  ["lib/tutorials/curriculum/level4/performance.ts", 1],
-  ["lib/tutorials/curriculum/level4/solid-patterns.ts", 2],
-  ["lib/tutorials/curriculum/level5/index.ts", 10],
-  ["lib/tutorials/system-design/curriculum/level0.ts", 6],
-  ["lib/tutorials/system-design/curriculum/level1.ts", 2],
-  ["lib/tutorials/system-design/curriculum/level3.ts", 10],
-  ["lib/tutorials/system-design/curriculum/level5.ts", 7],
-  ["lib/tutorials/system-design/curriculum/level9.ts", 3],
+  ["lib/tutorials/curriculum/level5/index.ts", 1],
+  ["lib/tutorials/system-design/curriculum/level3.ts", 8],
+  ["lib/tutorials/system-design/curriculum/level9.ts", 1],
 ])
 
 /**
