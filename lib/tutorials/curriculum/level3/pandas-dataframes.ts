@@ -107,7 +107,7 @@ def attach_category(rows, categories):
 `
 
 const LEDGER_REPORT_STARTER = String.raw`def category_report(rows, categories):
-    """Summarise the joined rows per category name (see README.md)."""
+    """Summarize the joined rows per category name (see README.md)."""
     # TODO: every known category needs an entry, present or not. A missing amount
     # is not a zero-value transaction, so it must not reach total, count or average.
     return {}
@@ -603,7 +603,7 @@ Some tests are hidden.`,
           role: "editable",
           language: "python",
           content: LEDGER_REPORT_STARTER,
-          description: "Summarise, rank, and account for the unmatched rows",
+          description: "Summarize, rank, and account for the unmatched rows",
         },
         {
           path: "tests/__init__.py",
