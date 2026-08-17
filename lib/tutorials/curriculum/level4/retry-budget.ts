@@ -598,11 +598,11 @@ for attempt in range(5):
     ceiling = min(MAX_DELAY, BASE_DELAY * 2 ** attempt)
     print(attempt, round(ceiling, 2), round(rng.uniform(0.0, ceiling), 3))
 
-# 0 0.5 0.16
-# 1 1.0 0.94
-# 2 2.0 0.51
-# 3 4.0 1.44
-# 4 8.0 5.19
+# 0 0.5 0.162
+# 1 1.0 0.151
+# 2 2.0 1.302
+# 3 4.0 0.29
+# 4 8.0 4.287
 \`\`\`
 
 \`random.Random(seed)\` is a generator you own, so seeding it makes a run reproducible without touching the global \`random\` state that the rest of the process shares. \`rng.uniform(a, b)\` returns a float between \`a\` and \`b\`.
