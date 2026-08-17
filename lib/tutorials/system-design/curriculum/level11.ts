@@ -2599,7 +2599,7 @@ a 70B-class model with grouped-query attention
 the same shape with full multi-head attention, 64 kv heads instead of 8
   2 x 80 x 64 x 128 x 2 = 2,621,440 bytes = 2.5 MiB per token   (8x more)
 
-one 8-GPU node, 640 GB of HBM, weights at FP8 take 70 GB -> ~570 GB for KV
+one 8-GPU node, 640 GiB of HBM, weights at FP8 take 70 GiB -> ~570 GiB for KV
   at 8,192 tokens per sequence
     grouped-query   8,192 x 320 KiB = 2.5 GiB  ->  ~228 concurrent sequences
     multi-head      8,192 x 2.5 MiB =  20 GiB  ->   ~28 concurrent sequences
