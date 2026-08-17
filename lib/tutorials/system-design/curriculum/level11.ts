@@ -4146,7 +4146,7 @@ The chunk is not badly written and it is not too long. It is unretrievable, beca
 
 ## Overlap is a guess, and a narrow one
 
-Overlap exists to survive a boundary that lands mid-thought. It duplicates the last N tokens of each chunk into the front of the next, so a sentence cut in half appears whole in at least one chunk. That is worth having and it is cheap in engineering. It is not cheap in index size: 20 percent overlap is 20 percent more chunks, 20 percent more vectors, and 20 percent more candidates competing for your top-k. And it fixes only local damage. The orphaned claim is not a boundary problem. The context that would have made chunk 42 findable was never adjacent to it.
+Overlap exists to survive a boundary that lands mid-thought. It duplicates the last N tokens of each chunk into the front of the next, so a sentence cut in half appears whole in at least one chunk. That is worth having and it is cheap in engineering. It is not cheap in index size: 20 percent overlap is 25 percent more chunks, 25 percent more vectors, and 25 percent more candidates competing for your top-k, because the stride between chunk starts drops to 80 percent of the chunk size and 1 / 0.8 is 1.25. And it fixes only local damage. The orphaned claim is not a boundary problem. The context that would have made chunk 42 findable was never adjacent to it.
 
 ## Structure-aware splitting: split where the document already splits
 
