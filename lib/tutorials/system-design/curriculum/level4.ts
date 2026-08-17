@@ -460,6 +460,8 @@ anycast) so it is never a SPOF.
   "reveal": "In your design write, draw the stack explicitly and add one sentence on HA: the balancer tier itself runs active-active with a floating IP or anycast, because a lone balancer is a single point of failure no matter how healthy the fleet behind it is."
 }
 \`\`\`
+
+**Sources:** [AWS Network Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html) · [AWS Application Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html) · [HAProxy configuration](https://docs.haproxy.org/3.0/configuration.html)
 `.trim()
 
 const lbAlgorithmsTeach = `
