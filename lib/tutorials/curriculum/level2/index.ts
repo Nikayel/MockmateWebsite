@@ -3631,7 +3631,7 @@ def parse_csv(text):
     hints: [
       "Wrap the string so it reads like a file: `io.StringIO(text)`.",
       "Build a reader: `csv.reader(io.StringIO(text))`.",
-      "Materialise the rows: `return [row for row in csv.reader(io.StringIO(text))]`.",
+      "Materialize the rows: `return [row for row in csv.reader(io.StringIO(text))]`.",
     ],
     referenceSolution: `import csv
 import io
@@ -5433,7 +5433,7 @@ for chunk in batched(range(10), 3):
 
 ### Pitfalls
 
-- **An iterator is single use.** Anything from \`itertools\` is consumed as you read it, so calling \`list()\` twice on the same object gives you the contents and then an empty list. Materialise once if you need it twice.
+- **An iterator is single use.** Anything from \`itertools\` is consumed as you read it, so calling \`list()\` twice on the same object gives you the contents and then an empty list. Materialize once if you need it twice.
 - **\`chain(pages)\` is not \`chain.from_iterable(pages)\`.** The first treats the outer list as a single source and yields the inner lists themselves; the second flattens. It is a silent shape bug rather than an error.
 - **\`groupby\` compares keys with \`==\` on adjacent items only.** It never sorts, hashes, or reorders, so the correctness of your grouping rests entirely on the ordering you handed it.
 
