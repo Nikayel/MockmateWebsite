@@ -170,7 +170,7 @@ def parse_line(line: str) -> Entry | None:
     if text.count(":") != 1:
         raise BadLineError("bad log line: " + repr(line))
     worker, raw_minutes = (part.strip() for part in text.split(":"))
-    if not worker or not raw_minutes.isdigit():
+    if not worker or not raw_minutes.isdecimal():
         raise BadLineError("bad log line: " + repr(line))
     return Entry(worker=worker, minutes=int(raw_minutes))
 `
@@ -608,17 +608,17 @@ for number, line in enumerate(text.splitlines(), start=1):
 
 \`enumerate(..., start=1)\` is worth the habit: humans and editors number the first line 1, so a report that says "line 0" sends someone hunting.
 
-Finally, checking that a piece of text is a whole number is \`str.isdigit()\`, and its strictness is the point:
+Finally, checking that a piece of text is a whole number is \`str.isdecimal()\`, and its strictness is the point:
 
 \`\`\`python
-print("45".isdigit())    # True
-print("4.5".isdigit())   # False
-print("-5".isdigit())    # False
-print(" 45".isdigit())   # False, so strip the text first
-print("".isdigit())      # False
+print("45".isdecimal())    # True
+print("4.5".isdecimal())   # False
+print("-5".isdecimal())    # False
+print(" 45".isdecimal())   # False, so strip the text first
+print("".isdecimal())      # False
 \`\`\`
 
-One call rejects fractions, negatives and empty text, which is why it beats a \`try: int(x)\` when "whole minutes" is the actual rule. Note the fourth line: surrounding spaces make it \`False\`, so strip before you ask.
+One call rejects fractions, negatives and empty text, which is exactly the "whole minutes" rule here. It is not better than a \`try: int(x)\`, it answers a different question: \`int(x)\` happily accepts \`-5\`, so reach for that when a sign is legal. Note the fourth line: surrounding spaces make it \`False\`, so strip before you ask. Use \`isdecimal\` rather than the looser \`isdigit\`, which returns True for characters like ² that \`int()\` then refuses.
 
 ### The reporting function
 
@@ -720,7 +720,7 @@ For \`"alice: 45\\nnonsense\\nalice: 15\\n"\` return
     hints: [
       "`text.splitlines()` gives the lines, and `enumerate(..., start=1)` numbers them the way a person would.",
       "Sort each line into one of three outcomes before you total anything: carries no data, is a shift, or is bad. `line.strip()` first, so a line of spaces reads as blank.",
-      '`entry.partition(":")` hands back the piece before the colon, the colon itself (empty when there was none), and everything after it, and `.isdigit()` rejects minutes that are negative, fractional or missing. Total with `totals[worker] = totals.get(worker, 0) + minutes`.',
+      '`entry.partition(":")` hands back the piece before the colon, the colon itself (empty when there was none), and everything after it, and `.isdecimal()` rejects minutes that are negative, fractional or missing. Total with `totals[worker] = totals.get(worker, 0) + minutes`.',
     ],
     referenceSolution: `def summarize_log(text):
     totals = {}
@@ -731,7 +731,7 @@ For \`"alice: 45\\nnonsense\\nalice: 15\\n"\` return
             continue
         worker, colon, raw_minutes = entry.partition(":")
         worker, raw_minutes = worker.strip(), raw_minutes.strip()
-        if not colon or not worker or not raw_minutes.isdigit():
+        if not colon or not worker or not raw_minutes.isdecimal():
             skipped.append(number)
             continue
         totals[worker] = totals.get(worker, 0) + int(raw_minutes)
@@ -791,7 +791,7 @@ it has to name where the code actually lives. Bad lines are reported, never fata
     starterCode: "",
     hints: [
       "Build it bottom up: one line, then a directory of files, then the command over that directory, then the declaration that points at the command. Each layer only calls the one below it.",
-      "`parse_line` has three outcomes, so decide them in order: nothing to report (blank or `#`), then a valid `worker: minutes`, then everything else is a `BadLineError`. `str.isdigit()` is a quick way to reject minutes that are negative, fractional, or not numbers at all.",
+      "`parse_line` has three outcomes, so decide them in order: nothing to report (blank or `#`), then a valid `worker: minutes`, then everything else is a `BadLineError`. `str.isdecimal()` is a quick way to reject minutes that are negative, fractional, or not numbers at all.",
       "`Path.glob` with a pattern matches the top level of a directory only, which is the rule the README states about subfolders, and sorting the paths it yields orders them by name. In `collect_entries` the line number has to come from `enumerate`'s `start`, and the `try` belongs around the single `parse_line` call so one rejection costs you that line and nothing more. `main` validates both bad call shapes before it reads anything. If the entry-point test says it cannot find your command, the fix is the `module.path:function` string in `[project.scripts]`, not the Python.",
     ],
     workspace: {
