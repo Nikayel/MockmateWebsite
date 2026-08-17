@@ -78,6 +78,36 @@ describe("production rate limiter fallback", () => {
     )
   })
 
+  it("sends batched commands to Upstash's /pipeline endpoint, never the base URL", async () => {
+    // The base URL accepts exactly ONE command and 400s on an array of arrays, which
+    // is why the Redis branch silently never worked before 2026-08-17.
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      statusText: "OK",
+      json: async () => [{ result: 0 }, { result: [] }, { result: "0" }],
+    }))
+    vi.stubGlobal("fetch", fetchMock)
+
+    const rateLimiter = await importRateLimiter({
+      NODE_ENV: "production",
+      UPSTASH_REDIS_REST_URL: "https://redis.example.com",
+      UPSTASH_REDIS_REST_TOKEN: "token",
+      USE_DISTRIBUTED_RATE_LIMIT: "true",
+    })
+
+    const result = await rateLimiter.checkRateLimit("pipeline-user", "free", 100)
+    await rateLimiter.startRequestTracking("pipeline-user", 100)
+    await rateLimiter.endRequestTracking("pipeline-user")
+
+    expect(result.allowed).toBe(true)
+    expect(fetchMock).toHaveBeenCalled()
+    for (const call of fetchMock.mock.calls as unknown as [string][]) {
+      expect(call[0]).toBe("https://redis.example.com/pipeline")
+    }
+    // A healthy Redis path must not log the fallback error.
+    expect(loggerError).not.toHaveBeenCalled()
+  })
+
   it("does not fall back to Firestore transactions when Redis calls fail in production", async () => {
     vi.stubGlobal(
       "fetch",

@@ -101,6 +101,11 @@ function shouldFallbackToFirestore(): boolean {
  * Get rate limit state from Redis (distributed)
  * Uses Sorted Set (ZSET) to store sliding window timestamps + token weight
  * pipeline structure avoids round-trips
+ *
+ * Batched command arrays MUST go to Upstash's `/pipeline` endpoint — the base URL
+ * accepts exactly one command and 400s on an array of arrays. These three helpers
+ * posted to the base URL from their introduction until 2026-08-17, so the Redis
+ * branch had never once succeeded in production: every call threw and fell back.
  */
 async function getRedisRateLimitState(userId: string): Promise<{
   requestCount: number
@@ -114,7 +119,7 @@ async function getRedisRateLimitState(userId: string): Promise<{
   const concurrentKey = `rate_limiter:concurrent:${userId}`
 
   try {
-    const response = await fetch(`${redisUrl}`, {
+    const response = await fetch(`${redisUrl}/pipeline`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${redisToken}`,
@@ -182,7 +187,7 @@ async function recordRedisRequestStart(userId: string, estimatedTokens: number):
   const member = `${now}:${estimatedTokens}`
 
   try {
-    const response = await fetch(`${redisUrl}`, {
+    const response = await fetch(`${redisUrl}/pipeline`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${redisToken}`,
@@ -214,7 +219,7 @@ async function recordRedisRequestStart(userId: string, estimatedTokens: number):
 async function recordRedisRequestEnd(userId: string): Promise<void> {
   const concurrentKey = `rate_limiter:concurrent:${userId}`
   try {
-    const response = await fetch(`${redisUrl}`, {
+    const response = await fetch(`${redisUrl}/pipeline`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${redisToken}`,
