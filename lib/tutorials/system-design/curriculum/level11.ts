@@ -2083,7 +2083,7 @@ The other half of the bill is structural. An agent resends the whole conversatio
       "About 320,000, one turn's worth per turn plus some overhead"
     ]
   },
-  "workedExample": "The initial values are 40 turns adding 800 tokens each, so the final turn alone carries 32,000 tokens of input and the run bills 656,000 across all forty. Turn on caching at a 0.1x read and a 1.25x write and the same run bills about 102,000 units, removing roughly 84 percent of the input spend. Now drag the turn count up: the uncached number grows with the square of the turns while the cached number grows nearly linearly, so the gap widens the longer the agent runs.",
+  "workedExample": "The initial values are 40 turns adding 800 tokens each, so the final turn alone carries 32,000 tokens of input and the run bills 656,000 across all forty. Turn on caching at a 0.1x read and a 1.25x write and the same run bills about 102,000 units, removing roughly 84 percent of the input spend. Now drag the turn count up. The cached formula keeps the same quadratic term and multiplies it by the read rate, so the cached curve is quadratic too, and the share removed climbs toward a ceiling of 1 minus the read multiplier, 90 percent at a 0.1x read. At 40 turns that quadratic term is already about 61 percent of the cached total, and at 120 turns it is about 83 percent.",
   "inputs": [
     {
       "kind": "slider",
@@ -2159,7 +2159,7 @@ The other half of the bill is structural. An agent resends the whole conversatio
       "format": "percent"
     }
   ],
-  "caption": "The uncached curve is quadratic in turns and the cached curve is close to linear, which is why caching is a prerequisite for a long-running agent rather than an optimization of one, and why context compaction is a cost lever and not only a context-window lever."
+  "caption": "Caching does not flatten the quadratic, it scales it by the read multiplier, so the cached curve is quadratic as well and the share of input spend it can remove is capped at 1 minus that multiplier. That ceiling is still why caching is a prerequisite for a long-running agent rather than an optimization of one, and why context compaction is a cost lever and not only a context-window lever."
 }
 \`\`\`
 
@@ -2192,7 +2192,7 @@ Nothing above is unique to hosted APIs; it is the same mechanism with the price 
       "feedback": "That is the right worry about semantic caching and the reason the gateway lesson tunes the threshold. It does not rescue it here, because near-duplicate questions are not what this workload produces."
     }
   ],
-  "reveal": "Prompt caching is arithmetic, not a setting. Three prices for one token means a cache write is an investment that repays on the second request at the short TTL and the third at the long one. The entry is keyed on an exact prefix, so the layout of the prompt decides the hit rate, and the ordering rule is most stable first inside a budget of four breakpoints. Two details do most of the silent damage: the minimum cacheable prefix moves between models, and the TTL runs from the start of the request rather than the end of the response. Underneath all of it, an agent resends its whole conversation every turn, so input cost grows with the square of the turn count and caching is what flattens it. Finally, a prefix cache is shared state: salt the key per tenant."
+  "reveal": "Prompt caching is arithmetic, not a setting. Three prices for one token means a cache write is an investment that repays on the second request at the short TTL and the third at the long one. The entry is keyed on an exact prefix, so the layout of the prompt decides the hit rate, and the ordering rule is most stable first inside a budget of four breakpoints. Two details do most of the silent damage: the minimum cacheable prefix moves between models, and the TTL runs from the start of the request rather than the end of the response. Underneath all of it, an agent resends its whole conversation every turn, so input cost grows with the square of the turn count, and caching scales that quadratic term by the read rate rather than flattening it, which is why the most caching can ever remove is 1 minus the read multiplier. Finally, a prefix cache is shared state: salt the key per tenant."
 }
 \`\`\`
 
