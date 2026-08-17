@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowRight, BookOpen, Clock, Timer } from "lucide-react"
+import { ArrowRight, BookOpen, Clock, Info, Timer } from "lucide-react"
 import { scenarios } from "@/lib/scenarios"
 import { lessonForDrill } from "@/lib/tutorials/system-design/lesson-drills"
 import type { DifficultyLevel, SystemDesignScenario } from "@/lib/scenarios/types"
@@ -67,6 +67,22 @@ export function SystemDesignDrills() {
           a model answer. A drill is the whole round instead: {drills.length} open-ended briefs,
           each one a timed interview with an AI interviewer who questions your design as you build
           it and scores it when you submit. Read the levels first, then drill.
+        </p>
+      </div>
+
+      {/* Said out loud rather than left to be discovered. Every drill below runs end to end and is
+          scored, so nothing here is a placeholder; what is still moving is how closely the ROUND
+          resembles the real thing, which is a higher bar than "it works" and one the DSA and
+          debugging tracks clear more convincingly today. A learner who notices the difference
+          should find that we noticed it first. */}
+      <div className="border-border bg-muted/30 mb-5 flex items-start gap-2.5 rounded-xl border p-4">
+        <Info className="text-accent mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <p className="text-muted-foreground text-sm text-pretty">
+          <span className="text-foreground font-medium">Still being tuned.</span> These rounds run
+          end to end and they are scored, but they are not yet as close to a real interview as our
+          DSA and debugging rounds are. We are working with curriculum developers and senior
+          engineers at tech companies to make a system design round mirror the one they actually
+          run.
         </p>
       </div>
 
