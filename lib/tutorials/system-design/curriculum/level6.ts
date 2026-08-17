@@ -2263,6 +2263,8 @@ replay window or replays double-apply.
   "reveal": "Retention gives you the replay window; idempotency gives you safety inside it. Size them together: a 7-day replay window with a 24-hour dedup memory is a double-apply waiting for its first incident."
 }
 \`\`\`
+
+**Sources:** [Kafka log compaction](https://kafka.apache.org/documentation/#compaction) · [KIP-405 tiered storage](https://cwiki.apache.org/confluence/display/KAFKA/KIP-405%3A+Kafka+Tiered+Storage) · Designing Data-Intensive Applications, ch. 11
 `.trim()
 
 const deliverySemanticsTeach = `
