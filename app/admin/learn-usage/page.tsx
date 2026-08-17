@@ -5,16 +5,23 @@ import { Clock } from "lucide-react"
 import { AdminLayout, AdminSection, DataTable, type Column } from "@/components/admin/shared"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { UserProfileDrawer } from "@/components/admin/UserProfileDrawer"
 import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import { formatLearnDuration } from "@/lib/admin/format-learn-duration"
-import type { PlatformLearnDayRow, PlatformLearnUsageView } from "@/lib/admin/learn-usage-views"
+import type {
+  PlatformLearnDayRow,
+  PlatformLearnerRow,
+  PlatformLearnUsageView,
+} from "@/lib/admin/learn-usage-views"
 
 /**
  * Platform view over the Learn time rollups: how much active study time the curriculum gets,
- * day by day, split by course, and which lessons carry it. Active time means visible tab +
- * recent input (see lib/tutorials/learn-time-client.ts), so these numbers are engagement,
- * not wall clock — and deliberately NOT the dashboard "Practice" stat, which stays
- * interview-only. Per-learner detail lives in the Users page drawer, not here.
+ * day by day, split by course, by learner, and which lessons carry it. Active time means
+ * visible tab + recent input (see lib/tutorials/learn-time-client.ts), so these numbers are
+ * engagement, not wall clock — and deliberately NOT the dashboard "Practice" stat, which
+ * stays interview-only. Clicking a learner opens the same profile drawer as the Users page
+ * (its Learn Usage section carries the per-lesson and day-by-day detail); the learner rows
+ * only exist for admins holding view_user_details, so the section explains itself when absent.
  */
 const TIME_RANGES = ["7d", "30d", "90d", "all"] as const
 type TimeRange = (typeof TIME_RANGES)[number]
@@ -38,6 +45,10 @@ export default function LearnUsagePage() {
   const [data, setData] = useState<PlatformLearnUsageView | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // The profile drawer needs the token; keep the latest one instead of re-fetching on click.
+  const [authToken, setAuthToken] = useState<string | null>(null)
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   const load = useCallback(async (range: TimeRange) => {
     setLoading(true)
@@ -45,6 +56,7 @@ export default function LearnUsagePage() {
     try {
       const token = await getCurrentUserToken()
       if (!token) throw new Error("Not signed in")
+      setAuthToken(token)
       const res = await fetch(`/api/admin/learn-usage?timeRange=${range}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -68,14 +80,14 @@ export default function LearnUsagePage() {
     {
       key: "activeMs",
       label: "Active time",
-      render: (row) => formatLearnDuration(row.activeMs),
+      render: (_, row) => formatLearnDuration(row.activeMs),
     },
     { key: "activeUsers", label: "Learners" },
     { key: "opens", label: "Lesson opens" },
     {
       key: "byCourseMs",
       label: "By course",
-      render: (row) => courseBreakdown(row.byCourseMs),
+      render: (_, row) => courseBreakdown(row.byCourseMs),
     },
   ]
 
@@ -84,9 +96,43 @@ export default function LearnUsagePage() {
     {
       key: "activeMs",
       label: "Active time",
-      render: (row) => formatLearnDuration(row.activeMs),
+      render: (_, row) => formatLearnDuration(row.activeMs),
     },
     { key: "users", label: "Learners" },
+  ]
+
+  const learnerColumns: Column<PlatformLearnerRow>[] = [
+    {
+      key: "email",
+      label: "Learner",
+      render: (_, row) => (
+        <button
+          type="button"
+          title={row.userId}
+          onClick={() => {
+            setSelectedUserId(row.userId)
+            setDrawerOpen(true)
+          }}
+          className="rounded-sm text-left font-medium text-white underline-offset-2 hover:text-[#c4703f] hover:underline focus-visible:ring-2 focus-visible:ring-[#c4703f] focus-visible:outline-none"
+        >
+          {row.email ?? row.fullName ?? `${row.userId.slice(0, 8)}…`}
+        </button>
+      ),
+    },
+    {
+      key: "activeMs",
+      label: "Active time",
+      sortable: true,
+      render: (_, row) => formatLearnDuration(row.activeMs),
+    },
+    { key: "activeDays", label: "Days", sortable: true },
+    { key: "opens", label: "Lesson opens", sortable: true },
+    {
+      key: "byCourseMs",
+      label: "By course",
+      render: (_, row) => courseBreakdown(row.byCourseMs),
+    },
+    { key: "lastActiveDay", label: "Last active", sortable: true },
   ]
 
   const stats = [
@@ -145,6 +191,26 @@ export default function LearnUsagePage() {
       </div>
 
       <AdminSection
+        title="By learner"
+        description="Who the window's active time belongs to. Click a learner to open their full profile, including per-lesson and day-by-day learn detail."
+      >
+        {data && !data.learners ? (
+          <p className="rounded-lg border border-gray-800 bg-gray-900/50 px-4 py-3 text-sm text-gray-400">
+            Per-learner rows require the user-details permission; the aggregate numbers above are
+            unaffected.
+          </p>
+        ) : (
+          <DataTable
+            data={data?.learners ?? []}
+            columns={learnerColumns}
+            keyExtractor={(row) => row.userId}
+            loading={loading}
+            emptyMessage="No learner activity recorded in this window."
+          />
+        )}
+      </AdminSection>
+
+      <AdminSection
         title="Day by day"
         description="One row per UTC day with at least one active learner. Learners counts distinct signed-in users; anonymous visitors are not measured."
       >
@@ -169,6 +235,16 @@ export default function LearnUsagePage() {
           emptyMessage="No lesson time recorded yet."
         />
       </AdminSection>
+
+      <UserProfileDrawer
+        isOpen={drawerOpen}
+        onClose={() => {
+          setDrawerOpen(false)
+          setSelectedUserId(null)
+        }}
+        userId={selectedUserId}
+        token={authToken}
+      />
     </AdminLayout>
   )
 }
