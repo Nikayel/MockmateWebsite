@@ -88,7 +88,11 @@ the problem. Otherwise it returns:
 perfectly good directory: it reports zero files, zero entries, nothing skipped, and no totals.`,
 })
 
-const CAP_PYPROJECT_STARTER = String.raw`[project]
+const CAP_PYPROJECT_STARTER = String.raw`[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
 name = "shiftlog"
 version = "0.1.0"
 description = "Total the minutes in a folder of workshop shift logs"
@@ -103,7 +107,11 @@ shiftlog = "shiftlog.main:run"
 testpaths = ["tests"]
 `
 
-const CAP_PYPROJECT_REFERENCE = String.raw`[project]
+const CAP_PYPROJECT_REFERENCE = String.raw`[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
 name = "shiftlog"
 version = "0.1.0"
 description = "Total the minutes in a folder of workshop shift logs"
@@ -474,6 +482,10 @@ A project that only runs on your laptop is a liability. The moment a teammate cl
 \`pyproject.toml\` is the standard, tool-agnostic place to describe a Python project. It replaces the old \`setup.py\` plus \`requirements.txt\` sprawl.
 
 \`\`\`toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "todo"
 version = "0.1.0"
@@ -483,7 +495,7 @@ dependencies = ["httpx>=0.27"]
 todo = "todo.cli:main"
 \`\`\`
 
-The \`[project]\` table holds metadata: the package \`name\`, its \`version\`, and its \`dependencies\`. Note that \`dependencies\` are ranges (\`httpx>=0.27\`), a statement of intent, not exact pins. The \`[project.scripts]\` table wires a console command (\`todo\`) to a function (\`main\` in \`todo.cli\`), so installing the package gives you a runnable CLI.
+The \`[build-system]\` table names the tool that turns this source tree into an installable package, and it is the table people leave out. Without it \`uv\` treats the project as a loose folder rather than a package, so it never installs \`[project.scripts]\` and your console command silently does not appear; \`pip\` falls back to legacy setuptools instead. \`hatchling\` is the common default. The \`[project]\` table holds metadata: the package \`name\`, its \`version\`, and its \`dependencies\`. Note that \`dependencies\` are ranges (\`httpx>=0.27\`), a statement of intent, not exact pins. The \`[project.scripts]\` table wires a console command (\`todo\`) to a function (\`main\` in \`todo.cli\`), so installing the package gives you a runnable CLI.
 
 Your capstone project is laid out this way: a \`shiftlog/\` package directory holds one module per job, with \`pyproject.toml\` at the root naming the package and pointing its console script at the function that runs the command.
 
