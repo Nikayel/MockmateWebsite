@@ -78,12 +78,12 @@ export default function LearnResearchPage() {
     {
       key: "firstTryAccuracy",
       label: "First-try correct",
-      render: (row) => percent(row.firstTryAccuracy),
+      render: (_, row) => percent(row.firstTryAccuracy),
     },
     {
       key: "topDistractors",
       label: "Misconception that fired",
-      render: (row) =>
+      render: (_, row) =>
         row.topDistractors.length
           ? `${row.topDistractors[0].label} (${row.topDistractors[0].count})`
           : "none",
@@ -93,17 +93,17 @@ export default function LearnResearchPage() {
   const exerciseColumns: Column<ExerciseStruggle>[] = [
     { key: "itemId", label: "Exercise" },
     { key: "learners", label: "Learners" },
-    { key: "passRate", label: "Ever passed", render: (row) => percent(row.passRate) },
+    { key: "passRate", label: "Ever passed", render: (_, row) => percent(row.passRate) },
     {
       key: "medianAttemptsToPass",
       label: "Median attempts",
-      render: (row) => row.medianAttemptsToPass ?? "n/a",
+      render: (_, row) => row.medianAttemptsToPass ?? "n/a",
     },
-    { key: "hintRate", label: "Used a hint", render: (row) => percent(row.hintRate) },
+    { key: "hintRate", label: "Used a hint", render: (_, row) => percent(row.hintRate) },
     {
       key: "topErrorKinds",
       label: "Top error",
-      render: (row) =>
+      render: (_, row) =>
         row.topErrorKinds.length
           ? `${row.topErrorKinds[0].kind} (${row.topErrorKinds[0].count})`
           : "none",
@@ -118,7 +118,7 @@ export default function LearnResearchPage() {
     {
       key: "completionRate",
       label: "Completion",
-      render: (row) => percent(row.completionRate),
+      render: (_, row) => percent(row.completionRate),
     },
   ]
 
