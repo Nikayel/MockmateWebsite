@@ -1,4 +1,4 @@
-import type { EmbeddingProvider } from "@/lib/rag/types"
+import { generateTextEmbedding } from "@/lib/rag/services/embeddings"
 import { vectorDB } from "@/lib/rag/vectordb"
 import { getScenariosByType } from "@/lib/scenarios/index"
 import type { SystemDesignScenario } from "@/lib/scenarios/types"
@@ -10,7 +10,6 @@ const RATE_LIMIT_DELAY_MS = 100
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export async function vectorizeSystemDesignScenarios(
-  embeddingProvider: EmbeddingProvider,
   onProgress?: VectorizationProgressCallback
 ): Promise<VectorizationJobResult> {
   const errors: string[] = []
@@ -27,7 +26,7 @@ export async function vectorizeSystemDesignScenarios(
 
       try {
         const text = systemDesignToEmbeddingText(scenario)
-        const embedding = await embeddingProvider.generateEmbedding(text)
+        const embedding = await generateTextEmbedding(text, { service: "rag-indexing" })
 
         await vectorDB.upsert([
           {

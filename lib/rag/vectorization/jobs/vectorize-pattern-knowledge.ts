@@ -1,4 +1,4 @@
-import type { EmbeddingProvider } from "@/lib/rag/types"
+import { generateTextEmbedding } from "@/lib/rag/services/embeddings"
 import { vectorDB } from "@/lib/rag/vectordb"
 import {
   getPatternKnowledge,
@@ -29,7 +29,6 @@ export const VECTORIZE_PATTERN_KNOWLEDGE_PATTERNS: DSAPattern[] = [
 ]
 
 export async function vectorizePatternKnowledge(
-  embeddingProvider: EmbeddingProvider,
   onProgress?: VectorizationProgressCallback
 ): Promise<VectorizationJobResult> {
   const errors: string[] = []
@@ -49,7 +48,7 @@ export async function vectorizePatternKnowledge(
 
     try {
       const text = patternKnowledgeToDocument(knowledge)
-      const embedding = await embeddingProvider.generateEmbedding(text)
+      const embedding = await generateTextEmbedding(text, { service: "rag-indexing" })
 
       await vectorDB.upsert([
         {

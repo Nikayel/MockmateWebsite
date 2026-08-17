@@ -1,5 +1,5 @@
 import { ALL_COMPANIES } from "@/lib/data/company-questions"
-import type { EmbeddingProvider } from "@/lib/rag/types"
+import { generateTextEmbedding } from "@/lib/rag/services/embeddings"
 import { vectorDB } from "@/lib/rag/vectordb"
 import {
   companyToEmbeddingText,
@@ -12,7 +12,6 @@ const RATE_LIMIT_DELAY_MS = 50
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export async function vectorizeCompanyQuestions(
-  embeddingProvider: EmbeddingProvider,
   onProgress?: VectorizationProgressCallback
 ): Promise<VectorizationJobResult> {
   const errors: string[] = []
@@ -24,7 +23,9 @@ export async function vectorizeCompanyQuestions(
 
     try {
       const companyText = companyToEmbeddingText(company)
-      const companyEmbedding = await embeddingProvider.generateEmbedding(companyText)
+      const companyEmbedding = await generateTextEmbedding(companyText, {
+        service: "rag-indexing",
+      })
 
       await vectorDB.upsert([
         {
@@ -47,7 +48,9 @@ export async function vectorizeCompanyQuestions(
       for (const question of company.mustKnowQuestions) {
         try {
           const questionText = mustKnowQuestionToEmbeddingText(question, company)
-          const questionEmbedding = await embeddingProvider.generateEmbedding(questionText)
+          const questionEmbedding = await generateTextEmbedding(questionText, {
+            service: "rag-indexing",
+          })
 
           await vectorDB.upsert([
             {

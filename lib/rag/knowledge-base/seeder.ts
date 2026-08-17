@@ -5,7 +5,7 @@
  * and other reference materials for retrieval.
  */
 
-import { getHybridProvider } from "../embeddings/hybrid-provider"
+import { generateTextEmbeddings } from "../services/embeddings"
 import { vectorDB } from "../vectordb"
 import type { VectorDocument } from "../types"
 import type { KnowledgeDocument, SeedingProgress, KnowledgeType } from "./types"
@@ -67,7 +67,6 @@ export interface KnowledgeBaseStatus {
  * Knowledge seeder class for managing the RAG knowledge base
  */
 export class KnowledgeBaseSeeder {
-  private embeddingProvider = getHybridProvider()
   private progress: SeedingProgress
 
   constructor() {
@@ -193,7 +192,8 @@ export class KnowledgeBaseSeeder {
   private async seedBatch(documents: KnowledgeDocument[]): Promise<void> {
     // Generate embeddings for all documents in batch
     const texts = documents.map((d) => d.content)
-    const embeddings = await this.embeddingProvider.generateEmbeddings(texts)
+    // Admin-triggered seeding: nobody's session paid for it, so it bills system.
+    const embeddings = await generateTextEmbeddings(texts, { service: "rag-indexing" })
 
     // Create vector documents
     const vectorDocs: VectorDocument[] = documents.map((doc, index) => ({

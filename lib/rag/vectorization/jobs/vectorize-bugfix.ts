@@ -1,4 +1,5 @@
-import type { EmbeddingProvider, VectorDocument } from "@/lib/rag/types"
+import { generateTextEmbedding } from "@/lib/rag/services/embeddings"
+import type { VectorDocument } from "@/lib/rag/types"
 import { vectorDB } from "@/lib/rag/vectordb"
 import { getScenariosByType } from "@/lib/scenarios/index"
 import type { BugFixScenario } from "@/lib/scenarios/types"
@@ -41,7 +42,6 @@ const REMOVED_LEGACY_BUGFIX_SCENARIO_IDS = [
 ]
 
 export async function vectorizeBugFixScenarios(
-  embeddingProvider: EmbeddingProvider,
   onProgress?: VectorizationProgressCallback
 ): Promise<VectorizationJobResult> {
   const errors: string[] = []
@@ -69,7 +69,7 @@ export async function vectorizeBugFixScenarios(
       for (const scenario of batch) {
         try {
           const text = bugFixToEmbeddingText(scenario)
-          const embedding = await embeddingProvider.generateEmbedding(text)
+          const embedding = await generateTextEmbedding(text, { service: "rag-indexing" })
 
           documents.push({
             id: `bugfix-${scenario.id}`,

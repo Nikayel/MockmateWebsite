@@ -1,4 +1,5 @@
-import type { EmbeddingProvider, VectorDocument } from "@/lib/rag/types"
+import { generateTextEmbedding } from "@/lib/rag/services/embeddings"
+import type { VectorDocument } from "@/lib/rag/types"
 import { vectorDB } from "@/lib/rag/vectordb"
 import { getScenariosByType } from "@/lib/scenarios/index"
 import type { DSAScenario } from "@/lib/scenarios/types"
@@ -36,7 +37,6 @@ export function dsaScenarioToVectorDocument(
 }
 
 export async function vectorizeDSAProblems(
-  embeddingProvider: EmbeddingProvider,
   onProgress?: VectorizationProgressCallback
 ): Promise<VectorizationJobResult> {
   const errors: string[] = []
@@ -58,7 +58,7 @@ export async function vectorizeDSAProblems(
       for (const scenario of batch) {
         try {
           const text = scenarioToEmbeddingText(scenario)
-          const embedding = await embeddingProvider.generateEmbedding(text)
+          const embedding = await generateTextEmbedding(text, { service: "rag-indexing" })
           documents.push(dsaScenarioToVectorDocument(scenario, embedding))
           vectorized++
         } catch (error) {
@@ -79,11 +79,8 @@ export async function vectorizeDSAProblems(
   return { vectorized, errors }
 }
 
-export async function vectorizeSingleProblem(
-  scenario: DSAScenario,
-  embeddingProvider: EmbeddingProvider
-): Promise<void> {
+export async function vectorizeSingleProblem(scenario: DSAScenario): Promise<void> {
   const text = scenarioToEmbeddingText(scenario)
-  const embedding = await embeddingProvider.generateEmbedding(text)
+  const embedding = await generateTextEmbedding(text, { service: "rag-indexing" })
   await vectorDB.upsert([dsaScenarioToVectorDocument(scenario, embedding)])
 }

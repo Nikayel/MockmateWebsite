@@ -1,4 +1,5 @@
-import type { EmbeddingProvider, VectorDocument } from "@/lib/rag/types"
+import { generateTextEmbedding } from "@/lib/rag/services/embeddings"
+import type { VectorDocument } from "@/lib/rag/types"
 import { vectorDB } from "@/lib/rag/vectordb"
 import { getScenariosByType } from "@/lib/scenarios/index"
 import type { AddFunctionalityScenario } from "@/lib/scenarios/types"
@@ -20,7 +21,6 @@ const REMOVED_LEGACY_ADD_FUNCTIONALITY_IDS = [
 ]
 
 export async function vectorizeAddFunctionalityScenarios(
-  embeddingProvider: EmbeddingProvider,
   onProgress?: VectorizationProgressCallback
 ): Promise<VectorizationJobResult> {
   const errors: string[] = []
@@ -56,7 +56,7 @@ export async function vectorizeAddFunctionalityScenarios(
       for (const scenario of batch) {
         try {
           const text = addFunctionalityToEmbeddingText(scenario)
-          const embedding = await embeddingProvider.generateEmbedding(text)
+          const embedding = await generateTextEmbedding(text, { service: "rag-indexing" })
 
           documents.push({
             id: `add-functionality-${scenario.id}`,
