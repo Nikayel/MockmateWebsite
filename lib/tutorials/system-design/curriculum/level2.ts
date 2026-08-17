@@ -1126,6 +1126,8 @@ that can be re-aggregated.
   "reveal": "In your design write, state the contention level first, then the mechanism: low contention gets a version check, high contention on known rows gets a short row lock taken in consistent order, and a hot key gets restructured, never serialized."
 }
 \`\`\`
+
+**Sources:** [PostgreSQL MVCC introduction](https://www.postgresql.org/docs/current/mvcc-intro.html) · [PostgreSQL routine vacuuming](https://www.postgresql.org/docs/current/routine-vacuuming.html) · [MySQL InnoDB locking](https://dev.mysql.com/doc/refman/8.4/en/innodb-locking.html)
 `.trim()
 
 const btreeVsLsmTeach = `
