@@ -461,7 +461,7 @@ Note the double call in \`getincrementaldecoder("utf-8")()\`: the first returns 
 
 ### The second buffer is yours
 
-The decoder solves partial characters. It has nothing to say about partial **lines**, and a protocol that separates messages with a newline needs that solved too. So you keep a text buffer, split it on the separator, and put the last piece back.
+The decoder solves partial characters. It has nothing to say about partial **lines**, and a protocol that separates messages with a newline needs that solved too. So you keep a text buffer and split it on the separator, and now you have to decide which of the resulting pieces are finished lines and which one is not.
 
 \`\`\`python
 buffer = ""
