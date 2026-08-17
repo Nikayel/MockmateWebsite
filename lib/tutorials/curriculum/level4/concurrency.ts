@@ -654,7 +654,9 @@ So the exercises in this lesson do not use \`concurrent.futures\` at all. They h
   ],
   "reveal": "The useful habit is to ask what each stage is waiting on before picking a tool. Waiting on someone else means threads or async, waiting on your own CPU means processes, and a job that does both usually wants a different answer per stage."
 }
-\`\`\``,
+\`\`\`
+
+**Sources:** [PEP 703, free-threaded CPython](https://peps.python.org/pep-0703/) · [concurrent.futures](https://docs.python.org/3/library/concurrent.futures.html) · [The GIL](https://docs.python.org/3/glossary.html)`,
     demoCode: `from concurrent.futures import ThreadPoolExecutor
 
 
