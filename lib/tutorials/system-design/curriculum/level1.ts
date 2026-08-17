@@ -3694,6 +3694,8 @@ replace the version check rather than tuning it.
   "reveal": "This bug is the whole lesson in one scene: method semantics decide what is retryable and cacheable, 'Cache-Control' plus an ETag makes reads cheap via '304 Not Modified', and the same ETag with 'If-Match' gives optimistic concurrency. In the design exercise, have every read return an ETag, require 'If-Match' on every update, and name '412' as the conflict signal."
 }
 \`\`\`
+
+**Sources:** [RFC 9110, HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110.html) · [RFC 9111, HTTP caching](https://www.rfc-editor.org/rfc/rfc9111.html) · [MDN, Cache-Control header](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control)
 `.trim()
 
 const serializationCompressionTeach = `
