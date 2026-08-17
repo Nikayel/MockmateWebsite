@@ -960,6 +960,10 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
         id: "sd-l7-deployment-strategies",
         anchor: "Blue-green, canary and rolling deploys, and the signal that aborts a canary",
       },
+      {
+        id: "sd-l11-agent-tracing",
+        anchor: "Spans over an agent loop, where an HTTP span habit misleads",
+      },
     ],
     cta: {
       href: "/system-design-interview-practice",
@@ -1753,6 +1757,84 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
     cta: {
       href: "/system-design-interview-practice",
       label: "Practice a design round on an agent that reads untrusted text and holds real secrets",
+    },
+  },
+
+  // ---------------------------------------------------------------------------------------------
+  // System Design: operating AI systems (Level 11 module 7, shipped 2026-08-16)
+  // ---------------------------------------------------------------------------------------------
+  "sd-l11-llm-eval-guardrails": {
+    related: [
+      {
+        id: "sd-l11-trajectory-evals",
+        anchor: "Scoring the path an agent took, with pass^k where pass@k rewards luck",
+      },
+      {
+        id: "sd-l11-constrained-decoding",
+        anchor: "Masking illegal tokens as they decode, so a schema violation cannot be sampled",
+      },
+      {
+        id: "sd-l11-injection-safe-design",
+        anchor: "The lethal trifecta, the failure an output filter on its own does not contain",
+      },
+      {
+        id: "sd-l11-online-serving-rollout",
+        anchor: "Shadow and canary with automatic rollback, and the degradation ladder under it",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label: "Practice a design round where a prompt change has to pass a gate before it ships",
+    },
+  },
+
+  "sd-l11-agent-tracing": {
+    related: [
+      {
+        id: "sd-l11-trajectory-evals",
+        anchor: "Scoring tool selection, redundant steps, recovery and cost per success",
+      },
+      {
+        id: "sd-l7-three-pillars-otel",
+        anchor: "Metrics, logs and traces with OpenTelemetry, the convention this extends",
+      },
+      {
+        id: "sd-l11-multi-agent-fanout",
+        anchor: "The token multiplier a fan-out adds to every branch of the tree",
+      },
+      {
+        id: "sd-l11-model-gateway",
+        anchor: "Per-team token budgets at the chokepoint a cost join reads from",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label: "Practice a design round where you attribute spend per user on a multi-step agent run",
+    },
+  },
+
+  "sd-l11-trajectory-evals": {
+    related: [
+      {
+        id: "sd-l11-agent-tracing",
+        anchor: "The trace tree these scores are computed over, tokens on every node",
+      },
+      {
+        id: "sd-l11-llm-eval-guardrails",
+        anchor: "Golden-set gates before a prompt change ships, and the filter on the way out",
+      },
+      {
+        id: "sd-l11-llm-agents",
+        anchor: "The loop being scored, and the bounds that stop it running forever",
+      },
+      {
+        id: "sd-l11-multi-agent-fanout",
+        anchor: "Cost per success, once a fan-out multiplies the token bill",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label: "Practice a design round where a right answer by a wrong route still has to be caught",
     },
   },
 
