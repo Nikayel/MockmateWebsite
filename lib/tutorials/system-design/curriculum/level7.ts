@@ -1699,6 +1699,8 @@ The exponential part (\`base * 2^attempt\`) spaces retries further apart as fail
   "reveal": "Every call gets a connect timeout and a request timeout set from the downstream's real p99, and the remaining deadline travels down the chain instead of resetting at each hop. Retries need exponential backoff with full jitter so a thousand clients do not retry in the same instant, a budget capping retries to a small fraction of traffic, idempotency before any write is retried, and exactly one retrying layer so three tiers of retries cannot multiply into twenty-seven calls."
 }
 \`\`\`
+
+**Sources:** [AWS: timeouts, retries, backoff, jitter](https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/) · [AWS: exponential backoff and jitter](https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/) · [Google SRE: cascading failures](https://sre.google/sre-book/addressing-cascading-failures/)
 `.trim()
 
 const circuitBreakersTeach = `
