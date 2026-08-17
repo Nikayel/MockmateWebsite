@@ -1612,6 +1612,8 @@ Quantization shrinks the model weights so more of the GPU is left over and the m
   "reveal": "LLM serving is a memory problem wearing a compute problem's clothes. KV cache size caps concurrency, so PagedAttention removes the fragmentation and continuous batching keeps the GPU saturated by swapping finished sequences out mid flight. Then reason in three numbers rather than one: time to first token is prefill and scales with prompt length, inter token latency is decode and is what streaming feels like, and throughput is what you trade against both when you raise the batch. Quantization, parallelism, prefix caching, and speculative decoding are levers on top of that, and each one moves a specific number, so name which."
 }
 \`\`\`
+
+**Sources:** [PagedAttention and vLLM](https://arxiv.org/abs/2309.06180) · [Orca: continuous batching for transformer serving](https://www.usenix.org/conference/osdi22/presentation/yu) · [vLLM documentation](https://docs.vllm.ai/en/latest/)
 `.trim()
 
 const prefillDecodeSplitTeach = `
