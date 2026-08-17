@@ -100,6 +100,14 @@ interface UserData {
   hasBudgetOverride: boolean
 }
 
+/** One row of live month-to-date spend, per provider. */
+interface ProviderSpendRow {
+  provider: string
+  requests: number
+  tokens: number
+  cost: number
+}
+
 /** How much of the underlying data an aggregate actually saw. */
 interface ScanCoverage {
   scanned: number
@@ -537,6 +545,37 @@ export default function AIUsagePage() {
     },
   ]
 
+  // Live provider spend columns
+  const providerSpendColumns: Column<ProviderSpendRow>[] = [
+    {
+      key: "provider",
+      label: "Provider",
+      render: (value: string) => <span className="text-white">{value}</span>,
+    },
+    {
+      key: "requests",
+      label: "Requests",
+      align: "right",
+      render: (value: number) => <span className="text-gray-300">{value.toLocaleString()}</span>,
+    },
+    {
+      key: "tokens",
+      label: "Tokens",
+      align: "right",
+      render: (value: number) => (
+        <span className="font-mono text-[#c4703f]">{formatTokens(value || 0)}</span>
+      ),
+    },
+    {
+      key: "cost",
+      label: "Cost",
+      align: "right",
+      render: (value: number) => (
+        <span className="font-mono text-green-400">{formatCost(value)}</span>
+      ),
+    },
+  ]
+
   // Scenario table columns
   const scenarioColumns: Column<ScenarioUsage>[] = [
     {
@@ -621,6 +660,13 @@ export default function AIUsagePage() {
   // money", and that answer is the top row.
   const serviceSpend = Object.entries(aiUsage?.byServiceId ?? {})
     .map(([id, totals]) => ({ id, ...totals }))
+    .sort((a, b) => b.cost - a.cost)
+
+  // What the rate card on the same tab actually cost this month. Cached hits
+  // and pre-service legacy rows have their own buckets in this map; they are
+  // real rows, so they are shown rather than filtered into invisibility.
+  const providerSpend = Object.entries(aiUsage?.providers ?? {})
+    .map(([provider, totals]) => ({ provider, ...totals }))
     .sort((a, b) => b.cost - a.cost)
 
   const trendDays = aiUsage?.trends?.daily ?? []
@@ -1134,7 +1180,28 @@ export default function AIUsagePage() {
         </TabsContent>
 
         {/* Providers Tab */}
-        <TabsContent value="providers">
+        <TabsContent value="providers" className="space-y-4">
+          {/* The rate card below is a price list. This is what those rates
+              actually cost this month, which the tab used to omit entirely. */}
+          <DataTable
+            title="Spend by provider"
+            description="Month to date, from recorded usage events"
+            icon={Cpu}
+            data={providerSpend}
+            columns={providerSpendColumns}
+            keyExtractor={(row) => row.provider}
+            emptyMessage="No provider spend recorded this month"
+            error={overviewError}
+          />
+          {providerSpend.some(
+            (row) => row.provider === "cache" || row.provider === UNATTRIBUTED_SERVICE
+          ) && (
+            <p className="px-1 text-xs text-gray-500">
+              &quot;cache&quot; is a served-from-cache hit that made no upstream call;
+              &quot;unattributed&quot; is a recorded call that named no provider.
+            </p>
+          )}
+
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {/* Provider Costs Reference */}
             <Card className="border-gray-800 bg-gray-900/50">
