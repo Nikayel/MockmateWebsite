@@ -72,12 +72,19 @@ export interface PathLessonSummary {
   skills: string[]
 }
 
+/** A module reduced to its heading, for the preview panel's "what is inside this level" outline. */
+export interface PathModuleSummary {
+  id: string
+  title: string
+  lessonCount: number
+}
+
 /**
  * A level projected to only what the Path landing renders (LevelSelector, LevelPreviewPanel,
- * LevelCard, ResumeLearning): identity, tagline, hour estimate, and a flat lesson list carrying just
- * the completion/nav id + the preview chip skills. Deliberately drops `modules` and every exercise
- * payload (starter code, reference solutions, tests) so the full authored `PythonLevel[]` never
- * serializes to the client.
+ * LevelCard, ResumeLearning, SystemDesignPath): identity, tagline, hour estimate, a module outline,
+ * and a flat lesson list carrying just the completion/nav id + the preview chip skills. Deliberately
+ * drops each module's LESSONS and every exercise payload (starter code, reference solutions, tests,
+ * teach markdown, model answers) so the full authored curriculum never serializes to the client.
  */
 export interface PathLevelSummary<Id extends TutorialLevelId = TutorialLevelId> {
   id: Id
@@ -85,10 +92,11 @@ export interface PathLevelSummary<Id extends TutorialLevelId = TutorialLevelId> 
   title: string
   tagline: string
   estimatedHours: number
+  modules: PathModuleSummary[]
   lessons: PathLessonSummary[]
 }
 
-/** Project an authored level onto the lean Path summary (drops modules + exercise payloads). */
+/** Project an authored level onto the lean Path summary (drops exercise payloads + markdown). */
 export function toPathLevelSummary<Id extends TutorialLevelId>(
   level: TutorialLevel<unknown, Id>
 ): PathLevelSummary<Id> {
@@ -98,6 +106,11 @@ export function toPathLevelSummary<Id extends TutorialLevelId>(
     title: level.title,
     tagline: level.tagline,
     estimatedHours: level.estimatedHours,
+    modules: level.modules.map((mod) => ({
+      id: mod.id,
+      title: mod.title,
+      lessonCount: mod.lessons.length,
+    })),
     lessons: level.modules.flatMap((mod) =>
       mod.lessons.map((lesson) => ({ id: lesson.id, skills: lesson.skills }))
     ),
