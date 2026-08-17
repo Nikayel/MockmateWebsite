@@ -2004,7 +2004,7 @@ the failure reports zero cache-creation tokens. it never raises.
 
 ## The ordering rule, and the budget on it
 
-The rule falls straight out of that picture: order the prompt from most stable to least stable. System instructions and tool definitions first, because they change on deploy. A shared corpus next, because it changes weekly. Retrieved RAG chunks late, because they are chosen per question and are therefore volatile, with one exception worth naming: if a small hot corpus is attached to nearly every request, it is stable and belongs early. The user's turn goes last, always.
+The rule falls straight out of that picture: order the prompt from most stable to least stable. System instructions first. Then whichever of the tool definitions and the shared corpus changes least often, and on a team that deploys daily, that is the corpus. Retrieved RAG chunks late, because they are chosen per question and are therefore volatile, with one exception worth naming: if a small hot corpus is attached to nearly every request, it is stable and belongs early. The user's turn goes last, always.
 
 You are not annotating freely. On Anthropic you get at most four explicit \`cache_control\` breakpoints per request, so you are choosing four boundaries in the prompt and everything between two boundaries is one cacheable unit. There is also a coupling that catches people: changing \`tool_choice\` invalidates cached message blocks, so a routing decision made per request can quietly cost the cache on a prompt whose text never moved.
 
@@ -2022,12 +2022,12 @@ You are not annotating freely. On Anthropic you get at most four explicit \`cach
     {
       "label": "The 3k-token tool schema, unchanged since the last deploy",
       "bucket": "Stable, goes early",
-      "feedback": "Deploy-frequency change is the definition of stable here. It also tends to be large, which is exactly what you want inside the cached region."
+      "feedback": "Deploy-frequency change is the definition of stable here, and it is large, which is exactly what you want inside the cached region. It still sits behind the shared corpus when the team deploys more often than the corpus changes, because the earlier block is the one that has to change least."
     },
     {
       "label": "The shared policy corpus attached to every request",
       "bucket": "Stable, goes early",
-      "feedback": "Identical across requests and large. This is the block the whole strategy exists to move onto the cheap tier."
+      "feedback": "Identical across requests and large. This is the block the whole strategy exists to move onto the cheap tier, and on a team that deploys daily it goes ahead of the tool schema, because it is the one that changes less often."
     },
     {
       "label": "Chunks retrieved for this particular question",
