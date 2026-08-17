@@ -683,6 +683,10 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
         id: "sd-l2-document",
         anchor: "Document databases, and what they index by default",
       },
+      {
+        id: "sd-l11-query-understanding",
+        anchor: "Query rewriting, decomposition and HyDE before the index is ever hit",
+      },
     ],
     cta: {
       href: "/system-design-interview-practice",
@@ -711,6 +715,10 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
       {
         id: "sd-l10-typeahead",
         anchor: "Design typeahead and autocomplete",
+      },
+      {
+        id: "sd-l11-late-interaction",
+        anchor: "Late interaction, one vector per token scored by MaxSim",
       },
     ],
     cta: {
@@ -1415,11 +1423,202 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
         id: "sd-l3-search-inverted-index",
         anchor: "Full-text search and the inverted index, the lexical half of hybrid retrieval",
       },
+      {
+        id: "sd-l11-chunking-strategy",
+        anchor: "Contextual retrieval and late chunking, the ingestion decisions recall inherits",
+      },
+      {
+        id: "sd-l11-query-understanding",
+        anchor:
+          "Query rewriting, HyDE and decomposition, because the question is a poor search key",
+      },
     ],
     cta: {
       href: "/system-design-interview-practice",
       label:
         "Practice a design round on a retrieval pipeline and explain how you keep the index fresh",
+    },
+  },
+
+  // ---------------------------------------------------------------------------------------------
+  // System Design: retrieval engineering (Level 11 module 5, shipped 2026-08-16)
+  // ---------------------------------------------------------------------------------------------
+  "sd-l11-vector-db-ann": {
+    related: [
+      {
+        id: "sd-l11-embedding-lifecycle",
+        anchor: "Reindexing when the embedding model changes, and the prefix that pays for it",
+      },
+      {
+        id: "sd-l11-late-interaction",
+        anchor: "One vector per token scored by MaxSim, and the storage bill compression pays down",
+      },
+      {
+        id: "sd-l11-graph-retrieval",
+        anchor: "Global questions, whose answer is a property of the corpus and not of any chunk",
+      },
+      {
+        id: "sd-l11-rag-architecture",
+        anchor: "The reranker and the ACL pre-filter, the retrieval stages teams skip",
+      },
+      {
+        id: "sd-l3-vector-hybrid-search",
+        anchor: "Hybrid retrieval, and fusing a lexical ranking with a semantic one",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label: "Practice a design round where the recall you promise has to fit a memory budget",
+    },
+  },
+
+  "sd-l11-chunking-strategy": {
+    related: [
+      {
+        id: "sd-l11-document-parsing",
+        anchor: "Reading order and merged cells, the information a parser destroys first",
+      },
+      {
+        id: "sd-l11-late-interaction",
+        anchor: "MaxSim over per-token vectors, which recovers the rare term pooling averages away",
+      },
+      {
+        id: "sd-l11-embedding-lifecycle",
+        anchor: "Blue-green reindexing, because two models' vectors are not comparable",
+      },
+      {
+        id: "py-l4-chunk-score-fuse",
+        anchor: "Write the overlapping chunker and the rank fusion yourself, in Python",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label: "Practice a design round where the chunk boundary is the recall decision you defend",
+    },
+  },
+
+  "sd-l11-document-parsing": {
+    related: [
+      {
+        id: "sd-l11-chunking-strategy",
+        anchor: "Contextual retrieval and late chunking, once the text is out of the document",
+      },
+      {
+        id: "sd-l11-late-interaction",
+        anchor: "Multi-vector scoring with MaxSim, what a page-image retriever runs on",
+      },
+      {
+        id: "sd-l11-graph-retrieval",
+        anchor: "GraphRAG, and the question no single extracted chunk answers",
+      },
+      {
+        id: "de-l11-curation-funnel",
+        anchor: "Acceptance rates per stage, and the one that silently ate the corpus",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label: "Practice a design round on an ingestion pipeline for PDFs nobody wrote for machines",
+    },
+  },
+
+  "sd-l11-query-understanding": {
+    related: [
+      {
+        id: "sd-l3-search-inverted-index",
+        anchor: "The inverted index and BM25, the lexical side a rewritten query still hits",
+      },
+      {
+        id: "sd-l11-late-interaction",
+        anchor: "Token-level scoring with MaxSim, for when a rewrite is not what recall needs",
+      },
+      {
+        id: "sd-l11-graph-retrieval",
+        anchor: "Where decomposition runs out and a graph index starts",
+      },
+      {
+        id: "sd-l11-rag-architecture",
+        anchor: "Retrieval as the security boundary, and the stages a demo pipeline skips",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label: "Practice a design round where you route a vague question before you search on it",
+    },
+  },
+
+  "sd-l11-late-interaction": {
+    related: [
+      {
+        id: "sd-l11-vector-db-ann",
+        anchor: "HNSW, IVF-PQ and DiskANN, and the memory budget that picks between them",
+      },
+      {
+        id: "sd-l11-embedding-lifecycle",
+        anchor: "Binary quantization and Matryoshka prefixes, the levers on a storage bill",
+      },
+      {
+        id: "sd-l11-query-understanding",
+        anchor: "Query rewriting, HyDE and decomposition, the other lever on recall",
+      },
+      {
+        id: "py-l4-chunk-score-fuse",
+        anchor: "Cosine scoring and reciprocal rank fusion, written out in Python",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label: "Practice a design round where per-token vectors have to fit the storage you costed",
+    },
+  },
+
+  "sd-l11-graph-retrieval": {
+    related: [
+      {
+        id: "sd-l11-chunking-strategy",
+        anchor: "Contextual retrieval and late chunking, the cheaper fix to try before a graph",
+      },
+      {
+        id: "sd-l11-query-understanding",
+        anchor: "Decomposition and HyDE, the routing layer above any graph index",
+      },
+      {
+        id: "sd-l11-document-parsing",
+        anchor: "Parsing and multimodal retrieval, where the entities are extracted from",
+      },
+      {
+        id: "sd-l2-graph",
+        anchor: "Graph databases, adjacency and the traversal a community summary walks",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label: "Practice a design round on a question whose answer no single document contains",
+    },
+  },
+
+  "sd-l11-embedding-lifecycle": {
+    related: [
+      {
+        id: "sd-l11-vector-db-ann",
+        anchor: "HNSW, IVF-PQ and DiskANN, and the index a rebuild has to refill",
+      },
+      {
+        id: "sd-l11-late-interaction",
+        anchor: "MaxSim over per-token vectors, and what compression costs recall",
+      },
+      {
+        id: "de-l11-exact-dedup",
+        anchor: "Hash dedup on a training corpus, done before anything is embedded",
+      },
+      {
+        id: "sd-l7-deployment-strategies",
+        anchor: "Blue-green and canary, the rollout shape a reindex borrows",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label: "Practice a design round on swapping an embedding model with the index still serving",
     },
   },
 
@@ -1670,6 +1869,14 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
       {
         id: "sd-l6-idempotency-dedup",
         anchor: "Idempotency and deduplication for a redelivered message",
+      },
+      {
+        id: "sd-l11-document-parsing",
+        anchor: "Reading order and merged cells, damage done before a hash ever sees the text",
+      },
+      {
+        id: "sd-l11-embedding-lifecycle",
+        anchor: "Reindexing a vector store as a blue-green rebuild, once the model changes",
       },
     ],
     cta: {
