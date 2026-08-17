@@ -5338,7 +5338,7 @@ The current revision is \`2026-07-28\`. Two things in it change how you build a 
                 ^^^^^ both keys are required per request, not once at connect
 \`\`\`
 
-Version negotiation moved out of the initialization handshake and into a per-request \`_meta\` field carrying two required keys, the revision the client speaks and the capabilities it offers back, and \`server/discover\` became mandatory. The consequence for your design is that a session is no longer pinned to whatever the two sides agreed at connect time: a proxy can route on the revision without replaying a handshake, and a long-lived session can shift revisions without being torn down. The spec documents a compatibility path back to \`2025-11-25\` and earlier, so a newer client and an older server still have a defined way to talk. What you must not do is infer the revision from behavior, which is how clients quietly break on a server upgrade.
+Version negotiation moved out of the initialization handshake and into a per-request \`_meta\` field carrying two required keys, the revision the client speaks and the capabilities it offers back, and \`server/discover\` became mandatory. The consequence for your design is that a session is no longer pinned to whatever the two sides agreed at connect time: a proxy can route on the revision without replaying a handshake, and a long-lived session can shift revisions without being torn down. The spec documents a compatibility path back to \`2025-11-25\` and earlier, so a client that implements both eras has a defined path to an older server; a modern-only client does not. What you must not do is infer the revision from behavior, which is how clients quietly break on a server upgrade.
 
 ## Authorization: the server is a resource server
 
