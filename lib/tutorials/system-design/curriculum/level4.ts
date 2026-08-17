@@ -3067,6 +3067,8 @@ layer HPA + cluster autoscaler + VPA, and because reactive scaling always trails
   "reveal": "In the design write, name the layers distinctly (HPA or event-driven scaling, cluster autoscaler, VPA on a separate signal), state the 2 to 5 minute scaling-lag number, and show how you hide it: scheduled pre-scaling for the 9am pattern, warm pools, and explicit headroom."
 }
 \`\`\`
+
+**Sources:** [Kubernetes HPA](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/) · [Kubernetes node autoscaling](https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/) · [KEDA concepts](https://keda.sh/docs/2.14/concepts/)
 `.trim()
 
 const capacityPlanningTeach = `
