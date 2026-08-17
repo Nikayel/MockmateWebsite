@@ -462,6 +462,38 @@ A checker reads the two identically. What the bracket form buys you is scope: \`
 function or class that declares it, where a module-level \`T = TypeVar("T")\` is a single shared
 placeholder that unrelated functions quietly reuse.
 
+### \`Self\`: the return type of a builder
+
+A method that hands back its own instance is easy to annotate wrongly. Naming the class works right
+up until somebody subclasses it, because the annotation then promises the parent type while the
+child is what actually comes back. \`typing.Self\` (Python 3.11) says "whatever class this was called
+on", so the answer follows the subclass without a second edit:
+
+\`\`\`python
+from typing import Self
+
+class Query:
+    def __init__(self) -> None:
+        self.parts: list[str] = []
+
+    def where(self, clause: str) -> Self:
+        self.parts.append(clause)
+        return self
+
+    @classmethod
+    def from_text(cls, text: str) -> Self:
+        query = cls()
+        query.parts.append(text)
+        return query
+
+Query().where("a = 1").where("b = 2")   # a checker keeps this a Query
+\`\`\`
+
+Add \`class AuditedQuery(Query)\` and \`AuditedQuery.from_text("x").where("y = 2")\` stays an
+\`AuditedQuery\` the whole way, with nothing in the parent to change. Annotate those two methods
+\`-> "Query"\` instead and the checker loses the subclass at the first call in the chain. This is the
+right annotation for builders, fluent APIs, \`from_*\` constructors and \`copy_with\` helpers.
+
 ### Protocols (structural typing)
 
 \`\`\`cswidget
