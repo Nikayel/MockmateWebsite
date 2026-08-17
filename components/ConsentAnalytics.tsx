@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import posthog from "posthog-js"
 import { hasAnalyticsConsent } from "@/components/CookieConsent"
 import { syncAnalyticsConsent } from "@/lib/analytics"
 
@@ -38,6 +39,21 @@ export function ConsentAnalytics() {
   // trackPageView has no call sites.
   useEffect(() => {
     syncAnalyticsConsent()
+  }, [hasConsent])
+
+  // PostHog rides the same consent switch. Before consent it runs cookieless
+  // (memory persistence, set in instrumentation-client.ts, nothing written to
+  // the device); consent upgrades it to durable persistence and starts session
+  // replay, and withdrawing consent reverts both mid-session.
+  useEffect(() => {
+    if (!posthog.__loaded) return
+    if (hasConsent) {
+      posthog.set_config({ persistence: "localStorage+cookie" })
+      posthog.startSessionRecording()
+    } else {
+      posthog.stopSessionRecording()
+      posthog.set_config({ persistence: "memory" })
+    }
   }, [hasConsent])
 
   if (!hasConsent) return null
