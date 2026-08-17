@@ -1818,6 +1818,8 @@ changelog instead of replaying the source; and consumer lag is the metric you sc
   "reveal": "Two rules combine: lag, not CPU, is the health signal, and group parallelism is capped by partition count. When lag rises at the cap, the lever is per-message speed or partition count, not more consumers."
 }
 \`\`\`
+
+**Sources:** [Kafka consumer configs](https://kafka.apache.org/documentation/#consumerconfigs) · [KIP-848 consumer rebalance protocol](https://cwiki.apache.org/confluence/display/KAFKA/KIP-848%3A+The+Next+Generation+of+the+Consumer+Rebalance+Protocol) · [Kafka design internals](https://kafka.apache.org/documentation/#design)
 `.trim()
 
 const compactionRetentionTeach = `
