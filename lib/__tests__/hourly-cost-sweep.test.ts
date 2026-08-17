@@ -128,9 +128,7 @@ describe("maybeRunHourlyCostSweep", () => {
     mocks.runTransaction.mockRejectedValue(new Error("firestore down"))
     const { maybeRunHourlyCostSweep } = await import("../cost-anomaly-detection")
 
-    await expect(
-      maybeRunHourlyCostSweep(new Date("2026-08-08T10:00:00Z"))
-    ).resolves.toBeUndefined()
+    await expect(maybeRunHourlyCostSweep(new Date("2026-08-08T10:00:00Z"))).resolves.toBeUndefined()
     expect(mocks.loggerError).toHaveBeenCalled()
   })
 })
