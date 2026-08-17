@@ -1540,6 +1540,8 @@ In a cloud-native world instances vanish routinely: spot reclamation, autoscale 
   "reveal": "Config in the environment so one image runs everywhere, stateless disposable processes with session in Redis and files in object storage, backing services attached by URL and credentials, strict build, release, and run separation, and logs streamed to stdout rather than a local file that dies with the instance. Together those are what make a process safe for the platform to kill, move, and restart."
 }
 \`\`\`
+
+**Sources:** [The Twelve-Factor App](https://12factor.net/) · [Kubernetes pod lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) · [Google Cloud reliability framework](https://cloud.google.com/architecture/framework/reliability)
 `.trim()
 
 const serverlessFaasTeach = `
