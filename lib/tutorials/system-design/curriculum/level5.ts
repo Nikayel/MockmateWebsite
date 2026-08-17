@@ -2381,6 +2381,8 @@ leader does not know it was deposed.
   "reveal": "This is exactly the apply exercise: election with randomized timeouts and the up-to-date-log rule, commit on majority, and the fate of the uncommitted entry. Committed means immortal; merely appended means expendable."
 }
 \`\`\`
+
+**Sources:** [Raft paper](https://raft.github.io/raft.pdf) · [etcd Raft learning docs](https://etcd.io/docs/v3.5/learning/api/) · [The Raft Consensus Algorithm](https://raft.github.io/)
 `.trim()
 
 const quorumsTunableTeach = `
