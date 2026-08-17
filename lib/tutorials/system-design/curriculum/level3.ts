@@ -1536,6 +1536,8 @@ detector and a grace window so a blip does not move 1/N of your keys.
   "reveal": "You now have the full ladder: 'mod N' fails on any resize, the ring cuts movement to about 1/N, vnodes even out load and spread rebalancing, bounded-load caps hotspots, and rendezvous hashing covers small replica-selection jobs. In the design write, quantify the key movement when your system adds or loses a node."
 }
 \`\`\`
+
+**Sources:** [Karger et al., consistent hashing paper](https://www.cs.princeton.edu/courses/archive/fall09/cos518/papers/chash.pdf) · [Amazon Dynamo paper](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf) · [Cassandra's Dynamo-inspired architecture](https://cassandra.apache.org/doc/latest/cassandra/architecture/dynamo.html)
 `.trim()
 
 const shardKeyHotspotsTeach = `
