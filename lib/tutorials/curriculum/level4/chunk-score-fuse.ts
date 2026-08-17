@@ -485,8 +485,10 @@ def reciprocal_rank_fusion(rankings, k=60):
 
 
 print(reciprocal_rank_fusion([["p1", "p2"], ["p2", "p1"]], k=60))
-# {'p1': 0.03226..., 'p2': 0.03252...}
+# {'p1': 0.03252247488101534, 'p2': 0.03252247488101534}
 \`\`\`
+
+Those two totals are identical, and the tie is the point. The two rankings are mirror images, so each document holds one first place and one second place, and \`1/61 + 1/62\` is what that is worth whichever list it came from. Rank fusion is symmetric in a way that adding scores never is.
 
 That is the whole algorithm. Three properties are worth naming because each is doing a job:
 
