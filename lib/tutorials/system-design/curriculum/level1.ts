@@ -1345,6 +1345,8 @@ carried as a SPIFFE URI inside each service's short-lived certificate.
   "reveal": "Termination is a dial between edge features and how far encryption reaches. In your design write, say where TLS terminates, how certs rotate automatically so an expired cert cannot take the site down, and whether internal hops use mTLS for service identity."
 }
 \`\`\`
+
+**Sources:** [RFC 8446, TLS 1.3](https://www.rfc-editor.org/rfc/rfc8446.html) · [RFC 5280, X.509 certificates](https://www.rfc-editor.org/rfc/rfc5280.html) · High Performance Browser Networking, ch. 4
 `.trim()
 
 const httpVersionsTeach = `
