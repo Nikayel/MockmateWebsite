@@ -14,6 +14,7 @@ import {
   Minus,
   ChevronRight,
   Activity,
+  Gauge,
   Layers,
   Crosshair,
   HelpCircle,
@@ -71,6 +72,51 @@ interface MetricsData {
     budgetUsedPercent: number
     budgetRemaining: number
   } | null
+}
+
+/**
+ * Your AI allowance for the month.
+ *
+ * The API has always returned this block and the page dropped it, so a learner
+ * had no way to see how much of their allowance was left until a request was
+ * refused. Copy stays plain: this is an allowance running down, not a bill.
+ */
+function UsageCard({ usage }: { usage: NonNullable<MetricsData["usage"]> }) {
+  const usedPercent = Math.max(0, usage.budgetUsedPercent || 0)
+  const barWidth = Math.min(100, usedPercent)
+
+  return (
+    <div className="border-border/50 bg-card/50 mb-8 rounded-2xl border p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Gauge className="text-muted-foreground h-4 w-4" />
+          <span className="text-muted-foreground text-sm font-medium">AI usage this month</span>
+        </div>
+        <span className="text-muted-foreground font-mono text-xs">
+          {(usage.totalRequests || 0).toLocaleString()} requests
+        </span>
+      </div>
+      <div
+        className="bg-muted h-1.5 w-full overflow-hidden rounded-full"
+        role="progressbar"
+        aria-valuenow={Math.round(usedPercent)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Share of your monthly AI allowance used"
+      >
+        <div
+          className={`h-full rounded-full ${usedPercent >= 80 ? "bg-amber-400" : "bg-emerald-400"}`}
+          style={{ width: `${barWidth}%` }}
+        />
+      </div>
+      <div className="text-muted-foreground mt-2 flex items-center justify-between text-xs">
+        <span>{usedPercent.toFixed(0)}% of your monthly allowance used</span>
+        {/* An over-budget account reports a negative remainder; "$0.00 left" is
+            the honest reading of that, and the percent above still tells it. */}
+        <span>${Math.max(0, usage.budgetRemaining || 0).toFixed(2)} left</span>
+      </div>
+    </div>
+  )
 }
 
 // Mini sparkline component for trends
@@ -622,6 +668,10 @@ export default function MetricsPage() {
                   )}
                 </div>
               </div>
+
+              {/* Omitted entirely when the account has no usage summary yet:
+                  an empty allowance bar would raise a question nobody asked. */}
+              {metrics.usage && <UsageCard usage={metrics.usage} />}
 
               {/* CTA - Minimal */}
               <div className="border-border/50 bg-card/30 flex items-center justify-between rounded-2xl border p-6">
