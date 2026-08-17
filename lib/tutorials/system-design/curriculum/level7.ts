@@ -852,6 +852,8 @@ The tuning tradeoff: shorter windows and lower burn-rate thresholds detect probl
   "reveal": "Burn rate is multiples of sustainable spend: 1x uses exactly the budget over the window, and 14.4x burns about 2 percent of a month in an hour. The long window supplies significance and the short window supplies fast reset, so page on fast burn and ticket on slow burn. Above all, keep the pager pointed at the symptom users feel rather than at causes like CPU, because cause-based paging is what teaches engineers to ignore the pager."
 }
 \`\`\`
+
+**Sources:** [Google SRE workbook: alerting on SLOs](https://sre.google/workbook/alerting-on-slos/) · [Prometheus metric types](https://prometheus.io/docs/concepts/metric_types/)
 `.trim()
 
 const goldenSignalsTeach = `
