@@ -412,6 +412,36 @@ class Account:
 
 \`-> None\` on \`__init__\` is the convention: it returns nothing.
 
+### \`TypedDict\`: a shape for the dicts you already pass around
+
+\`dict[str, int]\` says every value is an \`int\`, which is almost never true of the record-shaped dicts
+real code moves between functions: \`{"key": "a.csv", "bytes": 120}\` has a different type per key.
+Annotating that \`dict[str, object]\` throws the shape away and puts a cast at every read.
+\`TypedDict\` names the keys and their types instead:
+
+\`\`\`python
+from typing import TypedDict, NotRequired
+
+class Upload(TypedDict):
+    key: str
+    bytes: int
+    note: NotRequired[str]      # may be absent entirely
+
+row: Upload = {"key": "a.csv", "bytes": 120}          # fine, note is optional
+full: Upload = {"key": "b.csv", "bytes": 8, "note": "retry"}
+\`\`\`
+
+At runtime an \`Upload\` is an ordinary \`dict\`: \`type(row) is dict\` is \`True\`, nothing is validated, and a
+\`"bytes"\` holding the string \`"oops"\` raises nothing. The whole payoff is with the checker, which now
+knows \`row["bytes"]\` is an \`int\` and flags a typo like \`row["byte"]\` that a plain dict would swallow
+until it reached a \`KeyError\` in production. \`NotRequired\` marks the keys that may be missing, and its
+mirror \`Required\` does the opposite inside a \`total=False\` class.
+
+Reach for \`TypedDict\` when the dict is already the interface: JSON you parse at a boundary, a row you
+hand to a template, kwargs you forward. Reach for a \`@dataclass\` when you own the object and want
+methods, defaults and real attribute access. The dataclass is the better default; \`TypedDict\` is what
+you use when the value has to stay a dict.
+
 ### Reading the annotations back
 
 Because annotations are recorded rather than acted on, your own code can read them. Every class and function keeps them in \`__annotations__\`, and \`typing.get_type_hints()\` is the version you actually want: it hands back real type objects and gathers inherited fields too.
