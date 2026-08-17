@@ -2358,6 +2358,8 @@ policy.
   "reveal": "In the design write, name the algorithm, the key dimension (per user, per API key, per endpoint), the exact rejection contract (429, Retry-After, the RateLimit headers), and your fail-open or fail-closed call. The contract earns as much credit as the algorithm."
 }
 \`\`\`
+
+**Sources:** [Cloudflare sliding-window counting](https://blog.cloudflare.com/counting-things-a-lot-of-different-things/) · [Cloudflare rate limiting rules](https://developers.cloudflare.com/waf/rate-limiting-rules/) · [Stripe rate limits](https://docs.stripe.com/rate-limits)
 `.trim()
 
 const distributedRateLimitingTeach = `
