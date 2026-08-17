@@ -467,7 +467,7 @@ The decoder solves partial characters. It has nothing to say about partial **lin
 buffer = ""
 buffer += 'data: {"delta": "hi"}\\ndata: {"del'
 parts = buffer.split("\\n")
-buffer = parts.pop()        # the tail is not a line yet
+buffer = parts.pop()
 print(parts)                # ['data: {"delta": "hi"}']
 print(repr(buffer))         # 'data: {"del'
 \`\`\`
@@ -519,23 +519,7 @@ A protocol usually carries non-payload lines too: blank ones, comments, event na
 
 ### Stopping is part of the protocol
 
-Most streams end with a sentinel rather than by closing. When you see it, you stop reading, and now you owe the connection a close. A generator is where this bites: leaving a \`for\` loop early does not finish the generator, and whatever it was holding stays held until somebody closes it.
-
-\`\`\`python
-def rows():
-    try:
-        for index in range(5):
-            yield index
-    finally:
-        print("connection released")
-
-
-stream = rows()
-print(next(stream))         # 0
-stream.close()              # connection released
-\`\`\`
-
-\`close()\` raises \`GeneratorExit\` at the paused \`yield\`, so a \`finally\` inside the generator runs. On your side of the loop, the same job belongs in a \`try\` / \`finally\`, so the close happens on the sentinel path, the exception path, and the ran-out-of-chunks path alike.
+Most streams end with a sentinel rather than by closing, so the loop that reads one ends on a message rather than on the end of the body.
 
 \`\`\`cswidget
 {
@@ -565,6 +549,24 @@ stream.close()              # connection released
   "reveal": "Three separate obligations hide behind one read loop: finish the character, finish the line, and release the connection. The first two are state you carry, the third is a promise you keep on every path out."
 }
 \`\`\`
+
+Stopping on the sentinel leaves the connection where it was, so releasing it is a job you still owe. A generator is where this bites: leaving a \`for\` loop early does not finish the generator, and whatever it was holding stays held until somebody closes it.
+
+\`\`\`python
+def rows():
+    try:
+        for index in range(5):
+            yield index
+    finally:
+        print("connection released")
+
+
+stream = rows()
+print(next(stream))         # 0
+stream.close()              # connection released
+\`\`\`
+
+\`close()\` raises \`GeneratorExit\` at the paused \`yield\`, so a \`finally\` inside the generator runs. On your side of the loop, the same job belongs in a \`try\` / \`finally\`, so the close happens on the sentinel path, the exception path, and the ran-out-of-chunks path alike.
 
 ### Pitfalls
 
