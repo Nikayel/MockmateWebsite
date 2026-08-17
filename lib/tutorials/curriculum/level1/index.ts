@@ -2212,6 +2212,8 @@ That is the entire trick behind \`minutes_to_hm(total_minutes)\`: return \`[tota
 \`\`\`
 
 **Interview nuance:** the identity \`a == (a // b) * b + (a % b)\` always holds in Python, and because \`//\` floors (rather than truncating toward zero like C, Java, and Go), Python's \`%\` result always carries the sign of the divisor \`b\`, never the sign of \`a\`. Interviewers use this to test whether you actually know your language's division semantics: \`-7 % 3\` is \`2\` in Python but \`-1\` in C. When you need clock-style wraparound (an index that stays in range), Python's flooring \`%\` is the behavior you want.
+
+**Sources:** [Binary arithmetic operations](https://docs.python.org/3/reference/expressions.html) · [PEP 238, division operator](https://peps.python.org/pep-0238/) · [Floating point arithmetic](https://docs.python.org/3/tutorial/floatingpoint.html)
 `,
     demoCode: `total = 125
 print(total // 60)   # 2  (whole hours)
