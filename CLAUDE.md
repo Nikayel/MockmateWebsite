@@ -140,6 +140,17 @@ sibling's uncommitted work, which is unrecoverable. Content has survived every o
 incidents; what does not survive is `git log` telling the truth about which change is where, and that
 is what you need on the day something has to be bisected or reverted.
 
+**A printed commit sha is not proof the commit exists.** Three times on 2026-08-16, `git commit`
+printed full success (sha, "1 file changed") and the commit was later absent from history with no
+reflog trace: twice a concurrent sibling's lint-staged stash/reset raced the ref update, once the
+external volume unmounted before the object flushed. Pathspec discipline protects a commit's
+CONTENTS, not the ref update itself. So after every commit in a concurrent fleet, verify it:
+
+    git cat-file -e <sha> && git merge-base --is-ancestor <sha> HEAD
+
+If it vanished, the edit is still in the working tree; re-commit it. An agent that trusts the
+printed output will report a sha that `git show` cannot find.
+
 Commit with `git -c commit.gpgsign=false` on this volume.
 
 **Verify agent reports yourself.** Agents report success they did not achieve. Before relaying a
