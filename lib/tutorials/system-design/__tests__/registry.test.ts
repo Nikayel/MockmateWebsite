@@ -3,7 +3,7 @@
  * SQL and Python registry tests: the twelve levels stay registered and ordered, slugs round-trip to
  * levels (route resolution), lesson + exercise ids stay globally unique and namespaced, and the
  * in-lesson "next" never silently crosses a level boundary (crossing is the deliberate hand-off
- * `getFirstLessonOfNextSystemDesignLevel`). System Design is the largest course (222 lessons) and its
+ * `getFirstLessonOfNextSystemDesignLevel`). System Design is the largest course (224 lessons) and its
  * nav helpers back app/learn/system-design/[levelSlug]/[lessonId] + the lesson player, so a
  * duplicated id, a mis-registered level, or a slug typo would break routing with nothing to catch it.
  */
@@ -51,9 +51,9 @@ describe("system-design registry — structure & id integrity", () => {
     expect(getSystemDesignLevelBySlug("no-such-slug")).toBeUndefined()
   })
 
-  it("has 222 lessons with globally-unique, sd- namespaced ids", () => {
+  it("has 224 lessons with globally-unique, sd- namespaced ids", () => {
     const lessons = listAllSystemDesignLessons()
-    expect(lessons).toHaveLength(222)
+    expect(lessons).toHaveLength(224)
     const ids = lessons.map((lesson) => lesson.id)
     expect(new Set(ids).size).toBe(ids.length)
     expect(ids.every((id) => /^sd-l\d+-/.test(id))).toBe(true)
@@ -64,7 +64,7 @@ describe("system-design registry — structure & id integrity", () => {
       lesson.apply.id,
       lesson.practice.id,
     ])
-    expect(exerciseIds).toHaveLength(444)
+    expect(exerciseIds).toHaveLength(448)
     expect(new Set(exerciseIds).size).toBe(exerciseIds.length)
     expect(exerciseIds.every((id) => id.startsWith("sd-"))).toBe(true)
   })

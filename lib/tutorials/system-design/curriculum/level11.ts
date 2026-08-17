@@ -6268,13 +6268,500 @@ Read the direction rather than the ordering. The list is moving away from what t
 **Sources:** [The lethal trifecta](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/) · [CaMeL, defeating prompt injections by design](https://arxiv.org/abs/2503.18813) · [Constitutional Classifiers++](https://arxiv.org/abs/2601.04603) · [OWASP GenAI LLM Top 10, 2026 edition](https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/)
 `.trim()
 
+const agentTracingTeach = `
+## Three assumptions an agent trace breaks
+
+You already know distributed tracing on the request and response model: a span is a network call, the depth of the tree is fixed by your call graph, and the attribute you stare at is duration. An agent run breaks all three at once.
+
+Depth is decided at runtime by the model rather than by your code, so the same endpoint produces a three-span trace for one user and a ninety-span trace for the next. One logical operation runs for minutes rather than milliseconds, so the trace is still open while the user is still waiting. And duration stops being the expensive axis, because tokens are money: a span that took 400 milliseconds can cost more than the span beside it that took 40 seconds.
+
+Here is the shape, with the numbers that matter on every node.
+
+\`\`\`
+invoke_agent  research-assistant           42.1s   in 61,206   out 3,410
+├─ plan  gpt-x                              6.4s   in  8,614   out   380
+│  ├─ chat  gpt-x                           3.1s   in  4,102   out   210
+│  └─ chat  gpt-x                           3.3s   in  4,512   out   170
+├─ execute_tool  search_docs                0.9s   in      0   out     0
+├─ retrieval  corpus-v4                     0.3s   in      0   out     0
+├─ chat  gpt-x                             11.2s   in 22,140   out   890
+├─ execute_tool  run_query                  2.7s   in      0   out     0
+├─ chat  gpt-x                             10.9s   in 24,802   out 1,020
+└─ chat  gpt-x                              8.5s   in  5,650   out 1,120
+\`\`\`
+
+Read the depth first. The two \`chat\` spans that produced the plan are children of \`plan\`, and every tool span is a sibling of \`plan\` under \`invoke_agent\`. Read the durations second: the children sum to 40.9s while the parent is 42.1s, because the orchestrator's own work between steps lives in the parent and in no child. Read the tokens last, which is the reading nobody trained on HTTP traces performs: 61,206 input tokens crossed this one user request, and duration alone will never show it.
+
+## The convention, and where it now lives
+
+OpenTelemetry's GenAI semantic conventions are the vendor-neutral answer to all of this. They define \`gen_ai.*\` attributes, span shapes for inference and tool and agent operations, metrics, and a convention for where prompt content goes. That matters because a trace outlives the vendor that first collected it: spans named by a vendor SDK cannot be moved to another backend without re-instrumenting every service, and they cannot be joined to the HTTP spans around them because the two vocabularies disagree about what a span is called.
+
+Two facts about the state of these conventions have to be said plainly, because both of them mislead a careful reader.
+
+**Nothing in GenAI semconv is Stable.** The spans, events, metrics, and agent-spans documents all carry the Development marker, and the repository has no tagged release at all. Attribute names can still change. Build on the shape, not on the spelling.
+
+**As of semantic-conventions v1.42.0 in June 2026, the GenAI conventions moved out of the main semantic-conventions repository into a dedicated GenAI repository.** Every \`gen_ai.*\` page on the main registry now renders with a Deprecated badge, and that badge means relocated, not abandoned. A learner who greps the old registry for authority concludes the whole vocabulary was retired, which is exactly backwards.
+
+The operation vocabulary is the part you should memorize, because it is what makes one team's trace legible to another: \`chat\`, \`embeddings\`, \`retrieval\`, \`fetch_response\`, \`generate_content\`, \`text_completion\`, \`execute_tool\`, \`create_agent\`, \`invoke_agent\`, \`invoke_workflow\`, \`plan\`, plus a memory family (\`create_memory\`, \`update_memory\`, \`upsert_memory\`, \`delete_memory\`, \`search_memory\`, and create and delete for a memory store).
+
+Span names are model-parameterized rather than free text: \`{gen_ai.operation.name} {gen_ai.request.model}\` for inference and embeddings, \`{gen_ai.operation.name} {gen_ai.data_source.id}\` for retrievals, and the bare operation name for the rest. The response id is deliberately kept out of the name. A name carrying a unique id per call is unbounded cardinality, which is the same cost mistake as an unbounded metric label. Note also that \`invoke_agent\` splits into a client variant and an internal variant: the client variant requires a provider name, the internal one does not, because an in-process loop has no provider to name.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Attribute", "Level, August 2026", "What it is for"],
+  "rows": [
+    ["gen_ai.operation.name", "Required", "chat, execute_tool, invoke_agent, plan, and the rest of the vocabulary"],
+    ["gen_ai.provider.name", "Required", "Which provider served the call, so a gateway failover is visible"],
+    ["gen_ai.request.model", "Conditionally required", "What you asked for. Rides in the span name"],
+    ["gen_ai.response.model", "Recommended", "What actually served you, which is often not what you asked for"],
+    ["gen_ai.usage.input_tokens", "Recommended", "The billable half nobody watches"],
+    ["gen_ai.usage.output_tokens", "Recommended", "The billable half everybody watches"],
+    ["gen_ai.conversation.id", "Conditionally required", "Set it only when it is readily available, never fake one"],
+    ["gen_ai.input.messages", "Opt-In", "The prompt. Registry-annotated as likely to contain sensitive data"],
+    ["gen_ai.output.messages", "Opt-In", "The completion. Same annotation"],
+    ["gen_ai.system_instructions", "Opt-In", "The system prompt. Same annotation"]
+  ],
+  "highlightCols": ["Level, August 2026"],
+  "caption": "Levels as documented in August 2026 on the inference operation. Nothing here is Stable, so treat the spellings as dated and the shape as durable. The conversation-id guidance is the one most often ignored: the spec declines to fabricate a grouping key, and a synthetic UUID or a reused trace id silently defeats the grouping it appears to provide."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "plan-span-nesting",
+  "prompt": "Your agent framework emits a plan span, and it nests the tool spans that the plan decided to run underneath it as children. What does that cost you?",
+  "options": [
+    {
+      "label": "Nothing. The plan caused those tool calls, so containing them is the honest shape",
+      "feedback": "Tempting, because causally the plan did decide them. But a span tree is a containment tree, not a causal graph, and containment means 'this work happened inside that span's clock'. Nesting execution inside the decision makes the decision look as expensive as the whole run."
+    },
+    {
+      "label": "The decision phase now swallows the execution phase, so every per-phase number is wrong",
+      "correct": true,
+      "feedback": "Right. The plan span's clock and its token totals now count work that is not planning, and the damage spreads from there: plan latency, plan cost, and any per-phase breakdown you build on top all inherit the error, and the aggregate looks perfectly plausible while being wrong in a fixed direction."
+    },
+    {
+      "label": "Only the waterfall's indentation changes. The metrics come from histograms, not from the tree",
+      "feedback": "The histograms are computed FROM the tree: a per-invocation count of child spans under a parent is exactly a tree query. Get the parentage wrong and the counts inherit it."
+    }
+  ]
+}
+\`\`\`
+
+## Plan and execution are phases, not caller and callee
+
+An agent trace is a tree over a loop rather than a call chain, and that is the structural fact the HTTP model cannot supply. A \`plan\` span is the decision phase, where the agent formulates a strategy before executing it. The LLM calls that produce the plan nest under it, because they genuinely happen inside its clock. The tool spans that carry out the plan are typically siblings of \`plan\` under the parent \`invoke_agent\`, because the plan had already finished when they started.
+
+Get that wrong and every downstream aggregation lies in the same direction, quietly, forever. Getting it right is a five-minute instrumentation decision.
+
+## Why a span per model call is not enough
+
+This is the beat that justifies treating agent telemetry as its own subject. The conventions define, per agent invocation, two histograms of counts: one of inference calls and one of tool calls (\`invoke_agent.inference_calls\` and \`invoke_agent.tool_calls\` in the current spelling). Not counters. Histograms, so you can ask for a p99.
+
+Runaway loops, tool thrash, and a planner that re-queries seven times before committing are all properties of the distribution of child-span counts under one parent. If your unit of analysis is one model call, all three are invisible, because every individual call looks completely normal: normal duration, normal token count, normal status. A p50 of 4 inference calls per run beside a p99 of 60 is a loop that does not always terminate, and no per-call dashboard will ever draw it.
+
+There is no HTTP analogue for this measurement, which is precisely why the mental model does not transfer. In a request and response system the number of downstream calls is a property of the code: it is 3, or it is 3 plus a retry, and you would never build a histogram of it. Here it is a property of the model's output, so it is a random variable, and you watch its tail the way you watch a latency tail.
+
+## There is no cost attribute, and that is deliberate
+
+The conventions carry token usage and deliberately carry no price. This is worth understanding rather than working around, because the reasoning generalizes: prices change, spans are immutable, and a dollar figure baked into a span written last March cannot be re-derived when you renegotiate a contract or when a provider drops its rate. A count can be re-priced forever. A price cannot be re-counted.
+
+So cost is a downstream join and the price table is yours to version. The join needs three token classes rather than one, because uncached input, cached input, and output are three different prices. Your provider bills a cache read at a fraction of a fresh input token, and the standard token counters do not split them, so the cached-input count is a number your gateway has to record on the way past.
+
+\`\`\`
+price table (versioned, with an effective_from date)
+  model   class            usd per 1M tokens
+  gpt-x   input_uncached    3.00
+  gpt-x   input_cached      0.30
+  gpt-x   output           15.00
+
+the join, per span
+  cost = in_uncached / 1e6 * 3.00
+       + in_cached   / 1e6 * 0.30
+       + out         / 1e6 * 15.00
+
+the run from the span tree above, with 40,000 of its 61,206
+input tokens served from the prompt cache
+  uncached   21,206 / 1e6 *  3.00  = $0.0636
+  cached     40,000 / 1e6 *  0.30  = $0.0120
+  output      3,410 / 1e6 * 15.00  = $0.0512
+  total                            = $0.1268
+
+the same run, priced with one input class at the uncached rate
+  input      61,206 / 1e6 *  3.00  = $0.1836
+  output      3,410 / 1e6 * 15.00  = $0.0512
+  total                            = $0.2348
+\`\`\`
+
+One input class reports this run at 85 percent more than it cost. That error does not average out across a fleet, because it is signed: it always overstates, and it overstates most for the teams doing the best prompt-cache work, which is the exact opposite of the incentive you want on a chargeback dashboard.
+
+## Payload capture, and the storage seam it hands you
+
+Three attributes carry the payloads: \`gen_ai.input.messages\`, \`gen_ai.output.messages\`, and \`gen_ai.system_instructions\`. All three are Opt-In, and all three are annotated in the registry as likely to contain sensitive information. The spans document is explicit that instrumentations should not capture them by default and that capture should be gated behind an explicit opt-in, "for example" an environment variable. Read that hedge carefully: the variable is illustrative, not normative, so do not design around one portable flag across four languages.
+
+The same three attributes can instead ride a log-based event, \`gen_ai.client.inference.operation.details\`, which is one of only two events the conventions currently define (the other reports an evaluation result).
+
+That dual homing is not a footnote, it is the architecture. Metadata-rich spans go to the hot trace store you query all day. The bulky prompt and completion payloads go to a separate pipeline that is cheaper per byte, shorter on retention, and access-controlled, and the two are joined on trace id and span id. A seven-day prompt retention beside a ninety-day trace retention falls out of that split as configuration. Reach for it before you reach for a bespoke redaction processor, which has to understand the shape of every prompt you will ever ship and will be wrong about the first one you did not anticipate.
+
+Two cautions come with it. The events path is in development and not yet available in some languages, and the fallback is span attributes, which puts prompt text straight back into your trace store. And treat the capture flag as production configuration with secret-level review: content capture is off by default, so the risk direction is not somebody forgetting to enable it, it is somebody enabling it to debug an incident on Thursday and nobody turning it off.
+
+On sampling, reason from the cost structure rather than from the spec, which takes no position here. You already know head-based sampling decides at the first span and tail-based sampling buffers the whole trace at the collector before deciding. For an agent, every signal that makes a run worth keeping (it errored, it looped, it burned 400k tokens, an eval marked it bad an hour later) exists only after the run has finished, so a head decision is a coin flip on exactly the traces you need. Agent traces are also low volume and high value next to web traffic, which inverts the calculus that makes head sampling attractive there. That is an argument, and a good one, but it is your argument and not a rule anyone handed you.
+
+## Bucket boundaries, the smallest beat with the largest payoff
+
+The conventions specify explicit, non-default bucket boundaries for the two histograms that matter, precisely because these distributions run across three to four orders of magnitude.
+
+\`\`\`
+gen_ai.client.token.usage       unit {token}, powers of 4
+  1, 4, 16, 64, 256, 1024, 4096, 16384, 65536, 262144,
+  1048576, 4194304, 16777216, 67108864
+
+gen_ai.client.operation.duration  unit s, powers of 2
+  0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28, 2.56,
+  5.12, 10.24, 20.48, 40.96, 81.92
+
+http.server.request.duration      unit s, the web ladder you inherit by habit
+  0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75,
+  1, 2.5, 5, 7.5, 10
+
+one 45-second agent run, measured on each
+  GenAI ladder  lands in (40.96, 81.92]   a real bucket with two real edges
+  web ladder    lands in (10, +Inf)       the overflow bucket, no upper edge
+\`\`\`
+
+An explicit-bucket histogram estimates a quantile by interpolating inside the bucket the quantile falls into. If your top finite boundary is 10 seconds and your agent runs take 30 to 90 seconds, every single run lands in the overflow bucket, the estimator has no upper edge to interpolate against, and your reported p99 becomes a property of the bucket layout rather than a measurement of the system. The cruel part is that it will also be perfectly stable, so it renders as a healthy flat line while the thing it claims to measure doubles.
+
+One more detail on the token histogram: it requires a token-type attribute separating input from output. Without it you have summed two quantities with different prices and different distributions into a single number that means nothing.
+
+## Three conventions, one normalization target
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "convention-gives-it-or-you-build-it",
+  "prompt": "Last call before the design write. Sort each thing you need by whether the conventions hand it to you or whether it is yours to build.",
+  "buckets": [
+    "The convention supplies it",
+    "You build it"
+  ],
+  "items": [
+    {
+      "label": "A vocabulary that names a planning span and separates it from a tool call",
+      "bucket": "The convention supplies it",
+      "feedback": "The operation vocabulary is the whole point of a shared convention: it is what makes one team's trace readable by another team's tooling."
+    },
+    {
+      "label": "The dollar figure on a run",
+      "bucket": "You build it",
+      "feedback": "Counts are carried, prices are not, on purpose. A price in an immutable span cannot be re-derived when the rate changes; a count can be re-priced forever."
+    },
+    {
+      "label": "Boundaries that keep a 45-second run out of an overflow bucket",
+      "bucket": "The convention supplies it",
+      "feedback": "Both ladders are specified explicitly, and both differ from the defaults you would otherwise inherit. Setting them is a one-line instrumentation change."
+    },
+    {
+      "label": "Which of thirty internal teams a run should be charged to",
+      "bucket": "You build it",
+      "feedback": "A tenant dimension is your resource attribute, set at the top of the run and inherited by every child span. Nothing in the vocabulary knows your org chart."
+    },
+    {
+      "label": "How long captured prompt text is retained before deletion",
+      "bucket": "You build it",
+      "feedback": "The conventions give you the seam by defining a separate content channel. What that channel's retention is remains a policy decision you configure and defend."
+    },
+    {
+      "label": "A per-invocation histogram of how many tool calls one agent run made",
+      "bucket": "The convention supplies it",
+      "feedback": "This is the measurement with no HTTP analogue, and it is specified rather than left to you, which is a strong hint about how often it is the thing that breaks."
+    }
+  ],
+  "reveal": "Four things to carry out of here. The tree shape is a loop, not a call chain, so a plan span contains the calls that produced the plan and sits beside the tool spans that executed it. The unit of analysis is the invocation, not the model call, which is why the conventions define per-invocation histograms of inference and tool counts. Cost is a join you own against a versioned price table with three token classes, because the conventions carry counts and deliberately carry no price. And prompt payloads are Opt-In with a second home on a log event, which is the storage seam that gives you a short content retention beside a long trace retention without writing a redaction processor."
+}
+\`\`\`
+
+Three instrumentation conventions exist in the wild and you will meet all three. OpenInference, from the Arize and Phoenix ecosystem, does not use \`gen_ai.*\` at all: it organizes everything under a span-kind attribute with ten kinds, including RERANKER, GUARDRAIL, and EVALUATOR, which tells you it was designed around evaluation workflows. OpenLLMetry uses an \`llm.\` prefix. GenAI semconv is the third.
+
+The ecosystem's answer was not agreement at the instrumentation library, it was normalization at the collector. The OpenTelemetry Collector contrib distribution ships a GenAI normalizer processor (Alpha, traces only) that rewrites attributes from non-OTel GenAI instrumentation into GenAI semconv, with built-in mapping tables for exactly two sources: OpenInference and OpenLLMetry. So the practical stance is to emit the standard where you control the code and translate at the edge where you do not. That mapping table also exposes the trap worth remembering: \`llm.token_count.prompt\` and \`llm.usage.prompt_tokens\` are two different names for the same quantity, in two different libraries, both using an \`llm.\` prefix.
+
+**Interview nuance:** the answer that shows experience is a trace id that survives into the eval set. A production failure becomes a regression case only if you can find the exact run, read its trajectory, replay its inputs, and attach the trace to the case. If the trace id dies at the edge of the trace store, then "the assistant got worse this week" is an opinion forever, and no amount of dashboard will settle it.
+
+**Recap:** an agent trace is a tree over a loop, so nest the plan's model calls under \`plan\` and keep tool spans as siblings under \`invoke_agent\`; measure per invocation, because inference-call and tool-call counts are distributions and loops hide in their tails; join token counts against your own versioned price table with uncached input, cached input, and output priced separately; dual-home prompt payloads to a short-retention, access-controlled channel and treat the capture flag as production config; and set the specified bucket boundaries, because the web ladder's 10-second ceiling turns every agent p99 into a quantization artifact.
+
+**Sources:** [OpenTelemetry GenAI semantic conventions](https://github.com/open-telemetry/semantic-conventions-genai) · [Gen AI registry, now relocated](https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/) · [Inside the LLM Call: GenAI observability](https://opentelemetry.io/blog/2026/genai-observability/) · [How we built our multi-agent research system](https://www.anthropic.com/engineering/built-multi-agent-research-system)
+`.trim()
+
+const trajectoryEvalsTeach = `
+## Two runs, one answer, and only one of them was safe
+
+Every scoring method you have so far grades one output against one expected answer. An agent does not produce an output, it produces a path: a sequence of tool calls, each with arguments, each of which changed the world. Two runs can land on an identical final answer by wildly different routes.
+
+\`\`\`
+task: "refund order 88213 and tell the customer"
+
+run A                                        run B
+  lookup_order(88213)      ok                  lookup_order(88213)      ok
+  check_policy(88213)      refundable          refund(88213, 240.00)    ok
+  refund(88213, 240.00)    ok                  lookup_order(88213)      ok
+  send_email(cust, ...)    ok                  check_policy(88213)      refundable
+                                               refund(88213, 240.00)    ok
+                                               lookup_order(88213)      ok
+                                               send_email(cust, ...)    ok
+                                               send_email(cust, ...)    ok
+
+final answer, both runs   "Your refund of $240.00 is on its way."
+answer-match score        1.0                  1.0
+\`\`\`
+
+Run B refunded twice, emailed twice, checked the policy after moving the money rather than before, and spent 8 tool calls against run A's 4. An answer-match eval sees none of it, because it reads the last line and nothing else. Worse, run B is the run that reaches the right answer by accident after taking a destructive action, and an output-only gate will happily ship the model that produces it.
+
+Trajectory evaluation is the discipline that scores the path. It has its own vocabulary, and almost nobody arrives at an interview holding it.
+
+## The artifact is an ordered list, and most of it is programmatic
+
+The thing you evaluate is the trajectory: the ordered list of (tool, arguments, result) the run produced, plus the final answer and the run's cost. If you did the tracing work, you already have it, because that list is exactly what the span tree holds, which is why production traces and eval cases are the same object viewed twice.
+
+What makes trajectory eval cheap is that most of what you want to assert about that list is programmatic, and therefore deterministic, free, and trustworthy. The tool names are a closed set. The arguments are typed. The results carry a status. No model is needed to notice that \`refund\` appears twice with the same order id, and no model should be asked to.
+
+## The metric family
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Metric", "Definition", "What it catches that task success misses"],
+  "rows": [
+    ["Task success", "The final state matches the required end state", "Nothing new. This is the number you already have"],
+    ["Tool-selection precision", "Correct calls divided by total calls", "Guessing, thrash, and tools called outside their purpose"],
+    ["Tool-selection recall", "Required calls made divided by required calls", "A mandatory step silently skipped, like a policy check"],
+    ["Redundant-step rate", "Repeated (tool, args) pairs divided by total calls", "Loops, re-queries, and duplicated side effects"],
+    ["Error-recovery rate", "Runs that recover divided by runs that hit a tool error", "Brittleness that only appears when a dependency is flaky"],
+    ["Steps to completion", "Tool calls per successful run, p50 and p99", "The long tail that eats the budget while the median looks fine"],
+    ["Cost per success", "Total spend divided by successful runs", "A change that gets cheaper by failing more often"],
+    ["Wall clock", "First call to final answer, p50 and p99", "What the person on the other end is actually waiting through"]
+  ],
+  "highlightCols": ["What it catches that task success misses"],
+  "caption": "Eight numbers, and the first one is the only one an output-only eval already gives you. Every other row is a property of the path, computable from the trajectory with no model in the loop."
+}
+\`\`\`
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "id": "cost-per-run-versus-cost-per-success",
+  "prompt": "A prompt change takes average spend per run from $0.20 down to $0.14 across 1,000 runs, and takes task success from 90 percent down to 55 percent. The cost dashboard is green. Ship it?",
+  "options": [
+    {
+      "label": "Yes. Spend fell 30 percent, and success rate is a separate goal with its own budget and its own owner",
+      "feedback": "This is the trap the per-run metric sets, and it is the reason the row exists. Spend per run is a rate over attempts, and attempts are not what anyone wanted."
+    },
+    {
+      "label": "No, because the work still has to get done, so divide spend by successes rather than by runs before comparing",
+      "correct": true,
+      "feedback": "Right, and doing that division makes the change more expensive rather than cheaper. $200 over 900 outcomes is $0.222 each; $140 over 550 outcomes is $0.255 each, so the cheap version costs about 15 percent more per unit of work done. And that ignores the 350 extra failures, which come back as retries, escalations, and support tickets you pay for a second time."
+    },
+    {
+      "label": "Only if wall clock held too, since a cheaper run that takes twice as long is not cheaper in any sense that matters",
+      "feedback": "Wall clock is a real metric on the list and it is worth watching, but it is not what is broken here. This change is being scored per attempt when it should be scored per outcome, and that is true no matter what the clock did."
+    }
+  ]
+}
+\`\`\`
+
+Cost per success, not cost per run. A change that reduces the bill by failing more often improves every per-attempt number and degrades the only one that describes work getting done. The same reasoning applies to steps and to wall clock: divide by successes, because a run that failed fast is not a run that went well.
+
+## pass@k and pass^k, which is why this lesson exists
+
+Two metrics that look like notation variants ask opposite questions.
+
+**\`pass@k\`** asks whether the agent solved the task **at least once** in k tries. **\`pass^k\`** asks whether it solved the task **every** time in k tries.
+
+Which one is correct depends entirely on how many attempts your user gets. A code assistant that shows five suggestions and lets a human pick the good one is a \`pass@k\` system, and improving \`pass@k\` genuinely improves it. A support agent that issues one refund is a \`pass^k\` system, and a model that solves the task 4 times out of 8 is not 50 percent good, it is unusable, because you cannot tell your customer which four.
+
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "The two metrics pull apart as k grows",
+  "predictPrompt": {
+    "question": "One run of a task succeeds 90 percent of the time. If the eight runs were independent, how often would all eight succeed?",
+    "options": [
+      "About 90 percent, because each run is 90 percent",
+      "About 72 percent",
+      "About 43 percent",
+      "Under 10 percent"
+    ]
+  },
+  "workedExample": "Start at a per-run success rate of 0.9 with k of 8. Under independence, all eight succeeding is 0.9 to the eighth power, which is 0.4305: a system that reads as 90 percent reliable per attempt is right end to end for fewer than half of its users. At least one of the eight succeeding is 1 minus 0.1 to the eighth, which is 99.999999 percent, so pass@k has already saturated and cannot tell two models apart at all. Now drag k upward and watch pass@k stay pinned at the ceiling while pass^k falls off a cliff. Then drag the per-run rate to 0.99 to see how much reliability you have to buy to move pass^k at k of 8, and to 0.999 to see how much more.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "p",
+      "label": "Per-run success rate on one task",
+      "min": 0.5,
+      "max": 0.999,
+      "scale": "linear",
+      "step": 0.001,
+      "initial": 0.9
+    },
+    {
+      "kind": "slider",
+      "id": "k",
+      "label": "Repeated runs of the same task (k)",
+      "min": 1,
+      "max": 20,
+      "scale": "linear",
+      "step": 1,
+      "initial": 8,
+      "unit": "runs"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "passhat",
+      "label": "pass^k: every run succeeds",
+      "expr": "pow(p, k)",
+      "format": "percent",
+      "sparkline": {
+        "over": "k"
+      }
+    },
+    {
+      "id": "passat",
+      "label": "pass@k: at least one run succeeds",
+      "expr": "1 - pow(1 - p, k)",
+      "format": "percent"
+    },
+    {
+      "id": "gap",
+      "label": "Gap between the two claims",
+      "expr": "passat - passhat",
+      "format": "percent"
+    }
+  ],
+  "caption": "Same model, same task, same eight runs. One number says the system is essentially perfect and the other says it is a coin flip, and the difference between them is only which question you asked."
+}
+\`\`\`
+
+Independence is the optimistic case, and real agents are not independent. The tau-bench work measured this directly: a leading tool-calling agent succeeded on fewer than half the tasks and its \`pass^8\` in the retail domain came in under 25 percent. Run the independence arithmetic on that and the numbers do not reconcile at all. At a 50 percent per-run rate, independence predicts 0.5 to the eighth, which is 1 in 256, under half a percent. The measured figure is dozens of times higher.
+
+The direction of that gap is not an accident and it is worth understanding, because it generalizes. Averaged over a task set, \`pass^k\` is the mean of each task's own success rate raised to the k, and that is always at least the mean rate raised to the k. Difficulty is spread unevenly across tasks: some are solved every single time and some are never solved, and it is the always-solved fraction that survives eight repetitions. So the failures cluster on particular tasks rather than scattering randomly across runs, which is genuinely good news for debugging, because a task that fails 6 times out of 8 has a deterministic bug wearing a probabilistic costume and is worth reading. It is bad news for any metric that rewards solving something at least once.
+
+## Grade against invariants, not against a golden path
+
+The obvious next move is to record a reference trajectory and compare against it. It over-penalizes immediately, because there is usually more than one correct path. Run A above could have looked up the order and checked the policy in either order and been equally right, and an exact path match would fail one of those two arbitrarily.
+
+Assert invariants instead. They are the properties that must hold on every correct path rather than one path that happened to be correct.
+
+\`\`\`
+ordering      check_policy(id) precedes refund(id) for the same id
+arguments     refund is never called with a null, zero, or negative amount
+prohibition   delete_account never appears in a run whose task was a refund
+cardinality   at most one successful refund per order id per run
+termination   the run ends by answering, not by hitting the step cap
+grounding     every order id in the final answer appeared in a tool result
+\`\`\`
+
+Six assertions over a list. They run in milliseconds, they need no model, they never flake, and each one names a specific way a run can be wrong while still producing the right sentence. Write these first, and reach for a judge only for what an assertion cannot express.
+
+## What a judge may score, and what it may not
+
+You already know a judge scales where human labeling cannot, and that it carries biases toward longer answers, toward its own style, and toward position. Over a trajectory the division of labor gets sharper.
+
+A judge can reasonably score whether the plan made sense, whether a tool choice was defensible given only what the agent knew at that step, and whether the final answer is actually supported by what the tools returned. A judge must not be asked whether the run stayed under budget, made fewer than twelve calls, or called \`refund\` twice, because those are arithmetic over a list, and a program gets them right every time for free while a judge gets them mostly right for money.
+
+One number is worth sharpening because it changes a practice rather than an opinion. The MT-Bench study measured position bias directly by swapping the two candidate answers and re-asking: the strongest judge in that study was consistent on 65.0 percent of pairs. Roughly a third of its verdicts flipped on the ordering alone. The operational answer is to run both orderings and count a disagreement as a tie, which converts an invisible bias into a visible abstention. It also doubles your judge spend, which is exactly why it belongs on the golden-set cadence rather than on every commit. The same study raised that consistency to 77.5 percent with few-shot examples, at roughly four times the prompt cost, which is the same trade paid in a different currency.
+
+## An eval without error bars is an anecdote
+
+\`\`\`
+binary metric, n items, observed rate p
+  standard error = sqrt(p * (1 - p) / n)
+  near p = 0.5 that is about 0.5 / sqrt(n)
+
+  n =  100    SE = 0.0500    95% interval about +/- 10 points
+  n =  400    SE = 0.0250    95% interval about +/-  5 points
+  n = 1600    SE = 0.0125    95% interval about +/-  2.5 points
+
+so   72% on 100 items against 78% on 100 items is not a result
+and  cutting the interval to a quarter costs 16 times the items
+\`\`\`
+
+That last line is why sample size is not the lever people reach for twice. Two moves buy far more than more items does.
+
+**Paired analysis.** When you compare two models, run both on the same items and analyze the per-item difference rather than the two rates. The variance of a difference is the sum of the variances minus twice the covariance, and on a shared item set that covariance is large and positive, because an item that is hard for one model is usually hard for the other. Subtracting it removes most of the noise. This is the single biggest sample-size saving available in eval, and an unpaired comparison throws it away for nothing in return.
+
+**Clustered standard errors.** When items share a passage, a document, or a customer context, they are not independent observations. Ten questions about one document are closer to one observation than to ten, and treating them as ten understates your error bars. That is how a confident three-point improvement survives review and then fails to appear in production. Cluster the standard errors on whatever the items share.
+
+## Simulated users, a resettable world, and a holdout you never publish
+
+Multi-turn agent eval needs a counterparty and a world, and both cost real engineering. The counterparty is a simulated user: a model given a persona and a goal, supplying the turns your agent has to handle, including the ones where the customer changes their mind halfway. The world is a resettable environment where the tools have real state, so a refund actually moves a balance and the next call sees the new one. Budget for both explicitly, because the alternative is stopping at single-turn eval and finding out in production that your agent cannot handle a follow-up. Anything the model can execute belongs in a sandbox; a framework such as Inspect AI, from the UK AI Security Institute, gives you the dataset, solver, and scorer split plus sandboxed execution of untrusted model code, so you do not build that twice.
+
+Then keep a private holdout, and keep it private. A public benchmark score is not a measurement of your system if the model has seen the benchmark, and contamination is now the default assumption at the frontier rather than an edge case worth mentioning. Your holdout does not need to be large. It needs to be unpublished, which also means never pasting it into a provider whose retention terms you have not read.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "assertion-or-judge",
+  "prompt": "Last call before the design write. Sort each thing you want to know about a trajectory by what should decide it.",
+  "buckets": [
+    "A program decides it",
+    "Only a judge can decide it"
+  ],
+  "items": [
+    {
+      "label": "refund was called twice with the same order id",
+      "bucket": "A program decides it",
+      "feedback": "A cardinality invariant over a typed list. Deterministic, free, and it never flakes. Asking a model for this is paying for a worse answer."
+    },
+    {
+      "label": "The plan the agent formed was a reasonable way to approach the request",
+      "bucket": "Only a judge can decide it",
+      "feedback": "There is no golden plan to diff against, and reasonableness is exactly the kind of holistic reading a judge is for. Validate it against human labels before you trust it."
+    },
+    {
+      "label": "The run stayed under twelve tool calls and thirty cents",
+      "bucket": "A program decides it",
+      "feedback": "Arithmetic over the trajectory. A judge would be slower, more expensive, and occasionally wrong about addition."
+    },
+    {
+      "label": "check_policy was called before refund rather than after it",
+      "bucket": "A program decides it",
+      "feedback": "An ordering invariant, which is the shape that catches run B while leaving every legitimate reordering alone."
+    },
+    {
+      "label": "The final answer is supported by what the tools actually returned",
+      "bucket": "Only a judge can decide it",
+      "feedback": "Partly checkable, since ids and amounts can be matched against tool results, but the general claim of support over free text needs a reader. Assert the checkable half and judge the rest."
+    },
+    {
+      "label": "Given only what the agent knew at step 3, picking search over a direct lookup was defensible",
+      "bucket": "Only a judge can decide it",
+      "feedback": "This is counterfactual reasoning about a decision under partial information, which no assertion can express. It is also where a judge earns its cost."
+    }
+  ],
+  "reveal": "Five things to carry into the design write. The artifact is the path, not the answer, and most of what you want to know about a path is a programmatic assertion rather than a model call. The metric family divides by successes, not by attempts, because a change that fails more often looks cheap on every per-attempt number. pass@k and pass^k ask opposite questions, and a system a customer uses once is a pass^k system no matter how good its pass@k looks. Grade against invariants rather than a golden path, since there is usually more than one correct route. And put error bars on everything, then buy precision with paired analysis and clustered standard errors before you buy it with more items."
+}
+\`\`\`
+
+**Interview nuance:** production traces are the eval set. The strong answer describes the pipeline from a failed run to a regression case (find it by trace id, replay its inputs, freeze it as a case with its invariants attached) and names the order of work: error analysis on real traces first, automated metrics second. Read fifty failed runs and label what actually went wrong before writing a single scorer, because the metric you would have written from intuition is almost never the one the failures ask for. And validate any judge you build against held-out human labels on true-positive and true-negative rate rather than on raw agreement. A judge that says "pass" to everything scores 90 percent agreement on a set where 90 percent pass, and catches nothing at all.
+
+**Recap:** score the path, not just the destination, because two runs with the same answer can differ by a duplicated refund; compute the programmatic metrics first (tool-selection precision and recall, redundant steps, recovery rate, steps and cost per success) and reserve the judge for plan quality and support; use \`pass^k\` when the user gets one attempt and \`pass@k\` only when they genuinely get k; grade against ordering, argument, prohibition, and cardinality invariants rather than a golden path; and put error bars on every comparison, buying precision with paired analysis and clustered standard errors before buying it with sample size.
+
+**Sources:** [tau-bench and the pass^k metric](https://arxiv.org/abs/2406.12045) · [Adding Error Bars to Evals](https://arxiv.org/abs/2411.00640) · [Judging LLM-as-a-Judge with MT-Bench](https://arxiv.org/abs/2306.05685) · [LLM Evals FAQ](https://hamel.dev/blog/posts/evals-faq/)
+`.trim()
+
 export const systemDesignLevel11: DesignLevel = {
   id: 11,
   slug: "specialized-systems",
   title: "Level 11: Specialized & Frontier Systems",
   tagline:
     "The frontier: ML systems, LLM and GenAI infrastructure, real-time analytics and globally consistent data, and IoT, edge, and time-series.",
-  estimatedHours: 18,
+  estimatedHours: 19,
   modules: [
     {
       id: "sd-l11-m1",
@@ -8246,6 +8733,238 @@ export const systemDesignLevel11: DesignLevel = {
               "**Browsing hygiene that is real but secondary:** the browser runs with no access to the user's own cookies or sessions, so it cannot act as the user on sites outside the flow; per-task ephemeral profiles; no file downloads; a screenshot and DOM log per step for audit. An injection classifier over page text in cascade form gives a rate to watch. All of this is defense in depth and none of it is what bounds the loss.",
               "**Cost, stated:** the split adds a model call per step and the policy refuses some legitimate flows, which will look like the agent being unable to complete purchases on sites that need an unusual step. Published work on this pattern puts the capability cost at roughly seven points against an undefended agent, in exchange for a property that holds against an attacker who knows the design.",
               "Common wrong turn: one agent that browses, reasons, and pays, hardened with a page classifier and a confirmation dialog. Both are probabilities on the attacker's side of the boundary, the classifier because it can be retried against and the dialog because it summarizes what the model says rather than what the tool will do, so a hostile page that alters the summary alters what the user approves.",
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: "sd-l11-m7",
+      title: "Operating AI Systems",
+      description:
+        "Two lessons on what changes after the system is live. An agent trace is a tree with a cost on every node rather than a chain of HTTP spans, and it needs a schema that says so. And an agent run is a sequence of decisions rather than an answer, so the eval that gates it has to score the path, not just the destination.",
+      lessons: [
+        {
+          id: "sd-l11-agent-tracing",
+          title: "Agent Tracing and GenAI Telemetry",
+          summary:
+            "An agent trace is a tree over a loop with tokens on every node, so HTTP span habits mislead: the convention gives the shape, and cost is a join you own.",
+          estimatedMinutes: 35,
+          difficulty: "hard",
+          skills: ["genai-observability", "tracing", "cost-attribution"],
+          teach: { markdown: agentTracingTeach, estimatedMinutes: 14 },
+          apply: {
+            id: "sd-l11-agent-tracing-apply",
+            prompt:
+              "Define the observability layer for an internal agent platform running 200k agent runs a day across 30 teams, where every team is charged back for its own token spend and no prompt text may be retained beyond 7 days.",
+            thinkAbout: [
+              "What is the unit of analysis, and which numbers exist only at the parent span?",
+              "Where does prompt text live, and what makes a 7-day limit a config value rather than a rewrite?",
+              "The conventions carry no price. Where does a per-team dollar figure come from?",
+              "How much telemetry is this actually, and does that change the sampling decision?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: 200k agent runs a day, roughly 8 spans per run, so about 1.6M spans a day, which is small for a trace store. Runs are minutes long, teams self-serve their own agents on a shared orchestrator, and finance wants a monthly chargeback per team that survives a price change.",
+              "**Instrument to GenAI semconv, not to a vendor SDK.** Every run opens an `invoke_agent` span; model calls are `chat` spans; tool calls are `execute_tool`; retrievals are `retrieval`. The plan phase gets a `plan` span with its model calls as children and the tool spans as siblings, because plan and execution are phases rather than caller and callee, and getting that backwards makes every per-phase number wrong in a fixed direction. Set the specified explicit bucket boundaries on token usage and operation duration rather than inheriting web-latency defaults, or a 45-second run lands in an overflow bucket and the p99 becomes a quantization artifact.",
+              "**Tenancy is a resource attribute, set once at the top.** A `team.id` (plus `agent.id` and a deploy version) goes on the root `invoke_agent` span and is propagated to every child, so a chargeback query is a group-by rather than a heuristic. I would not use `gen_ai.conversation.id` for this: the spec says to populate it only when it is readily available, and a fabricated grouping key silently defeats the grouping it appears to provide.",
+              "**Cost is a downstream join, priced from a versioned table.** Spans carry counts; a `price_table(model, class, usd_per_1m, effective_from)` carries money, so a rate change or a renegotiation re-prices history instead of invalidating it. Three token classes, not one: uncached input, cached input, and output. My gateway records the cached-input count on the way past, because the standard counters do not split it, and collapsing the two input classes overstates cost by a large signed margin that falls hardest on the teams doing the best prompt-cache work.",
+              "**Two stores, one join key.** Metadata-rich spans go to the hot trace store at 90-day retention, and the content attributes (input messages, output messages, system instructions) ride the log-event channel to a cheaper, access-controlled pipeline with a 7-day lifecycle rule, joined back on trace id and span id. At roughly 40 KB of message payload per run that is about 8 GB a day and 56 GB retained, which is a rounding error in object storage and a genuine problem in a trace index, and that asymmetry is the entire argument for splitting them. Content capture is Opt-In and off by default, so the flag is production config with secret-level review, and the retention is a lifecycle policy rather than a deletion job somebody has to remember to write.",
+              "**Sampling:** at 1.6M spans a day I keep 100 percent of spans and gate only content, because agent traces are low volume and high value, and every signal that makes a run interesting (an error, a loop, a token spike, a later eval verdict) exists only after the run finishes. That reasoning is mine and not the spec's, and I would say so.",
+              "**Dashboards that follow from the model:** per-invocation p50 and p99 of inference-call and tool-call counts (loops live in that tail and are invisible per call), cost per run and cost per successful run by team, cache-hit share of input tokens, and error rate by tool. Alert on the tail of the call-count histogram, not on average duration.",
+              "Common wrong turn: instrumenting one span per model call and computing cost from a hardcoded price constant. The first makes runaway loops undetectable because every individual call looks normal; the second makes last quarter's chargeback unrecomputable the day a price changes, and both are found only when finance asks a question nobody can answer.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-agent-tracing-practice",
+            prompt:
+              "Read the on-call handoff below and say what telemetry would already have answered it. Latency and error rate are both flat while three customers report that the assistant got worse this week, so say what you would query first, in what order, what each result would rule out, and what had to have been recorded before the complaint arrived.",
+            thinkAbout: [
+              "Latency and error rate are flat. Which failure modes does that pair of flat lines actually eliminate, and which does it not touch at all?",
+              "Which of your telemetry could distinguish a model swap, a longer system prompt, a retrieval regression, and a loop that now terminates late but still terminates?",
+              "What has to have been captured before the complaint arrived, and what can still be reconstructed afterwards?",
+              "'Got worse' is a quality claim. What in the trace is even capable of carrying a quality signal?",
+            ],
+            modelAnswerOutline: [
+              "Framing first: Atlas held p50 at 3.2s and its 5xx rate actually fell, and that pair of readings rules out the outage-shaped explanations and rules out almost nothing else. Both metrics are properties of the request envelope, and every interesting agent regression lives inside the envelope: same duration, same 200, different path, different tokens, different answer. The design goal is telemetry where 'worse' is a number before it is a complaint.",
+              "**What must already exist.** Against the handoff's inventory almost none of it does: one span per model call carrying a total token count is not a run, and with no id joining calls back to runs there is nothing to group by. What the platform needs is a per-invocation record: model requested and model actually served (they differ, and a provider-side default change is a real cause), input and output token counts split by cached and uncached, inference-call and tool-call counts as histograms, tool error and retry counts, retrieval result counts and scores, prompt template version, agent version, and the deploy sha. Plus a stable trace id carried into every downstream record, because the entire investigation is a join.",
+              "**Query one: did the inputs change?** Compare this week against last on the distribution of input tokens per run and on prompt-template version share. A system prompt that grew, a context window that now packs more retrieved chunks, or a template rollout at 20 percent all show here and none of them touch latency or error rate. If input tokens moved, the answer is upstream of the model.",
+              "**Query two: did the path change?** Compare the p50 and p99 of tool-call and inference-call counts per invocation. A planner that now re-queries three extra times, a tool that started failing softly and getting retried, or a loop that terminates one iteration later are all shifts in this distribution and are all invisible per call. A p99 that moved while p50 held is the signature of a subpopulation, not a global regression.",
+              "**Query three: did the model change under you?** Group by `gen_ai.response.model` and by provider, week over week. A silent point-release swap or a gateway failover that started routing 15 percent of traffic to a fallback is a one-line group-by and is the single most common answer to this complaint.",
+              "**Query four: did retrieval get worse?** Retrieval spans carry the data source id and the number of results. A reindex that changed chunking, a filter that started excluding a corpus, or an embedding version bump shows as a shift in result counts or in score distributions, and it degrades answers while leaving every latency number identical.",
+              "**Then stop querying and read.** Aggregates localize; they do not diagnose. I pull 30 to 50 runs from the affected slice by trace id, read their trajectories, and label what actually went wrong. That labeling is the input to the eval set, which is why the trace id has to survive into it: a run I cannot find is a run I cannot turn into a regression case.",
+              "**The quality signal itself.** Nothing in a trace measures quality directly, so the design has to attach one: implicit signals (thumbs down, retries, edits, escalation, abandonment) recorded against the trace id, and an offline judge or a human label run on a sample of production traces on a schedule. That is what turns 'got worse' into a line on a chart with a date on it. Without it, the earliest possible detection is a human complaint, which is the situation being described.",
+              "Common wrong turn: proposing to add logging now and re-run the week. The week is gone. The design question is which signals had to be recorded before the complaint, and the honest answer to 'we cannot tell' is that the platform had no quality signal at all, not that it needs a bigger dashboard.",
+            ],
+            supplied: {
+              label: "On-call handoff: the assistant got worse",
+              body: `**Ticket, escalated from support.** Three enterprise customers filed the same complaint this week: answers from the Atlas assistant are "less useful than last week." None of them can point at a specific broken request. Two of the three add that it "asks more follow-up questions than it used to."
+
+**What the platform records today.** One span per model call, carrying duration, HTTP status, and a total token count. A gateway access log carrying route, status, and latency. There is no per-run span, no tool or retrieval spans, no record of which model actually served a call, no prompt-template or deploy version on anything, and no id that joins a model call back to the run it belonged to. Content capture has never been enabled.
+
+**The dashboard, week over week.**
+
+| Reading | Last week | This week |
+| --- | --- | --- |
+| Requests per day | 41,200 | 42,900 |
+| p50 end to end | 3.1s | 3.2s |
+| p99 end to end | 11.4s | 11.6s |
+| HTTP 5xx rate | 0.21% | 0.19% |
+| Tool-call error rate | 0.4% | 0.4% |
+| Tokens per day | 88M | 121M |
+| User feedback signal | not collected | not collected |
+
+**Merged during the window.** A prompt-template change went out behind a flag at a percentage nobody recorded, and the vendor's changelog lists a point release for the model family Atlas calls.
+`,
+            },
+            rubric: [
+              {
+                name: "What the flat lines eliminate",
+                weak: "Treats flat latency and error rate as evidence that nothing changed, and hunts for a subtle performance problem anyway.",
+                adequate:
+                  "Notes that quality is not visible in latency or errors, but does not say which explanations the two flat lines actually remove.",
+                strong:
+                  "Says both metrics describe the request envelope, clears the outage-shaped causes on them, and states that path, tokens, and answer content all change inside an unchanged envelope.",
+              },
+              {
+                name: "Per-invocation signals, not per-call",
+                weak: "Proposes dashboards of average latency and total token spend, with the model call as the unit of analysis.",
+                adequate:
+                  "Records token counts and tool errors per run but never treats call counts as a distribution with a tail worth watching.",
+                strong:
+                  "Puts inference-call and tool-call counts per invocation on a histogram and reads a moved p99 against a held p50 as a subpopulation rather than a global shift.",
+              },
+              {
+                name: "Query order and what each result rules out",
+                weak: "Lists signals to collect without an order, so every hypothesis stays alive to the end.",
+                adequate:
+                  "Gives a sensible first query but does not attach an elimination to each result, so the sequence never narrows.",
+                strong:
+                  "Orders inputs, then path, then served model, then retrieval, and names what a flat result at each step removes from the suspect list before moving on.",
+              },
+              {
+                name: "Where the quality signal comes from",
+                weak: "Assumes the existing telemetry can answer a quality question, and never says what would carry that signal.",
+                adequate:
+                  "Mentions user feedback or an eval but does not tie either back to the individual run that produced the bad answer.",
+                strong:
+                  "Attaches implicit signals and sampled judge or human labels to the trace id, so a bad run is findable, replayable, and promotable into the regression set.",
+              },
+            ],
+          },
+        },
+        {
+          id: "sd-l11-trajectory-evals",
+          title: "Trajectory Evals for Multi-Step Agent Runs",
+          summary:
+            "An agent returns a path, not an answer: score tool selection, redundant steps, recovery, and cost per success, and use pass^k where pass@k rewards luck.",
+          estimatedMinutes: 40,
+          difficulty: "hard",
+          skills: ["agent-eval", "trajectory-eval", "eval-statistics"],
+          teach: { markdown: trajectoryEvalsTeach, estimatedMinutes: 15 },
+          apply: {
+            id: "sd-l11-trajectory-evals-apply",
+            prompt:
+              "Propose the eval gate for a customer-support agent with 12 tools, four of which have real side effects, so that no prompt or model change ships without evidence it did not get worse.",
+            thinkAbout: [
+              "What do you assert about a trajectory with a program, and what genuinely needs a judge?",
+              "Four tools have side effects. What must be true of every correct path, regardless of route?",
+              "How many attempts does a customer get, and which reliability metric follows from that?",
+              "What makes a score difference big enough to block a release?",
+            ],
+            modelAnswerOutline: [
+              "Assumptions: a support agent with 12 tools, 4 of which write (refund, cancel, credit, update-address) and 8 of which read; a customer gets one attempt at a resolution; prompt changes land weekly and model upgrades quarterly; and the gate has to run on every change without a human in the loop.",
+              "**The eval set is built from production traces, not imagination.** Every case is a real run pulled by trace id, frozen with its inputs, its tool results, and the label a human put on it. I would start with error analysis rather than metrics: read 50 failed runs, label what went wrong, and let the categories that appear decide which scorers get written. Stratify the set so the four writing tools are over-represented relative to traffic, because that is where a wrong path costs money rather than patience.",
+              "**Programmatic assertions first, because they are the cheap and trustworthy layer.** Ordering: a policy check precedes every write for the same entity. Cardinality: at most one successful write per entity per run. Arguments: no write with a null id or a non-positive amount. Prohibition: no write tool at all on a run whose task is read-only. Termination: the run ends by answering rather than by hitting the step cap. Grounding: every id and amount in the final answer appeared in a tool result. Each of these fails a specific historical incident, and each runs in milliseconds with no model.",
+              "**Then the metric family, all divided by successes.** Task success against the required end state, tool-selection precision and recall against the required call set, redundant-step rate, error-recovery rate measured with a fault-injection variant that makes one read tool fail, steps to completion at p50 and p99, cost per success, and wall clock. Cost per run is reported but never gated on, because a change can improve it by failing more often.",
+              "**Reliability is pass^k, not pass@k, and the requirement decides that.** A customer issues one refund request, so the question is whether the agent gets it right every time, not whether it can get it right once. I run each case k times (k of 5 to 8 on the writing subset, where the variance costs money) and gate on pass^k. Tasks that fail some runs and pass others are routed to a triage queue rather than averaged away, because a task failing 6 of 8 times is usually a deterministic bug rather than noise.",
+              "**A judge, scoped and validated.** The judge scores plan reasonableness and whether the answer is supported by the tool results, and nothing that arithmetic can settle. It runs both orderings on any pairwise comparison and counts a disagreement as a tie, so position bias becomes a visible abstention instead of a silent contribution to the score. It is validated on held-out human labels by true-positive and true-negative rate, not by raw agreement, and it runs at golden-set cadence rather than per commit because the double-ordering pass doubles its cost.",
+              "**The ship rule, with error bars.** Comparisons are paired: the candidate and the current production version run on the same items, and I analyze the per-item difference, which removes most of the variance through the covariance term and is worth far more than growing the set. Standard errors are clustered on shared context, since several cases derived from one customer thread are not independent. The gate blocks on any invariant violation at all (those are absolute, not statistical), on a statistically resolvable drop in pass^k or in tool-selection precision, and on a rise in cost per success. Everything that passes still canaries at 1 to 5 percent of live traffic with auto-rollback, because the eval set is always behind the traffic.",
+              "**The loop closes.** Every production failure is pulled by trace id, labeled, and added as a case with the invariant that would have caught it, so the set grows toward the traffic that actually arrives. A private holdout never enters a prompt and never gets published, so contamination cannot quietly inflate the gate.",
+              "Common wrong turn: gating on task success alone, computed once per case. It scores a run that double-refunded and a run that did it correctly identically, it hides a loop that triples the cost, and running each case once turns a 60 percent reliable agent into a green build roughly 60 percent of the time.",
+            ],
+          },
+          practice: {
+            id: "sd-l11-trajectory-evals-practice",
+            prompt:
+              "Read the release report below and say what trajectory evaluation would have caught this upgrade. Task-success rate is unchanged and support escalations have doubled, so name the metric you believe moved, say why the existing gate could not see it, and say how you would confirm it from the traces already collected.",
+            thinkAbout: [
+              "Task success is a property of the final state. What can double while it holds perfectly still?",
+              "Which of the path metrics would move for each candidate explanation, and which would not move at all?",
+              "An escalation is a human deciding the outcome was unacceptable. What in a trajectory predicts that decision?",
+              "The gate passed. Was it the wrong metric, too few runs per case, or a set that never contained this case?",
+            ],
+            modelAnswerOutline: [
+              "Framing: task success asks whether the end state was reached. An escalation says a human found the way it was reached unacceptable, or found a side effect nobody asked for. Those are different questions, and a gate built only on the first is structurally incapable of seeing the second, which means the fix is a new class of metric rather than a bigger sample of the old one.",
+              "**Candidates, and the path metric that separates each.** A duplicated side effect (a second refund or a double credit) moves redundant-step rate and violates a cardinality invariant while leaving the end state correct. A skipped verification step moves tool-selection recall and violates an ordering invariant. A newly chatty planner moves steps to completion at p99 and cost per success while p50 holds, and the gate's own mean wall clock per case did move, from 14.2s to 15.9s, with nothing gated on it. A tool the upgraded model now prefers but uses wrongly moves tool-selection precision. Degraded recovery after a flaky dependency moves error-recovery rate and shows up only under fault injection. Each has a distinct signature, so the design is to instrument all of them rather than to guess between them.",
+              "**The metric I would bet moved: redundant-step rate, together with a cardinality invariant on the writing tools.** A duplicated write is the failure that produces an escalation with a correct final state attached, because the customer got the outcome and also got a second charge or a second email. It is invisible to any answer-match, it is trivially detectable on the trajectory, and it is the single most common way an upgraded model degrades a tool-using agent: the new model is more willing to retry.",
+              "**Why the gate passed anyway, in three layers.** The metric layer: task success was the only gated number, and it is the one number this failure class preserves by construction. The statistics layer: each case ran once, so a change from consistently-right to sometimes-double-refunding shows up as noise rather than as a signal, and pass^k would have exposed it while pass@k and single-run success both hide it. The coverage layer: the set was built from happy paths, so it contained few of the retry-shaped situations where the new model's extra willingness expresses itself.",
+              "**What the eval becomes.** Trajectory capture on every case, invariants asserted per run (one successful write per entity, verification before write, no write on a read-only task, termination by answer), the path metrics reported beside task success, k repeated runs per case with pass^k gated on the writing subset, and a fault-injection variant that fails one read tool so recovery behavior is measured rather than assumed. Escalation becomes a first-class label joined back to the trace, so 'a human rejected this' is an outcome the eval set can be built from.",
+              "**Prove it retrospectively before changing anything.** Both model versions ran in production and every run from both periods is retained with full trajectory capture, so the evidence already exists. I recompute redundant-step rate, tool-selection precision and recall, and per-entity write counts on both weeks' traces and check whether the escalated runs are separable from the rest. If they are, the metric that moved is now measured rather than argued, and the same query becomes the pre-ship gate. If they are not, the cause is outside the trajectory (answer tone, a policy change, a support-queue change) and I want to know that before building the wrong eval.",
+              "**Then the ordering rule.** Read the escalated transcripts first and label them, then write the scorer that the labels demand. Writing scorers first produces a dashboard that measures what was easy to measure, which is how a gate ends up green during a doubling.",
+              "Common wrong turn: concluding the model upgrade should be rolled back and the eval set enlarged. Rollback may be right operationally, but a larger set of the same output-only cases scored once each would have passed this change too, and would pass the next one.",
+            ],
+            supplied: {
+              label: "Release report: support agent v4.1 to v4.2",
+              body: `**The gate that passed.** The support agent's eval set is 240 cases, each replayed once against the candidate model and scored on one number: did the run reach the expected end state. The cases were written by hand from the product spec at launch and have not changed since.
+
+| Reading | v4.1 (production) | v4.2 (candidate) |
+| --- | --- | --- |
+| Task success | 91.7% | 91.2% |
+| Cases in the set | 240 | 240 |
+| Runs per case | 1 | 1 |
+| Mean wall clock per case | 14.2s | 15.9s |
+| Mean spend per case | $0.031 | $0.036 |
+| Gate verdict | baseline | pass |
+
+**Production, two weeks either side of the rollout.**
+
+| Reading | Before | After |
+| --- | --- | --- |
+| Task success on sampled traffic | 91.4% | 91.1% |
+| Support escalations per 1,000 runs | 3.1 | 6.4 |
+| p50 tool calls per run | 4 | 4 |
+| p99 tool calls per run | 9 | 17 |
+| Tool error rate | 1.2% | 1.3% |
+| Mean spend per run | $0.029 | $0.034 |
+
+**From the escalation queue.** An analyst sampled 25 escalated threads. In every one the customer had received the outcome they asked for, and none was escalated over a wrong answer.
+
+**What is already stored.** Both periods are retained for 90 days with full trajectory capture, every tool call and every argument. The eval set carries no assertions over the trajectory and runs each case once.
+`,
+            },
+            rubric: [
+              {
+                name: "Why flat task success is uninformative",
+                weak: "Treats the flat success rate as evidence the model is fine and looks for the cause outside the agent entirely.",
+                adequate:
+                  "Notices that success rate misses something but does not say what class of failure preserves a correct end state.",
+                strong:
+                  "States that task success grades the destination while an escalation judges the route, and names failures that keep the end state correct, such as a duplicated write.",
+              },
+              {
+                name: "Path metrics mapped to candidate causes",
+                weak: "Proposes collecting more metrics without saying which candidate explanation each one would separate.",
+                adequate:
+                  "Names two or three path metrics but leaves several explanations sharing the same signature, so nothing is eliminated.",
+                strong:
+                  "Gives each candidate a distinct signature across redundant steps, selection precision and recall, p99 steps, and recovery rate, then commits to the most likely one.",
+              },
+              {
+                name: "Repeated runs and the reliability metric",
+                weak: "Scores each eval case exactly once and never raises variance across repeated runs of the same task.",
+                adequate:
+                  "Suggests running cases multiple times but keeps a metric that credits solving a task at least once across the repeats.",
+                strong:
+                  "Runs k repeats and gates on every-run success for the side-effecting subset, saying that a solved-at-least-once metric hides a model that became inconsistent.",
+              },
+              {
+                name: "Proving it from traces already collected",
+                weak: "Redesigns the eval without ever checking the claim against production data that already exists.",
+                adequate:
+                  "Says traces would help but does not propose a specific recomputation that would confirm or kill the hypothesis.",
+                strong:
+                  "Recomputes the path metrics over both weeks' traces, asks whether escalated runs separate from the rest, and treats a negative result as evidence the cause is outside the trajectory.",
+              },
             ],
           },
         },

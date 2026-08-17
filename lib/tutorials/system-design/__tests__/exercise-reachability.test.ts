@@ -46,7 +46,7 @@ describe("system design exercise reachability", () => {
   const lessons = listAllSystemDesignLessons()
 
   it("authors an apply and a practice exercise on every lesson", () => {
-    expect(lessons.length).toBe(222)
+    expect(lessons.length).toBe(224)
     const incomplete = lessons
       .filter(
         (lesson) =>
