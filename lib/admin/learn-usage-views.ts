@@ -15,6 +15,7 @@ import {
   scanLearnDailySince,
   type LearnDailyUsage,
 } from "@/lib/tutorials/learn-time"
+import { adminAuth } from "@/lib/firebase-admin"
 import type { ScanCoverage } from "@/lib/usage/scan-limits"
 import type { CourseId } from "@/lib/tutorials/types"
 
@@ -54,6 +55,19 @@ export interface PlatformLearnDayRow {
   byCourseMs: Partial<Record<CourseId, number>>
 }
 
+export interface PlatformLearnerRow {
+  userId: string
+  /** Null when the auth record is gone (deleted account with surviving telemetry). */
+  email: string | null
+  fullName: string | null
+  activeMs: number
+  opens: number
+  /** Distinct UTC days with any active time inside the window. */
+  activeDays: number
+  byCourseMs: Partial<Record<CourseId, number>>
+  lastActiveDay: string
+}
+
 export interface PlatformLearnUsageView {
   /** Oldest first, for charting. */
   days: PlatformLearnDayRow[]
@@ -61,9 +75,17 @@ export interface PlatformLearnUsageView {
   topLessons: Array<{ lessonId: string; activeMs: number; users: number }>
   totals: { activeMs: number; opens: number; activeUsers: number }
   coverage: ScanCoverage
+  /**
+   * Most-active learners in the window. Present only when the request carried
+   * VIEW_USER_DETAILS — the aggregate view above stays readable by analytics-only
+   * admins, who must not be able to page through individual learners.
+   */
+  learners?: PlatformLearnerRow[]
 }
 
 const TOP_LESSONS_LIMIT = 50
+/** Also the bound on the identity lookup; adminAuth.getUsers accepts at most 100. */
+const TOP_LEARNERS_LIMIT = 50
 
 function addCourseMs(
   target: Partial<Record<CourseId, number>>,
@@ -118,8 +140,65 @@ export async function getUserLearnUsageView(
   }
 }
 
+/**
+ * Rank learners by active time within the scanned window. Pure so the shape of the
+ * rollup (day counting, course merging, ordering) is unit-testable without Firestore.
+ * `learn_daily` holds one doc per user per day, so each row is a distinct active day.
+ */
+export function aggregateLearnerRows(
+  rows: LearnDailyUsage[]
+): Array<Omit<PlatformLearnerRow, "email" | "fullName">> {
+  const byUser = new Map<string, Omit<PlatformLearnerRow, "email" | "fullName">>()
+  for (const row of rows) {
+    if (!row.user_id || !row.day) continue
+    let user = byUser.get(row.user_id)
+    if (!user) {
+      user = {
+        userId: row.user_id,
+        activeMs: 0,
+        opens: 0,
+        activeDays: 0,
+        byCourseMs: {},
+        lastActiveDay: row.day,
+      }
+      byUser.set(row.user_id, user)
+    }
+    user.activeMs += row.total_active_ms ?? 0
+    user.opens += row.opens ?? 0
+    user.activeDays += 1
+    if (row.day > user.lastActiveDay) user.lastActiveDay = row.day
+    addCourseMs(user.byCourseMs, row.by_course_ms)
+  }
+  return [...byUser.values()].sort((a, b) => b.activeMs - a.activeMs)
+}
+
+/**
+ * Same email precedence as the admin users list (auth record first). A failed lookup
+ * degrades to uid-only rows rather than failing the whole platform view: identity is
+ * decoration here, the time data is the point.
+ */
+async function resolveLearnerIdentities(
+  userIds: string[]
+): Promise<Map<string, { email: string | null; fullName: string | null }>> {
+  const identities = new Map<string, { email: string | null; fullName: string | null }>()
+  if (userIds.length === 0) return identities
+  try {
+    const result = await adminAuth.getUsers(userIds.map((uid) => ({ uid })))
+    for (const user of result.users) {
+      identities.set(user.uid, {
+        email: user.email ?? null,
+        fullName: user.displayName ?? null,
+      })
+    }
+  } catch (error) {
+    console.error("[learn-usage] learner identity lookup failed", error)
+  }
+  return identities
+}
+
 export async function getPlatformLearnUsageView(
-  sinceDayKey: string
+  sinceDayKey: string,
+  options?: { includeLearners?: boolean }
 ): Promise<PlatformLearnUsageView> {
   const { rows, coverage } = await scanLearnDailySince(sinceDayKey)
 
@@ -163,7 +242,7 @@ export async function getPlatformLearnUsageView(
     }
   }
 
-  return {
+  const view: PlatformLearnUsageView = {
     days: [...byDay.values()]
       .map(({ userIds, ...day }) => ({ ...day, activeUsers: userIds.size }))
       .sort((a, b) => a.day.localeCompare(b.day)),
@@ -174,4 +253,16 @@ export async function getPlatformLearnUsageView(
     totals: { ...totals, activeUsers: allUsers.size },
     coverage,
   }
+
+  if (options?.includeLearners) {
+    const ranked = aggregateLearnerRows(rows).slice(0, TOP_LEARNERS_LIMIT)
+    const identities = await resolveLearnerIdentities(ranked.map((row) => row.userId))
+    view.learners = ranked.map((row) => ({
+      ...row,
+      email: identities.get(row.userId)?.email ?? null,
+      fullName: identities.get(row.userId)?.fullName ?? null,
+    }))
+  }
+
+  return view
 }
