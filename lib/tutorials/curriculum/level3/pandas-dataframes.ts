@@ -375,7 +375,7 @@ The double brackets trip everyone once. \`df["a"]\` asks for one column and gets
     {
       "label": "A Series of True and False, one per row, in the same index order.",
       "correct": true,
-      "feedback": "Right, and that separation is the whole design. The mask is an ordinary value you can name, invert with a tilde, or combine with the and and or operators, and df[mask] is the step that actually selects rows."
+      "feedback": "Right, and that separation is the whole design. The mask is an ordinary value you can name, invert with a tilde, or combine with the & and | operators, and df[mask] is the step that actually selects rows."
     },
     {
       "label": "A single True or False, for whether any amount is over 100.",
