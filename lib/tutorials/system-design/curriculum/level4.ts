@@ -3588,6 +3588,8 @@ and harder cross-cell operations.
   "reveal": "In the design exercise, name the mechanism and its price in the same breath: cells cap any single failure at one cell's share of users, shuffle sharding makes full overlap between two tenants a rounding error, and you pay with fragmented headroom, harder cross-cell operations, and a router that must stay dumb and highly available."
 }
 \`\`\`
+
+**Sources:** [AWS shuffle sharding](https://aws.amazon.com/builders-library/workload-isolation-using-shuffle-sharding/) · [AWS fault isolation boundaries](https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/abstract-and-introduction.html) · [AWS static stability](https://aws.amazon.com/builders-library/static-stability-using-availability-zones/)
 `.trim()
 
 export const systemDesignLevel4: DesignLevel = {
