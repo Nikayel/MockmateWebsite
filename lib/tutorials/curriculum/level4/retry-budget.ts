@@ -13,7 +13,7 @@
  * the stub carries none of it.
  *
  * Time budget (counted, not guessed). Teach 8: ~1,150 prose words, four checks, four code fences.
- * Apply 12: 45 provided lines to read (two fakes and the grader's probe), 20 to write across
+ * Apply 12: 52 provided lines to read (two fakes and the grader's probes), 20 to write across
  * `backoff_delay` and `call_with_budget`. Practice 35: 60 lines of README, 45 of read-only gateway
  * and spec, 37 to write across two files. 8 + 12 + 35 = 55, the lesson total.
  *
@@ -317,6 +317,30 @@ def run_tests(record):
     record("a rejected refund is not retried", a_rejected_refund_is_not_retried)
 `
 
+const RETRY_TEST_KEYS_HIDDEN = String.raw`from dispatch.keys import idempotency_key
+
+BASE = {"account": "a1", "cents": 500, "reason": "duplicate charge"}
+
+
+def run_tests(record):
+    def the_field_order_does_not_change_the_key():
+        built_one_way = {"account": "a1", "cents": 500, "reason": "duplicate charge", "attempt": 1}
+        built_another = {"attempt": 1, "reason": "duplicate charge", "cents": 500, "account": "a1"}
+        first = idempotency_key(dict(built_one_way, sent_at="2026-08-16T02:00:00Z"))
+        second = idempotency_key(dict(built_another, sent_at="2026-08-16T02:11:07Z"))
+        assert first == second, (
+            f"the same refund built in a different field order produced {first!r} and {second!r}"
+        )
+
+    def a_different_reason_is_a_different_operation():
+        first = idempotency_key(dict(BASE, attempt=1, sent_at="t"))
+        second = idempotency_key(dict(BASE, reason="fraud", attempt=1, sent_at="t"))
+        assert first != second, f"two different refunds share the key {first!r}"
+
+    record("the field order does not change the key", the_field_order_does_not_change_the_key)
+    record("a different reason is a different operation", a_different_reason_is_a_different_operation)
+`
+
 const RETRY_TEST_HIDDEN = String.raw`from dispatch.gateway import PaymentGateway
 from dispatch.runner import RefundRunner
 
@@ -424,6 +448,13 @@ const RETRY_APPLY_GRADER = String.raw`def probe_delays(seed):
     return [backoff_delay(attempt, rng) for attempt in range(8)]
 
 
+def probe_peaks(seed):
+    """Read-only. The largest delay each of the first five attempts produced over many draws,
+    which is how the grader sees whether the ceiling grows at all."""
+    rng = random.Random(seed)
+    return [max(backoff_delay(attempt, rng) for _ in range(200)) for attempt in range(5)]
+
+
 def run_task(script, token_budget, time_budget, max_attempts):
     """Graded entry point: the task result, plus what the grader measured about your backoff."""
     model = FakeModel(script)
@@ -438,6 +469,8 @@ def run_task(script, token_budget, time_budget, max_attempts):
         for attempt, delay in enumerate(delays)
     )
     result["delays_vary"] = delays != probe_delays(2)
+    peaks = probe_peaks(4)
+    result["delays_grow"] = all(earlier < later for earlier, later in zip(peaks, peaks[1:]))
     return result
 `
 
@@ -789,6 +822,7 @@ backoff. Leave it alone.`,
           calls: 1,
           delays_capped: true,
           delays_vary: true,
+          delays_grow: true,
         },
         description: "the first call succeeds",
       },
@@ -806,6 +840,7 @@ backoff. Leave it alone.`,
           calls: 3,
           delays_capped: true,
           delays_vary: true,
+          delays_grow: true,
         },
         description: "two overloads, then success, and the failures are billed too",
       },
@@ -823,6 +858,7 @@ backoff. Leave it alone.`,
           calls: 1,
           delays_capped: true,
           delays_vary: true,
+          delays_grow: true,
         },
         description: "a terminal error is not retried",
       },
@@ -840,6 +876,7 @@ backoff. Leave it alone.`,
           calls: 2,
           delays_capped: true,
           delays_vary: true,
+          delays_grow: true,
         },
         description: "the token budget aborts to a partial result",
       },
@@ -857,6 +894,7 @@ backoff. Leave it alone.`,
           calls: 2,
           delays_capped: true,
           delays_vary: true,
+          delays_grow: true,
         },
         description: "attempts run out before the budget does",
       },
@@ -874,8 +912,27 @@ backoff. Leave it alone.`,
           calls: 1,
           delays_capped: true,
           delays_vary: true,
+          delays_grow: true,
         },
         description: "there is no time left to wait, so it does not wait",
+      },
+      {
+        input: {
+          script: ["overloaded:8", "overloaded:8", "overloaded:8", "ok:90"],
+          token_budget: 1000,
+          time_budget: 60.0,
+          max_attempts: 5,
+        },
+        expected: {
+          status: "ok",
+          text: "the summary",
+          tokens: 114,
+          calls: 4,
+          delays_capped: true,
+          delays_vary: true,
+          delays_grow: true,
+        },
+        description: "the wait a retry draws from grows with the attempt number",
       },
     ],
   },
@@ -905,7 +962,7 @@ The gateway is a fake with no latency, so there is nothing to wait for and no ba
       primaryFilePath: "dispatch/keys.py",
       editableFilePaths: ["dispatch/keys.py", "dispatch/runner.py"],
       visibleTestPaths: ["tests/test_keys.py", "tests/test_runner.py"],
-      hiddenTestPaths: ["tests/test_runner_hidden.py"],
+      hiddenTestPaths: ["tests/test_keys_hidden.py", "tests/test_runner_hidden.py"],
       testRunnerPath: "tests/run_workspace_tests.py",
       files: [
         { path: "README.md", role: "docs", language: "markdown", content: RETRY_README },
@@ -960,6 +1017,14 @@ The gateway is a fake with no latency, so there is nothing to wait for and no ba
           description: "Visible retry tests",
         },
         {
+          path: "tests/test_keys_hidden.py",
+          role: "test",
+          language: "python",
+          content: RETRY_TEST_KEYS_HIDDEN,
+          hidden: true,
+          description: "Hidden key-stability tests",
+        },
+        {
           path: "tests/test_runner_hidden.py",
           role: "test",
           language: "python",
@@ -974,6 +1039,7 @@ The gateway is a fake with no latency, so there is nothing to wait for and no ba
           content: buildRunner([
             { module: "test_keys", label: "visible keys" },
             { module: "test_runner", label: "visible runner" },
+            { module: "test_keys_hidden", label: "hidden keys" },
             { module: "test_runner_hidden", label: "hidden runner" },
           ]),
           hidden: true,
