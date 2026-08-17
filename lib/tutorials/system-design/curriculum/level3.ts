@@ -2541,6 +2541,8 @@ near cache, layering the defenses and never treating a cold cache as safe.
   "reveal": "A strong design write layers all three families and adds the cold-start rule: never bring an empty cache online under full load; warm it or ramp traffic, with coalescing on."
 }
 \`\`\`
+
+**Sources:** [XFetch, probabilistic cache stampede prevention](https://cseweb.ucsd.edu/~avattani/papers/cache_stampede.pdf) · [AWS ElastiCache caching strategies](https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Strategies.html)
 `.trim()
 
 const distributedCacheArchTeach = `
