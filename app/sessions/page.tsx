@@ -23,6 +23,7 @@ import { InterviewSession } from "@/lib/types"
 import Link from "next/link"
 import { getScenarioById } from "@/lib/scenarios/index"
 import { clampPracticeMinutes, isTruncatedDuration } from "@/lib/session-duration"
+import { isFeedbackGenerationStalled } from "@/lib/feedback/generation-stalled"
 import { SparraLoader } from "@/components/brand/SparraLoader"
 
 export default function SessionsPage() {
@@ -194,14 +195,22 @@ export default function SessionsPage() {
                     !isPostInterviewDiscussion &&
                     session.scenario_id &&
                     scenarioExists
+                  // A transit state that outlived the stall threshold will never
+                  // resolve on its own; show it as failed (retryable), not as an
+                  // eternal "scoring" badge.
+                  const feedbackStalled = isFeedbackGenerationStalled(
+                    session.feedback_status,
+                    session.completed_at
+                  )
                   const isFeedbackPending =
-                    session.feedback_status === "pending" ||
-                    session.feedback_status === "processing" ||
-                    (session.completed_at &&
-                      !session.feedback &&
-                      session.feedback_status !== "failed" &&
-                      session.feedback_status !== "complete")
-                  const isFeedbackFailed = session.feedback_status === "failed"
+                    !feedbackStalled &&
+                    (session.feedback_status === "pending" ||
+                      session.feedback_status === "processing" ||
+                      (session.completed_at &&
+                        !session.feedback &&
+                        session.feedback_status !== "failed" &&
+                        session.feedback_status !== "complete"))
+                  const isFeedbackFailed = session.feedback_status === "failed" || feedbackStalled
                   const hasFeedback =
                     session.feedback &&
                     session.completed_at &&

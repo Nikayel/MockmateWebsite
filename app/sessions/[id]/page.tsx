@@ -16,6 +16,7 @@ import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
 import { InterviewSession } from "@/lib/types"
 import Link from "next/link"
 import { clampPracticeMinutes, isTruncatedDuration } from "@/lib/session-duration"
+import { isFeedbackGenerationStalled } from "@/lib/feedback/generation-stalled"
 import { SparraLoader } from "@/components/brand/SparraLoader"
 
 export default function SessionDetailPage() {
@@ -101,13 +102,17 @@ export default function SessionDetailPage() {
     init()
   }, [authLoading, initialized, authCheckComplete, loadSession])
 
-  // Poll for feedback completion when session is in "pending" state.
+  // Poll for feedback completion while the session is in a transit state.
+  // "processing" polls too: the stream route now persists server-side, so a
+  // session opened mid-generation resolves to complete (or failed) on its own.
   // Backoff + a hard cap: the old fixed 5s interval had no stop condition
   // other than the status changing, so a session stuck in "pending" polled 2
   // Firestore reads every 5 seconds for as long as the tab stayed open.
+  const isTransitStatus =
+    session?.feedback_status === "pending" || session?.feedback_status === "processing"
   useEffect(() => {
     // Only poll if session is evaluating
-    if (!session || session.feedback_status !== "pending") return
+    if (!session || !isTransitStatus) return
 
     let cancelled = false
     let attempts = 0
@@ -125,7 +130,11 @@ export default function SessionDetailPage() {
         if (updatedSession) {
           setSession(updatedSession)
           // Stop polling once feedback is complete or failed
-          if (updatedSession.feedback_status !== "pending") return
+          if (
+            updatedSession.feedback_status !== "pending" &&
+            updatedSession.feedback_status !== "processing"
+          )
+            return
         }
       }
 
@@ -140,7 +149,7 @@ export default function SessionDetailPage() {
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [session?.feedback_status, loadSession])
+  }, [session?.feedback_status, isTransitStatus, loadSession])
 
   if (loading || authLoading || !initialized) {
     return <SparraLoader fullPage />
@@ -283,8 +292,12 @@ export default function SessionDetailPage() {
               onNewProblem={() => router.push("/interview")}
               clarifyingQuestionsAssessment={session.clarifying_questions_assessment}
             />
-          ) : session.feedback_status === "pending" ? (
-            // Session is being evaluated - show evaluating state
+          ) : (session.feedback_status === "pending" || session.feedback_status === "processing") &&
+            !isFeedbackGenerationStalled(session.feedback_status, session.completed_at) ? (
+            // Session is being evaluated - show evaluating state. "processing"
+            // belongs here too: it was invisible before (fell through to the
+            // "still in progress" branch below), which showed a completed,
+            // scored session as unfinished.
             <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-12 text-center">
               <div className="mx-auto mb-5 flex justify-center" role="status">
                 <Sparra
@@ -312,8 +325,12 @@ export default function SessionDetailPage() {
                 Go to Dashboard
               </Button>
             </div>
-          ) : session.feedback_status === "failed" ? (
-            // Feedback generation failed - allow retry
+          ) : session.feedback_status === "failed" ||
+            isFeedbackGenerationStalled(session.feedback_status, session.completed_at) ? (
+            // Feedback generation failed - allow retry. Stalled transit states
+            // (completed long ago, still pending/processing) are failures in
+            // fact if not in name: nothing will ever finish them, so honesty +
+            // retry beats an eternal spinner.
             <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-12 text-center">
               <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10">
                 <Terminal className="h-7 w-7 text-red-400" />
