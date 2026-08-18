@@ -25,7 +25,11 @@ import {
 } from "@/lib/spaced-repetition/mastery-score"
 import { completeFeedbackSections } from "@/lib/feedback/structured-feedback-schema"
 import { getScenarioById } from "@/lib/scenarios"
-import { validatePersistRequestBody } from "@/lib/feedback/persist-request-schema"
+import {
+  validatePersistRequestBody,
+  validateFeedbackFailureReport,
+} from "@/lib/feedback/persist-request-schema"
+import { resolvePersistAction } from "@/lib/feedback/persist-guard"
 
 // This route does Firestore writes only, no AI calls, so it does not need a
 // large budget. The previous `export const maxDuration = 10` cited a Vercel
@@ -46,9 +50,50 @@ export async function POST(request: NextRequest) {
     }
     const authenticatedUserId = authResult.userId
 
+    const rawBody: unknown = await request.json()
+
+    // Failure reports: the stream route's error path marks the session failed
+    // so it lands in a terminal state (with the retry UI) even when the client
+    // has already disconnected. Guarded: a completed session is never
+    // downgraded, so a late failure report cannot clobber real feedback.
+    if (
+      typeof rawBody === "object" &&
+      rawBody !== null &&
+      (rawBody as { outcome?: unknown }).outcome === "failed"
+    ) {
+      const failure = validateFeedbackFailureReport(rawBody)
+      if (!failure.success) {
+        return NextResponse.json({ error: failure.error }, { status: 400 })
+      }
+      if (failure.data.userId !== authenticatedUserId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+      const sessionRef = adminDb.collection("interview_sessions").doc(failure.data.sessionId)
+      const snapshot = await sessionRef.get()
+      if (!snapshot.exists) {
+        return NextResponse.json({ error: "Session not found" }, { status: 404 })
+      }
+      if (snapshot.get("user_id") !== authenticatedUserId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+      if (snapshot.get("feedback_status") === "complete") {
+        return NextResponse.json({ success: true, skipped: "already complete" })
+      }
+      await sessionRef.update({
+        feedback_status: "failed",
+        feedback_error: failure.data.errorMessage ?? null,
+        updated_at: FieldValue.serverTimestamp(),
+      })
+      logger.warn("[Feedback Persist] Session marked failed by generation error", {
+        sessionId: failure.data.sessionId,
+        errorMessage: failure.data.errorMessage,
+      })
+      return NextResponse.json({ success: true, markedFailed: true })
+    }
+
     // Scores land in readiness metrics and spaced repetition, so the body is
     // validated and clamped (0-100, finite) before anything is persisted.
-    const validation = validatePersistRequestBody(await request.json())
+    const validation = validatePersistRequestBody(rawBody)
     if (!validation.success) {
       logger.warn("[Feedback Persist] Rejected invalid request body", validation.logContext)
       return NextResponse.json({ error: validation.error }, { status: 400 })
@@ -87,6 +132,25 @@ export async function POST(request: NextRequest) {
     }
     if (sessionSnapshot.get("user_id") !== authenticatedUserId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    // Two writers race for every session now (client-after-stream and the
+    // stream route's server-side persist). First real persist wins; real
+    // feedback may upgrade fallback scores; nothing overwrites real feedback.
+    const incomingSource = validation.data.source ?? "stream"
+    const persistAction = resolvePersistAction(
+      {
+        status: sessionSnapshot.get("feedback_status") as string | undefined,
+        source: sessionSnapshot.get("feedback_source") as string | undefined,
+      },
+      incomingSource
+    )
+    if (persistAction === "skip") {
+      logger.info("[Feedback Persist] Skipped: session already has terminal feedback", {
+        sessionId,
+        incomingSource,
+      })
+      return NextResponse.json({ success: true, alreadyPersisted: true })
     }
 
     logger.info("[Feedback Persist] Processing request", {
@@ -184,6 +248,11 @@ export async function POST(request: NextRequest) {
       // Feedback content
       feedback: feedback.raw,
       feedback_status: "complete" as const,
+      // Which writer landed this persist (see persist-guard); a later real
+      // persist may upgrade "fallback", nothing else is ever overwritten.
+      feedback_source: incomingSource,
+      // A successful persist clears any failure marker from an earlier attempt.
+      feedback_error: FieldValue.delete(),
 
       // Scores — guided labs keep the (invalid) interview score out of the
       // readiness fields and surface a labeled practice/mastery number instead.

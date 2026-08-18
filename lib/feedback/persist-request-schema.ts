@@ -86,8 +86,39 @@ export const persistRequestSchema = z
         optimalSpaceComplexity: z.string().optional(),
       })
       .optional(),
+
+    // Who is persisting: the client after a successful stream ("stream"), the
+    // client's fallback scoring ("fallback"), or the stream route itself
+    // ("server"). Drives the idempotency guard (lib/feedback/persist-guard):
+    // real feedback may upgrade fallback, nothing overwrites real. A garbage
+    // value degrades to "stream" rather than rejecting the whole persist.
+    source: z.enum(["stream", "fallback", "server"]).catch("stream").optional(),
   })
   .passthrough()
+
+/**
+ * POST /api/feedback/persist with `outcome: "failed"` marks a session's
+ * feedback generation as failed WITHOUT writing scores. Sent by the stream
+ * route's error path (and only there), so a generation that dies after the
+ * client disconnected still lands in a terminal state with a retry UI instead
+ * of sitting in "processing" forever.
+ */
+export const feedbackFailureReportSchema = z.object({
+  outcome: z.literal("failed"),
+  sessionId: z.string().min(1),
+  userId: z.string().min(1),
+  errorMessage: z.string().max(500).optional(),
+})
+
+export type FeedbackFailureReport = z.infer<typeof feedbackFailureReportSchema>
+
+export function validateFeedbackFailureReport(
+  rawBody: unknown
+): { success: true; data: FeedbackFailureReport } | { success: false; error: string } {
+  const parsed = feedbackFailureReportSchema.safeParse(rawBody)
+  if (!parsed.success) return { success: false, error: "Invalid failure report" }
+  return { success: true, data: parsed.data }
+}
 
 export type PersistRequest = z.infer<typeof persistRequestSchema> & {
   scores: Record<keyof z.infer<typeof persistScoresSchema>, number>

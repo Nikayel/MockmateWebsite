@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest"
-import { validatePersistRequestBody } from "../persist-request-schema"
+import {
+  validatePersistRequestBody,
+  validateFeedbackFailureReport,
+} from "../persist-request-schema"
 
 function validBody(overrides: Record<string, unknown> = {}) {
   return {
@@ -48,21 +51,45 @@ describe("validatePersistRequestBody", () => {
 
   it("rejects non-numeric scores", () => {
     const result = validatePersistRequestBody(
-      validBody({ scores: { understanding: "high", problemSolving: 65, codeQuality: 80, communication: 60, overall: 68 } })
+      validBody({
+        scores: {
+          understanding: "high",
+          problemSolving: 65,
+          codeQuality: 80,
+          communication: 60,
+          overall: 68,
+        },
+      })
     )
     expect(result.success).toBe(false)
   })
 
   it("rejects NaN/Infinity scores", () => {
     const result = validatePersistRequestBody(
-      validBody({ scores: { understanding: Infinity, problemSolving: 65, codeQuality: 80, communication: 60, overall: 68 } })
+      validBody({
+        scores: {
+          understanding: Infinity,
+          problemSolving: 65,
+          codeQuality: 80,
+          communication: 60,
+          overall: 68,
+        },
+      })
     )
     expect(result.success).toBe(false)
   })
 
   it("clamps out-of-range scores into 0-100", () => {
     const result = validatePersistRequestBody(
-      validBody({ scores: { understanding: 999, problemSolving: -50, codeQuality: 80, communication: 60, overall: 250 } })
+      validBody({
+        scores: {
+          understanding: 999,
+          problemSolving: -50,
+          codeQuality: 80,
+          communication: 60,
+          overall: 250,
+        },
+      })
     )
     expect(result.success).toBe(true)
     if (result.success) {
@@ -74,7 +101,15 @@ describe("validatePersistRequestBody", () => {
 
   it("preserves a legitimate zero score", () => {
     const result = validatePersistRequestBody(
-      validBody({ scores: { understanding: 40, problemSolving: 40, codeQuality: 40, communication: 0, overall: 30 } })
+      validBody({
+        scores: {
+          understanding: 40,
+          problemSolving: 40,
+          codeQuality: 40,
+          communication: 0,
+          overall: 30,
+        },
+      })
     )
     expect(result.success).toBe(true)
     if (result.success) {
@@ -234,5 +269,66 @@ describe("validatePersistRequestBody", () => {
     const absent = validatePersistRequestBody(validBody())
     expect(absent.success).toBe(true)
     if (absent.success) expect(absent.data.bugfixScoreBreakdown).toBeUndefined()
+  })
+})
+
+describe("persist source field", () => {
+  it("passes a declared source through", () => {
+    for (const source of ["stream", "fallback", "server"]) {
+      const result = validatePersistRequestBody(validBody({ source }))
+      expect(result.success).toBe(true)
+      if (result.success) expect(result.data.source).toBe(source)
+    }
+  })
+
+  it("degrades an unknown source to stream instead of rejecting the persist", () => {
+    const result = validatePersistRequestBody(validBody({ source: "hax" }))
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.source).toBe("stream")
+  })
+
+  it("stays optional for legacy clients", () => {
+    const result = validatePersistRequestBody(validBody())
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.source).toBeUndefined()
+  })
+})
+
+describe("validateFeedbackFailureReport", () => {
+  it("accepts a minimal failure report", () => {
+    const result = validateFeedbackFailureReport({
+      outcome: "failed",
+      sessionId: "session-1",
+      userId: "user-1",
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it("carries a bounded error message", () => {
+    const result = validateFeedbackFailureReport({
+      outcome: "failed",
+      sessionId: "session-1",
+      userId: "user-1",
+      errorMessage: "Provider timed out",
+    })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.errorMessage).toBe("Provider timed out")
+  })
+
+  it("rejects reports without a session or with the wrong outcome literal", () => {
+    expect(
+      validateFeedbackFailureReport({ outcome: "failed", sessionId: "", userId: "u" }).success
+    ).toBe(false)
+    expect(
+      validateFeedbackFailureReport({ outcome: "oops", sessionId: "s", userId: "u" }).success
+    ).toBe(false)
+    expect(
+      validateFeedbackFailureReport({
+        outcome: "failed",
+        sessionId: "s",
+        userId: "u",
+        errorMessage: "x".repeat(501),
+      }).success
+    ).toBe(false)
   })
 })
