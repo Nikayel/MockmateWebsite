@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import type { Scenario, ScenarioType } from "@/lib/scenarios"
 import type { UsageLimit } from "@/lib/stores"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
+import { getScenarioLabLink } from "@/lib/labs/lab-links"
 import { getScenarioCardContext, STARTER_SCENARIO_ID } from "./scenario-card-meta"
 
 interface ScenarioCardProps {
@@ -39,6 +40,7 @@ export const ScenarioCard = memo(function ScenarioCard({
 }: ScenarioCardProps) {
   const TypeIcon = TYPE_ICONS[scenario.type] ?? Cpu
   const { typeLabel, contextLine, signal } = getScenarioCardContext(scenario)
+  const labLink = getScenarioLabLink(scenario.id)
   const isLocked = !!(usageLimit && usageLimit.allowed === false && scenario.type !== "dsa")
   const companies = scenario.companies.slice(0, 2).join(", ")
   const extraCompanies = scenario.companies.length > 2 ? ` +${scenario.companies.length - 2}` : ""
@@ -108,6 +110,22 @@ export const ScenarioCard = memo(function ScenarioCard({
         ) : (
           <p className="text-muted-foreground mb-4 line-clamp-2 text-sm leading-6">{contextLine}</p>
         ))}
+
+      {/* Guided-version pointer. The four Case Lab Build exercises also live here as
+          standalone scenarios, where they are scored as full interviews; without this
+          line, browser arrivals never learn the guided lab exists before choosing. */}
+      {labLink && (
+        <p className="text-muted-foreground mb-4 text-xs">
+          Part of the {labLink.labTitle} Case Lab.{" "}
+          <Link
+            href={`/labs/${labLink.labId}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-accent-strong font-medium hover:underline"
+          >
+            Take the guided version
+          </Link>
+        </p>
+      )}
 
       {/* Quiet meta row */}
       <div className="text-muted-foreground mt-auto flex items-center justify-between gap-2 pt-1 text-xs">
