@@ -89,8 +89,13 @@ export interface ProfileQuota {
   created_at: string
   updated_at: string
   // Free opens: after first use, get 10 free scenario opens before next usage is counted
+  // (free-tier mechanic; paid tiers meter distinct scenarios via scenarios_started instead)
   free_opens_remaining?: number
   last_session_start?: string // Track when last paid session started
+  // Scenario ids started this billing period. On paid tiers a session start only
+  // spends quota when its scenario is NOT already in this list, so same-period
+  // redos are free. Server-written only (profile_quota is client-read-only).
+  scenarios_started?: string[]
 }
 
 export interface ChatMessage {

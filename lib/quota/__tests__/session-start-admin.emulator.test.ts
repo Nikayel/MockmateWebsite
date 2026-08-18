@@ -50,7 +50,14 @@ describe.skipIf(!EMULATOR)("recordSessionStartAdmin (Firestore emulator)", () =>
 
   async function seedQuotaDoc(
     uid: string,
-    fields: { sessions_used: number; free_opens_remaining: number; periodStart: Date; periodEnd: Date; sessions_limit?: number }
+    fields: {
+      sessions_used: number
+      free_opens_remaining: number
+      periodStart: Date
+      periodEnd: Date
+      sessions_limit?: number
+      scenarios_started?: string[]
+    }
   ): Promise<void> {
     const ref = db.collection("profile_quota").doc()
     await ref.set({
@@ -59,6 +66,7 @@ describe.skipIf(!EMULATOR)("recordSessionStartAdmin (Firestore emulator)", () =>
       sessions_used: fields.sessions_used,
       sessions_limit: fields.sessions_limit ?? 8,
       free_opens_remaining: fields.free_opens_remaining,
+      ...(fields.scenarios_started ? { scenarios_started: fields.scenarios_started } : {}),
       period_start: fields.periodStart.toISOString(),
       period_end: fields.periodEnd.toISOString(),
       created_at: new Date().toISOString(),
@@ -71,7 +79,7 @@ describe.skipIf(!EMULATOR)("recordSessionStartAdmin (Firestore emulator)", () =>
     const signup = daysAgo(40)
     await seedProfile(uid, "free", signup)
 
-    const result = await recordSessionStartAdmin(uid, db)
+    const result = await recordSessionStartAdmin(uid, undefined, db)
 
     expect(result.success).toBe(true)
     expect(result.usedPaidSession).toBe(true)
@@ -96,17 +104,17 @@ describe.skipIf(!EMULATOR)("recordSessionStartAdmin (Firestore emulator)", () =>
     const uid = freshUid()
     await seedProfile(uid, "free", daysAgo(40))
 
-    await recordSessionStartAdmin(uid, db) // paid #1, grants 10 opens
+    await recordSessionStartAdmin(uid, undefined, db) // paid #1, grants 10 opens
 
     for (let expectedOpens = 9; expectedOpens >= 0; expectedOpens--) {
-      const result = await recordSessionStartAdmin(uid, db)
+      const result = await recordSessionStartAdmin(uid, undefined, db)
       expect(result.usedPaidSession).toBe(false)
       expect(result.freeOpensRemaining).toBe(expectedOpens)
       expect(result.sessionsUsed).toBe(1)
     }
 
     // Opens exhausted -> the next start is paid session #2 with a fresh grant.
-    const paidAgain = await recordSessionStartAdmin(uid, db)
+    const paidAgain = await recordSessionStartAdmin(uid, undefined, db)
     expect(paidAgain.usedPaidSession).toBe(true)
     expect(paidAgain.sessionsUsed).toBe(2)
     expect(paidAgain.freeOpensRemaining).toBe(FREE_OPENS_PER_PAID_SESSION)
@@ -129,7 +137,7 @@ describe.skipIf(!EMULATOR)("recordSessionStartAdmin (Firestore emulator)", () =>
       periodEnd: window.periodEnd,
     })
 
-    const denied = await recordSessionStartAdmin(uid, db)
+    const denied = await recordSessionStartAdmin(uid, undefined, db)
 
     expect(denied.success).toBe(false)
     expect(denied.code).toBe("LIMIT_REACHED")
@@ -139,11 +147,8 @@ describe.skipIf(!EMULATOR)("recordSessionStartAdmin (Firestore emulator)", () =>
     expect(docs[0].sessions_used).toBe(8) // untouched
 
     // But a remaining free open is still spendable at the limit.
-    await db
-      .collection("profile_quota")
-      .doc(docs[0].id)
-      .update({ free_opens_remaining: 2 })
-    const viaOpen = await recordSessionStartAdmin(uid, db)
+    await db.collection("profile_quota").doc(docs[0].id).update({ free_opens_remaining: 2 })
+    const viaOpen = await recordSessionStartAdmin(uid, undefined, db)
     expect(viaOpen.success).toBe(true)
     expect(viaOpen.usedPaidSession).toBe(false)
     expect(viaOpen.freeOpensRemaining).toBe(1)
@@ -153,7 +158,7 @@ describe.skipIf(!EMULATOR)("recordSessionStartAdmin (Firestore emulator)", () =>
     const uid = freshUid()
     await seedProfile(uid, "pro", daysAgo(40))
 
-    const result = await recordSessionStartAdmin(uid, db)
+    const result = await recordSessionStartAdmin(uid, undefined, db)
 
     expect(result.success).toBe(true)
     expect(result.sessionsLimit).toBeGreaterThan(8)
@@ -177,19 +182,130 @@ describe.skipIf(!EMULATOR)("recordSessionStartAdmin (Firestore emulator)", () =>
     })
 
     // Current period: allowed again via a NEW doc (the "reset").
-    const first = await recordSessionStartAdmin(uid, db)
+    const first = await recordSessionStartAdmin(uid, undefined, db)
     expect(first.success).toBe(true)
     expect(first.usedPaidSession).toBe(true)
     expect(first.sessionsUsed).toBe(1)
 
     // Second start reuses the same current-period doc — no second reset.
-    const second = await recordSessionStartAdmin(uid, db)
+    const second = await recordSessionStartAdmin(uid, undefined, db)
     expect(second.usedPaidSession).toBe(false)
 
     const docs = await quotaDocs(uid)
     expect(docs).toHaveLength(2)
     const previous = docs.find((d) => d.period_start === previousRef.periodStart.toISOString())
     expect(previous?.sessions_used).toBe(8) // history untouched
+  })
+
+  // ---------------------------------------------------------------------------
+  // Paid distinct-question metering (2026-08-18): a scenario counts once per
+  // billing period; same-period redos are free and opens are never granted.
+  // ---------------------------------------------------------------------------
+
+  it("paid: meters distinct scenarios and makes same-period redos free", async () => {
+    const uid = freshUid()
+    await seedProfile(uid, "pro", daysAgo(40))
+
+    const first = await recordSessionStartAdmin(uid, "dsa-two-sum", db)
+    expect(first.usedPaidSession).toBe(true)
+    expect(first.freeRetry).toBe(false)
+    expect(first.sessionsUsed).toBe(1)
+    expect(first.freeOpensRemaining).toBe(0) // paid path grants NO opens
+
+    const redo = await recordSessionStartAdmin(uid, "dsa-two-sum", db)
+    expect(redo.success).toBe(true)
+    expect(redo.freeRetry).toBe(true)
+    expect(redo.usedPaidSession).toBe(false)
+    expect(redo.sessionsUsed).toBe(1) // unchanged
+
+    const second = await recordSessionStartAdmin(uid, "dsa-majority-element", db)
+    expect(second.usedPaidSession).toBe(true)
+    expect(second.sessionsUsed).toBe(2)
+
+    const docs = await quotaDocs(uid)
+    expect(docs).toHaveLength(1)
+    expect(docs[0].scenarios_started).toEqual(
+      expect.arrayContaining(["dsa-two-sum", "dsa-majority-element"])
+    )
+    expect(docs[0].free_opens_remaining).toBe(0)
+  })
+
+  it("paid at the limit: redos still start, new scenarios are denied", async () => {
+    const uid = freshUid()
+    const signup = daysAgo(40)
+    await seedProfile(uid, "pro", signup)
+    const window = billingPeriodFromProfile({
+      subscription_tier: "pro",
+      created_at: signup.toISOString(),
+    })
+    await seedQuotaDoc(uid, {
+      sessions_used: 100,
+      sessions_limit: 100,
+      free_opens_remaining: 0,
+      scenarios_started: ["dsa-two-sum"],
+      periodStart: window.periodStart,
+      periodEnd: window.periodEnd,
+    })
+
+    const redo = await recordSessionStartAdmin(uid, "dsa-two-sum", db)
+    expect(redo.success).toBe(true)
+    expect(redo.freeRetry).toBe(true)
+    expect(redo.sessionsUsed).toBe(100)
+
+    const denied = await recordSessionStartAdmin(uid, "dsa-valid-anagram", db)
+    expect(denied.success).toBe(false)
+    expect(denied.code).toBe("LIMIT_REACHED")
+    const docs = await quotaDocs(uid)
+    expect(docs[0].sessions_used).toBe(100) // untouched
+  })
+
+  it("paid without a scenarioId falls back to the legacy opens mechanic", async () => {
+    const uid = freshUid()
+    await seedProfile(uid, "pro", daysAgo(40))
+
+    const first = await recordSessionStartAdmin(uid, undefined, db)
+    expect(first.usedPaidSession).toBe(true)
+    expect(first.freeOpensRemaining).toBe(FREE_OPENS_PER_PAID_SESSION)
+  })
+
+  it("paid: ignores a redo ledger on a zero-usage doc (forged-doc depth)", async () => {
+    const uid = freshUid()
+    const signup = daysAgo(40)
+    await seedProfile(uid, "pro", signup)
+    const window = billingPeriodFromProfile({
+      subscription_tier: "pro",
+      created_at: signup.toISOString(),
+    })
+    await seedQuotaDoc(uid, {
+      sessions_used: 0,
+      sessions_limit: 100,
+      free_opens_remaining: 0,
+      scenarios_started: ["dsa-two-sum"],
+      periodStart: window.periodStart,
+      periodEnd: window.periodEnd,
+    })
+
+    const result = await recordSessionStartAdmin(uid, "dsa-two-sum", db)
+    expect(result.freeRetry).toBe(false)
+    expect(result.usedPaidSession).toBe(true)
+    expect(result.sessionsUsed).toBe(1)
+  })
+
+  it("free tier with a scenarioId keeps the opens mechanic but records the ledger", async () => {
+    const uid = freshUid()
+    await seedProfile(uid, "free", daysAgo(40))
+
+    const first = await recordSessionStartAdmin(uid, "dsa-two-sum", db)
+    expect(first.usedPaidSession).toBe(true)
+    expect(first.freeOpensRemaining).toBe(FREE_OPENS_PER_PAID_SESSION)
+
+    const second = await recordSessionStartAdmin(uid, "dsa-two-sum", db)
+    expect(second.usedPaidSession).toBe(false) // spent an open, NOT a free redo
+    expect(second.freeRetry).toBe(false)
+    expect(second.freeOpensRemaining).toBe(FREE_OPENS_PER_PAID_SESSION - 1)
+
+    const docs = await quotaDocs(uid)
+    expect(docs[0].scenarios_started).toEqual(["dsa-two-sum"])
   })
 
   it("targets the most-conservative doc when legacy duplicates exist", async () => {
@@ -214,7 +330,7 @@ describe.skipIf(!EMULATOR)("recordSessionStartAdmin (Firestore emulator)", () =>
       periodEnd: window.periodEnd,
     })
 
-    const result = await recordSessionStartAdmin(uid, db)
+    const result = await recordSessionStartAdmin(uid, undefined, db)
 
     expect(result.success).toBe(true)
     expect(result.sessionsUsed).toBe(6) // incremented the REAL counter

@@ -26,11 +26,14 @@ vi.mock("@/lib/logger", () => ({
   },
 }))
 
-function createRequest(): NextRequest {
+function createRequest(body?: unknown): NextRequest {
   return {
     headers: {
       get: (name: string) => (name === "Authorization" ? "Bearer valid-token" : null),
     },
+    // Legacy clients POST with no body at all; the route must treat a json()
+    // failure as "no scenarioId" rather than an error.
+    json: () => (body === undefined ? Promise.reject(new Error("no body")) : Promise.resolve(body)),
   } as unknown as NextRequest
 }
 
@@ -59,7 +62,46 @@ describe("/api/usage/session-start", () => {
     expect(response.status).toBe(200)
     expect(response.data?.usedPaidSession).toBe(true)
     expect(response.data?.freeOpensRemaining).toBe(10)
-    expect(mocks.recordSessionStartAdmin).toHaveBeenCalledWith("user-1")
+    expect(mocks.recordSessionStartAdmin).toHaveBeenCalledWith("user-1", undefined)
+  })
+
+  it("passes a valid scenarioId through to the writer (paid redo detection)", async () => {
+    mocks.recordSessionStartAdmin.mockResolvedValue({
+      success: true,
+      usedPaidSession: false,
+      freeRetry: true,
+      freeOpensRemaining: 0,
+      sessionsUsed: 4,
+      sessionsLimit: 100,
+    })
+    const { POST } = await import("./route")
+
+    const response = (await POST(
+      createRequest({ scenarioId: "dsa-two-sum" })
+    )) as unknown as StubResponse
+
+    expect(response.status).toBe(200)
+    expect(response.data?.freeRetry).toBe(true)
+    expect(mocks.recordSessionStartAdmin).toHaveBeenCalledWith("user-1", "dsa-two-sum")
+  })
+
+  it("drops a malformed scenarioId instead of blocking the start", async () => {
+    mocks.recordSessionStartAdmin.mockResolvedValue({
+      success: true,
+      usedPaidSession: true,
+      freeRetry: false,
+      freeOpensRemaining: 0,
+      sessionsUsed: 5,
+      sessionsLimit: 100,
+    })
+    const { POST } = await import("./route")
+
+    const response = (await POST(
+      createRequest({ scenarioId: "../profiles/steal" })
+    )) as unknown as StubResponse
+
+    expect(response.status).toBe(200)
+    expect(mocks.recordSessionStartAdmin).toHaveBeenCalledWith("user-1", undefined)
   })
 
   it("returns 403 with the quota snapshot when the limit is reached", async () => {

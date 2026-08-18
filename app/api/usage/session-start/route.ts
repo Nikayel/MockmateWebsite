@@ -23,8 +23,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  // Optional body: { scenarioId }. Paid tiers meter DISTINCT scenarios per
+  // billing period, so the writer needs the scenario's identity to recognize a
+  // free redo. Absent or malformed ids degrade to the legacy opens mechanic
+  // rather than blocking the start — stale bundles still post no body at all.
+  let scenarioId: string | undefined
   try {
-    const result = await recordSessionStartAdmin(authResult.userId)
+    const body: unknown = await request.json()
+    const candidate =
+      body && typeof body === "object" ? (body as { scenarioId?: unknown }).scenarioId : undefined
+    if (typeof candidate === "string" && /^[a-z0-9][a-z0-9_-]{0,99}$/i.test(candidate)) {
+      scenarioId = candidate
+    }
+  } catch {
+    // No JSON body: legacy client.
+  }
+
+  try {
+    const result = await recordSessionStartAdmin(authResult.userId, scenarioId)
 
     if (!result.success) {
       return NextResponse.json({ error: "Session limit exceeded", ...result }, { status: 403 })
@@ -39,6 +55,13 @@ export async function POST(request: NextRequest) {
       await trackEventServer("funnel_session_start", {
         userId: authResult.userId,
         nth_in_period: result.sessionsUsed,
+      })
+    } else if (result.freeRetry) {
+      // Redo starts are free, but their volume is exactly the engagement signal
+      // the redo rule exists to create — track them separately from spends.
+      await trackEventServer("funnel_session_retry", {
+        userId: authResult.userId,
+        scenario_id: scenarioId,
       })
     }
 
