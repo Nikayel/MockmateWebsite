@@ -25,6 +25,7 @@
  */
 
 import { NextRequest } from "next/server"
+import { waitUntil } from "@vercel/functions"
 import { verifyAuthEdge } from "@/lib/auth-edge"
 import {
   generateFeedbackResponseEdge,
@@ -406,10 +407,69 @@ export async function POST(request: NextRequest) {
   const stream = new TransformStream()
   const writer = stream.writable.getWriter()
 
-  // Helper to send SSE events
+  // Helper to send SSE events. Disconnect-tolerant: a closed tab makes writes
+  // reject, and before 2026-08-18 that rejection aborted the whole pipeline at
+  // the next `await sendEvent`, orphaning the session in feedback_status
+  // "processing" forever (found via a real user's stuck session). Now the
+  // first failed write flips clientGone and later frames become no-ops, so
+  // generation and the server-side persist below always run to completion.
+  let clientGone = false
   const sendEvent = async (event: string, data: unknown) => {
-    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
-    await writer.write(encoder.encode(payload))
+    if (clientGone) return
+    try {
+      const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
+      await writer.write(encoder.encode(payload))
+    } catch {
+      clientGone = true
+    }
+  }
+
+  // Server-side persistence: the browser used to be the ONLY caller of
+  // /api/feedback/persist, so its death mid-stream lost the feedback. The
+  // stream route now persists the finished result itself, forwarding the
+  // caller's own bearer token (this runtime has no Firebase Admin). The client
+  // still persists too; the persist route's idempotency guard makes the race
+  // safe, whoever lands first.
+  const forwardedAuth = request.headers.get("authorization") ?? ""
+  // Same origin resolution as the spend-ceiling probe above; request.url last
+  // because test harnesses (and some proxies) hand this route a bare path.
+  const resolvePersistUrl = (): string | null => {
+    const configuredOrigin = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "")
+    const origin =
+      configuredOrigin || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+    if (origin) return `${origin}/api/feedback/persist`
+    try {
+      return new URL("/api/feedback/persist", request.url).toString()
+    } catch {
+      return null
+    }
+  }
+  const persistServerSide = async (payload: Record<string, unknown>) => {
+    const persistUrl = resolvePersistUrl()
+    if (!persistUrl) {
+      logger.error("[Streaming Feedback] Cannot resolve persist URL; server-side persist skipped", {
+        sessionId: payload.sessionId,
+      })
+      return
+    }
+    try {
+      const response = await fetch(persistUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: forwardedAuth },
+        body: JSON.stringify(payload),
+      })
+      if (!response.ok) {
+        logger.error("[Streaming Feedback] Server-side persist rejected", {
+          status: response.status,
+          sessionId: payload.sessionId,
+        })
+      }
+    } catch (error) {
+      logger.error("[Streaming Feedback] Server-side persist failed", {
+        sessionId: payload.sessionId,
+        error,
+      })
+    }
   }
 
   // Process in background while streaming.
@@ -417,6 +477,9 @@ export async function POST(request: NextRequest) {
   // when request.json() is what threw, which is when the body is least knowable.
   let loggedScenarioId: unknown
   let loggedScenarioType: unknown
+  // Set once the body names a real Firestore session owned by the caller; the
+  // catch uses it to mark that session "failed" instead of leaving "processing".
+  let persistTarget: { sessionId: string; userId: string } | null = null
 
   const processRequest = async () => {
     try {
@@ -446,6 +509,8 @@ export async function POST(request: NextRequest) {
         bugfixPrevention,
         bugfixRootCauseRubric,
         bugfixGroundTruth,
+        elapsedTimeSeconds,
+        hintsUsed,
       } = body
 
       loggedScenarioId = scenarioId
@@ -457,6 +522,12 @@ export async function POST(request: NextRequest) {
       if (!userId || userId !== authenticatedUserId) {
         await sendEvent("error", { message: "Forbidden" })
         return
+      }
+
+      // Guest rounds have no Firestore session doc; only real sessions get the
+      // server-side persist / failure marking.
+      if (typeof sessionId === "string" && sessionId.length > 0) {
+        persistTarget = { sessionId, userId }
       }
 
       // Untrusted numeric inputs: a non-numeric count would make passRate NaN
@@ -975,6 +1046,24 @@ export async function POST(request: NextRequest) {
       // ========================================
       await sendEvent("phase", { phase: "complete", message: "Done!" })
 
+      const bugfixPostSessionReport =
+        bugfixEvidenceSummary && bugfixScoreBreakdown
+          ? buildBugfixPostSessionReport({
+              evidence: bugfixEvidenceSummary,
+              score: bugfixScoreBreakdown,
+              rootCauseText: typeof bugfixRootCause === "string" ? bugfixRootCause : undefined,
+              preventionText: typeof bugfixPrevention === "string" ? bugfixPrevention : undefined,
+            })
+          : undefined
+
+      const finalScoresPayload = {
+        understanding: finalScores.understanding,
+        problemSolving: finalScores.problemSolving,
+        codeQuality: finalScores.codeQuality,
+        communication: finalScores.communication,
+        overall: finalScores.overall,
+      }
+
       await sendEvent("feedback", {
         raw: feedback,
         tldr: sections.tldr || "",
@@ -984,25 +1073,48 @@ export async function POST(request: NextRequest) {
         silentNotes: finalSilentNotes,
         bugfixEvidenceSummary,
         bugfixScoreBreakdown,
-        bugfixPostSessionReport:
-          bugfixEvidenceSummary && bugfixScoreBreakdown
-            ? buildBugfixPostSessionReport({
-                evidence: bugfixEvidenceSummary,
-                score: bugfixScoreBreakdown,
-                rootCauseText: typeof bugfixRootCause === "string" ? bugfixRootCause : undefined,
-                preventionText: typeof bugfixPrevention === "string" ? bugfixPrevention : undefined,
-              })
-            : undefined,
-        scores: {
-          understanding: finalScores.understanding,
-          problemSolving: finalScores.problemSolving,
-          codeQuality: finalScores.codeQuality,
-          communication: finalScores.communication,
-          overall: finalScores.overall,
-        },
+        bugfixPostSessionReport,
+        scores: finalScoresPayload,
       })
 
       await sendEvent("done", { success: true })
+
+      // Persist the finished result server-side, AFTER the frames so a live
+      // client is never delayed by the persist round-trip. If the tab is gone
+      // the frames above were silent no-ops and this write is the only thing
+      // standing between the user and a permanently unscored session. The
+      // payload mirrors the client's own persist call byte-for-byte except
+      // source, so the idempotency guard arbitrates the race.
+      if (persistTarget) {
+        await persistServerSide({
+          sessionId: persistTarget.sessionId,
+          userId: persistTarget.userId,
+          scores: finalScoresPayload,
+          feedback: {
+            raw: feedback,
+            tldr: sections.tldr || "",
+            whatWorked: sections.whatWorked || [],
+            fixNext: sections.fixNext || [],
+            actionPlan: sections.actionPlan || [],
+          },
+          silentNotes: finalSilentNotes || [],
+          bugfixEvidenceSummary: bugfixEvidenceSummary ?? null,
+          bugfixScoreBreakdown: bugfixScoreBreakdown ?? null,
+          bugfixPostSessionReport: bugfixPostSessionReport ?? null,
+          testsPassed,
+          testsTotal,
+          timeSpentMinutes: Math.round((Number(elapsedTimeSeconds) || 0) / 60),
+          hintsUsed: Number(hintsUsed) || 0,
+          difficulty: scenarioDifficulty || "medium",
+          scenarioType: scenarioType || "dsa",
+          scenarioTitle: scenarioTitle || "Unknown",
+          scenarioId,
+          scenarioPattern,
+          conversationTranscript,
+          efficiencyMetrics,
+          source: "server",
+        })
+      }
     } catch (error) {
       // Terminal failure: the user has just finished a full interview and will get
       // no feedback at all. This was console-only, so the most user-visible failure
@@ -1015,13 +1127,38 @@ export async function POST(request: NextRequest) {
       await sendEvent("error", {
         message: error instanceof Error ? error.message : "Failed to generate feedback",
       })
+      // Land the session in a terminal state. Without this, a generation error
+      // after the client disconnected left feedback_status "processing"
+      // forever, with no retry UI and nothing for the reaper to have to catch.
+      if (persistTarget) {
+        await persistServerSide({
+          outcome: "failed",
+          sessionId: persistTarget.sessionId,
+          userId: persistTarget.userId,
+          errorMessage:
+            error instanceof Error ? error.message.slice(0, 500) : "Feedback generation failed",
+        })
+      }
     } finally {
-      await writer.close()
+      try {
+        await writer.close()
+      } catch {
+        // Already closed/errored because the client went away; nothing to do.
+      }
     }
   }
 
-  // Start processing (don't await - let it stream)
-  processRequest()
+  // Start processing without awaiting so the stream response returns
+  // immediately. waitUntil keeps the invocation alive after a client
+  // disconnect; without it Vercel may end the function when the response
+  // stream is canceled, which is exactly the window that orphaned sessions.
+  const processing = processRequest()
+  try {
+    waitUntil(processing)
+  } catch {
+    // Outside a Vercel request context (next dev, tests) the promise is
+    // already running; there is just no runtime to pin it to.
+  }
 
   // Return the stream immediately
   return new Response(stream.readable, {
