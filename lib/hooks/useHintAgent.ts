@@ -10,6 +10,19 @@ import type {
 } from "@/lib/agents/hints/contracts"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import { logger } from "@/lib/logger"
+import { trackEvent } from "@/lib/analytics"
+
+/**
+ * One line summarizing a test outcome, used to decide hint staleness: hints
+ * generated against one set of failures go quietly stale when the failures
+ * change, instead of auto-burning a regeneration the user never asked for.
+ */
+function testSignature(
+  results: { passed: number; total: number; failingTests?: string[] } | null | undefined
+): string {
+  if (!results) return "none"
+  return `${results.passed}/${results.total}:${(results.failingTests ?? []).join("|")}`
+}
 
 /**
  * useHintAgent Hook
@@ -49,6 +62,8 @@ interface UseHintAgentReturn {
   isPersonalized: boolean
   revealedHintIds: Set<string>
   elapsedMinutes: number
+  /** Hints exist but the test outcome changed since they were generated. */
+  hintsStale: boolean
 
   // Actions
   generateHints: () => Promise<void>
@@ -85,6 +100,12 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
   const [revealedHintIds, setRevealedHintIds] = useState<Set<string>>(new Set())
   const [elapsedMinutes, setElapsedMinutes] = useState(0)
   const [lastTrigger, setLastTrigger] = useState<HintTrigger>("initial")
+  // True when hints exist but the test outcome has changed since they were
+  // generated. Refs (not state deps) keep updateTestResults identity-stable,
+  // which the interview page's memoization relies on.
+  const [hintsStale, setHintsStale] = useState(false)
+  const hasHintsRef = useRef(false)
+  const generatedSignatureRef = useRef<string>("none")
 
   // Refs for tracking
   const struggleMetricsRef = useRef<StruggleMetrics>({
@@ -177,6 +198,14 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
         setStruggleLevel(data.struggleLevel || "none")
         setRecommendedLevel(data.recommendedRevealLevel || 1)
         setIsPersonalized(data.personalizationApplied || false)
+        hasHintsRef.current = (data.hints || []).length > 0
+        generatedSignatureRef.current = testSignature(testResultsRef.current)
+        setHintsStale(false)
+        trackEvent("hint_generated", {
+          problem_id: problemId,
+          trigger,
+          hint_count: (data.hints || []).length,
+        })
       } catch (err) {
         logger.error("[useHintAgent] Generate error", { error: err, problemId, userId, trigger })
         setError(err instanceof Error ? err.message : "Failed to generate hints")
@@ -218,14 +247,21 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
   // This prevents showing hints before user has even read the problem.
 
   // Reveal a hint
-  const revealHint = useCallback((hintId: string) => {
-    setRevealedHintIds((prev) => {
-      const newSet = new Set(prev)
-      newSet.add(hintId)
-      struggleMetricsRef.current.hintsRevealed = newSet.size
-      return newSet
-    })
-  }, [])
+  const revealHint = useCallback(
+    (hintId: string) => {
+      setRevealedHintIds((prev) => {
+        const newSet = new Set(prev)
+        newSet.add(hintId)
+        struggleMetricsRef.current.hintsRevealed = newSet.size
+        return newSet
+      })
+      // The generation->reveal funnel: a month of generations shipped with a
+      // measured reveal rate of zero before anyone noticed, because reveals
+      // never left the browser.
+      trackEvent("hint_revealed", { problem_id: problemId, hint_id: hintId })
+    },
+    [problemId]
+  )
 
   // Get the next unrevealed hint
   const getNextHint = useCallback(async (): Promise<GeneratedHint | null> => {
@@ -308,6 +344,11 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
       if (results.passed < results.total) {
         struggleMetricsRef.current.testsFailed++
       }
+      // A changed outcome makes existing hints stale; the panel offers a
+      // refresh instead of anything regenerating on its own.
+      if (hasHintsRef.current && testSignature(results) !== generatedSignatureRef.current) {
+        setHintsStale(true)
+      }
     },
     []
   )
@@ -321,6 +362,9 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
     setIsPersonalized(false)
     setError(null)
     setElapsedMinutes(0)
+    setHintsStale(false)
+    hasHintsRef.current = false
+    generatedSignatureRef.current = "none"
     struggleMetricsRef.current = {
       timeSpentMinutes: 0,
       codeChanges: 0,
@@ -342,6 +386,7 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
     isPersonalized,
     revealedHintIds,
     elapsedMinutes,
+    hintsStale,
     generateHints,
     regenerateHints,
     revealHint,

@@ -959,7 +959,9 @@ function InterviewPageContent() {
   const fetchRAGHints = useCallback(async () => {
     if (!selectedScenario || !user?.id || !firebaseUser) return
     hintAgent.updateCode(code)
-    await hintAgent.regenerateHints("initial")
+    // "manual": this only ever runs from the hint panel's request button now,
+    // and an explicit ask must not be blocked by the initial-trigger code guard.
+    await hintAgent.regenerateHints("manual")
     setRevealedAIHintIndices(new Set())
     // Depend on the specific stable hintAgent methods (both are useCallback([])
     // inside useHintAgent) rather than the whole hintAgent object, which
@@ -989,50 +991,18 @@ function InterviewPageContent() {
         total: summary.total,
         failingTests: results.filter((r) => !r.passed).map((r) => r.description),
       })
-
-      if (summary.failed > 0) {
-        void hintAgent.regenerateHints("test_failed")
-      } else if (summary.passed === summary.total) {
-        void hintAgent.regenerateHints("test_passed")
-      }
+      // No regeneration here: updateTestResults marks existing hints stale and
+      // the panel offers a refresh. Generation only ever happens on intent.
     },
     [hintAgent, code]
   )
 
-  // Fetch AI hints only when user has written meaningful code BEYOND starter code
-  // This prevents showing hints before user even starts coding
-  useEffect(() => {
-    if (!isInterviewStarted || !selectedScenario || showFeedback || showPostInterviewDiscussion) {
-      return
-    }
-
-    // Calculate how much code the user has written beyond the starter code
-    const currentCodeLength = code.trim().length
-    const starterCodeLength = starterCode.trim().length
-    const userWrittenLength = currentCodeLength - starterCodeLength
-    // User must write at least 30 meaningful characters beyond starter code
-    const hasWrittenCode = userWrittenLength >= 30
-
-    // Reset hint fetching flag when interview resets
-    if (!hasWrittenCode) {
-      hasFetchedHintsRef.current = false
-      return
-    }
-
-    // Fetch hints once when user starts writing meaningful code
-    if (hasWrittenCode && !hasFetchedHintsRef.current) {
-      hasFetchedHintsRef.current = true
-      fetchRAGHints()
-    }
-  }, [
-    code,
-    starterCode,
-    isInterviewStarted,
-    selectedScenario,
-    showFeedback,
-    showPostInterviewDiscussion,
-    fetchRAGHints,
-  ])
+  // Hints are generated ON INTENT ONLY (the panel's request button). The
+  // auto-generation that used to live here - once when the user wrote 30 chars,
+  // then again on EVERY test run below - burned two LLM calls per trigger for a
+  // blurred, opt-in panel with a measured reveal rate of zero (2026-08-18
+  // audit: 35% of monthly AI spend). The struggle/test signals still flow into
+  // the hint agent so an intentional request is fully informed.
 
   // Proactive interviewer - INACTIVITY detection - DISABLED
   // Was too intrusive and interrupted user flow
@@ -1810,6 +1780,7 @@ function InterviewPageContent() {
       hintAgent: { revealHint: hintAgent.revealHint },
       hintFeedback,
       hintFetchStatus,
+      hintsStale: hintAgent.hintsStale,
       isInterviewStarted,
       ragHints,
       realInterviewMode,
@@ -1838,6 +1809,7 @@ function InterviewPageContent() {
     focusMode,
     handleFileUpload,
     hintAgent.revealHint,
+    hintAgent.hintsStale,
     hintFeedback,
     hintFetchStatus,
     isInterviewStarted,

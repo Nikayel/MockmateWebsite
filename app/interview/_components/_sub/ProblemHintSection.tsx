@@ -1,7 +1,7 @@
 "use client"
 
 import { type Dispatch, type SetStateAction } from "react"
-import { Eye, Lightbulb, ThumbsDown, ThumbsUp } from "lucide-react"
+import { Eye, Lightbulb, RefreshCw, ThumbsDown, ThumbsUp } from "lucide-react"
 
 interface ProblemHintSectionProps {
   isBugfix: boolean
@@ -11,6 +11,8 @@ interface ProblemHintSectionProps {
   revealedAIHintIndices: Set<number>
   selectedScenarioId: string | undefined
   hintAgent: { revealHint: (hintId: string) => void }
+  /** Test outcome changed since these hints were generated. */
+  hintsStale: boolean
   fetchRAGHints: () => Promise<void>
   submitHintFeedback: (hintIndex: number, feedbackType: "helpful" | "unhelpful") => Promise<void>
   setRevealedAIHintIndices: Dispatch<SetStateAction<Set<number>>>
@@ -24,6 +26,7 @@ export function ProblemHintSection({
   revealedAIHintIndices,
   selectedScenarioId,
   hintAgent,
+  hintsStale,
   fetchRAGHints,
   submitHintFeedback,
   setRevealedAIHintIndices,
@@ -48,18 +51,27 @@ export function ProblemHintSection({
       ) : hintFetchStatus === "error" || ragHints.length === 0 ? (
         <div className="border-border/30 bg-muted/30 rounded-lg border p-3">
           <p className="text-muted-foreground text-sm">
-            Signals will appear here as you code. Keep working from evidence first.
+            Stuck? Ask for a signal when you want one. Nothing is generated until you do.
           </p>
           <button
             onClick={fetchRAGHints}
             className="mt-2 flex items-center gap-1.5 text-xs text-amber-300 transition-colors hover:text-amber-200"
           >
             <Lightbulb className="h-3 w-3" aria-hidden="true" />
-            Request another signal
+            Request a signal
           </button>
         </div>
       ) : (
         <div className="space-y-2">
+          {hintsStale && (
+            <button
+              onClick={fetchRAGHints}
+              className="flex w-full items-center gap-1.5 rounded-lg border border-amber-400/30 bg-amber-500/10 p-2 text-left text-xs text-amber-200 transition-colors hover:bg-amber-500/20"
+            >
+              <RefreshCw className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+              Your test results changed since these signals. Refresh them?
+            </button>
+          )}
           {ragHints
             .slice(0, Math.min(revealedAIHintIndices.size + 1, ragHints.length))
             .map((hint, i) => {

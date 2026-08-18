@@ -59,6 +59,7 @@ export interface ProblemColumnCtx {
   hintAgent: { revealHint: (hintId: string) => void }
   hintFeedback: Map<string, "helpful" | "unhelpful">
   hintFetchStatus: "idle" | "loading" | "success" | "error"
+  hintsStale: boolean
   isInterviewStarted: boolean
   ragHints: Array<{ level: number; hint: string; id?: string }>
   realInterviewMode: boolean
@@ -99,6 +100,7 @@ export const ProblemColumn = memo(function ProblemColumn({
     hintAgent,
     hintFeedback,
     hintFetchStatus,
+    hintsStale,
     isInterviewStarted,
     ragHints,
     realInterviewMode,
@@ -273,8 +275,10 @@ export const ProblemColumn = memo(function ProblemColumn({
 
                     {/* Debugging signals - shown independently, right after description */}
                     {/* Only show hints when user has written meaningful code beyond starter code */}
-                    {/* Use hintFetchStatus to prevent flickering - section stays visible after first fetch attempt */}
-                    {isInterviewStarted && hintFetchStatus !== "idle" && (
+                    {/* Always rendered once the interview starts: hints generate on
+                        intent only now, so the section's empty state IS the request
+                        affordance. Gating on fetch status would hide it forever. */}
+                    {isInterviewStarted && (
                       <ProblemHintSection
                         isBugfix={isBugfix}
                         ragHints={ragHints}
@@ -283,6 +287,7 @@ export const ProblemColumn = memo(function ProblemColumn({
                         revealedAIHintIndices={revealedAIHintIndices}
                         selectedScenarioId={selectedScenario?.id}
                         hintAgent={hintAgent}
+                        hintsStale={hintsStale}
                         fetchRAGHints={fetchRAGHints}
                         submitHintFeedback={submitHintFeedback}
                         setRevealedAIHintIndices={setRevealedAIHintIndices}
