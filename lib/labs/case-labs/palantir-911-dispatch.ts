@@ -56,6 +56,7 @@ export const palantir911Dispatch: CaseLab = {
       },
     ],
   },
+  hook: "Rank which responder units to send, with a human still in the loop.",
   skills: [
     "decomposition",
     "ranking under constraints",

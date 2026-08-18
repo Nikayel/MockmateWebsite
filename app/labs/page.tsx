@@ -1,14 +1,40 @@
 /**
  * Case Labs gallery — `/labs`.
  *
- * This is the strongest-ranking product page on the site and, until this pass, its thinnest: about
- * 250 words, no `<h2>` at all, and every word of explanation living inside the client component that
- * owns the filter chips. A page that ranks on the strength of its URL and title alone has nothing to
- * hold a position with, so the explanatory copy is now Server Components (`HowCaseLabsWork`,
- * `CaseLabRoundsExplainer`, `CaseLabNextSteps`) that land in the initial HTML, and `CaseLabGallery`
- * shrank to what actually needs to be interactive: the chips and the list they filter.
+ * ## Above the fold there are exactly three things
  *
- * The filters stay `useState` only. Making them URL state would mint an indexable URL per filter
+ * An `<h1>`, one line, one button. Everything else moved below the labs. The page previously opened
+ * with two intro paragraphs, a five-card milestone explainer, a round-type essay and three rows of
+ * filter chips: about 650 words and roughly two and a half screens before the first lab was on
+ * screen, on a page whose only job is to get someone into a lab.
+ *
+ * ## Order
+ *
+ *   1. Hero            h1 + one line
+ *   2. Primary CTA     one button + one qualifier line
+ *   3. Pick a case lab filters + two groups of cards
+ *   4. How a lab works five-step strip + shared detail panel
+ *   5. SEO prose       what a decomposition interview is / who interviews this way
+ *   6. Common questions FAQ disclosure
+ *   7. Where to practice next
+ *
+ * The milestone strip below the cards answers a question the visitor now has; above them it raised
+ * one they did not. Nothing was cut to make room: the explanatory copy is all still here, still
+ * Server Components in the initial HTML, and it tiles instead of stacking.
+ *
+ * ## The h1 carries the query
+ *
+ * It used to be the word "Case Labs", which nobody searches for and which the nav already says. The
+ * page ranks on its URL and title alone today; "decomposition interview practice" is what the labs
+ * actually are and what a candidate types the week before a Palantir or Stripe loop.
+ *
+ * ## One entry point, not two
+ *
+ * The hero CTA is the only "start here". The grid briefly repeated it as an accent-bordered card
+ * with a START HERE tab, which made the other three labs look like the ones you were not meant to
+ * pick. The CTA resolves through `getStarterCaseLab`, so it cannot name a retired lab.
+ *
+ * Filters stay `useState` only. Making them URL state would mint an indexable URL per filter
  * combination over a four-lab catalog, which is a doorway-page generator, not navigation.
  */
 
@@ -18,35 +44,24 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { CaseLabGallery } from "@/components/labs/CaseLabGallery"
-import { ThemeToggle } from "@/components/ThemeToggle"
-import { BreadcrumbJsonLd, LessonListJsonLd } from "@/components/seo/JsonLd"
+import { BreadcrumbJsonLd, CourseListJsonLd } from "@/components/seo/JsonLd"
 import { getStarterCaseLab, listCaseLabs } from "@/lib/labs/case-labs"
-import type { BrowsableCaseLab } from "@/lib/labs/types"
-import { truncateForDescription } from "@/lib/seo/learn-metadata"
 import { canonicalPageMetadata } from "@/lib/seo/page-metadata"
-import { HowCaseLabsWork } from "./_components/HowCaseLabsWork"
-import { CaseLabRoundsExplainer } from "./_components/CaseLabRoundsExplainer"
+import { MilestoneStrip } from "./_components/MilestoneStrip"
+import { CaseLabsExplainer } from "./_components/CaseLabsExplainer"
+import { CaseLabsFaq } from "./_components/CaseLabsFaq"
 import { CaseLabNextSteps } from "./_components/CaseLabNextSteps"
-
-/** Long enough to carry the situation, short enough that four of them still scan as a list. */
-const SUMMARY_MAX_CHARS = 190
-
-const LAB_COUNT = listCaseLabs().length
 
 export const metadata = canonicalPageMetadata({
   path: "/labs",
-  title: "Case Labs: Interview Practice in a Real Codebase",
-  description: `Work a company-style engineering problem end to end: clarify, decompose, design, then build inside a real multi-file codebase until the tests pass. ${LAB_COUNT} labs.`,
+  // No site name: `app/layout.tsx` sets `title.template = "%s | CodeSparring"` and appends it.
+  title: "Decomposition Interview Practice: Palantir FDSE & Stripe Style Labs",
+  description:
+    "Practice the decomposition interview on a real multi-file codebase. Scope an underspecified problem, commit to a design, then build until the tests pass, in labs modeled on Palantir FDSE and Stripe engineering rounds.",
 })
 
 export default function CaseLabsGalleryPage() {
-  // The row summary is derived here, on the server, so `truncateForDescription` and the SEO module
-  // behind it never reach the browse bundle. `brief.situation` is the authored scene-setting
-  // paragraph, which is the closest thing a lab has to a pitch.
-  const labs: BrowsableCaseLab[] = listCaseLabs().map((lab) => ({
-    ...lab,
-    summary: truncateForDescription(lab.brief.situation, SUMMARY_MAX_CHARS),
-  }))
+  const labs = listCaseLabs()
   const starter = getStarterCaseLab()
 
   // The global nav stays outside the workbook scope so it keeps the app's dark chrome; everything
@@ -60,56 +75,56 @@ export default function CaseLabsGalleryPage() {
           { name: "Case Labs", url: "/labs" },
         ]}
       />
-      {/* The list this page visibly renders, stated as an ItemList so a crawler gets the titles and
-          the order without inferring both from link markup. `LessonListJsonLd` is a generic
-          ItemList emitter; "Lesson" in its name is where it was first mounted, not a constraint on
-          its shape. */}
-      <LessonListJsonLd
-        name="CodeSparring case labs"
-        lessons={labs.map((lab) => ({ title: lab.title, url: `/labs/${lab.id}` }))}
+      {/* `Course` per lab rather than a bare `ItemList` of links. Each lab is a self-contained,
+          free, hour-shaped unit of work with an authored description, a skill list and a real
+          duration, so the vocabulary fits and it carries strictly more than titles and order. The
+          `isAccessibleForFree` claim inside the schema is true of what is indexed here: the brief,
+          the five milestones and the Build workspace all open without an account. */}
+      <CourseListJsonLd
+        courses={labs.map((lab) => ({
+          name: lab.title,
+          description: lab.hook,
+          url: `/labs/${lab.id}`,
+          workloadMinutes: lab.estimatedMinutes,
+          teaches: lab.skills,
+        }))}
       />
       <main className="case-lab-workbook min-h-screen bg-[var(--wb-page)] text-[var(--wb-text)]">
-        <div className="container mx-auto flex max-w-3xl flex-col gap-10 px-4 pt-24 pb-16 sm:pt-28">
-          <header className="flex flex-col gap-4">
-            <div className="flex items-start justify-between gap-3">
-              <h1 className="text-2xl font-bold text-[var(--wb-text)] sm:text-3xl">Case Labs</h1>
-              <ThemeToggle className="mt-1 shrink-0" />
+        <div className="container mx-auto flex max-w-[1120px] flex-col gap-10 px-4 pt-20 pb-16 sm:pt-24">
+          <header className="flex flex-col gap-5">
+            <div className="flex flex-col gap-3">
+              <h1 className="max-w-[760px] text-2xl leading-tight font-bold text-[var(--wb-text)] sm:text-4xl">
+                Decomposition interview practice, on a real codebase
+              </h1>
+              <p className="max-w-[640px] text-sm leading-relaxed text-[var(--wb-text-secondary)] sm:text-base">
+                The round Palantir FDSE and Stripe engineering interviews actually run: scope an
+                underspecified problem, decompose it, design it, then build until the tests pass.
+              </p>
             </div>
-            <p className="text-[var(--wb-text-secondary)]">
-              A case lab is one company-style engineering problem you carry end to end. You scope
-              it, decompose it, commit to a design, then open a real multi-file codebase and work
-              until the tests pass. There is no blank editor and no single function to fill in: the
-              build step drops you into an existing project with files you may edit, files you may
-              only read, and a test suite you run in the browser.
-            </p>
-            <p className="text-[var(--wb-text-secondary)]">
-              That end-to-end shape is what an onsite round looks like once you are past the phone
-              screen, and it is the part a timed algorithm drill cannot rehearse. Today there are{" "}
-              {LAB_COUNT} labs, each framed on a real company round. Most also name the rounds of
-              that loop they do not cover and where to prepare those, because finishing one lab is
-              not the same as being ready for the interview.
-            </p>
             {starter && (
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-                <Button asChild className="self-start">
+              <div className="flex flex-col items-start gap-2">
+                <Button asChild size="lg">
                   <Link href={`/labs/${starter.id}`}>Start with {starter.title}</Link>
                 </Button>
-                <span className="text-xs text-[var(--wb-text-secondary)]">
-                  <span className="capitalize">{starter.difficulty}</span> ·{" "}
-                  {starter.estimatedMinutes} min ·{" "}
-                  <span className="capitalize">{starter.buildLanguage}</span>
-                </span>
+                {/* Plain text, not a second button. Every value is read off the lab the CTA points
+                    at, so it cannot claim 45 minutes for a 60-minute lab. */}
+                <p className="text-xs text-[var(--wb-text-secondary)]">
+                  Easiest lab · {starter.estimatedMinutes} min · no account needed
+                </p>
               </div>
             )}
           </header>
 
-          <HowCaseLabsWork />
-
-          <CaseLabRoundsExplainer labs={labs} />
-
           <CaseLabGallery labs={labs} />
 
-          <CaseLabNextSteps />
+          {/* Everything below is explanation and ranking surface. It is deliberately after the
+              catalog: a visitor who already knows what a case lab is never scrolls past it again. */}
+          <div className="flex flex-col gap-10 border-t border-[var(--wb-border)] pt-10">
+            <MilestoneStrip />
+            <CaseLabsExplainer />
+            <CaseLabsFaq />
+            <CaseLabNextSteps />
+          </div>
         </div>
       </main>
       <Footer />

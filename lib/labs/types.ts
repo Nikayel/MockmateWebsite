@@ -146,6 +146,16 @@ export interface CaseLab {
   whyThisCompany: string
   /** PF-10: honest scope — rounds covered here vs where to prep the rest. */
   coverage?: CaseLabCoverage
+  /**
+   * One line for the browse card, stating the problem as a hook.
+   *
+   * Authored rather than derived. The card used to show `brief.situation` truncated to 190
+   * characters and clamped to three lines, which meant every card on `/labs` ended mid-sentence in
+   * an ellipsis and the reader had to open a lab to find out what it was. A hook that fits is a
+   * copy problem, not a layout problem, so it is written to fit: `case-labs-registry.test.ts` caps
+   * the length and rejects a trailing ellipsis.
+   */
+  hook: string
   /** Skills surfaced for browse filtering. */
   skills: string[]
   milestones: CaseLabMilestone[]
@@ -165,19 +175,6 @@ export interface CaseLab {
   buildLanguage: WorkspaceScenarioLanguage
   /** §7.4 Onsite-only: a mid-build constraint change. Omit to skip the curveball. */
   buildCurveball?: CaseLabCurveball
-}
-
-/**
- * A lab as the `/labs` browse surface needs it: the authored record plus the one-paragraph summary
- * shown on its row.
- *
- * The summary is derived on the server from `brief.situation` rather than authored a second time,
- * so a rewritten brief cannot leave a stale pitch behind on the gallery. It is a separate field
- * because the derivation uses the shared SEO text helpers, and the browse list is a client component
- * that has no business importing those into the browser bundle.
- */
-export interface BrowsableCaseLab extends CaseLab {
-  summary: string
 }
 
 // ============================================================

@@ -13,6 +13,15 @@ const MILESTONE_ORDER = ["clarify", "decompose", "design", "build", "review"]
 const GUIDANCE_LIST_MIN = 3
 const GUIDANCE_LIST_MAX = 5
 
+/**
+ * The browse card on `/labs` renders `hook` and every entry of `skills` in full: no clamp, no
+ * ellipsis, no "+N more". That is only safe while the authored copy fits, so the fit is a test
+ * rather than a comment. A hook that outgrows the cap is a copy problem to solve in the registry,
+ * never a `line-clamp` to add to the card.
+ */
+const HOOK_MAX_CHARS = 90
+const CARD_SKILLS_MAX = 5
+
 /** Every learner-facing string in a guidance block, for bulk assertions. */
 function guidanceStrings(g: MilestoneGuidance): string[] {
   return [
@@ -41,6 +50,16 @@ describe("case lab registry", () => {
       expect(milestone.title).toBeTruthy()
       expect(milestone.purpose).toBeTruthy()
     }
+  })
+
+  it.each(listCaseLabs())("$id ships a browse hook that fits its card", (lab) => {
+    expect(lab.hook.trim()).toBeTruthy()
+    expect(lab.hook.length).toBeLessThanOrEqual(HOOK_MAX_CHARS)
+    // A hook that already ends in an ellipsis is a truncated paragraph wearing a hook's name.
+    expect(lab.hook).not.toMatch(/(\u2026|\.\.\.)/)
+    expect(lab.hook.trim().endsWith(".")).toBe(true)
+    expect(lab.skills.length).toBeGreaterThan(0)
+    expect(lab.skills.length).toBeLessThanOrEqual(CARD_SKILLS_MAX)
   })
 })
 

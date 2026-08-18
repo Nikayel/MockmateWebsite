@@ -54,6 +54,7 @@ export const palantirUsageRollup: CaseLab = {
       },
     ],
   },
+  hook: "A metered-usage pipeline bills some accounts twice. Find out why.",
   skills: [
     "code comprehension",
     "debugging",

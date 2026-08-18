@@ -7,10 +7,12 @@
  * the sitemap with zero inbound internal links anywhere on the site, and `/labs` is the page whose
  * subject genuinely overlaps theirs: half the labs are debugging rounds.
  *
- * Plain anchors, server rendered, no JS gate.
+ * Plain anchors, server rendered, no JS gate. Tiled two-up rather than stacked, because four link
+ * rows at the foot of a page are four rows of scrolling for four links.
  */
 
 import Link from "next/link"
+import { ArrowUpRight } from "lucide-react"
 
 const NEXT_STEPS: { href: string; label: string; body: string }[] = [
   {
@@ -38,22 +40,32 @@ const NEXT_STEPS: { href: string; label: string; body: string }[] = [
 export function CaseLabNextSteps() {
   return (
     <section aria-labelledby="next-steps" className="flex flex-col gap-4">
-      <h2 id="next-steps" className="text-xl font-semibold text-[var(--wb-text)] sm:text-2xl">
-        Where to practice next
-      </h2>
-      <p className="text-sm text-[var(--wb-text-secondary)]">
-        A lab is an hour of work. These are the shorter routes, and the reading, around it.
-      </p>
-      <ul className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <h2 id="next-steps" className="text-lg font-semibold text-[var(--wb-text)] sm:text-xl">
+          Where to practice next
+        </h2>
+        <p className="text-sm text-[var(--wb-text-secondary)]">
+          A lab is an hour of work. These are the shorter routes, and the reading, around it.
+        </p>
+      </div>
+      <ul className="grid gap-3 sm:grid-cols-2">
         {NEXT_STEPS.map((step) => (
-          <li key={step.href} className="text-sm text-[var(--wb-text-secondary)]">
+          <li key={step.href}>
             <Link
               href={step.href}
-              className="font-medium text-[var(--wb-accent-strong)] underline underline-offset-2"
+              className="group flex h-full flex-col gap-1 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-main)] p-3 transition-colors hover:border-[var(--wb-accent)]"
             >
-              {step.label}
+              <span className="flex items-center gap-1 text-sm font-semibold text-[var(--wb-accent-strong)]">
+                {step.label}
+                <ArrowUpRight
+                  className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5"
+                  aria-hidden
+                />
+              </span>
+              <span className="text-[13px] leading-relaxed text-[var(--wb-text-secondary)]">
+                {step.body}
+              </span>
             </Link>
-            <span> · {step.body}</span>
           </li>
         ))}
       </ul>

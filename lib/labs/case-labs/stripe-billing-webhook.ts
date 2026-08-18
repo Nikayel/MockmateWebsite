@@ -25,6 +25,7 @@ export const stripeBillingWebhook: CaseLab = {
   },
   whyThisCompany:
     'Stripe interviews drop you into payments-grade correctness problems where the hard part is never the algorithm. It\'s reasoning about at-least-once delivery, idempotency, and ordering when the network and the provider are both allowed to lie to you. This lab mirrors that: the actual fix is a couple of guards, but the signal is whether you can scope "exactly once" precisely and defend it when a replay or a concurrent worker shows up.',
+  hook: "Subscription webhooks arrive twice and out of order. Make the worker safe.",
   skills: [
     "idempotency",
     "event ordering",

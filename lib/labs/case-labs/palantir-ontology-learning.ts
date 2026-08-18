@@ -56,6 +56,7 @@ export const palantirOntologyLearning: CaseLab = {
       },
     ],
   },
+  hook: "Learn an unfamiliar object graph from minimal docs, then extend it.",
   skills: [
     "learning unfamiliar APIs",
     "reading minimal docs",
