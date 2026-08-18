@@ -356,6 +356,12 @@ export async function checkUsageLimit(userId: string): Promise<{
   limit: number
   freeOpensRemaining: number
   periodEnd: string
+  /**
+   * Scenario ids already attempted this billing period. On paid tiers a start
+   * on one of these is a free redo even when `allowed` is false, so UI gates
+   * should treat `allowed || scenariosStarted.includes(id)` as startable.
+   */
+  scenariosStarted: string[]
 }> {
   const profile = await getUserProfile(userId)
   const quota = await resolveUserQuota(
@@ -372,6 +378,7 @@ export async function checkUsageLimit(userId: string): Promise<{
     limit: quota.sessions_limit,
     freeOpensRemaining: quota.free_opens_remaining || 0,
     periodEnd: quota.period_end,
+    scenariosStarted: quota.scenarios_started ?? [],
   }
 }
 
@@ -1130,10 +1137,18 @@ export async function findLatestSubmittedSession(
  * argument is no longer trusted — and profile_quota is client-read-only in
  * Firestore rules, so this API call is the only way to spend a session.
  */
-export async function recordSessionStart(_userId: string): Promise<{
+export async function recordSessionStart(
+  _userId: string,
+  // Lets the server recognize a paid-tier redo (a scenario already attempted
+  // this billing period starts free instead of spending a session).
+  scenarioId?: string
+): Promise<{
   success: boolean
   usedPaidSession: boolean
+  freeRetry: boolean
   freeOpensRemaining: number
+  sessionsUsed: number
+  sessionsLimit: number
 }> {
   const { getCurrentUserToken } = await import("./firebase-lazy")
   const token = await getCurrentUserToken()
@@ -1143,7 +1158,8 @@ export async function recordSessionStart(_userId: string): Promise<{
 
   const response = await fetch("/api/usage/session-start", {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(scenarioId ? { scenarioId } : {}),
   })
 
   if (response.status === 403) {
@@ -1156,13 +1172,19 @@ export async function recordSessionStart(_userId: string): Promise<{
 
   const data = (await response.json()) as {
     usedPaidSession?: boolean
+    freeRetry?: boolean
     freeOpensRemaining?: number
+    sessionsUsed?: number
+    sessionsLimit?: number
   }
 
   return {
     success: true,
     usedPaidSession: !!data.usedPaidSession,
+    freeRetry: !!data.freeRetry,
     freeOpensRemaining: data.freeOpensRemaining ?? 0,
+    sessionsUsed: data.sessionsUsed ?? 0,
+    sessionsLimit: data.sessionsLimit ?? 0,
   }
 }
 

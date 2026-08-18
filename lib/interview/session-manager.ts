@@ -128,10 +128,16 @@ export async function startInterviewSession({
         }).catch((err) => console.error("Session metrics init failed:", err))
       }
 
-      // Record session start (uses free opens or consumes 1 usage)
-      const result = await recordSessionStart(userId)
-      if (result.usedPaidSession) {
+      // Record session start (paid redo, free open, or 1 session of quota)
+      const result = await recordSessionStart(userId, scenario.id)
+      if (result.freeRetry) {
+        toast.success("Redo session. This doesn't use one of your monthly sessions.")
+      } else if (result.usedPaidSession && result.freeOpensRemaining > 0) {
         toast.success(`Session started! You now have ${result.freeOpensRemaining} free opens.`)
+      } else if (result.usedPaidSession && result.sessionsLimit > 0) {
+        toast.success(
+          `Session started! ${Math.max(0, result.sessionsLimit - result.sessionsUsed)} of ${result.sessionsLimit} sessions left this month.`
+        )
       }
 
       onSessionCreated?.(sessionId)
