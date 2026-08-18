@@ -102,7 +102,7 @@ export function CaseLabsFaq() {
         {FAQS.map((faq) => (
           <details
             key={faq.question}
-            className="group rounded-lg border border-[var(--wb-border)] bg-[var(--wb-main)] transition-colors open:border-[var(--wb-accent)]"
+            className="group rounded-lg border border-[var(--wb-border)] bg-[var(--wb-card)] transition-colors open:border-[var(--wb-accent)]"
           >
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-3 [&::-webkit-details-marker]:hidden">
               <h3 className="text-sm font-semibold text-[var(--wb-text)]">{faq.question}</h3>

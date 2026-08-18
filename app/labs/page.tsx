@@ -1,9 +1,10 @@
 /**
  * Case Labs gallery — `/labs`.
  *
- * ## Above the fold there are exactly three things
+ * ## Above the fold
  *
- * An `<h1>`, one line, one button. Everything else moved below the labs. The page previously opened
+ * An `<h1>`, one line, one button, then a 64px band naming the five milestones. Everything else is
+ * below the labs. The page previously opened
  * with two intro paragraphs, a five-card milestone explainer, a round-type essay and three rows of
  * filter chips: about 650 words and roughly two and a half screens before the first lab was on
  * screen, on a page whose only job is to get someone into a lab.
@@ -12,15 +13,21 @@
  *
  *   1. Hero            h1 + one line
  *   2. Primary CTA     one button + one qualifier line
- *   3. Pick a case lab filters + two groups of cards
- *   4. How a lab works five-step strip + shared detail panel
+ *   3. Pipeline band   five milestone names, 64px, anchored to section 5
+ *   4. Pick a case lab filters + two categorised groups of cards
+ *   5. How a lab works the same five milestones in full
  *   5. SEO prose       what a decomposition interview is / who interviews this way
  *   6. Common questions FAQ disclosure
  *   7. Where to practice next
  *
- * The milestone strip below the cards answers a question the visitor now has; above them it raised
- * one they did not. Nothing was cut to make room: the explanatory copy is all still here, still
- * Server Components in the initial HTML, and it tiles instead of stacking.
+ * The milestone SECTION stays below the cards, where it answers a question the visitor now has
+ * rather than raising one they did not. Only its five names come up into the hero, as a band.
+ * Moving the whole section instead lands the first lab card around 757px, which clears a 900px
+ * viewport by nothing and fails an 800px one: that is the 1733px regression this page was rebuilt
+ * to fix, starting over with better intentions. The band costs about 24px net.
+ *
+ * Nothing was cut to make room: the explanatory copy is all still here, still Server Components in
+ * the initial HTML, and it tiles instead of stacking.
  *
  * ## The h1 carries the query
  *
@@ -47,6 +54,7 @@ import { CaseLabGallery } from "@/components/labs/CaseLabGallery"
 import { BreadcrumbJsonLd, CourseListJsonLd } from "@/components/seo/JsonLd"
 import { getStarterCaseLab, listCaseLabs } from "@/lib/labs/case-labs"
 import { canonicalPageMetadata } from "@/lib/seo/page-metadata"
+import { MilestonePipelineBand } from "./_components/MilestonePipelineBand"
 import { MilestoneStrip } from "./_components/MilestoneStrip"
 import { CaseLabsExplainer } from "./_components/CaseLabsExplainer"
 import { CaseLabsFaq } from "./_components/CaseLabsFaq"
@@ -96,14 +104,26 @@ export default function CaseLabsGalleryPage() {
               <h1 className="max-w-[760px] text-2xl leading-tight font-bold text-[var(--wb-text)] sm:text-4xl">
                 Decomposition interview practice, on a real codebase
               </h1>
-              <p className="max-w-[640px] text-sm leading-relaxed text-[var(--wb-text-secondary)] sm:text-base">
-                The round Palantir FDSE and Stripe engineering interviews actually run: scope an
-                underspecified problem, decompose it, design it, then build until the tests pass.
+              {/* One line, and the same 760px measure as the h1 so the hero reads as one aligned
+                  block. It used to be 27 words over two lines, 165px of a 390x844 first screen, and
+                  its second half listed the process. The band below shows the process better, so
+                  that half is gone; both entity terms, which are the page's highest-intent query
+                  words, stay. */}
+              <p className="max-w-[760px] text-sm leading-relaxed text-[var(--wb-text-secondary)] sm:text-base">
+                The round Palantir FDSE and Stripe engineering interviews actually run.
               </p>
             </div>
             {starter && (
               <div className="flex flex-col items-start gap-2">
-                <Button asChild size="lg">
+                {/* The page's one large accent element. Bound to `--wb-accent-fill`/`--wb-accent-on`
+                    rather than the global `bg-primary`, which renders cream in dark and was the
+                    loudest off-system thing on an otherwise fully tokenised page. h-11 because 40px
+                    is under the touch-target floor, on the primary action. */}
+                <Button
+                  asChild
+                  size="lg"
+                  className="h-11 bg-[var(--wb-accent-fill)] text-[var(--wb-accent-on)] hover:bg-[var(--wb-accent-hover)] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wb-accent)]"
+                >
                   <Link href={`/labs/${starter.id}`}>Start with {starter.title}</Link>
                 </Button>
                 {/* Plain text, not a second button. Every value is read off the lab the CTA points
@@ -113,6 +133,7 @@ export default function CaseLabsGalleryPage() {
                 </p>
               </div>
             )}
+            <MilestonePipelineBand />
           </header>
 
           <CaseLabGallery labs={labs} />

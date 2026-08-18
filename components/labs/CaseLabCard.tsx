@@ -22,17 +22,55 @@
  * START HERE tab, which made the other three read as the ones you were not supposed to pick. The
  * hero CTA already answers "where do I begin", and it only has to be answered once.
  *
+ * ## Difficulty is a meter, not a hue
+ *
+ * It used to be an emerald/amber/red mark in the top-right corner, the highest-salience position on
+ * the card after the title. That spent the three loudest colours on the page on the least
+ * decision-relevant attribute: on the Palantir bugfix card, "Hard" in red outcompeted the lab's own
+ * name, and it put three foreign hues into a two-hue system. Difficulty is ORDINAL data and colour
+ * cannot express order (nothing about red says "more than amber" except learned convention), so it
+ * is three filled-or-empty segments, which can. The word stays beside it and carries the accessible
+ * meaning, so the bars are `aria-hidden` and colour is never the only channel.
+ *
+ * `lib/ui/difficulty-colors.ts` is deliberately untouched: it has ten other call sites and this is
+ * a /labs decision, not a platform one.
+ *
  * The longer "why this company" pitch still lives on the detail page, not here.
  */
 
 import Link from "next/link"
 import { ArrowRight, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { CompanyLogo } from "@/components/labs/CompanyLogo"
 import { getCompanyBrand } from "@/lib/labs/companies"
 import { workspaceLanguageLabel } from "@/lib/ui/language-labels"
 import type { CaseLab } from "@/lib/labs/types"
+
+/** Filled segments per level. Ordinal, which is the whole point of the meter. */
+const DIFFICULTY_STEPS: Record<string, number> = { easy: 1, medium: 2, hard: 3 }
+const DIFFICULTY_SEGMENTS = 3
+
+function DifficultyMeter({ difficulty }: { difficulty: string }) {
+  const filled = DIFFICULTY_STEPS[difficulty] ?? 0
+  return (
+    <span className="flex shrink-0 items-center gap-1.5 pt-0.5">
+      <span aria-hidden className="flex items-end gap-[2px]">
+        {Array.from({ length: DIFFICULTY_SEGMENTS }, (_, index) => (
+          <span
+            key={index}
+            className={cn(
+              "h-2.5 w-1 rounded-[1px]",
+              index < filled ? "bg-[var(--wb-text-secondary)]" : "bg-[var(--wb-track)]"
+            )}
+          />
+        ))}
+      </span>
+      <span className="text-[11px] font-medium text-[var(--wb-text-secondary)] capitalize">
+        {difficulty}
+      </span>
+    </span>
+  )
+}
 
 export function CaseLabCard({ lab }: { lab: CaseLab }) {
   const brand = getCompanyBrand(lab.company)
@@ -41,10 +79,11 @@ export function CaseLabCard({ lab }: { lab: CaseLab }) {
     <Link
       href={`/labs/${lab.id}`}
       className={cn(
-        "group flex h-full flex-col gap-3 rounded-xl border border-[var(--wb-border)] bg-[var(--wb-main)] p-4 transition-all duration-200",
+        "group flex h-full cursor-pointer flex-col gap-3 rounded-xl border border-[var(--wb-border)] bg-[var(--wb-card)] p-4 transition-all duration-200 sm:p-5",
         // Hover lift. `motion-reduce` drops the transform, not the colour change: the border and
         // shadow still say "this is the one under the cursor" without moving anything.
-        "hover:-translate-y-[3px] hover:border-[var(--wb-accent)] hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none"
+        "hover:-translate-y-[3px] hover:border-[var(--wb-accent)] hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wb-accent)]"
       )}
     >
       <div className="flex items-start gap-3">
@@ -57,36 +96,19 @@ export function CaseLabCard({ lab }: { lab: CaseLab }) {
             {brand.label} · {lab.role}
           </p>
         </div>
-        {/* A dot plus the word, not a filled pill: four pills of four colours turned the grid into a
-            row of badges competing with the titles. */}
-        <span className="flex shrink-0 items-center gap-1.5 pt-0.5">
-          <span
-            aria-hidden
-            className={cn("h-2 w-2 rounded-full", difficultyColorClass(lab.difficulty, "dot"))}
-          />
-          <span
-            className={cn(
-              "text-xs font-medium capitalize",
-              difficultyColorClass(lab.difficulty, "textOnLight")
-            )}
-          >
-            {lab.difficulty}
-          </span>
-        </span>
+        <DifficultyMeter difficulty={lab.difficulty} />
       </div>
 
       <p className="text-sm leading-relaxed text-[var(--wb-text-secondary)]">{lab.hook}</p>
 
-      <ul className="flex flex-wrap items-center gap-1">
-        {lab.skills.map((skill) => (
-          <li
-            key={skill}
-            className="rounded bg-[var(--wb-panel)] px-1.5 py-0.5 text-[11px] text-[var(--wb-text-secondary)]"
-          >
-            {skill}
-          </li>
-        ))}
-      </ul>
+      {/* Keywords, not affordances. Five grey pills per card was the largest block of low-value
+          texture in the grid and read at nearly body weight; as middot-separated text they still
+          say what the lab is about and stop competing with the title. The demotion comes from
+          removing the fill, NOT from lowering the contrast: `--wb-muted` measures 2.48:1 on the
+          card, which is not a legible way to make something quiet. */}
+      <p className="text-[11px] leading-relaxed text-[var(--wb-text-secondary)]">
+        {lab.skills.join(" · ")}
+      </p>
 
       {/* `mt-auto` pins the footer so cards of unequal hook length still align across the grid. */}
       <div className="mt-auto flex items-center gap-3 border-t border-[var(--wb-border)] pt-3 text-xs text-[var(--wb-text-secondary)]">

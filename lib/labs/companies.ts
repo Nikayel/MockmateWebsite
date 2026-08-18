@@ -14,10 +14,21 @@ export interface CompanyBrand {
   id: string
   /** Display name, properly cased (the data stores lowercase ids). */
   label: string
-  /** Brand background for the logo tile / badge. */
+  /** Brand background for the logo tile / badge, on a light surface. */
   brandColor: string
   /** Readable text/foreground on top of `brandColor`. */
   onBrandColor: string
+  /**
+   * The same pair for a dark surface. Optional: a mark with enough chroma reads on both, and
+   * repeating it would just be a second place to update.
+   *
+   * Palantir needs it. Its mark is #1A1A18, which against the dark card (#232220) measures 1.10:1
+   * and simply is not there: three of the four labs rendered a bare floating glyph with no tile,
+   * which broke the alignment grid on every card. Inverting the mark on dark is what Palantir's own
+   * brand does, so this is the correct treatment rather than a workaround.
+   */
+  brandColorDark?: string
+  onBrandColorDark?: string
   /** Monogram shown in the logo tile when no SVG mark is supplied. */
   monogram: string
 }
@@ -28,6 +39,9 @@ const COMPANY_BRANDS: Record<string, CompanyBrand> = {
     label: "Palantir",
     brandColor: "#1A1A18",
     onBrandColor: "#FFFFFF",
+    // Inverted for dark: tile 13.10:1 against the card, glyph 14.37:1 against the tile.
+    brandColorDark: "#ECE9E1",
+    onBrandColorDark: "#1A1A18",
     monogram: "P",
   },
   stripe: {

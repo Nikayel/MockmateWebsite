@@ -53,7 +53,7 @@ export function CaseLabNextSteps() {
           <li key={step.href}>
             <Link
               href={step.href}
-              className="group flex h-full flex-col gap-1 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-main)] p-3 transition-colors hover:border-[var(--wb-accent)]"
+              className="group flex h-full flex-col gap-1 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-card)] p-3 transition-colors hover:border-[var(--wb-accent)]"
             >
               <span className="flex items-center gap-1 text-sm font-semibold text-[var(--wb-accent-strong)]">
                 {step.label}

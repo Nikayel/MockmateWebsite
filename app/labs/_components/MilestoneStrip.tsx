@@ -3,85 +3,48 @@
 /**
  * The five-milestone strip on `/labs`, below the lab cards.
  *
- * It used to be five stacked paragraph cards ABOVE the labs, where it raised a question before the
- * visitor had seen anything. Below the cards it answers one instead, and as a strip of five columns
- * with one shared detail panel it costs a fifth of the height.
+ * The hero carries a names-only band that anchors here; this is the body it points at.
+ *
+ * ## It is a pipeline, not a table row
+ *
+ * The previous version put five equal columns behind vertical dividers. A divider says "these are
+ * peers", which is the exact opposite of "these happen in order", so the only ordering cue left was
+ * an 11px numeral. The dividers are gone and a 2px rail runs through the node centres instead,
+ * which is the continuity channel the relationship actually lives on. `--wb-rail` is held to the
+ * 3:1 non-text bar against BOTH surfaces it can sit on, because it is the sole carrier of the
+ * sequence.
+ *
+ * The rail deliberately does NOT fill up to the active step. A filled-to-here bar reads as progress
+ * and would assert the visitor has completed milestones they have not started.
  *
  * ## Why hover is safe here
  *
- * Hover-to-reveal is normally an accessibility failure, so this deliberately never depends on it:
+ * Hover-to-reveal is normally an accessibility failure, so this never depends on it:
  *
- * - Every step's LABEL is always visible and self-explanatory: number, name, and a one-line summary.
- *   A visitor who never hovers, on a phone or otherwise, still reads the whole pipeline.
- * - Hover, keyboard focus AND click all open the same detail. `onFocus` runs the same handler as
- *   `onMouseEnter`, so tabbing through the strip walks the details in order.
- * - Each step is a real `<button>`, so it is tabbable and operable by Enter and Space for free.
- * - Click PINS a step. Leaving the strip with the mouse returns to the pinned step, or to step 1 if
- *   nothing is pinned, so a touch user's tap is not undone by a stray pointer event.
+ * - Every step's LABEL is always visible and self-explanatory: number, name, one-line summary.
+ * - Hover, keyboard focus AND click all open the same detail; `onFocus` runs the same handler as
+ *   `onMouseEnter`, so tabbing walks the details in order.
+ * - Each step is a real `<button>`, tabbable and operable by Enter and Space for free.
+ * - Click PINS. Leaving with the mouse returns to the pinned step, or step 1 if nothing is pinned,
+ *   so a tap is never undone by a stray pointer event.
+ * - The active state is carried by a 2px accent rule under the column, not by the tint: the tint
+ *   measures 1.08:1 in light and is not a state signal on its own.
  *
- * ## Why all five paragraphs are rendered
+ * ## Mobile drops the shared panel entirely
  *
- * The panel holds every step's paragraph and hides four of them with `hidden`, rather than
- * rendering only the active one. This copy is a reason the page ranks; conditional rendering would
- * put four fifths of it behind an interaction a crawler never performs. Same reason the FAQ answers
- * ship expanded-in-the-DOM and collapsed in CSS.
+ * Below `md` the strip stacked to ~580px and tapping step 4 updated a panel several hundred pixels
+ * below the tap, so the interaction changed something the user could not see. On mobile every
+ * detail renders inline under its own step and nothing is interactive. The strings come from ONE
+ * array rendered at two sizes, so the two can never drift.
  *
- * Every claim in the copy is checked against the code that implements it. The five milestones and
- * their order are pinned by `lib/labs/__tests__/case-labs-registry.test.ts`; the Build workspace
- * being multi-file with editable and read-only files is pinned by `case-lab-build-wiring.test.ts`;
- * the self-grade rubric is the five `CaseLabRubricDimension` values.
+ * All five details are in the initial HTML in both layouts. On desktop the inactive four are
+ * `hidden`, never conditionally rendered: this copy is a reason the page ranks.
  */
 
 import { useState } from "react"
 import { cn } from "@/lib/utils"
-import type { MilestoneKind } from "@/lib/labs/types"
 
-interface MilestoneStep {
-  kind: MilestoneKind
-  title: string
-  /** Always visible under the step name. This is what makes hover optional. */
-  oneLiner: string
-  /** Revealed in the shared panel on hover, focus or click. */
-  detail: string
-}
-
-const MILESTONE_STEPS: MilestoneStep[] = [
-  {
-    kind: "clarify",
-    title: "Clarify",
-    oneLiner: "Write the questions you would ask.",
-    detail:
-      "Write down the questions you would ask the interviewer, and the assumption you would make on each one if nobody answered. The brief is deliberately underspecified, the same way the real prompt is.",
-  },
-  {
-    kind: "decompose",
-    title: "Decompose",
-    oneLiner: "Break the system into parts.",
-    detail:
-      "Lay out the workflow end to end, name the entities the system actually has, and draw the one state machine that matters. This is where the real bottleneck usually becomes obvious.",
-  },
-  {
-    kind: "design",
-    title: "Design",
-    oneLiner: "Commit to an API contract.",
-    detail:
-      "Commit to an API contract with named inputs and outputs, argue the tradeoffs you chose between, and say what the system does when the primary path is unavailable.",
-  },
-  {
-    kind: "build",
-    title: "Build",
-    oneLiner: "Make the tests pass.",
-    detail:
-      "Open the codebase. Several files, some you may edit and some you may only read, plus a test suite you run in the browser. You change the files you are allowed to change until the tests pass.",
-  },
-  {
-    kind: "review",
-    title: "Review",
-    oneLiner: "Grade yourself, then read the feedback.",
-    detail:
-      "Grade yourself on handling ambiguity, decomposition, design, code correctness, and communication, then read the written feedback on the work you actually produced.",
-  },
-]
+import { MILESTONE_SECTION_ID, MILESTONE_STEPS } from "./milestone-steps"
 
 const DETAIL_PANEL_ID = "case-lab-milestone-detail"
 
@@ -90,25 +53,25 @@ export function MilestoneStrip() {
   const [pinned, setPinned] = useState<number | null>(null)
 
   return (
-    <section aria-labelledby="how-a-case-lab-works" className="flex flex-col gap-4">
+    <section aria-labelledby={MILESTONE_SECTION_ID} className="flex scroll-mt-24 flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2
-          id="how-a-case-lab-works"
+          id={MILESTONE_SECTION_ID}
           className="text-lg font-semibold text-[var(--wb-text)] sm:text-xl"
         >
           How a case lab works
         </h2>
-        <p className="text-sm text-[var(--wb-text-secondary)]">
+        <p className="max-w-[70ch] text-sm text-[var(--wb-text-secondary)]">
           Every lab runs the same five milestones in the same order. You can move between them
           freely, and nothing is hidden until you have earned it.
         </p>
       </div>
 
       <div
-        className="overflow-hidden rounded-xl border border-[var(--wb-border)] bg-[var(--wb-main)]"
+        className="overflow-hidden rounded-xl border border-[var(--wb-border)] bg-[var(--wb-card)]"
         onMouseLeave={() => setActive(pinned ?? 0)}
       >
-        <div className="grid grid-cols-1 divide-y divide-[var(--wb-border)] md:grid-cols-5 md:divide-x md:divide-y-0">
+        <div className="md:grid md:grid-cols-5">
           {MILESTONE_STEPS.map((step, index) => {
             const isActive = index === active
             return (
@@ -124,19 +87,34 @@ export function MilestoneStrip() {
                   setActive(index)
                 }}
                 className={cn(
-                  "flex flex-col items-start gap-1 p-3 text-left transition-colors",
-                  "focus-visible:ring-2 focus-visible:ring-[var(--wb-accent)] focus-visible:outline-none",
-                  isActive && "bg-[var(--wb-accent-soft)]"
+                  "relative flex w-full cursor-pointer flex-col items-start gap-2 p-4 text-left transition-colors",
+                  "border-b-2 border-b-transparent",
+                  "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--wb-accent)]",
+                  // Below md the columns become rows, so they need a separator of their own.
+                  index > 0 && "border-t border-t-[var(--wb-border)] md:border-t-0",
+                  // The 2px rule is the state signal; the tint is reinforcement.
+                  isActive && "bg-[var(--wb-accent-soft)] md:border-b-[var(--wb-accent)]"
                 )}
               >
-                <span className="flex items-center gap-2">
+                {/* The connector, one segment per step, running from THIS node's centre to the
+                    next one's. Drawn per column rather than as one container-wide line so it needs
+                    no percentage math and cannot drift when the padding changes; the outer
+                    `overflow-hidden` trims nothing because the last step draws none. It is emitted
+                    before the node so the node paints over it. */}
+                {index < MILESTONE_STEPS.length - 1 && (
+                  <span
+                    aria-hidden
+                    className="absolute top-[30px] left-[30px] hidden h-[2px] w-full bg-[var(--wb-rail)] md:block"
+                  />
+                )}
+                <span className="flex items-center gap-2 md:flex-col md:items-start">
                   <span
                     aria-hidden
                     className={cn(
-                      "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold transition-colors",
+                      "relative z-[1] flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-xs font-semibold transition-colors",
                       isActive
-                        ? "bg-[var(--wb-accent)] text-white"
-                        : "bg-[var(--wb-panel)] text-[var(--wb-text-secondary)]"
+                        ? "border-[var(--wb-accent-fill)] bg-[var(--wb-accent-fill)] text-[var(--wb-accent-on)]"
+                        : "border-[var(--wb-rail)] bg-[var(--wb-card)] text-[var(--wb-text-secondary)]"
                     )}
                   >
                     {index + 1}
@@ -153,17 +131,21 @@ export function MilestoneStrip() {
                 <span className="text-xs leading-relaxed text-[var(--wb-text-secondary)]">
                   {step.oneLiner}
                 </span>
+                {/* Mobile: the detail lives here, always open, and there is nothing to tap. */}
+                <span className="text-[13px] leading-relaxed text-[var(--wb-text-secondary)] md:hidden">
+                  {step.detail}
+                </span>
               </button>
             )
           })}
         </div>
 
-        {/* Fixed minimum height so swapping a short paragraph for a long one never reflows the page
-            under the cursor. */}
+        {/* Desktop: one shared panel. Fixed minimum height so swapping a short paragraph for a long
+            one never reflows the page under the cursor. */}
         <div
           id={DETAIL_PANEL_ID}
           aria-live="polite"
-          className="min-h-[62px] border-t border-[var(--wb-border)] bg-[var(--wb-panel)] p-3"
+          className="hidden min-h-[62px] border-t border-[var(--wb-border)] bg-[var(--wb-panel)] p-4 md:block"
         >
           {MILESTONE_STEPS.map((step, index) => (
             <div
@@ -173,7 +155,7 @@ export function MilestoneStrip() {
               <span className="font-mono text-[11px] tracking-wider text-[var(--wb-accent-strong)] uppercase">
                 Step {index + 1} · {step.title}
               </span>
-              <p className="text-[13px] leading-relaxed text-[var(--wb-text-secondary)]">
+              <p className="max-w-[80ch] text-[13px] leading-relaxed text-[var(--wb-text-secondary)]">
                 {step.detail}
               </p>
             </div>
