@@ -290,7 +290,7 @@ export async function generateLLMHint(request: LLMHintRequest): Promise<Generate
 
     // Call LLM
     const response = await generateAIResponse(systemPrompt, userPrompt, [], {
-      complexity: "simple", // Uses Gemini for cost efficiency
+      complexity: "simple", // Cheapest routing lane (Luna at reasoningEffort none since 2026-08-06)
       temperature: 0.7,
       skipCache: false,
       service: "interview-hints",

@@ -175,26 +175,13 @@ describe("consolidated hint agent", () => {
     expect(response.diagnosis?.primaryNeed).toBe("debugging")
   })
 
-  it("lets the diagnosis steer non-debug hint categories", async () => {
-    const { generateAIResponse } = await import("@/lib/ai-providers")
+  it("lets the deterministic diagnosis steer non-debug hint categories", async () => {
+    // Diagnosis is deterministic now (no LLM): trigger "code_change" maps to
+    // "implementation", and the LEVEL COUNT is owned solely by the struggle
+    // calculator - the old LLM diagnosis could bump it, which is exactly the
+    // double-derivation this removed.
     const { generateLLMHintsForLevels } = await import("../llm-generator")
     const { generateHints } = await import("../index")
-
-    vi.mocked(generateAIResponse).mockResolvedValue({
-      text: JSON.stringify({
-        primaryNeed: "implementation",
-        confidence: 0.86,
-        reason: "The user has chosen an approach but needs help coding it correctly.",
-        evidence: ["Code has a loop", "No failing tests yet"],
-        recommendedLevel: 3,
-        shouldUseRag: false,
-        shouldUseUserHistory: false,
-        shouldUsePatternKnowledge: false,
-        shouldUseTestFailures: false,
-      }),
-      provider: "gemini-lite",
-      latencyMs: 1,
-    })
 
     vi.mocked(generateLLMHintsForLevels).mockImplementation(async ({ levels }) =>
       levels.map(({ level, category }) => ({
@@ -212,6 +199,15 @@ describe("consolidated hint agent", () => {
     const response = await generateHints({
       ...baseRequest,
       trigger: "code_change",
+      // High-struggle metrics so the struggle calculator (the only remaining
+      // owner of reveal level) recommends level 3, generating all four levels.
+      struggleMetrics: {
+        ...baseRequest.struggleMetrics,
+        timeSpentMinutes: 35,
+        testsRun: 5,
+        testsFailed: 5,
+        lastCodeChangeMinutesAgo: 6,
+      },
     })
 
     expect(response.diagnosis?.primaryNeed).toBe("implementation")

@@ -1,46 +1,21 @@
-import { z } from "zod"
-import { generateAIResponse } from "@/lib/ai-providers"
 import type { HintCategory, HintDiagnosis, HintGenerationRequest, HintLevel } from "./types"
 import type { StruggleLevel } from "./struggle-calculator"
 
-const hintDiagnosisSchema = z.object({
-  primaryNeed: z.enum(["conceptual", "approach", "implementation", "optimization", "debugging"]),
-  confidence: z.number().min(0).max(1),
-  reason: z.string().min(1).max(240),
-  evidence: z.array(z.string().min(1).max(160)).max(4).default([]),
-  recommendedLevel: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
-  shouldUseRag: z.boolean(),
-  shouldUseUserHistory: z.boolean(),
-  shouldUsePatternKnowledge: z.boolean(),
-  shouldUseTestFailures: z.boolean(),
-})
+/**
+ * Deterministic hint diagnosis.
+ *
+ * This used to be an LLM call: Luna was asked, on every hint generation, to
+ * emit routing booleans (shouldUseRag, recommendedLevel, ...) from signals the
+ * client had already computed locally - paying a model to decide whether to
+ * call another model, doubling the cost and latency of every generation. The
+ * deterministic mapping below was originally its FALLBACK; measured against a
+ * month of usage (2026-08-18) the LLM's routing added nothing the fallback
+ * didn't already express, so the fallback was promoted to the only path. The
+ * one remaining LLM call in the hint pipeline is the one that writes the hint
+ * text itself.
+ */
 
-const DIAGNOSIS_SYSTEM_PROMPT = `You diagnose what kind of coding interview hint a user needs.
-
-Return JSON only. Choose exactly one primaryNeed:
-- conceptual: user needs to understand the underlying idea or pattern
-- approach: user needs help choosing the algorithm/data structure
-- implementation: user knows the idea but needs help translating it into code
-- optimization: solution may work but needs better complexity
-- debugging: tests/errors indicate a bug or failing edge case
-
-Be conservative. Do not reveal solutions. Base the diagnosis on the user's current code, tests, constraints, and struggle state.`
-
-function parseDiagnosis(text: string): HintDiagnosis | null {
-  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/)
-  const jsonSource = codeBlockMatch ? codeBlockMatch[1] : text
-  const jsonMatch = jsonSource.match(/\{[\s\S]*\}/)
-
-  if (!jsonMatch) return null
-
-  try {
-    return hintDiagnosisSchema.parse(JSON.parse(jsonMatch[0]))
-  } catch {
-    return null
-  }
-}
-
-function fallbackPrimaryNeed(request: HintGenerationRequest): HintCategory {
+function primaryNeedFor(request: HintGenerationRequest): HintCategory {
   if (request.trigger === "test_failed" || (request.testResults?.failingTests?.length ?? 0) > 0) {
     return "debugging"
   }
@@ -60,19 +35,43 @@ function fallbackPrimaryNeed(request: HintGenerationRequest): HintCategory {
   return "approach"
 }
 
-export function buildFallbackDiagnosis(
+export function buildDeterministicDiagnosis(
   request: HintGenerationRequest,
+  struggleLevel: StruggleLevel,
   recommendedRevealLevel: HintLevel
 ): HintDiagnosis {
-  const primaryNeed = fallbackPrimaryNeed(request)
+  const primaryNeed = primaryNeedFor(request)
+  const failingCount = request.testResults?.failingTests?.length ?? 0
+
+  // Hard signals (failing tests, an empty editor) justify high confidence;
+  // everything else scales with how much struggle the metrics show.
+  const confidence =
+    failingCount > 0 || !request.userCode.trim()
+      ? 0.9
+      : struggleLevel === "high"
+        ? 0.75
+        : struggleLevel === "moderate"
+          ? 0.65
+          : 0.55
+
+  const reasonByNeed: Record<HintCategory, string> = {
+    debugging: "Failing tests point at a concrete bug to chase.",
+    conceptual: "No code yet, so the underlying idea is the useful nudge.",
+    optimization: "Tests pass and a target complexity exists to compare against.",
+    implementation: "Code is actively changing; translation into working code is the gap.",
+    approach: "Code exists but is not converging; the algorithm choice is the likely gap.",
+  }
 
   return {
     primaryNeed,
-    confidence: 0.5,
-    reason: "Used deterministic fallback because LLM diagnosis was unavailable.",
+    confidence,
+    reason: reasonByNeed[primaryNeed],
     evidence: [
       `trigger=${request.trigger || "manual"}`,
-      `tests=${request.testResults ? `${request.testResults.passed}/${request.testResults.total}` : "none"}`,
+      `tests=${
+        request.testResults ? `${request.testResults.passed}/${request.testResults.total}` : "none"
+      }`,
+      `struggle=${struggleLevel}`,
     ],
     recommendedLevel: recommendedRevealLevel,
     shouldUseRag: primaryNeed !== "debugging",
@@ -82,76 +81,26 @@ export function buildFallbackDiagnosis(
   }
 }
 
+/**
+ * Kept as the graph node's entry point (async signature preserved so the
+ * LangGraph node needs no change). Also retained under its old fallback name
+ * for any legacy import.
+ */
 export async function diagnoseHintNeed(params: {
   request: HintGenerationRequest
   struggleLevel: StruggleLevel
   recommendedRevealLevel: HintLevel
 }): Promise<HintDiagnosis> {
-  const { request, struggleLevel, recommendedRevealLevel } = params
+  return buildDeterministicDiagnosis(
+    params.request,
+    params.struggleLevel,
+    params.recommendedRevealLevel
+  )
+}
 
-  const userPrompt = `## Problem
-Title: ${request.problemTitle}
-Difficulty: ${request.difficulty}
-Pattern: ${request.problemPattern || "unknown"}
-Constraints: ${request.constraints?.slice(0, 5).join("; ") || "not provided"}
-Target complexity: ${
-    request.optimalComplexity
-      ? `${request.optimalComplexity.time} time, ${request.optimalComplexity.space} space`
-      : "not provided"
-  }
-
-## User State
-Trigger: ${request.trigger || "manual"}
-Struggle level: ${struggleLevel}
-Current reveal level from metrics: ${recommendedRevealLevel}
-Tests: ${
-    request.testResults
-      ? `${request.testResults.passed}/${request.testResults.total} passed`
-      : "not run"
-  }
-Failing tests: ${request.testResults?.failingTests?.slice(0, 3).join(" | ") || "none"}
-Existing hints: ${request.existingHints?.slice(-3).join(" | ") || "none"}
-
-## User Code (${request.language})
-\`\`\`${request.language}
-${request.userCode || "// no code written yet"}
-\`\`\`
-
-Return JSON:
-{
-  "primaryNeed": "conceptual|approach|implementation|optimization|debugging",
-  "confidence": 0.0,
-  "reason": "short reason",
-  "evidence": ["specific observed evidence"],
-  "recommendedLevel": 1,
-  "shouldUseRag": true,
-  "shouldUseUserHistory": true,
-  "shouldUsePatternKnowledge": true,
-  "shouldUseTestFailures": false
-}`
-
-  try {
-    const response = await generateAIResponse(DIAGNOSIS_SYSTEM_PROMPT, userPrompt, [], {
-      complexity: "simple",
-      temperature: 0.2,
-      skipCache: false,
-      service: "interview-hints",
-      eventType: "hint_request",
-      userId: request.userId,
-      sessionId: request.sessionId,
-    })
-
-    const diagnosis = parseDiagnosis(response.text)
-
-    if (!diagnosis || diagnosis.confidence < 0.35) {
-      return buildFallbackDiagnosis(request, recommendedRevealLevel)
-    }
-
-    return {
-      ...diagnosis,
-      recommendedLevel: Math.max(diagnosis.recommendedLevel, recommendedRevealLevel) as HintLevel,
-    }
-  } catch {
-    return buildFallbackDiagnosis(request, recommendedRevealLevel)
-  }
+export function buildFallbackDiagnosis(
+  request: HintGenerationRequest,
+  recommendedRevealLevel: HintLevel
+): HintDiagnosis {
+  return buildDeterministicDiagnosis(request, "none", recommendedRevealLevel)
 }
