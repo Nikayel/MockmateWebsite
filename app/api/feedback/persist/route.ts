@@ -30,6 +30,7 @@ import {
   validateFeedbackFailureReport,
 } from "@/lib/feedback/persist-request-schema"
 import { resolvePersistAction } from "@/lib/feedback/persist-guard"
+import { prepareTranscriptForStorage } from "@/lib/feedback/transcript-storage"
 
 // This route does Firestore writes only, no AI calls, so it does not need a
 // large budget. The previous `export const maxDuration = 10` cited a Vercel
@@ -308,6 +309,34 @@ export async function POST(request: NextRequest) {
     }
 
     await adminDb.collection("interview_sessions").doc(sessionId).update(updateData)
+
+    // Archive the conversation. This is the ONLY moment the full transcript
+    // exists server-side; before 2026-08-18 it was counted and discarded, so
+    // no completed session anywhere had a reviewable conversation. Subcollection
+    // doc so list queries stay light; best-effort so a transcript hiccup can
+    // never fail the persist itself. delete-user-data removes it recursively.
+    const transcript = prepareTranscriptForStorage(conversationTranscript)
+    if (transcript) {
+      try {
+        await adminDb
+          .collection("interview_sessions")
+          .doc(sessionId)
+          .collection("artifacts")
+          .doc("transcript")
+          .set({
+            messages: transcript.messages,
+            original_message_count: transcript.originalCount,
+            truncated: transcript.truncated,
+            source: incomingSource,
+            persisted_at: FieldValue.serverTimestamp(),
+          })
+      } catch (error) {
+        logger.warn("[Feedback Persist] Transcript archive failed (persist unaffected)", {
+          sessionId,
+          error,
+        })
+      }
+    }
 
     const latencyMs = Date.now() - startTime
 
