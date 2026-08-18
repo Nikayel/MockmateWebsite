@@ -13,7 +13,7 @@
  *   1. Hero            h1 + one line
  *   2. Primary CTA     one button + one qualifier line
  *   3. Pick a case lab filters + two categorised groups of cards
- *   4. How a lab works the five milestones, once, as static step cards
+ *   4. How a lab works the five milestones, once, as hover/focus/tap step cards
  *   5. SEO prose       what a decomposition interview is / who interviews this way
  *   6. Common questions FAQ disclosure
  *   7. Where to practice next
@@ -44,6 +44,7 @@
  */
 
 import Link from "next/link"
+import { ArrowDown } from "lucide-react"
 
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -112,18 +113,36 @@ export default function CaseLabsGalleryPage() {
             </div>
             {starter && (
               <div className="flex flex-col items-start gap-2">
-                {/* `--wb-accent-fill`/`--wb-accent-on` resolve to the same clay the primary button
-                    on /pricing and the homepage uses (#a3522a light, #d0824f dark), rather than the
-                    global `bg-primary`, which renders cream in dark and matched nothing. h-11
-                    because 40px is under the touch-target floor, on the primary action. */}
-                <Button
-                  asChild
-                  size="lg"
-                  className="h-11 bg-[var(--wb-accent-fill)] text-[var(--wb-accent-on)] hover:bg-[var(--wb-accent-hover)] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wb-accent)]"
-                >
-                  <Link href={`/labs/${starter.id}`}>Start with {starter.title}</Link>
-                </Button>
-                {/* Plain text, not a second button. Every value is read off the lab the CTA points
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* `--wb-accent-fill`/`--wb-accent-on` resolve to the same clay the primary button
+                      on /pricing and the homepage uses (#a3522a light, #d0824f dark), rather than
+                      the global `bg-primary`, which renders cream in dark and matched nothing. h-11
+                      because 40px is under the touch-target floor, on the primary action. */}
+                  <Button
+                    asChild
+                    size="lg"
+                    className="h-11 bg-[var(--wb-accent-fill)] text-[var(--wb-accent-on)] hover:bg-[var(--wb-accent-hover)] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wb-accent)]"
+                  >
+                    <Link href={`/labs/${starter.id}`}>Start with {starter.title}</Link>
+                  </Button>
+                  {/* Deliberately quiet, and deliberately an anchor rather than a button: it moves
+                      you down the page, so it should be a link, it should work with JS off, and
+                      middle-click should open it where a link would. Smooth scrolling and its
+                      reduced-motion override are both already global in `app/globals.css`.
+
+                      NOT labelled "How it works": the global header already has a link by that
+                      exact name pointing at /why-codesparring, and two links with one accessible
+                      name going to two places is precisely what a screen reader's link list makes
+                      unusable. This one is named after the section it lands on. */}
+                  <a
+                    href="#how-it-works"
+                    className="inline-flex h-11 items-center gap-1.5 rounded-md border border-[var(--wb-border)] px-4 text-sm font-medium text-[var(--wb-text)] transition-colors hover:border-[var(--wb-accent)] hover:text-[var(--wb-accent-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wb-accent)]"
+                  >
+                    How a lab works
+                    <ArrowDown className="h-3.5 w-3.5" aria-hidden />
+                  </a>
+                </div>
+                {/* Plain text, not a third button. Every value is read off the lab the CTA points
                     at, so it cannot claim 45 minutes for a 60-minute lab. */}
                 <p className="text-xs text-[var(--wb-text-secondary)]">
                   Easiest lab · {starter.estimatedMinutes} min · no account needed
