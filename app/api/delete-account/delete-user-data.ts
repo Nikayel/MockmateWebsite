@@ -148,7 +148,17 @@ export async function deleteAllUserData(
   for (const entry of USER_KEYED_QUERIES) {
     try {
       const refs = await collectQueryKeyedRefs(db, userId, entry.collection, entry.fields)
-      deletedDocuments += await deleteInChunks(db, refs)
+      if (entry.recursive) {
+        // These docs carry subcollections (e.g. interview_sessions/artifacts
+        // transcripts). Firestore does not cascade, so a batch delete of the
+        // parents would leave the children readable forever.
+        for (const ref of refs) {
+          await db.recursiveDelete(ref)
+        }
+        deletedDocuments += refs.length
+      } else {
+        deletedDocuments += await deleteInChunks(db, refs)
+      }
     } catch (error) {
       failedCollections.push(entry.collection)
       logger.error("Account deletion: failed to delete user-keyed query results", {

@@ -46,6 +46,12 @@ export interface UserKeyedQuery {
   collection: string
   fields: string[]
   note?: string
+  /**
+   * Delete matched documents with recursiveDelete instead of a batch delete.
+   * Required when the documents carry subcollections: Firestore does NOT
+   * cascade, so a batch delete of the parent would orphan the children.
+   */
+  recursive?: boolean
 }
 
 /**
@@ -106,7 +112,12 @@ export const USER_KEYED_DOCUMENTS: readonly UserKeyedDocument[] = [
  * recoverable from the uid alone.
  */
 export const USER_KEYED_QUERIES: readonly UserKeyedQuery[] = [
-  { collection: "interview_sessions", fields: ["user_id"] },
+  {
+    collection: "interview_sessions",
+    fields: ["user_id"],
+    recursive: true,
+    note: "Sessions carry an artifacts subcollection (conversation transcripts since 2026-08-18); recursive so those PII docs cannot orphan.",
+  },
   { collection: "profile_quota", fields: ["user_id"] },
   {
     collection: "payment_history",
