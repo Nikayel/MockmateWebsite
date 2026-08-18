@@ -3,10 +3,17 @@
 /**
  * ThemeToggle — platform-wide light/dark switch (next-themes).
  *
- * A compact Sun/Moon segmented control used in the global header and the
- * immersive lab topbar (which hides the header). Styled with the app's semantic
- * tokens so it reads correctly in both themes. Renders a stable placeholder
- * until mounted to avoid a hydration mismatch on the active theme.
+ * ONE button that flips to the other theme, used in the global header and the immersive lab topbar
+ * (which hides the header). It was a two-button segmented radiogroup, which spent twice the width to
+ * say the same thing and read as a pair of controls that toggle back and forth rather than as one
+ * switch.
+ *
+ * The icon shows the theme you are switching TO, which is the convention every OS-level dark-mode
+ * switch uses: a sun means "go light". The `aria-label` says the action for the same reason, so a
+ * screen reader announces "Switch to light mode" instead of naming a state the user cannot see.
+ *
+ * Renders a stable icon and label until mounted so the server HTML and the first client render
+ * agree; the real theme lands on the mount effect.
  */
 
 import { useEffect, useState } from "react"
@@ -47,42 +54,26 @@ export function ThemeToggle({ className }: { className?: string }) {
   useEffect(() => setMounted(true), [])
 
   const current = (theme === "system" ? resolvedTheme : theme) ?? "dark"
+  const isDark = current === "dark"
+  const next = isDark ? "light" : "dark"
 
-  const options = [
-    { value: "light", icon: Sun, label: "Light mode" },
-    { value: "dark", icon: Moon, label: "Dark mode" },
-  ] as const
+  // Before mount the active theme is unknown, so both renders show the same neutral icon and an
+  // action-neutral label. Committing to one here is what produced hydration warnings.
+  const Icon = !mounted ? Moon : isDark ? Sun : Moon
+  const label = mounted ? `Switch to ${next} mode` : "Toggle color theme"
 
   return (
-    <div
+    <button
+      type="button"
+      onClick={() => applyTheme(setTheme, next)}
+      aria-label={label}
+      title={label}
       className={cn(
-        "border-border bg-muted/40 inline-flex items-center gap-0.5 rounded-md border p-0.5",
+        "border-border bg-muted/40 text-muted-foreground hover:text-accent hover:border-accent/40 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors",
         className
       )}
-      role="radiogroup"
-      aria-label="Color theme"
     >
-      {options.map(({ value, icon: Icon, label }) => {
-        const active = mounted && current === value
-        return (
-          <button
-            key={value}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            aria-label={label}
-            onClick={() => applyTheme(setTheme, value)}
-            className={cn(
-              "flex h-6 w-6 items-center justify-center rounded transition-colors",
-              active
-                ? "bg-background text-accent shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Icon className="h-3.5 w-3.5" aria-hidden />
-          </button>
-        )
-      })}
-    </div>
+      <Icon className="h-3.5 w-3.5" aria-hidden />
+    </button>
   )
 }

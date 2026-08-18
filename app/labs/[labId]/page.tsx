@@ -161,16 +161,16 @@ export default function CaseLabPlayPage() {
       <Header />
       <main className="case-lab-workbook min-h-screen bg-[var(--wb-page)] text-[var(--wb-text)]">
         <div className="container mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-24 pb-12 sm:pt-28">
-          <div className="flex items-center justify-between gap-2">
-            <Link
-              href="/labs"
-              className="flex w-fit items-center gap-1 text-sm text-[var(--wb-muted)] hover:text-[var(--wb-text)]"
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden />
-              Back to labs
-            </Link>
-            <ThemeToggle />
-          </div>
+          {/* No ThemeToggle on this screen: unlike the immersive one below, it renders <Header />,
+              which already carries the switch. Two copies of one control on one screen read as two
+              controls. */}
+          <Link
+            href="/labs"
+            className="flex w-fit items-center gap-1 text-sm text-[var(--wb-muted)] hover:text-[var(--wb-text)]"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            Back to labs
+          </Link>
 
           {signedOutBanner}
 
