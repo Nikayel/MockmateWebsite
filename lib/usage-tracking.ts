@@ -358,11 +358,13 @@ const DAILY_USAGE_COLLECTION = "daily_usage"
 /**
  * Fraction of the monthly allowance any single UTC day may consume.
  *
- * 0.5 is chosen so it does not bind before the session quota does. At the
- * calibrated ~$0.40 pathological / ~$0.15 typical session cost, half of free's
- * $6.50 still covers all 8 of its monthly sessions in one day at the
- * pathological rate, and half of pro's $28 covers all 35. So a user who wants
- * to spend their whole month's quota in one sitting still can.
+ * 0.5 is chosen so it does not bind before the session quota does for normal
+ * usage. At the calibrated ~$0.40 pathological / ~$0.15 typical session cost,
+ * half of free's $6.50 still covers all 8 of its monthly sessions in one day at
+ * the pathological rate, and half of pro's $28 covers ~93 typical sessions
+ * against the 100-question quota. What it no longer covers (since the
+ * 2026-08-18 quota rise) is all 100 in one day at the PATHOLOGICAL rate; that
+ * account is exactly the runaway shape this cap exists for.
  *
  * What it does remove is the ability to spend a month's allowance in a day
  * WITHOUT consuming sessions — the runaway-loop and long-session cases, where

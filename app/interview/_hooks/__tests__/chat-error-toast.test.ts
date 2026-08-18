@@ -19,7 +19,7 @@ describe("buildChatErrorToast", () => {
     const result = buildChatErrorToast(429, {
       error: "Session limit exceeded",
       message:
-        "You've used all 8 free sessions for this month. Upgrade to Pro for 35 sessions per month, a personalized roadmap, and spaced repetition.",
+        "You've used all 8 free sessions for this month. Upgrade to Pro for 100 sessions per month, a personalized roadmap, and spaced repetition.",
       code: "QUOTA_EXCEEDED",
     })
 

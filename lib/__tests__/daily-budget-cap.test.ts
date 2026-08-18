@@ -49,7 +49,7 @@ vi.mock("../logger", () => ({
 }))
 
 vi.mock("../config", () => ({
-  PRICING_CONFIG: { free: { sessionsPerMonth: 8 }, pro: { sessionsPerMonth: 35 } },
+  PRICING_CONFIG: { free: { sessionsPerMonth: 8 }, pro: { sessionsPerMonth: 100 } },
 }))
 
 vi.mock("../global-spend-guard", () => ({
@@ -80,13 +80,19 @@ describe("resolveDailyBudgetCap", () => {
     expect(resolveDailyBudgetCap(6.5)).toBe(3.25)
   })
 
-  it("does not bind before the session quota does", async () => {
+  it("does not bind before the session quota does for realistic single-day use", async () => {
     const { resolveDailyBudgetCap } = await import("../usage-tracking")
     // Calibrated session costs from lib/__tests__/cost-constants.test.ts:
-    // ~$0.40 pathological. Free is 8 sessions/month, pro 35.
+    // ~$0.40 pathological / ~$0.15 typical. Free is 8 sessions/month.
     const PATHOLOGICAL_SESSION_COST = 0.4
+    const TYPICAL_SESSION_COST = 0.15
+    // Free: the whole month's quota fits in one day even at pathological cost.
     expect(resolveDailyBudgetCap(6.5)).toBeGreaterThanOrEqual(8 * PATHOLOGICAL_SESSION_COST)
-    expect(resolveDailyBudgetCap(28)).toBeGreaterThanOrEqual(35 * PATHOLOGICAL_SESSION_COST)
+    // Pro (quota 100 since 2026-08-18): the cap covers ~93 TYPICAL sessions in
+    // a single day — far beyond any human single-day run — but deliberately no
+    // longer covers all 100 at the PATHOLOGICAL rate. That account is exactly
+    // the runaway shape the cap exists for (see DAILY_BUDGET_FRACTION's doc).
+    expect(resolveDailyBudgetCap(28)).toBeGreaterThanOrEqual(90 * TYPICAL_SESSION_COST)
   })
 
   it("treats a missing or nonsensical cap as no daily gate", async () => {

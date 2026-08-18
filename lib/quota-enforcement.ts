@@ -1,10 +1,11 @@
 /**
  * Quota Enforcement Middleware
  *
- * Ensures users stay within their subscription tier limits:
- * - Free: 8 sessions/month, $0.50 budget
- * - Pro: 35 sessions/month, $25 budget
- * - Enterprise: Unlimited sessions, $100 budget
+ * Ensures users stay within their subscription tier limits (numbers live in
+ * lib/config.ts and lib/pricing.ts, the single sources of truth):
+ * - Free: 8 sessions/month, $6.50 budget
+ * - Pro: 100 distinct questions/billing period (same-period redos free), $28 budget
+ * - Enterprise: Effectively unlimited sessions, $112 budget
  *
  * This middleware should be used in API routes that consume resources:
  * - /api/chat (AI messages)
@@ -15,7 +16,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb, adminAuth } from "./firebase-admin"
 import { logger } from "./logger"
-import { getSessionsLimitForTier, isPaidTier } from "./pricing"
+import { AI_BUDGET_CAPS, getSessionsLimitForTier, isPaidTier } from "./pricing"
 import { resolveBudgetCap } from "./usage/budget"
 import { CIRCUIT_BREAKER } from "./constants"
 import { PRICING_CONFIG } from "./config"
@@ -607,12 +608,20 @@ export async function checkQuota(
       }
     }
 
-    // Check session limit (skip if user has free opens remaining)
-    if (quota.freeOpensRemaining <= 0 && quota.sessionsUsed >= quota.sessionsLimit) {
-      const sessionLimitMessage =
-        tier === "free"
-          ? `You've used all ${quota.sessionsLimit} free sessions for this month. Upgrade to Pro for ${PRICING_CONFIG.pro.sessionsPerMonth} sessions per month, a personalized roadmap, and spaced repetition.`
-          : `You've used all ${quota.sessionsLimit} Pro sessions for this billing period. Your limit resets ${resetClause(quota.periodEnd)}.`
+    // Session limit: FREE TIER ONLY (skip if the user has free opens left).
+    //
+    // Paid quotas meter DISTINCT questions at session start
+    // (lib/quota/session-start-admin.ts) and same-period redos are free, so a
+    // paid user legitimately chats at 100/100 inside a redo session; blocking
+    // here would kill that session's AI mid-interview. Paid spend stays bounded
+    // by the monthly and daily budget caps below, and new-session starts stay
+    // bounded by the server-authoritative session-start writer.
+    if (
+      tier === "free" &&
+      quota.freeOpensRemaining <= 0 &&
+      quota.sessionsUsed >= quota.sessionsLimit
+    ) {
+      const sessionLimitMessage = `You've used all ${quota.sessionsLimit} free sessions for this month. Upgrade to Pro for ${PRICING_CONFIG.pro.sessionsPerMonth} sessions per month, a personalized roadmap, and spaced repetition.`
       const response = NextResponse.json(
         {
           error: "Session limit exceeded",
@@ -643,15 +652,19 @@ export async function checkQuota(
         budgetUsed: quota.budgetUsed,
         budgetLimit: quota.budgetLimit,
         message: "Session limit exceeded",
+        code: "QUOTA_EXCEEDED",
         response,
       }
     }
 
     // Check budget limit
     if (quota.budgetUsed >= quota.budgetLimit) {
+      // Derived so the advertised multiple can never overstate the caps table
+      // (the old hardcoded "50x" was a fossil from the $0.50 free-budget era).
+      const proBudgetMultiple = Math.floor(AI_BUDGET_CAPS.pro / AI_BUDGET_CAPS.free)
       const budgetMessage =
         tier === "free"
-          ? "You've hit this month's free AI usage limit. Upgrade to Pro for a 50x higher AI allowance plus 35 interview sessions."
+          ? `You've hit this month's free AI usage limit. Upgrade to Pro for a ${proBudgetMultiple}x higher AI allowance plus ${PRICING_CONFIG.pro.sessionsPerMonth} interview sessions.`
           : `You've used your full $${quota.budgetLimit.toFixed(2)} AI allowance for this billing period. Your allowance resets ${resetClause(quota.periodEnd)}.`
       const response = NextResponse.json(
         {

@@ -38,7 +38,7 @@ vi.mock("../logger", () => ({
 vi.mock("../config", () => ({
   PRICING_CONFIG: {
     free: { sessionsPerMonth: 2 },
-    pro: { sessionsPerMonth: 35 },
+    pro: { sessionsPerMonth: 100 },
   },
 }))
 
@@ -46,6 +46,14 @@ vi.mock("../config", () => ({
 // (individual tests override isGlobalCeilingExceeded to simulate a breach).
 vi.mock("../global-spend-guard", () => ({
   isGlobalCeilingExceeded: vi.fn(() => Promise.resolve(false)),
+}))
+
+// Mock the daily-cost reader so the paid path can flow PAST the session gate to
+// its allow without hitting real Firestore (the real reader throws on the
+// mocked handles, which routes into fail-open and masks the gate under test).
+vi.mock("../usage-tracking", () => ({
+  getUserDailyCost: vi.fn(() => Promise.resolve(0)),
+  resolveDailyBudgetCap: vi.fn(() => 14),
 }))
 
 // Helper: build a minimal NextRequest-like object with controllable headers.
@@ -221,7 +229,82 @@ describe("Quota Enforcement", () => {
 
     it("should apply correct limits for pro tier", async () => {
       const { PRICING_CONFIG } = await import("../config")
-      expect(PRICING_CONFIG.pro.sessionsPerMonth).toBe(35)
+      expect(PRICING_CONFIG.pro.sessionsPerMonth).toBe(100)
+    })
+  })
+
+  // 2026-08-18: the session-count gate on cost-bearing routes applies to the
+  // FREE tier only. Paid quotas meter distinct questions at session start and
+  // same-period redos are free, so a paid user legitimately chats at
+  // limit/limit inside a redo session; blocking here killed that session's AI.
+  describe("session limit gate (free-only)", () => {
+    function mockQuotaState(tier: string, sessionsUsed: number) {
+      const summaryDoc = {
+        get: vi.fn(() => Promise.resolve({ exists: true, data: () => ({ totalCost: 0 }) })),
+      }
+      const profileDoc = {
+        get: vi.fn(() =>
+          Promise.resolve({ exists: true, data: () => ({ subscription_tier: tier }) })
+        ),
+        collection: vi.fn(() => ({ doc: vi.fn(() => summaryDoc) })),
+      }
+      const quotaDoc = {
+        data: () => ({
+          sessions_used: sessionsUsed,
+          free_opens_remaining: 0,
+          period_start: new Date().toISOString(),
+        }),
+      }
+      return { profileDoc, quotaDoc }
+    }
+
+    async function installMocks(tier: string, sessionsUsed: number) {
+      const { profileDoc, quotaDoc } = mockQuotaState(tier, sessionsUsed)
+      const { adminDb } = await import("../firebase-admin")
+      // The "fail open" test above queues a mockImplementationOnce(throw) that
+      // its own ANONYMOUS request never consumes (it never touches Firestore),
+      // and a pending once-impl outranks mockImplementation. Reset it so these
+      // tests exercise the gate, not a stale injected outage.
+      vi.mocked(adminDb.collection).mockReset()
+      vi.mocked(adminDb.collection).mockImplementation(
+        (name: string) =>
+          (name === "profile_quota"
+            ? {
+                where: vi.fn(() => ({
+                  orderBy: vi.fn(() => ({
+                    limit: vi.fn(() => ({
+                      get: vi.fn(() => Promise.resolve({ docs: [quotaDoc] })),
+                    })),
+                  })),
+                })),
+              }
+            : { doc: vi.fn(() => profileDoc) }) as any
+      )
+    }
+
+    it("blocks a FREE user at their session limit with 429 QUOTA_EXCEEDED", async () => {
+      await installMocks("free", 2) // mocked free limit is 2
+
+      const { checkQuota } = await import("../quota-enforcement")
+      const result = await checkQuota(makeRequest({ Authorization: "Bearer valid-token" }), {
+        requireAuth: true,
+      })
+
+      expect(result.allowed).toBe(false)
+      expect(result.code).toBe("QUOTA_EXCEEDED")
+      expect(result.response?.status).toBe(429)
+    })
+
+    it("does NOT block a PRO user at their session limit (budget caps own paid spend)", async () => {
+      await installMocks("pro", 100) // at the mocked pro limit
+
+      const { checkQuota } = await import("../quota-enforcement")
+      const result = await checkQuota(makeRequest({ Authorization: "Bearer valid-token" }), {
+        requireAuth: true,
+      })
+
+      expect(result.allowed).toBe(true)
+      expect(result.sessionsUsed).toBe(100)
     })
   })
 
