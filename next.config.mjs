@@ -116,13 +116,16 @@ const nextConfig = {
               // Note: 'unsafe-inline' is required for Next.js/Turbopack development mode
               // Next.js injects inline scripts for hydration and HMR that need inline execution
               // In production, consider implementing nonce-based CSP for better security
-              "script-src 'self' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com https://cdn.jsdelivr.net https://apis.google.com https://*.googleapis.com https://www.gstatic.com https://accounts.google.com 'wasm-unsafe-eval'",
+              // us.posthog.com + us-assets are for the PostHog TOOLBAR only (site
+              // owner logging in to view heatmaps on the live page); visitor
+              // analytics stay same-origin through the /ingest proxy.
+              "script-src 'self' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com https://cdn.jsdelivr.net https://apis.google.com https://*.googleapis.com https://www.gstatic.com https://accounts.google.com https://us.posthog.com https://us-assets.i.posthog.com 'wasm-unsafe-eval'",
               // Note: 'unsafe-inline' for styles is still needed for Next.js/React inline styles
               // TODO: Implement nonce-based CSP for even stricter security
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data: https://fonts.gstatic.com",
-              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com https://*.firebase.googleapis.com https://*.google-analytics.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://oauth2.googleapis.com https://www.googleapis.com wss://*.firebaseio.com https://api.stripe.com https://cdn.jsdelivr.net wss://api.deepgram.com wss://*.deepgram.com",
+              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com https://*.firebase.googleapis.com https://*.google-analytics.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://oauth2.googleapis.com https://www.googleapis.com wss://*.firebaseio.com https://api.stripe.com https://cdn.jsdelivr.net wss://api.deepgram.com wss://*.deepgram.com https://us.posthog.com https://us-assets.i.posthog.com",
               "worker-src 'self' blob: https://cdn.jsdelivr.net",
               "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://www.youtube.com https://accounts.google.com https://*.googleapis.com https://*.firebaseapp.com https://*.web.app",
               "object-src 'none'",
