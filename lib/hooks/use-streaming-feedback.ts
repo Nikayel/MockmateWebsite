@@ -299,6 +299,9 @@ export function useStreamingFeedback() {
             scenarioPattern: request.scenarioPattern,
             conversationTranscript: request.conversationTranscript,
             efficiencyMetrics: request.efficiencyMetrics,
+            // The stream route also persists server-side; the persist route's
+            // idempotency guard arbitrates whichever of the two lands first.
+            source: "stream",
           }),
         })
 

@@ -109,6 +109,10 @@ export function useFeedbackStreaming(
               scenarioTitle: request.scenarioTitle || "Unknown",
               scenarioId: request.scenarioId,
               scenarioPattern: request.scenarioPattern,
+              // Fallback scores are placeholders: the persist route lets a
+              // later REAL persist (client stream or server-side) upgrade a
+              // fallback-complete session, but never the reverse.
+              source: "fallback",
             }),
           })
         }
