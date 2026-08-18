@@ -38,13 +38,16 @@ function AnimatedPrice({
   const isInView = useInView(ref, { once: true, amount: 0.5 })
   const prefersReducedMotion = useReducedMotion()
   const spring = useSpring(0, { stiffness: 50, damping: 25 })
-  const display = useTransform(spring, (v) => Math.floor(v).toLocaleString())
+  // Pin the locale: a bare toLocaleString() groups digits by the browser's locale,
+  // so a visitor whose locale differs from the server's renders a different string
+  // and trips a hydration mismatch on server-rendered pricing.
+  const display = useTransform(spring, (v) => Math.floor(v).toLocaleString("en-US"))
   // Seeded with the REAL price, not "0". This used to start at "0" and only
   // count up once the browser scrolled it into view, which meant the server
   // rendered every price on the page as "$0" — what a crawler reads, what a
   // no-JS visitor sees, and what shows for the split second before hydration.
   // The count-up now starts from zero only when we are actually going to run it.
-  const [displayValue, setDisplayValue] = useState(() => value.toLocaleString())
+  const [displayValue, setDisplayValue] = useState(() => value.toLocaleString("en-US"))
 
   useEffect(() => {
     const unsubscribe = display.on("change", setDisplayValue)
