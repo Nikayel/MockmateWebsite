@@ -151,8 +151,8 @@ export function isSessionConclusionMessage(message: string): boolean {
 // =============================================================================
 // lib/quota-enforcement.ts already does the hard part: it returns a machine
 // readable `code` and a message written for the person reading it ("You've used
-// all 8 free sessions for this month. Upgrade to Pro for 35 sessions per month,
-// a personalized roadmap, and spaced repetition."). The chat hook then threw the
+// all 8 free sessions for this month. Upgrade to Pro for 100 sessions per
+// month, a personalized roadmap, and spaced repetition."). The chat hook then threw the
 // code away and rendered every failure as a red toast titled "Rate limit
 // reached", with no link anywhere.
 //

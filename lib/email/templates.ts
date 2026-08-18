@@ -18,6 +18,7 @@
  */
 
 import { getAppBaseUrl } from "../site-url"
+import { PRICING_CONFIG } from "../config"
 
 // Email type determines footer behavior
 type EmailType = "transactional" | "reminder"
@@ -708,7 +709,7 @@ export function getSubscriptionConfirmationEmailHtml(
 
     ${oneTimeNote}
 
-    <p>Pro gives you 35 interview sessions a month, spaced repetition scheduling, and an interview roadmap tailored to your company, role, and skills.</p>
+    <p>Pro gives you ${PRICING_CONFIG.pro.sessionsPerMonth} interview sessions a month with free redos, spaced repetition scheduling, and an interview roadmap tailored to your company, role, and skills.</p>
 
     ${ctaButton("Start practicing", `${data.appUrl}/dashboard`)}
 
@@ -743,7 +744,7 @@ Thanks for upgrading. Pro is active on your account.
 
 ${planBlock}
 
-Pro gives you 35 interview sessions a month, spaced repetition scheduling, and an interview roadmap tailored to your company, role, and skills.
+Pro gives you ${PRICING_CONFIG.pro.sessionsPerMonth} interview sessions a month with free redos, spaced repetition scheduling, and an interview roadmap tailored to your company, role, and skills.
 
 Start practicing: ${data.appUrl}/dashboard
 

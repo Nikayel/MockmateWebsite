@@ -1,6 +1,7 @@
 import { Metadata } from "next"
 import Link from "next/link"
 import { COMPETITOR_PRICING } from "@/lib/pricing-comparison"
+import { PRICING_CONFIG } from "@/lib/config"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
@@ -94,7 +95,7 @@ export default function VsLeetCodePage() {
     },
     {
       question: "How does the price compare to LeetCode Premium?",
-      answer: `LeetCode Premium runs $${COMPETITOR_PRICING.leetcodePremium.monthlyPrice} a month. CodeSparring's free plan costs nothing and includes 8 full interview sessions a month. Pro is $25 a month, or $225 billed yearly, for 35 sessions, spaced repetition, and a personalized roadmap.`,
+      answer: `LeetCode Premium runs $${COMPETITOR_PRICING.leetcodePremium.monthlyPrice} a month. CodeSparring's free plan costs nothing and includes 8 full interview sessions a month. Pro is $25 a month, or $225 billed yearly, for ${PRICING_CONFIG.pro.sessionsPerMonth} sessions, spaced repetition, and a personalized roadmap.`,
     },
   ]
 

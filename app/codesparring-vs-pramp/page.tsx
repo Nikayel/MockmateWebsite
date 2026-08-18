@@ -1,6 +1,7 @@
 import { Metadata } from "next"
 import Link from "next/link"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
+import { PRICING_CONFIG } from "@/lib/config"
 
 export const metadata: Metadata = {
   title: "CodeSparring vs Pramp | Mock Interview Comparison",
@@ -57,8 +58,9 @@ export default function VsPrampPage() {
           </p>
           <p>
             The free plan includes 8 full sessions a month with complete AI feedback, no card
-            required. <Link href="/pricing">Pro</Link> adds 35 sessions a month, spaced repetition
-            scheduling, and a personalized roadmap.
+            required. <Link href="/pricing">Pro</Link> adds {PRICING_CONFIG.pro.sessionsPerMonth}{" "}
+            sessions a month with free redos, spaced repetition scheduling, and a personalized
+            roadmap.
           </p>
         </>
       ),
@@ -85,8 +87,7 @@ export default function VsPrampPage() {
   const faqs = [
     {
       question: "Is CodeSparring free like Pramp?",
-      answer:
-        "The free plan includes 8 full interview sessions a month with complete AI feedback, no card required. Pro exists for people who want 35 sessions a month plus spaced repetition and a personalized roadmap.",
+      answer: `The free plan includes 8 full interview sessions a month with complete AI feedback, no card required. Pro exists for people who want ${PRICING_CONFIG.pro.sessionsPerMonth} sessions a month plus spaced repetition and a personalized roadmap.`,
     },
     {
       question: "Does the AI grade communication the way a peer would?",

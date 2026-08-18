@@ -77,14 +77,20 @@ export function isPaidTier(tier: SubscriptionTier): boolean {
  */
 export const AI_BUDGET_CAPS = {
   // Re-set 2026-08-01 alongside the ~23x cost-constant correction below. These
-  // are deliberately set NOT to bind: the server-authoritative session quota
-  // (lib/config.ts: free 8/mo, pro 35/mo) is the real limit, and these are the
-  // runaway backstop. At the corrected rates a session costs roughly $0.40
-  // pathological / $0.15 typical, so free covers ~16 sessions against a quota
-  // of 8. Leaving the old $0.50 here after the correction would have started
-  // blocking free users partway through their SECOND session.
+  // are deliberately set NOT to bind for typical usage: the server-authoritative
+  // session quota (lib/config.ts: free 8/mo, pro 100 distinct questions/period)
+  // is the real limit, and these are the runaway backstop. At the corrected
+  // rates a session costs roughly $0.40 pathological / $0.15 typical, so free
+  // covers ~16 sessions against a quota of 8.
+  //
+  // 2026-08-18: the Pro quota rose 35 -> 100 distinct questions with free
+  // same-period redos, and these caps deliberately did NOT move. 100 typical
+  // sessions cost ~$15 against the $28 cap, so normal use never touches it;
+  // a subscriber grinding pathological sessions now hits the budget backstop
+  // before the session quota, which is the backstop doing its job (revenue is
+  // $25/mo — an unbounded cap would let one account run the plan at a loss).
   free: 6.5, // ~16 sessions, quota is 8
-  pro: 28.0, // ~70 sessions, quota is 35
+  pro: 28.0, // ~186 typical sessions, quota is 100 distinct questions
   enterprise: 112.0, // 4x pro
 } as const
 
@@ -138,7 +144,10 @@ export const PRO_AI_LIMIT_MULTIPLIER = Math.min(
 )
 
 /**
- * Re-opens granted when a session start spends a paid session.
+ * Re-opens granted when a session start spends a paid session. FREE TIER ONLY
+ * since 2026-08-18: paid tiers meter DISTINCT scenarios per billing period
+ * instead (`scenarios_started` on the quota doc), so a paid redo is free by
+ * identity rather than by a generic opens allowance.
  *
  * The counter is per user, per billing period, and lives on the `profile_quota` doc as
  * `free_opens_remaining`; it is NOT scoped to the scenario that was opened. The value is defined

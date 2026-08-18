@@ -34,7 +34,7 @@ import { SubscriptionStatusBanner } from "@/components/ui/subscription-status-ba
 import Link from "next/link"
 import { toast } from "sonner"
 import { isPaidTier } from "@/lib/pricing"
-import type { SubscriptionTier } from "@/lib/config"
+import { PRICING_CONFIG, type SubscriptionTier } from "@/lib/config"
 import { SparraLoader } from "@/components/brand/SparraLoader"
 
 const OnboardingModal = dynamic(
@@ -857,7 +857,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm font-medium text-amber-400">Running low on sessions</p>
                   <p className="text-muted-foreground mt-0.5 text-xs">
-                    Upgrade to Pro for 35 sessions a month
+                    Upgrade to Pro for {PRICING_CONFIG.pro.sessionsPerMonth} sessions a month
                   </p>
                 </div>
                 <Link href="/upgrade">

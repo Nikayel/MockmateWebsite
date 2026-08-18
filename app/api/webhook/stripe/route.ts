@@ -529,7 +529,7 @@ export async function POST(request: NextRequest) {
           // any quota work begins.
           const userEmail = (profile?.email as string) || session.customer_email
           const [quotaResult] = await Promise.allSettled([
-            // Update quota to reflect Pro subscription (35 sessions) - reset usage for new subscription
+            // Update quota to reflect Pro subscription (limit from lib/config) - reset usage for new subscription
             updateQuotaForSubscriptionTierAdmin(userId, "pro", {
               resetUsage: true,
               profileData: {

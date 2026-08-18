@@ -5,6 +5,7 @@ import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 // a price on a comparison table cannot drift apart (each entry carries its source URL and the date
 // it was checked).
 import { COMPETITOR_PRICING, formatPlanPrice } from "@/lib/pricing-comparison"
+import { PRICING_CONFIG } from "@/lib/config"
 
 export const metadata: Metadata = {
   title: "Best AI Coding Interview Tools in 2026",
@@ -223,8 +224,7 @@ export default function BestAIToolsPage() {
     },
     {
       question: "What does CodeSparring cost?",
-      answer:
-        "The free plan includes 8 full sessions a month with complete AI feedback, no card required. Pro is $25 a month, or $225 a year, and includes 35 sessions a month, spaced repetition scheduling, and a personalized roadmap.",
+      answer: `The free plan includes 8 full sessions a month with complete AI feedback, no card required. Pro is $25 a month, or $225 a year, and includes ${PRICING_CONFIG.pro.sessionsPerMonth} sessions a month, spaced repetition scheduling, and a personalized roadmap.`,
     },
   ]
 

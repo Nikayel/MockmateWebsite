@@ -6,6 +6,7 @@ import { Play, Check, Clock, Cpu, Bug } from "lucide-react"
 import { EXERCISE_TYPES } from "./scenario-display"
 import { Button } from "@/components/ui/button"
 import type { Scenario, ScenarioType } from "@/lib/scenarios"
+import { PRICING_CONFIG } from "@/lib/config"
 import type { UsageLimit } from "@/lib/stores"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { getScenarioLabLink } from "@/lib/labs/lab-links"
@@ -147,7 +148,7 @@ export const ScenarioCard = memo(function ScenarioCard({
         <div className="border-border bg-muted/50 mt-4 rounded-lg border p-3">
           <p className="text-foreground mb-1 text-xs font-medium">Session limit reached</p>
           <p className="text-muted-foreground mb-2 text-xs">
-            Upgrade to Pro for 35 sessions every month
+            Upgrade to Pro for {PRICING_CONFIG.pro.sessionsPerMonth} sessions every month
           </p>
           <Link href="/limit-reached">
             <Button

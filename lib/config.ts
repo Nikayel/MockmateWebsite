@@ -66,14 +66,14 @@ export const PRICING_CONFIG = {
       comingSoon: true,
     },
     // Shared features
-    sessionsPerMonth: 35,
-    sessionsDisplay: "35 full interview sessions per month",
+    sessionsPerMonth: 100,
+    sessionsDisplay: "100 AI interview sessions per month",
     // Core value: what makes Pro worth it
     valueProps: [
       {
-        title: "Re-practice Every Scenario",
+        title: "Redo Questions Free",
         description:
-          "Starting a session uses 1 of your monthly sessions and unlocks that scenario for repeated practice, so you can come back and run it again without spending another session.",
+          "A question only counts once per billing period, no matter how many times you rerun it. Drill the same problem until the pattern sticks without spending another session.",
       },
       {
         title: "Spaced Repetition System",
@@ -88,8 +88,8 @@ export const PRICING_CONFIG = {
     ],
     // Complete feature list for Pro
     features: [
-      "35 full interview sessions per month",
-      "Unlimited practice within each scenario",
+      "100 AI interview sessions per month",
+      "Free redos: a question counts once per month",
       "Spaced repetition scheduling",
       "Interview roadmap tailored to your company, role, and skills",
       "Pattern mastery tracking (15+ patterns)",
@@ -101,8 +101,8 @@ export const PRICING_CONFIG = {
     ],
     // Quick comparison for pricing cards
     highlights: [
-      "35 sessions/month",
-      "Unlimited practice per problem",
+      "100 sessions/month",
+      "Each question counts once per month",
       "Spaced repetition scheduling",
       "Tailored interview roadmap",
       "Pattern mastery tracking",
