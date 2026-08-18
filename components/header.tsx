@@ -171,6 +171,10 @@ export function Header() {
   // One picker window per hub drives both the desktop nav button and the mobile menu row.
   const [isInterviewPickerOpen, setIsInterviewPickerOpen] = useState(false)
   const [isLearnPickerOpen, setIsLearnPickerOpen] = useState(false)
+  // False on the server and on the first client render, true only after mount. It
+  // gates every auth-dependent branch so the first client render matches the server
+  // HTML byte for byte, even when Firebase auth resolves mid-hydration.
+  const [mounted, setMounted] = useState(false)
   const { user, initialized } = useAuth()
   const pathname = usePathname()
   const userDisplayName = user?.user_metadata?.full_name || user?.email || "Account"
@@ -181,6 +185,8 @@ export function Header() {
     interview: { open: isInterviewPickerOpen, setOpen: setIsInterviewPickerOpen },
     learn: { open: isLearnPickerOpen, setOpen: setIsLearnPickerOpen },
   }
+
+  useEffect(() => setMounted(true), [])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -208,33 +214,26 @@ export function Header() {
     }
   }
 
-  // The nav renders the marketing links from the first paint, before `useAuth()` reports back.
-  // It used to render a spinner for the whole row instead, which meant the server HTML (the only
-  // version a crawler ever reads) carried exactly one link out of the header: the wordmark. Only
-  // the two auth-dependent controls actually need to wait, so only they do, and they wait in a
-  // fixed-size slot so nothing around them moves when the answer arrives.
-  const showAppNav = initialized && user
-  const authSlot = (mobile: boolean) =>
-    initialized ? (
-      <Link
-        href="/login"
-        onClick={mobile ? () => setIsMobileMenuOpen(false) : undefined}
-        className={
-          mobile
-            ? "border-accent/40 bg-accent/10 text-accent hover:border-accent/60 hover:bg-accent/15 focus-visible:ring-accent/50 inline-flex h-9 w-fit items-center rounded-full border px-4 text-sm font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
-            : "border-accent/40 bg-accent/10 text-accent hover:border-accent/60 hover:bg-accent/15 focus-visible:ring-accent/50 inline-flex h-8 items-center rounded-full border px-4 text-[13px] font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
-        }
-      >
-        Sign in
-      </Link>
-    ) : (
-      <div
-        aria-hidden="true"
-        className={`inline-flex items-center justify-center ${mobile ? "h-9 w-[88px]" : "h-8 w-[82px]"}`}
-      >
-        <div className="border-foreground h-4 w-4 animate-spin rounded-full border-b-2 opacity-50" />
-      </div>
-    )
+  // The marketing nav, including the "Sign in" link, ships in the server HTML — the
+  // only version a crawler ever reads. `showAppNav` waits on `mounted`, so a logged-in
+  // visitor whose auth resolves mid-hydration cannot swap the marketing nav for the
+  // product nav during the hydration render. That swap, and the earlier spinner that
+  // turned into a "Sign in" text node, produced the React #418 hydration mismatch. The
+  // nav now changes only after mount, so the first client render matches the server's.
+  const showAppNav = mounted && initialized && user
+  const authSlot = (mobile: boolean) => (
+    <Link
+      href="/login"
+      onClick={mobile ? () => setIsMobileMenuOpen(false) : undefined}
+      className={
+        mobile
+          ? "border-accent/40 bg-accent/10 text-accent hover:border-accent/60 hover:bg-accent/15 focus-visible:ring-accent/50 inline-flex h-9 w-fit items-center rounded-full border px-4 text-sm font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
+          : "border-accent/40 bg-accent/10 text-accent hover:border-accent/60 hover:bg-accent/15 focus-visible:ring-accent/50 inline-flex h-8 items-center rounded-full border px-4 text-[13px] font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
+      }
+    >
+      Sign in
+    </Link>
+  )
 
   return (
     <header
@@ -250,10 +249,10 @@ export function Header() {
             : "bg-background/70 border-transparent"
         }`}
       >
-        <div className={`mx-auto px-4 sm:px-6 ${user ? "max-w-7xl" : "max-w-6xl"}`}>
+        <div className={`mx-auto px-4 sm:px-6 ${showAppNav ? "max-w-7xl" : "max-w-6xl"}`}>
           <div className="flex h-14 items-center justify-between gap-4 font-[var(--font-geist)]">
             <Link
-              href={user ? "/dashboard" : "/"}
+              href={showAppNav ? "/dashboard" : "/"}
               className="group flex items-center gap-2"
               onClick={() => {
                 // For logged-out users already on the home route, scroll back to
