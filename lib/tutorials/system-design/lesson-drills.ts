@@ -100,11 +100,17 @@ export function drillForLesson(lessonId: string): LessonDrill | null {
 
 export interface DrillLesson {
   id: string
-  /** Public reading route for the lesson, so the drill can point back at what teaches it. */
+  /** Public reading route for the paired lesson. */
   href: string
 }
 
-/** The lesson a drill has a counterpart in, or null. */
+/**
+ * The lesson a drill has a counterpart in, or null.
+ *
+ * Currently has no UI consumer: the drill cards used to render a "read the lesson on this system
+ * first" back-link from it, removed on owner request 2026-08-18. Kept because the pairing is
+ * curated in both directions and the tests pin both ends; delete it only if that stops being true.
+ */
 export function lessonForDrill(drillId: string): DrillLesson | null {
   const pair = LESSON_DRILLS.find((entry) => entry.drillId === drillId)
   if (!pair) return null

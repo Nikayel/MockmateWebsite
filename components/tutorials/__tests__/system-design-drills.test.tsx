@@ -32,14 +32,11 @@ const renderedHrefs = [...html.matchAll(/href="([^"]+)"/g)].map((match) =>
 )
 
 /**
- * Card links only.
- *
- * Each card may now be followed by a sibling "read the lesson" back-link into `/learn`, so counting
- * every anchor no longer counts cards. Partitioning by destination keeps both assertions honest:
- * every drill still needs exactly one card, and every card link still needs `practice=true`.
+ * Card links only. Filtering by destination keeps the count honest if the section ever grows
+ * another kind of anchor again (the cards used to carry a "read the lesson" back-link): every
+ * drill needs exactly one card, and every card link needs `practice=true`.
  */
 const drillHrefs = renderedHrefs.filter((href) => href.startsWith("/interview"))
-const lessonHrefs = renderedHrefs.filter((href) => href.startsWith("/learn"))
 
 describe("SystemDesignDrills", () => {
   it("has a real registry to work from", () => {
@@ -58,17 +55,6 @@ describe("SystemDesignDrills", () => {
       expect(drillHrefs).toContain(`/interview?scenario=${drill.id}&practice=true`)
     }
     expect(drillHrefs).toHaveLength(registryDrills.length)
-  })
-
-  it("points a drill back at the lesson that teaches the same system, where one exists", () => {
-    // The other half of SD-W13. A learner who opens a 45-minute timed round cold and struggles had
-    // no route to the untimed lesson on the same system, and the lesson had no route here.
-    expect(lessonHrefs.length).toBeGreaterThan(0)
-    for (const href of lessonHrefs) {
-      expect(href).toMatch(/^\/learn\/system-design\/case-studies\/sd-l10-[\w-]+$/)
-    }
-    // Never more back-links than cards: one per drill at most.
-    expect(lessonHrefs.length).toBeLessThanOrEqual(registryDrills.length)
   })
 
   it("shows each scenario's own title, time, and description", () => {
