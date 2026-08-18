@@ -19,8 +19,11 @@
  * 700px further down, in different words. The second one is deleted. `blurb` is the surviving
  * definition, and it comes from the same constant the grouping does.
  *
- * The group is a bordered, tinted container with a 3px category rule across its top, a category
- * icon, a 17px heading and a count pill. Before, it was a 14px bold line and a grey sentence
+ * The group is a bordered region with a category icon, a 17px heading and a count pill. It carries
+ * a border but NO fill on purpose: `--wb-card` is the elevation step for a clickable object, and
+ * filling the group with it too put cards on a surface of their own colour, so the only thing
+ * separating a lab from its container was a hairline. Unfilled, the lab cards are the only raised
+ * things in the region, which is what they are. Before, it was a 14px bold line and a grey sentence
  * floating above a card grid: two pixels SMALLER than the card titles it governed, and the same
  * size and weight as a FAQ row, so the page was telling the eye that a category and a FAQ question
  * were the same kind of thing. Groups now sit 48px apart against 14px from a header to its own
@@ -60,7 +63,7 @@ function FilterChip({
       className={cn(
         // 44px tall. These were 26px, under the touch-target floor, on the one control that
         // narrows the catalog.
-        "inline-flex min-h-[44px] cursor-pointer items-center rounded-[10px] border px-3.5 text-xs font-medium transition-colors",
+        "inline-flex min-h-[44px] cursor-pointer items-center rounded-full border px-4 text-xs font-medium transition-colors",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wb-accent)]",
         active
           ? "border-[var(--wb-accent)] bg-[var(--wb-accent-soft)] text-[var(--wb-accent-strong)]"
@@ -132,20 +135,12 @@ export function CaseLabGallery({ labs }: { labs: CaseLab[] }) {
               <section
                 key={group.type}
                 aria-labelledby={`round-${group.type}`}
-                className={cn(
-                  // Square top corners so the 3px rule reads as a tab edge rather than a pill.
-                  "flex flex-col rounded-t rounded-b-2xl border-x border-t-[3px] border-b p-4 sm:p-5",
-                  visual.container,
-                  visual.rule
-                )}
+                className="flex flex-col rounded-2xl border border-[var(--wb-border)] p-4 sm:p-5"
               >
                 <div className="flex flex-wrap items-center gap-2.5">
                   <span
                     aria-hidden
-                    className={cn(
-                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                      visual.tile
-                    )}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--wb-accent-soft)] text-[var(--wb-accent-strong)]"
                   >
                     <Icon className="h-[18px] w-[18px]" />
                   </span>
@@ -157,12 +152,7 @@ export function CaseLabGallery({ labs }: { labs: CaseLab[] }) {
                   </h3>
                   {/* Outside the heading on purpose: inside it, the accessible name became
                       "Debugging and re-engineering, 2 labs". */}
-                  <span
-                    className={cn(
-                      "rounded-full px-2 py-[3px] text-[11px] font-semibold tracking-[0.04em] uppercase",
-                      visual.pill
-                    )}
-                  >
+                  <span className="rounded-full bg-[var(--wb-panel)] px-2 py-[3px] text-[11px] font-semibold tracking-[0.04em] text-[var(--wb-text-secondary)] uppercase">
                     {groupLabs.length} {groupLabs.length === 1 ? "lab" : "labs"}
                   </span>
                 </div>
@@ -171,7 +161,7 @@ export function CaseLabGallery({ labs }: { labs: CaseLab[] }) {
                 </p>
                 {/* auto-fit rather than a fixed column count: two-up at 1120px, one-up the moment a
                     card would go under 400px, with no breakpoint to keep in sync. */}
-                <div className="mt-3.5 grid [grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-3.5">
+                <div className="mt-4 grid [grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-3.5">
                   {groupLabs.map((lab) => (
                     <CaseLabCard key={lab.id} lab={lab} />
                   ))}

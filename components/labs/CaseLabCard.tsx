@@ -79,7 +79,7 @@ export function CaseLabCard({ lab }: { lab: CaseLab }) {
     <Link
       href={`/labs/${lab.id}`}
       className={cn(
-        "group flex h-full cursor-pointer flex-col gap-3 rounded-xl border border-[var(--wb-border)] bg-[var(--wb-card)] p-4 transition-all duration-200 sm:p-5",
+        "group flex h-full cursor-pointer flex-col gap-3 rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-card)] p-4 transition-all duration-200 sm:p-5",
         // Hover lift. `motion-reduce` drops the transform, not the colour change: the border and
         // shadow still say "this is the one under the cursor" without moving anything.
         "hover:-translate-y-[3px] hover:border-[var(--wb-accent)] hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none",

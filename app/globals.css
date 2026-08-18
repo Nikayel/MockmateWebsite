@@ -368,7 +368,7 @@
   --wb-panel: #f3f2ee;
   --wb-field-bg: #f8f7f3;
   /* Borders */
-  --wb-border: #cdc8bb;
+  --wb-border: #e6e2d8;
   --wb-border-strong: #d0ccc2;
   --wb-input-border: #ddd9d0;
   /* Text */
@@ -392,30 +392,12 @@
      so `bg-[--wb-accent] text-white` at 11px failed AA in both themes wherever it was used. The
      pair INVERTS between themes (white on dark clay, near-black on bright clay), which is exactly
      why it has to be two tokens rather than a hardcoded text colour. Light 7.31:1. */
-  --wb-accent-fill: #7c4a2d;
+  --wb-accent-fill: #a3522a;
   --wb-accent-on: #ffffff;
   /* Sequence rail. Held to the 3:1 non-text bar against BOTH surfaces it can sit on, because it is
      the sole carrier of "these five things happen in this order". `--wb-border-strong` was the
      obvious candidate and measures 1.60:1, which is not a line, it is a suggestion. */
   --wb-rail: #8a867d;
-  /* Round-type category identity. Warm/cool is the most legible two-way split on a warm neutral
-     page. `ink` is text and icons, `soft` is the tile behind an icon, `field` is the group fill,
-     `edge` is its border. The 3px group rule uses `ink` for bugfix and `--wb-accent` for build so
-     it reads at full chroma. Adding a category means adding four values here and in dark, and
-     wiring the type in `roundGroupVisuals`, which will not compile until you do.
-
-     The light `field` values are a shade lighter than the hue would ideally want. The group blurb
-     is `--wb-text-secondary`, which landed at exactly 4.50:1 on the first pass: a pass, but with
-     zero margin, so any later token nudge would silently drop it under AA. These buy 0.14 and
-     0.16 of headroom for a tint difference nobody can see. */
-  --wb-cat-bugfix-ink: #2f6f6a;
-  --wb-cat-bugfix-soft: #dde9e7;
-  --wb-cat-bugfix-field: #eef4f2;
-  --wb-cat-bugfix-edge: #cfe0dd;
-  --wb-cat-build-ink: #7c4a2d;
-  --wb-cat-build-soft: #f0e4da;
-  --wb-cat-build-field: #f9f3ed;
-  --wb-cat-build-edge: #ecdbcc;
   /* Misc */
   --wb-success: #1d9e75;
   --wb-track: #e7e4db;
@@ -435,7 +417,7 @@
   --wb-panel: #232220;
   --wb-field-bg: #232220;
   /* Borders */
-  --wb-border: #47443b;
+  --wb-border: #38362f;
   --wb-border-strong: #45423a;
   --wb-input-border: #45423a;
   /* Text */
@@ -458,14 +440,6 @@
   --wb-accent-fill: #d0824f;
   --wb-accent-on: #1a1917;
   --wb-rail: #7a746a;
-  --wb-cat-bugfix-ink: #74b8b0;
-  --wb-cat-bugfix-soft: #22302e;
-  --wb-cat-bugfix-field: #182220;
-  --wb-cat-bugfix-edge: #2f423f;
-  --wb-cat-build-ink: #e0a074;
-  --wb-cat-build-soft: #35281f;
-  --wb-cat-build-field: #241d18;
-  --wb-cat-build-edge: #453327;
   /* Misc */
   --wb-success: #4cc79b;
   --wb-track: #38362f;
