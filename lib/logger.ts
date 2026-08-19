@@ -17,6 +17,7 @@
 // isomorphic - it touches window/navigator only inside the function body - so
 // pulling it into server and Edge bundles is inert.
 import { reportClientError } from "@/components/monitoring/report-client-error"
+import { keepAliveUntilSettled } from "./serverless-keep-alive"
 
 type LogLevel = "debug" | "info" | "warn" | "error"
 
@@ -217,49 +218,6 @@ function toSentryLevel(level: LogLevel): "debug" | "info" | "warning" | "error" 
  */
 function resolveEnvironment(): string {
   return process.env.VERCEL_ENV || process.env.NODE_ENV || "production"
-}
-
-/**
- * Vercel's request context, published on globalThis under a well-known symbol.
- * This is the same channel `@vercel/functions`' `waitUntil` reads.
- */
-const VERCEL_REQUEST_CONTEXT = Symbol.for("@vercel/request-context")
-
-interface VercelRequestContext {
-  get?: () => { waitUntil?: (promise: Promise<unknown>) => void } | undefined
-}
-
-/**
- * Keep the serverless instance alive until a fire-and-forget delivery settles.
- *
- * Vercel freezes a function instance the moment its handler returns and kills
- * any fetch still in flight, so the errors most likely to be dropped are the
- * ones logged immediately before returning a 500 - exactly the ones worth
- * keeping. `@vercel/functions` exports `waitUntil` for this, but it is not a
- * dependency here and observability does not justify adding one, so we read the
- * same request context it reads.
- *
- * Off-Vercel (local Node, Edge outside a request, the browser, tests) the
- * symbol is absent and the promise is left floating. That is the correct
- * degradation: those runtimes do not freeze work mid-flight.
- */
-function keepAliveUntilSettled(delivery: Promise<unknown>): void {
-  // The logger must never be the thing that crashes a request, so a rejection
-  // is swallowed here rather than escaping as an unhandled rejection.
-  const settled = delivery.catch(() => {})
-
-  try {
-    const context = (globalThis as unknown as Record<symbol, unknown>)[VERCEL_REQUEST_CONTEXT] as
-      | VercelRequestContext
-      | undefined
-    const waitUntil = context?.get?.()?.waitUntil
-    if (typeof waitUntil === "function") {
-      waitUntil(settled)
-    }
-  } catch {
-    // Any surprise in the host's context object leaves `settled` floating,
-    // which is what we would have done anyway.
-  }
 }
 
 /** Latched so the quota-exhausted notice is printed once per instance, not per dropped event. */
