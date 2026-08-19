@@ -11,22 +11,24 @@ export const graphValidTreeScenario: DSAScenario = {
   description: "Determine if an undirected graph is a valid tree",
   tags: ["graph", "dfs", "bfs", "union-find"],
   estimatedTime: 25,
-  problemStatement: `You have a graph of n nodes labeled from 0 to n - 1. You are given n and a list of edges where edges[i] = [ai, bi] indicates an undirected edge between nodes ai and bi. Return true if the edges form a valid tree, and false otherwise.`,
+  problemStatement: `You're working with n nodes, labeled 0 through n - 1, and a collection edges where each entry edges[i] = [ai, bi] represents a two-way link between nodes ai and bi.
+
+Decide whether these links assemble the nodes into a valid tree, and return true or false. To qualify as a tree, the structure must hang together as one connected piece covering all n nodes, and it must contain no cycle anywhere.`,
   examples: [
-    { input: "n = 5, edges = [[0,1],[0,2],[0,3],[1,4]]", output: "true" },
+    { input: "n = 4, edges = [[0,1],[1,2],[1,3]]", output: "true" },
     {
-      input: "n = 5, edges = [[0,1],[1,2],[2,3],[1,3],[1,4]]",
+      input: "n = 5, edges = [[0,1],[1,2],[2,4],[4,1],[0,3]]",
       output: "false",
-      explanation: "There is a cycle: 1-2-3-1",
+      explanation: "Nodes 1, 2, and 4 close a loop: 1-2-4-1",
     },
   ],
   constraints: [
-    "1 <= n <= 2000",
-    "0 <= edges.length <= 5000",
-    "edges[i].length == 2",
-    "0 <= ai, bi < n",
-    "ai != bi",
-    "There are no self-loops or repeated edges",
+    "n lies between 1 and 2000.",
+    "edges.length lies between 0 and 5000.",
+    "Each edge entry names exactly 2 endpoints.",
+    "Endpoints ai and bi are at least 0 and strictly less than n.",
+    "A link never joins a node to itself (ai != bi).",
+    "Duplicate connections and self-loops never appear.",
   ],
   hints: [
     "A valid tree has exactly n-1 edges and is connected",

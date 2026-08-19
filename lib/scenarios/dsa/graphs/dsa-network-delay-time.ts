@@ -11,12 +11,17 @@ export const networkDelayTimeScenario: DSAScenario = {
   description: "Find minimum time for signal to reach all nodes using Dijkstra",
   tags: ["graph", "dijkstra", "heap", "shortest-path"],
   estimatedTime: 30,
-  problemStatement: `You are given a network of n nodes with travel times. Return the minimum time for all nodes to receive a signal from node k, or -1 if impossible.`,
+  problemStatement: `You've mapped a network of n nodes, numbered 1 through n. The array times records its one-way links: times[i] = [ui, vi, wi] means a signal leaving node ui reaches node vi exactly wi time units later.
+
+At time 0, node k fires off a signal, and it spreads along every link it can use. Return the earliest moment by which all n nodes have heard it. If even one node can never receive the signal, return -1.`,
   examples: [
-    { input: "times = [[2,1,1],[2,3,1],[3,4,1]], n = 4, k = 2", output: "2" },
-    { input: "times = [[1,2,1]], n = 2, k = 2", output: "-1" },
+    { input: "times = [[3,1,2],[3,4,4],[1,2,3]], n = 4, k = 3", output: "5" },
+    { input: "times = [[2,3,5]], n = 3, k = 3", output: "-1" },
   ],
-  constraints: ["1 <= k <= n <= 100", "1 <= times.length <= 6000"],
+  constraints: [
+    "k names a real node: 1 <= k <= n <= 100",
+    "the link list is bounded by 1 <= times.length <= 6000",
+  ],
   hints: ["Use Dijkstra's algorithm with min-heap", "Return max of all minimum distances"],
   starterCode: {
     javascript: `function networkDelayTime(times, n, k) {\n  // Write your solution here\n\n}`,

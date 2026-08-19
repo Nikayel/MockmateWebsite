@@ -8,34 +8,38 @@ export const shortestPathBinaryMatrixScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Microsoft", "Apple", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe"],
-  description: "Find shortest path from top-left to bottom-right in binary grid",
+  description:
+    "Count the cells on the shortest 8-directional walk across a grid of open and blocked cells",
   tags: ["bfs", "matrix", "shortest-path"],
   estimatedTime: 20,
-  problemStatement: `Given an n x n binary matrix grid, return the length of the shortest clear path from top-left to bottom-right. A clear path connects 0s and can move in 8 directions. Return -1 if no such path exists.
+  problemStatement: `You're navigating an n x n grid of cells named grid, each holding 0 (open) or 1 (blocked). Starting from the top left cell, you want to arrive at the bottom right cell while stepping only on open cells. A single step may take you to any of the 8 cells surrounding your current one, so sideways, vertical, and diagonal moves are all legal whenever the destination cell is open.
 
-Example:
+Count the cells on the shortest possible walk, the cell you start on and the cell you finish on both included, and return that count. If the top left or bottom right cell is blocked, or no walk connects them, return -1.
 
 \`\`\`
-┌───┬───┬───┐        the 8 moves
-│ 0 │ 0 │ 0 │          ↖ ↑ ↗
-├───┼───┼───┤          ← ● →
-│ 1 │ 1 │ 0 │          ↙ ↓ ↘
+┌───┬───┬───┐        the 8 ways to step
+│ 0 │ 1 │ 1 │           ↖ ↑ ↗
+├───┼───┼───┤           ← ● →
+│ 0 │ 1 │ 1 │           ↙ ↓ ↘
 ├───┼───┼───┤
-│ 1 │ 1 │ 0 │
+│ 0 │ 0 │ 0 │
 └───┴───┴───┘
 \`\`\`
 
-One clear path runs (0,0), (0,1), (0,2), (1,2), (2,2), which visits 4 cells.`,
+Here one best walk is (0,0), (1,0), (2,1), (2,2): it touches 4 cells, so the answer is 4.`,
   examples: [
-    { input: "grid = [[0,1],[1,0]]", output: "2" },
-    { input: "grid = [[0,0,0],[1,1,0],[1,1,0]]", output: "4" },
+    { input: "grid = [[0,0],[0,0]]", output: "2" },
+    { input: "grid = [[0,1,1],[0,1,1],[0,0,0]]", output: "4" },
     {
-      input: "grid = [[1,0,0],[1,1,0],[1,1,0]]",
+      input: "grid = [[1,0,0],[0,0,0],[0,0,0]]",
       output: "-1",
-      explanation: "Starting cell is blocked",
+      explanation: "The walk can never begin, because the entry cell is blocked",
     },
   ],
-  constraints: ["n == grid.length", "n == grid[i].length", "1 <= n <= 100", "grid[i][j] is 0 or 1"],
+  constraints: [
+    "the grid is square: n rows and n columns, 1 <= n <= 100",
+    "every cell of grid is either 0 or 1",
+  ],
   hints: [
     "BFS from (0,0) - guarantees shortest path",
     "8 directions: horizontal, vertical, diagonal",

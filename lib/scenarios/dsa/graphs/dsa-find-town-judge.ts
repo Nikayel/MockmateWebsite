@@ -10,27 +10,24 @@ export const findTownJudgeScenario: DSAScenario = {
   description: "Find person trusted by everyone but trusts no one",
   tags: ["graph", "array", "hash-table"],
   estimatedTime: 15,
-  problemStatement: `In a town of n people labeled 1 to n, there is a rumor that one person is the town judge. If the town judge exists:
-1. The town judge trusts nobody.
-2. Everybody (except the judge) trusts the town judge.
-3. There is exactly one person that satisfies properties 1 and 2.
+  problemStatement: `You've moved to a town whose n residents are labeled 1 to n, and rumor has it that one of them quietly serves as the town judge. For the judge to be real, two things must both hold: the judge trusts no one at all, while every one of the other n - 1 residents trusts the judge. Whenever the judge exists, exactly one resident fits both conditions.
 
-Given trust where trust[i] = [a, b] means a trusts b, return the town judge's label, or -1 if not found.`,
+Your evidence is the array trust, where trust[i] = [a, b] records that person a trusts person b. Return the label of the judge, or -1 when nobody qualifies.`,
   examples: [
-    { input: "n = 2, trust = [[1,2]]", output: "2" },
-    { input: "n = 3, trust = [[1,3],[2,3]]", output: "3" },
+    { input: "n = 2, trust = [[2,1]]", output: "1" },
+    { input: "n = 4, trust = [[1,2],[3,2],[4,2]]", output: "2" },
     {
-      input: "n = 3, trust = [[1,3],[2,3],[3,1]]",
+      input: "n = 4, trust = [[1,2],[3,2],[4,2],[2,4]]",
       output: "-1",
-      explanation: "3 trusts someone",
+      explanation: "Resident 2 is trusted by everyone else but also trusts resident 4",
     },
   ],
   constraints: [
-    "1 <= n <= 1000",
-    "0 <= trust.length <= 10^4",
-    "trust[i].length == 2",
-    "All pairs are unique",
-    "a != b",
+    "n falls between 1 and 1000.",
+    "trust may hold as few as 0 and as many as 10^4 pairs.",
+    "Every trust entry lists exactly 2 people.",
+    "No trust pair repeats.",
+    "People never trust themselves (a != b).",
   ],
   hints: [
     "Count in-degree and out-degree for each person",

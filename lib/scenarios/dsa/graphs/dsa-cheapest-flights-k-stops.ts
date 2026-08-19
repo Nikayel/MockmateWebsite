@@ -11,19 +11,24 @@ export const cheapestFlightsKStopsScenario: DSAScenario = {
   description: "Find cheapest flight with at most k stops",
   tags: ["graph", "bfs", "dynamic-programming", "shortest-path"],
   estimatedTime: 30,
-  problemStatement: `Find the cheapest price from src to dst with at most k stops. Return -1 if no such route exists.`,
+  problemStatement: `You're comparing airfares across a network of n cities, numbered 0 to n - 1. Every listing in flights is a one-way route: flights[i] = [from, to, price] means a plane departs city from, lands in city to, and charges price for the seat. A route in one direction implies nothing about the reverse direction.
+
+Starting from src, you want to arrive at dst while making no more than k stops, where a stop is an intermediate city you pass through on the way, so the trip uses at most k + 1 flights. Return the cheapest total fare that respects the stop limit, or -1 when dst cannot be reached within it.`,
   examples: [
     {
       input:
-        "n = 4, flights = [[0,1,100],[1,2,100],[2,0,100],[1,3,600],[2,3,200]], src = 0, dst = 3, k = 1",
-      output: "700",
+        "n = 5, flights = [[0,1,80],[1,4,90],[0,2,50],[2,3,60],[3,4,50]], src = 0, dst = 4, k = 1",
+      output: "170",
     },
     {
-      input: "n = 3, flights = [[0,1,100],[1,2,100],[0,2,500]], src = 0, dst = 2, k = 0",
-      output: "500",
+      input: "n = 3, flights = [[0,1,120],[1,2,130],[0,2,650]], src = 0, dst = 2, k = 0",
+      output: "650",
     },
   ],
-  constraints: ["1 <= n <= 100", "0 <= flights.length <= n*(n-1)/2"],
+  constraints: [
+    "The city count n sits between 1 and 100.",
+    "flights.length ranges from 0 up to n*(n-1)/2.",
+  ],
   hints: ["BFS with (node, cost, stops)", "Bellman-Ford with k+1 iterations"],
   starterCode: {
     javascript: `function findCheapestPrice(n, flights, src, dst, k) {\n  // Write your solution here\n\n}`,

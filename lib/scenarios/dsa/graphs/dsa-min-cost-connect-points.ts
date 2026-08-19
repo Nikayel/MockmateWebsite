@@ -8,12 +8,17 @@ export const minCostConnectPointsScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Microsoft", "Palantir"],
   roles: ["junior", "senior", "swe"],
-  description: "Find minimum spanning tree cost using Prim's or Kruskal's",
+  description: "Connect all points at minimum total Manhattan-distance cost",
   tags: ["graph", "union-find", "minimum-spanning-tree"],
   estimatedTime: 30,
-  problemStatement: `Return the minimum cost to make all points connected using Manhattan distance.`,
-  examples: [{ input: "points = [[0,0],[2,2],[3,10],[5,2],[7,0]]", output: "20" }],
-  constraints: ["1 <= points.length <= 1000", "-10^6 <= xi, yi <= 10^6"],
+  problemStatement: `You're laying wire between locations on a 2D plane. Each points[i] = [xi, yi] gives one location's integer coordinates, and joining two locations costs their Manhattan distance: |xi - xj| + |yi - yj|, the horizontal gap plus the vertical gap.
+
+Wire the network so that every location can reach every other, directly or through intermediate locations, with exactly one simple route between any pair. Return the smallest total cost of wire that achieves this.`,
+  examples: [{ input: "points = [[0,0],[3,0],[3,4],[7,4],[0,3]]", output: "14" }],
+  constraints: [
+    "points holds between 1 and 1000 locations.",
+    "Every coordinate xi, yi lies in the range -10^6 to 10^6.",
+  ],
   hints: ["MST problem - use Prim's or Kruskal's algorithm"],
   starterCode: {
     javascript: `function minCostConnectPoints(points) {\n  // Write your solution here\n\n}`,

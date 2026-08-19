@@ -11,22 +11,26 @@ export const keysAndRoomsScenario: DSAScenario = {
   description: "Check if all rooms can be visited starting from room 0",
   tags: ["graph", "dfs", "bfs"],
   estimatedTime: 20,
-  problemStatement: `There are n rooms labeled 0 to n-1 and all rooms are locked except for room 0. Your goal is to visit all rooms. When you visit a room, you may find keys to other rooms.
+  problemStatement: `You're standing inside room 0 of a building with n rooms numbered 0 to n - 1. Every other room is locked, and the keys are scattered around the building: rooms[i] lists the labels of the keys lying in room i, where a key labeled j opens room j.
 
-Given rooms where rooms[i] is the set of keys in room i, return true if you can visit all rooms.`,
+Nothing restricts your movement except the locks themselves. You can revisit rooms as often as you like, and every key stays with you once picked up. Return true if you can eventually walk into every room, and false if at least one room stays sealed no matter what you do.`,
   examples: [
-    { input: "rooms = [[1],[2],[3],[]]", output: "true", explanation: "Visit 0 -> 1 -> 2 -> 3" },
     {
-      input: "rooms = [[1,3],[3,0,1],[2],[0]]",
+      input: "rooms = [[4],[2],[],[1],[3]]",
+      output: "true",
+      explanation: "Room 0 holds the key to room 4, which holds the key to room 3, then 1, then 2",
+    },
+    {
+      input: "rooms = [[3,1],[0,3],[2],[1]]",
       output: "false",
-      explanation: "Can't enter room 2",
+      explanation: "The only key to room 2 sits inside room 2 itself",
     },
   ],
   constraints: [
-    "n == rooms.length",
-    "2 <= n <= 1000",
-    "0 <= rooms[i].length <= 1000",
-    "1 <= sum(rooms[i].length) <= 3000",
+    "rooms.length equals n.",
+    "Room count n sits between 2 and 1000.",
+    "One room can carry anywhere from 0 to 1000 keys.",
+    "The total key count across rooms falls between 1 and 3000.",
   ],
   hints: [
     "DFS/BFS from room 0",

@@ -8,41 +8,37 @@ export const surroundedRegionsScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe"],
-  description: "Capture surrounded regions by flipping 'O' to 'X'",
+  description: "Flip enclosed regions of 'O' cells to 'X' while border-connected regions survive",
   tags: ["array", "dfs", "bfs", "matrix", "union-find"],
   estimatedTime: 25,
-  problemStatement: `Given an m x n matrix board containing 'X' and 'O', capture all regions that are 4-directionally surrounded by 'X'.
+  problemStatement: `You're editing an m x n character board named board, where every cell shows 'X' or 'O'. The 'O' cells clump together into regions: two 'O' cells belong to the same region when they share an edge, meaning one sits directly up, down, left, or right from the other.
 
-A region is captured by flipping all 'O's into 'X's in that surrounded region.
-
-Example:
+A region counts as captured when 'X' cells hem it in completely and none of its cells lies on the outer border of the board. Rewrite every captured region entirely to 'X', modifying board in place. A region that includes even one border cell escapes capture and keeps all of its 'O's.
 
 \`\`\`
 Input                     Output
 ┌───┬───┬───┬───┐         ┌───┬───┬───┬───┐
-│ X │ X │ X │ X │         │ X │ X │ X │ X │
+│ X │ O │ X │ X │         │ X │ O │ X │ X │
 ├───┼───┼───┼───┤         ├───┼───┼───┼───┤
-│ X │ O │ O │ X │         │ X │ X │ X │ X │
+│ X │ O │ X │ X │         │ X │ O │ X │ X │
 ├───┼───┼───┼───┤         ├───┼───┼───┼───┤
 │ X │ X │ O │ X │         │ X │ X │ X │ X │
 ├───┼───┼───┼───┤         ├───┼───┼───┼───┤
-│ X │ O │ X │ X │         │ X │ O │ X │ X │
+│ X │ X │ X │ X │         │ X │ X │ X │ X │
 └───┴───┴───┴───┘         └───┴───┴───┴───┘
 \`\`\`
 
-The O on the bottom edge survives, because a region touching the border is not surrounded.`,
+The single 'O' in the third row is hemmed in on all four sides, so it flips. The column of two 'O's reaches the top edge, so that region survives untouched.`,
   examples: [
     {
-      input: 'board = [["X","X","X","X"],["X","O","O","X"],["X","X","O","X"],["X","O","X","X"]]',
-      output: '[["X","X","X","X"],["X","X","X","X"],["X","X","X","X"],["X","O","X","X"]]',
-      explanation: "The bottom 'O' is on the border, so it is not captured.",
+      input: 'board = [["X","O","X","X"],["X","O","X","X"],["X","X","O","X"],["X","X","X","X"]]',
+      output: '[["X","O","X","X"],["X","O","X","X"],["X","X","X","X"],["X","X","X","X"]]',
+      explanation: "The enclosed 'O' flips to 'X'; the two 'O's linked to the top border are safe.",
     },
   ],
   constraints: [
-    "m == board.length",
-    "n == board[i].length",
-    "1 <= m, n <= 200",
-    "board[i][j] is 'X' or 'O'.",
+    "board measures m rows by n columns, where 1 <= m, n <= 200",
+    "each cell holds either 'X' or 'O'",
   ],
   hints: [
     "Start from border 'O's - they cannot be captured",

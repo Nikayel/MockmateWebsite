@@ -17,45 +17,40 @@ export const numberOfIslandsScenario: DSAScenario = {
     "Palantir",
   ],
   roles: ["intern", "new-grad", "junior", "senior", "swe", "fdse"],
-  description: "Count the number of islands in a 2D grid",
+  description: "Count how many islands of connected land a water map contains",
   tags: ["array", "depth-first-search", "breadth-first-search", "union-find", "matrix"],
   estimatedTime: 25,
-  problemStatement: `Given an m x n 2D binary grid grid which represents a map of '1's (land) and '0's (water), return the number of islands.
+  problemStatement: `You're given a rectangular character grid named grid, where '1' marks a patch of land and '0' marks open water. Count the islands on the map and return how many there are.
 
-An island is surrounded by water and is formed by connecting adjacent lands horizontally or vertically. You may assume all four edges of the grid are all surrounded by water.
-
-Example:
+Two land cells belong to the same island only when one sits directly above, below, to the left, or to the right of the other; touching at a corner joins nothing. The sea extends past every edge of the map, so land on the boundary still forms islands the ordinary way.
 
 \`\`\`
 ┌───┬───┬───┬───┬───┐
-│ 1 │ 1 │ 0 │ 0 │ 0 │
+│ 0 │ 1 │ 0 │ 0 │ 1 │
 ├───┼───┼───┼───┼───┤
-│ 1 │ 1 │ 0 │ 0 │ 0 │
+│ 0 │ 1 │ 0 │ 0 │ 0 │
 ├───┼───┼───┼───┼───┤
-│ 0 │ 0 │ 1 │ 0 │ 0 │
+│ 1 │ 0 │ 0 │ 1 │ 0 │
 ├───┼───┼───┼───┼───┤
-│ 0 │ 0 │ 0 │ 1 │ 1 │
+│ 1 │ 0 │ 0 │ 1 │ 0 │
 └───┴───┴───┴───┴───┘
 \`\`\`
 
-This grid holds 3 islands: the block in the top-left, the single cell in the centre, and the pair in the bottom-right.`,
+This map holds 4 islands: a vertical pair near the top left, a lone cell in the top right corner, and two more vertical pairs in the lower half.`,
   examples: [
     {
-      input:
-        'grid = [["1","1","1","1","0"],["1","1","0","1","0"],["1","1","0","0","0"],["0","0","0","0","0"]]',
+      input: 'grid = [["1","1","0"],["1","1","0"],["0","1","1"]]',
       output: "1",
     },
     {
       input:
-        'grid = [["1","1","0","0","0"],["1","1","0","0","0"],["0","0","1","0","0"],["0","0","0","1","1"]]',
-      output: "3",
+        'grid = [["0","1","0","0","1"],["0","1","0","0","0"],["1","0","0","1","0"],["1","0","0","1","0"]]',
+      output: "4",
     },
   ],
   constraints: [
-    "m == grid.length",
-    "n == grid[i].length",
-    "1 <= m, n <= 300",
-    "grid[i][j] is '0' or '1'",
+    "grid has m rows and n columns, sized 1 <= m, n <= 300",
+    "every cell of grid holds the character '0' or the character '1'",
   ],
   hints: [
     "Use DFS or BFS to explore each island",
@@ -138,7 +133,7 @@ This grid holds 3 islands: the block in the top-left, the single cell in the cen
   // ==========================================
   // Real Interview Mode (Fuzzy Mode) Fields
   // ==========================================
-  fuzzyStatement: "Given a 2D grid map, count the number of islands.",
+  fuzzyStatement: "You have a map of land and water cells. Count the islands.",
 
   clarifyingQuestions: [
     {

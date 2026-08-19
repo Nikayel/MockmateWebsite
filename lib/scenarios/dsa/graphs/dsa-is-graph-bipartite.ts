@@ -8,27 +8,29 @@ export const isGraphBipartiteScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Microsoft", "LinkedIn", "Palantir"],
   roles: ["junior", "senior", "swe"],
-  description: "Check if graph can be colored with two colors (bipartite)",
+  description: "Decide whether a graph's nodes split into two independent sets",
   tags: ["graph", "bfs", "dfs", "union-find"],
   estimatedTime: 20,
-  problemStatement: `Given an undirected graph, return true if it is bipartite. A graph is bipartite if nodes can be divided into two independent sets such that every edge connects a node in set A to one in set B.`,
+  problemStatement: `You're analyzing an undirected graph on n nodes, numbered 0 to n - 1 and supplied as an adjacency list: graph[u] contains every node that shares an edge with node u.
+
+The graph counts as bipartite when its nodes can be separated into two groups so that no edge joins two members of the same group; every edge must run between the groups. Return true when such a separation exists, and false when it does not.`,
   examples: [
     {
-      input: "graph = [[1,2,3],[0,2],[0,1,3],[0,2]]",
+      input: "graph = [[1,2],[0,2],[0,1,3],[2]]",
       output: "false",
-      explanation: "No way to partition nodes into two sets.",
+      explanation: "Nodes 0, 1, and 2 form a triangle, which no two-group separation can absorb.",
     },
     {
-      input: "graph = [[1,3],[0,2],[1,3],[0,2]]",
+      input: "graph = [[1,5],[0,2],[1,3],[2,4],[3,5],[4,0]]",
       output: "true",
-      explanation: "Sets {0,2} and {1,3}.",
+      explanation: "Groups {0,2,4} and {1,3,5} work: every edge crosses between them.",
     },
   ],
   constraints: [
-    "graph.length == n",
-    "1 <= n <= 100",
-    "0 <= graph[u].length < n",
-    "Graph is undirected (if j in graph[i], then i in graph[j])",
+    "The outer list has one entry per node (graph.length == n).",
+    "n is at least 1 and at most 100.",
+    "Each graph[u] holds fewer than n neighbors, possibly 0.",
+    "Adjacency is symmetric: whenever j appears in graph[i], i also appears in graph[j].",
   ],
   hints: [
     "Try to 2-color the graph",

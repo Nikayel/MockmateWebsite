@@ -8,34 +8,34 @@ export const alienDictionaryScenario: DSAScenario = {
   difficulty: "hard",
   companies: ["Google", "Amazon", "Meta", "Microsoft", "Apple", "Palantir"],
   roles: ["junior", "senior", "swe"],
-  description: "Derive the order of letters in an alien language using topological sort",
+  description:
+    "Reconstruct an alien alphabet from a lexicographically sorted word list (topological sort)",
   tags: ["graph", "topological-sort", "string", "dfs", "bfs"],
   estimatedTime: 35,
-  problemStatement: `There is a new alien language that uses the English alphabet. However, the order of the letters is unknown to you.
+  problemStatement: `An expedition has recovered a dictionary from an alien civilization. The language reuses the lowercase English letters, but its alphabet arranges them in some unknown order.
 
-You are given a list of strings words from the alien language's dictionary, where the strings are sorted lexicographically by the rules of this new language.
-
-Derive the order of letters in this language. If the order is invalid, return an empty string. If there are multiple valid orderings, return any of them.`,
+You're given words, a list of strings appearing exactly as the dictionary printed them: sorted according to that alien alphabet. Reconstruct an ordering of the letters that is consistent with the list and return it as a string. When more than one ordering fits the evidence, any of them is accepted. When no alphabet could have produced this list, return an empty string.`,
   examples: [
     {
-      input: 'words = ["wrt","wrf","er","ett","rftt"]',
-      output: '"wertf"',
-      explanation: "From the words, we can derive: w < e, r < t, t < f, e < r",
+      input: 'words = ["dmb","dmz","gm","gbb","mzbb"]',
+      output: '"dgmbz"',
+      explanation:
+        "Neighboring words reveal b before z, d before g, m before b, and g before m, which chains into d, g, m, b, z.",
     },
     {
-      input: 'words = ["z","x"]',
-      output: '"zx"',
+      input: 'words = ["p","f"]',
+      output: '"pf"',
     },
     {
-      input: 'words = ["z","x","z"]',
+      input: 'words = ["k","w","k"]',
       output: '""',
-      explanation: "The order is invalid, so return empty string.",
+      explanation: "The list puts k before w and also w before k, so no alphabet can explain it.",
     },
   ],
   constraints: [
-    "1 <= words.length <= 100",
-    "1 <= words[i].length <= 100",
-    "words[i] consists of only lowercase English letters.",
+    "words holds between 1 and 100 strings",
+    "each word runs 1 to 100 characters long",
+    "every character is a lowercase English letter",
   ],
   hints: [
     "Compare adjacent words to build directed edges",

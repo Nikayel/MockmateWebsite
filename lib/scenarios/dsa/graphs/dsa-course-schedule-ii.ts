@@ -8,35 +8,36 @@ export const courseScheduleIiScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe"],
-  description: "Find the order to take courses using topological sort (Kahn's algorithm)",
+  description: "Find an order to take all courses that satisfies every prerequisite",
   tags: ["graph", "dfs", "bfs", "topological-sort"],
   estimatedTime: 30,
-  problemStatement: `There are a total of numCourses courses you have to take, labeled from 0 to numCourses - 1. You are given an array prerequisites where prerequisites[i] = [ai, bi] indicates that you must take course bi first if you want to take course ai.
+  problemStatement: `You're mapping out a schedule across numCourses courses, labeled 0 through numCourses - 1. Enrollment rules arrive as the array prerequisites: each prerequisites[i] = [ai, bi] says course bi has to be finished before course ai can begin.
 
-Return the ordering of courses you should take to finish all courses. If there are many valid answers, return any of them. If it is impossible to finish all courses, return an empty array.`,
+Build an ordering of all the courses that honors every rule, and return it as an array. Whenever several orderings work, any one of them is accepted. Should the rules make completing everything impossible, return an empty array instead.`,
   examples: [
     {
-      input: "numCourses = 2, prerequisites = [[1,0]]",
-      output: "[0,1]",
-      explanation: "Take course 0 first, then course 1.",
+      input: "numCourses = 3, prerequisites = [[1,0],[2,1]]",
+      output: "[0,1,2]",
+      explanation: "Course 0 unlocks course 1, which unlocks course 2; exactly one schedule works.",
     },
     {
-      input: "numCourses = 4, prerequisites = [[1,0],[2,0],[3,1],[3,2]]",
-      output: "[0,2,1,3] or [0,1,2,3]",
-      explanation: "Multiple valid orderings exist.",
+      input: "numCourses = 4, prerequisites = [[2,0],[3,0],[1,2],[1,3]]",
+      output: "[0,2,3,1] or [0,3,2,1]",
+      explanation:
+        "Course 0 opens up courses 2 and 3, which can come in either order before course 1.",
     },
     {
-      input: "numCourses = 1, prerequisites = []",
-      output: "[0]",
+      input: "numCourses = 2, prerequisites = []",
+      output: "[0,1] or [1,0]",
     },
   ],
   constraints: [
-    "1 <= numCourses <= 2000",
-    "0 <= prerequisites.length <= numCourses * (numCourses - 1)",
-    "prerequisites[i].length == 2",
-    "0 <= ai, bi < numCourses",
-    "ai != bi",
-    "All the pairs [ai, bi] are distinct.",
+    "numCourses is at least 1 and at most 2000.",
+    "The pair count runs from 0 up to numCourses * (numCourses - 1).",
+    "Each prerequisites[i] holds exactly 2 labels.",
+    "Labels ai and bi start at 0 and stay below numCourses.",
+    "A course never requires itself (ai != bi).",
+    "No pair [ai, bi] shows up twice.",
   ],
   hints: [
     "Build adjacency list and track in-degrees for each node",

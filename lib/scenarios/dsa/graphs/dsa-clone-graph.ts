@@ -11,9 +11,9 @@ export const cloneGraphScenario: DSAScenario = {
   description: "Deep clone an undirected graph.",
   tags: ["graph", "dfs", "bfs", "hash-table"],
   estimatedTime: 25,
-  problemStatement: `Given a reference of a node in a connected undirected graph, return a deep copy (clone) of the graph.
+  problemStatement: `You're handed a reference to one node of a connected undirected graph, and your task is to construct a complete deep copy of it. Every node in the copy must be a freshly created object; handing back nodes from the original structure, or wiring a cloned node to an original neighbor, does not count.
 
-Each node in the graph contains a value (int) and a list (List[Node]) of its neighbors.
+Each node stores an integer val alongside a neighbors list holding its adjacent nodes:
 
 \`\`\`
 class Node {
@@ -22,41 +22,39 @@ class Node {
 }
 \`\`\`
 
-Test case format: For simplicity, each node's value is the same as the node's index (1-indexed). The input is given as an adjacency list where adjList[i] is a list of neighbors for node i+1.
-
-Example:
+For testing, graphs are serialized as adjacency lists. Nodes are numbered starting at 1 and each node's val equals its number, so adjList[i] holds the neighbor numbers of the node numbered i + 1, and your clone is read back out in the same shape. For instance, this three-way star:
 
 \`\`\`
-  1 ─── 2
-  │     │
-  │     │
-  4 ─── 3
+  2 ─── 1 ─── 3
+        │
+        4
 
-adjList = [[2,4],[1,3],[2,4],[1,3]]
+adjList = [[2,3,4],[1],[1],[1]]
 \`\`\``,
   examples: [
     {
-      input: "adjList = [[2,4],[1,3],[2,4],[1,3]]",
-      output: "[[2,4],[1,3],[2,4],[1,3]]",
-      explanation: "4 nodes: node 1 connects to 2,4; node 2 connects to 1,3; etc.",
+      input: "adjList = [[2,3,4],[1],[1],[1]]",
+      output: "[[2,3,4],[1],[1],[1]]",
+      explanation:
+        "Node 1 sits at the center with edges to 2, 3, and 4; each outer node links back only to 1.",
     },
     {
       input: "adjList = [[]]",
       output: "[[]]",
-      explanation: "Single node with no neighbors",
+      explanation: "A lone node whose neighbor list is empty",
     },
     {
       input: "adjList = []",
       output: "[]",
-      explanation: "Empty graph",
+      explanation: "No nodes exist, so the copy has none either",
     },
   ],
   constraints: [
-    "The number of nodes in the graph is in the range [0, 100].",
-    "1 <= Node.val <= 100",
-    "Node.val is unique for each node.",
-    "There are no repeated edges and no self-loops.",
-    "The graph is connected.",
+    "Node count sits anywhere in the range [0, 100].",
+    "Each value obeys 1 <= Node.val <= 100.",
+    "No two nodes carry the same val.",
+    "Neither repeated edges nor self-loops appear.",
+    "Every node can reach every other node.",
   ],
   hints: [
     "Use HashMap to track old to new node mapping",

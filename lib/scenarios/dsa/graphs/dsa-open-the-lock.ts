@@ -8,24 +8,26 @@ export const openTheLockScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe"],
-  description: "Find minimum turns to unlock combination lock using BFS",
+  description: "Find the fewest wheel turns that reach a lock's target code while dodging deadends",
   tags: ["bfs", "string", "hash-table"],
   estimatedTime: 25,
-  problemStatement: `You have a lock with 4 circular wheels, each with digits 0-9. The lock starts at "0000". Each move turns one wheel one slot (9 wraps to 0, 0 wraps to 9). Some combinations are deadends that lock permanently. Return minimum turns to reach target, or -1 if impossible.`,
+  problemStatement: `You're holding a combination padlock with 4 rotating wheels, each showing one digit from 0 to 9. Wheels turn in either direction and wrap around: one click forward from 9 shows 0, and one click back from 0 shows 9. A single move rotates exactly one wheel by one click, and the display starts out reading "0000".
+
+The list deadends names poisoned combinations. The instant the wheels show any one of them, the mechanism seizes and nothing can turn again. Return the fewest moves that take the display from "0000" to target without ever landing on a deadend, or -1 if no sequence of turns can do it.`,
   examples: [
-    { input: 'deadends = ["0201","0101","0102","1212","2002"], target = "0202"', output: "6" },
-    { input: 'deadends = ["8888"], target = "0009"', output: "1" },
+    { input: 'deadends = ["0012","0021","0011"], target = "0022"', output: "6" },
+    { input: 'deadends = ["7777"], target = "9000"', output: "1" },
     {
-      input: 'deadends = ["0000"], target = "8888"',
+      input: 'deadends = ["0000"], target = "6543"',
       output: "-1",
-      explanation: "Cannot move from starting position",
+      explanation: "The lock seizes on its starting display before any turn is made",
     },
   ],
   constraints: [
-    "1 <= deadends.length <= 500",
-    "deadends[i].length == 4",
-    "target.length == 4",
-    "target will not be in deadends",
+    "deadends.length falls between 1 and 500",
+    "each code in deadends is exactly 4 digits",
+    "target is likewise a 4 digit string",
+    "target itself never appears in deadends",
   ],
   hints: [
     "BFS from '0000' to target",

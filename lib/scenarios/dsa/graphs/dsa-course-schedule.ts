@@ -16,30 +16,30 @@ export const courseScheduleScenario: DSAScenario = {
   // The statement renders through MarkdownRenderer, so it is written as markdown: no ASCII
   // diagrams (single line breaks collapse and garble them), and no approach naming — the
   // strategy lives in `hints`, which the UI keeps behind click-to-reveal.
-  problemStatement: `There are a total of \`numCourses\` courses you have to take, labeled from \`0\` to \`numCourses - 1\`. You are given an array \`prerequisites\` where \`prerequisites[i] = [a, b]\` indicates that you must take course \`b\` first if you want to take course \`a\`.
+  problemStatement: `Your degree plan lists \`numCourses\` courses, numbered \`0\` through \`numCourses - 1\`. Some courses gate others: the array \`prerequisites\` records each rule as \`prerequisites[i] = [a, b]\`, meaning course \`b\` must be completed before you can enroll in course \`a\`.
 
-For example, the pair \`[0, 1]\` indicates that to take course 0 you have to first take course 1.
+The pair \`[3, 7]\`, for instance, tells you that course 7 comes before course 3 in any workable plan.
 
-Return \`true\` if you can finish all courses. Otherwise, return \`false\`.`,
+Decide whether every course can eventually be completed in some order. Return \`true\` if so, and \`false\` if the rules make it impossible.`,
   examples: [
     {
-      input: "numCourses = 2, prerequisites = [[1,0]]",
+      input: "numCourses = 3, prerequisites = [[2,1]]",
       output: "true",
-      explanation: "Take course 0, then course 1.",
+      explanation: "Finish course 1, unlock course 2, and slot course 0 in anywhere.",
     },
     {
-      input: "numCourses = 2, prerequisites = [[1,0],[0,1]]",
+      input: "numCourses = 3, prerequisites = [[1,2],[2,1]]",
       output: "false",
       explanation:
-        "To take course 1 you must first take course 0, and to take course 0 you must first take course 1. So it is impossible.",
+        "Course 1 waits on course 2 while course 2 waits on course 1, so neither can ever begin.",
     },
   ],
   constraints: [
-    "1 <= numCourses <= 2000",
-    "0 <= prerequisites.length <= 5000",
-    "prerequisites[i].length == 2",
-    "0 <= ai, bi < numCourses",
-    "All pairs prerequisites[i] are unique",
+    "numCourses stays within 1 and 2000.",
+    "The rule list holds at most 5000 pairs, possibly 0.",
+    "Every prerequisites[i] contains exactly 2 course labels.",
+    "Labels a and b start at 0 and stay below numCourses.",
+    "No rule pair occurs more than once.",
   ],
   // Progressive reveal: each hint gives away strictly more than the one before it, so the
   // first unlock nudges modeling while the last spells out the DFS mechanics.

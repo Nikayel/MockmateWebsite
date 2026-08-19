@@ -8,25 +8,36 @@ export const snakesAndLaddersScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe", "fdse"],
-  description: "Find minimum moves to reach end of snakes and ladders board",
+  description: "Count the fewest die moves needed to finish a snakes and ladders board",
   tags: ["bfs", "matrix", "simulation"],
   estimatedTime: 30,
-  problemStatement: `You are given an n x n board labeled from 1 to n^2 in Boustrophedon style (alternating left-to-right and right-to-left per row, starting from bottom-left). board[r][c] = -1 means no snake/ladder, otherwise it's the destination square.
+  problemStatement: `You're playing a solo round of snakes and ladders on an n x n matrix named board. Its squares carry labels 1 through n^2 laid out in a back-and-forth pattern: label 1 occupies the bottom left corner, the bottom row is numbered left to right, the row above it right to left, and the direction keeps flipping on every row up the board.
 
-Return minimum number of moves to reach square n^2 starting from 1, or -1 if impossible.`,
+\`\`\`
+36 35 34 33 32 31
+25 26 27 28 29 30
+24 23 22 21 20 19
+13 14 15 16 17 18
+12 11 10  9  8  7
+ 1  2  3  4  5  6
+\`\`\`
+
+Your piece begins on square 1. Each move, you advance it to any square labeled curr+1 through min(curr+6, n^2), as though you rolled a six-sided die and chose how far to go. Whenever the square you stop on stores a value other than -1, a snake or ladder lives there, and it immediately carries your piece to the square that value names; a -1 marks a plain square. At most one snake or ladder is followed per move, so if one delivers you onto the mouth of another, the second stays unused until a later move lands there again.
+
+Return the fewest moves that put your piece exactly on square n^2, or -1 if that square can never be reached.`,
   examples: [
     {
       input:
-        "board = [[-1,-1,-1,-1,-1,-1],[-1,-1,-1,-1,-1,-1],[-1,-1,-1,-1,-1,-1],[-1,35,-1,-1,13,-1],[-1,-1,-1,-1,-1,-1],[-1,15,-1,-1,-1,-1]]",
+        "board = [[-1,-1,-1,-1,-1,-1],[-1,-1,9,-1,-1,-1],[-1,-1,-1,-1,-1,-1],[-1,-1,-1,-1,-1,-1],[-1,-1,-1,-1,-1,-1],[-1,-1,22,-1,-1,-1]]",
       output: "4",
-      explanation: "1 -> 2 -> 15 -> 35 -> 36",
+      explanation:
+        "Move onto square 3 and ride its ladder up to 22, then stop on 28, 34, and finally 36.",
     },
-    { input: "board = [[-1,-1],[-1,3]]", output: "1" },
+    { input: "board = [[-1,4],[-1,-1]]", output: "1" },
   ],
   constraints: [
-    "n == board.length == board[i].length",
-    "2 <= n <= 20",
-    "board[i][j] is -1 or in [1, n^2]",
+    "board is square, with 2 <= n <= 20 rows and columns",
+    "every square stores -1 or a label between 1 and n^2",
   ],
   hints: [
     "BFS from square 1",

@@ -11,23 +11,25 @@ export const findPathExistsScenario: DSAScenario = {
   description: "Check if path exists between two nodes in undirected graph",
   tags: ["graph", "bfs", "dfs", "union-find"],
   estimatedTime: 15,
-  problemStatement: `Given a bi-directional graph with n vertices and edges, determine if there is a valid path from source to destination.`,
+  problemStatement: `You're exploring a network of n vertices numbered 0 to n - 1. Its wiring is the array edges, where edges[i] = [ui, vi] connects vertices ui and vi, and every connection can be traveled in both directions. Some vertices may have no connections at all.
+
+Figure out whether some sequence of edges leads from vertex source to vertex destination, and return true or false accordingly.`,
   examples: [
     {
-      input: "n = 3, edges = [[0,1],[1,2],[2,0]], source = 0, destination = 2",
+      input: "n = 4, edges = [[0,1],[1,2],[2,3],[3,0]], source = 1, destination = 3",
       output: "true",
-      explanation: "Path 0 -> 1 -> 2 or 0 -> 2",
+      explanation: "Travel 1 -> 2 -> 3, or go the long way around through 0",
     },
     {
-      input: "n = 6, edges = [[0,1],[0,2],[3,5],[5,4],[4,3]], source = 0, destination = 5",
+      input: "n = 7, edges = [[0,1],[1,2],[2,0],[3,4],[4,5]], source = 2, destination = 5",
       output: "false",
-      explanation: "No path from 0 to 5",
+      explanation: "Vertices 0, 1, 2 form one cluster and 3, 4, 5 another; no edge bridges them",
     },
   ],
   constraints: [
-    "1 <= n <= 2 * 10^5",
-    "0 <= edges.length <= 2 * 10^5",
-    "0 <= source, destination <= n - 1",
+    "n can be as small as 1 and as large as 2 * 10^5.",
+    "edges.length tops out at 2 * 10^5 and may be 0.",
+    "Both source and destination are valid vertex labels between 0 and n - 1.",
   ],
   hints: [
     "Build adjacency list",

@@ -8,30 +8,30 @@ export const allPathsSourceTargetScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Bloomberg", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe"],
-  description: "Find all paths from source (0) to target (n-1) in a DAG",
+  description: "Enumerate every route through a DAG from node 0 to node n-1",
   tags: ["graph", "dfs", "backtracking"],
   estimatedTime: 25,
-  problemStatement: `Given a directed acyclic graph (DAG) of n nodes labeled from 0 to n - 1, find all possible paths from node 0 to node n - 1 and return them in any order.
+  problemStatement: `You're working with a directed acyclic graph of n nodes numbered 0 through n - 1. Its wiring comes as graph, where graph[i] holds every node that a directed edge leads to from node i.
 
-The graph is given as follows: graph[i] is a list of all nodes you can visit from node i (i.e., there is a directed edge from node i to node graph[i][j]).`,
+Collect every distinct path that begins at node 0 and finishes at node n - 1, and return them as a list of paths; the paths may appear in whatever sequence you like.`,
   examples: [
     {
-      input: "graph = [[1,2],[3],[3],[]]",
-      output: "[[0,1,3],[0,2,3]]",
-      explanation: "There are two paths: 0 -> 1 -> 3 and 0 -> 2 -> 3.",
+      input: "graph = [[1,2],[3],[3],[4],[]]",
+      output: "[[0,1,3,4],[0,2,3,4]]",
+      explanation: "Two routes exist: 0 -> 1 -> 3 -> 4 and 0 -> 2 -> 3 -> 4.",
     },
     {
-      input: "graph = [[4,3,1],[3,2,4],[3],[4],[]]",
-      output: "[[0,4],[0,3,4],[0,1,3,4],[0,1,2,3,4],[0,1,4]]",
+      input: "graph = [[1,2,4],[2,3],[3],[4],[]]",
+      output: "[[0,1,2,3,4],[0,1,3,4],[0,2,3,4],[0,4]]",
     },
   ],
   constraints: [
-    "n == graph.length",
-    "2 <= n <= 15",
-    "0 <= graph[i][j] < n",
-    "graph[i][j] != i (no self-loops)",
-    "All the elements of graph[i] are unique.",
-    "The input graph is guaranteed to be a DAG.",
+    "graph.length equals n",
+    "n stays between 2 and 15",
+    "every listed target satisfies 0 <= graph[i][j] < n",
+    "no node lists itself: graph[i][j] != i",
+    "within graph[i], no target repeats",
+    "the graph you receive is always acyclic (a DAG)",
   ],
   hints: [
     "Use DFS/backtracking from source to explore all paths",

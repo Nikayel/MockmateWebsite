@@ -8,36 +8,34 @@ export const wordLadderScenario: DSAScenario = {
   difficulty: "hard",
   companies: ["Amazon", "Google", "Meta", "Palantir"],
   roles: ["junior", "senior", "swe"],
-  description: "Find shortest transformation sequence from begin word to end word.",
+  description:
+    "Count the words in the shortest one-letter-at-a-time chain from one word to another",
   tags: ["graph", "bfs", "hash-table"],
   estimatedTime: 35,
-  problemStatement: `A transformation sequence from word beginWord to word endWord using a dictionary wordList is a sequence of words beginWord -> s1 -> s2 -> ... -> sk such that:
+  problemStatement: `You're given a starting word beginWord, a target word endWord, and a bank of usable words wordList. Your goal is to morph beginWord into endWord through a chain of words in which every link changes exactly one letter position and keeps all the other letters where they were.
 
-- Every adjacent pair of words differs by a single letter.
-- Every si for 1 <= i <= k is in wordList. Note that beginWord does not need to be in wordList.
-- sk == endWord
+Each word appearing in the chain after beginWord, endWord included, must be a member of wordList; beginWord itself is exempt from that requirement. Return how many words the shortest such chain contains, counting both beginWord and endWord. If endWord can never be reached this way, return 0.
 
-Given two words, beginWord and endWord, and a dictionary wordList, return the number of words in the shortest transformation sequence from beginWord to endWord, or 0 if no such sequence exists.`,
+As an illustration, pit, pat, mat, man is a valid chain of 4 words: each hop rewrites just one letter of the word before it, and every word after the first belongs to the bank.`,
   examples: [
     {
-      input: 'beginWord = "hit", endWord = "cog", wordList = ["hot","dot","dog","lot","log","cog"]',
-      output: "5",
-      explanation: "hit -> hot -> dot -> dog -> cog (length 5)",
+      input: 'beginWord = "pit", endWord = "man", wordList = ["pat","mat","man","map","pan"]',
+      output: "4",
+      explanation: "pit -> pat -> mat -> man uses 4 words in total.",
     },
     {
-      input: 'beginWord = "hit", endWord = "cog", wordList = ["hot","dot","dog","lot","log"]',
+      input: 'beginWord = "pit", endWord = "man", wordList = ["pat","mat","map","pan"]',
       output: "0",
-      explanation: 'endWord "cog" is not in wordList',
+      explanation: 'No chain can end on "man" because wordList does not contain it.',
     },
   ],
   constraints: [
-    "1 <= beginWord.length <= 10",
-    "endWord.length == beginWord.length",
-    "1 <= wordList.length <= 5000",
-    "wordList[i].length == beginWord.length",
-    "beginWord, endWord, and wordList[i] consist of lowercase English letters.",
-    "beginWord != endWord",
-    "All the words in wordList are unique.",
+    "beginWord.length runs from 1 to 10",
+    "endWord and every word in wordList match beginWord's length",
+    "wordList carries between 1 and 5000 entries",
+    "only lowercase English letters appear in any of the words",
+    "beginWord and endWord are different words",
+    "no duplicate words exist inside wordList",
   ],
   hints: [
     "Model as graph: words are nodes, edges connect words differing by 1 letter",

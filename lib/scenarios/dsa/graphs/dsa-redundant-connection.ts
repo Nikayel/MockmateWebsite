@@ -11,12 +11,18 @@ export const redundantConnectionScenario: DSAScenario = {
   description: "Find the edge that creates a cycle using Union-Find",
   tags: ["graph", "union-find", "dfs"],
   estimatedTime: 25,
-  problemStatement: `You are given a graph that started as a tree with n nodes, with one additional edge added. Return an edge that can be removed so that the resulting graph is a tree. If there are multiple answers, return the one that occurs last in the input.`,
+  problemStatement: `You're looking at an undirected graph that began as a tree of n nodes labeled 1 through n, until one extra edge was tacked on between two different nodes that weren't already joined. The array edges now holds all n links, where edges[i] = [ai, bi] connects nodes ai and bi.
+
+Find an edge you could delete so that what remains is a tree again, and return it. When more than one deletion would work, return the candidate that appears latest in edges.`,
   examples: [
-    { input: "edges = [[1,2],[1,3],[2,3]]", output: "[2,3]" },
-    { input: "edges = [[1,2],[2,3],[3,4],[1,4],[1,5]]", output: "[1,4]" },
+    { input: "edges = [[1,2],[2,4],[1,4],[3,4]]", output: "[1,4]" },
+    { input: "edges = [[2,3],[3,5],[4,5],[2,5],[1,2]]", output: "[2,5]" },
   ],
-  constraints: ["n == edges.length", "3 <= n <= 1000", "1 <= ai < bi <= n"],
+  constraints: [
+    "edges holds exactly n entries: n == edges.length",
+    "the node count runs 3 <= n <= 1000",
+    "each pair satisfies 1 <= ai < bi <= n",
+  ],
   hints: [
     "Use Union-Find to detect when adding edge creates cycle",
     "Return last edge where both nodes have same root",

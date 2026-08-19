@@ -11,18 +11,22 @@ export const numberConnectedComponentsScenario: DSAScenario = {
   description: "Count connected components using Union-Find or DFS",
   tags: ["graph", "union-find", "dfs", "bfs"],
   estimatedTime: 20,
-  problemStatement: `You have a graph of n nodes. You are given an integer n and an array edges where edges[i] = [ai, bi] indicates an undirected edge between ai and bi.
+  problemStatement: `You're handed a headcount and a wiring list: n nodes labeled 0 through n - 1, plus an array edges where each entry edges[i] = [ai, bi] joins nodes ai and bi in both directions.
 
-Return the number of connected components in the graph.`,
+Those links may or may not tie the whole graph together. Return the number of connected components, where a component is a group of nodes that can all reach one another by walking edges. A node touching no edge counts as a component of its own.`,
   examples: [
     {
-      input: "n = 5, edges = [[0,1],[1,2],[3,4]]",
-      output: "2",
-      explanation: "Component 1: {0,1,2}, Component 2: {3,4}",
+      input: "n = 6, edges = [[0,2],[2,4],[1,5]]",
+      output: "3",
+      explanation: "The three groups are {0,2,4}, {1,5}, and node 3 by itself",
     },
-    { input: "n = 5, edges = [[0,1],[1,2],[2,3],[3,4]]", output: "1" },
+    { input: "n = 4, edges = [[2,3],[0,3],[1,2]]", output: "1" },
   ],
-  constraints: ["1 <= n <= 2000", "1 <= edges.length <= 5000", "0 <= ai, bi < n"],
+  constraints: [
+    "node count stays within 1 <= n <= 2000",
+    "the list holds 1 <= edges.length <= 5000 pairs",
+    "endpoints stay in range: 0 <= ai, bi < n",
+  ],
   hints: [
     "Union-Find: Initially n components, decrement when unioning",
     "DFS/BFS: Count traversal starts",

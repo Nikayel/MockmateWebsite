@@ -8,25 +8,27 @@ export const evaluateDivisionScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Bloomberg", "Palantir"],
   roles: ["junior", "senior", "swe", "fdse"],
-  description: "Evaluate division queries using graph DFS",
+  description: "Compute division results from known variable ratios",
   tags: ["graph", "dfs", "union-find", "hash-table"],
   estimatedTime: 30,
-  problemStatement: `Given equations like a/b = k and queries [c, d], return the result of c/d if calculable, or -1.0 if not.`,
+  problemStatement: `You're handed a log of division results between named variables: for every index i, equations[i] = [A, B] together with values[i] states that A / B = values[i]. Variables are strings, and the facts you receive never contradict one another or force a division by zero.
+
+Then queries arrives, where each queries[j] = [C, D] asks what C / D evaluates to. Work each answer out from the recorded facts, and report -1.0 for any query whose value cannot be determined, including when C or D never showed up in the equations at all. Return the answers as an array of doubles, in the order the queries were asked.`,
   examples: [
     {
       input:
-        'equations = [["a","b"],["b","c"]], values = [2.0,3.0], queries = [["a","c"],["b","a"],["a","e"],["a","a"],["x","x"]]',
-      output: "[6.00000,0.50000,-1.00000,1.00000,-1.00000]",
+        'equations = [["p","q"],["q","r"]], values = [4.0,2.0], queries = [["p","r"],["q","p"],["p","z"],["q","q"],["m","m"]]',
+      output: "[8.00000,0.25000,-1.00000,1.00000,-1.00000]",
     },
     {
-      input: 'equations = [["a","b"]], values = [0.5], queries = [["a","b"],["b","a"]]',
-      output: "[0.50000,2.00000]",
+      input: 'equations = [["u","v"]], values = [0.2], queries = [["u","v"],["v","u"]]',
+      output: "[0.20000,5.00000]",
     },
   ],
   constraints: [
-    "1 <= equations.length <= 20",
-    "1 <= queries.length <= 20",
-    "Variables are lowercase strings",
+    "equations.length falls between 1 and 20.",
+    "You receive anywhere from 1 to 20 queries.",
+    "Every variable is a lowercase string.",
   ],
   hints: [
     "Build weighted graph: a->b with weight k, b->a with weight 1/k",

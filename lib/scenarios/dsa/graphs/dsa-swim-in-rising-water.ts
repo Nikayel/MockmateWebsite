@@ -7,12 +7,25 @@ export const swimInRisingWaterScenario: DSAScenario = {
   pattern: "graphs",
   difficulty: "hard",
   companies: ["Amazon", "Google", "Meta"],
-  description: "Find minimum time to swim from top-left to bottom-right",
+  description:
+    "Find the earliest time rising water lets you swim between opposite corners of a grid",
   tags: ["graph", "binary-search", "heap", "union-find"],
   estimatedTime: 35,
-  problemStatement: `At time t, water depth everywhere is t. You can swim between adjacent cells if both elevations <= t. Return minimum time to reach (n-1, n-1) from (0, 0).`,
-  examples: [{ input: "grid = [[0,2],[1,3]]", output: "3" }],
-  constraints: ["n == grid.length", "1 <= n <= 50", "0 <= grid[i][j] < n^2"],
+  problemStatement: `Rain is flooding an n x n basin whose terrain is recorded in the integer matrix grid, where grid[i][j] is the elevation of that square of ground. The water level climbs everywhere at the same speed: after t units of time, every square is submerged to depth t.
+
+You start on the top left square at time 0 and want to occupy the bottom right square. You may swim between two squares that share an edge whenever the water covers them both, which happens once both of their elevations are at most t. Swimming itself costs no time. Return the earliest time t at which you can be sitting on the bottom right square.`,
+  examples: [
+    {
+      input: "grid = [[0,3],[2,1]]",
+      output: "2",
+      explanation:
+        "At t = 2 you can drop onto the square of elevation 2, then cross to the finish at elevation 1. Leaving through the 3 would take until t = 3.",
+    },
+  ],
+  constraints: [
+    "grid is n x n in size, with 1 <= n <= 50",
+    "every elevation sits in the range 0 <= grid[i][j] < n^2",
+  ],
   hints: ["Binary search + DFS/BFS", "Dijkstra with max elevation", "Union-Find by elevation"],
   starterCode: {
     javascript: `function swimInWater(grid) {\n  // Write your solution here\n\n}`,
