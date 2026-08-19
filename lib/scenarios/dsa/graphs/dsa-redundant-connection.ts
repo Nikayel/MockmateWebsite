@@ -8,7 +8,7 @@ export const redundantConnectionScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Palantir"],
   roles: ["junior", "senior", "swe"],
-  description: "Find the edge that creates a cycle using Union-Find",
+  description: "Find the extra edge whose removal restores the graph to a tree",
   tags: ["graph", "union-find", "dfs"],
   estimatedTime: 25,
   problemStatement: `You're looking at an undirected graph that began as a tree of n nodes labeled 1 through n, until one extra edge was tacked on between two different nodes that weren't already joined. The array edges now holds all n links, where edges[i] = [ai, bi] connects nodes ai and bi.

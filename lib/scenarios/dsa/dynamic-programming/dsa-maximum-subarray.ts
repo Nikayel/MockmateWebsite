@@ -2,7 +2,7 @@ import type { DSAScenario } from "../../types"
 
 export const maximumSubarrayScenario: DSAScenario = {
   id: "dsa-maximum-subarray",
-  title: "Maximum Subarray (Kadane's Algorithm)",
+  title: "Maximum Subarray",
   type: "dsa",
   pattern: "dp-1d",
   difficulty: "medium",

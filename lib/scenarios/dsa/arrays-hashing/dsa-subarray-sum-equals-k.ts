@@ -18,7 +18,7 @@ A subarray means a run of one or more elements sitting next to each other in the
     {
       input: "nums = [2,2,2], k = 4",
       output: "2",
-      explanation: "The windows nums[0..1] and nums[1..2] both add up to 4",
+      explanation: "The subarrays nums[0..1] and nums[1..2] both add up to 4",
     },
     {
       input: "nums = [3,2,5], k = 5",

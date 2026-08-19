@@ -8,7 +8,7 @@ export const networkDelayTimeScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe"],
-  description: "Find minimum time for signal to reach all nodes using Dijkstra",
+  description: "Find the minimum time for a signal to reach every node in the network",
   tags: ["graph", "dijkstra", "heap", "shortest-path"],
   estimatedTime: 30,
   problemStatement: `You've mapped a network of n nodes, numbered 1 through n. The array times records its one-way links: times[i] = [ui, vi, wi] means a signal leaving node ui reaches node vi exactly wi time units later.

@@ -107,25 +107,27 @@ Two hard requirements shape this exercise: total running time proportional to th
     description: "Report how many ones a 32-bit binary pattern contains",
     tags: ["bit-manipulation", "divide-and-conquer"],
     estimatedTime: 10,
-    problemStatement: `You're handed the 32-bit binary form of an unsigned integer n. Count how many of its positions hold a '1' and return that count, the quantity often called the Hamming weight of n.`,
+    problemStatement: `You're handed n, an unsigned 32-bit integer. Reading n in binary across all 32 positions, count how many of those positions hold a 1 and return that count, the quantity often called the Hamming weight of n.`,
     examples: [
       {
-        input: "n = 00000000000000000000000000101101",
+        input: "n = 45",
         output: "4",
-        explanation: "Four positions hold a '1': the bits worth 32, 8, 4, and 1.",
+        explanation: "45 is 101101 in binary, so four positions hold a 1: 32, 8, 4, and 1.",
       },
       {
-        input: "n = 00000000000000000000010000000000",
+        input: "n = 1024",
         output: "1",
-        explanation: "Only the bit worth 1024 is set.",
+        explanation:
+          "1024 in binary is a single 1 followed by ten 0s, so only one position is set.",
       },
       {
-        input: "n = 11111111111111111111111111100111",
+        input: "n = 4294967271",
         output: "30",
-        explanation: "Every position is set except the two worth 8 and 16.",
+        explanation:
+          "4294967271 fills all 32 positions except the two worth 8 and 16, leaving 30 ones.",
       },
     ],
-    constraints: ["n arrives as a binary string exactly 32 characters long"],
+    constraints: ["n is an unsigned 32-bit integer, so it ranges from 0 to 2^32 - 1"],
     hints: [
       "Method 1: Check each bit by shifting right and AND with 1",
       "Method 2: Use n & (n-1) trick to clear the rightmost 1 bit",
@@ -265,22 +267,22 @@ Two hard requirements shape this exercise: total running time proportional to th
     description: "Mirror the 32-bit pattern of an unsigned integer end to end",
     tags: ["bit-manipulation", "divide-and-conquer"],
     estimatedTime: 15,
-    problemStatement: `Your input n is an unsigned 32-bit integer, delivered as a binary string of exactly 32 characters. Mirror the whole bit pattern end to end: the lowest-order bit trades places with the highest-order bit, the second-lowest with the second-highest, and so on through all 32 positions. Return the unsigned integer that the mirrored pattern encodes.
+    problemStatement: `Your input n is an unsigned 32-bit integer. Reading it as a pattern of exactly 32 bits, mirror the whole bit pattern end to end: the lowest-order bit trades places with the highest-order bit, the second-lowest with the second-highest, and so on through all 32 positions. Return the unsigned integer that the mirrored pattern encodes.
 
 One housekeeping note: some languages, Java among them, have no unsigned type, so there the same 32 bits ride in a signed integer for both input and output. Only the bit pattern itself matters.`,
     examples: [
       {
-        input: "n = 00000000000000000000000011010010",
-        output: "1258291200 (01001011000000000000000000000000)",
+        input: "n = 210",
+        output: "1258291200",
         explanation:
-          "The incoming string encodes the unsigned value 210. Read back to front, the bits spell 01001011 followed by 24 zeros, which encodes 1258291200.",
+          "210 occupies the low bits as 11010010. Read back to front, those bits spell 01001011 followed by 24 zeros, which encodes 1258291200.",
       },
       {
-        input: "n = 11111111111111111111111111110111",
-        output: "4026531839 (11101111111111111111111111111111)",
+        input: "n = 4294967287",
+        output: "4026531839",
       },
     ],
-    constraints: ["the input arrives as a binary string spanning exactly 32 characters"],
+    constraints: ["n is an unsigned 32-bit integer, so it ranges from 0 to 2^32 - 1"],
     hints: [
       "Process bit by bit from right to left",
       "Get rightmost bit with n & 1",

@@ -24,7 +24,7 @@ Return the largest profit such a trade can produce. If every possible pairing lo
         input: "prices = [9,2,8,4,10,3]",
         output: "8",
         explanation:
-          "Buy on day 2 when the price dips to 2, sell on day 5 at 10, and clear 10-2 = 8.",
+          "Buy on day 1 when the price dips to 2, sell on day 4 at 10, and clear 10-2 = 8.",
       },
       {
         input: "prices = [12,11,8,5,2]",

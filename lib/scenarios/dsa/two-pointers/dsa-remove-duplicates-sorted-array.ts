@@ -12,7 +12,7 @@ export const dsaRemoveDuplicatesSortedArrayScenario: DSAScenario = {
   estimatedTime: 15,
   problemStatement: `You're given an integer array nums arranged in non-decreasing order. Compact it in place so every distinct value keeps exactly one occurrence, with those values staying in the order they first appeared. Then report how many distinct values nums holds.
 
-Call that count k. A correct submission leaves the first k slots of nums holding the distinct values in their original order, and returns k. Whatever sits past those first k slots is ignored by the grader.`,
+Call that count k. Arrange the distinct values in the first k slots of nums in their original order, and return k. Whatever sits past those first k slots doesn't matter.`,
   examples: [
     {
       input: "nums = [4,4,7]",

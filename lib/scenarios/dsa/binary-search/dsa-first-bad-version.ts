@@ -7,7 +7,7 @@ export const dsaFirstBadVersionScenario: DSAScenario = {
   pattern: "binary-search",
   difficulty: "easy",
   companies: ["Google", "Amazon", "Meta", "Microsoft"],
-  description: "Find the first bad version using binary search with minimal API calls",
+  description: "Find the first bad version with as few API calls as possible",
   tags: ["binary-search", "interactive"],
   estimatedTime: 15,
   problemStatement: `Your team cuts releases one after another, numbered 1 through n, and each release builds directly on the one before it. A regression slipped in at some point: one version failed the quality gate, and every version after it inherits the defect. Everything before it is clean.

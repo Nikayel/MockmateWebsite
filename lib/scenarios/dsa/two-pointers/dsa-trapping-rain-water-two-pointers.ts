@@ -2,7 +2,7 @@ import type { DSAScenario } from "../../types"
 
 export const dsaTrappingRainWaterTwoPointersScenario: DSAScenario = {
   id: "dsa-trapping-rain-water-two-pointers",
-  title: "Trapping Rain Water (Two Pointers)",
+  title: "Trapping Rain Water",
   type: "dsa",
   pattern: "two-pointers",
   difficulty: "hard",
