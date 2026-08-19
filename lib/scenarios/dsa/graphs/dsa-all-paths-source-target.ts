@@ -60,6 +60,9 @@ Collect every distinct path that begins at node 0 and finishes at node n - 1, an
         [0, 1, 3],
         [0, 2, 3],
       ],
+      // The statement lets paths come back in any sequence; test 2 already set this and
+      // test 1 did not, so a different neighbour iteration order failed here only.
+      compareAsSet: true,
       description: "Two paths",
     },
     {

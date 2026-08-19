@@ -39,6 +39,9 @@ Collect every value that occurs two times and return those values as an array. Y
     {
       input: { nums: [4, 3, 2, 7, 8, 2, 3, 1] },
       expected: [2, 3],
+      // The statement sets no output order, so a first-seen-order answer ([3,2] from a
+      // counting pass) is just as correct. Without this it was exact-compared and failed.
+      compareAsSet: true,
       description: "Multiple duplicates",
     },
     { input: { nums: [1, 1, 2] }, expected: [1], description: "Single duplicate" },

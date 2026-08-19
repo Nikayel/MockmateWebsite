@@ -11,9 +11,9 @@ export const lowestCommonAncestorBinaryTreeScenario: DSAScenario = {
   description: "Locate the deepest node that keeps both given nodes among its descendants",
   tags: ["tree", "dfs", "recursion"],
   estimatedTime: 25,
-  problemStatement: `You're given the root of a binary tree plus two nodes that live in it, p and q. Their lowest common ancestor (LCA) is the deepest node that counts both p and q among its descendants, and for this purpose every node is treated as a descendant of itself.
+  problemStatement: `You're given the root of a binary tree plus p and q, the values of two nodes that live in it. All values in the tree are distinct. The lowest common ancestor (LCA) of those two nodes is the deepest node that counts both of them among its descendants, and for this purpose every node is treated as a descendant of itself.
 
-Find that ancestor node and return it.
+Find that ancestor and return its value.
 
 \`\`\`
         9

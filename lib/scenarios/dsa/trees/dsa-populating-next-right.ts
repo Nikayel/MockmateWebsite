@@ -12,7 +12,9 @@ export const populatingNextRightScenario: DSAScenario = {
   estimatedTime: 25,
   problemStatement: `You're handed root, the top of a perfect binary tree: every internal node has both children, and all of the leaves sit together on the bottom level. Each node also carries an extra next pointer, and every next starts out as NULL.
 
-Thread each level into a rightward chain: a node's next should reference whichever node stands immediately to its right on the same level. The last node of a level has nothing to its right, so its next keeps its NULL value. Return root once the wiring is done.`,
+Thread each level into a rightward chain: a node's next should reference whichever node stands immediately to its right on the same level. The last node of a level has nothing to its right, so its next keeps its NULL value.
+
+Once the wiring is in place, prove it by walking the tree through those next pointers: start at the leftmost node of each level, follow next across the level, and collect the values you pass, appending the string "#" at the end of every level. Return that array.`,
   examples: [
     {
       input: "root = [5,9,2,10,4,6,11]",

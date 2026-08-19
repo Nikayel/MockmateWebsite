@@ -35,12 +35,17 @@ Across every non-empty path the tree offers, return the largest sum you can achi
     "Return max single path to parent: node.val + max(left, right, 0)",
   ],
   starterCode: {
-    javascript: `function binary_tree_max_path_sum() {
-// Your code here
+    javascript: `function maxPathSum(root) {
+  // Write your solution here
+
 }`,
-    python: `def binary_tree_max_path_sum():
-  # Your code here
-  pass`,
+    python: `def maxPathSum(root):
+    # Write your solution here
+    pass`,
+    typescript: `function maxPathSum(root: TreeNode | null): number {
+  // Write your solution here
+
+}`,
   },
   optimalComplexity: {
     time: "O(n)",
