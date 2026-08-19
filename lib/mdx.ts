@@ -37,6 +37,9 @@ export function getBlogPostBySlug(slug: string): BlogPost | null {
     title: data.title || "",
     description: data.description || "",
     date: data.date || new Date().toISOString(),
+    // Left undefined rather than defaulted to `date`, so every reader can tell "never revised"
+    // apart from "revised on its publication date" and choose its own fallback.
+    updated: data.updated || undefined,
     author: data.author || "CodeSparring Team",
     readTime: stats.text,
     category: data.category || "guides",

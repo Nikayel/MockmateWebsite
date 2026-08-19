@@ -259,10 +259,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
   ]
 
   // Individual blog posts from MDX files. These carry a REAL lastModified: the post's own front
-  // matter date, which is authored and therefore trustworthy.
+  // matter date, which is authored and therefore trustworthy. `updated` wins where a post has been
+  // substantively revised since publication, because THAT is what lastmod means; without it a
+  // rewritten post kept advertising the date of a version that no longer exists.
   const blogPostPages: MetadataRoute.Sitemap = getAllBlogPosts().map((post) => ({
     url: absoluteUrl(`/blog/${post.slug}`),
-    lastModified: post.date,
+    lastModified: post.updated ?? post.date,
     changeFrequency: "monthly" as const,
     priority: 0.8,
   }))

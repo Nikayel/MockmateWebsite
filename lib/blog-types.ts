@@ -3,6 +3,23 @@ export interface BlogPostMeta {
   title: string
   description: string
   date: string
+  /**
+   * When this post was last SUBSTANTIVELY revised, as `YYYY-MM-DD`. Optional and absent on most
+   * posts; `date` is the fallback everywhere it is read.
+   *
+   * It exists because a blog post is the one part of this site whose `lastmod` we publish, on the
+   * grounds that the authored front-matter date is true (see the header of `app/sitemap.ts`). Before
+   * this field, "authored and true" quietly meant "true on the day it was first published": the
+   * de-slop sweep rewrote fourteen posts and every one of them kept telling crawlers, and every
+   * reader, that nothing had changed since its original date.
+   *
+   * Set it only when the body actually changed in a way a returning reader would notice. Bumping it
+   * for a typo, or to look fresh, is the exact abuse that teaches a crawler to ignore the field, and
+   * the sitemap header explains at length why this site would rather emit no date than a wrong one.
+   * `lib/__tests__/blog-updated-dates.test.ts` enforces the format and that it never predates
+   * `date` or sits in the future.
+   */
+  updated?: string
   author: string
   readTime: string
   category: "dsa" | "faang" | "system-design" | "career" | "guides"

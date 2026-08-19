@@ -61,6 +61,7 @@ export default async function BlogPostPage({ params }: Props) {
         description={post.description}
         url={`/blog/${post.slug}`}
         datePublished={post.date}
+        dateModified={post.updated}
         author={post.author}
         image={post.image}
       />
