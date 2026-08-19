@@ -8,7 +8,7 @@ export const numberConnectedComponentsScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "LinkedIn", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe"],
-  description: "Count connected components using Union-Find or DFS",
+  description: "Count how many separate connected pieces the graph splits into",
   tags: ["graph", "union-find", "dfs", "bfs"],
   estimatedTime: 20,
   problemStatement: `You're handed a headcount and a wiring list: n nodes labeled 0 through n - 1, plus an array edges where each entry edges[i] = [ai, bi] joins nodes ai and bi in both directions.
@@ -24,7 +24,7 @@ Those links may or may not tie the whole graph together. Return the number of co
   ],
   constraints: [
     "node count stays within 1 <= n <= 2000",
-    "the list holds 1 <= edges.length <= 5000 pairs",
+    "the list holds 0 <= edges.length <= 5000 pairs",
     "endpoints stay in range: 0 <= ai, bi < n",
   ],
   hints: [

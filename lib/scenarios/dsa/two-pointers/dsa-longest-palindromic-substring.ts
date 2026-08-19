@@ -12,7 +12,7 @@ export const dsaLongestPalindromicSubstringScenario: DSAScenario = {
   estimatedTime: 25,
   problemStatement: `You're given a string s. Return its longest palindromic substring.
 
-A palindrome reads identically in both directions. When two or more substrings tie for the greatest length, any one of them is an accepted answer.`,
+A palindrome reads identically in both directions. When two or more substrings tie for the greatest length, return the one that starts earliest in s.`,
   examples: [
     {
       input: 's = "momon"',

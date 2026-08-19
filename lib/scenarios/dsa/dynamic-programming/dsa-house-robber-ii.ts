@@ -12,7 +12,7 @@ export const houseRobberIiScenario: DSAScenario = {
   estimatedTime: 25,
   problemStatement: `You're planning a night of burglaries on a street that loops back on itself: the houses stand in a circle, so the first house and the last house are direct neighbors. nums[i] tells you how much cash is stashed in house i, and every pair of adjacent houses shares a linked alarm that calls the police the moment both are broken into on the same night.
 
-Because the circle makes them neighbors, hitting both the first house and the last house is off the table too. Return the most cash you can take in one night without tripping any alarm.`,
+Because the circle makes them neighbors, hitting both the first house and the last house is off the table too whenever the street has more than one house. Return the most cash you can take in one night without tripping any alarm.`,
   examples: [
     {
       input: "nums = [4,1,4]",

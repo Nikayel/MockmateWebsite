@@ -11,7 +11,7 @@ export const minCostConnectPointsScenario: DSAScenario = {
   description: "Connect all points at minimum total Manhattan-distance cost",
   tags: ["graph", "union-find", "minimum-spanning-tree"],
   estimatedTime: 30,
-  problemStatement: `You're laying wire between locations on a 2D plane. Each points[i] = [xi, yi] gives one location's integer coordinates, and joining two locations costs their Manhattan distance: |xi - xj| + |yi - yj|, the horizontal gap plus the vertical gap.
+  problemStatement: `You're laying wire between locations on a 2D plane. Each points[i] = [xi, yi] gives one location's integer coordinates, no two locations share a spot, and joining two locations costs their Manhattan distance: |xi - xj| + |yi - yj|, the horizontal gap plus the vertical gap.
 
 Wire the network so that every location can reach every other, directly or through intermediate locations, with exactly one simple route between any pair. Return the smallest total cost of wire that achieves this.`,
   examples: [{ input: "points = [[0,0],[3,0],[3,4],[7,4],[0,3]]", output: "14" }],

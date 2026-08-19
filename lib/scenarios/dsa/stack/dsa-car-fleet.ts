@@ -12,7 +12,7 @@ export const dsaCarFleetScenario: DSAScenario = {
   estimatedTime: 25,
   problemStatement: `You're tracking n cars that all drive toward the same destination along a one-lane road, with the finish line target miles out. Two integer arrays of length n describe them: position[i] tells you where the ith car currently sits, and speed[i] gives its speed in miles per hour.
 
-Overtaking is impossible on this road. When a faster car closes the gap to a slower car ahead, it tucks in bumper to bumper and adopts the slower car's speed from that moment on. Any non-empty group of cars traveling together at one position and one speed forms a single car fleet, and a car driving alone counts as a fleet too.
+Overtaking is impossible on this road. When a faster car closes the gap to a slower car ahead, it tucks in bumper to bumper and adopts the slower car's speed from that moment on. Any non-empty group of cars traveling together at one position and one speed forms a single car fleet, and a car driving alone counts as a fleet too. A car that catches a fleet exactly at the destination joins it and counts as part of that same fleet.
 
 Determine how many distinct fleets end up rolling across the destination.`,
   examples: [

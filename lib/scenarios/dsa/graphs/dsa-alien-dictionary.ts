@@ -8,13 +8,12 @@ export const alienDictionaryScenario: DSAScenario = {
   difficulty: "hard",
   companies: ["Google", "Amazon", "Meta", "Microsoft", "Apple", "Palantir"],
   roles: ["junior", "senior", "swe"],
-  description:
-    "Reconstruct an alien alphabet from a lexicographically sorted word list (topological sort)",
+  description: "Reconstruct an alien alphabet from a lexicographically sorted word list",
   tags: ["graph", "topological-sort", "string", "dfs", "bfs"],
   estimatedTime: 35,
   problemStatement: `An expedition has recovered a dictionary from an alien civilization. The language reuses the lowercase English letters, but its alphabet arranges them in some unknown order.
 
-You're given words, a list of strings appearing exactly as the dictionary printed them: sorted according to that alien alphabet. Reconstruct an ordering of the letters that is consistent with the list and return it as a string. When more than one ordering fits the evidence, any of them is accepted. When no alphabet could have produced this list, return an empty string.`,
+You're given words, a list of strings appearing exactly as the dictionary printed them: sorted according to that alien alphabet. In any alphabet, a word always sorts before a longer word that begins with it, so a list placing a word after one of its own extensions can't come from any alphabet. Reconstruct an ordering of the letters that is consistent with the list and return it as a string. When more than one ordering fits the evidence, any of them is accepted. When no alphabet could have produced this list, return an empty string.`,
   examples: [
     {
       input: 'words = ["dmb","dmz","gm","gbb","mzbb"]',

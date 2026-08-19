@@ -17,7 +17,7 @@ export const intervalsScenarios: DSAScenario[] = [
     description: "Collapse every cluster of overlapping ranges into a single span",
     tags: ["array", "sorting", "intervals"],
     estimatedTime: 25,
-    problemStatement: `You're given an array intervals, where each entry intervals[i] = [starti, endi] marks the start and end of one range. Some of these ranges collide with one another. Combine every group of colliding ranges into a single continuous span, and return the list of spans left over. That list must hold only disjoint spans which together cover everything the input covered.
+    problemStatement: `You're given an array intervals, where each entry intervals[i] = [starti, endi] marks the start and end of one range. Some of these ranges collide with one another. Combine every group of colliding ranges into a single continuous span, and return the list of spans left over, ordered by start. That list must hold only disjoint spans which together cover everything the input covered.
 
 Two ranges collide even when they only touch: if one ends exactly where the next begins, both belong in the same merged span.`,
     examples: [
@@ -441,7 +441,7 @@ For this problem, two ranges conflict only when their interiors genuinely cross.
     description: "Figure out how many rooms must be reserved for a day of meetings",
     tags: ["array", "heap", "sorting", "intervals", "two-pointers"],
     estimatedTime: 25,
-    problemStatement: `Your company's calendar for the day lives in intervals, with intervals[i] = [starti, endi] describing when each meeting runs. Two meetings whose times cross cannot share a room, so you must decide how much space to reserve.
+    problemStatement: `Your company's calendar for the day lives in intervals, with intervals[i] = [starti, endi] describing when each meeting runs. Two meetings whose times cross cannot share a room, so you must decide how much space to reserve. A meeting that ends at some time and another that starts at that exact time can share a room.
 
 Return the smallest count of rooms that lets every meeting take place exactly as scheduled.`,
     examples: [
@@ -541,7 +541,7 @@ Return the smallest count of rooms that lets every meeting take place exactly as
     description: "Decide whether one calendar is free of double-bookings",
     tags: ["array", "sorting", "intervals"],
     estimatedTime: 15,
-    problemStatement: `You're looking after one person's schedule, given as intervals with intervals[i] = [starti, endi] for each appointment. Nobody can sit in two appointments at the same time.
+    problemStatement: `You're looking after one person's schedule, given as intervals with intervals[i] = [starti, endi] for each appointment. Nobody can sit in two appointments at the same time, though an appointment ending exactly when the next one starts is fine.
 
 Report true if the whole agenda can be attended from start to finish, and false if any two entries clash.`,
     examples: [

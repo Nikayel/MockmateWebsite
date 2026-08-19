@@ -38,7 +38,7 @@ Legal pairing means three things hold at once: every opening bracket gets closed
     },
   ],
   constraints: [
-    "s holds at least 1 character and at most 10^4",
+    "s holds at most 10^4 characters and may be empty",
     "every character of s is one of the bracket marks '()[]{}'",
   ],
   hints: [

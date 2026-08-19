@@ -24,6 +24,8 @@ export const snakesAndLaddersScenario: DSAScenario = {
 
 Your piece begins on square 1. Each move, you advance it to any square labeled curr+1 through min(curr+6, n^2), as though you rolled a six-sided die and chose how far to go. Whenever the square you stop on stores a value other than -1, a snake or ladder lives there, and it immediately carries your piece to the square that value names; a -1 marks a plain square. At most one snake or ladder is followed per move, so if one delivers you onto the mouth of another, the second stays unused until a later move lands there again.
 
+The starting square and the final square are always plain squares: no snake or ladder ever begins there.
+
 Return the fewest moves that put your piece exactly on square n^2, or -1 if that square can never be reached.`,
   examples: [
     {
