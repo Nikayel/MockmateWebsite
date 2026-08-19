@@ -498,9 +498,17 @@ Every card must end up in some group; none may be left over and no group may com
         description: "Group size 1 always works",
       },
       {
+        // Was expected: false with the note "Consecutive pairs not possible", which is
+        // simply wrong: [1,2] [3,4] [5,6] deals cleanly. The frozen key failed every
+        // correct solution. Corrected 2026-08-19 by the post-sweep adversarial audit.
         input: { hand: [1, 2, 3, 4, 5, 6], groupSize: 2 },
+        expected: true,
+        description: "Six consecutive cards deal into three pairs",
+      },
+      {
+        input: { hand: [1, 2, 4, 5, 7, 8], groupSize: 3 },
         expected: false,
-        description: "Consecutive pairs not possible",
+        description: "Runs of three are impossible: every triple is broken by a gap",
       },
     ],
   },
