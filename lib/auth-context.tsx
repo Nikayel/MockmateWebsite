@@ -5,6 +5,8 @@ import { User as FirebaseUser, onAuthStateChanged, Auth } from "firebase/auth"
 import posthog from "posthog-js"
 import { User as UserType } from "./types"
 import { convertFirebaseUser } from "./auth"
+import { hasAnalyticsConsent } from "@/components/CookieConsent"
+import { applyPostHogConsent } from "./posthog-consent"
 
 interface AuthContextType {
   user: UserType | null
@@ -73,6 +75,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               document.cookie = "firebase-auth-token=; path=/; max-age=0; SameSite=Lax"
               if (hadUser && posthog.__loaded) {
                 posthog.reset()
+                // reset() clears PostHog's consent state along with the
+                // identity, dropping the instance back to its cookie-writing
+                // default. Without this line a visitor who signs out is no
+                // longer in cookieless mode, and on 2026-08-18 that is exactly
+                // how ninety seconds of one person's browsing arrived as four
+                // separate "people". See lib/posthog-consent.
+                applyPostHogConsent(hasAnalyticsConsent())
               }
               hadUser = false
             }
