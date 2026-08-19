@@ -336,6 +336,27 @@ function detectPropertyValidators(
     return validators
   }
 
+  // Deleting a BST node with two children has several textbook-correct answers
+  // (promote the successor, promote the predecessor), and the statement accepts any
+  // of them. Exact match against one frozen shape failed the others; 2026-08-19.
+  if (scenarioId === "dsa-delete-node-bst") {
+    validators.push(PropertyBuilders.bstAfterDeletion("root", "key"))
+    return validators
+  }
+
+  // Both statements accept ANY valid arrangement, and both were graded by exact string
+  // match: "aabb" has two correct answers, "aaadbbcc" with k=2 has 384. See
+  // PropertyBuilders.spacedRearrangement for why no canonical answer could be stated
+  // instead. Reorganize is the k=2 case of the same rule.
+  if (scenarioId === "dsa-reorganize-string") {
+    validators.push(PropertyBuilders.spacedRearrangement("s"))
+    return validators
+  }
+  if (scenarioId === "dsa-rearrange-string-k-distance") {
+    validators.push(PropertyBuilders.spacedRearrangement("s", "k"))
+    return validators
+  }
+
   // Two-sum pattern detection.
   //
   // An allowlist, because the previous conditions were a substring check on the id OR "has

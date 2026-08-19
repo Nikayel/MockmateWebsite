@@ -279,6 +279,162 @@ export const PropertyBuilders = {
   }),
 
   /**
+   * The output is a valid BST holding exactly the input tree's values with one
+   * instance of `key` removed.
+   *
+   * Written for dsa-delete-node-bst (2026-08-19). Deleting a node with two children
+   * admits several correct trees: promoting the in-order successor and promoting the
+   * predecessor are both textbook, and the statement says so. The scenario was graded
+   * by exact match against the successor-shaped answer, so a correct predecessor
+   * solution scored 0 - the same defect this file already records for
+   * balancedBstFromSorted, left unfixed on the sibling scenario.
+   *
+   * Deleting a key the tree does not hold is a no-op, which this handles naturally:
+   * the surviving multiset is then the original one.
+   */
+  bstAfterDeletion: (rootKey = "root", keyKey = "key"): Property => ({
+    name: "bst-after-deletion",
+    description: "Output is a valid BST holding the input values minus the deleted key",
+    check: (ctx) => {
+      const { input, output } = ctx
+      const source = input[rootKey]
+      const key = input[keyKey]
+      if (!Array.isArray(source) || !Array.isArray(output)) return false
+
+      // In-order values of a level-order array, via the sorted-values shortcut: a BST's
+      // in-order traversal is its values in ascending order, so validity and contents can
+      // both be decided from the serialised array plus a structural walk.
+      interface Node {
+        val: number
+        left: Node | null
+        right: Node | null
+      }
+      const build = (arr: Array<number | null>): Node | null => {
+        if (arr.length === 0 || arr[0] === null || arr[0] === undefined) return null
+        const root: Node = { val: arr[0] as number, left: null, right: null }
+        const queue: Node[] = [root]
+        let i = 1
+        while (queue.length > 0 && i < arr.length) {
+          const node = queue.shift() as Node
+          if (i < arr.length) {
+            const value = arr[i++]
+            if (value !== null && value !== undefined) {
+              node.left = { val: value as number, left: null, right: null }
+              queue.push(node.left)
+            }
+          }
+          if (i < arr.length) {
+            const value = arr[i++]
+            if (value !== null && value !== undefined) {
+              node.right = { val: value as number, left: null, right: null }
+              queue.push(node.right)
+            }
+          }
+        }
+        return root
+      }
+
+      const inorder = (node: Node | null, out: number[]): void => {
+        if (!node) return
+        inorder(node.left, out)
+        out.push(node.val)
+        inorder(node.right, out)
+      }
+
+      const sourceValues: number[] = []
+      inorder(build(source as Array<number | null>), sourceValues)
+      const resultValues: number[] = []
+      inorder(build(output as Array<number | null>), resultValues)
+
+      // Strictly ascending in-order is exactly the BST property (values are distinct here).
+      for (let i = 1; i < resultValues.length; i++) {
+        if (resultValues[i] <= resultValues[i - 1]) return false
+      }
+
+      const expectedValues = [...sourceValues]
+      const at = expectedValues.indexOf(key as number)
+      if (at !== -1) expectedValues.splice(at, 1)
+      expectedValues.sort((a, b) => a - b)
+
+      return JSON.stringify(resultValues) === JSON.stringify(expectedValues)
+    },
+  }),
+
+  /**
+   * The output is a rearrangement of the input string in which equal letters sit at
+   * least `minGap` positions apart, or "" when no such arrangement exists.
+   *
+   * Written for dsa-reorganize-string and dsa-rearrange-string-k-distance (2026-08-19).
+   * Both statements promise that any valid arrangement is accepted, and both were graded
+   * by exact string match: "aabb" has two valid answers and only "abab" scored, while
+   * "aaadbbcc" with k=2 has 384 valid answers and only one of them counted. The frozen
+   * keys are not even internally consistent about which one to pin (four of the five
+   * k-distance keys are the alphabetically smallest answer; "abacabcd" is not), so there
+   * was no canonical rule to state instead. Grading the property is the honest fix.
+   *
+   * An empty answer is checked against real feasibility rather than taken on trust: the
+   * greedy "place the most-frequent letter that is currently legal" order succeeds
+   * whenever any arrangement does, so if it finds one, "" was wrong.
+   */
+  spacedRearrangement: (sKey = "s", kKey?: string, defaultGap = 2): Property => ({
+    name: "spaced-rearrangement",
+    description: "Output rearranges the input with equal letters kept far enough apart",
+    check: (ctx) => {
+      const { input, output } = ctx
+      const source: string = input[sKey] ?? ""
+      if (typeof output !== "string") return false
+      const rawGap = kKey ? input[kKey] : defaultGap
+      const gap = Math.max(1, Number(rawGap ?? defaultGap))
+
+      const counts = (text: string): Record<string, number> => {
+        const map: Record<string, number> = {}
+        for (const ch of text) map[ch] = (map[ch] ?? 0) + 1
+        return map
+      }
+      // Key order follows first appearance, so "abab" and "baba" serialise differently
+      // even though they hold the same letters. Compare a sorted signature instead.
+      const signature = (text: string): string =>
+        Object.entries(counts(text))
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([ch, n]) => `${ch}:${n}`)
+          .join(",")
+      const satisfiesGap = (text: string): boolean => {
+        const lastSeen: Record<string, number> = {}
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i]
+          if (lastSeen[ch] !== undefined && i - lastSeen[ch] < gap) return false
+          lastSeen[ch] = i
+        }
+        return true
+      }
+
+      if (output.length > 0) {
+        // Same letters, same multiplicities, and legally spaced.
+        if (signature(output) !== signature(source)) return false
+        return satisfiesGap(output)
+      }
+
+      // Claimed impossible: only correct when the greedy construction also fails.
+      const remaining = counts(source)
+      const placed: string[] = []
+      for (let i = 0; i < source.length; i++) {
+        const legal = Object.keys(remaining)
+          .filter((ch) => remaining[ch] > 0)
+          .filter((ch) => {
+            const idx = placed.lastIndexOf(ch)
+            return idx === -1 || i - idx >= gap
+          })
+          .sort((a, b) => remaining[b] - remaining[a])
+        if (legal.length === 0) return true // genuinely stuck, so "" is right
+        const pick = legal[0]
+        remaining[pick] -= 1
+        placed.push(pick)
+      }
+      return false // greedy built a valid arrangement, so "" was wrong
+    },
+  }),
+
+  /**
    * Valid palindrome check
    */
   isPalindrome: (): Property => ({
