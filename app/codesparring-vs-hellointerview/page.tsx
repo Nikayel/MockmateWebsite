@@ -24,9 +24,25 @@ const HELLO = COMPETITOR_PRICING.helloInterview
 const REVIEWED_ON = formatVerifiedOn(HELLO.verifiedOn)
 const { monthly, yearly } = PRICING_CONFIG.pro.website
 
+/**
+ * The title leads with THEIR name, and it is `absolute` on purpose.
+ *
+ * Measured in the 30 days to 2026-08-18, this page is the ranking result for "hellointerview"
+ * (12 impressions, average position 21.5), "hello interview", "hello interview alternative",
+ * "hello interview reviews" and "is hello interview worth it". Every one of those searchers is
+ * looking for a company they already know by name; the previous title opened with "CodeSparring",
+ * a brand they have never heard of, and spent the first and most-scanned words of the line on it.
+ *
+ * `absolute` bypasses the root layout's ` | CodeSparring` template, which would otherwise render
+ * our name twice in one line once the title itself names us. Our name still appears, in the half
+ * of the title that answers "compared to what".
+ *
+ * The URL is deliberately unchanged: it is the indexed one, and renaming it would trade whatever
+ * equity it has for a redirect.
+ */
 export const metadata: Metadata = {
-  title: "CodeSparring vs Hello Interview",
-  description: `A sourced comparison of CodeSparring and Hello Interview: prices, how billing renews, what is free, and what each one covers. Reviewed ${REVIEWED_ON}.`,
+  title: { absolute: "Hello Interview vs CodeSparring: Honest Comparison" },
+  description: `Looking for a Hello Interview alternative? A sourced comparison of prices, how billing renews, what is free, and what each one covers. Reviewed ${REVIEWED_ON}.`,
   alternates: {
     canonical: "/codesparring-vs-hellointerview",
   },
