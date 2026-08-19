@@ -14,26 +14,28 @@ export const intervalsScenarios: DSAScenario[] = [
     difficulty: "medium",
     companies: ["Meta", "Google", "Amazon", "Microsoft", "Palantir"],
     roles: ["new-grad", "junior", "senior", "swe", "fdse"],
-    description: "Merge all overlapping intervals",
+    description: "Collapse every cluster of overlapping ranges into a single span",
     tags: ["array", "sorting", "intervals"],
     estimatedTime: 25,
-    problemStatement: `Given an array of intervals where intervals[i] = [starti, endi], merge all overlapping intervals, and return an array of the non-overlapping intervals that cover all the intervals in the input.`,
+    problemStatement: `You're given an array intervals, where each entry intervals[i] = [starti, endi] marks the start and end of one range. Some of these ranges collide with one another. Combine every group of colliding ranges into a single continuous span, and return the list of spans left over. That list must hold only disjoint spans which together cover everything the input covered.
+
+Two ranges collide even when they only touch: if one ends exactly where the next begins, both belong in the same merged span.`,
     examples: [
       {
-        input: "intervals = [[1,3],[2,6],[8,10],[15,18]]",
-        output: "[[1,6],[8,10],[15,18]]",
-        explanation: "Since intervals [1,3] and [2,6] overlap, merge them into [1,6].",
+        input: "intervals = [[2,5],[4,9],[6,7],[12,14]]",
+        output: "[[2,9],[12,14]]",
+        explanation: "[2,5], [4,9], and [6,7] chain into [2,9]; [12,14] stays separate.",
       },
       {
-        input: "intervals = [[1,4],[4,5]]",
-        output: "[[1,5]]",
-        explanation: "Intervals [1,4] and [4,5] are considered overlapping.",
+        input: "intervals = [[3,6],[6,8]]",
+        output: "[[3,8]]",
+        explanation: "[3,6] and [6,8] touch at 6, so they fuse into one span [3,8].",
       },
     ],
     constraints: [
-      "1 <= intervals.length <= 10^4",
-      "intervals[i].length == 2",
-      "0 <= starti <= endi <= 10^4",
+      "The list holds between 1 and 10^4 ranges.",
+      "Each range is a pair of exactly 2 values, a start and an end.",
+      "0 <= starti <= endi <= 10^4 for every range.",
     ],
     hints: [
       "First, sort the intervals by their start time",
@@ -222,29 +224,28 @@ export const intervalsScenarios: DSAScenario[] = [
     description: "Insert a new interval into a sorted list of non-overlapping intervals",
     tags: ["array", "intervals"],
     estimatedTime: 25,
-    problemStatement: `You are given an array of non-overlapping intervals intervals where intervals[i] = [starti, endi] represent the start and the end of the ith interval and intervals is sorted in ascending order by starti. You are also given an interval newInterval = [start, end] that represents the start and end of another interval.
+    problemStatement: `You're given intervals, a list of ranges that already sits in ascending order by start and contains no collisions, with intervals[i] = [starti, endi]. One extra range arrives as newInterval = [start, end].
 
-Insert newInterval into intervals such that intervals is still sorted in ascending order by starti and intervals still does not have any overlapping intervals (merge overlapping intervals if necessary).
-
-Return intervals after the insertion.`,
+Work newInterval into the list so that both guarantees still hold afterward: ascending order by start, and no two ranges colliding. Wherever the newcomer runs into existing ranges, fold all of them together into a single span. Ranges that merely touch at an endpoint count as colliding. Return the updated list.`,
     examples: [
       {
-        input: "intervals = [[1,3],[6,9]], newInterval = [2,5]",
-        output: "[[1,5],[6,9]]",
+        input: "intervals = [[2,4],[7,9]], newInterval = [3,6]",
+        output: "[[2,6],[7,9]]",
       },
       {
-        input: "intervals = [[1,2],[3,5],[6,7],[8,10],[12,16]], newInterval = [4,8]",
-        output: "[[1,2],[3,10],[12,16]]",
-        explanation: "The new interval [4,8] overlaps with [3,5],[6,7],[8,10].",
+        input: "intervals = [[1,2],[4,6],[7,8],[9,11],[14,17]], newInterval = [5,9]",
+        output: "[[1,2],[4,11],[14,17]]",
+        explanation:
+          "newInterval [5,9] collides with [4,6], [7,8], and [9,11], so all four become [4,11].",
       },
     ],
     constraints: [
-      "0 <= intervals.length <= 10^4",
-      "intervals[i].length == 2",
-      "0 <= starti <= endi <= 10^5",
-      "intervals is sorted by starti in ascending order.",
-      "newInterval.length == 2",
-      "0 <= start <= end <= 10^5",
+      "The list can hold anywhere from 0 up to 10^4 ranges.",
+      "Each existing range is a pair of exactly 2 endpoints.",
+      "Existing endpoints satisfy 0 <= starti <= endi <= 10^5.",
+      "The list arrives ordered by its start values, smallest first.",
+      "newInterval is likewise a pair of 2 endpoints.",
+      "Its endpoints satisfy 0 <= start <= end <= 10^5.",
     ],
     hints: [
       "Three phases: intervals before, overlapping with, and after newInterval",
@@ -326,31 +327,33 @@ Return intervals after the insertion.`,
     pattern: "intervals",
     difficulty: "medium",
     companies: ["Google", "Amazon", "Meta"],
-    description: "Find minimum number of intervals to remove to make rest non-overlapping",
+    description: "Count the fewest deletions that leave no two ranges in conflict",
     tags: ["array", "greedy", "sorting", "intervals"],
     estimatedTime: 25,
-    problemStatement: `Given an array of intervals intervals where intervals[i] = [starti, endi], return the minimum number of intervals you need to remove to make the rest of the intervals non-overlapping.`,
+    problemStatement: `You're handed a batch of ranges as intervals, where intervals[i] = [starti, endi]. Some of them conflict with each other. Delete as few ranges as possible so that the survivors are mutually conflict-free, then report how many deletions that took.
+
+For this problem, two ranges conflict only when their interiors genuinely cross. Sharing a boundary point alone is harmless: [1,2] and [2,3] can coexist untouched.`,
     examples: [
       {
-        input: "intervals = [[1,2],[2,3],[3,4],[1,3]]",
+        input: "intervals = [[5,8],[8,10],[10,12],[6,11]]",
         output: "1",
-        explanation: "[1,3] can be removed and the rest of the intervals are non-overlapping.",
+        explanation: "Dropping [6,11] leaves ranges that only meet at edges, which is allowed.",
       },
       {
-        input: "intervals = [[1,2],[1,2],[1,2]]",
-        output: "2",
-        explanation: "You need to remove two [1,2] to make the rest non-overlapping.",
+        input: "intervals = [[4,7],[4,7],[4,7],[4,7]]",
+        output: "3",
+        explanation: "Only one copy of [4,7] can stay, so the other three must go.",
       },
       {
-        input: "intervals = [[1,2],[2,3]]",
+        input: "intervals = [[3,5],[5,9]]",
         output: "0",
-        explanation: "No intervals need to be removed as they are already non-overlapping.",
+        explanation: "These two merely touch at 5, so nothing has to be deleted.",
       },
     ],
     constraints: [
-      "1 <= intervals.length <= 10^5",
-      "intervals[i].length == 2",
-      "-5 * 10^4 <= starti < endi <= 5 * 10^4",
+      "Expect anywhere from 1 to 10^5 ranges.",
+      "A range always carries exactly 2 numbers.",
+      "Every bound fits within -5 * 10^4 <= starti < endi <= 5 * 10^4.",
     ],
     hints: [
       "This is an interval scheduling maximization problem",
@@ -435,24 +438,29 @@ Return intervals after the insertion.`,
     pattern: "intervals",
     difficulty: "medium",
     companies: ["Google", "Amazon", "Meta", "Microsoft", "Apple"],
-    description: "Find the minimum number of conference rooms required",
+    description: "Figure out how many rooms must be reserved for a day of meetings",
     tags: ["array", "heap", "sorting", "intervals", "two-pointers"],
     estimatedTime: 25,
-    problemStatement: `Given an array of meeting time intervals intervals where intervals[i] = [starti, endi], return the minimum number of conference rooms required.`,
+    problemStatement: `Your company's calendar for the day lives in intervals, with intervals[i] = [starti, endi] describing when each meeting runs. Two meetings whose times cross cannot share a room, so you must decide how much space to reserve.
+
+Return the smallest count of rooms that lets every meeting take place exactly as scheduled.`,
     examples: [
       {
-        input: "intervals = [[0,30],[5,10],[15,20]]",
+        input: "intervals = [[1,12],[3,7],[8,11]]",
         output: "2",
         explanation:
-          "Meetings [0,30] and [5,10] overlap, then [0,30] and [15,20] overlap. Need 2 rooms.",
+          "[1,12] occupies one room the whole time while [3,7] and later [8,11] use a second.",
       },
       {
-        input: "intervals = [[7,10],[2,4]]",
+        input: "intervals = [[9,11],[13,15]]",
         output: "1",
-        explanation: "Meetings do not overlap, so 1 room is enough.",
+        explanation: "One meeting wraps up before the other begins, so a single room does it.",
       },
     ],
-    constraints: ["1 <= intervals.length <= 10^4", "0 <= starti < endi <= 10^6"],
+    constraints: [
+      "The schedule contains between 1 and 10^4 meetings.",
+      "Times obey 0 <= starti < endi <= 10^6.",
+    ],
     hints: [
       "Sort intervals by start time",
       "Use a min-heap to track end times of ongoing meetings",
@@ -530,26 +538,28 @@ Return intervals after the insertion.`,
     pattern: "intervals",
     difficulty: "easy",
     companies: ["Amazon", "Meta", "Google", "Microsoft"],
-    description: "Check if a person can attend all meetings",
+    description: "Decide whether one calendar is free of double-bookings",
     tags: ["array", "sorting", "intervals"],
     estimatedTime: 15,
-    problemStatement: `Given an array of meeting time intervals where intervals[i] = [starti, endi], determine if a person could attend all meetings.`,
+    problemStatement: `You're looking after one person's schedule, given as intervals with intervals[i] = [starti, endi] for each appointment. Nobody can sit in two appointments at the same time.
+
+Report true if the whole agenda can be attended from start to finish, and false if any two entries clash.`,
     examples: [
       {
-        input: "intervals = [[0,30],[5,10],[15,20]]",
+        input: "intervals = [[2,9],[4,6],[11,14]]",
         output: "false",
-        explanation: "Meeting [0,30] overlaps with [5,10] and [15,20].",
+        explanation: "[4,6] falls entirely inside [2,9], so those two clash.",
       },
       {
-        input: "intervals = [[7,10],[2,4]]",
+        input: "intervals = [[6,8],[1,4]]",
         output: "true",
-        explanation: "Meetings don't overlap.",
+        explanation: "The earlier appointment ends before the later one starts.",
       },
     ],
     constraints: [
-      "0 <= intervals.length <= 10^4",
-      "intervals[i].length == 2",
-      "0 <= starti < endi <= 10^6",
+      "There may be no appointments at all: the count runs from 0 to 10^4.",
+      "Each appointment is a pair of exactly 2 numbers.",
+      "Times satisfy 0 <= starti < endi <= 10^6.",
     ],
     hints: [
       "Sort by start time",

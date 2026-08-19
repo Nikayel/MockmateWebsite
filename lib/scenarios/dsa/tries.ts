@@ -21,26 +21,25 @@ export const triesScenarios: DSAScenario[] = [
       "Design and implement a trie data structure with insert, search, and startsWith operations",
     tags: ["trie", "design", "string", "hash-table"],
     estimatedTime: 25,
-    problemStatement: `A trie (pronounced as "try") or prefix tree is a tree data structure used to efficiently store and retrieve keys in a dataset of strings. There are various applications of this data structure, such as autocomplete and spellchecker.
+    problemStatement: `You're building the Trie class, the prefix tree behind features like autocomplete and spell checking. It collects strings and answers two kinds of membership questions about everything collected so far.
 
-Implement the Trie class:
-- Trie() Initializes the trie object.
-- void insert(String word) Inserts the string word into the trie.
-- boolean search(String word) Returns true if the string word is in the trie (i.e., was inserted before), and false otherwise.
-- boolean startsWith(String prefix) Returns true if there is a previously inserted string word that has the prefix prefix, and false otherwise.`,
+- Trie() constructs an empty structure.
+- insert(word) records word.
+- search(word) returns true only when word itself was inserted earlier; a string that merely opens some longer inserted word does not count as present.
+- startsWith(prefix) returns true when at least one inserted word begins with prefix, and a word always counts as a prefix of itself.`,
     examples: [
       {
         input:
-          '["Trie", "insert", "search", "search", "startsWith", "insert", "search"]\n[[], ["apple"], ["apple"], ["app"], ["app"], ["app"], ["app"]]',
+          '["Trie", "insert", "search", "search", "startsWith", "insert", "search"]\n[[], ["planet"], ["planet"], ["plan"], ["plan"], ["plan"], ["plan"]]',
         output: "[null, null, true, false, true, null, true]",
         explanation:
-          'Trie trie = new Trie();\ntrie.insert("apple"); trie.search("apple"); // true\ntrie.search("app"); // false\ntrie.startsWith("app"); // true\ntrie.insert("app"); trie.search("app"); // true',
+          'insert("planet") stores the word. search("planet") finds it, while search("plan") stays false because "plan" is only the front of a stored word. startsWith("plan") is true thanks to "planet". Once insert("plan") runs, search("plan") flips to true.',
       },
     ],
     constraints: [
-      "1 <= word.length, prefix.length <= 2000",
-      "word and prefix consist only of lowercase English letters.",
-      "At most 3 * 10^4 calls in total will be made to insert, search, and startsWith.",
+      "Both word and prefix run from 1 to 2000 characters.",
+      "Only lowercase English letters appear in word and prefix.",
+      "insert, search, and startsWith together are called at most 3 * 10^4 times.",
     ],
     hints: [
       "Each node in the trie should have an array of 26 children (for lowercase letters) and a boolean to mark end of word",
@@ -164,31 +163,32 @@ Implement the Trie class:
     description: "Find all words from a dictionary that exist in a 2D board of characters",
     tags: ["trie", "backtracking", "matrix", "dfs"],
     estimatedTime: 45,
-    problemStatement: `Given an m x n board of characters and a list of strings words, return all words on the board.
+    problemStatement: `You're handed board, an m x n grid of lowercase letters, and words, a list of dictionary entries. Return every entry that can be spelled by tracing a path through the grid.
 
-Each word must be constructed from letters of sequentially adjacent cells, where adjacent cells are horizontally or vertically neighboring. The same letter cell may not be used more than once in a word.`,
+A path begins on any cell and extends one step at a time to a cell directly above, below, left, or right of the current one. Diagonal moves are not allowed, and a single path may never revisit a cell it has already used. List each spellable entry once, no matter how many distinct paths produce it.`,
     examples: [
       {
         input:
-          'board = [["o","a","a","n"],["e","t","a","e"],["i","h","k","r"],["i","f","l","v"]], words = ["oath","pea","eat","rain"]',
-        output: '["eat","oath"]',
-        explanation: 'Both "oath" and "eat" can be constructed from adjacent letters on the board.',
+          'board = [["c","o","r","n"],["d","e","l","t"],["h","m","a","x"],["y","u","s","k"]], words = ["corn","melt","mash","vast"]',
+        output: '["corn","melt"]',
+        explanation:
+          '"corn" runs across the top row, and "melt" climbs from the m up to e then right along l and t. "mash" dead-ends before reaching an h, and the board holds no v for "vast".',
       },
       {
-        input: 'board = [["a","b"],["c","d"]], words = ["abcb"]',
+        input: 'board = [["p","q"],["s","r"]], words = ["pqrq"]',
         output: "[]",
-        explanation: 'The word "abcb" cannot be formed without reusing cells.',
+        explanation: 'Spelling "pqrq" would require stepping on the lone "q" cell twice.',
       },
     ],
     constraints: [
-      "m == board.length",
-      "n == board[i].length",
-      "1 <= m, n <= 12",
-      "board[i][j] is a lowercase English letter.",
-      "1 <= words.length <= 3 * 10^4",
-      "1 <= words[i].length <= 10",
-      "words[i] consists of lowercase English letters.",
-      "All the strings of words are unique.",
+      "m equals board.length, the number of rows.",
+      "n equals board[i].length, the number of columns.",
+      "Grid dimensions satisfy 1 <= m, n <= 12.",
+      "Every cell board[i][j] stores a lowercase English letter.",
+      "The word list size obeys 1 <= words.length <= 3 * 10^4.",
+      "Each entry's length obeys 1 <= words[i].length <= 10.",
+      "Entries in words consist of lowercase English letters.",
+      "No entry appears twice in words.",
     ],
     hints: [
       "Build a Trie from all words first - this allows efficient prefix checking",
@@ -263,41 +263,32 @@ Each word must be constructed from letters of sequentially adjacent cells, where
     pattern: "trie",
     difficulty: "hard",
     companies: ["Google", "Amazon", "Meta", "Microsoft", "Apple"],
-    description: "Design a search autocomplete system that returns top 3 historical hot sentences",
+    description:
+      "Design a search autocomplete system that surfaces the three most-typed sentences for a prefix",
     tags: ["trie", "design", "string", "heap", "sorting"],
     estimatedTime: 45,
-    problemStatement: `Design a search autocomplete system for a search engine. Users may input a sentence (at least one word and end with a special character '#').
+    problemStatement: `You're building the ranking engine behind a search box, exposed as the AutocompleteSystem class. It is constructed from two parallel arrays of length n: sentences, holding queries users typed in the past, and times, where times[i] records how many times sentences[i] was typed. After construction, a user types one character at a time through input(c), and every sentence they type finishes with the special character '#'.
 
-You are given a string array sentences and an integer array times both of length n where sentences[i] is a previously typed sentence and times[i] is the corresponding number of times the sentence was typed.
+For any character except '#', input(c) returns up to 3 suggestions: the historical sentences that begin with everything typed so far in the current sentence. A sentence's heat is the number of times it has been typed in full before. Order suggestions by heat, highest first, and settle equal heat by ASCII order, smaller string first. When fewer than 3 sentences match the prefix, return all of the matches.
 
-For each input character except '#', return the top 3 historical hot sentences that have the same prefix as the part of the sentence already typed. Here are the specific rules:
-
-- The hot degree for a sentence is defined as the number of times a user typed the exactly same sentence before.
-- The returned top 3 hot sentences should be sorted by hot degree (descendingly). If several sentences have the same hot degree, use ASCII-code order (smaller one appears first).
-- If less than 3 hot sentences exist, return as many as you can.
-- When the input is '#', it means the sentence ends, and in this case, you need to return an empty list.
-
-Implement the AutocompleteSystem class:
-- AutocompleteSystem(String[] sentences, int[] times) Initializes the object with sentences and times.
-- List<String> input(char c) Takes the next character c of the input sentence and returns the hot sentences.`,
+When c is '#', the sentence in progress is complete. Record it into the history (its typed count grows by one), reset the working prefix, and return an empty list.`,
     examples: [
       {
         input:
-          'AutocompleteSystem(["i love you", "island", "iroman", "i love leetcode"], [5, 3, 2, 2])\ninput("i")\ninput(" ")\ninput("a")\ninput("#")',
-        output:
-          '[["i love you", "island", "i love leetcode"], ["i love you", "i love leetcode"], [], []]',
+          'AutocompleteSystem(["hot pot", "horizon", "hazmat", "hey there"], [7, 4, 3, 2])\ninput("h")\ninput("o")\ninput("b")\ninput("#")',
+        output: '[["hot pot", "horizon", "hazmat"], ["hot pot", "horizon"], [], []]',
         explanation:
-          'After typing "i", top 3 are returned. After "i ", only sentences starting with "i " qualify. After "i a", no matches. "#" ends input.',
+          'Typing "h" matches all four sentences, so the three most-typed come back. "ho" narrows the field to two. "hob" matches nothing, and "#" finishes the sentence, storing "hob" in the history.',
       },
     ],
     constraints: [
-      "n == sentences.length == times.length",
-      "1 <= n <= 100",
-      "1 <= sentences[i].length <= 100",
-      "1 <= times[i] <= 50",
-      'c is a lowercase English letter, a hash "#", or space " ".',
-      'Each tested sentence will be a sequence of characters c that end with "#".',
-      "At most 5000 calls will be made to input.",
+      "sentences and times share one length, n.",
+      "n stays within 1 <= n <= 100.",
+      "Sentence lengths obey 1 <= sentences[i].length <= 100.",
+      "Prior counts satisfy 1 <= times[i] <= 50.",
+      'Each character c is a lowercase English letter, a space " ", or the terminator "#".',
+      'Sentences arrive one character at a time, and every one of them closes with "#".',
+      "input receives at most 5000 calls.",
     ],
     hints: [
       "Use a Trie to store all sentences with their frequencies at leaf nodes",
@@ -403,35 +394,34 @@ Implement the AutocompleteSystem class:
     pattern: "trie",
     difficulty: "medium",
     companies: ["Google", "Amazon", "Meta", "Apple", "Microsoft"],
-    description: "Determine if a string can be segmented into dictionary words",
+    description: "Decide whether a string can be split entirely into dictionary words",
     tags: ["trie", "dynamic-programming", "string", "memoization"],
     estimatedTime: 25,
-    problemStatement: `Given a string s and a dictionary of strings wordDict, return true if s can be segmented into a space-separated sequence of one or more dictionary words.
+    problemStatement: `You're given a string s and a word list wordDict. Determine whether s can be carved into consecutive pieces so that every piece is a wordDict entry and the pieces, joined back together, spell s exactly with no characters left over. Report true when some such split exists and false when none does.
 
-Note that the same word in the dictionary may be reused multiple times in the segmentation.`,
+Reuse is unrestricted: one wordDict entry may appear in the split any number of times.`,
     examples: [
       {
-        input: 's = "leetcode", wordDict = ["leet","code"]',
+        input: 's = "playground", wordDict = ["play","ground"]',
         output: "true",
-        explanation: 'Return true because "leetcode" can be segmented as "leet code".',
+        explanation: '"playground" splits cleanly as "play ground".',
       },
       {
-        input: 's = "applepenapple", wordDict = ["apple","pen"]',
+        input: 's = "codebugcode", wordDict = ["code","bug"]',
         output: "true",
-        explanation:
-          'Return true because "applepenapple" can be segmented as "apple pen apple". Note that you are allowed to reuse a dictionary word.',
+        explanation: '"codebugcode" splits as "code bug code", using "code" twice.',
       },
       {
-        input: 's = "catsandog", wordDict = ["cats","dog","sand","and","cat"]',
+        input: 's = "rainbowl", wordDict = ["rain","bow","owl","in"]',
         output: "false",
       },
     ],
     constraints: [
-      "1 <= s.length <= 300",
-      "1 <= wordDict.length <= 1000",
-      "1 <= wordDict[i].length <= 20",
-      "s and wordDict[i] consist of only lowercase English letters.",
-      "All the strings of wordDict are unique.",
+      "s runs between 1 and 300 characters.",
+      "wordDict holds from 1 to 1000 words.",
+      "Each dictionary word spans 1 to 20 characters.",
+      "Lowercase English letters make up s and every wordDict entry.",
+      "wordDict never lists the same word twice.",
     ],
     hints: [
       "Build a Trie from wordDict for O(1) prefix checking",
@@ -498,34 +488,34 @@ Note that the same word in the dictionary may be reused multiple times in the se
     description: "Replace words in a sentence with their shortest root from a dictionary",
     tags: ["trie", "string", "array", "hash-table"],
     estimatedTime: 25,
-    problemStatement: `In English, we have a concept called root, which can be followed by some other word to form another longer word - let's call this word successor. For example, when the root "an" is followed by the successor word "other", we can form a new word "another".
+    problemStatement: `You're given dictionary, an array of roots, and sentence, a string of words separated by spaces. A root builds longer words by taking on a suffix: the root "plant" can grow into "plantation". Walk through sentence word by word and shrink wherever possible: when a word starts with at least one of the roots, swap the word for the shortest root matching its opening letters. A word that no root can claim stays as it is.
 
-Given a dictionary consisting of many roots and a sentence consisting of words separated by spaces, replace all the successors in the sentence with the root forming it. If a successor can be replaced by more than one root, replace it with the root that has the shortest length.
-
-Return the sentence after the replacement.`,
+Return the rebuilt sentence, words in their original order.`,
     examples: [
       {
         input:
-          'dictionary = ["cat","bat","rat"], sentence = "the cattle was rattled by the battery"',
-        output: '"the cat was rat by the bat"',
-        explanation: '"cattle" -> "cat", "rattled" -> "rat", "battery" -> "bat"',
+          'dictionary = ["farm","toy","grow"], sentence = "the farmer was growing toys near the farmland"',
+        output: '"the farm was grow toy near the farm"',
+        explanation:
+          '"farmer" and "farmland" shrink to "farm", "growing" to "grow", "toys" to "toy".',
       },
       {
-        input: 'dictionary = ["a","b","c"], sentence = "aadsfasf absbs bbab cadsfabd"',
-        output: '"a]a b c"',
-        explanation: "Each word is replaced by its shortest root.",
+        input: 'dictionary = ["d","e","f"], sentence = "dishes eggs forks spoons"',
+        output: '"d e f spoons"',
+        explanation:
+          'Three words open with a single-letter root and collapse to it; "spoons" matches no root and survives intact.',
       },
     ],
     constraints: [
-      "1 <= dictionary.length <= 1000",
-      "1 <= dictionary[i].length <= 100",
-      "dictionary[i] consists of only lower-case letters.",
-      "1 <= sentence.length <= 10^6",
-      "sentence consists of only lower-case letters and spaces.",
-      "The number of words in sentence is in the range [1, 1000]",
-      "The length of each word in sentence is in the range [1, 1000]",
-      "Every two consecutive words in sentence will be separated by exactly one space.",
-      "sentence does not have leading or trailing spaces.",
+      "dictionary carries between 1 and 1000 roots.",
+      "Each root's length falls between 1 and 100.",
+      "Roots are built from lower-case letters only.",
+      "sentence has length 1 to 10^6.",
+      "Only lower-case letters and spaces appear in sentence.",
+      "sentence contains between 1 and 1000 words.",
+      "Each sentence word runs from 1 to 1000 characters.",
+      "Neighboring words are separated by exactly one space.",
+      "No leading or trailing spaces surround sentence.",
     ],
     hints: [
       "Build a Trie from the dictionary roots",
@@ -591,26 +581,25 @@ Return the sentence after the replacement.`,
     description: "Design a data structure that supports adding words and searching with wildcards",
     tags: ["trie", "design", "string", "dfs"],
     estimatedTime: 30,
-    problemStatement: `Design a data structure that supports adding new words and finding if a string matches any previously added string.
+    problemStatement: `You're assembling WordDictionary, a class that accumulates words and then answers pattern lookups over everything accumulated so far.
 
-Implement the WordDictionary class:
-- WordDictionary() Initializes the object.
-- void addWord(word) Adds word to the data structure, it can be matched later.
-- bool search(word) Returns true if there is any string in the data structure that matches word or false otherwise. word may contain dots '.' where dots can be matched with any letter.`,
+- WordDictionary() creates the empty structure.
+- addWord(word) stores word for future matching.
+- search(word) reports whether any stored word matches the query. A query may contain the character '.', and each '.' stands in for exactly one letter of any kind. All other characters must match literally, which also means a matching word always has the same length as the query.`,
     examples: [
       {
         input:
-          '["WordDictionary","addWord","addWord","addWord","search","search","search","search"]\n[[],["bad"],["dad"],["mad"],["pad"],["bad"],[".ad"],["b.."]]',
+          '["WordDictionary","addWord","addWord","addWord","search","search","search","search"]\n[[],["sun"],["run"],["fun"],["gun"],["run"],[".un"],["s.."]]',
         output: "[null,null,null,null,false,true,true,true]",
         explanation:
-          'addWord adds words, search("pad") returns false (not added), search(".ad") matches "bad","dad","mad"',
+          'search("gun") fails because "gun" was never added. search("run") hits an exact match, ".un" matches every stored word, and "s.." pins the first letter while wildcarding the other two.',
       },
     ],
     constraints: [
-      "1 <= word.length <= 25",
-      "word in addWord consists of lowercase English letters.",
-      'word in search consists of "." or lowercase English letters.',
-      "At most 10^4 calls to addWord and search.",
+      "Word lengths satisfy 1 <= word.length <= 25.",
+      "Arguments to addWord contain lowercase English letters only.",
+      'Arguments to search mix lowercase English letters with the wildcard ".".',
+      "addWord and search together receive at most 10^4 calls.",
     ],
     hints: [
       "Use Trie for efficient prefix matching",

@@ -16,24 +16,27 @@ export const slidingWindowScenarios: DSAScenario[] = [
     description: "Find the maximum profit from buying and selling a stock",
     tags: ["array", "dynamic-programming", "greedy"],
     estimatedTime: 20,
-    problemStatement: `You are given an array prices where prices[i] is the price of a given stock on the ith day.
+    problemStatement: `The array prices charts a single stock across consecutive days, with prices[i] being its price on day i. You get one trade at most: pick a day to buy one share, then sell that share on some later day. The sell can never land on or before the buy.
 
-You want to maximize your profit by choosing a single day to buy one stock and choosing a different day in the future to sell that stock.
-
-Return the maximum profit you can achieve from this transaction. If you cannot achieve any profit, return 0.`,
+Return the largest profit such a trade can produce. If every possible pairing loses money, make no trade and return 0.`,
     examples: [
       {
-        input: "prices = [7,1,5,3,6,4]",
-        output: "5",
-        explanation: "Buy on day 2 (price = 1) and sell on day 5 (price = 6), profit = 6-1 = 5.",
+        input: "prices = [9,2,8,4,10,3]",
+        output: "8",
+        explanation:
+          "Buy on day 2 when the price dips to 2, sell on day 5 at 10, and clear 10-2 = 8.",
       },
       {
-        input: "prices = [7,6,4,3,1]",
+        input: "prices = [12,11,8,5,2]",
         output: "0",
-        explanation: "In this case, no transactions are done and the max profit = 0.",
+        explanation:
+          "The price only falls, so every buy-then-sell pairing loses; skip trading and take 0.",
       },
     ],
-    constraints: ["1 <= prices.length <= 10^5", "0 <= prices[i] <= 10^4"],
+    constraints: [
+      "prices covers between 1 and 10^5 days",
+      "Each day's price falls between 0 and 10^4",
+    ],
     hints: [
       "Track the minimum price seen so far",
       "For each price, calculate the profit if we sold today",
@@ -116,30 +119,33 @@ public:
     pattern: "sliding-window",
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Microsoft", "Apple", "TikTok", "Reddit", "Spotify"],
-    description: "Find the length of the longest substring without repeating characters.",
+    description: "Measure the longest run of characters in a string where nothing repeats.",
     tags: ["string", "sliding-window", "hash-table"],
     estimatedTime: 25,
-    problemStatement: `Given a string s, find the length of the longest substring without repeating characters.`,
+    problemStatement: `Take a string s and hunt for its longest substring in which no character shows up twice. Report that substring's length, not the substring itself.
+
+A substring is a contiguous block of s, so its characters have to sit side by side in the original string.`,
     examples: [
       {
-        input: 's = "abcabcbb"',
-        output: "3",
-        explanation: 'The answer is "abc", with the length of 3',
+        input: 's = "wovewove"',
+        output: "4",
+        explanation: 'The best stretch is "wove", 4 characters long',
       },
       {
-        input: 's = "bbbbb"',
+        input: 's = "gggg"',
         output: "1",
-        explanation: 'The answer is "b", with the length of 1',
+        explanation: 'Every character matches, so a lone "g" of length 1 is the best available',
       },
       {
-        input: 's = "pwwkew"',
-        output: "3",
-        explanation: 'The answer is "wke", with the length of 3',
+        input: 's = "swwiftw"',
+        output: "4",
+        explanation:
+          '"wift" wins with length 4. "swift" looks tempting, but its letters are not contiguous in s',
       },
     ],
     constraints: [
-      "0 <= s.length <= 5 * 10^4",
-      "s consists of English letters, digits, symbols and spaces",
+      "s runs from 0 to 5 * 10^4 characters",
+      "Expect English letters, digits, symbols, and spaces in s",
     ],
     hints: [
       "Use sliding window with two pointers",
@@ -184,7 +190,8 @@ public:
     // ==========================================
     // Real Interview Mode (Fuzzy Mode) Fields
     // ==========================================
-    fuzzyStatement: "Given a string, find the longest substring without repeating characters.",
+    fuzzyStatement:
+      "You get a string. Find the longest chunk of it that never repeats a character.",
 
     clarifyingQuestions: [
       {
@@ -277,22 +284,26 @@ public:
     description: "Find maximum in each sliding window of size k.",
     tags: ["array", "deque", "sliding-window"],
     estimatedTime: 30,
-    problemStatement: `You are given an array of integers nums, and there is a sliding window of size k which is moving from the very left of the array to the very right. You can only see the k numbers in the window. Each time the sliding window moves right by one position.
+    problemStatement: `A frame spanning exactly k consecutive entries starts at the left edge of the integer array nums. Step by step it shifts one position rightward until it sits flush against the array's right edge, and at every stop only the k values inside the frame are visible.
 
-Return the max sliding window - an array of the maximum values in each window.`,
+Record the largest visible value at each stop, and return those maximums in order as an array.`,
     examples: [
       {
-        input: "nums = [1,3,-1,-3,5,3,6,7], k = 3",
-        output: "[3,3,5,5,6,7]",
+        input: "nums = [2,5,-2,-4,8,1,9], k = 3",
+        output: "[5,5,8,8,9]",
         explanation:
-          "Window positions and max: [1,3,-1]→3, [3,-1,-3]→3, [-1,-3,5]→5, [-3,5,3]→5, [5,3,6]→6, [3,6,7]→7",
+          "Frame stops and their largest values: [2,5,-2]→5, [5,-2,-4]→5, [-2,-4,8]→8, [-4,8,1]→8, [8,1,9]→9",
       },
       {
-        input: "nums = [1], k = 1",
-        output: "[1]",
+        input: "nums = [6], k = 1",
+        output: "[6]",
       },
     ],
-    constraints: ["1 <= nums.length <= 10^5", "-10^4 <= nums[i] <= 10^4", "1 <= k <= nums.length"],
+    constraints: [
+      "nums holds between 1 and 10^5 values",
+      "Entries range across -10^4 to 10^4",
+      "k is at least 1 and never larger than nums.length",
+    ],
     hints: [
       "Use deque to maintain window in decreasing order",
       "Remove elements outside window from front",
@@ -354,30 +365,31 @@ Return the max sliding window - an array of the maximum values in each window.`,
     description: "Find minimum window in s containing all chars from t.",
     tags: ["string", "sliding-window", "hash-table"],
     estimatedTime: 35,
-    problemStatement: `Given two strings s and t of lengths m and n respectively, return the minimum window substring of s such that every character in t (including duplicates) is included in the window. If there is no such substring, return the empty string "".
+    problemStatement: `Two strings come in: s of length m and t of length n. Search s for the shortest substring that covers all of t, meaning each character of t appears inside that substring at least as many times as it appears in t. Duplicates in t raise the bar: if t carries two copies of a letter, a qualifying window needs two as well.
 
-The testcases will be generated such that the answer is unique.`,
+Return that shortest substring. When no window of s covers t, return the empty string "". You can count on the answer being unique for every test.`,
     examples: [
       {
-        input: 's = "ADOBECODEBANC", t = "ABC"',
-        output: '"BANC"',
-        explanation: 'The minimum window substring "BANC" includes A, B, and C from string t.',
+        input: 's = "XAAYBZCXKZY", t = "XYZ"',
+        output: '"XKZY"',
+        explanation:
+          'The tightest stretch of s covering X, Y, and Z is "XKZY"; the K just rides along.',
       },
       {
-        input: 's = "a", t = "a"',
-        output: '"a"',
+        input: 's = "q", t = "q"',
+        output: '"q"',
       },
       {
-        input: 's = "a", t = "aa"',
+        input: 's = "mn", t = "mm"',
         output: '""',
-        explanation: "s does not contain two a's, so return empty string.",
+        explanation: "t demands two m's and s only has one, so no window qualifies.",
       },
     ],
     constraints: [
-      "m == s.length",
-      "n == t.length",
-      "1 <= m, n <= 10^5",
-      "s and t consist of uppercase and lowercase English letters.",
+      "m is the length of s",
+      "n is the length of t",
+      "Both lengths sit between 1 and 10^5",
+      "Only uppercase and lowercase English letters appear in s and t.",
     ],
     hints: [
       "Use sliding window with two pointers",
@@ -439,23 +451,26 @@ The testcases will be generated such that the answer is unique.`,
     description: "Find longest substring with same letter after k replacements",
     tags: ["string", "sliding-window", "hash-table"],
     estimatedTime: 25,
-    problemStatement: `You are given a string s and an integer k. You can choose any character of the string and change it to any other uppercase English character. You can perform this operation at most k times. Return the length of the longest substring containing the same letter you can get after performing the above operations.`,
+    problemStatement: `A string s of uppercase letters comes with an edit budget k. Spending one unit lets you overwrite any single position of s with whatever uppercase letter you like, and you can spend at most k units in total.
+
+After your edits, some substring will consist of one letter repeated. Return the longest length such a uniform substring can reach.`,
     examples: [
       {
-        input: 's = "ABAB", k = 2',
-        output: "4",
-        explanation: "Replace the two A's with two B's or vice versa.",
+        input: 's = "CDCDC", k = 2',
+        output: "5",
+        explanation: "Turn both D's into C's and the whole string becomes \"CCCCC\".",
       },
       {
-        input: 's = "AABABBA", k = 1',
+        input: 's = "GGHGHHG", k = 1',
         output: "4",
-        explanation: 'Replace one A in the middle to get "AABBBBA" or similar.',
+        explanation:
+          'Rewriting the first H as G yields the run "GGGG"; no window of length 5 can go uniform on one edit.',
       },
     ],
     constraints: [
-      "1 <= s.length <= 10^5",
-      "s consists of only uppercase English letters",
-      "0 <= k <= s.length",
+      "s runs from 1 to 10^5 characters",
+      "Nothing but uppercase English letters appears in s",
+      "k can be as small as 0 and never exceeds s.length",
     ],
     hints: [
       "Use sliding window with character frequency count",
@@ -483,18 +498,27 @@ The testcases will be generated such that the answer is unique.`,
     description: "Check if s2 contains a permutation of s1",
     tags: ["string", "sliding-window", "hash-table"],
     estimatedTime: 25,
-    problemStatement: `Given two strings s1 and s2, return true if s2 contains a permutation of s1, or false otherwise. In other words, return true if one of s1's permutations is a substring of s2.`,
+    problemStatement: `Two lowercase strings s1 and s2 are in play. Decide whether some contiguous slice of s2 is a rearrangement of s1: the exact same letters with the exact same counts, just possibly shuffled. Return true when such a slice exists and false when none does.`,
     examples: [
       {
-        input: 's1 = "ab", s2 = "eidbaooo"',
+        input: 's1 = "tao", s2 = "chaotic"',
         output: "true",
-        explanation: 's2 contains one permutation of s1 ("ba").',
+        explanation: 'The slice "aot" inside s2 rearranges into s1.',
       },
-      { input: 's1 = "ab", s2 = "eidboaoo"', output: "false" },
+      {
+        input: 's1 = "tao", s2 = "cathode"',
+        output: "false",
+        explanation: "All three letters appear in s2, but never side by side.",
+      },
+      {
+        input: 's1 = "veto", s2 = "vet"',
+        output: "false",
+        explanation: "s1 does not even fit inside s2, so no slice can work.",
+      },
     ],
     constraints: [
-      "1 <= s1.length, s2.length <= 10^4",
-      "s1 and s2 consist of lowercase English letters",
+      "s1 and s2 each run from 1 to 10^4 characters",
+      "Only lowercase English letters appear in s1 and s2",
     ],
     hints: [
       "Use sliding window of size s1.length",
@@ -522,16 +546,21 @@ The testcases will be generated such that the answer is unique.`,
     description: "Find longest subarray of 1s after flipping at most k 0s",
     tags: ["array", "sliding-window"],
     estimatedTime: 20,
-    problemStatement: `Given a binary array nums and an integer k, return the maximum number of consecutive 1's in the array if you can flip at most k 0's.`,
+    problemStatement: `The array nums contains nothing but 0s and 1s, and you're allowed to turn up to k of its 0s into 1s. Choose those flips to build the longest possible unbroken run of 1s, then return that run's length.`,
     examples: [
       {
-        input: "nums = [1,1,1,0,0,0,1,1,1,1,0], k = 2",
-        output: "6",
-        explanation: "Flip the bolded zeros: [1,1,1,0,0,1,1,1,1,1,1]",
+        input: "nums = [1,0,1,1,0,1,0,1,1], k = 2",
+        output: "7",
+        explanation:
+          "Flip the zeros at positions 4 and 6: [1,0,1,1,1,1,1,1,1] has seven 1s in a row",
       },
-      { input: "nums = [0,0,1,1,0,0,1,1,1,0,1,1,0,0,0,1,1,1,1], k = 3", output: "10" },
+      { input: "nums = [0,1,1,0,1,0,1,1,1,0,0,1,1,1,0,1,1], k = 3", output: "11" },
     ],
-    constraints: ["1 <= nums.length <= 10^5", "nums[i] is either 0 or 1", "0 <= k <= nums.length"],
+    constraints: [
+      "nums holds between 1 and 10^5 entries",
+      "Every entry is a 0 or a 1",
+      "k ranges from 0 up to nums.length",
+    ],
     hints: [
       "Sliding window: expand right, shrink left when zeros > k",
       "Count zeros in current window",

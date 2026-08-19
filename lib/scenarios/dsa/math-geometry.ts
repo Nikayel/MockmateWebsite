@@ -13,26 +13,26 @@ export const mathGeometryScenarios: DSAScenario[] = [
     pattern: "math-geometry",
     difficulty: "medium",
     companies: ["Amazon", "Apple", "Microsoft", "Meta"],
-    description: "Rotate an N x N 2D matrix by 90 degrees clockwise in-place",
+    description: "Turn a square matrix 90 degrees clockwise without allocating a second grid",
     tags: ["array", "matrix", "math"],
     estimatedTime: 20,
-    problemStatement: `You are given an n x n 2D matrix representing an image, rotate the image by 90 degrees (clockwise).
+    problemStatement: `You're working with a square image stored as an n x n matrix of pixel values, and the picture needs to turn 90 degrees clockwise. After the turn, what was the top row of matrix should read down its rightmost column.
 
-You have to rotate the image in-place, which means you have to modify the input 2D matrix directly. DO NOT allocate another 2D matrix and do the rotation.`,
+Do the whole transformation in-place: overwrite the entries of matrix itself as you work. Building a second array to hold the rotated result is off the table.`,
     examples: [
       {
-        input: "matrix = [[1,2,3],[4,5,6],[7,8,9]]",
-        output: "[[7,4,1],[8,5,2],[9,6,3]]",
+        input: "matrix = [[2,14,8],[5,7,11],[16,3,9]]",
+        output: "[[16,5,2],[3,7,14],[9,11,8]]",
       },
       {
-        input: "matrix = [[5,1,9,11],[2,4,8,10],[13,3,6,7],[15,14,12,16]]",
-        output: "[[15,13,2,5],[14,3,4,1],[12,6,8,9],[16,7,10,11]]",
+        input: "matrix = [[21,3,17,6],[10,25,8,19],[4,12,30,7],[18,9,5,22]]",
+        output: "[[18,4,10,21],[9,12,25,3],[5,30,8,17],[22,7,19,6]]",
       },
     ],
     constraints: [
-      "n == matrix.length == matrix[i].length",
-      "1 <= n <= 20",
-      "-1000 <= matrix[i][j] <= 1000",
+      "matrix is always square, with n == matrix.length == matrix[i].length",
+      "The side length obeys 1 <= n <= 20",
+      "Every cell holds a value in -1000 <= matrix[i][j] <= 1000",
     ],
     hints: [
       "Transpose the matrix first (swap rows and columns)",
@@ -124,38 +124,33 @@ public:
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Microsoft"],
     description:
-      "Implement the myAtoi(string s) function which converts a string to a 32-bit signed integer.",
+      "Parse a string into a 32-bit signed integer, honoring whitespace, sign, and clamping rules.",
     tags: ["string", "implementation"],
     estimatedTime: 30,
-    problemStatement: `Implement the myAtoi(string s) function, which converts a string to a 32-bit signed integer (similar to C/C++'s atoi function).
+    problemStatement: `You're building myAtoi(s), a parser that turns the string s into a 32-bit signed integer, mirroring how C's atoi behaves.
 
-The algorithm for myAtoi(string s) is as follows:
+Scan s from the left. First, skip past any run of leading spaces. Next, if the character you land on is '+' or '-', consume it: a '-' marks the outcome negative, while a '+' or no sign at all leaves it positive. Then keep consuming digit characters, accumulating the number they spell, and stop the moment you meet anything that is not a digit or run out of string; whatever comes after is irrelevant. Leading zeros carry no weight, so "0057" spells 57, and if you never consumed a single digit the value is 0.
 
-1. Read in and ignore any leading whitespace.
-2. Check if the next character (if not already at the end of the string) is '-' or '+'. Read this character in if it is either. This determines if the final result is negative or positive respectively. Assume the result is positive if neither is present.
-3. Read in next the characters until the next non-digit character or the end of the input is reached. The rest of the string is ignored.
-4. Convert these digits into an integer (i.e. "123" -> 123, "0032" -> 32). If no digits were read, then the integer is 0. Change the sign as necessary (from step 2).
-5. If the integer is out of the 32-bit signed integer range [-2^31, 2^31 - 1], then clamp the integer so that it remains in the range. Specifically, integers less than -2^31 should be clamped to -2^31, and integers greater than 2^31 - 1 should be clamped to 2^31 - 1.
-6. Return the integer as the final result.`,
+Finally, apply the sign and clamp: anything below -2^31 becomes -2^31, and anything above 2^31 - 1 becomes 2^31 - 1. Hand back that clamped value.`,
     examples: [
       {
-        input: 's = "42"',
-        output: "42",
+        input: 's = "731"',
+        output: "731",
       },
       {
-        input: 's = "   -42"',
-        output: "-42",
-        explanation: 'Leading whitespace is ignored, then "-" is read so result is negative',
+        input: 's = "   -905"',
+        output: "-905",
+        explanation: "Spaces are skipped, then the minus sign makes the parsed 905 negative",
       },
       {
-        input: 's = "4193 with words"',
-        output: "4193",
-        explanation: "Reading stops at first non-digit character",
+        input: 's = "2681 apples"',
+        output: "2681",
+        explanation: "Digits are consumed until the space; everything after is discarded",
       },
     ],
     constraints: [
-      "0 <= s.length <= 200",
-      "s consists of English letters (lower-case and upper-case), digits (0-9), ' ', '+', '-', and '.'.",
+      "The length can be anywhere in 0 <= s.length <= 200",
+      "Only upper-case and lower-case English letters, digits (0-9), ' ', '+', '-', and '.' appear in s",
     ],
     hints: [
       "Handle edge cases: leading whitespace, sign, overflow",
@@ -204,22 +199,24 @@ The algorithm for myAtoi(string s) is as follows:
     pattern: "math-geometry",
     difficulty: "medium",
     companies: ["Amazon", "Apple", "Microsoft", "Meta", "Google"],
-    description: "Return all elements of a matrix in spiral order",
+    description: "Flatten a rectangular matrix by walking it in a clockwise spiral",
     tags: ["array", "matrix", "simulation"],
     estimatedTime: 25,
-    problemStatement: `Given an m x n matrix, return all elements of the matrix in spiral order.`,
+    problemStatement: `You're looking at an m x n grid called matrix, and you need to flatten it into a single list by visiting cells in spiral order.
+
+Start at the top-left corner and sweep across the first row. On hitting the edge, head down the final column, then backwards along the bottom row, then up the leftmost column, and keep circling inward ring by ring until every cell has been visited exactly once. Return the values in the order you collected them.`,
     examples: [
-      { input: "matrix = [[1,2,3],[4,5,6],[7,8,9]]", output: "[1,2,3,6,9,8,7,4,5]" },
+      { input: "matrix = [[12,4,25],[7,18,9],[31,6,15]]", output: "[12,4,25,9,15,6,31,7,18]" },
       {
-        input: "matrix = [[1,2,3,4],[5,6,7,8],[9,10,11,12]]",
-        output: "[1,2,3,4,8,12,11,10,9,5,6,7]",
+        input: "matrix = [[3,14,8,21],[6,17,2,10],[19,5,13,26]]",
+        output: "[3,14,8,21,10,26,13,5,19,6,17,2]",
       },
     ],
     constraints: [
-      "m == matrix.length",
-      "n == matrix[i].length",
-      "1 <= m, n <= 10",
-      "-100 <= matrix[i][j] <= 100",
+      "The row count is m == matrix.length",
+      "Each row carries n == matrix[i].length entries",
+      "Dimensions stay small: 1 <= m, n <= 10",
+      "Cell values sit in -100 <= matrix[i][j] <= 100",
     ],
     hints: [
       "Track boundaries: top, bottom, left, right",
@@ -264,22 +261,24 @@ The algorithm for myAtoi(string s) is as follows:
     pattern: "math-geometry",
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Microsoft", "Google"],
-    description: "Set entire row and column to 0 if an element is 0",
+    description: "Wipe the full row and column of every cell that starts out as 0, in place",
     tags: ["array", "matrix", "hash-table"],
     estimatedTime: 25,
-    problemStatement: `Given an m x n integer matrix, if an element is 0, set its entire row and column to 0's. You must do it in place.`,
+    problemStatement: `You're handed an m x n integer grid named matrix, and some of its cells hold 0. For every such cell, the whole row and the whole column it sits in have to end up filled with 0's.
+
+Only zeros present in the original grid trigger a wipe; the 0's you write while clearing rows and columns never cascade further. Carry out the rewrite in place, mutating matrix directly rather than assembling a fresh grid for the answer.`,
     examples: [
-      { input: "matrix = [[1,1,1],[1,0,1],[1,1,1]]", output: "[[1,0,1],[0,0,0],[1,0,1]]" },
+      { input: "matrix = [[4,7,2],[6,0,9],[3,8,5]]", output: "[[4,0,2],[0,0,0],[3,0,5]]" },
       {
-        input: "matrix = [[0,1,2,0],[3,4,5,2],[1,3,1,5]]",
-        output: "[[0,0,0,0],[0,4,5,0],[0,3,1,0]]",
+        input: "matrix = [[7,3,0,6],[0,8,4,9],[5,2,6,1]]",
+        output: "[[0,0,0,0],[0,0,0,0],[0,2,0,1]]",
       },
     ],
     constraints: [
-      "m == matrix.length",
-      "n == matrix[0].length",
-      "1 <= m, n <= 200",
-      "-2^31 <= matrix[i][j] <= 2^31 - 1",
+      "The grid has m == matrix.length rows",
+      "It has n == matrix[0].length columns",
+      "Both dimensions satisfy 1 <= m, n <= 200",
+      "A cell can be as small as -2^31 or as large as 2^31 - 1",
     ],
     hints: [
       "Use first row and column as markers",
@@ -332,20 +331,26 @@ The algorithm for myAtoi(string s) is as follows:
     pattern: "math-geometry",
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Microsoft"],
-    description: "Implement pow(x, n), which calculates x raised to the power n",
+    description: "Raise a floating-point base x to an integer exponent n, negatives included",
     tags: ["math", "recursion", "binary-exponentiation"],
     estimatedTime: 20,
-    problemStatement: `Implement pow(x, n), which calculates x raised to the power n (i.e., x^n).`,
+    problemStatement: `You're writing the power function from scratch. myPow(x, n) receives a floating-point base x and an integer exponent n, and it should evaluate x raised to the power n.
+
+Keep in mind that n can be zero or negative as well as positive; a negative exponent means the reciprocal, one over x raised to the matching positive exponent.`,
     examples: [
-      { input: "x = 2.00000, n = 10", output: "1024.00000" },
-      { input: "x = 2.10000, n = 3", output: "9.26100" },
-      { input: "x = 2.00000, n = -2", output: "0.25000", explanation: "2^-2 = 1/2^2 = 1/4 = 0.25" },
+      { input: "x = 3.00000, n = 5", output: "243.00000" },
+      { input: "x = 1.50000, n = 4", output: "5.06250" },
+      {
+        input: "x = 4.00000, n = -2",
+        output: "0.06250",
+        explanation: "4^-2 = 1/4^2 = 1/16 = 0.0625",
+      },
     ],
     constraints: [
-      "-100.0 < x < 100.0",
-      "-2^31 <= n <= 2^31 - 1",
-      "n is an integer",
-      "-10^4 <= x^n <= 10^4",
+      "The base is strictly inside -100.0 < x < 100.0",
+      "The exponent sits in -2^31 <= n <= 2^31 - 1",
+      "n is a whole number, never a fraction",
+      "Every answer stays within -10^4 <= x^n <= 10^4",
     ],
     hints: [
       "Use binary exponentiation for O(log n) time",
@@ -370,23 +375,25 @@ The algorithm for myAtoi(string s) is as follows:
     pattern: "math-geometry",
     difficulty: "easy",
     companies: ["Amazon", "Google", "Apple"],
-    description: "Increment a large integer represented as an array of digits",
+    description: "Add one to a huge number stored as an array of decimal digits",
     tags: ["array", "math"],
     estimatedTime: 15,
-    problemStatement: `You are given a large integer represented as an integer array digits, where each digits[i] is the ith digit of the integer. The digits are ordered from most significant to least significant. Increment the large integer by one and return the resulting array of digits.`,
+    problemStatement: `You're managing a very large number that arrives as an array called digits: one decimal digit per slot, ordered with the most significant digit first.
+
+Add exactly one to the value it represents and return the resulting digits in the same layout.`,
     examples: [
       {
-        input: "digits = [1,2,3]",
-        output: "[1,2,4]",
-        explanation: "The array represents the integer 123.",
+        input: "digits = [2,7,5]",
+        output: "[2,7,6]",
+        explanation: "The array spells out 275, and adding one gives 276.",
       },
-      { input: "digits = [4,3,2,1]", output: "[4,3,2,2]" },
-      { input: "digits = [9]", output: "[1,0]" },
+      { input: "digits = [8,0,6,4]", output: "[8,0,6,5]" },
+      { input: "digits = [9,9]", output: "[1,0,0]" },
     ],
     constraints: [
-      "1 <= digits.length <= 100",
-      "0 <= digits[i] <= 9",
-      "digits does not contain any leading 0's",
+      "The length stays within 1 <= digits.length <= 100",
+      "Every slot is a single decimal digit: 0 <= digits[i] <= 9",
+      "digits never starts with a leading 0",
     ],
     hints: [
       "Start from the rightmost digit",
@@ -411,19 +418,23 @@ The algorithm for myAtoi(string s) is as follows:
     pattern: "math-geometry",
     difficulty: "easy",
     companies: ["Amazon", "Apple", "Google"],
-    description: "Determine if a number is happy (sum of squares of digits eventually equals 1)",
+    description: "Decide whether repeatedly summing squared digits drives n down to 1",
     tags: ["math", "hash-table", "two-pointers"],
     estimatedTime: 15,
-    problemStatement: `A happy number is a number defined by the process: Starting with any positive integer, replace the number by the sum of the squares of its digits. Repeat the process until the number equals 1 (it will stay at 1), or it loops endlessly in a cycle. Return true if n is a happy number, false otherwise.`,
+    problemStatement: `You're given a positive integer n and must decide whether it is a happy number.
+
+Here is the test for happiness: square each decimal digit of the current value and add those squares together to get the next value. Repeating this step either drives the sequence to 1, where it stays forever, or traps it in an endless loop of values that never includes 1.
+
+Return true when n eventually reaches 1, and false when it never will.`,
     examples: [
       {
-        input: "n = 19",
+        input: "n = 23",
         output: "true",
-        explanation: "1^2 + 9^2 = 82 -> 8^2 + 2^2 = 68 -> 6^2 + 8^2 = 100 -> 1^2 + 0^2 + 0^2 = 1",
+        explanation: "2^2 + 3^2 = 13 -> 1^2 + 3^2 = 10 -> 1^2 + 0^2 = 1",
       },
-      { input: "n = 2", output: "false" },
+      { input: "n = 4", output: "false" },
     ],
-    constraints: ["1 <= n <= 2^31 - 1"],
+    constraints: ["The input satisfies 1 <= n <= 2^31 - 1"],
     hints: [
       "Use a set to detect cycles",
       "Alternative: Floyd's cycle detection with slow/fast pointers",
@@ -447,10 +458,12 @@ The algorithm for myAtoi(string s) is as follows:
     pattern: "math-geometry",
     difficulty: "easy",
     companies: ["Amazon", "Google", "Microsoft", "Roblox", "NVIDIA"],
-    description: "Convert a Roman numeral string to an integer",
+    description: "Read a Roman numeral string and compute the number it stands for",
     tags: ["string", "math", "hash-table"],
     estimatedTime: 15,
-    problemStatement: `Roman numerals are represented by seven different symbols: I, V, X, L, C, D and M.
+    problemStatement: `You're given a string s holding a Roman numeral, and your job is to work out the integer it encodes.
+
+Roman notation builds every number from seven symbols:
 
 Symbol       Value
 I             1
@@ -461,27 +474,20 @@ C             100
 D             500
 M             1000
 
-For example, 2 is written as II, 12 as XII, and 27 as XXVII.
-
-Roman numerals are usually written largest to smallest from left to right. However, there are subtraction cases:
-- I can be placed before V (5) and X (10) to make 4 and 9.
-- X can be placed before L (50) and C (100) to make 40 and 90.
-- C can be placed before D (500) and M (1000) to make 400 and 900.
-
-Given a roman numeral, convert it to an integer.`,
+Most numerals run in descending order of value, and you simply add the symbols up: VI is 6, XXI is 21. Six pairings subtract instead. When I sits directly in front of V or X, the pair reads 4 or 9. When X sits in front of L or C, the pair reads 40 or 90. And when C sits in front of D or M, the pair reads 400 or 900.`,
     examples: [
-      { input: 's = "III"', output: "3", explanation: "III = 3" },
-      { input: 's = "LVIII"', output: "58", explanation: "L = 50, V= 5, III = 3" },
+      { input: 's = "XVI"', output: "16", explanation: "X = 10, V = 5, I = 1" },
+      { input: 's = "MMXXVI"', output: "2026", explanation: "MM = 2000, XX = 20, VI = 6" },
       {
-        input: 's = "MCMXCIV"',
-        output: "1994",
-        explanation: "M = 1000, CM = 900, XC = 90 and IV = 4",
+        input: 's = "CDXLIX"',
+        output: "449",
+        explanation: "CD = 400, XL = 40, IX = 9",
       },
     ],
     constraints: [
-      "1 <= s.length <= 15",
-      "s contains only the characters (I, V, X, L, C, D, M)",
-      "It is guaranteed that s is a valid roman numeral in the range [1, 3999]",
+      "The length is bounded by 1 <= s.length <= 15",
+      "No characters besides I, V, X, L, C, D, and M appear in s",
+      "s is always a well-formed Roman numeral for a value in [1, 3999]",
     ],
     hints: [
       "Use a hash map to store symbol values",

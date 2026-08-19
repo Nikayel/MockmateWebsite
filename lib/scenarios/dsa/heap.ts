@@ -13,27 +13,28 @@ export const heapScenarios: DSAScenario[] = [
     pattern: "heap-priority-queue",
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Apple"],
-    description: "Find the kth largest element in an unsorted array",
+    description: "Pull the kth biggest value out of an unordered array",
     tags: ["array", "heap", "quickselect", "sorting"],
     estimatedTime: 20,
-    problemStatement: `Given an integer array nums and an integer k, return the kth largest element in the array.
+    problemStatement: `You're given nums, an array of integers, plus a number k. Report the value that would occupy the kth seat if the whole array were lined up from biggest to smallest.
 
-Note that it is the kth largest element in the sorted order, not the kth distinct element.
-
-Can you solve it without sorting?`,
+Duplicates keep their own seats in that lineup: the ranking counts positions, not distinct values. Try to produce the answer without arranging the entire array in order first.`,
     examples: [
       {
-        input: "nums = [3,2,1,5,6,4], k = 2",
-        output: "5",
-        explanation: "The second largest element is 5.",
+        input: "nums = [9,1,8,2,7], k = 2",
+        output: "8",
+        explanation: "Ranked from the top the values run 9, 8, 7, 2, 1, and seat 2 holds 8.",
       },
       {
-        input: "nums = [3,2,3,1,2,4,5,5,6], k = 4",
-        output: "4",
-        explanation: "The fourth largest element is 4.",
+        input: "nums = [6,6,4,4,9,2,2,5], k = 3",
+        output: "6",
+        explanation: "Descending, the array reads 9, 6, 6, 5, 4, 4, 2, 2. Seat 3 holds a 6.",
       },
     ],
-    constraints: ["1 <= k <= nums.length <= 10^5", "-10^4 <= nums[i] <= 10^4"],
+    constraints: [
+      "k is valid: 1 <= k <= nums.length, and the array never exceeds 10^5 entries.",
+      "Every value lands between -10^4 and 10^4 inclusive.",
+    ],
     hints: [
       "Use a min heap of size k",
       "Alternative: QuickSelect algorithm for O(n) average time",
@@ -115,14 +116,16 @@ public:
     pattern: "heap-priority-queue",
     difficulty: "hard",
     companies: ["Amazon", "Google", "Meta", "Microsoft"],
-    description: "Merge k sorted linked lists into one sorted list.",
+    description: "Combine k individually sorted linked lists into one ordered list.",
     tags: ["heap", "linked-list", "divide-and-conquer"],
     estimatedTime: 30,
-    problemStatement: `You are given an array of k linked-lists, each linked-list is sorted in ascending order. Merge all the linked-lists into one sorted linked-list and return it.`,
+    problemStatement: `You're given lists, an array holding the heads of k separate linked lists. Every one of those lists is already arranged smallest to largest on its own.
+
+Weave all of them together into a single linked list whose values run smallest to largest overall, and return its head. Every node from every input list must appear in the result.`,
     examples: [
       {
-        input: "lists = [[1,4,5],[1,3,4],[2,6]]",
-        output: "[1,1,2,3,4,4,5,6]",
+        input: "lists = [[2,3,9],[1,6,8],[4,5,6]]",
+        output: "[1,2,3,4,5,6,6,8,9]",
       },
       {
         input: "lists = []",
@@ -134,12 +137,12 @@ public:
       },
     ],
     constraints: [
-      "k == lists.length",
-      "0 <= k <= 10^4",
-      "0 <= lists[i].length <= 500",
-      "-10^4 <= lists[i][j] <= 10^4",
-      "lists[i] is sorted in ascending order",
-      "The sum of lists[i].length will not exceed 10^4",
+      "k matches the length of lists.",
+      "There can be as few as 0 lists and as many as 10^4.",
+      "An individual list holds from 0 up to 500 nodes.",
+      "Node values span -10^4 through 10^4.",
+      "Each input list already runs smallest to largest.",
+      "Across all lists combined, the node count stays within 10^4.",
     ],
     hints: [
       "Use min heap to track smallest elements from each list",
@@ -209,25 +212,26 @@ public:
     description: "Design a data structure that supports finding median in O(1).",
     tags: ["heap", "design", "two-heaps"],
     estimatedTime: 35,
-    problemStatement: `Design a data structure that supports the following operations:
+    problemStatement: `Numbers arrive one at a time, and you must be ready to report the median at any moment. Build a class named MedianFinder exposing this interface:
 
-- MedianFinder() initializes the MedianFinder object.
-- void addNum(int num) adds the integer num to the data structure.
-- double findMedian() returns the median of all elements so far.
+- MedianFinder() constructs an empty container.
+- void addNum(int num) folds the integer num into whatever has arrived so far.
+- double findMedian() reports the current median.
 
-The median is the middle value in an ordered integer list. If the size of the list is even, there is no middle value, and the median is the mean of the two middle values.`,
+For an odd count of stored values, the median is the single middle entry once everything stands in ascending order. For an even count there are two middle entries, and the median becomes their average.`,
     examples: [
       {
         input:
-          '["MedianFinder", "addNum", "addNum", "findMedian", "addNum", "findMedian"]\n[[], [1], [2], [], [3], []]',
-        output: "[null, null, null, 1.5, null, 2.0]",
-        explanation: "After adding 1 and 2, median is (1+2)/2 = 1.5. After adding 3, median is 2.",
+          '["MedianFinder", "addNum", "addNum", "findMedian", "addNum", "findMedian"]\n[[], [5], [9], [], [2], []]',
+        output: "[null, null, null, 7.0, null, 5.0]",
+        explanation:
+          "With 5 and 9 stored, the middles average to 7.0. Once 2 arrives, the median is 5.",
       },
     ],
     constraints: [
-      "-10^5 <= num <= 10^5",
-      "There will be at least one element before calling findMedian",
-      "At most 5 * 10^4 calls to addNum and findMedian",
+      "Every incoming value satisfies -10^5 <= num <= 10^5.",
+      "findMedian is never invoked before at least one value has arrived.",
+      "Combined, addNum and findMedian are called no more than 5 * 10^4 times.",
     ],
     hints: [
       "Use two heaps: max heap for smaller half, min heap for larger half",
@@ -332,27 +336,31 @@ The median is the middle value in an ordered integer list. If the size of the li
     pattern: "heap-priority-queue",
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Microsoft"],
-    description: "Find minimum intervals to complete all tasks with cooling period",
+    description: "Fit repeating jobs around a same-type cooldown in the fewest time units",
     tags: ["array", "heap", "greedy", "sorting"],
     estimatedTime: 30,
-    problemStatement: `Given a char array representing tasks CPU needs to do, and a cooling interval n. Each task takes one unit time and the CPU must wait at least n units between same tasks. Return the minimum number of intervals the CPU will take to finish all tasks.`,
+    problemStatement: `You're scheduling a processor. Its job queue arrives as tasks, where each entry is a capital letter naming a job type. Running any single job costs exactly one time unit, and the machine can also burn a unit doing nothing.
+
+A recovery rule applies, controlled by n: once a job of some type runs, at least n time units must pass before another job of that same type may run. Jobs of different types are unaffected and can go back to back.
+
+Return the smallest number of time units, idle gaps included, needed to finish everything in tasks.`,
     examples: [
       {
-        input: 'tasks = ["A","A","A","B","B","B"], n = 2',
-        output: "8",
-        explanation: "A -> B -> idle -> A -> B -> idle -> A -> B",
+        input: 'tasks = ["X","X","X","X","Y","Y"], n = 2',
+        output: "10",
+        explanation: "X -> Y -> idle -> X -> Y -> idle -> X -> idle -> idle -> X",
       },
       {
-        input: 'tasks = ["A","A","A","B","B","B"], n = 0',
-        output: "6",
-        explanation: "No cooling needed: any order works",
+        input: 'tasks = ["P","P","Q","Q"], n = 0',
+        output: "4",
+        explanation: "With no recovery gap, any order finishes without idling",
       },
-      { input: 'tasks = ["A","A","A","A","A","A","B","C","D","E","F","G"], n = 2', output: "16" },
+      { input: 'tasks = ["M","M","M","M","M","N","O","P","Q","R"], n = 3', output: "17" },
     ],
     constraints: [
-      "1 <= tasks.length <= 10^4",
-      "tasks[i] is uppercase English letter",
-      "0 <= n <= 100",
+      "The queue holds between 1 and 10^4 jobs.",
+      "Every entry in tasks is a capital English letter.",
+      "The recovery gap n stays within 0 <= n <= 100.",
     ],
     hints: [
       "Count frequency of each task",
@@ -395,19 +403,24 @@ The median is the middle value in an ordered integer list. If the size of the li
     pattern: "heap-priority-queue",
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Apple", "Snap"],
-    description: "Find k closest points to the origin using a heap",
+    description: "Pick the k points sitting nearest the origin on a plane",
     tags: ["array", "heap", "quickselect", "sorting"],
     estimatedTime: 20,
-    problemStatement: `Given an array of points where points[i] = [xi, yi] represents a point on the X-Y plane and an integer k, return the k closest points to the origin (0, 0). The distance between two points on the X-Y plane is the Euclidean distance. You may return the answer in any order.`,
+    problemStatement: `You're given points, a collection of coordinates on a flat plane with points[i] = [xi, yi], plus an integer k. Measure how far each point sits from the origin (0, 0) using ordinary straight-line (Euclidean) distance, then pick out the k entries lying nearest.
+
+Hand those k points back in whatever arrangement you like; no particular ordering is expected.`,
     examples: [
       {
-        input: "points = [[1,3],[-2,2]], k = 1",
-        output: "[[-2,2]]",
-        explanation: "Distance of (1,3) = sqrt(10), (-2,2) = sqrt(8). Closest is (-2,2).",
+        input: "points = [[4,1],[-1,2]], k = 1",
+        output: "[[-1,2]]",
+        explanation: "Distance of (4,1) = sqrt(17), (-1,2) = sqrt(5). Nearest is (-1,2).",
       },
-      { input: "points = [[3,3],[5,-1],[-2,4]], k = 2", output: "[[3,3],[-2,4]]" },
+      { input: "points = [[2,2],[-3,4],[5,-6]], k = 2", output: "[[2,2],[-3,4]]" },
     ],
-    constraints: ["1 <= k <= points.length <= 10^4", "-10^4 < xi, yi < 10^4"],
+    constraints: [
+      "The count k is valid: 1 <= k <= points.length <= 10^4.",
+      "Coordinates sit strictly inside -10^4 < xi, yi < 10^4.",
+    ],
     hints: [
       "Use max heap of size k",
       "Store negative distance to simulate max heap",
@@ -456,15 +469,18 @@ The median is the middle value in an ordered integer list. If the size of the li
     pattern: "heap-priority-queue",
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google"],
-    description: "Rearrange string so no two adjacent characters are same",
+    description: "Reorder a string so identical letters never touch",
     tags: ["string", "heap", "greedy", "hash-table"],
     estimatedTime: 25,
-    problemStatement: `Given a string s, rearrange the characters of s so that any two adjacent characters are not the same. Return any possible rearrangement of s or return "" if not possible.`,
+    problemStatement: `You're given a string s. Shuffle its letters into a new order in which no letter ever lands immediately beside a copy of itself. Any ordering that obeys the rule is acceptable, so return whichever one you produce. If every possible ordering puts two identical letters side by side somewhere, return the empty string "" instead.`,
     examples: [
-      { input: 's = "aab"', output: '"aba"' },
-      { input: 's = "aaab"', output: '""', explanation: "No valid arrangement exists." },
+      { input: 's = "ddc"', output: '"dcd"' },
+      { input: 's = "zzzq"', output: '""', explanation: "Three z's cannot avoid touching." },
     ],
-    constraints: ["1 <= s.length <= 500", "s consists of lowercase English letters"],
+    constraints: [
+      "The length of s runs from 1 to 500.",
+      "Only lowercase English letters appear in s.",
+    ],
     hints: [
       "Count character frequencies",
       "Use max heap to always pick most frequent char",
@@ -501,31 +517,33 @@ The median is the middle value in an ordered integer list. If the size of the li
     pattern: "heap-priority-queue",
     difficulty: "hard",
     companies: ["Google", "Amazon", "Meta", "Microsoft"],
-    description: "Rearrange string so same characters are at least k distance apart",
+    description: "Space repeated letters at least k slots away from each other",
     tags: ["string", "heap", "greedy", "hash-table", "queue"],
     estimatedTime: 35,
-    problemStatement: `Given a string s and an integer k, rearrange the string such that the same characters are at least distance k from each other. If it is not possible to rearrange the string, return an empty string "".`,
+    problemStatement: `You're given a string s along with an integer k. Reshuffle the characters so that any two occurrences of the same letter end up at least k positions apart in the final string.
+
+Sometimes the letters cannot be spread that thin. When no valid arrangement exists, return the empty string "".`,
     examples: [
       {
-        input: 's = "aabbcc", k = 3',
-        output: '"abcabc"',
-        explanation: "Same characters are at least 3 positions apart.",
+        input: 's = "wwxxyyzz", k = 4',
+        output: '"wxyzwxyz"',
+        explanation: "Matching letters land exactly 4 slots apart.",
       },
       {
-        input: 's = "aaabc", k = 3',
+        input: 's = "ggghi", k = 4',
         output: '""',
-        explanation: "It's not possible to rearrange.",
+        explanation: "Three g's would need a string of length 9; only 5 characters exist.",
       },
       {
-        input: 's = "aaadbbcc", k = 2',
-        output: '"abacabcd"',
-        explanation: "Same characters are at least 2 positions apart.",
+        input: 's = "ppqqrrs", k = 2',
+        output: '"pqrpqrs"',
+        explanation: "No letter reappears until at least 2 positions have passed.",
       },
     ],
     constraints: [
-      "1 <= s.length <= 3 * 10^5",
-      "s consists of only lowercase English letters.",
-      "0 <= k <= s.length",
+      "s holds between 1 and 3 * 10^5 characters.",
+      "Nothing but lowercase English letters appears in s.",
+      "k stays within 0 <= k <= s.length.",
     ],
     hints: [
       "Use a max heap to always pick the most frequent available character",
@@ -569,23 +587,21 @@ The median is the middle value in an ordered integer list. If the size of the li
     pattern: "heap-priority-queue",
     difficulty: "easy",
     companies: ["Amazon", "Google", "Meta"],
-    description: "Simulate stone smashing using max heap",
+    description: "Play the stone-smashing game down to the final survivor",
     tags: ["heap", "array"],
     estimatedTime: 15,
-    problemStatement: `You are given an array of integers stones where stones[i] is the weight of the ith stone. On each turn, we choose the heaviest two stones and smash them together. If x <= y, the result is:
-- If x == y, both stones are destroyed
-- If x != y, stone of weight y is destroyed and stone of weight y - x is left
+    problemStatement: `You're given stones, an array of integers where stones[i] records how heavy the ith stone is. The game runs in rounds: each round you grab the two heaviest stones and slam them into each other. Call their weights x and y, with x <= y. Matching weights (x == y) shatter both stones to dust. Unequal weights destroy the lighter stone and grind the heavier one down to y - x.
 
-At the end, there is at most one stone left. Return its weight, or 0 if no stones left.`,
+The rounds continue until the pile is down to a single stone or nothing at all. Return that survivor's weight, or 0 when the pile ends up empty.`,
     examples: [
       {
-        input: "stones = [2,7,4,1,8,1]",
+        input: "stones = [6,2,6,5,4]",
         output: "1",
-        explanation: "Smash 7,8->1, then 2,4->2, then 1,2->1, then 1,1->0, left with 1",
+        explanation: "The two 6s cancel out, 5 and 4 grind to 1, then 2 and 1 leave 1",
       },
-      { input: "stones = [1]", output: "1" },
+      { input: "stones = [4]", output: "4" },
     ],
-    constraints: ["1 <= stones.length <= 30", "1 <= stones[i] <= 1000"],
+    constraints: ["At least 1 stone is present, at most 30.", "Each weight is between 1 and 1000."],
     hints: [
       "Use max heap",
       "Pop two largest, push difference if non-zero",
@@ -610,25 +626,27 @@ At the end, there is at most one stone left. Return its weight, or 0 if no stone
     pattern: "heap-priority-queue",
     difficulty: "medium",
     companies: ["Amazon", "Google", "Meta", "Bloomberg"],
-    description: "Find k most frequent words with lexicographical tie-breaking",
+    description: "Rank the k most common words, settling ties alphabetically",
     tags: ["heap", "hash-table", "string", "sorting"],
     estimatedTime: 25,
-    problemStatement: `Given an array of strings words and an integer k, return the k most frequent strings. Return the answer sorted by frequency from highest to lowest. If two words have same frequency, sort them by lexicographical order.`,
+    problemStatement: `You're given words, an array of strings, together with an integer k. Work out which k strings occur most often across the array and hand those back.
+
+Arrange your answer so occurrence counts run from highest down to lowest. Whenever two words appear the same number of times, the one that comes first alphabetically claims the earlier spot.`,
     examples: [
       {
-        input: 'words = ["i","love","leetcode","i","love","coding"], k = 2',
-        output: '["i","love"]',
+        input: 'words = ["gum","dew","gum","dew","bay","fog"], k = 3',
+        output: '["dew","gum","bay"]',
       },
       {
-        input: 'words = ["the","day","is","sunny","the","the","the","sunny","is","is"], k = 4',
-        output: '["the","is","sunny","day"]',
+        input: 'words = ["kit","rug","kit","fan","kit","rug","kit","fan","rug","zip"], k = 4',
+        output: '["kit","rug","fan","zip"]',
       },
     ],
     constraints: [
-      "1 <= words.length <= 500",
-      "1 <= words[i].length <= 10",
-      "words[i] consists of lowercase English letters.",
-      "k is in the range [1, number of unique words]",
+      "The array carries between 1 and 500 words.",
+      "Each word runs 1 to 10 characters.",
+      "Words use lowercase English letters only.",
+      "k never exceeds the count of distinct words and is at least 1.",
     ],
     hints: [
       "Count frequencies with hash map",

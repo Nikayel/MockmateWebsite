@@ -19,23 +19,23 @@ export const greedyScenarios: DSAScenario[] = [
     description: "Determine if you can reach the last index of an array by jumping",
     tags: ["greedy", "array", "dynamic-programming"],
     estimatedTime: 20,
-    problemStatement: `You are given an integer array nums. You are initially positioned at the array's first index, and each element in the array represents your maximum jump length at that position.
+    problemStatement: `You're given an integer array nums and you start standing on its first index. Each value is a jump cap: a single hop from position i can carry you forward at most nums[i] indices, and shorter hops are always allowed.
 
-Return true if you can reach the last index, or false otherwise.`,
+Decide whether some sequence of hops can land you on the last index. Return true when it can be done and false when it cannot.`,
     examples: [
       {
-        input: "nums = [2,3,1,1,4]",
+        input: "nums = [3,1,0,2,4]",
         output: "true",
-        explanation: "Jump 1 step from index 0 to 1, then 3 steps to the last index.",
+        explanation: "Hop 3 steps from index 0 to index 3, then 1 step to the last index.",
       },
       {
-        input: "nums = [3,2,1,0,4]",
+        input: "nums = [2,1,0,0,5]",
         output: "false",
         explanation:
-          "You will always arrive at index 3 no matter what. Its maximum jump length is 0, which makes it impossible to reach the last index.",
+          "Every route funnels you into index 2, where the jump cap is 0, so the tail of the array is unreachable.",
       },
     ],
-    constraints: ["1 <= nums.length <= 10^4", "0 <= nums[i] <= 10^5"],
+    constraints: ["nums holds between 1 and 10^4 values", "each nums[i] lies between 0 and 10^5"],
     hints: [
       "Think about the maximum position you can reach at each step",
       "Track the farthest index reachable - if current index exceeds it, return false",
@@ -100,29 +100,25 @@ Return true if you can reach the last index, or false otherwise.`,
     description: "Find minimum number of jumps to reach the last index",
     tags: ["greedy", "array", "dynamic-programming", "bfs"],
     estimatedTime: 25,
-    problemStatement: `You are given a 0-indexed array of integers nums of length n. You are initially positioned at nums[0].
+    problemStatement: `You're standing on index 0 of a 0-indexed integer array nums with length n. From index i, one hop may take you to any index i + j as long as 0 <= j <= nums[i] and i + j < n, so each value caps how far a single hop from that spot can travel.
 
-Each element nums[i] represents the maximum length of a forward jump from index i. In other words, if you are at nums[i], you can jump to any nums[i + j] where:
-- 0 <= j <= nums[i] and
-- i + j < n
-
-Return the minimum number of jumps to reach nums[n - 1]. The test cases are generated such that you can reach nums[n - 1].`,
+Every input in this problem can reach the end. Count the fewest hops that put you on the final index, nums[n - 1], and return that count.`,
     examples: [
       {
-        input: "nums = [2,3,1,1,4]",
+        input: "nums = [3,1,1,2,5]",
         output: "2",
         explanation:
-          "The minimum number of jumps to reach the last index is 2. Jump 1 step from index 0 to 1, then 3 steps to the last index.",
+          "Two hops are enough: index 0 to index 3, then index 3 to the last index. No single hop covers the whole array.",
       },
       {
-        input: "nums = [2,3,0,1,4]",
+        input: "nums = [4,2,0,0,1,3]",
         output: "2",
       },
     ],
     constraints: [
-      "1 <= nums.length <= 10^4",
-      "0 <= nums[i] <= 1000",
-      "It's guaranteed that you can reach nums[n - 1].",
+      "nums contains between 1 and 10^4 entries",
+      "every nums[i] falls between 0 and 1000",
+      "reaching nums[n - 1] is always possible for the given inputs",
     ],
     hints: [
       'Use BFS-like level traversal - each "level" is one jump',
@@ -188,29 +184,27 @@ Return the minimum number of jumps to reach nums[n - 1]. The test cases are gene
     description: "Find the starting gas station to complete a circular tour",
     tags: ["greedy", "array"],
     estimatedTime: 25,
-    problemStatement: `There are n gas stations along a circular route, where the amount of gas at the ith station is gas[i].
+    problemStatement: `A loop road is dotted with n fuel stops. Pulling into stop i lets you add gas[i] units of fuel to your car, and driving the leg from stop i to stop i + 1 burns cost[i] units. The tank has no size limit, but you begin with it empty, parked at a stop of your choosing.
 
-You have a car with an unlimited gas tank and it costs cost[i] of gas to travel from the ith station to its next (i + 1)th station. You begin the journey with an empty tank at one of the gas stations.
-
-Given two integer arrays gas and cost, return the starting gas station's index if you can travel around the circuit once in the clockwise direction, otherwise return -1. If there exists a solution, it is guaranteed to be unique.`,
+Using the two integer arrays gas and cost, find a stop you could depart from and drive the whole loop exactly once, always moving to the next stop in order, without the fuel level ever dropping below zero. Return that stop's index, or -1 when no stop works. Whenever an answer exists, exactly one index satisfies it.`,
     examples: [
       {
-        input: "gas = [1,2,3,4,5], cost = [3,4,5,1,2]",
-        output: "3",
+        input: "gas = [2,3,9,1,2], cost = [3,5,2,2,4]",
+        output: "2",
         explanation:
-          "Start at station 3 (index 3) and fill up with 4 unit of gas. Tank = 4. Travel to station 4 (cost 1). Tank = 3. Fill up (5 gas). Tank = 8. Travel to station 0 (cost 2). Tank = 6. And so on...",
+          "Departing stop 2 with its 9 units, you roll into the later stops holding 7, 6, 4, 3, and finally 1 unit back at stop 2, so the tank never runs out.",
       },
       {
-        input: "gas = [2,3,4], cost = [3,4,3]",
+        input: "gas = [3,1,2], cost = [4,2,2]",
         output: "-1",
         explanation:
-          "You can't start at any station as you don't have enough gas to reach the next station.",
+          "The stops offer 6 units of fuel in total while the loop costs 8 to drive, so every choice of start strands you.",
       },
     ],
     constraints: [
-      "n == gas.length == cost.length",
+      "gas and cost share the same length n",
       "1 <= n <= 10^5",
-      "0 <= gas[i], cost[i] <= 10^4",
+      "each gas[i] and each cost[i] sits between 0 and 10^4",
     ],
     hints: [
       "If total gas >= total cost, a solution exists",
@@ -271,32 +265,31 @@ Given two integer arrays gas and cost, return the starting gas station's index i
     description: "Find minimum intervals needed to execute all tasks with cooldown",
     tags: ["greedy", "array", "hash-table", "heap", "counting"],
     estimatedTime: 30,
-    problemStatement: `Given a characters array tasks, representing the tasks a CPU needs to do, where each letter represents a different task. Tasks could be done in any order. Each task is done in one unit of time. For each unit of time, the CPU could complete either one task or just be idle.
+    problemStatement: `You're scheduling work for a CPU using a character array tasks, where every letter names a job type and each job burns exactly one unit of time. During any single unit the processor either runs one job or sits idle. The wrinkle is a cooldown, supplied as a non-negative integer n: once a job of some letter runs, at least n units of time must pass before another job carrying that same letter may start. Jobs with different letters need no gap at all.
 
-However, there is a non-negative integer n that represents the cooldown period between two same tasks (the same letter in the array), that is that there must be at least n units of time between any two same tasks.
-
-Return the least number of units of times that the CPU will take to finish all the given tasks.`,
+Work out the smallest total number of time units, idle slots included, that finishes every job in tasks, and return it.`,
     examples: [
       {
-        input: 'tasks = ["A","A","A","B","B","B"], n = 2',
-        output: "8",
+        input: 'tasks = ["A","A","A","B"], n = 3',
+        output: "9",
         explanation:
-          "A -> B -> idle -> A -> B -> idle -> A -> B. There is at least 2 units of time between any two same tasks.",
+          "One shortest run: A -> B -> idle -> idle -> A -> idle -> idle -> idle -> A. Three units always sit between consecutive A runs.",
       },
       {
-        input: 'tasks = ["A","A","A","B","B","B"], n = 0',
-        output: "6",
-        explanation: "On this case any permutation of size 6 would work since n = 0.",
+        input: 'tasks = ["A","A","B","B","C"], n = 0',
+        output: "5",
+        explanation:
+          "With no cooldown the jobs run back to back, so the answer is just the job count.",
       },
       {
-        input: 'tasks = ["A","A","A","A","A","A","B","C","D","E","F","G"], n = 2',
-        output: "16",
+        input: 'tasks = ["Z","Z","Z","Z","Z","P","Q","R"], n = 3',
+        output: "17",
       },
     ],
     constraints: [
-      "1 <= tasks.length <= 10^4",
-      "tasks[i] is upper-case English letter.",
-      "The integer n is in the range [0, 100].",
+      "tasks holds between 1 and 10^4 entries",
+      "every entry of tasks is an uppercase English letter",
+      "n is an integer no smaller than 0 and no larger than 100",
     ],
     hints: [
       "Focus on the most frequent task - it determines the minimum time",
@@ -355,28 +348,30 @@ Return the least number of units of times that the CPU will take to finish all t
     difficulty: "medium",
     companies: ["Amazon", "Google", "Meta"],
     description:
-      "Partition a string into maximum parts where each letter appears in at most one part",
+      "Split a string into the most pieces possible without any letter spanning two pieces",
     tags: ["greedy", "string", "hash-table", "two-pointers"],
     estimatedTime: 20,
-    problemStatement: `You are given a string s. We want to partition the string into as many parts as possible so that each letter appears in at most one part.
+    problemStatement: `You've got a string s that needs slicing into chunks, and the slicing has one rule: no letter's appearances may land in two different chunks. Every copy of a letter must sit inside the same chunk. Subject to that rule, cut s into as many chunks as you possibly can.
 
-Note that the partition is done so that after concatenating all the parts in order, the resultant string should be s.
-
-Return a list of integers representing the size of these parts.`,
+The cuts only divide the string; reading the chunks left to right must reproduce s exactly. Return an array holding each chunk's length, in the order the chunks appear.`,
     examples: [
       {
-        input: 's = "ababcbacadefegdehijhklij"',
-        output: "[9,7,8]",
+        input: 's = "drodortwtxkekxe"',
+        output: "[6,3,6]",
         explanation:
-          'The partition is "ababcbaca", "defegde", "hijhklij". This is a partition so that each letter appears in at most one part.',
+          'The slices are "drodor", "twt" and "xkekxe". Each letter lives entirely inside one slice; cutting any earlier would strand a repeat of d, r or o in the next slice.',
       },
       {
-        input: 's = "eccbbbbdec"',
-        output: "[10]",
-        explanation: "All characters share the same partition.",
+        input: 's = "svvttsv"',
+        output: "[7]",
+        explanation:
+          "The opening letter returns near the end and the letter spans chain together, so no legal cut point exists and the whole string stays one slice.",
       },
     ],
-    constraints: ["1 <= s.length <= 500", "s consists of lowercase English letters."],
+    constraints: [
+      "s contains between 1 and 500 characters",
+      "every character of s is a lowercase English letter",
+    ],
     hints: [
       "First pass: record last occurrence of each character",
       "Second pass: extend partition end to include all occurrences of current characters",
@@ -433,28 +428,31 @@ Return a list of integers representing the size of these parts.`,
     pattern: "greedy",
     difficulty: "medium",
     companies: ["Google", "Amazon"],
-    description: "Determine if cards can be rearranged into groups of consecutive cards",
+    description:
+      "Decide whether a hand of cards deals out into fixed-size runs of consecutive values",
     tags: ["greedy", "array", "hash-table", "sorting"],
     estimatedTime: 25,
-    problemStatement: `Alice has some number of cards and she wants to rearrange the cards into groups so that each group is of size groupSize, and consists of groupSize consecutive cards.
+    problemStatement: `You're holding a pile of numbered cards described by the integer array hand, where hand[i] is the number printed on the ith card, and you want to deal the whole pile out for a run-based card game. A deal splits the cards into groups where every group contains exactly groupSize cards, and the numbers inside a group climb by exactly one from card to card, forming an unbroken run of consecutive values.
 
-Given an integer array hand where hand[i] is the value written on the ith card and an integer groupSize, return true if she can rearrange the cards, or false otherwise.`,
+Every card must end up in some group; none may be left over and no group may come up short. Decide whether such a deal exists, returning true when it does and false when it does not.`,
     examples: [
       {
-        input: "hand = [1,2,3,6,2,3,4,7,8], groupSize = 3",
+        input: "hand = [5,6,4,2,7,3,5,6,7], groupSize = 3",
         output: "true",
-        explanation: "Alice's hand can be rearranged as [1,2,3],[2,3,4],[6,7,8]",
+        explanation:
+          "One valid deal is [2,3,4], [5,6,7] and [5,6,7], using every card exactly once.",
       },
       {
-        input: "hand = [1,2,3,4,5], groupSize = 4",
+        input: "hand = [4,5,6,7,8,9,10], groupSize = 3",
         output: "false",
-        explanation: "Alice's hand cannot be rearranged into groups of 4.",
+        explanation:
+          "No matter how you deal them, the 7 cards cannot all land in complete groups of 3.",
       },
     ],
     constraints: [
-      "1 <= hand.length <= 10^4",
-      "0 <= hand[i] <= 10^9",
-      "1 <= groupSize <= hand.length",
+      "hand holds between 1 and 10^4 cards",
+      "each card value lies between 0 and 10^9",
+      "groupSize is at least 1 and at most hand.length",
     ],
     hints: [
       "If hand.length % groupSize != 0, return false immediately",
@@ -516,29 +514,30 @@ Given an integer array hand where hand[i] is the value written on the ith card a
     description: "Check if a string with wildcards can be a valid parentheses string",
     tags: ["greedy", "string", "dynamic-programming", "stack"],
     estimatedTime: 25,
-    problemStatement: `Given a string s containing only three types of characters: '(', ')' and '*', return true if s is valid.
+    problemStatement: `You're looking at a string s built entirely from three characters: '(', ')' and '*'. Your job is to judge whether s can be read as a balanced parenthesis sequence.
 
-The following rules define a valid string:
-- Any left parenthesis '(' must have a corresponding right parenthesis ')'.
-- Any right parenthesis ')' must have a corresponding left parenthesis '('.
-- Left parenthesis '(' must go before the corresponding right parenthesis ')'.
-- '*' could be treated as a single right parenthesis ')' or a single left parenthesis '(' or an empty string "".`,
+Balanced means the usual pairing: every opener '(' eventually finds its own closer ')' somewhere to its right, every closer pairs with an opener that came earlier, and no closer shows up before its partner. The twist is the wildcard: each '*' may independently stand in for a single '(', for a single ')', or for nothing at all.
+
+Return true when at least one way of reading the wildcards makes s balanced, and false when no reading does.`,
     examples: [
       {
-        input: 's = "()"',
+        input: 's = "(())"',
         output: "true",
       },
       {
-        input: 's = "(*)"',
+        input: 's = "()*"',
         output: "true",
       },
       {
-        input: 's = "(*))"',
+        input: 's = "*())"',
         output: "true",
-        explanation: "The * can be treated as (",
+        explanation: "Reading the leading * as an opening bracket balances the string.",
       },
     ],
-    constraints: ["1 <= s.length <= 100", "s[i] is '(', ')' or '*'."],
+    constraints: [
+      "the length of s falls between 1 and 100",
+      "every character of s is one of '(', ')' or '*'",
+    ],
     hints: [
       "Track the range of possible open parentheses count [low, high]",
       "low: minimum open count (treat * as ) or empty)",
@@ -605,28 +604,29 @@ The following rules define a valid string:
     description: "Check if target triplet can be formed by taking max of triplet components",
     tags: ["greedy", "array"],
     estimatedTime: 20,
-    problemStatement: `A triplet is an array of three integers. You are given a 2D integer array triplets, where triplets[i] = [ai, bi, ci] describes the ith triplet. You are also given an integer array target = [x, y, z] that describes the triplet you want to obtain.
+    problemStatement: `You're working with a 2D integer array triplets, where each entry is a triplet, meaning an array of exactly three integers. Alongside it you get one more triplet, target = [x, y, z], that you'd like to see appear inside triplets.
 
-To obtain target, you may apply the following operation on triplets any number of times (possibly zero):
-- Choose two indices (0-indexed) i and j (i != j) and update triplets[j] to become [max(ai, aj), max(bi, bj), max(ci, cj)].
+One move is available, and you may perform it as many times as you like, including never: pick two different positions i and j within triplets, then overwrite triplets[j] coordinate by coordinate with the larger of the two values at each spot. In other words its new first value becomes the bigger of the two first values, its new second value the bigger of the two second values, and its new third value the bigger of the two third values, while triplets[i] stays as it was.
 
-Return true if it is possible to obtain the target triplet [x, y, z] as an element of triplets, or false otherwise.`,
+Report whether some sequence of moves can make [x, y, z] show up as an entry of triplets: true if it can, false if it cannot.`,
     examples: [
       {
-        input: "triplets = [[2,5,3],[1,8,4],[1,7,5]], target = [2,7,5]",
+        input: "triplets = [[4,2,6],[1,9,2],[3,5,6]], target = [4,5,6]",
         output: "true",
-        explanation: "Merge triplets [2,5,3] and [1,7,5] to get [2,7,5].",
+        explanation:
+          "Applying the move to the first and third triplets produces [max(4,3), max(2,5), max(6,6)] = [4,5,6], exactly the target.",
       },
       {
-        input: "triplets = [[3,4,5],[4,5,6]], target = [3,2,5]",
+        input: "triplets = [[2,6,3],[5,7,1]], target = [5,4,3]",
         output: "false",
-        explanation: "It is impossible to obtain [3,2,5] since 2 is not in any triplet.",
+        explanation:
+          "The middle value 4 can never appear: both triplets carry a larger middle value, and the move never lowers a coordinate.",
       },
     ],
     constraints: [
-      "1 <= triplets.length <= 10^5",
-      "triplets[i].length == target.length == 3",
-      "1 <= ai, bi, ci, x, y, z <= 1000",
+      "triplets contains between 1 and 10^5 entries",
+      "each entry of triplets, like target itself, has exactly 3 values",
+      "every number appearing in triplets or target sits between 1 and 1000",
     ],
     hints: [
       "A triplet can only be used if all its values are <= corresponding target values",
@@ -700,33 +700,30 @@ Return true if it is possible to obtain the target triplet [x, y, z] as an eleme
     pattern: "greedy",
     difficulty: "easy",
     companies: ["Amazon", "Roblox", "Google", "Microsoft"],
-    description: "Find maximum number of units that can be put on a truck with limited capacity",
+    description: "Choose which boxes to load so a capacity-limited truck carries the most units",
     tags: ["greedy", "array", "sorting"],
     estimatedTime: 15,
-    problemStatement: `You are assigned to put some amount of boxes onto one truck. You are given a 2D array boxTypes, where boxTypes[i] = [numberOfBoxesi, numberOfUnitsPerBoxi]:
-- numberOfBoxesi is the number of boxes of type i.
-- numberOfUnitsPerBoxi is the number of units in each box of type i.
+    problemStatement: `You're in charge of loading one delivery truck from a warehouse of boxed goods. The inventory arrives as a 2D array boxTypes, where each entry boxTypes[i] holds two numbers: first, how many boxes of type i sit on the shelf, and second, how many units of product are packed inside every single box of that type.
 
-You are also given an integer truckSize, which is the maximum number of boxes that can be put on the truck. You can choose any boxes to put on the truck as long as the number of boxes does not exceed truckSize.
-
-Return the maximum total number of units that can be put on the truck.`,
+The truck has room for at most truckSize boxes in total. Capacity is counted in boxes, never in units, and you may load any mix of the available boxes that stays within it. Return the largest total number of units the truck can drive away with.`,
     examples: [
       {
-        input: "boxTypes = [[1,3],[2,2],[3,1]], truckSize = 4",
-        output: "8",
+        input: "boxTypes = [[2,4],[3,2],[1,6]], truckSize = 4",
+        output: "16",
         explanation:
-          "Take 1 box of type 0 (3 units) + 2 boxes of type 1 (2*2=4 units) + 1 box of type 2 (1 unit) = 8 units total",
+          "Load the lone 6-unit box, both 4-unit boxes, and one 2-unit box: 6 + 8 + 2 = 16 units across 4 boxes.",
       },
       {
-        input: "boxTypes = [[5,10],[2,5],[4,7],[3,9]], truckSize = 10",
-        output: "91",
-        explanation: "Sort by units per box descending, then greedily take boxes",
+        input: "boxTypes = [[4,8],[6,3],[2,11],[5,5]], truckSize = 9",
+        output: "69",
+        explanation:
+          "Both 11-unit boxes, all four 8-unit boxes, and three 5-unit boxes fill the 9 slots: 22 + 32 + 15 = 69 units.",
       },
     ],
     constraints: [
-      "1 <= boxTypes.length <= 1000",
-      "1 <= numberOfBoxesi, numberOfUnitsPerBoxi <= 1000",
-      "1 <= truckSize <= 10^6",
+      "boxTypes describes between 1 and 1000 box types",
+      "in every boxTypes[i], both the box count and the units per box range from 1 to 1000",
+      "truckSize lies between 1 and 10^6",
     ],
     hints: [
       "Sort boxes by units per box in descending order (greedy)",

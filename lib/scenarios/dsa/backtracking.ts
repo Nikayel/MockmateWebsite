@@ -13,32 +13,33 @@ export const backtrackingScenarios: DSAScenario[] = [
     pattern: "backtracking",
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Microsoft", "Apple"],
-    description: "Search for a word in a 2D board using backtracking",
+    description:
+      "Decide whether a word can be traced through a letter grid one adjacent cell at a time",
     tags: ["array", "backtracking", "matrix"],
     estimatedTime: 25,
-    problemStatement: `Given an m x n grid of characters board and a string word, return true if word exists in the grid.
+    problemStatement: `You're given board, a character grid with m rows and n columns, plus a string word. Decide whether word can be spelled by walking a path through the grid: start on any cell, and at each step move only to a cell sharing an edge with the current one, so up, down, left, or right, never diagonally. Every step must land on the next letter of word.
 
-The word can be constructed from letters of sequentially adjacent cells, where adjacent cells are horizontally or vertically neighboring. The same letter cell may not be used more than once.`,
+A path may visit any cell at most once. Return true when such a path exists, false otherwise.`,
     examples: [
       {
-        input: 'board = [["A","B","C","E"],["S","F","C","S"],["A","D","E","E"]], word = "ABCCED"',
+        input: 'board = [["P","L","A","N"],["K","R","O","E"],["B","M","S","T"]], word = "PLANET"',
         output: "true",
       },
       {
-        input: 'board = [["A","B","C","E"],["S","F","C","S"],["A","D","E","E"]], word = "SEE"',
+        input: 'board = [["P","L","A","N"],["K","R","O","E"],["B","M","S","T"]], word = "TEN"',
         output: "true",
       },
       {
-        input: 'board = [["A","B","C","E"],["S","F","C","S"],["A","D","E","E"]], word = "ABCB"',
+        input: 'board = [["P","L","A","N"],["K","R","O","E"],["B","M","S","T"]], word = "NEN"',
         output: "false",
       },
     ],
     constraints: [
-      "m == board.length",
-      "n = board[i].length",
-      "1 <= m, n <= 6",
-      "1 <= word.length <= 15",
-      "board and word consists of only lowercase and uppercase English letters",
+      "m is the row count of board",
+      "n is the column count of board",
+      "both m and n fall between 1 and 6",
+      "word holds between 1 and 15 characters",
+      "every cell of board and every character of word is an English letter, either case",
     ],
     hints: [
       "Use backtracking to explore all paths",
@@ -137,30 +138,28 @@ public:
     pattern: "backtracking",
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Apple", "Google"],
-    description: "Find all unique combinations that sum to a target",
+    description: "List every distinct way to build a target sum from reusable values",
     tags: ["array", "backtracking"],
     estimatedTime: 25,
-    problemStatement: `Given an array of distinct integers candidates and a target integer target, return a list of all unique combinations of candidates where the chosen numbers sum to target. You may return the combinations in any order.
+    problemStatement: `You're given candidates, an array of distinct positive integers, and an integer target. Assemble every combination of values drawn from candidates whose total is exactly target. A combination may repeat a single candidate as many times as needed.
 
-The same number may be chosen from candidates an unlimited number of times. Two combinations are unique if the frequency of at least one of the chosen numbers is different.
-
-The test cases are generated such that the number of unique combinations that sum up to target is less than 150 combinations for the given input.`,
+Two combinations count as the same one when they use each value an identical number of times, regardless of ordering, so [2,2,3] and [3,2,2] are one combination, not two. Return the full list of distinct combinations in whatever order suits you; every test input yields fewer than 150 of them.`,
     examples: [
       {
-        input: "candidates = [2,3,6,7], target = 7",
-        output: "[[2,2,3],[7]]",
-        explanation: "2+2+3=7 and 7=7 are the only combinations.",
+        input: "candidates = [2,4,5], target = 9",
+        output: "[[2,2,5],[4,5]]",
+        explanation: "2+2+5 and 4+5 are the only ways to reach 9.",
       },
       {
-        input: "candidates = [2,3,5], target = 8",
-        output: "[[2,2,2,2],[2,3,3],[3,5]]",
+        input: "candidates = [3,4,6], target = 12",
+        output: "[[3,3,3,3],[3,3,6],[4,4,4],[6,6]]",
       },
     ],
     constraints: [
-      "1 <= candidates.length <= 30",
-      "2 <= candidates[i] <= 40",
-      "All elements of candidates are distinct",
-      "1 <= target <= 40",
+      "candidates holds between 1 and 30 values",
+      "each value in candidates sits in the range 2 to 40",
+      "no value inside candidates repeats",
+      "target sits between 1 and 40",
     ],
     hints: [
       "Use backtracking to explore all combinations",
@@ -244,19 +243,21 @@ public:
     pattern: "backtracking",
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Microsoft"],
-    description: "Generate all permutations of a collection of distinct integers",
+    description: "Produce every ordering of a set of distinct numbers",
     tags: ["array", "backtracking"],
     estimatedTime: 20,
-    problemStatement: `Given an array nums of distinct integers, return all the possible permutations. You can return the answer in any order.`,
+    problemStatement: `You're given nums, an array of integers where no value repeats. Build every arrangement of its elements: each arrangement uses all the numbers exactly once, and none may appear twice in your output.
+
+Return the complete set of arrangements; the sequence they come back in is up to you.`,
     examples: [
-      { input: "nums = [1,2,3]", output: "[[1,2,3],[1,3,2],[2,1,3],[2,3,1],[3,1,2],[3,2,1]]" },
-      { input: "nums = [0,1]", output: "[[0,1],[1,0]]" },
-      { input: "nums = [1]", output: "[[1]]" },
+      { input: "nums = [4,5,6]", output: "[[4,5,6],[4,6,5],[5,4,6],[5,6,4],[6,4,5],[6,5,4]]" },
+      { input: "nums = [7,2]", output: "[[7,2],[2,7]]" },
+      { input: "nums = [9]", output: "[[9]]" },
     ],
     constraints: [
-      "1 <= nums.length <= 6",
-      "-10 <= nums[i] <= 10",
-      "All the integers of nums are unique",
+      "nums holds at least 1 and at most 6 numbers",
+      "every entry falls between -10 and 10",
+      "no two entries of nums are equal",
     ],
     hints: [
       "Use backtracking to build permutations",
@@ -301,18 +302,20 @@ public:
     pattern: "backtracking",
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Apple"],
-    description: "Generate all possible subsets (the power set)",
+    description: "Enumerate every subset an array of unique values can form",
     tags: ["array", "backtracking", "bit-manipulation"],
     estimatedTime: 20,
-    problemStatement: `Given an integer array nums of unique elements, return all possible subsets (the power set). The solution set must not contain duplicate subsets.`,
+    problemStatement: `You're given an integer array nums whose values never repeat. Gather every subset you can pick out of it, from the empty selection all the way up to the entire array.
+
+No subset may show up twice in your result, and both the subsets and the overall list can come back in whatever order you prefer.`,
     examples: [
-      { input: "nums = [1,2,3]", output: "[[],[1],[2],[1,2],[3],[1,3],[2,3],[1,2,3]]" },
-      { input: "nums = [0]", output: "[[],[0]]" },
+      { input: "nums = [4,7,9]", output: "[[],[4],[7],[4,7],[9],[4,9],[7,9],[4,7,9]]" },
+      { input: "nums = [5]", output: "[[],[5]]" },
     ],
     constraints: [
-      "1 <= nums.length <= 10",
-      "-10 <= nums[i] <= 10",
-      "All the numbers of nums are unique",
+      "nums contains between 1 and 10 elements",
+      "each element lies in the span -10 to 10",
+      "no element of nums appears more than once",
     ],
     hints: [
       "For each element, decide to include it or not",
@@ -359,19 +362,22 @@ public:
     pattern: "backtracking",
     difficulty: "hard",
     companies: ["Amazon", "Meta", "Google", "Microsoft"],
-    description: "Place n queens on an n×n chessboard such that no two queens attack each other",
+    description: "Find every safe way to seat n queens on an n by n board",
     tags: ["array", "backtracking"],
     estimatedTime: 35,
-    problemStatement: `The n-queens puzzle is the problem of placing n queens on an n x n chessboard such that no two queens attack each other. Given an integer n, return all distinct solutions to the n-queens puzzle.`,
+    problemStatement: `You're given one integer n, which sets both the size of a chessboard and the number of queens to put on it. Arrange all n queens on the n x n board so that none of them threatens another, meaning no pair ever shares a row, a column, or a diagonal. Find every distinct arrangement that pulls this off.
+
+Report each arrangement as n strings of n characters, one string per board row, writing 'Q' where a queen stands and '.' for an open square. Return the complete list of arrangements; their order doesn't matter.`,
     examples: [
       {
-        input: "n = 4",
-        output: '[[".Q..","...Q","Q...","..Q."],["..Q.","Q...","...Q",".Q.."]]',
-        explanation: "There exist two distinct solutions to the 4-queens puzzle.",
+        input: "n = 6",
+        output:
+          '[[".Q....","...Q..",".....Q","Q.....","..Q...","....Q."],["..Q...",".....Q",".Q....","....Q.","Q.....","...Q.."],["...Q..","Q.....","....Q.",".Q....",".....Q","..Q..."],["....Q.","..Q...","Q.....",".....Q","...Q..",".Q...."]]',
+        explanation: "A 6 x 6 board admits exactly four arrangements.",
       },
       { input: "n = 1", output: '[["Q"]]' },
     ],
-    constraints: ["1 <= n <= 9"],
+    constraints: ["n stays within 1 and 9"],
     hints: [
       "Place queens row by row",
       "For each row, try all columns and check if position is safe",
@@ -417,16 +423,24 @@ public:
     pattern: "backtracking",
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Apple"],
-    description: "Return all possible letter combinations that a phone number could represent",
+    description: "Expand a string of keypad digits into every letter string it could spell",
     tags: ["string", "backtracking", "hash-table"],
     estimatedTime: 20,
-    problemStatement: `Given a string containing digits from 2-9 inclusive, return all possible letter combinations that the number could represent. Mapping: 2-abc, 3-def, 4-ghi, 5-jkl, 6-mno, 7-pqrs, 8-tuv, 9-wxyz`,
+    problemStatement: `You're given digits, a string in which every character is a digit from 2 through 9. On a classic phone keypad each of those digits carries letters: 2 has abc, 3 has def, 4 has ghi, 5 has jkl, 6 has mno, 7 has pqrs, 8 has tuv, and 9 has wxyz.
+
+Produce every string obtainable by swapping each digit of digits, kept in order, for one of that digit's letters. When digits is empty, produce an empty list. Your results may come back in whatever order you like.`,
     examples: [
-      { input: 'digits = "23"', output: '["ad","ae","af","bd","be","bf","cd","ce","cf"]' },
+      {
+        input: 'digits = "89"',
+        output: '["tw","tx","ty","tz","uw","ux","uy","uz","vw","vx","vy","vz"]',
+      },
       { input: 'digits = ""', output: "[]" },
-      { input: 'digits = "2"', output: '["a","b","c"]' },
+      { input: 'digits = "5"', output: '["j","k","l"]' },
     ],
-    constraints: ["0 <= digits.length <= 4", "digits[i] is a digit in the range ['2', '9']"],
+    constraints: [
+      "digits may hold anywhere from 0 to 4 characters",
+      "every character of digits falls in the span '2' through '9'",
+    ],
     hints: [
       "Use a mapping from digit to letters",
       "Use backtracking to generate all combinations",
@@ -454,15 +468,20 @@ public:
     pattern: "backtracking",
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google"],
-    description: "Partition a string such that every substring is a palindrome",
+    description: "List every way to slice a string into palindromic pieces",
     tags: ["string", "backtracking", "dynamic-programming"],
     estimatedTime: 30,
-    problemStatement: `Given a string s, partition s such that every substring of the partition is a palindrome. Return all possible palindrome partitioning of s.`,
+    problemStatement: `You're given a string s of lowercase letters. Cut s into a run of non-empty pieces, leaving the letters in their original order, so that each piece is a palindrome, reading identically left to right and right to left.
+
+Usually several cutting patterns qualify. Return every one of them, with each pattern listing its pieces from the front of s to the back.`,
     examples: [
-      { input: 's = "aab"', output: '[["a","a","b"],["aa","b"]]' },
-      { input: 's = "a"', output: '[["a"]]' },
+      { input: 's = "noon"', output: '[["n","o","o","n"],["n","oo","n"],["noon"]]' },
+      { input: 's = "z"', output: '[["z"]]' },
     ],
-    constraints: ["1 <= s.length <= 16", "s contains only lowercase English letters"],
+    constraints: [
+      "s runs from 1 to 16 characters long",
+      "every character of s is a lowercase English letter",
+    ],
     hints: [
       "Use backtracking to try all partitions",
       "For each position, try all palindrome substrings starting there",
@@ -491,10 +510,7 @@ public:
       },
       {
         input: { s: "aba" },
-        expected: [
-          ["a", "b", "a"],
-          ["aba"],
-        ],
+        expected: [["a", "b", "a"], ["aba"]],
         description: "Palindrome string",
         compareAsSet: true,
       },
@@ -512,21 +528,23 @@ public:
     pattern: "backtracking",
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Microsoft", "Apple"],
-    description: "Generate all combinations of well-formed parentheses",
+    description: "Build every balanced arrangement of n parenthesis pairs",
     tags: ["string", "backtracking", "dynamic-programming"],
     estimatedTime: 20,
-    problemStatement: `Given n pairs of parentheses, write a function to generate all combinations of well-formed parentheses.`,
+    problemStatement: `You're given an integer n, the number of parenthesis pairs at your disposal. A string counts as well formed when scanning it left to right never shows more ')' than '(' at any point and the two totals finish equal.
+
+Produce every distinct well-formed string that uses exactly n opening and n closing parentheses.`,
     examples: [
       {
-        input: "n = 3",
-        output: '["((()))","(()())","(())()","()(())","()()()"]',
+        input: "n = 2",
+        output: '["(())","()()"]',
       },
       {
         input: "n = 1",
         output: '["()"]',
       },
     ],
-    constraints: ["1 <= n <= 8"],
+    constraints: ["n ranges from 1 up to 8"],
     hints: [
       "Use backtracking with two counters: open and close",
       'Can add "(" if open < n',
