@@ -7,41 +7,41 @@ export const constructBinaryTreePreorderInorderScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft"],
-  description: "Build a binary tree from preorder and inorder traversals.",
+  description: "Rebuild the unique binary tree encoded by its preorder and inorder sequences.",
   tags: ["tree", "recursion", "divide-and-conquer", "hash-table"],
   estimatedTime: 30,
-  problemStatement: `Given two integer arrays preorder and inorder where preorder is the preorder traversal of a binary tree and inorder is the inorder traversal of the same tree, construct and return the binary tree.
+  problemStatement: `You're given two integer arrays, preorder and inorder, that record two walks over the same binary tree. In preorder, each node appears before everything in its left subtree, which appears before everything in its right subtree. In inorder, everything in a node's left subtree appears first, then the node itself, then everything in its right subtree.
 
-Example visualization:
+Exactly one binary tree produces both sequences. Rebuild it and return its root.
 
-  preorder = [3, 9, 20, 15, 7]   (Root, Left, Right)
-  inorder  = [9, 3, 15, 20, 7]   (Left, Root, Right)
+\`\`\`
+preorder = [7, 4, 12, 9, 15]
+inorder  = [4, 7, 9, 12, 15]
 
-  Step 1: 3 is root (first in preorder)
-  Step 2: In inorder, left of 3 is [9], right is [15,20,7]
+The tree they describe:
 
-  Reconstructed tree:
-        3
-       / \\
-      9  20
-         / \\
-        15  7`,
+      7
+     / \\
+    4   12
+        / \\
+       9   15
+\`\`\``,
   examples: [
     {
-      input: "preorder = [3,9,20,15,7], inorder = [9,3,15,20,7]",
-      output: "[3,9,20,null,null,15,7]",
+      input: "preorder = [7,4,12,9,15], inorder = [4,7,9,12,15]",
+      output: "[7,4,12,null,null,9,15]",
     },
     {
-      input: "preorder = [-1], inorder = [-1]",
-      output: "[-1]",
+      input: "preorder = [-6], inorder = [-6]",
+      output: "[-6]",
     },
   ],
   constraints: [
-    "1 <= preorder.length <= 3000",
-    "inorder.length == preorder.length",
-    "-3000 <= preorder[i], inorder[i] <= 3000",
-    "preorder and inorder consist of unique values.",
-    "Each value of inorder also appears in preorder.",
+    "preorder holds between 1 and 3000 values.",
+    "inorder has exactly the same length as preorder.",
+    "Entries of both arrays lie between -3000 and 3000.",
+    "All traversal values are distinct.",
+    "Every value found in inorder also shows up in preorder.",
   ],
   hints: [
     "First element of preorder is root",

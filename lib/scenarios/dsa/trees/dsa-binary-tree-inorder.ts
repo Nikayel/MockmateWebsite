@@ -7,28 +7,25 @@ export const binaryTreeInorderScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "easy",
   companies: ["Amazon", "Google", "Meta"],
-  description: "Return the inorder traversal of a binary tree's nodes' values.",
+  description: "Produce a binary tree's left-node-right (inorder) visiting sequence.",
   tags: ["tree", "dfs", "stack", "recursion"],
   estimatedTime: 15,
-  problemStatement: `Given the root of a binary tree, return the inorder traversal of its nodes' values.`,
+  problemStatement: `You're given the root of a binary tree. Report its inorder traversal: for any node, everything in its left subtree is listed first, then the node's own value, then everything in its right subtree. Return the values in that visiting order.`,
   examples: [
     {
-      input: "root = [1,null,2,3]",
-      output: "[1,3,2]",
+      input: "root = [4,null,7,6]",
+      output: "[4,6,7]",
     },
     {
       input: "root = []",
       output: "[]",
     },
     {
-      input: "root = [1]",
-      output: "[1]",
+      input: "root = [9]",
+      output: "[9]",
     },
   ],
-  constraints: [
-    "The number of nodes in the tree is in the range [0, 100].",
-    "-100 <= Node.val <= 100",
-  ],
+  constraints: ["The tree has between 0 and 100 nodes.", "Values stay within -100 to 100."],
   hints: [
     "Inorder: left -> root -> right",
     "Can solve recursively or iteratively with stack",

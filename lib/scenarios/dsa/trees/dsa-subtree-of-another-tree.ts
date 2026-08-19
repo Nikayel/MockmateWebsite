@@ -7,40 +7,38 @@ export const subtreeOfAnotherTreeScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "easy",
   companies: ["Amazon", "Google", "Meta", "Microsoft"],
-  description: "Check if a tree is a subtree of another tree.",
+  description: "Decide whether one tree appears intact inside another.",
   tags: ["tree", "dfs", "recursion", "string-matching"],
   estimatedTime: 20,
-  problemStatement: `Given the roots of two binary trees root and subRoot, return true if there is a subtree of root with the same structure and node values of subRoot and false otherwise.
+  problemStatement: `You're given two binary trees by their roots, root and subRoot. Pick any node inside root and take everything hanging from it, that node plus all of its descendants, and you have one of root's subtrees; the whole of root counts as one too. Return true if any such subtree is an exact copy of subRoot, matching in both shape and values, and false if none is.
 
-A subtree of a binary tree tree is a tree that consists of a node in tree and all of this node's descendants.
-
-Example:
+A match can't stop partway down: whatever dangles below the chosen node is part of the comparison.
 
 \`\`\`
 root              subRoot
-    3                4
+    8                6
    / \\              / \\
-  4   5            1   2
+  6   9            3   7
  / \\
-1   2
+3   7
 \`\`\`
 
-The subtree rooted at 4 has the same shape and values as subRoot, so the answer is true.`,
+The node 6 inside root carries precisely the shape and values of subRoot, so this pair gives true.`,
   examples: [
     {
-      input: "root = [3,4,5,1,2], subRoot = [4,1,2]",
+      input: "root = [8,6,9,3,7], subRoot = [6,3,7]",
       output: "true",
     },
     {
-      input: "root = [3,4,5,1,2,null,null,null,null,0], subRoot = [4,1,2]",
+      input: "root = [8,6,9,3,7,null,null,null,null,1], subRoot = [6,3,7]",
       output: "false",
     },
   ],
   constraints: [
-    "The number of nodes in root is in the range [1, 2000].",
-    "The number of nodes in subRoot is in the range [1, 1000].",
-    "-10^4 <= root.val <= 10^4",
-    "-10^4 <= subRoot.val <= 10^4",
+    "root brings between 1 and 2000 nodes.",
+    "subRoot brings between 1 and 1000 nodes.",
+    "Every value in root fits within -10^4 to 10^4.",
+    "Every value in subRoot fits within -10^4 to 10^4.",
   ],
   hints: [
     "For each node in root, check if it matches subRoot using isSameTree",

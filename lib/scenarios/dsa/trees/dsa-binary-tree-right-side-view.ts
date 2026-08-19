@@ -7,30 +7,30 @@ export const binaryTreeRightSideViewScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft"],
-  description: "Return the values of nodes visible from the right side.",
+  description: "List the rightmost visible node of every level, top to bottom.",
   tags: ["tree", "bfs", "dfs"],
   estimatedTime: 20,
-  problemStatement: `Given the root of a binary tree, imagine yourself standing on the right side of it, return the values of the nodes you can see ordered from top to bottom.
+  problemStatement: `You're given the root of a binary tree. Suppose you stood off to the tree's right side and looked at it edge-on: at each depth, the only node you could make out is the one furthest to the right on that level.
 
-Example:
+Return the values of those visible nodes, ordered from the top level down.
 
 \`\`\`
-    1
+    7
    / \\
-  2   3
+  3   9
    \\   \\
-    5   4
+    6   12
 \`\`\`
 
-Standing on the right side you see [1, 3, 4].`,
+Viewed from the right, this tree shows you [7, 9, 12].`,
   examples: [
     {
-      input: "root = [1,2,3,null,5,null,4]",
-      output: "[1,3,4]",
+      input: "root = [7,3,9,null,6,null,12]",
+      output: "[7,9,12]",
     },
     {
-      input: "root = [1,null,3]",
-      output: "[1,3]",
+      input: "root = [4,null,8]",
+      output: "[4,8]",
     },
     {
       input: "root = []",
@@ -38,8 +38,8 @@ Standing on the right side you see [1, 3, 4].`,
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [0, 100].",
-    "-100 <= Node.val <= 100",
+    "There are 0 to 100 nodes in the tree.",
+    "Each node's value lies in the span -100 to 100.",
   ],
   hints: [
     "Use BFS, take last node of each level",

@@ -7,26 +7,25 @@ export const validateBstScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Microsoft", "Apple", "Bloomberg"],
-  description: "Determine if a binary tree is a valid BST",
+  description: "Decide whether a binary tree obeys BST ordering everywhere",
   tags: ["binary-search-tree", "dfs", "recursion"],
   estimatedTime: 20,
-  problemStatement: `Given the root of a binary tree, determine if it is a valid binary search tree (BST).
+  problemStatement: `You're given the root of a binary tree and must decide whether it qualifies as a binary search tree. The BST property says: every value anywhere in a node's left subtree is strictly smaller than that node's value, and every value anywhere in its right subtree is strictly larger. Note the word anywhere; the requirement reaches past immediate children to every descendant, and it applies at every node of the tree, not just at root.
 
-A valid BST is defined as follows:
-- The left subtree of a node contains only nodes with keys less than the node's key.
-- The right subtree of a node contains only nodes with keys greater than the node's key.
-- Both the left and right subtrees must also be binary search trees.`,
+Strictness matters too: equal values are never allowed on either side.
+
+Return true if root satisfies all of this, false otherwise.`,
   examples: [
-    { input: "root = [2,1,3]", output: "true" },
+    { input: "root = [4,2,9]", output: "true" },
     {
-      input: "root = [5,1,4,null,null,3,6]",
+      input: "root = [7,2,6,null,null,5,8]",
       output: "false",
-      explanation: "The root node's value is 5 but its right child's value is 4.",
+      explanation: "6 sits in 7's right subtree, yet 6 is smaller than 7.",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [1, 10^4].",
-    "-2^31 <= Node.val <= 2^31 - 1",
+    "The tree holds between 1 and 10^4 nodes.",
+    "Values may span the full -2^31 to 2^31 - 1 range.",
   ],
   hints: [
     "Pass min/max bounds down the tree",

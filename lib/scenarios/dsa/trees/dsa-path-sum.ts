@@ -7,25 +7,25 @@ export const pathSumScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "easy",
   companies: ["Amazon", "Meta", "Google", "Microsoft"],
-  description: "Check if tree has root-to-leaf path with given sum",
+  description: "Decide whether any root-to-leaf path hits a target total",
   tags: ["binary-tree", "dfs", "recursion"],
   estimatedTime: 15,
-  problemStatement: `Given the root of a binary tree and an integer targetSum, return true if the tree has a root-to-leaf path such that adding up all the values along the path equals targetSum.
+  problemStatement: `You're given the root of a binary tree and an integer targetSum. Consider every route that begins at root, follows child pointers downward, and finishes at a leaf, a node with no children. Total the values met along the way.
 
-A leaf is a node with no children.`,
+Return true if at least one root-to-leaf route totals exactly targetSum, and false when none does. The finish line matters here: an internal node whose running total happens to match doesn't count, and an empty tree contains no routes at all, so its answer is false.`,
   examples: [
     {
-      input: "root = [5,4,8,11,null,13,4,7,2,null,null,null,1], targetSum = 22",
+      input: "root = [8,5,11,2,null,16,6,4,7,null,null,null,3], targetSum = 19",
       output: "true",
-      explanation: "Path 5 → 4 → 11 → 2 = 22",
+      explanation: "The route 8 -> 5 -> 2 -> 4 totals 19",
     },
-    { input: "root = [1,2,3], targetSum = 5", output: "false" },
-    { input: "root = [], targetSum = 0", output: "false" },
+    { input: "root = [4,6,2], targetSum = 3", output: "false" },
+    { input: "root = [], targetSum = 5", output: "false" },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [0, 5000].",
-    "-1000 <= Node.val <= 1000",
-    "-1000 <= targetSum <= 1000",
+    "The node count ranges from 0 up to 5000.",
+    "Each value lies within -1000 to 1000.",
+    "targetSum stays inside -1000 to 1000 as well.",
   ],
   hints: [
     "Use DFS, subtracting node value from targetSum",

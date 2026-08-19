@@ -7,25 +7,27 @@ export const recoverBstScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Microsoft", "Bloomberg"],
-  description: "Recover BST where exactly two nodes were swapped",
+  description: "Swap back the two values that broke a BST",
   tags: ["binary-search-tree", "dfs", "inorder", "morris-traversal"],
   estimatedTime: 30,
-  problemStatement: `You are given the root of a binary search tree (BST), where the values of exactly two nodes of the tree were swapped by mistake. Recover the tree without changing its structure.`,
+  problemStatement: `You're handed the root of a binary search tree that was damaged in one specific way: the values of exactly two of its nodes got traded with each other. Nothing else moved, and the tree's shape is still the intended one.
+
+Recall what a healthy BST promises: inside any node's left subtree every value stays strictly below that node's value, and inside its right subtree every value stays strictly above it. Restore that promise by putting the two traded values back where they belong. Adjust values only; every parent-child link must remain exactly as it is.`,
   examples: [
     {
-      input: "root = [1,3,null,null,2]",
-      output: "[3,1,null,null,2]",
-      explanation: "3 and 1 are swapped",
+      input: "root = [2,6,null,null,4]",
+      output: "[6,2,null,null,4]",
+      explanation: "6 and 2 traded places",
     },
     {
-      input: "root = [3,1,4,null,null,2]",
-      output: "[2,1,4,null,null,3]",
-      explanation: "2 and 3 are swapped",
+      input: "root = [7,2,9,null,null,5]",
+      output: "[5,2,9,null,null,7]",
+      explanation: "7 and 5 traded places",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [2, 1000].",
-    "-2^31 <= Node.val <= 2^31 - 1",
+    "Node count sits between 2 and 1000.",
+    "Values can be as low as -2^31 and as high as 2^31 - 1.",
   ],
   hints: [
     "Inorder traversal should be sorted",

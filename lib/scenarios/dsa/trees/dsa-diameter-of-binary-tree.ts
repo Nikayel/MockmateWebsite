@@ -7,40 +7,38 @@ export const diameterOfBinaryTreeScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "easy",
   companies: ["Amazon", "Google", "Meta", "Apple"],
-  description: "Find the diameter (longest path) of a binary tree",
+  description: "Measure the longest node-to-node path in a binary tree, counted in edges",
   tags: ["tree", "dfs", "recursion"],
   estimatedTime: 20,
-  problemStatement: `Given the root of a binary tree, return the length of the diameter of the tree.
+  problemStatement: `You're given the root of a binary tree. Its diameter is the length of the longest path connecting any two nodes in the tree, and nothing forces that path to run through the root.
 
-The diameter of a binary tree is the length of the longest path between any two nodes in a tree. This path may or may not pass through the root.
-
-The length of a path between two nodes is represented by the number of edges between them.
-
-Example:
+Measure a path's length by the number of edges it uses, then return the diameter.
 
 \`\`\`
-      1
-     / \\
-    2   3
-   / \\
-  4   5
+        8
+       / \\
+      5   9
+     /     \\
+    2       12
+   /
+  1
 \`\`\`
 
-The longest path runs 4 - 2 - 1 - 3 (or 5 - 2 - 1 - 3), which is 3 edges, so the diameter is 3.`,
+The longest path here is 1 - 2 - 5 - 8 - 9 - 12. It uses 5 edges, so the diameter is 5.`,
   examples: [
     {
-      input: "root = [1,2,3,4,5]",
-      output: "3",
-      explanation: "The longest path is [4,2,1,3] or [5,2,1,3] with 3 edges.",
+      input: "root = [8,5,9,2,null,null,12,1]",
+      output: "5",
+      explanation: "The longest path is [1,2,5,8,9,12], crossing 5 edges.",
     },
     {
-      input: "root = [1,2]",
+      input: "root = [4,7]",
       output: "1",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [1, 10^4].",
-    "-100 <= Node.val <= 100",
+    "Between 1 and 10^4 nodes make up the tree.",
+    "Each carries a value from -100 to 100.",
   ],
   hints: [
     "Diameter through a node = left_height + right_height",

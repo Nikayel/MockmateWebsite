@@ -7,25 +7,27 @@ export const binaryTreeMaxPathSumScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "hard",
   companies: ["Amazon", "Google", "Meta"],
-  description: "Find the maximum path sum in a binary tree.",
+  description: "Find the best achievable sum along any node-to-node path in a binary tree.",
   tags: ["tree", "dfs", "recursion"],
   estimatedTime: 30,
-  problemStatement: `A path in a binary tree is a sequence of nodes where each pair of adjacent nodes has an edge. A node can only appear once in the sequence. The path sum is the sum of the node values. Return the maximum path sum of any non-empty path.`,
+  problemStatement: `You're given a binary tree via its root. A path here is a chain of distinct nodes in which every consecutive pair is joined by an edge of the tree. A path may begin and end anywhere, and it is free to skip the root entirely. Its sum is the total of the values on its nodes.
+
+Across every non-empty path the tree offers, return the largest sum you can achieve.`,
   examples: [
     {
-      input: "root = [1,2,3]",
-      output: "6",
-      explanation: "Path is 2->1->3",
+      input: "root = [4,5,6]",
+      output: "15",
+      explanation: "The winning path is 5 -> 4 -> 6",
     },
     {
-      input: "root = [-10,9,20,null,null,15,7]",
-      output: "42",
-      explanation: "Path is 15->20->7",
+      input: "root = [-8,12,16,null,null,9,10]",
+      output: "35",
+      explanation: "The path 9 -> 16 -> 10 avoids the negative root",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [1, 3 * 10^4].",
-    "-1000 <= Node.val <= 1000",
+    "Expect at least 1 node and up to 3 * 10^4 of them.",
+    "Individual values range from -1000 to 1000.",
   ],
   hints: [
     "For each node, calculate max path through that node",

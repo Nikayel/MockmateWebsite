@@ -7,32 +7,33 @@ export const balancedBinaryTreeScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "easy",
   companies: ["Amazon", "Google", "Meta", "Apple"],
-  description: "Check if a binary tree is height-balanced.",
+  description:
+    "Decide whether a binary tree keeps every node's subtree heights within 1 of each other.",
   tags: ["tree", "dfs", "recursion"],
   estimatedTime: 15,
-  problemStatement: `Given a binary tree, determine if it is height-balanced.
+  problemStatement: `You're given the root of a binary tree. Decide whether the tree is height-balanced and answer with true or false.
 
-A height-balanced binary tree is a binary tree in which the depth of the two subtrees of every node never differs by more than one.
+A tree earns the height-balanced label when, at every node in it, the heights of the left subtree and the right subtree differ by at most 1.
 
 Example:
 
 \`\`\`
-Balanced (true)        Not balanced (false)
-      3                        1
-     / \\                      / \\
-    9  20                     2   2
-       / \\                   / \\
-      15  7                  3   3
-                            / \\
-                           4   4
+Balanced (true)      Not balanced (false)
+      7                    10
+     / \\                  /  \\
+    4   9                 5    16
+   /     \\               / \\
+  2       11             3   8
+                        /
+                       1
 \`\`\``,
   examples: [
     {
-      input: "root = [3,9,20,null,null,15,7]",
+      input: "root = [7,4,9,2,null,null,11]",
       output: "true",
     },
     {
-      input: "root = [1,2,2,3,3,null,null,4,4]",
+      input: "root = [10,5,16,3,8,null,null,1]",
       output: "false",
     },
     {
@@ -41,8 +42,8 @@ Balanced (true)        Not balanced (false)
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [0, 5000].",
-    "-10^4 <= Node.val <= 10^4",
+    "Anywhere from 0 to 5000 nodes may be present.",
+    "Each value sits between -10^4 and 10^4.",
   ],
   hints: [
     "For each node: |left_height - right_height| <= 1",

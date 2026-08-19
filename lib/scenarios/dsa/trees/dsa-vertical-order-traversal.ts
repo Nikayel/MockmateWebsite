@@ -7,22 +7,23 @@ export const verticalOrderTraversalScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "hard",
   companies: ["Amazon", "Meta", "Google", "Microsoft", "Bloomberg"],
-  description: "Return vertical order traversal with special ordering rules",
+  description: "Read a binary tree column by column under strict tie rules",
   tags: ["binary-tree", "bfs", "dfs", "sorting", "hash-table"],
   estimatedTime: 35,
-  problemStatement: `Given the root of a binary tree, calculate the vertical order traversal of the binary tree.
+  problemStatement: `You're given the root of a binary tree and need to report its nodes in vertical slices. Coordinates come from the walk down: root occupies row 0, column 0, and a node standing at (row, col) places its left child at (row + 1, col - 1) and its right child at (row + 1, col + 1).
 
-For each node at position (row, col), its left and right children will be at positions (row + 1, col - 1) and (row + 1, col + 1) respectively. The root is at (0, 0).
+A slice gathers every node that shares one column. Emit the slices from the leftmost column through the rightmost. Within a single slice, a node in a higher row (closer to root) comes before a node in a lower row, and whenever two nodes collide on the exact same row and column, the smaller value is listed first.
 
-The vertical order traversal of a binary tree is a list of top-to-bottom orderings for each column index starting from the leftmost column and ending on the rightmost column. If two nodes are in the same row and column, order them by their values.`,
+Return the slices as a list of lists.`,
   examples: [
-    { input: "root = [3,9,20,null,null,15,7]", output: "[[9],[3,15],[20],[7]]" },
-    { input: "root = [1,2,3,4,5,6,7]", output: "[[4],[2],[1,5,6],[3],[7]]" },
+    { input: "root = [6,10,14,null,null,12,8]", output: "[[10],[6,12],[14],[8]]" },
+    {
+      input: "root = [2,6,3,9,4,1,8]",
+      output: "[[9],[6],[2,1,4],[3],[8]]",
+      explanation: "4 and 1 collide at row 2, column 0, so the smaller value 1 comes first",
+    },
   ],
-  constraints: [
-    "The number of nodes in the tree is in the range [1, 1000].",
-    "0 <= Node.val <= 1000",
-  ],
+  constraints: ["Node count runs from 1 to 1000.", "Values are non-negative, from 0 up to 1000."],
   hints: [
     "Track (col, row, val) for each node",
     "Use BFS or DFS to traverse",

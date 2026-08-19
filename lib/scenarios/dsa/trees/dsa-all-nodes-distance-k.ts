@@ -8,26 +8,27 @@ export const allNodesDistanceKScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Palantir"],
   roles: ["junior", "senior", "swe"],
-  description: "Find all nodes at distance K from a target node",
+  description: "Collect every node exactly k edges away from a chosen target node",
   tags: ["binary-tree", "bfs", "dfs", "graph"],
   estimatedTime: 30,
-  problemStatement: `Given the root of a binary tree, the value of a target node target, and an integer k, return an array of the values of all nodes that have a distance k from the target node.
+  problemStatement: `You're given the root of a binary tree, a target node target somewhere inside it, and an integer k. Treat the distance between two nodes as the number of edges on the route that connects them.
 
-You can return the answer in any order.`,
+Collect the values of every node sitting exactly k edges away from target, and return them as an array. Any ordering is acceptable.`,
   examples: [
     {
-      input: "root = [3,5,1,6,2,0,8,null,null,7,4], target = 5, k = 2",
-      output: "[7,4,1]",
-      explanation: "Nodes at distance 2 from node 5 are 7, 4, and 1.",
+      input: "root = [6,2,9,1,4,8,11,null,null,3,5], target = 2, k = 2",
+      output: "[3,5,9]",
+      explanation:
+        "Two edges from node 2: its grandchildren 3 and 5, plus node 9 reached up through the root.",
     },
-    { input: "root = [1], target = 1, k = 3", output: "[]" },
+    { input: "root = [7], target = 7, k = 4", output: "[]" },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [1, 500].",
-    "0 <= Node.val <= 500",
-    "All Node.val are unique.",
-    "target is a value of a node in the tree.",
-    "0 <= k <= 1000",
+    "The tree holds at least 1 and at most 500 nodes.",
+    "Node values run from 0 to 500.",
+    "No two nodes share the same value.",
+    "target always matches a node that exists in the tree.",
+    "k is between 0 and 1000.",
   ],
   hints: [
     "Convert tree to undirected graph (add parent pointers)",

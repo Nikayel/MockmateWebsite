@@ -7,20 +7,20 @@ export const sumRootToLeafScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google"],
-  description: "Sum all root-to-leaf numbers formed by paths",
+  description: "Add up the numbers each root-to-leaf path spells out",
   tags: ["binary-tree", "dfs"],
   estimatedTime: 20,
-  problemStatement: `You are given the root of a binary tree containing digits from 0 to 9 only. Each root-to-leaf path in the tree represents a number.
+  problemStatement: `You're given a binary tree through root, and every node in it stores a single digit, 0 through 9. Reading the digits along any path from the top down to a leaf (a node with no children) spells a decimal number: passing 4, then 0, then 8 produces 408.
 
-Return the total sum of all root-to-leaf numbers.`,
+Spell out that number for every root-to-leaf path in the tree, then return the sum of all of them.`,
   examples: [
-    { input: "root = [1,2,3]", output: "25", explanation: "12 + 13 = 25" },
-    { input: "root = [4,9,0,5,1]", output: "1026", explanation: "495 + 491 + 40 = 1026" },
+    { input: "root = [3,6,8]", output: "74", explanation: "36 + 38 = 74" },
+    { input: "root = [6,2,5,9,3]", output: "1317", explanation: "629 + 623 + 65 = 1317" },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [1, 1000].",
-    "0 <= Node.val <= 9",
-    "The depth of the tree will not exceed 10.",
+    "Between 1 and 1000 nodes are present.",
+    "Every value is a single digit, 0 to 9.",
+    "No path goes deeper than 10 levels.",
   ],
   hints: [
     "DFS passing current number formed so far",

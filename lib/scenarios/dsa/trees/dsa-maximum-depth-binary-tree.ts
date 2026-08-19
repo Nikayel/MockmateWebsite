@@ -7,37 +7,37 @@ export const maximumDepthBinaryTreeScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "easy",
   companies: ["Amazon", "Google", "Meta", "Apple", "Microsoft", "NVIDIA"],
-  description: "Find the maximum depth of a binary tree.",
+  description: "Count the nodes on the longest root-to-leaf walk in a binary tree.",
   tags: ["tree", "dfs", "bfs", "recursion"],
   estimatedTime: 10,
-  problemStatement: `Given the root of a binary tree, return its maximum depth.
+  problemStatement: `You're given the root of a binary tree. Its maximum depth counts the nodes on the longest chain you can follow from root straight down, parent to child, before running out at a leaf.
 
-A binary tree's maximum depth is the number of nodes along the longest path from the root node down to the farthest leaf node.
-
-Example:
+Here's one tree whose answer is 3:
 
 \`\`\`
-      3
+      8
      / \\
-    9  20
+    4  25
        / \\
-      15  7
+     12  30
 \`\`\`
 
-The longest root-to-leaf path passes 3 nodes, so the maximum depth is 3.`,
+Walking 8 to 25 to 12 touches 3 nodes, and no downward walk in this tree touches more, so its maximum depth is 3.
+
+Return the maximum depth of the tree hanging from root.`,
   examples: [
     {
-      input: "root = [3,9,20,null,null,15,7]",
+      input: "root = [8,4,25,null,null,12,30]",
       output: "3",
     },
     {
-      input: "root = [1,null,2]",
+      input: "root = [7,null,9]",
       output: "2",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [0, 10^4].",
-    "-100 <= Node.val <= 100",
+    "Anywhere from 0 to 10^4 nodes may be present.",
+    "Each node's value sits between -100 and 100.",
   ],
   hints: [
     "Depth = 1 + max(left_depth, right_depth)",

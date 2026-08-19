@@ -8,16 +8,16 @@ export const serializeDeserializeTreeScenario: DSAScenario = {
   difficulty: "hard",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Roblox", "Snap", "TikTok", "Palantir"],
   roles: ["junior", "senior", "swe", "fdse"],
-  description: "Design an algorithm to serialize and deserialize a binary tree.",
+  description: "Flatten a binary tree to a string and rebuild it exactly.",
   tags: ["tree", "dfs", "bfs", "design"],
   estimatedTime: 35,
-  problemStatement: `Serialization is the process of converting a data structure or object into a sequence of bits so that it can be stored in a file or memory buffer, or transmitted across a network connection link to be reconstructed later in the same or another computer environment.
+  problemStatement: `Your task is to move a binary tree through a string and bring it back intact. Serializing flattens the tree into a sequence of characters that could sit in a file or travel over a network; deserializing reads that sequence and rebuilds the structure it described.
 
-Design an algorithm to serialize and deserialize a binary tree. There is no restriction on how your serialization/deserialization algorithm should work. You just need to ensure that a binary tree can be serialized to a string and this string can be deserialized to the original tree structure.`,
+Implement both halves of the Codec: serialize accepts root and emits a single string, and deserialize accepts that string as data and reconstructs a tree identical to the original. The wire format is entirely your call. The one contract that matters is the round trip: deserialize(serialize(root)) must hand back exactly the tree you started from.`,
   examples: [
     {
-      input: "root = [1,2,3,null,null,4,5]",
-      output: "[1,2,3,null,null,4,5]",
+      input: "root = [8,3,9,null,null,6,2]",
+      output: "[8,3,9,null,null,6,2]",
     },
     {
       input: "root = []",
@@ -25,8 +25,8 @@ Design an algorithm to serialize and deserialize a binary tree. There is no rest
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [0, 10^4].",
-    "-1000 <= Node.val <= 1000",
+    "A tree here holds anywhere from 0 to 10^4 nodes.",
+    "Stored values run from -1000 to 1000.",
   ],
   hints: [
     "Use preorder traversal with null markers",

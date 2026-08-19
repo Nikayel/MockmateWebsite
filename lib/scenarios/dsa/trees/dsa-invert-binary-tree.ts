@@ -7,32 +7,28 @@ export const invertBinaryTreeScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "easy",
   companies: ["Google", "Amazon", "Meta", "Apple", "Microsoft"],
-  description: "Invert a binary tree (mirror it).",
+  description: "Mirror a binary tree by swapping every node's pair of children.",
   tags: ["tree", "dfs", "bfs", "recursion"],
   estimatedTime: 10,
-  problemStatement: `Given the root of a binary tree, invert the tree, and return its root.
-
-Inverting a binary tree means swapping the left and right children of all nodes in the tree.
-
-Example:
+  problemStatement: `You're given the root of a binary tree. Invert it: every node in the tree trades its left child for its right child, all the way down, leaving a mirror image of the original. Return root once the swapping is done.
 
 \`\`\`
-Input              Output
-     4                4
-    / \\              / \\
-   2   7            7   2
-  / \\ / \\          / \\ / \\
- 1  3 6  9        9  6 3  1
+Before                After
+     10                  10
+    /  \\                /  \\
+   5    14             14    5
+  / \\   / \\           / \\   / \\
+ 2   8 12  20        20  12 8   2
 \`\`\``,
   examples: [
     {
-      input: "root = [4,2,7,1,3,6,9]",
-      output: "[4,7,2,9,6,3,1]",
-      explanation: "The tree is mirrored around its center.",
+      input: "root = [10,5,14,2,8,12,20]",
+      output: "[10,14,5,20,12,8,2]",
+      explanation: "Every left-right pair has traded places.",
     },
     {
-      input: "root = [2,1,3]",
-      output: "[2,3,1]",
+      input: "root = [6,4,9]",
+      output: "[6,9,4]",
     },
     {
       input: "root = []",
@@ -40,8 +36,8 @@ Input              Output
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [0, 100].",
-    "-100 <= Node.val <= 100",
+    "You'll see at most 100 nodes, possibly 0.",
+    "Any value from -100 to 100 can appear.",
   ],
   hints: [
     "Recursively swap left and right children",

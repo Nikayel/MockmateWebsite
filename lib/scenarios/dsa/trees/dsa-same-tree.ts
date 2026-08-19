@@ -7,42 +7,34 @@ export const sameTreeScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "easy",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple"],
-  description: "Check if two binary trees are structurally identical.",
+  description: "Check whether two binary trees match in shape and values.",
   tags: ["tree", "dfs", "bfs", "recursion"],
   estimatedTime: 10,
-  problemStatement: `Given the roots of two binary trees p and q, write a function to check if they are the same or not.
+  problemStatement: `You're given two binary trees by their roots, p and q. Decide whether they're carbon copies of each other: every position that holds a node in one must hold a node in the other, and matching positions must carry equal values. Return true for a perfect match, false for any difference in shape or contents.
 
-Two binary trees are considered the same if they are structurally identical, and the nodes have the same value.
+\`\`\`
+  p:          q:
+     7           7
+    / \\         / \\
+   4   9       4   9
+\`\`\`
 
-Example visualization:
-
-  Tree p:     Tree q:      Result:
-     1           1
-    / \\         / \\        TRUE ✓
-   2   3       2   3       (identical)
-
-  Tree p:     Tree q:      Result:
-     1           1
-    /             \\        FALSE ✗
-   2               2       (different structure)`,
+These two agree everywhere, so the answer is true. If q instead hung its 4 on the right side while p kept it on the left, the values alone wouldn't save it: the shapes differ, so the answer would be false.`,
   examples: [
     {
-      input: "p = [1,2,3], q = [1,2,3]",
+      input: "p = [7,4,9], q = [7,4,9]",
       output: "true",
     },
     {
-      input: "p = [1,2], q = [1,null,2]",
+      input: "p = [7,4], q = [7,null,4]",
       output: "false",
     },
     {
-      input: "p = [1,2,1], q = [1,1,2]",
+      input: "p = [5,8,5], q = [5,5,8]",
       output: "false",
     },
   ],
-  constraints: [
-    "The number of nodes in both trees is in the range [0, 100].",
-    "-10^4 <= Node.val <= 10^4",
-  ],
+  constraints: ["Each tree holds from 0 to 100 nodes.", "Node values lie between -10^4 and 10^4."],
   hints: [
     "Compare nodes recursively: value, left subtree, right subtree",
     "Base case: both null = true, one null = false",

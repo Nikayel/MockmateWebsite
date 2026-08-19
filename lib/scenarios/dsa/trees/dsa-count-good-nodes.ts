@@ -7,32 +7,33 @@ export const countGoodNodesScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Microsoft"],
-  description: "Count nodes where the path from root has no greater value.",
+  description: "Count nodes at least as large as everything above them on their root path.",
   tags: ["tree", "dfs", "recursion"],
   estimatedTime: 20,
-  problemStatement: `Given a binary tree root, a node X in the tree is named good if in the path from root to X there are no nodes with a value greater than X.
+  problemStatement: `You're given the root of a binary tree. Call a node good when no node on the walk from the root down to it carries a value strictly greater than its own; matching an ancestor's value is fine.
 
-Return the number of good nodes in the binary tree.`,
+Count how many good nodes the tree contains and return that number.`,
   examples: [
     {
-      input: "root = [3,1,4,3,null,1,5]",
-      output: "4",
-      explanation: "Root 3, node 4 (3<4), node 3 (3>=3), node 5 (3<4<5)",
+      input: "root = [6,2,7,6,null,8,9]",
+      output: "5",
+      explanation:
+        "Good: the root, the deeper 6 (a tie still counts), 7, 8, and 9; node 2 sits below a bigger ancestor",
     },
     {
-      input: "root = [3,3,null,4,2]",
+      input: "root = [5,5,null,7,1]",
       output: "3",
-      explanation: "Root 3, node 3, node 4",
+      explanation: "The root, the second 5, and 7 qualify",
     },
     {
-      input: "root = [1]",
+      input: "root = [8]",
       output: "1",
-      explanation: "Root is always good",
+      explanation: "A lone root has nothing above it, so it always counts",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [1, 10^5].",
-    "-10^4 <= Node.val <= 10^4",
+    "The tree size runs from 1 to 10^5 nodes.",
+    "Values may be anywhere from -10^4 to 10^4.",
   ],
   hints: [
     "DFS while tracking max value seen so far",

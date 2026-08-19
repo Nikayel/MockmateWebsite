@@ -10,22 +10,20 @@ export const populatingNextRightScenario: DSAScenario = {
   description: "Connect nodes at same level using next pointers",
   tags: ["binary-tree", "bfs", "dfs"],
   estimatedTime: 25,
-  problemStatement: `You are given a perfect binary tree where all leaves are on the same level, and every parent has two children.
+  problemStatement: `You're handed root, the top of a perfect binary tree: every internal node has both children, and all of the leaves sit together on the bottom level. Each node also carries an extra next pointer, and every next starts out as NULL.
 
-Populate each next pointer to point to its next right node. If there is no next right node, the next pointer should be set to NULL.
-
-Initially, all next pointers are set to NULL.`,
+Thread each level into a rightward chain: a node's next should reference whichever node stands immediately to its right on the same level. The last node of a level has nothing to its right, so its next keeps its NULL value. Return root once the wiring is done.`,
   examples: [
     {
-      input: "root = [1,2,3,4,5,6,7]",
-      output: "[1,#,2,3,#,4,5,6,7,#]",
-      explanation: "# denotes null next pointers",
+      input: "root = [5,9,2,10,4,6,11]",
+      output: "[5,#,9,2,#,10,4,6,11,#]",
+      explanation: "Reading each level left to right via next, # marks where a next is null",
     },
     { input: "root = []", output: "[]" },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [0, 2^12 - 1].",
-    "-1000 <= Node.val <= 1000",
+    "The tree carries between 0 and 2^12 - 1 nodes.",
+    "Values run from -1000 through 1000.",
   ],
   hints: [
     "BFS level by level, connect nodes in same level",

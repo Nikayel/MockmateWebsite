@@ -7,21 +7,23 @@ export const pathSumIiScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Microsoft"],
-  description: "Find all root-to-leaf paths with given sum",
+  description: "Collect every root-to-leaf path that adds up to a target",
   tags: ["binary-tree", "dfs", "backtracking"],
   estimatedTime: 25,
-  problemStatement: `Given the root of a binary tree and an integer targetSum, return all root-to-leaf paths where the sum of the node values in the path equals targetSum. Each path should be returned as a list of the node values, not node references.`,
+  problemStatement: `You're given the root of a binary tree along with an integer targetSum. A root-to-leaf path starts at root, follows child links downward, and stops at a leaf, meaning a node with no children.
+
+Collect every root-to-leaf path whose values total exactly targetSum. Report each qualifying path as the list of values along it, ordered from root to leaf, and return all of those lists together. The result holds plain values, never the nodes themselves.`,
   examples: [
     {
-      input: "root = [5,4,8,11,null,13,4,7,2,null,null,5,1], targetSum = 22",
-      output: "[[5,4,11,2],[5,8,4,5]]",
+      input: "root = [7,3,10,6,null,12,5,4,9,null,null,3,8], targetSum = 25",
+      output: "[[7,3,6,9],[7,10,5,3]]",
     },
-    { input: "root = [1,2,3], targetSum = 5", output: "[]" },
+    { input: "root = [2,4,6], targetSum = 9", output: "[]" },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [0, 5000].",
-    "-1000 <= Node.val <= 1000",
-    "-1000 <= targetSum <= 1000",
+    "Expect anywhere from 0 to 5000 nodes.",
+    "Node values span -1000 to 1000.",
+    "targetSum also falls between -1000 and 1000.",
   ],
   hints: [
     "Use DFS with backtracking",

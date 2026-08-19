@@ -7,22 +7,19 @@ export const flattenBinaryTreeScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Microsoft"],
-  description: "Flatten binary tree to linked list in-place using preorder",
+  description: "Restructure a binary tree in place into a preorder right-pointer chain",
   tags: ["binary-tree", "dfs", "linked-list"],
   estimatedTime: 25,
-  problemStatement: `Given the root of a binary tree, flatten the tree into a "linked list":
+  problemStatement: `You're given the root of a binary tree. Rework it, in place, into a single right-leaning chain that stands in for a linked list:
 
-- The "linked list" should use the same TreeNode class where the right child pointer points to the next node in the list and the left child pointer is always null.
-- The "linked list" should be in the same order as a pre-order traversal of the binary tree.`,
+- Keep the existing TreeNode objects. In the finished chain, each node's right pointer leads to the node that follows it, and every left pointer ends up null.
+- The chain must present the nodes in the tree's preorder sequence, where each node comes before its left subtree, which comes before its right subtree.`,
   examples: [
-    { input: "root = [1,2,5,3,4,null,6]", output: "[1,null,2,null,3,null,4,null,5,null,6]" },
+    { input: "root = [8,3,10,2,6,null,12]", output: "[8,null,3,null,2,null,6,null,10,null,12]" },
     { input: "root = []", output: "[]" },
-    { input: "root = [0]", output: "[0]" },
+    { input: "root = [5]", output: "[5]" },
   ],
-  constraints: [
-    "The number of nodes in the tree is in the range [0, 2000].",
-    "-100 <= Node.val <= 100",
-  ],
+  constraints: ["The tree contains 0 to 2000 nodes.", "Stored values range across -100 to 100."],
   hints: [
     "Morris traversal for O(1) space",
     "Or reverse postorder (right, left, root) and link",

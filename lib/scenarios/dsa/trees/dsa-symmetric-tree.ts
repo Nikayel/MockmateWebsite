@@ -7,34 +7,34 @@ export const symmetricTreeScenario: DSAScenario = {
   pattern: "trees",
   difficulty: "easy",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple"],
-  description: "Check if a binary tree is a mirror of itself.",
+  description: "Check whether a tree reads the same flipped left to right.",
   tags: ["tree", "dfs", "bfs", "recursion"],
   estimatedTime: 15,
-  problemStatement: `Given the root of a binary tree, check whether it is a mirror of itself (i.e., symmetric around its center).
+  problemStatement: `You're given the root of a binary tree. Imagine a vertical line through root and fold the tree across it: the tree is symmetric when the left half lands perfectly on the right half, position for position and value for value. Return true if the tree mirrors itself this way, false if anything fails to line up.
 
-Example visualization:
+\`\`\`
+Symmetric:            Not symmetric:
+      5                     5
+     / \\                   / \\
+    8   8                 8   8
+   / \\ / \\                 \\   \\
+  2  6 6  2                6    6
+\`\`\`
 
-  Symmetric (TRUE):       Not Symmetric (FALSE):
-        1                       1
-       / \\                     / \\
-      2   2                   2   2
-     / \\ / \\                   \\   \\
-    3  4 4  3                  3    3
-        |
-     (mirror)`,
+The first tree reads identically from both ends, so it's true. In the second, both 6s lean the same direction, so the fold misses and it's false.`,
   examples: [
     {
-      input: "root = [1,2,2,3,4,4,3]",
+      input: "root = [5,8,8,2,6,6,2]",
       output: "true",
     },
     {
-      input: "root = [1,2,2,null,3,null,3]",
+      input: "root = [5,8,8,null,6,null,6]",
       output: "false",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [1, 1000].",
-    "-100 <= Node.val <= 100",
+    "The tree has at least 1 node and at most 1000.",
+    "Each value falls between -100 and 100.",
   ],
   hints: [
     "Compare left subtree with right subtree (mirrored)",

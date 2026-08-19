@@ -8,44 +8,43 @@ export const lowestCommonAncestorBinaryTreeScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe"],
-  description: "Find the lowest common ancestor of two nodes in a binary tree",
+  description: "Locate the deepest node that keeps both given nodes among its descendants",
   tags: ["tree", "dfs", "recursion"],
   estimatedTime: 25,
-  problemStatement: `Given a binary tree, find the lowest common ancestor (LCA) of two given nodes in the tree.
+  problemStatement: `You're given the root of a binary tree plus two nodes that live in it, p and q. Their lowest common ancestor (LCA) is the deepest node that counts both p and q among its descendants, and for this purpose every node is treated as a descendant of itself.
 
-According to the definition of LCA on Wikipedia: "The lowest common ancestor is defined between two nodes p and q as the lowest node in T that has both p and q as descendants (where we allow a node to be a descendant of itself)."
-
-Example:
+Find that ancestor node and return it.
 
 \`\`\`
-        3
+        9
        / \\
-      5   1
+      4   13
      / \\  / \\
-    6   2 0   8
+    2   7 11 16
        / \\
-      7   4
+      6   8
 \`\`\`
 
-The LCA of 5 and 1 is 3. The LCA of 5 and 4 is 5, because a node counts as a descendant of itself.`,
+The LCA of 4 and 13 is 9. For 4 and 8 it is 4 itself, since a node may be its own descendant.`,
   examples: [
     {
-      input: "root = [3,5,1,6,2,0,8,null,null,7,4], p = 5, q = 1",
-      output: "3",
-      explanation: "The LCA of nodes 5 and 1 is 3.",
+      input: "root = [9,4,13,2,7,11,16,null,null,6,8], p = 4, q = 13",
+      output: "9",
+      explanation: "Nodes 4 and 13 hang from different sides of 9, so 9 is where their paths meet.",
     },
     {
-      input: "root = [3,5,1,6,2,0,8,null,null,7,4], p = 5, q = 4",
-      output: "5",
-      explanation: "The LCA of nodes 5 and 4 is 5, since a node can be a descendant of itself.",
+      input: "root = [9,4,13,2,7,11,16,null,null,6,8], p = 4, q = 8",
+      output: "4",
+      explanation:
+        "Node 8 lives inside 4's subtree, and a node counts as its own descendant, so the answer is 4.",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [2, 10^5].",
-    "-10^9 <= Node.val <= 10^9",
-    "All Node.val are unique.",
-    "p != q",
-    "p and q will exist in the tree.",
+    "The tree carries between 2 and 10^5 nodes.",
+    "Node values span -10^9 to 10^9.",
+    "Every value in the tree is distinct.",
+    "p and q are guaranteed to be different nodes.",
+    "Both p and q appear somewhere in the tree.",
   ],
   hints: [
     "Recursively search left and right subtrees for p and q",

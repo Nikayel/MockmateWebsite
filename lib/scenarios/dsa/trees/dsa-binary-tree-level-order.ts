@@ -8,28 +8,30 @@ export const binaryTreeLevelOrderScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Palantir"],
   roles: ["intern", "new-grad", "junior", "swe"],
-  description: "Return the level order traversal of a binary tree",
+  description: "Gather a binary tree's values depth by depth into per-level arrays",
   tags: ["tree", "bfs", "queue"],
   estimatedTime: 20,
-  problemStatement: `Given the root of a binary tree, return the level order traversal of its nodes' values. (i.e., from left to right, level by level).
+  problemStatement: `You're given the root of a binary tree. Gather its values one depth at a time, starting at the root's level and working downward, reading each level from left to right. That grouping is the tree's level order traversal.
 
-Example visualization:
+Return it as an array of arrays, with one inner array per level.
 
-      3           Level 0: [3]
+\`\`\`
+      4           level 0 -> [4]
      / \\
-    9  20         Level 1: [9, 20]
-       / \\
-      15  7       Level 2: [15, 7]
+    7   15        level 1 -> [7, 15]
+   / \\  /
+  3   5 12        level 2 -> [3, 5, 12]
+\`\`\`
 
-  Output: [[3], [9, 20], [15, 7]]`,
+Output: [[4], [7, 15], [3, 5, 12]]`,
   examples: [
     {
-      input: "root = [3,9,20,null,null,15,7]",
-      output: "[[3],[9,20],[15,7]]",
+      input: "root = [4,7,15,3,5,12]",
+      output: "[[4],[7,15],[3,5,12]]",
     },
     {
-      input: "root = [1]",
-      output: "[[1]]",
+      input: "root = [8]",
+      output: "[[8]]",
     },
     {
       input: "root = []",
@@ -37,8 +39,8 @@ Example visualization:
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [0, 2000].",
-    "-1000 <= Node.val <= 1000",
+    "Node count ranges from 0 through 2000.",
+    "Every stored value falls between -1000 and 1000.",
   ],
   hints: [
     "Use BFS with a queue",
