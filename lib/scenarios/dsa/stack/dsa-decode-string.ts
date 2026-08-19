@@ -11,31 +11,29 @@ export const dsaDecodeStringScenario: DSAScenario = {
   description: "Decode an encoded string with nested patterns",
   tags: ["stack", "string", "recursion"],
   estimatedTime: 25,
-  problemStatement: `Given an encoded string, return its decoded string.
+  problemStatement: `You're given an encoded string s. Expand it and return the plain decoded text.
 
-The encoding rule is: k[encoded_string], where the encoded_string inside the square brackets is being repeated exactly k times. Note that k is guaranteed to be a positive integer.
-
-You may assume that the input string is always valid; there are no extra white spaces, square brackets are well-formed, etc. Furthermore, you may assume that the original data does not contain any digits and that digits are only for those repeat numbers, k.`,
+The encoding follows one rule, k[piece]: a positive integer k directly before a square-bracketed piece means that piece repeats k consecutive times in the decoded text, and encodings can nest inside one another. The input always arrives cleanly formed, with every bracket paired and no stray whitespace, and digits appear only as those repeat counts k, never in the decoded text itself.`,
   examples: [
     {
-      input: 's = "3[a]2[bc]"',
-      output: '"aaabcbc"',
+      input: 's = "4[x]2[yz]"',
+      output: '"xxxxyzyz"',
     },
     {
-      input: 's = "3[a2[c]]"',
-      output: '"accaccacc"',
-      explanation: 'Inner 2[c] = "cc", then 3[acc] = "accaccacc"',
+      input: 's = "2[b4[d]]"',
+      output: '"bddddbdddd"',
+      explanation: 'The inner 4[d] becomes "dddd", so the outer group repeats "bdddd" twice.',
     },
     {
-      input: 's = "2[abc]3[cd]ef"',
-      output: '"abcabccdcdcdef"',
+      input: 's = "3[pq]5[r]st"',
+      output: '"pqpqpqrrrrrst"',
     },
   ],
   constraints: [
-    "1 <= s.length <= 30",
-    "s consists of lowercase English letters, digits, and square brackets",
-    "s is guaranteed to be a valid input",
-    "All the integers in s are in the range [1, 300]",
+    "s measures 1 to 30 characters",
+    "s contains only lowercase English letters, digits, and square brackets",
+    "s always arrives as a well-formed encoding",
+    "every repeat count k in s falls between 1 and 300",
   ],
   hints: [
     "Use two stacks: one for counts, one for strings",

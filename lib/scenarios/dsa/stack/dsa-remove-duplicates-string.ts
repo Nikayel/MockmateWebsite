@@ -7,34 +7,33 @@ export const dsaRemoveDuplicatesStringScenario: DSAScenario = {
   pattern: "stack",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Bloomberg"],
-  description: "Remove k adjacent duplicate letters using a stack",
+  description: "Repeatedly delete runs of k equal adjacent letters",
   tags: ["stack", "string"],
   estimatedTime: 25,
-  problemStatement: `You are given a string s and an integer k, a k duplicate removal consists of choosing k adjacent and equal letters from s and removing them, causing the left and the right side of the deleted substring to concatenate together.
+  problemStatement: `You're given a string s and an integer k. A removal step picks k equal letters sitting consecutively in s and deletes exactly those k, letting the text on the left and right of the hole fuse together.
 
-We repeatedly make k duplicate removals on s until we no longer can.
-
-Return the final string after all such duplicate removals have been made. It is guaranteed that the answer is unique.`,
+Repeat removal steps until no k consecutive equal letters remain anywhere. Return the string that survives; whichever order you apply the steps in, the survivor comes out the same.`,
   examples: [
     {
-      input: 's = "abcd", k = 2',
-      output: '"abcd"',
-      explanation: "No adjacent duplicates.",
+      input: 's = "wxyz", k = 3',
+      output: '"wxyz"',
+      explanation: "No letter appears 3 times in a row, so nothing can be removed.",
     },
     {
-      input: 's = "deeedbbcccbdaa", k = 3',
-      output: '"aa"',
-      explanation: '"eee" -> "ddbcccbdaa" -> "ddbbbdaa" -> "dddaa" -> "aa"',
+      input: 's = "azzzaabbbaac", k = 3',
+      output: '"aac"',
+      explanation:
+        '"zzz" goes first, leaving "aaabbbaac"; deleting "aaa" leaves "bbbaac"; deleting "bbb" leaves "aac", which has no run of three.',
     },
     {
-      input: 's = "pbbcggttciiippooaais", k = 2',
-      output: '"ps"',
+      input: 's = "grrottooba", k = 2',
+      output: '"goba"',
     },
   ],
   constraints: [
-    "1 <= s.length <= 10^5",
-    "2 <= k <= 10^4",
-    "s only contains lowercase English letters",
+    "s spans 1 to 10^5 characters",
+    "k sits between 2 and 10^4",
+    "nothing but lowercase English letters appears in s",
   ],
   hints: [
     "Use a stack that stores [character, count] pairs",

@@ -7,26 +7,32 @@ export const dsaDailyTemperaturesScenario: DSAScenario = {
   pattern: "stack",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "TikTok"],
-  description: "Find days until warmer temperature using monotonic stack",
+  description: "For each day, count the wait until a warmer temperature",
   tags: ["stack", "monotonic-stack", "array"],
   estimatedTime: 25,
-  problemStatement: `Given an array of integers temperatures represents the daily temperatures, return an array answer such that answer[i] is the number of days you have to wait after the ith day to get a warmer temperature. If there is no future day for which this is possible, keep answer[i] == 0 instead.`,
+  problemStatement: `You're given an integer array temperatures, one reading per day. For each day, work out how many days forward you'd have to jump to land on a day with a strictly higher reading.
+
+Fill an array answer of the same length, where answer[i] is that jump count for day i. A day that never sees a higher reading afterward keeps answer[i] at 0.`,
   examples: [
     {
-      input: "temperatures = [73,74,75,71,69,72,76,73]",
-      output: "[1,1,4,2,1,1,0,0]",
-      explanation: "For day 0 (73°), the next warmer is day 1 (74°), so answer[0] = 1.",
+      input: "temperatures = [68,72,70,65,71,74,66,66]",
+      output: "[1,4,2,1,1,0,0,0]",
+      explanation:
+        "Day 0 reads 68 and the very next day hits 72, so answer[0] = 1. Day 1's 72 stands until the 74 four days later.",
     },
     {
-      input: "temperatures = [30,40,50,60]",
+      input: "temperatures = [55,61,67,73]",
       output: "[1,1,1,0]",
     },
     {
-      input: "temperatures = [30,60,90]",
+      input: "temperatures = [42,58,77]",
       output: "[1,1,0]",
     },
   ],
-  constraints: ["1 <= temperatures.length <= 10^5", "30 <= temperatures[i] <= 100"],
+  constraints: [
+    "temperatures holds between 1 and 10^5 readings",
+    "every reading sits in the band 30 through 100",
+  ],
   hints: [
     "Use a monotonic decreasing stack to track indices",
     "When you find a warmer temperature, pop from stack and calculate days",

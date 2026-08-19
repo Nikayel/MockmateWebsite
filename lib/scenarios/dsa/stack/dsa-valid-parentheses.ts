@@ -17,30 +17,30 @@ export const dsaValidParenthesesScenario: DSAScenario = {
     "Palantir",
   ],
   roles: ["intern", "new-grad", "swe", "fdse"],
-  description: "Determine if a string containing parentheses is valid",
+  description: "Check whether a string of brackets closes everything it opens",
   tags: ["stack", "string"],
   estimatedTime: 15,
-  problemStatement: `Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.
+  problemStatement: `You're given a string s built entirely from the six bracket characters '(', ')', '{', '}', '[' and ']'. Decide whether the brackets in s pair up legally, and return true or false accordingly.
 
-An input string is valid if:
-1. Open brackets must be closed by the same type of brackets.
-2. Open brackets must be closed in the correct order.
-3. Every close bracket has a corresponding open bracket of the same type.`,
+Legal pairing means three things hold at once: every opening bracket gets closed by a bracket of the same kind, brackets close in the reverse of the order they were opened (the most recent unclosed opener always closes first), and no closing bracket ever appears without its opener.`,
   examples: [
     {
-      input: 's = "()"',
+      input: 's = "[]"',
       output: "true",
     },
     {
-      input: 's = "()[]{}"',
+      input: 's = "{}()[]"',
       output: "true",
     },
     {
-      input: 's = "(]"',
+      input: 's = "{)"',
       output: "false",
     },
   ],
-  constraints: ["1 <= s.length <= 10^4", "s consists of parentheses only '()[]{}'."],
+  constraints: [
+    "s holds at least 1 character and at most 10^4",
+    "every character of s is one of the bracket marks '()[]{}'",
+  ],
   hints: [
     "Use a stack to keep track of opening brackets",
     "When you see a closing bracket, check if it matches the top of the stack",
@@ -149,7 +149,7 @@ public:
   // ==========================================
   // Real Interview Mode (Fuzzy Mode) Fields
   // ==========================================
-  fuzzyStatement: "Given a string of brackets, determine if it's valid.",
+  fuzzyStatement: "You get a string full of brackets. Tell me whether it's valid.",
 
   clarifyingQuestions: [
     {

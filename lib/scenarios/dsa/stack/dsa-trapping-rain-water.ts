@@ -10,16 +10,22 @@ export const dsaTrappingRainWaterScenario: DSAScenario = {
   description: "Calculate how much water can be trapped after rain",
   tags: ["stack", "two-pointers", "dynamic-programming", "monotonic-stack"],
   estimatedTime: 30,
-  problemStatement: `Given n non-negative integers representing an elevation map where the width of each bar is 1, compute how much water it can trap after raining.`,
+  problemStatement: `You're given an array height holding n non-negative integers, an elevation profile in which each value is a terrain bar exactly one unit wide. When rain falls, water settles into every basin that taller bars wall off on both sides.
+
+Compute the total amount of water the profile retains.`,
   examples: [
     {
-      input: "height = [0,1,0,2,1,0,1,3,2,1,2,1]",
-      output: "6",
-      explanation: "The elevation map traps 6 units of rain water.",
+      input: "height = [0,2,0,3,1,0,1,4,2,0,3,1]",
+      output: "13",
+      explanation: "The basins between the taller bars hold 13 units of water in total.",
     },
-    { input: "height = [4,2,0,3,2,5]", output: "9" },
+    { input: "height = [3,1,0,4,2,5]", output: "7" },
   ],
-  constraints: ["n == height.length", "1 <= n <= 2 * 10^4", "0 <= height[i] <= 10^5"],
+  constraints: [
+    "n equals height.length",
+    "n falls between 1 and 2 * 10^4",
+    "each height[i] sits between 0 and 10^5",
+  ],
   hints: [
     "For each position, water = min(maxLeft, maxRight) - height",
     "Two pointers: track leftMax, rightMax, fill from lower side",

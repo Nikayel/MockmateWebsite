@@ -8,36 +8,33 @@ export const dsaSimplifyPathScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Meta", "Amazon", "Microsoft", "Palantir"],
   roles: ["new-grad", "junior", "swe", "fdse"],
-  description: "Simplify Unix-style file path using a stack",
+  description: "Canonicalize an absolute Unix-style file path",
   tags: ["stack", "string"],
   estimatedTime: 20,
-  problemStatement: `Given a string path, which is an absolute path (starting with a slash '/') to a file or directory in a Unix-style file system, convert it to the simplified canonical path.
+  problemStatement: `You're given a string path, an absolute path in a Unix-style file system; it always starts at the root with a '/'. Boil it down to the equivalent canonical path.
 
-In a Unix-style file system, a period '.' refers to the current directory, a double period '..' refers to the directory up a level, and any multiple consecutive slashes are treated as a single slash '/'. The canonical path should:
-- Start with a single slash '/'
-- Not end with a trailing '/'
-- Only contain the directories on the path from the root directory to the target file or directory`,
+Interpret the pieces the Unix way: a single period '.' stands for the current directory and simply drops out, a double period '..' backs up one directory level, and any run of consecutive slashes collapses into a single '/'. The canonical answer must begin with exactly one '/', must not carry a trailing '/', and must contain nothing but the directories actually on the route from the root down to the target file or directory.`,
   examples: [
     {
-      input: 'path = "/home/"',
-      output: '"/home"',
-      explanation: "Remove trailing slash.",
+      input: 'path = "/var/"',
+      output: '"/var"',
+      explanation: "The slash at the end gets dropped.",
     },
     {
-      input: 'path = "/../"',
+      input: 'path = "/../../"',
       output: '"/"',
-      explanation: "Going up from root stays at root.",
+      explanation: "There is nowhere above the root to climb to, so the path stays at '/'.",
     },
     {
-      input: 'path = "/home//foo/"',
-      output: '"/home/foo"',
-      explanation: "Multiple slashes are replaced by single slash.",
+      input: 'path = "/usr//local/"',
+      output: '"/usr/local"',
+      explanation: "The doubled slash collapses to a single separator.",
     },
   ],
   constraints: [
-    "1 <= path.length <= 3000",
-    "path consists of English letters, digits, period, slash, or underscore",
-    "path is a valid absolute Unix path",
+    "path measures between 1 and 3000 characters",
+    "letters, digits, periods, slashes, and underscores are the only characters in path",
+    "path is always a legitimate absolute Unix-style path",
   ],
   hints: [
     'Split by "/" and use a stack for directories',

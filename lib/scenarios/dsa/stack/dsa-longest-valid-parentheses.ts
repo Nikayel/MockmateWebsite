@@ -7,27 +7,29 @@ export const dsaLongestValidParenthesesScenario: DSAScenario = {
   pattern: "stack",
   difficulty: "hard",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple"],
-  description: "Find the length of the longest valid parentheses substring",
+  description: "Measure the longest well-formed parentheses run inside a string",
   tags: ["stack", "string", "dynamic-programming"],
   estimatedTime: 30,
-  problemStatement: `Given a string containing just the characters '(' and ')', return the length of the longest valid (well-formed) parentheses substring.`,
+  problemStatement: `You're working with a string s made up solely of '(' and ')' characters. Somewhere in s lives its longest contiguous stretch of parentheses that is fully balanced and properly nested.
+
+Return the length of that stretch.`,
   examples: [
     {
-      input: 's = "(()"',
-      output: "2",
-      explanation: 'The longest valid parentheses substring is "()".',
+      input: 's = "((())"',
+      output: "4",
+      explanation: 'The trailing "(())" is the longest well-formed stretch.',
     },
     {
-      input: 's = ")()())"',
-      output: "4",
-      explanation: 'The longest valid parentheses substring is "()()".',
+      input: 's = ")()(())("',
+      output: "6",
+      explanation: 'Characters 1 through 6 form "()(())", six balanced characters in a row.',
     },
     {
       input: 's = ""',
       output: "0",
     },
   ],
-  constraints: ["0 <= s.length <= 3 * 10^4", "s[i] is '(' or ')'"],
+  constraints: ["s.length ranges from 0 to 3 * 10^4", "every character of s is '(' or ')'"],
   hints: [
     "Stack approach: push indices, not characters",
     "Initialize stack with -1 as base for length calculation",

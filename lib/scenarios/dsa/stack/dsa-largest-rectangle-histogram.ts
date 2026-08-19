@@ -10,19 +10,25 @@ export const dsaLargestRectangleHistogramScenario: DSAScenario = {
   description: "Find the largest rectangular area in a histogram",
   tags: ["stack", "monotonic-stack", "array"],
   estimatedTime: 35,
-  problemStatement: `Given an array of integers heights representing the histogram's bar height where the width of each bar is 1, return the area of the largest rectangle in the histogram.`,
+  problemStatement: `You're looking at a histogram described by the integer array heights: heights[i] is how tall the ith bar stands, every bar is exactly 1 unit wide, and the bars sit side by side on a common baseline.
+
+Work out the area of the biggest rectangle that can be drawn entirely within the histogram's bars, and return it.`,
   examples: [
     {
-      input: "heights = [2,1,5,6,2,3]",
-      output: "10",
-      explanation: "The largest rectangle has area = 10 (bars at index 2 and 3 with height 5).",
+      input: "heights = [3,1,4,5,4,2]",
+      output: "12",
+      explanation:
+        "A rectangle of height 4 stretches across the three middle bars (4, 5, 4), giving area 12.",
     },
     {
-      input: "heights = [2,4]",
-      output: "4",
+      input: "heights = [5,3]",
+      output: "6",
     },
   ],
-  constraints: ["1 <= heights.length <= 10^5", "0 <= heights[i] <= 10^4"],
+  constraints: [
+    "heights contains from 1 to 10^5 bars",
+    "each bar's height lies between 0 and 10^4",
+  ],
   hints: [
     "Use a monotonic increasing stack",
     "When you encounter a smaller bar, calculate areas for bars that can't extend further",

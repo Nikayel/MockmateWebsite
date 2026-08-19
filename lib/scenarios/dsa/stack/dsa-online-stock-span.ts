@@ -7,26 +7,24 @@ export const dsaOnlineStockSpanScenario: DSAScenario = {
   pattern: "stack",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Bloomberg", "Goldman Sachs"],
-  description: "Calculate stock price span using monotonic stack",
+  description: "Report each day's stock price span as quotes arrive",
   tags: ["stack", "design", "monotonic-stack", "data-stream"],
   estimatedTime: 25,
-  problemStatement: `Design an algorithm that collects daily price quotes for some stock and returns the span of that stock's price for the current day.
+  problemStatement: `You're building a tool that ingests one price quote per day for a stock and answers, each day, with that day's span.
 
-The span of the stock's price in one day is the maximum number of consecutive days (starting from that day and going backward) for which the stock price was less than or equal to the price of that day.
-
-For example, if the prices of the stock in the last four days is [7,2,1,2] and the price of the stock today is 2, then the span of today is 4 because starting from today, the price of the stock was less than or equal 2 for 4 consecutive days.
+The span for today counts today itself plus the unbroken run of immediately preceding days whose prices sat at or below today's. To illustrate: if the four earlier quotes were [9,3,1,3] and today's price lands at 3, the span is 4, because 3, 1, 3, and today's 3 all qualify before the 9 snaps the run.
 
 Implement the StockSpanner class:
-- StockSpanner() Initializes the object.
-- int next(int price) Returns the span of the stock's price given that today's price is price.`,
+- StockSpanner() constructs the tracker before any quote has arrived.
+- int next(int price) takes today's price as price and returns today's span.`,
   examples: [
     {
       input:
-        '["StockSpanner", "next", "next", "next", "next", "next", "next", "next"]\n[[], [100], [80], [60], [70], [60], [75], [85]]',
-      output: "[null, 1, 1, 1, 2, 1, 4, 6]",
+        '["StockSpanner", "next", "next", "next", "next", "next", "next", "next"]\n[[], [90], [70], [50], [65], [55], [80], [95]]',
+      output: "[null, 1, 1, 1, 2, 1, 5, 7]",
     },
   ],
-  constraints: ["1 <= price <= 10^5", "At most 10^4 calls will be made to next."],
+  constraints: ["every price falls between 1 and 10^5", "next will be invoked at most 10^4 times"],
   hints: [
     "Use monotonic decreasing stack of (price, span) pairs",
     "When new price >= stack top, pop and accumulate spans",

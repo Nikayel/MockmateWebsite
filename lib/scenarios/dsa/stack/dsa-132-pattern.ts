@@ -7,26 +7,30 @@ export const dsa132PatternScenario: DSAScenario = {
   pattern: "stack",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Microsoft", "Apple"],
-  description: "Find if there exists a 132 pattern in array",
+  description: "Decide whether any three positions of an array form a 132 pattern",
   tags: ["stack", "array", "monotonic-stack"],
   estimatedTime: 25,
-  problemStatement: `Given an array of n integers nums, a 132 pattern is a subsequence of three integers nums[i], nums[j] and nums[k] such that i < j < k and nums[i] < nums[k] < nums[j].
+  problemStatement: `You're given an integer array nums holding n values. A 132 pattern is any three positions i < j < k where nums[i] < nums[k] < nums[j]: the earliest of the three values is the smallest, the middle position carries the largest, and the final value lands strictly between them.
 
-Return true if there is a 132 pattern in nums, otherwise, return false.`,
+Return true if nums hides at least one such triple, and false if none exists.`,
   examples: [
-    { input: "nums = [1,2,3,4]", output: "false", explanation: "No 132 pattern exists." },
+    { input: "nums = [5,6,7,8]", output: "false", explanation: "No 132 pattern exists." },
     {
-      input: "nums = [3,1,4,2]",
+      input: "nums = [2,5,4,1]",
       output: "true",
-      explanation: "There is a 132 pattern: [1, 4, 2].",
+      explanation: "There is a 132 pattern: [2, 5, 4].",
     },
     {
-      input: "nums = [-1,3,2,0]",
+      input: "nums = [-2,6,3,1]",
       output: "true",
-      explanation: "There are three 132 patterns: [-1, 3, 2], [-1, 3, 0] and [-1, 2, 0].",
+      explanation: "There are three 132 patterns: [-2, 6, 3], [-2, 6, 1] and [-2, 3, 1].",
     },
   ],
-  constraints: ["n == nums.length", "1 <= n <= 2 * 10^5", "-10^9 <= nums[i] <= 10^9"],
+  constraints: [
+    "nums holds exactly n entries",
+    "n stays between 1 and 2 * 10^5",
+    "every nums[i] lies within [-10^9, 10^9]",
+  ],
   hints: [
     "Iterate from right to left",
     "Use stack to track potential 'k' values (the '2' in 132)",

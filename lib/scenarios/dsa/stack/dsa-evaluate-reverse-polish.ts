@@ -11,35 +11,28 @@ export const dsaEvaluateReversePolishScenario: DSAScenario = {
   description: "Evaluate arithmetic expression in Reverse Polish Notation",
   tags: ["stack", "math", "array"],
   estimatedTime: 20,
-  problemStatement: `You are given an array of strings tokens that represents an arithmetic expression in a Reverse Polish Notation.
+  problemStatement: `Your input is an array of strings tokens: an arithmetic expression laid out in Reverse Polish Notation. Compute and return the integer the whole expression works out to.
 
-Evaluate the expression. Return an integer that represents the value of the expression.
-
-Note that:
-- The valid operators are '+', '-', '*', and '/'.
-- Each operand may be an integer or another expression.
-- The division between two integers always truncates toward zero.
-- There will not be any division by zero.
-- The input represents a valid arithmetic expression in reverse polish notation.`,
+Notation rules to honor: '+', '-', '*', and '/' are the only operators; every operand is either an integer or the value of a nested RPN expression; dividing one integer by another drops the fractional part, truncating toward zero; a division by zero never occurs; and tokens always encodes a well-formed RPN expression.`,
   examples: [
     {
-      input: 'tokens = ["2","1","+","3","*"]',
-      output: "9",
-      explanation: "((2 + 1) * 3) = 9",
+      input: 'tokens = ["3","4","+","2","*"]',
+      output: "14",
+      explanation: "((3 + 4) * 2) = 14",
     },
     {
-      input: 'tokens = ["4","13","5","/","+"]',
-      output: "6",
-      explanation: "(4 + (13 / 5)) = 6",
+      input: 'tokens = ["5","17","6","/","+"]',
+      output: "7",
+      explanation: "(5 + (17 / 6)) = 7, because 17 / 6 truncates to 2",
     },
     {
-      input: 'tokens = ["10","6","9","3","+","-11","*","/","*","17","+","5","+"]',
-      output: "22",
+      input: 'tokens = ["12","4","8","2","+","-10","*","/","*","20","+","6","+"]',
+      output: "26",
     },
   ],
   constraints: [
-    "1 <= tokens.length <= 10^4",
-    "tokens[i] is either an operator or an integer in range [-200, 200]",
+    "tokens carries 1 to 10^4 entries",
+    "every tokens[i] is one of the four operators or an integer between -200 and 200",
   ],
   hints: [
     "Use a stack to store operands",

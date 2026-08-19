@@ -7,25 +7,28 @@ export const dsaMaxFrequencyStackScenario: DSAScenario = {
   pattern: "stack",
   difficulty: "hard",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Bloomberg"],
-  description: "Design a stack that pops the most frequent element",
+  description: "Build a stack variant whose pop returns the most frequent value",
   tags: ["stack", "hash-table", "design"],
   estimatedTime: 35,
-  problemStatement: `Design a stack-like data structure to push elements to the stack and pop the most frequent element from the stack.
+  problemStatement: `Build a container that behaves like a stack except in how it pops: pop always surrenders whichever value currently appears most often inside the structure.
 
 Implement the FreqStack class:
-- FreqStack() constructs an empty frequency stack.
-- void push(int val) pushes an integer val onto the top of the stack.
-- int pop() removes and returns the most frequent element in the stack. If there is a tie, the element closest to the top is removed and returned.`,
+- FreqStack() starts the structure empty.
+- void push(int val) adds the integer val to it.
+- int pop() removes and returns the most frequent value. If several values tie for the highest count, the tied value nearest the top (the one pushed latest among them) is the one removed and returned.`,
   examples: [
     {
       input:
-        '["FreqStack", "push", "push", "push", "push", "push", "push", "pop", "pop", "pop", "pop"]\n[[], [5], [7], [5], [7], [4], [5], [], [], [], []]',
-      output: "[null, null, null, null, null, null, null, 5, 7, 5, 4]",
+        '["FreqStack", "push", "push", "push", "push", "push", "push", "pop", "pop", "pop", "pop"]\n[[], [3], [9], [3], [9], [6], [3], [], [], [], []]',
+      output: "[null, null, null, null, null, null, null, 3, 9, 3, 6]",
       explanation:
-        "After pushes, frequencies are 5:3, 7:2, 4:1. Pop returns 5 (most frequent), then 7, 5, 4.",
+        "After the six pushes the counts stand at 3 three times, 9 twice, 6 once. The pops hand back 3 (top count), then 9 (tied with 3 at two but nearer the top), then 3, then 6.",
     },
   ],
-  constraints: ["0 <= val <= 10^9", "At most 2 * 10^4 calls will be made to push and pop."],
+  constraints: [
+    "val can be any integer from 0 through 10^9",
+    "push and pop together receive at most 2 * 10^4 calls",
+  ],
   hints: [
     "Track frequency of each element in a hashmap",
     "For each frequency level, maintain a stack of elements",

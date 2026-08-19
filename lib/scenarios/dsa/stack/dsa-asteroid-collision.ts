@@ -8,35 +8,36 @@ export const dsaAsteroidCollisionScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe", "fdse"],
-  description: "Simulate asteroid collisions using a stack",
+  description: "Work out which asteroids survive after every collision",
   tags: ["stack", "array", "simulation"],
   estimatedTime: 25,
-  problemStatement: `We are given an array asteroids of integers representing asteroids in a row.
+  problemStatement: `You're given an integer array asteroids describing rocks strung out along a single line. Each entry's absolute value is that asteroid's size, and its sign is its heading: positive drifts right, negative drifts left. All of them travel at the same speed.
 
-For each asteroid, the absolute value represents its size, and the sign represents its direction (positive meaning right, negative meaning left). Each asteroid moves at the same speed.
+Whenever a right-moving asteroid meets a left-moving one, the smaller of the two shatters; if they match in size, both shatter. Asteroids heading the same way never touch.
 
-Find out the state of the asteroids after all collisions. If two asteroids meet, the smaller one will explode. If both are the same size, both will explode. Two asteroids moving in the same direction will never meet.`,
+Return the asteroids still intact once every possible collision has played out.`,
   examples: [
     {
-      input: "asteroids = [5,10,-5]",
-      output: "[5,10]",
-      explanation: "The 10 and -5 collide resulting in 10. The 5 and 10 never collide.",
+      input: "asteroids = [4,9,-6]",
+      output: "[4,9]",
+      explanation:
+        "The 9 and -6 collide and the 9 survives. The 4 and 9 move together and never meet.",
     },
     {
-      input: "asteroids = [8,-8]",
+      input: "asteroids = [6,-6]",
       output: "[]",
-      explanation: "The 8 and -8 collide exploding each other.",
+      explanation: "The 6 and -6 are the same size, so both shatter.",
     },
     {
-      input: "asteroids = [10,2,-5]",
-      output: "[10]",
-      explanation: "The 2 and -5 collide resulting in -5. The 10 and -5 collide resulting in 10.",
+      input: "asteroids = [12,3,-8]",
+      output: "[12]",
+      explanation: "The 3 and -8 collide leaving -8. The 12 and -8 then collide leaving 12.",
     },
   ],
   constraints: [
-    "2 <= asteroids.length <= 10^4",
-    "-1000 <= asteroids[i] <= 1000",
-    "asteroids[i] != 0",
+    "asteroids.length falls between 2 and 10^4",
+    "each entry sits in the range [-1000, 1000]",
+    "no asteroids[i] is ever 0",
   ],
   hints: [
     "Use a stack to track surviving asteroids",

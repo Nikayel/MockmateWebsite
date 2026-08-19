@@ -8,36 +8,30 @@ export const dsaBasicCalculatorScenario: DSAScenario = {
   difficulty: "hard",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Palantir"],
   roles: ["junior", "senior", "swe", "fdse"],
-  description: "Implement a basic calculator with parentheses",
+  description: "Evaluate a parenthesized plus-and-minus expression by hand",
   tags: ["stack", "math", "string"],
   estimatedTime: 35,
-  problemStatement: `Given a string s representing a valid expression, implement a basic calculator to evaluate it, and return the result of the evaluation.
+  problemStatement: `You're handed a string s holding a well-formed arithmetic expression, and your job is to compute the integer it evaluates to.
 
-Note: You are not allowed to use any built-in function which evaluates strings as mathematical expressions.
-
-The expression string may contain:
-- '+' and '-' operators
-- '(' and ')' parentheses
-- ' ' spaces
-- Non-negative integers`,
+The only things that can appear in s are the operators '+' and '-', the parentheses '(' and ')', space characters, and non-negative integers. Reaching for a built-in evaluator (anything that executes strings as math or code) is off the table; do the arithmetic yourself.`,
   examples: [
     {
-      input: 's = "1 + 1"',
-      output: "2",
+      input: 's = "3 + 4"',
+      output: "7",
     },
     {
-      input: 's = " 2-1 + 2 "',
-      output: "3",
+      input: 's = " 9-4 + 1 "',
+      output: "6",
     },
     {
-      input: 's = "(1+(4+5+2)-3)+(6+8)"',
-      output: "23",
+      input: 's = "(5+(2+6+1)-4)+(3+9)"',
+      output: "22",
     },
   ],
   constraints: [
-    "1 <= s.length <= 3 * 10^5",
-    's consists of digits, "+", "-", "(", ")", and " "',
-    "s represents a valid expression",
+    "s runs from 1 to 3 * 10^5 characters",
+    'only digits, "+", "-", "(", ")", and the space " " appear in s',
+    "the expression inside s is always well-formed",
   ],
   hints: [
     "Use a stack to handle parentheses and signs",

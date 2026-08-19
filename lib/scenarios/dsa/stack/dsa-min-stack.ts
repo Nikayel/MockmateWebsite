@@ -8,31 +8,31 @@ export const dsaMinStackScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Microsoft", "Apple", "Meta", "ZipRecruiter", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe"],
-  description:
-    "Design a stack that supports push, pop, top, and retrieving the minimum element in constant time",
+  description: "Build a stack that can always report its minimum in constant time",
   tags: ["stack", "design"],
   estimatedTime: 20,
-  problemStatement: `Design a stack that supports push, pop, top, and retrieving the minimum element in constant time.
+  problemStatement: `Build a stack that can also report its smallest element, with every operation finishing in constant time.
 
 Implement the MinStack class:
-- MinStack() initializes the stack object.
-- void push(int val) pushes the element val onto the stack.
-- void pop() removes the element on the top of the stack.
-- int top() gets the top element of the stack.
-- int getMin() retrieves the minimum element in the stack.
+- MinStack() creates the stack empty.
+- void push(int val) places val on top.
+- void pop() discards the current top element.
+- int top() reads the top element without removing it.
+- int getMin() reports the smallest value the stack currently holds.
 
-You must implement a solution with O(1) time complexity for each function.`,
+Each of these operations must run in O(1) time.`,
   examples: [
     {
-      input: "MinStack(); push(-2); push(0); push(-3); getMin(); pop(); top(); getMin()",
-      output: "-3, 0, -2",
-      explanation: "getMin() returns -3. After pop, top is 0 and min is -2.",
+      input: "MinStack(); push(-4); push(1); push(-6); getMin(); pop(); top(); getMin()",
+      output: "-6, 1, -4",
+      explanation:
+        "getMin() sees -6 while it sits on the stack. Once pop removes it, the top is 1 and the minimum falls back to -4.",
     },
   ],
   constraints: [
-    "-2^31 <= val <= 2^31 - 1",
-    "Methods pop, top and getMin will always be called on non-empty stacks",
-    "At most 3 * 10^4 calls will be made to push, pop, top, and getMin",
+    "val always fits between -2^31 and 2^31 - 1",
+    "pop, top, and getMin are only ever invoked while the stack holds at least one element",
+    "push, pop, top, and getMin together account for at most 3 * 10^4 calls",
   ],
   hints: [
     "Use two stacks: one for values, one for minimums",

@@ -7,28 +7,27 @@ export const dsaNextGreaterElementIScenario: DSAScenario = {
   pattern: "stack",
   difficulty: "easy",
   companies: ["Amazon", "Google", "Bloomberg"],
-  description: "Find the next greater element for each element from a subset",
+  description: "Answer next-greater queries for values drawn from a second array",
   tags: ["stack", "hash-table", "monotonic-stack"],
   estimatedTime: 15,
-  problemStatement: `The next greater element of some element x in an array is the first greater element that is to the right of x in the same array.
+  problemStatement: `You're given two 0-indexed integer arrays nums1 and nums2. Neither contains a repeated value, and each entry of nums1 also appears somewhere in nums2.
 
-You are given two distinct 0-indexed integer arrays nums1 and nums2, where nums1 is a subset of nums2.
+A value's next greater element is the first entry strictly larger than it as you scan rightward from its spot in the array; running off the end without a hit means it has none. For every nums1[i], locate that same value inside nums2 and take the next greater element it has there, writing -1 when it has none.
 
-For each 0 <= i < nums1.length, find the index j such that nums1[i] == nums2[j] and determine the next greater element of nums2[j] in nums2. If there is no next greater element, then the answer for this query is -1.
-
-Return an array ans of length nums1.length such that ans[i] is the next greater element as described above.`,
+Hand back an array ans the same length as nums1, where ans[i] stores the result for nums1[i].`,
   examples: [
     {
-      input: "nums1 = [4,1,2], nums2 = [1,3,4,2]",
-      output: "[-1,3,-1]",
-      explanation: "For 4: no greater to right. For 1: 3 is next greater. For 2: no greater.",
+      input: "nums1 = [6,2,5], nums2 = [2,7,6,5]",
+      output: "[-1,7,-1]",
+      explanation:
+        "6 has nothing larger after it in nums2. 2 is followed immediately by 7. 5 sits last, so nothing follows it.",
     },
-    { input: "nums1 = [2,4], nums2 = [1,2,3,4]", output: "[3,-1]" },
+    { input: "nums1 = [3,8], nums2 = [2,3,5,8]", output: "[5,-1]" },
   ],
   constraints: [
-    "1 <= nums1.length <= nums2.length <= 1000",
-    "0 <= nums1[i], nums2[i] <= 10^4",
-    "All integers in nums1 and nums2 are unique.",
+    "nums1 has at least 1 element and never more than nums2, which tops out at 1000 elements",
+    "values in nums1 and nums2 all sit between 0 and 10^4",
+    "no value repeats inside nums1 or inside nums2",
   ],
   hints: [
     "Use monotonic decreasing stack on nums2",
