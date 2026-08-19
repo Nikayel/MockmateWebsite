@@ -8,7 +8,7 @@ export const maximalSquareScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Apple"],
   description: "Measure the largest all-1's square block hiding in a binary grid",
-  tags: ["dynamic-programming", "matrix"],
+  tags: ["matrix", "dynamic-programming"],
   estimatedTime: 25,
   problemStatement: `You're given an m x n matrix of characters where every cell is either '1' or '0'. Somewhere inside it hides the biggest square block built entirely from '1' cells, and your job is to size that block.
 

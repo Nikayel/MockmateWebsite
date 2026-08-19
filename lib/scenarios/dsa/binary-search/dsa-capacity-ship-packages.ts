@@ -8,7 +8,7 @@ export const dsaCapacityShipPackagesScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta"],
   description: "Find minimum ship capacity to ship all packages within D days",
-  tags: ["binary-search", "array"],
+  tags: ["array", "binary-search"],
   estimatedTime: 25,
   problemStatement: `A line of packages is waiting at a dock, and package i weighs weights[i]. You have days days to ship all of them. Each day you load packages from the front of the line, keeping their original order, and the total weight loaded on any single day can't exceed the ship's capacity.
 

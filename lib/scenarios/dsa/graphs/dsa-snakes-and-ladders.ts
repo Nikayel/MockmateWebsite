@@ -9,7 +9,7 @@ export const snakesAndLaddersScenario: DSAScenario = {
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe", "fdse"],
   description: "Count the fewest die moves needed to finish a snakes and ladders board",
-  tags: ["bfs", "matrix", "simulation"],
+  tags: ["matrix", "simulation", "bfs"],
   estimatedTime: 30,
   problemStatement: `You're playing a solo round of snakes and ladders on an n x n matrix named board. Its squares carry labels 1 through n^2 laid out in a back-and-forth pattern: label 1 occupies the bottom left corner, the bottom row is numbered left to right, the row above it right to left, and the direction keeps flipping on every row up the board.
 
@@ -48,10 +48,10 @@ Return the fewest moves that put your piece exactly on square n^2, or -1 if that
     "Follow snake/ladder if present",
   ],
   starterCode: {
-    javascript: `function snakesAndLadders(board) {\n  // BFS with board position conversion\n}`,
-    typescript: `function snakesAndLadders(board: number[][]): number {\n  // BFS with board position conversion\n}`,
-    python: `def snakesAndLadders(board: list[list[int]]) -> int:\n    # BFS with board position conversion\n    pass`,
-    java: `class Solution {\n    public int snakesAndLadders(int[][] board) {\n        // BFS with board position conversion\n        return -1;\n    }\n}`,
+    javascript: `function snakesAndLadders(board) {\n  // Write your solution here\n}`,
+    typescript: `function snakesAndLadders(board: number[][]): number {\n  // Write your solution here\n}`,
+    python: `def snakesAndLadders(board: list[list[int]]) -> int:\n    # Write your solution here\n    pass`,
+    java: `class Solution {\n    public int snakesAndLadders(int[][] board) {\n        // Write your solution here\n        return -1;\n    }\n}`,
   },
   optimalComplexity: { time: "O(n^2)", space: "O(n^2)" },
   testCases: [

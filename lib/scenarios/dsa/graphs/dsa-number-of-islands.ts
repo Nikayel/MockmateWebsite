@@ -18,7 +18,7 @@ export const numberOfIslandsScenario: DSAScenario = {
   ],
   roles: ["intern", "new-grad", "junior", "senior", "swe", "fdse"],
   description: "Count how many islands of connected land a water map contains",
-  tags: ["array", "depth-first-search", "breadth-first-search", "union-find", "matrix"],
+  tags: ["array", "matrix", "depth-first-search", "breadth-first-search", "union-find"],
   estimatedTime: 25,
   problemStatement: `You're given a rectangular character grid named grid, where '1' marks a patch of land and '0' marks open water. Count the islands on the map and return how many there are.
 

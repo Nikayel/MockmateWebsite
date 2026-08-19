@@ -8,7 +8,7 @@ export const dsaDailyTemperaturesScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "TikTok"],
   description: "For each day, count the wait until a warmer temperature",
-  tags: ["stack", "monotonic-stack", "array"],
+  tags: ["stack", "array", "monotonic-stack"],
   estimatedTime: 25,
   problemStatement: `You're given an integer array temperatures, one reading per day. For each day, work out how many days forward you'd have to jump to land on a day with a strictly higher reading.
 

@@ -9,7 +9,7 @@ export const allNodesDistanceKScenario: DSAScenario = {
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Palantir"],
   roles: ["junior", "senior", "swe"],
   description: "Collect every node exactly k edges away from a chosen target node",
-  tags: ["binary-tree", "bfs", "dfs", "graph"],
+  tags: ["binary-tree", "graph", "bfs", "dfs"],
   estimatedTime: 30,
   problemStatement: `You're given the root of a binary tree, the value target of a node somewhere inside it, and an integer k. All values in the tree are distinct. Treat the distance between two nodes as the number of edges on the route that connects them.
 

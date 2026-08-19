@@ -9,7 +9,7 @@ export const evaluateDivisionScenario: DSAScenario = {
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Bloomberg", "Palantir"],
   roles: ["junior", "senior", "swe", "fdse"],
   description: "Compute division results from known variable ratios",
-  tags: ["graph", "dfs", "union-find", "hash-table"],
+  tags: ["graph", "hash-table", "dfs", "union-find"],
   estimatedTime: 30,
   problemStatement: `You're handed a log of division results between named variables: for every index i, equations[i] = [A, B] together with values[i] states that A / B = values[i]. Variables are strings, and the facts you receive never contradict one another or force a division by zero.
 
@@ -37,10 +37,10 @@ Then queries arrives, where each queries[j] = [C, D] asks what C / D evaluates t
     "Union-Find with weights is also possible",
   ],
   starterCode: {
-    javascript: `function calcEquation(equations, values, queries) {\n  // Build graph and DFS for queries\n}`,
-    typescript: `function calcEquation(equations: string[][], values: number[], queries: string[][]): number[] {\n  // Build graph and DFS for queries\n}`,
-    python: `def calcEquation(equations: list[list[str]], values: list[float], queries: list[list[str]]) -> list[float]:\n    # Build graph and DFS for queries\n    pass`,
-    java: `class Solution {\n    public double[] calcEquation(List<List<String>> equations, double[] values, List<List<String>> queries) {\n        // Build graph and DFS for queries\n        return new double[0];\n    }\n}`,
+    javascript: `function calcEquation(equations, values, queries) {\n  // Write your solution here\n}`,
+    typescript: `function calcEquation(equations: string[][], values: number[], queries: string[][]): number[] {\n  // Write your solution here\n}`,
+    python: `def calcEquation(equations: list[list[str]], values: list[float], queries: list[list[str]]) -> list[float]:\n    # Write your solution here\n    pass`,
+    java: `class Solution {\n    public double[] calcEquation(List<List<String>> equations, double[] values, List<List<String>> queries) {\n        // Write your solution here\n        return new double[0];\n    }\n}`,
   },
   optimalComplexity: { time: "O(Q * (V + E))", space: "O(V + E)" },
   // The single original case only ever asked about variables in one connected component, so

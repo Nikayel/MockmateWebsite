@@ -42,17 +42,17 @@ Count how many good nodes the tree contains and return that number.`,
   ],
   starterCode: {
     javascript: `function goodNodes(root) {
-// Count good nodes using DFS
+// Write your solution here
 }`,
     typescript: `function goodNodes(root: TreeNode): number {
-// Count good nodes using DFS
+// Write your solution here
 }`,
     python: `def goodNodes(root: TreeNode) -> int:
-  # Count good nodes using DFS
+  # Write your solution here
   pass`,
     java: `class Solution {
   public int goodNodes(TreeNode root) {
-      // Count good nodes using DFS
+      // Write your solution here
       return 0;
   }
 }`,

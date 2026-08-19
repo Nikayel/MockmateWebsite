@@ -8,7 +8,7 @@ export const linkedListCycleScenario: DSAScenario = {
   difficulty: "easy",
   companies: ["Amazon", "Microsoft", "Meta", "Google", "Oracle"],
   description: "Detect whether a linked list loops back on itself",
-  tags: ["linked-list", "two-pointers", "hash-table"],
+  tags: ["linked-list", "hash-table", "two-pointers"],
   estimatedTime: 15,
   problemStatement: `You're given head, the first node of a linked list. In a well-formed list, walking node to node along next eventually falls off the end at null. In a malformed one, some next pointer bends back to an earlier node and the walk goes on forever. That closed loop is what we call a cycle.
 

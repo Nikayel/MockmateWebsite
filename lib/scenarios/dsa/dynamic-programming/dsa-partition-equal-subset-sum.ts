@@ -8,7 +8,7 @@ export const partitionEqualSubsetSumScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Microsoft"],
   description: "Decide whether an array splits into two groups with matching totals",
-  tags: ["dynamic-programming", "array"],
+  tags: ["array", "dynamic-programming"],
   estimatedTime: 25,
   problemStatement: `You're given an integer array nums and asked whether it splits cleanly in two. Specifically: can you place every entry into one of two groups so that both groups add up to the same total? Each entry must land in exactly one group, and a group keeps no notion of order.
 

@@ -38,10 +38,10 @@ Figure out whether some sequence of edges leads from vertex source to vertex des
     "Track visited nodes",
   ],
   starterCode: {
-    javascript: `function validPath(n, edges, source, destination) {\n  // BFS/DFS from source\n}`,
-    typescript: `function validPath(n: number, edges: number[][], source: number, destination: number): boolean {\n  // BFS/DFS from source\n}`,
-    python: `def validPath(n: int, edges: list[list[int]], source: int, destination: int) -> bool:\n    # BFS/DFS from source\n    pass`,
-    java: `class Solution {\n    public boolean validPath(int n, int[][] edges, int source, int destination) {\n        // BFS/DFS from source\n        return false;\n    }\n}`,
+    javascript: `function validPath(n, edges, source, destination) {\n  // Write your solution here\n}`,
+    typescript: `function validPath(n: number, edges: number[][], source: number, destination: number): boolean {\n  // Write your solution here\n}`,
+    python: `def validPath(n: int, edges: list[list[int]], source: int, destination: int) -> bool:\n    # Write your solution here\n    pass`,
+    java: `class Solution {\n    public boolean validPath(int n, int[][] edges, int source, int destination) {\n        // Write your solution here\n        return false;\n    }\n}`,
   },
   optimalComplexity: { time: "O(V + E)", space: "O(V + E)" },
   testCases: [

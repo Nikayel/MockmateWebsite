@@ -32,10 +32,10 @@ For a value x, its next greater number is the first element strictly bigger than
     "On second pass, only pop from stack (don't push)",
   ],
   starterCode: {
-    javascript: `function nextGreaterElements(nums) {\n  // Circular monotonic stack\n}`,
-    typescript: `function nextGreaterElements(nums: number[]): number[] {\n  // Circular monotonic stack\n}`,
-    python: `def nextGreaterElements(nums: list[int]) -> list[int]:\n    # Circular monotonic stack\n    pass`,
-    java: `class Solution {\n    public int[] nextGreaterElements(int[] nums) {\n        // Circular monotonic stack\n        return new int[0];\n    }\n}`,
+    javascript: `function nextGreaterElements(nums) {\n  // Write your solution here\n}`,
+    typescript: `function nextGreaterElements(nums: number[]): number[] {\n  // Write your solution here\n}`,
+    python: `def nextGreaterElements(nums: list[int]) -> list[int]:\n    # Write your solution here\n    pass`,
+    java: `class Solution {\n    public int[] nextGreaterElements(int[] nums) {\n        // Write your solution here\n        return new int[0];\n    }\n}`,
   },
   optimalComplexity: { time: "O(n)", space: "O(n)" },
   testCases: [

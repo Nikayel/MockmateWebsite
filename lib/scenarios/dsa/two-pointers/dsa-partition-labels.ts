@@ -8,7 +8,7 @@ export const dsaPartitionLabelsScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta"],
   description: "Split a string into the most pieces possible with no letter spanning two pieces",
-  tags: ["string", "two-pointers", "greedy", "hash-table"],
+  tags: ["string", "hash-table", "two-pointers", "greedy"],
   estimatedTime: 25,
   problemStatement: `You're given a string s. Slice it into the largest possible number of pieces such that no letter shows up in more than one piece. Reading the pieces back in order must reproduce s exactly.
 

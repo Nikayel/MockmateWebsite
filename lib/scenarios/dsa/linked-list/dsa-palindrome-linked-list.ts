@@ -8,7 +8,7 @@ export const palindromeLinkedListScenario: DSAScenario = {
   difficulty: "easy",
   companies: ["Amazon", "Meta", "Google", "Microsoft"],
   description: "Check if a linked list is a palindrome",
-  tags: ["linked-list", "two-pointers", "stack"],
+  tags: ["linked-list", "stack", "two-pointers"],
   estimatedTime: 20,
   problemStatement: `You're given head, the opening node of a singly linked list. Decide whether the list's values form the same sequence whether you walk them front to back or back to front. Return true when they do and false when they don't.
 

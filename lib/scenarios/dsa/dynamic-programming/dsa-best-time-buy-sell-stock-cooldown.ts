@@ -8,7 +8,7 @@ export const bestTimeBuySellStockCooldownScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta"],
   description: "Maximize profit with cooldown period after selling",
-  tags: ["dynamic-programming", "array"],
+  tags: ["array", "dynamic-programming"],
   estimatedTime: 30,
   problemStatement: `You're trading one stock across several days, and prices[i] is its price on day i. You can buy a share and later sell it, over as many rounds as you like, but you can hold at most one share at a time, so a new purchase has to wait until the share you hold is sold.
 

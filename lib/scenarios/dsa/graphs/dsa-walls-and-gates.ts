@@ -10,7 +10,7 @@ export const wallsAndGatesScenario: DSAScenario = {
   roles: ["new-grad", "junior", "senior", "swe"],
   description:
     "Stamp every open room in a floor plan with its walking distance to the nearest gate",
-  tags: ["bfs", "matrix", "multi-source-bfs"],
+  tags: ["matrix", "bfs", "multi-source-bfs"],
   estimatedTime: 25,
   problemStatement: `You're annotating the floor plan of a building, stored as an m x n grid called rooms. Every cell starts out as one of three values: -1 marks an impassable wall, 0 marks a gate, and 2147483647 (the largest 32-bit integer, drawn below as INF) marks an open room.
 
@@ -53,10 +53,10 @@ After the update, each open room shows the step count to its closest gate, while
     "Only update cells with INF value",
   ],
   starterCode: {
-    javascript: `function wallsAndGates(rooms) {\n  // Multi-source BFS from all gates\n}`,
-    typescript: `function wallsAndGates(rooms: number[][]): void {\n  // Multi-source BFS from all gates\n}`,
-    python: `def wallsAndGates(rooms: list[list[int]]) -> None:\n    # Multi-source BFS from all gates\n    pass`,
-    java: `class Solution {\n    public void wallsAndGates(int[][] rooms) {\n        // Multi-source BFS from all gates\n    }\n}`,
+    javascript: `function wallsAndGates(rooms) {\n  // Write your solution here\n}`,
+    typescript: `function wallsAndGates(rooms: number[][]): void {\n  // Write your solution here\n}`,
+    python: `def wallsAndGates(rooms: list[list[int]]) -> None:\n    # Write your solution here\n    pass`,
+    java: `class Solution {\n    public void wallsAndGates(int[][] rooms) {\n        // Write your solution here\n    }\n}`,
   },
   optimalComplexity: { time: "O(m * n)", space: "O(m * n)" },
   testCases: [

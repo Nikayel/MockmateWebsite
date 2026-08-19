@@ -8,7 +8,7 @@ export const bestTimeBuySellStockIiScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft"],
   description: "Maximize profit with unlimited transactions",
-  tags: ["dynamic-programming", "array", "greedy"],
+  tags: ["array", "dynamic-programming", "greedy"],
   estimatedTime: 20,
   problemStatement: `You're day-trading a single stock, and the integer array prices records it day by day: prices[i] is the price on day i.
 

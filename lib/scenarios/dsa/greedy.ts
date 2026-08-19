@@ -17,7 +17,7 @@ export const greedyScenarios: DSAScenario[] = [
     difficulty: "medium",
     companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple"],
     description: "Determine if you can reach the last index of an array by jumping",
-    tags: ["greedy", "array", "dynamic-programming"],
+    tags: ["array", "greedy", "dynamic-programming"],
     estimatedTime: 20,
     problemStatement: `You're given an integer array nums and you start standing on its first index. Each value is a jump cap: a single hop from position i can carry you forward at most nums[i] indices, and shorter hops are always allowed.
 
@@ -43,17 +43,17 @@ Decide whether some sequence of hops can land you on the last index. Return true
     ],
     starterCode: {
       javascript: `function canJump(nums) {
-  // Use greedy approach to track max reachable position
+  // Write your solution here
 }`,
       typescript: `function canJump(nums: number[]): boolean {
-  // Use greedy approach to track max reachable position
+  // Write your solution here
 }`,
       python: `def canJump(nums: list[int]) -> bool:
-    # Use greedy approach to track max reachable position
+    # Write your solution here
     pass`,
       java: `class Solution {
     public boolean canJump(int[] nums) {
-        // Use greedy approach to track max reachable position
+        // Write your solution here
         return false;
     }
 }`,
@@ -98,7 +98,7 @@ Decide whether some sequence of hops can land you on the last index. Return true
     difficulty: "medium",
     companies: ["Amazon", "Google", "Meta", "Apple"],
     description: "Find minimum number of jumps to reach the last index",
-    tags: ["greedy", "array", "dynamic-programming", "bfs"],
+    tags: ["array", "greedy", "dynamic-programming", "bfs"],
     estimatedTime: 25,
     problemStatement: `You're standing on index 0 of a 0-indexed integer array nums with length n. From index i, one hop may take you to any index i + j as long as 0 <= j <= nums[i] and i + j < n, so each value caps how far a single hop from that spot can travel.
 
@@ -127,17 +127,17 @@ Every input in this problem can reach the end. Count the fewest hops that put yo
     ],
     starterCode: {
       javascript: `function jump(nums) {
-  // Find minimum jumps using greedy BFS approach
+  // Write your solution here
 }`,
       typescript: `function jump(nums: number[]): number {
-  // Find minimum jumps using greedy BFS approach
+  // Write your solution here
 }`,
       python: `def jump(nums: list[int]) -> int:
-    # Find minimum jumps using greedy BFS approach
+    # Write your solution here
     pass`,
       java: `class Solution {
     public int jump(int[] nums) {
-        // Find minimum jumps using greedy BFS approach
+        // Write your solution here
         return 0;
     }
 }`,
@@ -182,7 +182,7 @@ Every input in this problem can reach the end. Count the fewest hops that put yo
     difficulty: "medium",
     companies: ["Amazon", "Google", "Meta", "Microsoft"],
     description: "Find the starting gas station to complete a circular tour",
-    tags: ["greedy", "array"],
+    tags: ["array", "greedy"],
     estimatedTime: 25,
     problemStatement: `A loop road is dotted with n fuel stops. Pulling into stop i lets you add gas[i] units of fuel to your car, and driving the leg from stop i to stop i + 1 burns cost[i] units. The tank has no size limit, but you begin with it empty, parked at a stop of your choosing.
 
@@ -213,17 +213,17 @@ Using the two integer arrays gas and cost, find a stop you could depart from and
     ],
     starterCode: {
       javascript: `function canCompleteCircuit(gas, cost) {
-  // Find starting station using greedy approach
+  // Write your solution here
 }`,
       typescript: `function canCompleteCircuit(gas: number[], cost: number[]): number {
-  // Find starting station using greedy approach
+  // Write your solution here
 }`,
       python: `def canCompleteCircuit(gas: list[int], cost: list[int]) -> int:
-    # Find starting station using greedy approach
+    # Write your solution here
     pass`,
       java: `class Solution {
     public int canCompleteCircuit(int[] gas, int[] cost) {
-        // Find starting station using greedy approach
+        // Write your solution here
         return -1;
     }
 }`,
@@ -263,7 +263,7 @@ Using the two integer arrays gas and cost, find a stop you could depart from and
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Microsoft"],
     description: "Find minimum intervals needed to execute all tasks with cooldown",
-    tags: ["greedy", "array", "hash-table", "heap", "counting"],
+    tags: ["array", "hash-table", "greedy", "heap", "counting"],
     estimatedTime: 30,
     problemStatement: `You're scheduling work for a CPU using a character array tasks, where every letter names a job type and each job burns exactly one unit of time. During any single unit the processor either runs one job or sits idle. The wrinkle is a cooldown, supplied as a non-negative integer n: once a job of some letter runs, at least n units of time must pass before another job carrying that same letter may start. Jobs with different letters need no gap at all.
 
@@ -298,17 +298,17 @@ Work out the smallest total number of time units, idle slots included, that fini
     ],
     starterCode: {
       javascript: `function leastInterval(tasks, n) {
-  // Calculate minimum intervals using greedy/math approach
+  // Write your solution here
 }`,
       typescript: `function leastInterval(tasks: string[], n: number): number {
-  // Calculate minimum intervals using greedy/math approach
+  // Write your solution here
 }`,
       python: `def leastInterval(tasks: list[str], n: int) -> int:
-    # Calculate minimum intervals using greedy/math approach
+    # Write your solution here
     pass`,
       java: `class Solution {
     public int leastInterval(char[] tasks, int n) {
-        // Calculate minimum intervals using greedy/math approach
+        // Write your solution here
         return 0;
     }
 }`,
@@ -349,7 +349,7 @@ Work out the smallest total number of time units, idle slots included, that fini
     companies: ["Amazon", "Google", "Meta"],
     description:
       "Split a string into the most pieces possible without any letter spanning two pieces",
-    tags: ["greedy", "string", "hash-table", "two-pointers"],
+    tags: ["string", "hash-table", "greedy", "two-pointers"],
     estimatedTime: 20,
     problemStatement: `You've got a string s that needs slicing into chunks, and the slicing has one rule: no letter's appearances may land in two different chunks. Every copy of a letter must sit inside the same chunk. Subject to that rule, cut s into as many chunks as you possibly can.
 
@@ -379,17 +379,17 @@ The cuts only divide the string; reading the chunks left to right must reproduce
     ],
     starterCode: {
       javascript: `function partitionLabels(s) {
-  // Use greedy two-pass approach
+  // Write your solution here
 }`,
       typescript: `function partitionLabels(s: string): number[] {
-  // Use greedy two-pass approach
+  // Write your solution here
 }`,
       python: `def partitionLabels(s: str) -> list[int]:
-    # Use greedy two-pass approach
+    # Write your solution here
     pass`,
       java: `class Solution {
     public List<Integer> partitionLabels(String s) {
-        // Use greedy two-pass approach
+        // Write your solution here
         return new ArrayList<>();
     }
 }`,
@@ -430,7 +430,7 @@ The cuts only divide the string; reading the chunks left to right must reproduce
     companies: ["Google", "Amazon"],
     description:
       "Decide whether a hand of cards deals out into fixed-size runs of consecutive values",
-    tags: ["greedy", "array", "hash-table", "sorting"],
+    tags: ["array", "hash-table", "greedy", "sorting"],
     estimatedTime: 25,
     problemStatement: `You're holding a pile of numbered cards described by the integer array hand, where hand[i] is the number printed on the ith card, and you want to deal the whole pile out for a run-based card game. A deal splits the cards into groups where every group contains exactly groupSize cards, and the numbers inside a group climb by exactly one from card to card, forming an unbroken run of consecutive values.
 
@@ -462,17 +462,17 @@ Every card must end up in some group; none may be left over and no group may com
     ],
     starterCode: {
       javascript: `function isNStraightHand(hand, groupSize) {
-  // Use greedy approach with sorting
+  // Write your solution here
 }`,
       typescript: `function isNStraightHand(hand: number[], groupSize: number): boolean {
-  // Use greedy approach with sorting
+  // Write your solution here
 }`,
       python: `def isNStraightHand(hand: list[int], groupSize: int) -> bool:
-    # Use greedy approach with sorting
+    # Write your solution here
     pass`,
       java: `class Solution {
     public boolean isNStraightHand(int[] hand, int groupSize) {
-        // Use greedy approach with sorting
+        // Write your solution here
         return false;
     }
 }`,
@@ -520,7 +520,7 @@ Every card must end up in some group; none may be left over and no group may com
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google"],
     description: "Check if a string with wildcards can be a valid parentheses string",
-    tags: ["greedy", "string", "dynamic-programming", "stack"],
+    tags: ["string", "stack", "greedy", "dynamic-programming"],
     estimatedTime: 25,
     problemStatement: `You're looking at a string s built entirely from three characters: '(', ')' and '*'. Your job is to judge whether s can be read as a balanced parenthesis sequence.
 
@@ -555,17 +555,17 @@ Return true when at least one way of reading the wildcards makes s balanced, and
     ],
     starterCode: {
       javascript: `function checkValidString(s) {
-  // Use greedy range tracking
+  // Write your solution here
 }`,
       typescript: `function checkValidString(s: string): boolean {
-  // Use greedy range tracking
+  // Write your solution here
 }`,
       python: `def checkValidString(s: str) -> bool:
-    # Use greedy range tracking
+    # Write your solution here
     pass`,
       java: `class Solution {
     public boolean checkValidString(String s) {
-        // Use greedy range tracking
+        // Write your solution here
         return false;
     }
 }`,
@@ -610,7 +610,7 @@ Return true when at least one way of reading the wildcards makes s balanced, and
     difficulty: "medium",
     companies: ["Google", "Amazon"],
     description: "Check if target triplet can be formed by taking max of triplet components",
-    tags: ["greedy", "array"],
+    tags: ["array", "greedy"],
     estimatedTime: 20,
     problemStatement: `You're working with a 2D integer array triplets, where each entry is a triplet, meaning an array of exactly three integers. Alongside it you get one more triplet, target = [x, y, z], that you'd like to see appear inside triplets.
 
@@ -643,17 +643,17 @@ Report whether some sequence of moves can make [x, y, z] show up as an entry of 
     ],
     starterCode: {
       javascript: `function mergeTriplets(triplets, target) {
-  // Use greedy filtering approach
+  // Write your solution here
 }`,
       typescript: `function mergeTriplets(triplets: number[][], target: number[]): boolean {
-  // Use greedy filtering approach
+  // Write your solution here
 }`,
       python: `def mergeTriplets(triplets: list[list[int]], target: list[int]) -> bool:
-    # Use greedy filtering approach
+    # Write your solution here
     pass`,
       java: `class Solution {
     public boolean mergeTriplets(int[][] triplets, int[] target) {
-        // Use greedy filtering approach
+        // Write your solution here
         return false;
     }
 }`,
@@ -709,7 +709,7 @@ Report whether some sequence of moves can make [x, y, z] show up as an entry of 
     difficulty: "easy",
     companies: ["Amazon", "Roblox", "Google", "Microsoft"],
     description: "Choose which boxes to load so a capacity-limited truck carries the most units",
-    tags: ["greedy", "array", "sorting"],
+    tags: ["array", "sorting", "greedy"],
     estimatedTime: 15,
     problemStatement: `You're in charge of loading one delivery truck from a warehouse of boxed goods. The inventory arrives as a 2D array boxTypes, where each entry boxTypes[i] holds two numbers: first, how many boxes of type i sit on the shelf, and second, how many units of product are packed inside every single box of that type.
 
@@ -740,19 +740,19 @@ The truck has room for at most truckSize boxes in total. Capacity is counted in 
     ],
     starterCode: {
       javascript: `function maximumUnits(boxTypes, truckSize) {
-  // Sort by units per box descending, then greedily fill truck
+  // Write your solution here
 
 }`,
       typescript: `function maximumUnits(boxTypes: number[][], truckSize: number): number {
-  // Sort by units per box descending, then greedily fill truck
+  // Write your solution here
 
 }`,
       python: `def maximumUnits(boxTypes, truckSize):
-    # Sort by units per box descending, then greedily fill truck
+    # Write your solution here
     pass`,
       java: `class Solution {
     public int maximumUnits(int[][] boxTypes, int truckSize) {
-        // Sort by units per box descending, then greedily fill truck
+        // Write your solution here
         return 0;
     }
 }`,

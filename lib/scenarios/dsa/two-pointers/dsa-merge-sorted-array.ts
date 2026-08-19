@@ -8,7 +8,7 @@ export const dsaMergeSortedArrayScenario: DSAScenario = {
   difficulty: "easy",
   companies: ["Meta", "Microsoft", "Amazon", "ZipRecruiter"],
   description: "Merge two sorted arrays into one sorted array in-place",
-  tags: ["array", "two-pointers", "sorting"],
+  tags: ["array", "sorting", "two-pointers"],
   estimatedTime: 15,
   problemStatement: `You're given two integer arrays, nums1 and nums2, each sorted in non-decreasing order, plus two integers m and n: m counts the real values at the front of nums1 and n counts the values in nums2.
 

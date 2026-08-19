@@ -8,7 +8,7 @@ export const constructBinaryTreePreorderInorderScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft"],
   description: "Rebuild the unique binary tree encoded by its preorder and inorder sequences.",
-  tags: ["tree", "recursion", "divide-and-conquer", "hash-table"],
+  tags: ["tree", "hash-table", "recursion", "divide-and-conquer"],
   estimatedTime: 30,
   problemStatement: `You're given two integer arrays, preorder and inorder, that record two walks over the same binary tree. In preorder, each node appears before everything in its left subtree, which appears before everything in its right subtree. In inorder, everything in a node's left subtree appears first, then the node itself, then everything in its right subtree.
 

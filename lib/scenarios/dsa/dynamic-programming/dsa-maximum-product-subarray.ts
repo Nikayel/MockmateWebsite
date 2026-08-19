@@ -8,7 +8,7 @@ export const maximumProductSubarrayScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "LinkedIn"],
   description: "Hunt down the run of adjacent entries whose product comes out largest",
-  tags: ["dynamic-programming", "array"],
+  tags: ["array", "dynamic-programming"],
   estimatedTime: 25,
   problemStatement: `You're given an integer array nums. Pick a contiguous run of entries, at least one entry long, whose product comes out as large as possible, and return that product.
 

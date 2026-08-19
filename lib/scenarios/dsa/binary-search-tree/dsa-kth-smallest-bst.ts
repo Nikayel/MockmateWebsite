@@ -8,7 +8,7 @@ export const dsaKthSmallestBstScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta"],
   description: "Find the kth smallest element in a BST.",
-  tags: ["tree", "dfs", "bst"],
+  tags: ["tree", "bst", "dfs"],
   estimatedTime: 20,
   problemStatement: `You're given the root of a binary search tree and an integer k. Rank every value stored in the tree from smallest to largest, then return the value holding rank k, where k = 1 names the smallest.
 

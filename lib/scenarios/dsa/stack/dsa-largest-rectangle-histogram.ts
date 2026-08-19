@@ -8,7 +8,7 @@ export const dsaLargestRectangleHistogramScenario: DSAScenario = {
   difficulty: "hard",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple"],
   description: "Find the largest rectangular area in a histogram",
-  tags: ["stack", "monotonic-stack", "array"],
+  tags: ["stack", "array", "monotonic-stack"],
   estimatedTime: 35,
   problemStatement: `You're looking at a histogram described by the integer array heights: heights[i] is how tall the ith bar stands, every bar is exactly 1 unit wide, and the bars sit side by side on a common baseline.
 

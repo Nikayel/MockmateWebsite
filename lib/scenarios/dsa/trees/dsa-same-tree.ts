@@ -42,17 +42,17 @@ These two agree everywhere, so the answer is true. If q instead hung its 4 on th
   ],
   starterCode: {
     javascript: `function isSameTree(p, q) {
-// Compare trees recursively
+// Write your solution here
 }`,
     typescript: `function isSameTree(p: TreeNode | null, q: TreeNode | null): boolean {
-// Compare trees recursively
+// Write your solution here
 }`,
     python: `def isSameTree(p: Optional[TreeNode], q: Optional[TreeNode]) -> bool:
-  # Compare trees recursively
+  # Write your solution here
   pass`,
     java: `class Solution {
   public boolean isSameTree(TreeNode p, TreeNode q) {
-      // Compare trees recursively
+      // Write your solution here
       return false;
   }
 }`,

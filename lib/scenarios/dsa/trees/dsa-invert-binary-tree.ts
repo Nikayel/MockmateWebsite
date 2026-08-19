@@ -46,17 +46,17 @@ Before                After
   ],
   starterCode: {
     javascript: `function invertTree(root) {
-// Swap left and right children recursively
+// Write your solution here
 }`,
     typescript: `function invertTree(root: TreeNode | null): TreeNode | null {
-// Swap left and right children recursively
+// Write your solution here
 }`,
     python: `def invertTree(root: Optional[TreeNode]) -> Optional[TreeNode]:
-  # Swap left and right children recursively
+  # Write your solution here
   pass`,
     java: `class Solution {
   public TreeNode invertTree(TreeNode root) {
-      // Swap left and right children recursively
+      // Write your solution here
       return null;
   }
 }`,

@@ -8,7 +8,7 @@ export const dsaReverseStringScenario: DSAScenario = {
   difficulty: "easy",
   companies: ["Amazon", "Microsoft", "Apple", "ZipRecruiter"],
   description: "Reverse a string array in-place",
-  tags: ["string", "two-pointers", "array"],
+  tags: ["string", "array", "two-pointers"],
   estimatedTime: 10,
   problemStatement: `You're given a character array s that spells out a string. Reverse it, so the characters end up running from last to first.
 

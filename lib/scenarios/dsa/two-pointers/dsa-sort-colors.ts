@@ -8,7 +8,7 @@ export const dsaSortColorsScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Microsoft", "Meta", "Apple", "NVIDIA"],
   description: "Sort an array of 0s, 1s, and 2s in place without a library sort",
-  tags: ["array", "two-pointers", "sorting"],
+  tags: ["array", "sorting", "two-pointers"],
   estimatedTime: 20,
   problemStatement: `You're given an array nums describing n objects, each painted red, white, or blue. The colors are encoded as integers: 0 for red, 1 for white, 2 for blue. Rearrange nums in place until objects sharing a color sit side by side, reds first, whites next, blues last, then return nums.
 

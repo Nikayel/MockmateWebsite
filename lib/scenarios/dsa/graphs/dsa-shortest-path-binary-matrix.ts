@@ -10,7 +10,7 @@ export const shortestPathBinaryMatrixScenario: DSAScenario = {
   roles: ["new-grad", "junior", "senior", "swe"],
   description:
     "Count the cells on the shortest 8-directional walk across a grid of open and blocked cells",
-  tags: ["bfs", "matrix", "shortest-path"],
+  tags: ["matrix", "shortest-path", "bfs"],
   estimatedTime: 20,
   problemStatement: `You're navigating an n x n grid of cells named grid, each holding 0 (open) or 1 (blocked). Starting from the top left cell, you want to arrive at the bottom right cell while stepping only on open cells. A single step may take you to any of the 8 cells surrounding your current one, so sideways, vertical, and diagonal moves are all legal whenever the destination cell is open.
 
@@ -47,10 +47,10 @@ Here one best walk is (0,0), (1,0), (2,1), (2,2): it touches 4 cells, so the ans
     "Check start and end cells first",
   ],
   starterCode: {
-    javascript: `function shortestPathBinaryMatrix(grid) {\n  // BFS with 8 directions\n}`,
-    typescript: `function shortestPathBinaryMatrix(grid: number[][]): number {\n  // BFS with 8 directions\n}`,
-    python: `def shortestPathBinaryMatrix(grid: list[list[int]]) -> int:\n    # BFS with 8 directions\n    pass`,
-    java: `class Solution {\n    public int shortestPathBinaryMatrix(int[][] grid) {\n        // BFS with 8 directions\n        return -1;\n    }\n}`,
+    javascript: `function shortestPathBinaryMatrix(grid) {\n  // Write your solution here\n}`,
+    typescript: `function shortestPathBinaryMatrix(grid: number[][]): number {\n  // Write your solution here\n}`,
+    python: `def shortestPathBinaryMatrix(grid: list[list[int]]) -> int:\n    # Write your solution here\n    pass`,
+    java: `class Solution {\n    public int shortestPathBinaryMatrix(int[][] grid) {\n        // Write your solution here\n        return -1;\n    }\n}`,
   },
   optimalComplexity: { time: "O(n^2)", space: "O(n^2)" },
   testCases: [

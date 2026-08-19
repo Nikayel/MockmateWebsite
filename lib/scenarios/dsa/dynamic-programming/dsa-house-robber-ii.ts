@@ -8,7 +8,7 @@ export const houseRobberIiScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft"],
   description: "Maximum robbery with circular house arrangement",
-  tags: ["dynamic-programming", "array"],
+  tags: ["array", "dynamic-programming"],
   estimatedTime: 25,
   problemStatement: `You're planning a night of burglaries on a street that loops back on itself: the houses stand in a circle, so the first house and the last house are direct neighbors. nums[i] tells you how much cash is stashed in house i, and every pair of adjacent houses shares a linked alarm that calls the police the moment both are broken into on the same night.
 

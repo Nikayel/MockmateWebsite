@@ -36,10 +36,10 @@ Implement the FreqStack class:
     "On pop: pop from stack at maxFreq, decrement freq, update maxFreq if needed",
   ],
   starterCode: {
-    javascript: `class FreqStack {\n  constructor() {\n    // Initialize freq map and frequency stacks\n  }\n\n  push(val) {\n    // Increment freq, push to appropriate stack\n  }\n\n  pop() {\n    // Pop from max frequency stack\n  }\n}`,
-    typescript: `class FreqStack {\n  constructor() {\n    // Initialize freq map and frequency stacks\n  }\n\n  push(val: number): void {\n    // Increment freq, push to appropriate stack\n  }\n\n  pop(): number {\n    // Pop from max frequency stack\n  }\n}`,
-    python: `class FreqStack:\n    def __init__(self):\n        # Initialize freq map and frequency stacks\n        pass\n\n    def push(self, val: int) -> None:\n        # Increment freq, push to appropriate stack\n        pass\n\n    def pop(self) -> int:\n        # Pop from max frequency stack\n        pass`,
-    java: `class FreqStack {\n    public FreqStack() {\n        // Initialize freq map and frequency stacks\n    }\n\n    public void push(int val) {\n        // Increment freq, push to appropriate stack\n    }\n\n    public int pop() {\n        // Pop from max frequency stack\n        return 0;\n    }\n}`,
+    javascript: `class FreqStack {\n  constructor() {\n    // Write your solution here\n  }\n\n  push(val) {\n    // Write your solution here\n  }\n\n  pop() {\n    // Write your solution here\n  }\n}`,
+    typescript: `class FreqStack {\n  constructor() {\n    // Write your solution here\n  }\n\n  push(val: number): void {\n    // Write your solution here\n  }\n\n  pop(): number {\n    // Write your solution here\n  }\n}`,
+    python: `class FreqStack:\n    def __init__(self):\n        # Write your solution here\n        pass\n\n    def push(self, val: int) -> None:\n        # Write your solution here\n        pass\n\n    def pop(self) -> int:\n        # Write your solution here\n        pass`,
+    java: `class FreqStack {\n    public FreqStack() {\n        // Write your solution here\n    }\n\n    public void push(int val) {\n        // Write your solution here\n    }\n\n    public int pop() {\n        // Write your solution here\n        return 0;\n    }\n}`,
   },
   optimalComplexity: { time: "O(1) per operation", space: "O(n)" },
   testCases: [

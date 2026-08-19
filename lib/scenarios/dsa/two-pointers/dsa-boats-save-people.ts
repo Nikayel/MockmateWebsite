@@ -8,7 +8,7 @@ export const dsaBoatsSavePeopleScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta"],
   description: "Find minimum boats to carry all people with weight limit",
-  tags: ["array", "two-pointers", "greedy", "sorting"],
+  tags: ["array", "sorting", "two-pointers", "greedy"],
   estimatedTime: 20,
   problemStatement: `You're given an array people, where people[i] is how much the ith person weighs, and an integer limit. Boats come in unlimited supply, and every boat shares one capacity, limit. A single boat can ferry at most two riders at once, and only while their combined weight stays within limit.
 

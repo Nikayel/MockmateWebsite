@@ -46,17 +46,17 @@ Return the maximum depth of the tree hanging from root.`,
   ],
   starterCode: {
     javascript: `function maxDepth(root) {
-// Find max depth recursively
+// Write your solution here
 }`,
     typescript: `function maxDepth(root: TreeNode | null): number {
-// Find max depth recursively
+// Write your solution here
 }`,
     python: `def maxDepth(root: Optional[TreeNode]) -> int:
-  # Find max depth recursively
+  # Write your solution here
   pass`,
     java: `class Solution {
   public int maxDepth(TreeNode root) {
-      // Find max depth recursively
+      // Write your solution here
       return 0;
   }
 }`,

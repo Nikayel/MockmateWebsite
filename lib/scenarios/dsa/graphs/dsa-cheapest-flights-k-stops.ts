@@ -9,7 +9,7 @@ export const cheapestFlightsKStopsScenario: DSAScenario = {
   companies: ["Amazon", "Google", "Meta", "Airbnb", "Palantir"],
   roles: ["junior", "senior", "swe"],
   description: "Find cheapest flight with at most k stops",
-  tags: ["graph", "bfs", "dynamic-programming", "shortest-path"],
+  tags: ["graph", "shortest-path", "bfs", "dynamic-programming"],
   estimatedTime: 30,
   problemStatement: `You're comparing airfares across a network of n cities, numbered 0 to n - 1. Every listing in flights is a one-way route: flights[i] = [from, to, price] means a plane departs city from, lands in city to, and charges price for the seat. A route in one direction implies nothing about the reverse direction.
 

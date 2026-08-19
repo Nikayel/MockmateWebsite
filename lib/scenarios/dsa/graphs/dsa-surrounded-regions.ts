@@ -9,7 +9,7 @@ export const surroundedRegionsScenario: DSAScenario = {
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe"],
   description: "Flip enclosed regions of 'O' cells to 'X' while border-connected regions survive",
-  tags: ["array", "dfs", "bfs", "matrix", "union-find"],
+  tags: ["array", "matrix", "dfs", "bfs", "union-find"],
   estimatedTime: 25,
   problemStatement: `You're editing an m x n character board named board, where every cell shows 'X' or 'O'. The 'O' cells clump together into regions: two 'O' cells belong to the same region when they share an edge, meaning one sits directly up, down, left, or right from the other.
 

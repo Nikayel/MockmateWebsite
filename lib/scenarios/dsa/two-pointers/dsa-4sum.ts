@@ -8,7 +8,7 @@ export const dsa4sumScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Apple"],
   description: "Find all unique quadruplets that sum to target",
-  tags: ["array", "two-pointers", "sorting"],
+  tags: ["array", "sorting", "two-pointers"],
   estimatedTime: 35,
   problemStatement: `You're given an integer array nums holding n values, plus an integer target. Gather every unique quadruplet [nums[a], nums[b], nums[c], nums[d]] built from four pairwise-distinct indices a, b, c, d drawn from 0 to n - 1, whose four values sum to target.
 

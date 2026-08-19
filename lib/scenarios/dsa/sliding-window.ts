@@ -120,7 +120,7 @@ public:
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Microsoft", "Apple", "TikTok", "Reddit", "Spotify"],
     description: "Measure the longest run of characters in a string where nothing repeats.",
-    tags: ["string", "sliding-window", "hash-table"],
+    tags: ["string", "hash-table", "sliding-window"],
     estimatedTime: 25,
     problemStatement: `Take a string s and hunt for its longest substring in which no character shows up twice. Report that substring's length, not the substring itself.
 
@@ -363,7 +363,7 @@ Record the largest visible value at each stop, and return those maximums in orde
     difficulty: "hard",
     companies: ["Amazon", "Google", "Meta", "Microsoft", "TikTok"],
     description: "Find minimum window in s containing all chars from t.",
-    tags: ["string", "sliding-window", "hash-table"],
+    tags: ["string", "hash-table", "sliding-window"],
     estimatedTime: 35,
     problemStatement: `Two strings come in: s of length m and t of length n. Search s for the shortest substring that covers all of t, meaning each character of t appears inside that substring at least as many times as it appears in t. Duplicates in t raise the bar: if t carries two copies of a letter, a qualifying window needs two as well.
 
@@ -449,7 +449,7 @@ Return that shortest substring. When no window of s covers t, return the empty s
     difficulty: "medium",
     companies: ["Amazon", "Google", "Meta", "TikTok"],
     description: "Find longest substring with same letter after k replacements",
-    tags: ["string", "sliding-window", "hash-table"],
+    tags: ["string", "hash-table", "sliding-window"],
     estimatedTime: 25,
     problemStatement: `A string s of uppercase letters comes with an edit budget k. Spending one unit lets you overwrite any single position of s with whatever uppercase letter you like, and you can spend at most k units in total.
 
@@ -496,7 +496,7 @@ After your edits, some substring will consist of one letter repeated. Return the
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Microsoft"],
     description: "Check if s2 contains a permutation of s1",
-    tags: ["string", "sliding-window", "hash-table"],
+    tags: ["string", "hash-table", "sliding-window"],
     estimatedTime: 25,
     problemStatement: `Two lowercase strings s1 and s2 are in play. Decide whether some contiguous slice of s2 is a rearrangement of s1: the exact same letters with the exact same counts, just possibly shuffled. Return true when such a slice exists and false when none does.`,
     examples: [

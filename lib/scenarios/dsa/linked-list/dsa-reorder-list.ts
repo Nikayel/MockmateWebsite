@@ -8,7 +8,7 @@ export const reorderListScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Microsoft"],
   description: "Relink a list to alternate nodes from its front and back",
-  tags: ["linked-list", "two-pointers", "stack"],
+  tags: ["linked-list", "stack", "two-pointers"],
   estimatedTime: 25,
   problemStatement: `You're given head, the first node of a singly linked list. Label its nodes L0, L1, and so on through Ln. Rebuild the chain so it runs L0 → Ln → L1 → Ln-1 → L2 → Ln-2 and keeps alternating between the front and the back until every node has its place.
 

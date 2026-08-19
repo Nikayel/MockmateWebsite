@@ -161,7 +161,7 @@ export const triesScenarios: DSAScenario[] = [
     difficulty: "hard",
     companies: ["Google", "Amazon", "Meta", "Microsoft", "Apple"],
     description: "Find all words from a dictionary that exist in a 2D board of characters",
-    tags: ["trie", "backtracking", "matrix", "dfs"],
+    tags: ["trie", "matrix", "backtracking", "dfs"],
     estimatedTime: 45,
     problemStatement: `You're handed board, an m x n grid of lowercase letters, and words, a list of dictionary entries. Return every entry that can be spelled by tracing a path through the grid.
 
@@ -199,17 +199,17 @@ A path begins on any cell and extends one step at a time to a cell directly abov
     ],
     starterCode: {
       javascript: `function findWords(board, words) {
-  // Build trie and search using backtracking
+  // Write your solution here
 }`,
       typescript: `function findWords(board: string[][], words: string[]): string[] {
-  // Build trie and search using backtracking
+  // Write your solution here
 }`,
       python: `def findWords(board: list[list[str]], words: list[str]) -> list[str]:
-    # Build trie and search using backtracking
+    # Write your solution here
     pass`,
       java: `class Solution {
     public List<String> findWords(char[][] board, String[] words) {
-        // Build trie and search using backtracking
+        // Write your solution here
         return new ArrayList<>();
     }
 }`,
@@ -299,7 +299,7 @@ When c is '#', the sentence in progress is complete. Record it into the history 
     starterCode: {
       javascript: `class AutocompleteSystem {
   constructor(sentences, times) {
-    // Initialize trie with historical data
+    // Initialize your data structure here
   }
 
   input(c) {
@@ -309,7 +309,7 @@ When c is '#', the sentence in progress is complete. Record it into the history 
 }`,
       typescript: `class AutocompleteSystem {
   constructor(sentences: string[], times: number[]) {
-    // Initialize trie with historical data
+    // Initialize your data structure here
   }
 
   input(c: string): string[] {
@@ -319,7 +319,7 @@ When c is '#', the sentence in progress is complete. Record it into the history 
 }`,
       python: `class AutocompleteSystem:
     def __init__(self, sentences: list[str], times: List[int]):
-        # Initialize trie with historical data
+        # Initialize your data structure here
         pass
 
     def input(self, c: str) -> list[str]:
@@ -395,7 +395,7 @@ When c is '#', the sentence in progress is complete. Record it into the history 
     difficulty: "medium",
     companies: ["Google", "Amazon", "Meta", "Apple", "Microsoft"],
     description: "Decide whether a string can be split entirely into dictionary words",
-    tags: ["trie", "dynamic-programming", "string", "memoization"],
+    tags: ["trie", "string", "dynamic-programming", "memoization"],
     estimatedTime: 25,
     problemStatement: `You're given a string s and a word list wordDict. Determine whether s can be carved into consecutive pieces so that every piece is a wordDict entry and the pieces, joined back together, spell s exactly with no characters left over. Report true when some such split exists and false when none does.
 
@@ -431,17 +431,17 @@ Reuse is unrestricted: one wordDict entry may appear in the split any number of 
     ],
     starterCode: {
       javascript: `function wordBreak(s, wordDict) {
-  // Use trie + DP to check if string can be segmented
+  // Write your solution here
 }`,
       typescript: `function wordBreak(s: string, wordDict: string[]): boolean {
-  // Use trie + DP to check if string can be segmented
+  // Write your solution here
 }`,
       python: `def wordBreak(s: str, wordDict: list[str]) -> bool:
-    # Use trie + DP to check if string can be segmented
+    # Write your solution here
     pass`,
       java: `class Solution {
     public boolean wordBreak(String s, List<String> wordDict) {
-        // Use trie + DP to check if string can be segmented
+        // Write your solution here
         return false;
     }
 }`,
@@ -525,17 +525,17 @@ Return the rebuilt sentence, words in their original order.`,
     ],
     starterCode: {
       javascript: `function replaceWords(dictionary, sentence) {
-  // Build trie from dictionary and replace words
+  // Write your solution here
 }`,
       typescript: `function replaceWords(dictionary: string[], sentence: string): string {
-  // Build trie from dictionary and replace words
+  // Write your solution here
 }`,
       python: `def replaceWords(dictionary: list[str], sentence: str) -> str:
-    # Build trie from dictionary and replace words
+    # Write your solution here
     pass`,
       java: `class Solution {
     public String replaceWords(List<String> dictionary, String sentence) {
-        // Build trie from dictionary and replace words
+        // Write your solution here
         return "";
     }
 }`,
@@ -608,8 +608,8 @@ Return the rebuilt sentence, words in their original order.`,
       "Optimize by pruning invalid paths early",
     ],
     starterCode: {
-      javascript: `class WordDictionary {\n  constructor() {\n    // Initialize\n  }\n\n  addWord(word) {\n    // Add word to trie\n  }\n\n  search(word) {\n    // Search with wildcard support\n  }\n}`,
-      typescript: `class WordDictionary {\n  constructor() {\n    // Initialize\n  }\n\n  addWord(word: string): void {\n    // Add word to trie\n  }\n\n  search(word: string): boolean {\n    // Search with wildcard support\n  }\n}`,
+      javascript: `class WordDictionary {\n  constructor() {\n    // Initialize\n  }\n\n  addWord(word) {\n    // Add a word to the data structure\n  }\n\n  search(word) {\n    // Search with wildcard support\n  }\n}`,
+      typescript: `class WordDictionary {\n  constructor() {\n    // Initialize\n  }\n\n  addWord(word: string): void {\n    // Add a word to the data structure\n  }\n\n  search(word: string): boolean {\n    // Search with wildcard support\n  }\n}`,
       python: `class WordDictionary:\n    def __init__(self):\n        pass\n\n    def addWord(self, word: str) -> None:\n        pass\n\n    def search(self, word: str) -> bool:\n        pass`,
     },
     optimalComplexity: {

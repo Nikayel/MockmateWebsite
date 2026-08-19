@@ -14,7 +14,7 @@ export const heapScenarios: DSAScenario[] = [
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Apple"],
     description: "Pull the kth biggest value out of an unordered array",
-    tags: ["array", "heap", "quickselect", "sorting"],
+    tags: ["array", "sorting", "heap", "quickselect"],
     estimatedTime: 20,
     problemStatement: `You're given nums, an array of integers, plus a number k. Report the value that would occupy the kth seat if the whole array were lined up from biggest to smallest.
 
@@ -117,7 +117,7 @@ public:
     difficulty: "hard",
     companies: ["Amazon", "Google", "Meta", "Microsoft"],
     description: "Combine k individually sorted linked lists into one ordered list.",
-    tags: ["heap", "linked-list", "divide-and-conquer"],
+    tags: ["linked-list", "heap", "divide-and-conquer"],
     estimatedTime: 30,
     problemStatement: `You're given lists, an array holding the heads of k separate linked lists. Every one of those lists is already arranged smallest to largest on its own.
 
@@ -210,7 +210,7 @@ Weave all of them together into a single linked list whose values run smallest t
     difficulty: "hard",
     companies: ["Amazon", "Google", "Meta", "Spotify"],
     description: "Design a data structure that supports finding median in O(1).",
-    tags: ["heap", "design", "two-heaps"],
+    tags: ["design", "heap", "two-heaps"],
     estimatedTime: 35,
     problemStatement: `Numbers arrive one at a time, and you must be ready to report the median at any moment. Build a class named MedianFinder exposing this interface:
 
@@ -337,7 +337,7 @@ For an odd count of stored values, the median is the single middle entry once ev
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Microsoft"],
     description: "Fit repeating jobs around a same-type cooldown in the fewest time units",
-    tags: ["array", "heap", "greedy", "sorting"],
+    tags: ["array", "sorting", "heap", "greedy"],
     estimatedTime: 30,
     problemStatement: `You're scheduling a processor. Its job queue arrives as tasks, where each entry is a capital letter naming a job type. Running any single job costs exactly one time unit, and the machine can also burn a unit doing nothing.
 
@@ -404,7 +404,7 @@ Return the smallest number of time units, idle gaps included, needed to finish e
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Apple", "Snap"],
     description: "Pick the k points sitting nearest the origin on a plane",
-    tags: ["array", "heap", "quickselect", "sorting"],
+    tags: ["array", "sorting", "heap", "quickselect"],
     estimatedTime: 20,
     problemStatement: `You're given points, a collection of coordinates on a flat plane with points[i] = [xi, yi], plus an integer k. Measure how far each point sits from the origin (0, 0) using ordinary straight-line (Euclidean) distance, then pick out the k entries lying nearest.
 
@@ -470,7 +470,7 @@ Hand those k points back in whatever arrangement you like; no particular orderin
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google"],
     description: "Reorder a string so identical letters never touch",
-    tags: ["string", "heap", "greedy", "hash-table"],
+    tags: ["string", "hash-table", "heap", "greedy"],
     estimatedTime: 25,
     problemStatement: `You're given a string s. Shuffle its letters into a new order in which no letter ever lands immediately beside a copy of itself. Any ordering that obeys the rule is acceptable, so return whichever one you produce. If every possible ordering puts two identical letters side by side somewhere, return the empty string "" instead.`,
     examples: [
@@ -518,7 +518,7 @@ Hand those k points back in whatever arrangement you like; no particular orderin
     difficulty: "hard",
     companies: ["Google", "Amazon", "Meta", "Microsoft"],
     description: "Space repeated letters at least k slots away from each other",
-    tags: ["string", "heap", "greedy", "hash-table", "queue"],
+    tags: ["string", "hash-table", "heap", "greedy", "queue"],
     estimatedTime: 35,
     problemStatement: `You're given a string s along with an integer k. Reshuffle the characters so that any two occurrences of the same letter end up at least k positions apart in the final string.
 
@@ -588,7 +588,7 @@ Sometimes the letters cannot be spread that thin. When no valid arrangement exis
     difficulty: "easy",
     companies: ["Amazon", "Google", "Meta"],
     description: "Play the stone-smashing game down to the final survivor",
-    tags: ["heap", "array"],
+    tags: ["array", "heap"],
     estimatedTime: 15,
     problemStatement: `You're given stones, an array of integers where stones[i] records how heavy the ith stone is. The game runs in rounds: each round you grab the two heaviest stones and slam them into each other. Call their weights x and y, with x <= y. Matching weights (x == y) shatter both stones to dust. Unequal weights destroy the lighter stone and grind the heavier one down to y - x.
 
@@ -627,7 +627,7 @@ The rounds continue until the pile is down to a single stone or nothing at all. 
     difficulty: "medium",
     companies: ["Amazon", "Google", "Meta", "Bloomberg"],
     description: "Rank the k most common words, settling ties alphabetically",
-    tags: ["heap", "hash-table", "string", "sorting"],
+    tags: ["hash-table", "string", "heap", "sorting"],
     estimatedTime: 25,
     problemStatement: `You're given words, an array of strings, together with an integer k. Work out which k strings occur most often across the array and hand those back.
 

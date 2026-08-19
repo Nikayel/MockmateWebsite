@@ -328,7 +328,7 @@ Work newInterval into the list so that both guarantees still hold afterward: asc
     difficulty: "medium",
     companies: ["Google", "Amazon", "Meta"],
     description: "Count the fewest deletions that leave no two ranges in conflict",
-    tags: ["array", "greedy", "sorting", "intervals"],
+    tags: ["array", "sorting", "greedy", "intervals"],
     estimatedTime: 25,
     problemStatement: `You're handed a batch of ranges as intervals, where intervals[i] = [starti, endi]. Some of them conflict with each other. Delete as few ranges as possible so that the survivors are mutually conflict-free, then report how many deletions that took.
 
@@ -363,17 +363,17 @@ For this problem, two ranges conflict only when their interiors genuinely cross.
     ],
     starterCode: {
       javascript: `function eraseOverlapIntervals(intervals) {
-  // Find minimum removals using greedy approach
+  // Write your solution here
 }`,
       typescript: `function eraseOverlapIntervals(intervals: number[][]): number {
-  // Find minimum removals using greedy approach
+  // Write your solution here
 }`,
       python: `def eraseOverlapIntervals(intervals: list[list[int]]) -> int:
-    # Find minimum removals using greedy approach
+    # Write your solution here
     pass`,
       java: `class Solution {
     public int eraseOverlapIntervals(int[][] intervals) {
-        // Find minimum removals using greedy approach
+        // Write your solution here
         return 0;
     }
 }`,
@@ -439,7 +439,7 @@ For this problem, two ranges conflict only when their interiors genuinely cross.
     difficulty: "medium",
     companies: ["Google", "Amazon", "Meta", "Microsoft", "Apple"],
     description: "Figure out how many rooms must be reserved for a day of meetings",
-    tags: ["array", "heap", "sorting", "intervals", "two-pointers"],
+    tags: ["array", "sorting", "heap", "intervals", "two-pointers"],
     estimatedTime: 25,
     problemStatement: `Your company's calendar for the day lives in intervals, with intervals[i] = [starti, endi] describing when each meeting runs. Two meetings whose times cross cannot share a room, so you must decide how much space to reserve. A meeting that ends at some time and another that starts at that exact time can share a room.
 
@@ -470,17 +470,17 @@ Return the smallest count of rooms that lets every meeting take place exactly as
     ],
     starterCode: {
       javascript: `function minMeetingRooms(intervals) {
-  // Find minimum rooms using heap or two pointers
+  // Write your solution here
 }`,
       typescript: `function minMeetingRooms(intervals: number[][]): number {
-  // Find minimum rooms using heap or two pointers
+  // Write your solution here
 }`,
       python: `def minMeetingRooms(intervals: list[list[int]]) -> int:
-    # Find minimum rooms using heap or two pointers
+    # Write your solution here
     pass`,
       java: `class Solution {
     public int minMeetingRooms(int[][] intervals) {
-        // Find minimum rooms using heap or two pointers
+        // Write your solution here
         return 0;
     }
 }`,

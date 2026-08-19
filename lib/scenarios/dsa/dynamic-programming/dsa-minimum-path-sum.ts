@@ -8,7 +8,7 @@ export const minimumPathSumScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Goldman Sachs"],
   description: "Cross a grid corner to corner while collecting the smallest possible total",
-  tags: ["dynamic-programming", "array", "matrix"],
+  tags: ["array", "matrix", "dynamic-programming"],
   estimatedTime: 20,
   problemStatement: `You're standing on the top-left cell of an m x n grid, and every cell holds a non-negative number. You need to reach the bottom-right cell, and each move goes exactly one cell down or one cell right, never up or left.
 

@@ -8,7 +8,7 @@ export const decodeWaysScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple"],
   description: "Count ways to decode a digit string into letters",
-  tags: ["dynamic-programming", "string"],
+  tags: ["string", "dynamic-programming"],
   estimatedTime: 25,
   problemStatement: `You've intercepted a message that was encoded by swapping every letter for its alphabet position: 'A' became "1", 'B' became "2", and so on up to 'Z', which became "26". The digits were then written out with nothing separating them, leaving you a digit string s.
 

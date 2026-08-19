@@ -35,10 +35,10 @@ Hand back an array ans the same length as nums1, where ans[i] stores the result 
     "Look up each element of nums1 in the map",
   ],
   starterCode: {
-    javascript: `function nextGreaterElement(nums1, nums2) {\n  // Use monotonic stack + hashmap\n}`,
-    typescript: `function nextGreaterElement(nums1: number[], nums2: number[]): number[] {\n  // Use monotonic stack + hashmap\n}`,
-    python: `def nextGreaterElement(nums1: list[int], nums2: list[int]) -> list[int]:\n    # Use monotonic stack + hashmap\n    pass`,
-    java: `class Solution {\n    public int[] nextGreaterElement(int[] nums1, int[] nums2) {\n        // Use monotonic stack + hashmap\n        return new int[0];\n    }\n}`,
+    javascript: `function nextGreaterElement(nums1, nums2) {\n  // Write your solution here\n}`,
+    typescript: `function nextGreaterElement(nums1: number[], nums2: number[]): number[] {\n  // Write your solution here\n}`,
+    python: `def nextGreaterElement(nums1: list[int], nums2: list[int]) -> list[int]:\n    # Write your solution here\n    pass`,
+    java: `class Solution {\n    public int[] nextGreaterElement(int[] nums1, int[] nums2) {\n        // Write your solution here\n        return new int[0];\n    }\n}`,
   },
   optimalComplexity: { time: "O(n + m)", space: "O(n)" },
   testCases: [

@@ -8,7 +8,7 @@ export const houseRobberScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta"],
   description: "Maximize amount robbed without robbing adjacent houses.",
-  tags: ["dynamic-programming", "array"],
+  tags: ["array", "dynamic-programming"],
   estimatedTime: 20,
   problemStatement: `You're casing a row of houses along a quiet street, and nums[i] is the cash hidden inside house i. The complication is the wiring: every two houses that sit side by side share a linked alarm, and breaking into both members of such a pair on one night brings the police.
 

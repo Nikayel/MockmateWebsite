@@ -31,10 +31,10 @@ Implement the StockSpanner class:
     "Push (price, accumulated_span) onto stack",
   ],
   starterCode: {
-    javascript: `class StockSpanner {\n  constructor() {\n    // Initialize stack\n  }\n\n  next(price) {\n    // Calculate span using monotonic stack\n  }\n}`,
-    typescript: `class StockSpanner {\n  constructor() {\n    // Initialize stack\n  }\n\n  next(price: number): number {\n    // Calculate span using monotonic stack\n  }\n}`,
-    python: `class StockSpanner:\n    def __init__(self):\n        # Initialize stack\n        pass\n\n    def next(self, price: int) -> int:\n        # Calculate span using monotonic stack\n        pass`,
-    java: `class StockSpanner {\n    public StockSpanner() {\n        // Initialize stack\n    }\n\n    public int next(int price) {\n        // Calculate span using monotonic stack\n        return 0;\n    }\n}`,
+    javascript: `class StockSpanner {\n  constructor() {\n    // Write your solution here\n  }\n\n  next(price) {\n    // Write your solution here\n  }\n}`,
+    typescript: `class StockSpanner {\n  constructor() {\n    // Write your solution here\n  }\n\n  next(price: number): number {\n    // Write your solution here\n  }\n}`,
+    python: `class StockSpanner:\n    def __init__(self):\n        # Write your solution here\n        pass\n\n    def next(self, price: int) -> int:\n        # Write your solution here\n        pass`,
+    java: `class StockSpanner {\n    public StockSpanner() {\n        // Write your solution here\n    }\n\n    public int next(int price) {\n        // Write your solution here\n        return 0;\n    }\n}`,
   },
   optimalComplexity: { time: "O(1) amortized per call", space: "O(n)" },
   testCases: [

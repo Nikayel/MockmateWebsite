@@ -8,7 +8,7 @@ export const binaryTreeZigzagScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Microsoft", "Apple", "Bloomberg"],
   description: "Traverse a binary tree by levels while the reading direction flips each depth",
-  tags: ["binary-tree", "bfs", "deque"],
+  tags: ["binary-tree", "deque", "bfs"],
   estimatedTime: 25,
   problemStatement: `You're given the root of a binary tree. Produce its zigzag level order traversal: read the top level left to right, read the level beneath it right to left, and keep flipping direction on every level after that.
 
@@ -39,10 +39,10 @@ Output: [[6], [14, 2], [9, 17]]`,
     "Track even/odd levels",
   ],
   starterCode: {
-    javascript: `function zigzagLevelOrder(root) {\n  // BFS with alternating direction\n}`,
-    typescript: `function zigzagLevelOrder(root: TreeNode | null): number[][] {\n  // BFS with alternating direction\n}`,
-    python: `def zigzagLevelOrder(root: Optional[TreeNode]) -> list[list[int]]:\n    # BFS with alternating direction\n    pass`,
-    java: `class Solution {\n    public List<List<Integer>> zigzagLevelOrder(TreeNode root) {\n        // BFS with alternating direction\n        return new ArrayList<>();\n    }\n}`,
+    javascript: `function zigzagLevelOrder(root) {\n  // Write your solution here\n}`,
+    typescript: `function zigzagLevelOrder(root: TreeNode | null): number[][] {\n  // Write your solution here\n}`,
+    python: `def zigzagLevelOrder(root: Optional[TreeNode]) -> list[list[int]]:\n    # Write your solution here\n    pass`,
+    java: `class Solution {\n    public List<List<Integer>> zigzagLevelOrder(TreeNode root) {\n        // Write your solution here\n        return new ArrayList<>();\n    }\n}`,
   },
   optimalComplexity: { time: "O(n)", space: "O(n)" },
   testCases: [

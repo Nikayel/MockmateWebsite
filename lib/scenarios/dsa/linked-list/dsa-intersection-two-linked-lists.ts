@@ -8,7 +8,7 @@ export const intersectionTwoLinkedListsScenario: DSAScenario = {
   difficulty: "easy",
   companies: ["Amazon", "Meta", "Microsoft", "Google", "Apple"],
   description: "Find the node where two linked lists intersect",
-  tags: ["linked-list", "two-pointers", "hash-table"],
+  tags: ["linked-list", "hash-table", "two-pointers"],
   estimatedTime: 20,
   problemStatement: `You're given headA and headB, the starting nodes of two singly linked lists. Somewhere along the way the two lists might merge and share every node from that point to the tail. Find the earliest node they have in common and return it; when the lists never touch, return null.
 

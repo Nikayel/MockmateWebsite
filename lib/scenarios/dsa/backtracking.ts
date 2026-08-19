@@ -15,7 +15,7 @@ export const backtrackingScenarios: DSAScenario[] = [
     companies: ["Amazon", "Meta", "Microsoft", "Apple"],
     description:
       "Decide whether a word can be traced through a letter grid one adjacent cell at a time",
-    tags: ["array", "backtracking", "matrix"],
+    tags: ["array", "matrix", "backtracking"],
     estimatedTime: 25,
     problemStatement: `You're given board, a character grid with m rows and n columns, plus a string word. Decide whether word can be spelled by walking a path through the grid: start on any cell, and at each step move only to a cell sharing an edge with the current one, so up, down, left, or right, never diagonally. Every step must land on the next letter of word.
 
@@ -303,7 +303,7 @@ Return the complete set of arrangements; the sequence they come back in is up to
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Apple"],
     description: "Enumerate every subset an array of unique values can form",
-    tags: ["array", "backtracking", "bit-manipulation"],
+    tags: ["array", "bit-manipulation", "backtracking"],
     estimatedTime: 20,
     problemStatement: `You're given an integer array nums whose values never repeat. Gather every subset you can pick out of it, from the empty selection all the way up to the entire array.
 
@@ -424,7 +424,7 @@ Report each arrangement as n strings of n characters, one string per board row, 
     difficulty: "medium",
     companies: ["Amazon", "Meta", "Google", "Apple"],
     description: "Expand a string of keypad digits into every letter string it could spell",
-    tags: ["string", "backtracking", "hash-table"],
+    tags: ["string", "hash-table", "backtracking"],
     estimatedTime: 20,
     problemStatement: `You're given digits, a string in which every character is a digit from 2 through 9. On a classic phone keypad each of those digits carries letters: 2 has abc, 3 has def, 4 has ghi, 5 has jkl, 6 has mno, 7 has pqrs, 8 has tuv, and 9 has wxyz.
 

@@ -8,7 +8,7 @@ export const dsaSquaresSortedArrayScenario: DSAScenario = {
   difficulty: "easy",
   companies: ["Amazon", "Meta", "Google", "Microsoft"],
   description: "Square every entry of a sorted array and keep the results in order",
-  tags: ["array", "two-pointers", "sorting"],
+  tags: ["array", "sorting", "two-pointers"],
   estimatedTime: 15,
   problemStatement: `You're given an integer array nums whose values already appear in non-decreasing order. Square each value, then hand back a new array holding all of those squares arranged in non-decreasing order as well.`,
   examples: [

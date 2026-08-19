@@ -9,7 +9,7 @@ export const serializeDeserializeTreeScenario: DSAScenario = {
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Roblox", "Snap", "TikTok", "Palantir"],
   roles: ["junior", "senior", "swe", "fdse"],
   description: "Flatten a binary tree to a string and rebuild it exactly.",
-  tags: ["tree", "dfs", "bfs", "design"],
+  tags: ["tree", "design", "dfs", "bfs"],
   estimatedTime: 35,
   problemStatement: `Your task is to move a binary tree through a string and bring it back intact. Serializing flattens the tree into a sequence of characters that could sit in a file or travel over a network; deserializing reads that sequence and rebuilds the structure it described.
 

@@ -9,7 +9,7 @@ export const dsaTimeBasedKeyValueStoreScenario: DSAScenario = {
   companies: ["Amazon", "Google", "Meta", "Lyft", "Palantir"],
   roles: ["junior", "senior", "swe", "fdse"],
   description: "Design a time-based key-value store with get by timestamp",
-  tags: ["binary-search", "design", "hash-table"],
+  tags: ["design", "hash-table", "binary-search"],
   estimatedTime: 30,
   problemStatement: `Build a key-value store where every write carries a time stamp, so one key can accumulate many values over its history, and reads ask what a key's value was as of a given moment.
 

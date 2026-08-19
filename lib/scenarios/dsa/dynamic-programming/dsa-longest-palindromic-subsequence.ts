@@ -8,7 +8,7 @@ export const longestPalindromicSubsequenceScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "LinkedIn", "Microsoft"],
   description: "Find the length of the longest palindromic subsequence",
-  tags: ["dynamic-programming", "string"],
+  tags: ["string", "dynamic-programming"],
   estimatedTime: 30,
   problemStatement: `You're given a string s. Strike out any characters you like (or none at all); the survivors, kept in their original order, form a subsequence of s.
 

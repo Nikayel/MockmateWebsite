@@ -8,7 +8,7 @@ export const longestCommonSubsequenceScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple", "Salesforce", "Atlassian"],
   description: "Find the length of the longest common subsequence of two strings",
-  tags: ["dynamic-programming", "string"],
+  tags: ["string", "dynamic-programming"],
   estimatedTime: 25,
   problemStatement: `You're comparing two strings, text1 and text2. A subsequence of a string is whatever is left after deleting any of its characters (possibly none) while keeping the survivors in their original order; "tor" is one subsequence of "storm". When a string is a subsequence of both inputs at once, it is a common subsequence of the pair.
 

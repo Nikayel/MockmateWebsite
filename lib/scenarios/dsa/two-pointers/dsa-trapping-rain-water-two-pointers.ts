@@ -8,7 +8,7 @@ export const dsaTrappingRainWaterTwoPointersScenario: DSAScenario = {
   difficulty: "hard",
   companies: ["Google", "Meta", "Amazon", "Microsoft"],
   description: "Work out how much rainwater settles between the bars of a height profile",
-  tags: ["array", "two-pointers", "dynamic-programming", "stack"],
+  tags: ["array", "stack", "two-pointers", "dynamic-programming"],
   estimatedTime: 30,
   problemStatement: `You're given an array height of n non-negative integers. Read it as the cross-section of a terrain: bar i is height[i] units tall and exactly one unit wide. When rain falls, water settles wherever lower bars sit between taller ones.
 

@@ -8,7 +8,7 @@ export const triangleScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Microsoft"],
   description: "Descend a triangle of numbers along adjacent cells for the cheapest total",
-  tags: ["dynamic-programming", "array"],
+  tags: ["array", "dynamic-programming"],
   estimatedTime: 25,
   problemStatement: `You're given a triangle array: the top row holds a single number, and each row after it holds one number more than the row above. Starting at the apex you descend one row per step. From index i of the current row, the only legal landings are index i or index i + 1 of the row below.
 

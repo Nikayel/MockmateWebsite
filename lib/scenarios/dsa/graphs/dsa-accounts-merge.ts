@@ -9,7 +9,7 @@ export const accountsMergeScenario: DSAScenario = {
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe", "fdse"],
   description: "Merge account rows that share an email into one entry per person",
-  tags: ["graph", "union-find", "dfs", "string"],
+  tags: ["graph", "string", "union-find", "dfs"],
   estimatedTime: 30,
   problemStatement: `You're given accounts, a list of rows in which each row opens with a person's name and every later entry is an email address that person has used. Whenever two rows share at least one email address, they belong to the same person, and the connection chains: a row that shares an email with a second row, which in turn shares a different email with a third, makes all three one person. A matching name proves nothing on its own, since two distinct people can carry the same name.
 

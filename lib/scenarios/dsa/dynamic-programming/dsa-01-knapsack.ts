@@ -8,7 +8,7 @@ export const zeroOneKnapsackScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Microsoft", "Goldman Sachs"],
   description: "Maximize the value you can pack without exceeding the weight capacity",
-  tags: ["dynamic-programming", "array"],
+  tags: ["array", "dynamic-programming"],
   estimatedTime: 30,
   problemStatement: `You're packing a knapsack that can hold at most W units of weight. There are n items to pick from; item i weighs weights[i] and is worth values[i].
 

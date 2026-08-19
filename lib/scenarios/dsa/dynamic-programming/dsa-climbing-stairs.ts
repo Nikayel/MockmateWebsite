@@ -8,7 +8,7 @@ export const climbingStairsScenario: DSAScenario = {
   difficulty: "easy",
   companies: ["Amazon", "Google", "Meta", "Apple"],
   description: "Calculate number of ways to climb stairs",
-  tags: ["dynamic-programming", "math", "memoization"],
+  tags: ["math", "dynamic-programming", "memoization"],
   estimatedTime: 15,
   problemStatement: `You're standing at the bottom of a staircase that is n steps tall. Every stride you take moves you up by either 1 step or 2 steps.
 

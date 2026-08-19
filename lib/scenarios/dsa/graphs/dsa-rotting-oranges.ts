@@ -9,7 +9,7 @@ export const rottingOrangesScenario: DSAScenario = {
   companies: ["Amazon", "Meta", "Microsoft", "Google", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe", "fdse"],
   description: "Measure how many minutes rot takes to spread through every fresh orange on a tray",
-  tags: ["array", "bfs", "matrix"],
+  tags: ["array", "matrix", "bfs"],
   estimatedTime: 25,
   problemStatement: `You're watching over a tray of oranges arranged as an m x n grid named grid. A cell reads 2 when its orange has already rotted, 1 when the orange is still fresh, and 0 when the slot holds nothing.
 

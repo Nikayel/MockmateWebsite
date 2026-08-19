@@ -8,7 +8,7 @@ export const verticalOrderTraversalScenario: DSAScenario = {
   difficulty: "hard",
   companies: ["Amazon", "Meta", "Google", "Microsoft", "Bloomberg"],
   description: "Read a binary tree column by column under strict tie rules",
-  tags: ["binary-tree", "bfs", "dfs", "sorting", "hash-table"],
+  tags: ["binary-tree", "hash-table", "bfs", "dfs", "sorting"],
   estimatedTime: 35,
   problemStatement: `You're given the root of a binary tree and need to report its nodes in vertical slices. Coordinates come from the walk down: root occupies row 0, column 0, and a node standing at (row, col) places its left child at (row + 1, col - 1) and its right child at (row + 1, col + 1).
 
@@ -31,10 +31,10 @@ Return the slices as a list of lists.`,
     "Group by column for final result",
   ],
   starterCode: {
-    javascript: `function verticalTraversal(root) {\n  // Track col, row, val and sort\n}`,
-    typescript: `function verticalTraversal(root: TreeNode | null): number[][] {\n  // Track col, row, val and sort\n}`,
-    python: `def verticalTraversal(root: Optional[TreeNode]) -> list[list[int]]:\n    # Track col, row, val and sort\n    pass`,
-    java: `class Solution {\n    public List<List<Integer>> verticalTraversal(TreeNode root) {\n        // Track col, row, val and sort\n        return new ArrayList<>();\n    }\n}`,
+    javascript: `function verticalTraversal(root) {\n  // Write your solution here\n}`,
+    typescript: `function verticalTraversal(root: TreeNode | null): number[][] {\n  // Write your solution here\n}`,
+    python: `def verticalTraversal(root: Optional[TreeNode]) -> list[list[int]]:\n    # Write your solution here\n    pass`,
+    java: `class Solution {\n    public List<List<Integer>> verticalTraversal(TreeNode root) {\n        // Write your solution here\n        return new ArrayList<>();\n    }\n}`,
   },
   optimalComplexity: { time: "O(n log n)", space: "O(n)" },
   testCases: [

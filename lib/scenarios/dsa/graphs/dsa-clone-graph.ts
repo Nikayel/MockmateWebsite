@@ -9,7 +9,7 @@ export const cloneGraphScenario: DSAScenario = {
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe"],
   description: "Deep clone an undirected graph.",
-  tags: ["graph", "dfs", "bfs", "hash-table"],
+  tags: ["graph", "hash-table", "dfs", "bfs"],
   estimatedTime: 25,
   problemStatement: `You're handed a reference to one node of a connected undirected graph, and your task is to construct a complete deep copy of it. Every node in the copy must be a freshly created object; handing back nodes from the original structure, or wiring a cloned node to an original neighbor, does not count.
 

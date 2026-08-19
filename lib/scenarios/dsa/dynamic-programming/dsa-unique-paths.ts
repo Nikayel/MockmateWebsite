@@ -8,7 +8,7 @@ export const uniquePathsScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta"],
   description: "Count every distinct down-and-right route across an m x n grid.",
-  tags: ["dynamic-programming", "math", "combinatorics"],
+  tags: ["math", "dynamic-programming", "combinatorics"],
   estimatedTime: 20,
   problemStatement: `You've parked a delivery robot on the top-left square of an m x n grid, and its charging dock sits on the bottom-right square. The robot's firmware allows exactly two moves: one square down or one square right. It can never back up or drift left.
 

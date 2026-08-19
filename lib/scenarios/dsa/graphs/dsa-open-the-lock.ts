@@ -9,7 +9,7 @@ export const openTheLockScenario: DSAScenario = {
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Apple", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe"],
   description: "Find the fewest wheel turns that reach a lock's target code while dodging deadends",
-  tags: ["bfs", "string", "hash-table"],
+  tags: ["string", "hash-table", "bfs"],
   estimatedTime: 25,
   problemStatement: `You're holding a combination padlock with 4 rotating wheels, each showing one digit from 0 to 9. Wheels turn in either direction and wrap around: one click forward from 9 shows 0, and one click back from 0 shows 9. A single move rotates exactly one wheel by one click, and the display starts out reading "0000".
 
@@ -36,10 +36,10 @@ The list deadends names poisoned combinations. The instant the wheels show any o
     "Handle edge case: '0000' in deadends",
   ],
   starterCode: {
-    javascript: `function openLock(deadends, target) {\n  // BFS through state space\n}`,
-    typescript: `function openLock(deadends: string[], target: string): number {\n  // BFS through state space\n}`,
-    python: `def openLock(deadends: list[str], target: str) -> int:\n    # BFS through state space\n    pass`,
-    java: `class Solution {\n    public int openLock(String[] deadends, String target) {\n        // BFS through state space\n        return -1;\n    }\n}`,
+    javascript: `function openLock(deadends, target) {\n  // Write your solution here\n}`,
+    typescript: `function openLock(deadends: string[], target: string): number {\n  // Write your solution here\n}`,
+    python: `def openLock(deadends: list[str], target: str) -> int:\n    # Write your solution here\n    pass`,
+    java: `class Solution {\n    public int openLock(String[] deadends, String target) {\n        // Write your solution here\n        return -1;\n    }\n}`,
   },
   optimalComplexity: { time: "O(10^4 * 4)", space: "O(10^4)" },
   testCases: [

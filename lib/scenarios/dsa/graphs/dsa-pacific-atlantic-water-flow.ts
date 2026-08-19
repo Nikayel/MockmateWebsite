@@ -9,7 +9,7 @@ export const pacificAtlanticWaterFlowScenario: DSAScenario = {
   companies: ["Amazon", "Meta", "Google", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe"],
   description: "Find every cell whose rainwater can drain to the Pacific and to the Atlantic",
-  tags: ["array", "dfs", "bfs", "matrix"],
+  tags: ["array", "matrix", "dfs", "bfs"],
   estimatedTime: 30,
   problemStatement: `You're surveying a rectangular island whose terrain sits in an m x n integer matrix heights, where heights[r][c] gives the elevation of that cell above the sea. The Pacific washes the island's top and left coastlines, and the Atlantic meets the bottom and right ones.
 

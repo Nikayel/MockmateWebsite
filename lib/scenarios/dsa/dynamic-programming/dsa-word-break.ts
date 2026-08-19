@@ -8,7 +8,7 @@ export const wordBreakScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta"],
   description: "Decide whether a string breaks cleanly into dictionary words.",
-  tags: ["dynamic-programming", "hash-table", "string"],
+  tags: ["hash-table", "string", "dynamic-programming"],
   estimatedTime: 25,
   problemStatement: `You're given a string s and a list of words wordDict. Decide whether s can be sliced into a left-to-right sequence of chunks, with nothing left over, so that every chunk appears in wordDict.
 

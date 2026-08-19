@@ -8,7 +8,7 @@ export const targetSumScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft"],
   description: "Count ways to assign + and - to reach target sum",
-  tags: ["dynamic-programming", "array", "backtracking"],
+  tags: ["array", "dynamic-programming", "backtracking"],
   estimatedTime: 30,
   problemStatement: `You're handed an integer array nums and an integer target. Walk down nums and write either a '+' or a '-' in front of every single entry; no entry may stay unsigned and none may be skipped. Reading off the signed entries and summing them gives the expression's value.
 

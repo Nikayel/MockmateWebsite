@@ -54,17 +54,17 @@ The LCA of 4 and 13 is 9. For 4 and 8 it is 4 itself, since a node may be its ow
   ],
   starterCode: {
     javascript: `function lowestCommonAncestor(root, p, q) {
-// Find LCA using recursion
+// Write your solution here
 }`,
     typescript: `function lowestCommonAncestor(root: TreeNode | null, p: TreeNode, q: TreeNode): TreeNode | null {
-// Find LCA using recursion
+// Write your solution here
 }`,
     python: `def lowestCommonAncestor(root: TreeNode, p: TreeNode, q: TreeNode) -> TreeNode:
-  # Find LCA using recursion
+  # Write your solution here
   pass`,
     java: `class Solution {
   public TreeNode lowestCommonAncestor(TreeNode root, TreeNode p, TreeNode q) {
-      // Find LCA using recursion
+      // Write your solution here
       return null;
   }
 }`,

@@ -9,7 +9,7 @@ export const regularExpressionMatchingScenario: DSAScenario = {
   companies: ["Google", "Amazon", "Meta", "Microsoft", "Apple"],
   description:
     "Build a matcher where '.' takes any one character and '*' repeats the element before it",
-  tags: ["dynamic-programming", "string", "recursion"],
+  tags: ["string", "dynamic-programming", "recursion"],
   estimatedTime: 40,
   problemStatement: `You're building a tiny pattern matcher. It receives a string s and a pattern p, and it must decide whether p matches all of s.
 

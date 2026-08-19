@@ -39,10 +39,10 @@ The graph counts as bipartite when its nodes can be separated into two groups so
     "Handle disconnected components",
   ],
   starterCode: {
-    javascript: `function isBipartite(graph) {\n  // BFS/DFS with 2-coloring\n}`,
-    typescript: `function isBipartite(graph: number[][]): boolean {\n  // BFS/DFS with 2-coloring\n}`,
-    python: `def isBipartite(graph: list[list[int]]) -> bool:\n    # BFS/DFS with 2-coloring\n    pass`,
-    java: `class Solution {\n    public boolean isBipartite(int[][] graph) {\n        // BFS/DFS with 2-coloring\n        return false;\n    }\n}`,
+    javascript: `function isBipartite(graph) {\n  // Write your solution here\n}`,
+    typescript: `function isBipartite(graph: number[][]): boolean {\n  // Write your solution here\n}`,
+    python: `def isBipartite(graph: list[list[int]]) -> bool:\n    # Write your solution here\n    pass`,
+    java: `class Solution {\n    public boolean isBipartite(int[][] graph) {\n        // Write your solution here\n        return false;\n    }\n}`,
   },
   optimalComplexity: { time: "O(V + E)", space: "O(V)" },
   testCases: [

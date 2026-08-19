@@ -9,7 +9,7 @@ export const binaryTreeLevelOrderScenario: DSAScenario = {
   companies: ["Amazon", "Google", "Meta", "Microsoft", "Palantir"],
   roles: ["intern", "new-grad", "junior", "swe"],
   description: "Gather a binary tree's values depth by depth into per-level arrays",
-  tags: ["tree", "bfs", "queue"],
+  tags: ["tree", "queue", "bfs"],
   estimatedTime: 20,
   problemStatement: `You're given the root of a binary tree. Gather its values one depth at a time, starting at the root's level and working downward, reading each level from left to right. That grouping is the tree's level order traversal.
 
@@ -49,17 +49,17 @@ Output: [[4], [7, 15], [3, 5, 12]]`,
   ],
   starterCode: {
     javascript: `function levelOrder(root) {
-// Use BFS to traverse level by level
+// Write your solution here
 }`,
     typescript: `function levelOrder(root: TreeNode | null): number[][] {
-// Use BFS to traverse level by level
+// Write your solution here
 }`,
     python: `def levelOrder(root: Optional[TreeNode]) -> list[list[int]]:
-  # Use BFS to traverse level by level
+  # Write your solution here
   pass`,
     java: `class Solution {
   public List<List<Integer>> levelOrder(TreeNode root) {
-      // Use BFS to traverse level by level
+      // Write your solution here
       return new ArrayList<>();
   }
 }`,

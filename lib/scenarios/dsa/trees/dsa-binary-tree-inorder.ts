@@ -8,7 +8,7 @@ export const binaryTreeInorderScenario: DSAScenario = {
   difficulty: "easy",
   companies: ["Amazon", "Google", "Meta"],
   description: "Produce a binary tree's left-node-right (inorder) visiting sequence.",
-  tags: ["tree", "dfs", "stack", "recursion"],
+  tags: ["tree", "stack", "dfs", "recursion"],
   estimatedTime: 15,
   problemStatement: `You're given the root of a binary tree. Report its inorder traversal: for any node, everything in its left subtree is listed first, then the node's own value, then everything in its right subtree. Return the values in that visiting order.`,
   examples: [

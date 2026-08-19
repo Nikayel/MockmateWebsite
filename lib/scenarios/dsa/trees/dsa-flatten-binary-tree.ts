@@ -8,7 +8,7 @@ export const flattenBinaryTreeScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Microsoft"],
   description: "Restructure a binary tree in place into a preorder right-pointer chain",
-  tags: ["binary-tree", "dfs", "linked-list"],
+  tags: ["binary-tree", "linked-list", "dfs"],
   estimatedTime: 25,
   problemStatement: `You're given the root of a binary tree. Rework it, in place, into a single right-leaning chain that stands in for a linked list:
 

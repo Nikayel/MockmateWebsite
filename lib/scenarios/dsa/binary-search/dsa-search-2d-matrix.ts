@@ -8,7 +8,7 @@ export const dsaSearch2dMatrixScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Microsoft", "NVIDIA"],
   description: "Search for a value in an m x n matrix with sorted rows",
-  tags: ["array", "binary-search", "matrix"],
+  tags: ["array", "matrix", "binary-search"],
   estimatedTime: 20,
   problemStatement: `You're working with an m x n integer grid called matrix that keeps two promises: within any row, values never decrease from left to right, and every row opens with a value strictly greater than the last value of the row above it.
 

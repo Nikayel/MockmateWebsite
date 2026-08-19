@@ -10,7 +10,7 @@ export const wordLadderScenario: DSAScenario = {
   roles: ["junior", "senior", "swe"],
   description:
     "Count the words in the shortest one-letter-at-a-time chain from one word to another",
-  tags: ["graph", "bfs", "hash-table"],
+  tags: ["graph", "hash-table", "bfs"],
   estimatedTime: 35,
   problemStatement: `You're given a starting word beginWord, a target word endWord, and a bank of usable words wordList. Your goal is to morph beginWord into endWord through a chain of words in which every link changes exactly one letter position and keeps all the other letters where they were.
 

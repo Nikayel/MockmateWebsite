@@ -8,7 +8,7 @@ export const editDistanceScenario: DSAScenario = {
   difficulty: "hard",
   companies: ["Amazon", "Google", "Meta", "Microsoft"],
   description: "Find minimum edit distance to convert one string to another.",
-  tags: ["dynamic-programming", "string"],
+  tags: ["string", "dynamic-programming"],
   estimatedTime: 35,
   problemStatement: `You're given two strings, word1 and word2, and the goal is to transform word1 until it reads exactly like word2. One operation is a single edit: insert a character anywhere, delete one character, or replace one character with a different one.
 

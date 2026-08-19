@@ -47,17 +47,17 @@ The longest path here is 1 - 2 - 5 - 8 - 9 - 12. It uses 5 edges, so the diamete
   ],
   starterCode: {
     javascript: `function diameterOfBinaryTree(root) {
-// Find diameter using DFS
+// Write your solution here
 }`,
     typescript: `function diameterOfBinaryTree(root: TreeNode | null): number {
-// Find diameter using DFS
+// Write your solution here
 }`,
     python: `def diameterOfBinaryTree(root: Optional[TreeNode]) -> int:
-  # Find diameter using DFS
+  # Write your solution here
   pass`,
     java: `class Solution {
   public int diameterOfBinaryTree(TreeNode root) {
-      // Find diameter using DFS
+      // Write your solution here
       return 0;
   }
 }`,

@@ -36,10 +36,10 @@ Your evidence is the array trust, where trust[i] = [a, b] records that person a 
     "Find person with count == n-1",
   ],
   starterCode: {
-    javascript: `function findJudge(n, trust) {\n  // Count trust relationships\n}`,
-    typescript: `function findJudge(n: number, trust: number[][]): number {\n  // Count trust relationships\n}`,
-    python: `def findJudge(n: int, trust: list[list[int]]) -> int:\n    # Count trust relationships\n    pass`,
-    java: `class Solution {\n    public int findJudge(int n, int[][] trust) {\n        // Count trust relationships\n        return -1;\n    }\n}`,
+    javascript: `function findJudge(n, trust) {\n  // Write your solution here\n}`,
+    typescript: `function findJudge(n: number, trust: number[][]): number {\n  // Write your solution here\n}`,
+    python: `def findJudge(n: int, trust: list[list[int]]) -> int:\n    # Write your solution here\n    pass`,
+    java: `class Solution {\n    public int findJudge(int n, int[][] trust) {\n        // Write your solution here\n        return -1;\n    }\n}`,
   },
   optimalComplexity: { time: "O(n + t)", space: "O(n)" },
   testCases: [

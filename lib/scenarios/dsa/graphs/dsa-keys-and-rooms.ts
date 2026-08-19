@@ -39,10 +39,10 @@ Nothing restricts your movement except the locks themselves. You can revisit roo
     "Check if visited count equals n",
   ],
   starterCode: {
-    javascript: `function canVisitAllRooms(rooms) {\n  // DFS/BFS from room 0\n}`,
-    typescript: `function canVisitAllRooms(rooms: number[][]): boolean {\n  // DFS/BFS from room 0\n}`,
-    python: `def canVisitAllRooms(rooms: list[list[int]]) -> bool:\n    # DFS/BFS from room 0\n    pass`,
-    java: `class Solution {\n    public boolean canVisitAllRooms(List<List<Integer>> rooms) {\n        // DFS/BFS from room 0\n        return false;\n    }\n}`,
+    javascript: `function canVisitAllRooms(rooms) {\n  // Write your solution here\n}`,
+    typescript: `function canVisitAllRooms(rooms: number[][]): boolean {\n  // Write your solution here\n}`,
+    python: `def canVisitAllRooms(rooms: list[list[int]]) -> bool:\n    # Write your solution here\n    pass`,
+    java: `class Solution {\n    public boolean canVisitAllRooms(List<List<Integer>> rooms) {\n        // Write your solution here\n        return false;\n    }\n}`,
   },
   optimalComplexity: { time: "O(n + k)", space: "O(n)" },
   testCases: [

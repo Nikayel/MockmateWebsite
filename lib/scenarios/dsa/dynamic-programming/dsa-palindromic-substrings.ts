@@ -8,7 +8,7 @@ export const palindromicSubstringsScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft"],
   description: "Count how many slices of a string read identically in both directions",
-  tags: ["dynamic-programming", "string", "two-pointers"],
+  tags: ["string", "dynamic-programming", "two-pointers"],
   estimatedTime: 25,
   problemStatement: `You're handed a string s and asked to count its palindromic substrings.
 

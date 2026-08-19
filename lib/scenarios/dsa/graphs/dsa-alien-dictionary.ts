@@ -9,7 +9,7 @@ export const alienDictionaryScenario: DSAScenario = {
   companies: ["Google", "Amazon", "Meta", "Microsoft", "Apple", "Palantir"],
   roles: ["junior", "senior", "swe"],
   description: "Reconstruct an alien alphabet from a lexicographically sorted word list",
-  tags: ["graph", "topological-sort", "string", "dfs", "bfs"],
+  tags: ["graph", "string", "topological-sort", "dfs", "bfs"],
   estimatedTime: 35,
   problemStatement: `An expedition has recovered a dictionary from an alien civilization. The language reuses the lowercase English letters, but its alphabet arranges them in some unknown order.
 

@@ -8,7 +8,7 @@ export const dsa3sumScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Meta", "Amazon", "Microsoft", "Apple"],
   description: "Find all unique triplets that sum to zero",
-  tags: ["array", "two-pointers", "sorting"],
+  tags: ["array", "sorting", "two-pointers"],
   estimatedTime: 30,
   problemStatement: `You're given an integer array nums. Collect every triplet of values [nums[i], nums[j], nums[k]] whose three indices i, j, and k are pairwise different and whose three values add up to 0.
 

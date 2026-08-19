@@ -8,7 +8,7 @@ export const linkedListCycleIiScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Amazon", "Microsoft", "Meta", "Google", "Apple"],
   description: "Locate the entry node of a linked list's loop",
-  tags: ["linked-list", "two-pointers", "hash-table"],
+  tags: ["linked-list", "hash-table", "two-pointers"],
   estimatedTime: 25,
   problemStatement: `You're given head, the first node of a linked list that might contain a loop. A loop exists when some node can be visited twice just by walking forward along next pointers. Your task is to identify the exact node where that loop is entered and return it. When no loop exists, return null.
 

@@ -8,7 +8,7 @@ export const minCostClimbingStairsScenario: DSAScenario = {
   difficulty: "easy",
   companies: ["Amazon", "Google", "Microsoft"],
   description: "Pay as little as possible to climb past the last stair",
-  tags: ["dynamic-programming", "array"],
+  tags: ["array", "dynamic-programming"],
   estimatedTime: 15,
   problemStatement: `You're facing a staircase where standing on stair i costs you cost[i]. Paying a stair's price lets you push off from it and land either one or two stairs higher.
 

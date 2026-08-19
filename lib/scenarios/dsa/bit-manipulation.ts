@@ -50,17 +50,17 @@ Two hard requirements shape this exercise: total running time proportional to th
     ],
     starterCode: {
       javascript: `function singleNumber(nums) {
-  // Use XOR to find the single number
+  // Write your solution here
 }`,
       typescript: `function singleNumber(nums: number[]): number {
-  // Use XOR to find the single number
+  // Write your solution here
 }`,
       python: `def singleNumber(nums: list[int]) -> int:
-    # Use XOR to find the single number
+    # Write your solution here
     pass`,
       java: `class Solution {
     public int singleNumber(int[] nums) {
-        // Use XOR to find the single number
+        // Write your solution here
         return 0;
     }
 }`,
@@ -215,17 +215,17 @@ Two hard requirements shape this exercise: total running time proportional to th
     ],
     starterCode: {
       javascript: `function countBits(n) {
-  // Use DP to count bits for each number
+  // Write your solution here
 }`,
       typescript: `function countBits(n: number): number[] {
-  // Use DP to count bits for each number
+  // Write your solution here
 }`,
       python: `def countBits(n: int) -> list[int]:
-    # Use DP to count bits for each number
+    # Write your solution here
     pass`,
       java: `class Solution {
     public int[] countBits(int n) {
-        // Use DP to count bits for each number
+        // Write your solution here
         return new int[n + 1];
     }
 }`,
@@ -375,17 +375,17 @@ One housekeeping note: some languages, Java among them, have no unsigned type, s
     ],
     starterCode: {
       javascript: `function missingNumber(nums) {
-  // Find the missing number using XOR or math
+  // Write your solution here
 }`,
       typescript: `function missingNumber(nums: number[]): number {
-  // Find the missing number using XOR or math
+  // Write your solution here
 }`,
       python: `def missingNumber(nums: list[int]) -> int:
-    # Find the missing number using XOR or math
+    # Write your solution here
     pass`,
       java: `class Solution {
     public int missingNumber(int[] nums) {
-        // Find the missing number using XOR or math
+        // Write your solution here
         return 0;
     }
 }`,
@@ -454,17 +454,17 @@ Return the value that a plus b would produce, computed without ever writing + or
     ],
     starterCode: {
       javascript: `function getSum(a, b) {
-  // Add two numbers using only bit operations
+  // Write your solution here
 }`,
       typescript: `function getSum(a: number, b: number): number {
-  // Add two numbers using only bit operations
+  // Write your solution here
 }`,
       python: `def getSum(a: int, b: int) -> int:
-    # Add two numbers using only bit operations
+    # Write your solution here
     pass`,
       java: `class Solution {
     public int getSum(int a, int b) {
-        // Add two numbers using only bit operations
+        // Write your solution here
         return 0;
     }
 }`,
