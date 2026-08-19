@@ -8518,6 +8518,11 @@ A rejection from any layer returns 429. The concurrency layer's 429 carries \`X-
           title: "Design a Stock Exchange: Order Matching Engine",
           summary:
             "Why a matching engine is single-threaded and in-memory: determinism and tail latency beat throughput, and a replayed journal rebuilds the book.",
+          // Every query this page ranks for leads with "matching engine" ("matching engine design",
+          // "order matching engine", "build a matching engine", 38 impressions, average position
+          // ~51 in the 30 days to 2026-08-18), so the searched phrase leads the title instead of
+          // trailing a colon where a 60-character SERP cut can reach it.
+          seoTitle: "Matching Engine Design for a Stock Exchange",
           estimatedMinutes: 45,
           difficulty: "hard",
           skills: ["low-latency", "matching-engine", "event-sourcing", "case-study"],

@@ -3671,6 +3671,13 @@ export const systemDesignLevel7: DesignLevel = {
           title: "SLI / SLO / SLA Hierarchy",
           summary:
             "The difference between what you measure, what you target, and what you promise a customer, and why averaging latency hides the users who are angry.",
+          // This page is the ranking result for ~30 query variants of "sli definition",
+          // "sli meaning" and "sli vs slo" (71 impressions, average position ~72 in the 30 days to
+          // 2026-08-18). None of those queries contain "Hierarchy", and none of them are asking for
+          // a hierarchy: they are asking which of the three words means what.
+          seoTitle: "SLI vs SLO vs SLA: Definitions and Examples",
+          seoDescription:
+            "An SLI is the measurement, an SLO the internal target, an SLA the external promise with penalties. Worked examples and where each number comes from.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["sli", "slo", "sla"],
