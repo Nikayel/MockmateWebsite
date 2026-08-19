@@ -7,24 +7,27 @@ export const dsaLongestPalindromicSubstringScenario: DSAScenario = {
   pattern: "two-pointers",
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Microsoft"],
-  description: "Find the longest palindromic substring in a string.",
+  description: "Find the longest stretch of a string that reads the same in both directions.",
   tags: ["string", "dynamic-programming", "two-pointers"],
   estimatedTime: 25,
-  problemStatement: `Given a string s, return the longest palindromic substring in s.
+  problemStatement: `You're given a string s. Return its longest palindromic substring.
 
-A palindromic string reads the same backward as forward.`,
+A palindrome reads identically in both directions. When two or more substrings tie for the greatest length, any one of them is an accepted answer.`,
   examples: [
     {
-      input: 's = "babad"',
-      output: '"bab"',
-      explanation: '"aba" is also a valid answer',
+      input: 's = "momon"',
+      output: '"mom"',
+      explanation: '"omo" is also a valid answer',
     },
     {
-      input: 's = "cbbd"',
-      output: '"bb"',
+      input: 's = "feeg"',
+      output: '"ee"',
     },
   ],
-  constraints: ["1 <= s.length <= 1000", "s consist of only digits and English letters"],
+  constraints: [
+    "s holds between 1 and 1000 characters",
+    "every character of s is a digit or an English letter",
+  ],
   hints: [
     "Expand around center for each possible center",
     "Consider both odd and even length palindromes",

@@ -7,27 +7,29 @@ export const dsaSortColorsScenario: DSAScenario = {
   pattern: "two-pointers",
   difficulty: "medium",
   companies: ["Amazon", "Microsoft", "Meta", "Apple", "NVIDIA"],
-  description: "Sort array with only 0, 1, 2 in one pass (Dutch National Flag)",
+  description: "Sort an array of 0s, 1s, and 2s in place without a library sort",
   tags: ["array", "two-pointers", "sorting"],
   estimatedTime: 20,
-  problemStatement: `Given an array nums with n objects colored red, white, or blue, sort them in-place so that objects of the same color are adjacent, with the colors in the order red, white, and blue.
+  problemStatement: `You're given an array nums describing n objects, each painted red, white, or blue. The colors are encoded as integers: 0 for red, 1 for white, 2 for blue. Rearrange nums in place until objects sharing a color sit side by side, reds first, whites next, blues last.
 
-We will use the integers 0, 1, and 2 to represent the color red, white, and blue, respectively.
+Calling your language's built-in sort is off the table.
 
-You must solve this problem without using the library's sort function.
-
-Follow up: Could you come up with a one-pass algorithm using only constant extra space?`,
+Follow up: can you finish the job in a single pass while keeping extra memory constant?`,
   examples: [
     {
-      input: "nums = [2,0,2,1,1,0]",
-      output: "[0,0,1,1,2,2]",
+      input: "nums = [2,1,0,1,0,1]",
+      output: "[0,0,1,1,1,2]",
     },
     {
-      input: "nums = [2,0,1]",
-      output: "[0,1,2]",
+      input: "nums = [0,2,1,2]",
+      output: "[0,1,2,2]",
     },
   ],
-  constraints: ["n == nums.length", "1 <= n <= 300", "nums[i] is either 0, 1, or 2"],
+  constraints: [
+    "n equals the length of nums",
+    "n lies between 1 and 300",
+    "each entry of nums is 0, 1, or 2",
+  ],
   hints: [
     "Use three pointers: low, mid, high",
     "All 0s should be before low, all 2s after high",

@@ -10,19 +10,22 @@ export const dsaBoatsSavePeopleScenario: DSAScenario = {
   description: "Find minimum boats to carry all people with weight limit",
   tags: ["array", "two-pointers", "greedy", "sorting"],
   estimatedTime: 20,
-  problemStatement: `You are given an array people where people[i] is the weight of the ith person, and an infinite number of boats where each boat can carry a maximum weight of limit. Each boat carries at most two people at the same time, provided the sum of the weight of those people is at most limit.
+  problemStatement: `You're given an array people, where people[i] is how much the ith person weighs, and an integer limit. Boats come in unlimited supply, and every boat shares one capacity, limit. A single boat can ferry at most two riders at once, and only while their combined weight stays within limit.
 
-Return the minimum number of boats to carry every given person.`,
+Return the fewest boats needed to carry everyone across.`,
   examples: [
-    { input: "people = [1,2], limit = 3", output: "1", explanation: "1 boat (1, 2)" },
+    { input: "people = [2,3], limit = 5", output: "1", explanation: "1 boat (2, 3)" },
     {
-      input: "people = [3,2,2,1], limit = 3",
+      input: "people = [6,2,3,5], limit = 7",
       output: "3",
-      explanation: "3 boats: (1, 2), (2), (3)",
+      explanation: "3 boats: (2, 5), (3), (6)",
     },
-    { input: "people = [3,5,3,4], limit = 5", output: "4" },
+    { input: "people = [6,8,7,5], limit = 8", output: "4" },
   ],
-  constraints: ["1 <= people.length <= 5 * 10^4", "1 <= people[i] <= limit <= 3 * 10^4"],
+  constraints: [
+    "people holds between 1 and 5 * 10^4 entries",
+    "every weight satisfies 1 <= people[i] <= limit, and limit is at most 3 * 10^4",
+  ],
   hints: [
     "Sort people by weight",
     "Use two pointers: lightest and heaviest person",

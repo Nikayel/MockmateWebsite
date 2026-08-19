@@ -10,27 +10,25 @@ export const dsaRemoveDuplicatesSortedArrayScenario: DSAScenario = {
   description: "Remove duplicates in-place from sorted array",
   tags: ["array", "two-pointers"],
   estimatedTime: 15,
-  problemStatement: `Given an integer array nums sorted in non-decreasing order, remove the duplicates in-place such that each unique element appears only once. The relative order of the elements should be kept the same. Then return the number of unique elements in nums.
+  problemStatement: `You're given an integer array nums arranged in non-decreasing order. Compact it in place so every distinct value keeps exactly one occurrence, with those values staying in the order they first appeared. Then report how many distinct values nums holds.
 
-Consider the number of unique elements of nums to be k. To get accepted, you need to:
-- Change the array nums such that the first k elements contain the unique elements in the order they were present originally.
-- Return k.`,
+Call that count k. A correct submission leaves the first k slots of nums holding the distinct values in their original order, and returns k. Whatever sits past those first k slots is ignored by the grader.`,
   examples: [
     {
-      input: "nums = [1,1,2]",
-      output: "2, nums = [1,2,_]",
-      explanation: "Function returns k = 2, with first two elements being 1 and 2.",
+      input: "nums = [4,4,7]",
+      output: "2, nums = [4,7,_]",
+      explanation: "The function returns k = 2, and the first two slots hold 4 and 7.",
     },
     {
-      input: "nums = [0,0,1,1,1,2,2,3,3,4]",
-      output: "5, nums = [0,1,2,3,4,_,_,_,_,_]",
-      explanation: "Function returns k = 5.",
+      input: "nums = [2,2,3,5,5,5,6,6,8,8]",
+      output: "5, nums = [2,3,5,6,8,_,_,_,_,_]",
+      explanation: "The function returns k = 5.",
     },
   ],
   constraints: [
-    "1 <= nums.length <= 3 * 10^4",
-    "-100 <= nums[i] <= 100",
-    "nums is sorted in non-decreasing order",
+    "nums holds between 1 and 3 * 10^4 values",
+    "each value lies between -100 and 100",
+    "the values of nums arrive in non-decreasing order",
   ],
   hints: [
     "Use two pointers: slow for unique position, fast to scan",

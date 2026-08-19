@@ -7,23 +7,26 @@ export const dsaMoveZeroesScenario: DSAScenario = {
   pattern: "two-pointers",
   difficulty: "easy",
   companies: ["Meta", "Amazon", "Apple", "Microsoft"],
-  description: "Move all zeroes to end while maintaining order",
+  description: "Send every zero to the back while the other values keep their order",
   tags: ["array", "two-pointers"],
   estimatedTime: 15,
-  problemStatement: `Given an integer array nums, move all 0's to the end of it while maintaining the relative order of the non-zero elements.
+  problemStatement: `You're given an integer array nums. Shift every 0 it contains to the tail of the array, keeping the remaining values in the same relative order they started in.
 
-Note that you must do this in-place without making a copy of the array.`,
+Work inside nums itself; building a copy of the array is off limits.`,
   examples: [
     {
-      input: "nums = [0,1,0,3,12]",
-      output: "[1,3,12,0,0]",
+      input: "nums = [6,0,0,5,9]",
+      output: "[6,5,9,0,0]",
     },
     {
-      input: "nums = [0]",
-      output: "[0]",
+      input: "nums = [0,0]",
+      output: "[0,0]",
     },
   ],
-  constraints: ["1 <= nums.length <= 10^4", "-2^31 <= nums[i] <= 2^31 - 1"],
+  constraints: [
+    "nums holds between 1 and 10^4 values",
+    "each nums[i] lies in the range -2^31 to 2^31 - 1",
+  ],
   hints: [
     "Use two pointers: one for next non-zero position, one to scan",
     "Swap non-zero elements to the front",

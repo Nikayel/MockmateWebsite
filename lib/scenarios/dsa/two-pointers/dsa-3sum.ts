@@ -10,24 +10,27 @@ export const dsa3sumScenario: DSAScenario = {
   description: "Find all unique triplets that sum to zero",
   tags: ["array", "two-pointers", "sorting"],
   estimatedTime: 30,
-  problemStatement: `Given an integer array nums, return all the triplets [nums[i], nums[j], nums[k]] such that i != j, i != k, and j != k, and nums[i] + nums[j] + nums[k] == 0.
+  problemStatement: `You're given an integer array nums. Collect every triplet of values [nums[i], nums[j], nums[k]] whose three indices i, j, and k are pairwise different and whose three values add up to 0.
 
-Notice that the solution set must not contain duplicate triplets.`,
+Report each qualifying combination of values exactly once: the answer must hold no duplicate triplets.`,
   examples: [
     {
-      input: "nums = [-1,0,1,2,-1,-4]",
-      output: "[[-1,-1,2],[-1,0,1]]",
+      input: "nums = [-2,-2,0,4,2,-4]",
+      output: "[[-4,0,4],[-2,-2,4],[-2,0,2]]",
     },
     {
-      input: "nums = [0,1,1]",
+      input: "nums = [1,2,4]",
       output: "[]",
     },
     {
-      input: "nums = [0,0,0]",
+      input: "nums = [0,0,0,0]",
       output: "[[0,0,0]]",
     },
   ],
-  constraints: ["3 <= nums.length <= 3000", "-10^5 <= nums[i] <= 10^5"],
+  constraints: [
+    "nums holds between 3 and 3000 integers",
+    "every nums[i] lies between -10^5 and 10^5",
+  ],
   hints: [
     "Sort the array first",
     "Fix one number and use two pointers for the remaining two",

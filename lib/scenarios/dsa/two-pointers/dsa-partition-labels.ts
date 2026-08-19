@@ -7,28 +7,29 @@ export const dsaPartitionLabelsScenario: DSAScenario = {
   pattern: "two-pointers",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta"],
-  description: "Partition string into parts where each letter appears in one part only",
+  description: "Split a string into the most pieces possible with no letter spanning two pieces",
   tags: ["string", "two-pointers", "greedy", "hash-table"],
   estimatedTime: 25,
-  problemStatement: `You are given a string s. We want to partition the string into as many parts as possible so that each letter appears in at most one part.
+  problemStatement: `You're given a string s. Slice it into the largest possible number of pieces such that no letter shows up in more than one piece. Reading the pieces back in order must reproduce s exactly.
 
-Note that the partition is done so that after concatenating all the parts in order, the resultant string should be s.
-
-Return a list of integers representing the size of these parts.`,
+Return the sizes of the pieces, as a list of integers in piece order.`,
   examples: [
     {
-      input: 's = "ababcbacadefegdehijhklij"',
-      output: "[9,7,8]",
+      input: 's = "cdcdefgefghih"',
+      output: "[4,6,3]",
       explanation:
-        'The partition is "ababcbaca", "defegde", "hijhklij". Each letter appears in at most one part.',
+        'The pieces are "cdcd", "efgefg", "hih". No letter belongs to more than one piece.',
     },
     {
-      input: 's = "eccbbbbdec"',
-      output: "[10]",
-      explanation: "All letters are interconnected, so single partition.",
+      input: 's = "nvbbvvbn"',
+      output: "[8]",
+      explanation: "Every letter's occurrences overlap here, so the whole string is one piece.",
     },
   ],
-  constraints: ["1 <= s.length <= 500", "s consists of lowercase English letters"],
+  constraints: [
+    "s holds between 1 and 500 characters",
+    "every character of s is a lowercase English letter",
+  ],
   hints: [
     "First, find the last occurrence of each character",
     "Track the end of current partition as max of last occurrences",

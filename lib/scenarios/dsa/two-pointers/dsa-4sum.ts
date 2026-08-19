@@ -10,21 +10,21 @@ export const dsa4sumScenario: DSAScenario = {
   description: "Find all unique quadruplets that sum to target",
   tags: ["array", "two-pointers", "sorting"],
   estimatedTime: 35,
-  problemStatement: `Given an array nums of n integers, return an array of all the unique quadruplets [nums[a], nums[b], nums[c], nums[d]] such that:
+  problemStatement: `You're given an integer array nums holding n values, plus an integer target. Gather every unique quadruplet [nums[a], nums[b], nums[c], nums[d]] built from four pairwise-distinct indices a, b, c, d drawn from 0 to n - 1, whose four values sum to target.
 
-- 0 <= a, b, c, d < n
-- a, b, c, d are distinct
-- nums[a] + nums[b] + nums[c] + nums[d] == target
-
-You may return the answer in any order.`,
+List the quadruplets however you like, but no combination of values may appear more than once.`,
   examples: [
     {
-      input: "nums = [1,0,-1,0,-2,2], target = 0",
-      output: "[[-2,-1,1,2],[-2,0,0,2],[-1,0,0,1]]",
+      input: "nums = [1,3,0,-2,2,-1], target = 2",
+      output: "[[-2,-1,2,3],[-2,0,1,3],[-1,0,1,2]]",
     },
-    { input: "nums = [2,2,2,2,2], target = 8", output: "[[2,2,2,2]]" },
+    { input: "nums = [3,3,3,3,3], target = 12", output: "[[3,3,3,3]]" },
   ],
-  constraints: ["1 <= nums.length <= 200", "-10^9 <= nums[i] <= 10^9", "-10^9 <= target <= 10^9"],
+  constraints: [
+    "nums holds between 1 and 200 integers",
+    "each nums[i] lies between -10^9 and 10^9",
+    "target lies between -10^9 and 10^9",
+  ],
   hints: [
     "Sort the array first",
     "Use two nested loops for first two numbers",

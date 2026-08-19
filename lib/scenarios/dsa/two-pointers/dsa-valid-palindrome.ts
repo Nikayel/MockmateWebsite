@@ -10,27 +10,31 @@ export const dsaValidPalindromeScenario: DSAScenario = {
   description: "Check if string is palindrome ignoring non-alphanumeric",
   tags: ["string", "two-pointers"],
   estimatedTime: 15,
-  problemStatement: `A phrase is a palindrome if, after converting all uppercase letters into lowercase letters and removing all non-alphanumeric characters, it reads the same forward and backward. Alphanumeric characters include letters and numbers.
+  problemStatement: `You're given a string s. Decide whether it qualifies as a palindrome under this definition: lowercase every uppercase letter, discard every character that is neither a letter nor a digit, and what remains must read identically in both directions. Letters and digits are the alphanumeric characters.
 
-Given a string s, return true if it is a palindrome, or false otherwise.`,
+Return true when s passes that test, and false when it does not.`,
   examples: [
     {
-      input: 's = "A man, a plan, a canal: Panama"',
+      input: 's = "No lemon, no melon!"',
       output: "true",
-      explanation: '"amanaplanacanalpanama" is a palindrome.',
+      explanation: '"nolemonnomelon" is a palindrome.',
     },
     {
-      input: 's = "race a car"',
+      input: 's = "hello world"',
       output: "false",
-      explanation: '"raceacar" is not a palindrome.',
+      explanation: '"helloworld" is not a palindrome.',
     },
     {
-      input: 's = " "',
+      input: 's = "?!"',
       output: "true",
-      explanation: "After removing non-alphanumeric characters, it's empty, which is a palindrome.",
+      explanation:
+        "Stripping the punctuation leaves an empty string, and an empty string is a palindrome.",
     },
   ],
-  constraints: ["1 <= s.length <= 2 * 10^5", "s consists only of printable ASCII characters"],
+  constraints: [
+    "s holds between 1 and 2 * 10^5 characters",
+    "every character of s is printable ASCII",
+  ],
   hints: [
     "Use two pointers from start and end",
     "Skip non-alphanumeric characters",

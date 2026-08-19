@@ -10,33 +10,33 @@ export const dsaEvenOddIndexSumDifferenceScenario: DSAScenario = {
   description: "Calculate the difference between sums of elements at even and odd indices",
   tags: ["array", "math"],
   estimatedTime: 10,
-  problemStatement: `Given an integer array nums, calculate the sum of elements at even indices and the sum of elements at odd indices. Return the difference (even sum - odd sum).
+  problemStatement: `You're given an integer array nums. Add up the values sitting at even indices, add up the values sitting at odd indices, and return the even-index total minus the odd-index total.
 
-Only consider elements within the range [-100, 100]. Elements outside this range should be ignored.`,
+A value only takes part when it lies inside [-100, 100]; anything outside that range contributes to neither total.`,
   examples: [
     {
-      input: "nums = [1, 2, 3, 4, 5]",
-      output: "3",
+      input: "nums = [2, 7, 6, 1, 8]",
+      output: "8",
       explanation:
-        "Even indices (0, 2, 4): 1 + 3 + 5 = 9. Odd indices (1, 3): 2 + 4 = 6. Difference: 9 - 6 = 3.",
+        "Even indices (0, 2, 4): 2 + 6 + 8 = 16. Odd indices (1, 3): 7 + 1 = 8. Difference: 16 - 8 = 8.",
     },
     {
-      input: "nums = [10, 20, 30, 40]",
-      output: "-20",
+      input: "nums = [5, 25, 15, 45]",
+      output: "-50",
       explanation:
-        "Even indices: 10 + 30 = 40. Odd indices: 20 + 40 = 60. Difference: 40 - 60 = -20.",
+        "Even indices: 5 + 15 = 20. Odd indices: 25 + 45 = 70. Difference: 20 - 70 = -50.",
     },
     {
-      input: "nums = [5, 200, 10, -5]",
-      output: "20",
+      input: "nums = [8, -300, 4, -6]",
+      output: "18",
       explanation:
-        "200 is outside [-100, 100] so ignored. Even: 5 + 10 = 15. Odd: -5 = -5. Difference: 15 - (-5) = 20.",
+        "-300 falls outside [-100, 100] and is skipped. Even: 8 + 4 = 12. Odd: -6 = -6. Difference: 12 - (-6) = 18.",
     },
   ],
   constraints: [
-    "1 <= nums.length <= 10^5",
-    "-10^9 <= nums[i] <= 10^9",
-    "Only consider elements where -100 <= nums[i] <= 100",
+    "nums holds between 1 and 10^5 elements",
+    "raw values span -10^9 to 10^9",
+    "only elements with -100 <= nums[i] <= 100 count toward either sum",
   ],
   hints: [
     "Iterate through the array once",

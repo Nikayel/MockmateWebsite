@@ -7,27 +7,30 @@ export const dsaContainerWithMostWaterScenario: DSAScenario = {
   pattern: "two-pointers",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta"],
-  description:
-    "Find two lines that together with the x-axis form a container that holds the most water.",
+  description: "Choose two heights that hold the biggest possible area of water between them.",
   tags: ["array", "two-pointers", "greedy"],
   estimatedTime: 20,
-  problemStatement: `Given n non-negative integers a1, a2, ..., an, where each represents a point at coordinate (i, ai). n vertical lines are drawn such that the two endpoints of the line i is at (i, ai) and (i, 0). Find two lines, which, together with the x-axis forms a container, such that the container contains the most water.
+  problemStatement: `You're given an integer array height with n non-negative entries. Each entry describes a vertical wall rising from the point (i, 0) up to (i, height[i]). Pick the pair of walls that, along with the x-axis between them, would enclose the biggest possible pool of water, and return how much water that pool holds.
 
-Notice that you may not slant the container.`,
+The walls stay upright: tilting the container is not allowed.`,
   examples: [
     {
-      input: "height = [1,8,6,2,5,4,8,3,7]",
-      output: "49",
+      input: "height = [2,6,4,9,3,7,1,5]",
+      output: "30",
       explanation:
-        "The maximum area is between index 1 and 8 (height 8 and 7), area = min(8,7) * (8-1) = 7 * 7 = 49",
+        "The best pair sits at index 1 and index 7 (heights 6 and 5), area = min(6,5) * (7-1) = 5 * 6 = 30",
     },
     {
-      input: "height = [1,1]",
-      output: "1",
-      explanation: "Area = min(1,1) * (1-0) = 1",
+      input: "height = [3,4]",
+      output: "3",
+      explanation: "Area = min(3,4) * (1-0) = 3",
     },
   ],
-  constraints: ["n == height.length", "2 <= n <= 10^5", "0 <= height[i] <= 10^4"],
+  constraints: [
+    "n equals the length of height",
+    "height holds between 2 and 10^5 entries",
+    "each height[i] lies between 0 and 10^4",
+  ],
   hints: [
     "Use two pointers starting from both ends",
     "Move the pointer with smaller height inward",

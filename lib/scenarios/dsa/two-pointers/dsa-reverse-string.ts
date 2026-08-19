@@ -10,20 +10,23 @@ export const dsaReverseStringScenario: DSAScenario = {
   description: "Reverse a string array in-place",
   tags: ["string", "two-pointers", "array"],
   estimatedTime: 10,
-  problemStatement: `Write a function that reverses a string. The input string is given as an array of characters s.
+  problemStatement: `You're given a character array s that spells out a string. Reverse it, so the characters end up running from last to first.
 
-You must do this by modifying the input array in-place with O(1) extra memory.`,
+All rearranging has to happen inside s itself, and you may claim no more than O(1) additional memory.`,
   examples: [
     {
-      input: 's = ["h","e","l","l","o"]',
-      output: '["o","l","l","e","h"]',
+      input: 's = ["s","p","a","r","k"]',
+      output: '["k","r","a","p","s"]',
     },
     {
-      input: 's = ["H","a","n","n","a","h"]',
-      output: '["h","a","n","n","a","H"]',
+      input: 's = ["R","o","t","a","t","o","r"]',
+      output: '["r","o","t","a","t","o","R"]',
     },
   ],
-  constraints: ["1 <= s.length <= 10^5", "s[i] is a printable ascii character"],
+  constraints: [
+    "s holds between 1 and 10^5 characters",
+    "every entry of s is a printable ascii character",
+  ],
   hints: [
     "Use two pointers at start and end",
     "Swap and move pointers toward center",

@@ -10,35 +10,35 @@ export const dsaMergeSortedArrayScenario: DSAScenario = {
   description: "Merge two sorted arrays into one sorted array in-place",
   tags: ["array", "two-pointers", "sorting"],
   estimatedTime: 15,
-  problemStatement: `You are given two integer arrays nums1 and nums2, sorted in non-decreasing order, and two integers m and n, representing the number of elements in nums1 and nums2 respectively.
+  problemStatement: `You're given two integer arrays, nums1 and nums2, each sorted in non-decreasing order, plus two integers m and n: m counts the real values at the front of nums1 and n counts the values in nums2.
 
-Merge nums1 and nums2 into a single array sorted in non-decreasing order.
+Fold every value of nums2 into nums1 so that nums1 ends up holding all m + n values in non-decreasing order.
 
-The final sorted array should not be returned by the function, but instead be stored inside the array nums1. To accommodate this, nums1 has a length of m + n, where the first m elements denote the elements that should be merged, and the last n elements are set to 0 and should be ignored. nums2 has a length of n.`,
+Write the result directly into nums1 rather than returning it. There is room because nums1 has length m + n: its first m slots carry the values to merge, and its trailing n slots hold placeholder 0s that exist only to be overwritten. nums2 has length n.`,
   examples: [
     {
-      input: "nums1 = [1,2,3,0,0,0], m = 3, nums2 = [2,5,6], n = 3",
-      output: "[1,2,2,3,5,6]",
+      input: "nums1 = [2,4,7,0,0,0], m = 3, nums2 = [1,4,9], n = 3",
+      output: "[1,2,4,4,7,9]",
       explanation:
-        "The arrays we are merging are [1,2,3] and [2,5,6]. The result is [1,2,2,3,5,6].",
+        "The arrays being merged are [2,4,7] and [1,4,9]. Together they give [1,2,4,4,7,9].",
     },
     {
-      input: "nums1 = [1], m = 1, nums2 = [], n = 0",
-      output: "[1]",
-      explanation: "The arrays we are merging are [1] and []. The result is [1].",
+      input: "nums1 = [5], m = 1, nums2 = [], n = 0",
+      output: "[5]",
+      explanation: "The arrays being merged are [5] and []. Together they give [5].",
     },
     {
-      input: "nums1 = [0], m = 0, nums2 = [1], n = 1",
-      output: "[1]",
-      explanation: "The arrays we are merging are [] and [1]. The result is [1].",
+      input: "nums1 = [0], m = 0, nums2 = [3], n = 1",
+      output: "[3]",
+      explanation: "The arrays being merged are [] and [3]. Together they give [3].",
     },
   ],
   constraints: [
-    "nums1.length == m + n",
-    "nums2.length == n",
-    "0 <= m, n <= 200",
-    "1 <= m + n <= 200",
-    "-10^9 <= nums1[i], nums2[j] <= 10^9",
+    "nums1 has length m + n",
+    "nums2 has length n",
+    "m and n each lie between 0 and 200",
+    "the combined count m + n is between 1 and 200",
+    "values in nums1 and nums2 lie between -10^9 and 10^9",
   ],
   hints: [
     "Start from the end of both arrays to avoid overwriting elements",

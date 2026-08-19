@@ -10,27 +10,27 @@ export const dsaStudentHighestAverageScenario: DSAScenario = {
   description: "Find the student with the highest average score from a list of records",
   tags: ["array", "hash-table", "sorting"],
   estimatedTime: 20,
-  problemStatement: `You are given a list of student score records. Each record contains a student name and a score. A student may have multiple scores.
+  problemStatement: `You're given a list of score records, each one pairing a student's name with a single score. The same student can show up in any number of records.
 
-Calculate the average score for each student and return the name of the student with the highest average. If there's a tie, return the name that comes first alphabetically.`,
+Work out every student's average across their records, then return the name attached to the highest average. Should several students share that top average, return whichever of their names sorts first alphabetically.`,
   examples: [
     {
-      input: 'records = [["Alice", 90], ["Bob", 85], ["Alice", 95], ["Bob", 80]]',
-      output: '"Alice"',
+      input: 'records = [["Maya", 88], ["Noah", 91], ["Maya", 96], ["Noah", 73]]',
+      output: '"Maya"',
       explanation:
-        "Alice's average: (90 + 95) / 2 = 92.5. Bob's average: (85 + 80) / 2 = 82.5. Alice wins.",
+        "Maya's average: (88 + 96) / 2 = 92. Noah's average: (91 + 73) / 2 = 82. Maya wins.",
     },
     {
-      input: 'records = [["Charlie", 100], ["David", 100]]',
-      output: '"Charlie"',
-      explanation: "Both have average 100. Charlie comes first alphabetically.",
+      input: 'records = [["Elena", 84], ["Dario", 84]]',
+      output: '"Dario"',
+      explanation: "Both average 84. Dario sorts before Elena alphabetically.",
     },
   ],
   constraints: [
-    "1 <= records.length <= 10^4",
-    "Each record is [name, score]",
-    "1 <= name.length <= 20",
-    "0 <= score <= 100",
+    "records holds between 1 and 10^4 entries",
+    "every record has the shape [name, score]",
+    "names run 1 to 20 characters long",
+    "scores range from 0 to 100",
   ],
   hints: [
     "Use a hash map to group scores by student name",

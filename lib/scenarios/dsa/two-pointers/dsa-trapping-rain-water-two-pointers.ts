@@ -7,22 +7,28 @@ export const dsaTrappingRainWaterTwoPointersScenario: DSAScenario = {
   pattern: "two-pointers",
   difficulty: "hard",
   companies: ["Google", "Meta", "Amazon", "Microsoft"],
-  description: "Calculate how much water can be trapped after raining given an elevation map",
+  description: "Work out how much rainwater settles between the bars of a height profile",
   tags: ["array", "two-pointers", "dynamic-programming", "stack"],
   estimatedTime: 30,
-  problemStatement: `Given n non-negative integers representing an elevation map where the width of each bar is 1, compute how much water it can trap after raining.`,
+  problemStatement: `You're given an array height of n non-negative integers. Read it as the cross-section of a terrain: bar i is height[i] units tall and exactly one unit wide. When rain falls, water settles wherever lower bars sit between taller ones.
+
+Return the total number of water units the terrain retains.`,
   examples: [
     {
-      input: "height = [0,1,0,2,1,0,1,3,2,1,2,1]",
-      output: "6",
-      explanation: "The elevation map traps 6 units of rain water.",
+      input: "height = [2,0,3,1,0,2,1,4]",
+      output: "10",
+      explanation: "This terrain retains 10 units of water.",
     },
     {
-      input: "height = [4,2,0,3,2,5]",
-      output: "9",
+      input: "height = [6,1,4,2,5]",
+      output: "8",
     },
   ],
-  constraints: ["n == height.length", "1 <= n <= 2 * 10^4", "0 <= height[i] <= 10^5"],
+  constraints: [
+    "n equals the length of height",
+    "n lies between 1 and 2 * 10^4",
+    "each bar height sits between 0 and 10^5",
+  ],
   hints: [
     "For each position, water level is determined by min(max_left, max_right) - height[i]",
     "Use two pointers from both ends",
