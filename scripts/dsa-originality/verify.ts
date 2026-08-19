@@ -25,6 +25,17 @@
  *
  * Exits 1 on any FAIL. Pre-sweep this MUST fail loudly (fingerprints +
  * unchanged statements); that failure is the proof it can catch a bad edit.
+ *
+ * HISTORICAL RECORD, NOT A STANDING CHECK. baseline.json is the PRE-sweep corpus,
+ * so this script only ever answers "did the sweep happen and did it stay inside
+ * its lane". It ran clean at 221/221 on 2026-08-18. The follow-up adversarial
+ * audit then deliberately changed frozen fields on ~20 scenarios (starter
+ * signatures that contradicted the grader, one wrong test key, added
+ * compareAsSet flags, two titles that named the algorithm), so re-running this
+ * now reports those as touched frozen fields. That is expected.
+ *
+ * The STANDING guard is lib/scenarios/__tests__/dsa-statement-house-voice.test.ts,
+ * which runs on every `pnpm test`.
  */
 
 import { createHash } from "node:crypto"
