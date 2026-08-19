@@ -7,23 +7,25 @@ export const reorderListScenario: DSAScenario = {
   pattern: "linked-list",
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Microsoft"],
-  description: "Reorder list to L0→Ln→L1→Ln-1→L2→Ln-2→...",
+  description: "Relink a list to alternate nodes from its front and back",
   tags: ["linked-list", "two-pointers", "stack"],
   estimatedTime: 25,
-  problemStatement: `You are given the head of a singly linked-list. Reorder it to: L0 → Ln → L1 → Ln-1 → L2 → Ln-2 → ... You may not modify values in the list's nodes. Only nodes themselves may be changed.
+  problemStatement: `You're given head, the first node of a singly linked list. Label its nodes L0, L1, and so on through Ln. Rebuild the chain so it runs L0 → Ln → L1 → Ln-1 → L2 → Ln-2 and keeps alternating between the front and the back until every node has its place.
+
+Node values must not be rewritten; produce the new order by relinking the nodes themselves.
 
 Example:
 
 \`\`\`
-Input    1 → 2 → 3 → 4 → 5
+Input    3 → 9 → 5 → 7 → 2
 
-Output   1 → 5 → 2 → 4 → 3
+Output   3 → 2 → 9 → 7 → 5
 \`\`\``,
   examples: [
-    { input: "head = [1,2,3,4]", output: "[1,4,2,3]" },
-    { input: "head = [1,2,3,4,5]", output: "[1,5,2,4,3]" },
+    { input: "head = [6,3,8,5]", output: "[6,5,3,8]" },
+    { input: "head = [3,9,5,7,2]", output: "[3,2,9,7,5]" },
   ],
-  constraints: ["The number of nodes is in the range [1, 5 * 10^4]", "1 <= Node.val <= 1000"],
+  constraints: ["Expect between 1 and 5 * 10^4 nodes", "Each value lies between 1 and 1000"],
   hints: ["Find the middle of the list", "Reverse the second half", "Merge two halves alternately"],
   starterCode: {
     javascript: `function reorderList(head) {\n  // Write your solution here\n\n}`,

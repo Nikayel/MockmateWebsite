@@ -10,23 +10,23 @@ export const reverseLinkedListScenario: DSAScenario = {
   description: "Reverse a singly linked list",
   tags: ["linked-list", "recursion"],
   estimatedTime: 15,
-  problemStatement: `Given the head of a singly linked list, reverse the list, and return the reversed list.
+  problemStatement: `You're given head, the entry point of a singly linked list. Rearrange the list so its nodes stand in the opposite order: the old tail becomes the new head and the old head ends up last. Return the new head.
 
 Example:
 
 \`\`\`
-Input    1 → 2 → 3 → 4 → 5 → null
+Input    2 → 7 → 9 → 4 → 6 → null
 
-Output   5 → 4 → 3 → 2 → 1 → null
+Output   6 → 4 → 9 → 7 → 2 → null
 \`\`\``,
   examples: [
     {
-      input: "head = [1,2,3,4,5]",
-      output: "[5,4,3,2,1]",
+      input: "head = [2,7,9,4,6]",
+      output: "[6,4,9,7,2]",
     },
     {
-      input: "head = [1,2]",
-      output: "[2,1]",
+      input: "head = [5,3]",
+      output: "[3,5]",
     },
     {
       input: "head = []",
@@ -34,8 +34,8 @@ Output   5 → 4 → 3 → 2 → 1 → null
     },
   ],
   constraints: [
-    "The number of nodes in the list is the range [0, 5000]",
-    "-5000 <= Node.val <= 5000",
+    "Node count runs from 0 up to 5000",
+    "Each value sits within -5000 <= Node.val <= 5000",
   ],
   hints: [
     "Use three pointers: prev, current, and next",

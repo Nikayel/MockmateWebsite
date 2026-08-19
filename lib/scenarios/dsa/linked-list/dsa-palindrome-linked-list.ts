@@ -10,19 +10,19 @@ export const palindromeLinkedListScenario: DSAScenario = {
   description: "Check if a linked list is a palindrome",
   tags: ["linked-list", "two-pointers", "stack"],
   estimatedTime: 20,
-  problemStatement: `Given the head of a singly linked list, return true if it is a palindrome or false otherwise.
+  problemStatement: `You're given head, the opening node of a singly linked list. Decide whether the list's values form the same sequence whether you walk them front to back or back to front. Return true when they do and false when they don't.
 
 Example:
 
 \`\`\`
-1 → 2 → 2 → 1     reads the same in both directions, so true
-1 → 2             does not, so false
+6 → 9 → 9 → 6     the same sequence from either end, so true
+4 → 7             becomes 7 → 4 from the far end, so false
 \`\`\``,
   examples: [
-    { input: "head = [1,2,2,1]", output: "true" },
-    { input: "head = [1,2]", output: "false" },
+    { input: "head = [6,9,9,6]", output: "true" },
+    { input: "head = [4,7]", output: "false" },
   ],
-  constraints: ["The number of nodes in the list is in the range [1, 10^5].", "0 <= Node.val <= 9"],
+  constraints: ["Anywhere from 1 to 10^5 nodes may be present.", "Node values are digits, 0 to 9"],
   hints: [
     "Find middle using slow/fast pointers",
     "Reverse second half of list",

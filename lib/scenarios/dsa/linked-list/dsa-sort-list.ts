@@ -10,15 +10,17 @@ export const sortListScenario: DSAScenario = {
   description: "Sort a linked list in O(n log n) time and O(1) space",
   tags: ["linked-list", "sorting", "merge-sort", "divide-and-conquer"],
   estimatedTime: 30,
-  problemStatement: `Given the head of a linked list, return the list after sorting it in ascending order.`,
+  problemStatement: `You're given the head of a linked list whose values arrive in no particular order. Rearrange the list so the values climb from smallest to largest, then return its new head.
+
+Duplicates are possible, and every occurrence must survive the reordering.`,
   examples: [
-    { input: "head = [4,2,1,3]", output: "[1,2,3,4]" },
-    { input: "head = [-1,5,3,4,0]", output: "[-1,0,3,4,5]" },
+    { input: "head = [9,5,2,7]", output: "[2,5,7,9]" },
+    { input: "head = [-3,8,1,6,-2]", output: "[-3,-2,1,6,8]" },
     { input: "head = []", output: "[]" },
   ],
   constraints: [
-    "The number of nodes in the list is in the range [0, 5 * 10^4].",
-    "-10^5 <= Node.val <= 10^5",
+    "The list may hold from 0 to 5 * 10^4 nodes.",
+    "Each value fits inside -10^5 <= Node.val <= 10^5",
   ],
   hints: [
     "Use merge sort for O(n log n) time",

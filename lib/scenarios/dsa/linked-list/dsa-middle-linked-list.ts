@@ -10,32 +10,36 @@ export const middleLinkedListScenario: DSAScenario = {
   description: "Find the middle node of a linked list",
   tags: ["linked-list", "two-pointers"],
   estimatedTime: 10,
-  problemStatement: `Given the head of a singly linked list, return the middle node of the linked list.
+  problemStatement: `You're given head, the starting node of a singly linked list. Return the node that sits at the midpoint of the list.
 
-If there are two middle nodes, return the second middle node.
+When the node count is even, two nodes share the midpoint; the answer is the later of the two.
 
 Example:
 
 \`\`\`
-Odd length    1 → 2 → 3 → 4 → 5
+Odd count     4 → 8 → 15 → 16 → 23
                       ↑
                     middle
 
-Even length   1 → 2 → 3 → 4 → 5 → 6
-                          ↑
-                    second middle
+Even count    4 → 8 → 15 → 16 → 23 → 42
+                           ↑
+                     second middle
 \`\`\``,
   examples: [
-    { input: "head = [1,2,3,4,5]", output: "[3,4,5]", explanation: "The middle node is 3." },
     {
-      input: "head = [1,2,3,4,5,6]",
-      output: "[4,5,6]",
-      explanation: "Two middle nodes 3 and 4, return 4.",
+      input: "head = [4,8,15,16,23]",
+      output: "[15,16,23]",
+      explanation: "The middle node carries 15.",
+    },
+    {
+      input: "head = [4,8,15,16,23,42]",
+      output: "[16,23,42]",
+      explanation: "Nodes 15 and 16 both sit at the midpoint; the later one, 16, is returned.",
     },
   ],
   constraints: [
-    "The number of nodes in the list is in the range [1, 100].",
-    "1 <= Node.val <= 100",
+    "The list holds no fewer than 1 and no more than 100 nodes.",
+    "Each node's value falls between 1 and 100",
   ],
   hints: [
     "Use slow and fast pointers",

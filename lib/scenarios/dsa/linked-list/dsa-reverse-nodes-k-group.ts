@@ -7,22 +7,20 @@ export const reverseNodesKGroupScenario: DSAScenario = {
   pattern: "linked-list",
   difficulty: "hard",
   companies: ["Amazon", "Meta", "Google", "Microsoft", "Apple"],
-  description: "Reverse linked list nodes k at a time",
+  description: "Reverse a linked list in blocks of k nodes",
   tags: ["linked-list", "recursion"],
   estimatedTime: 35,
-  problemStatement: `Given the head of a linked list, reverse the nodes of the list k at a time, and return the modified list.
+  problemStatement: `You're given the head of a linked list and a positive integer k, where k never exceeds the list's length. Working from the front, take the nodes k at a time and flip the order inside every complete group of k. When the final group comes up short of k nodes, leave that tail exactly as it was.
 
-k is a positive integer and is less than or equal to the length of the linked list. If the number of nodes is not a multiple of k then left-out nodes, in the end, should remain as it is.
-
-You may not alter the values in the list's nodes, only nodes themselves may be changed.`,
+Values stay in their nodes; produce the new arrangement by relinking the nodes themselves. Return the head of the result.`,
   examples: [
-    { input: "head = [1,2,3,4,5], k = 2", output: "[2,1,4,3,5]" },
-    { input: "head = [1,2,3,4,5], k = 3", output: "[3,2,1,4,5]" },
+    { input: "head = [4,9,2,7,6], k = 2", output: "[9,4,7,2,6]" },
+    { input: "head = [4,9,2,7,6], k = 3", output: "[2,9,4,7,6]" },
   ],
   constraints: [
-    "The number of nodes in the list is n.",
-    "1 <= k <= n <= 5000",
-    "0 <= Node.val <= 1000",
+    "n stands for the total number of nodes.",
+    "k and n satisfy 1 <= k <= n <= 5000",
+    "Values fall in the range 0 to 1000",
   ],
   hints: [
     "Count k nodes first to check if group exists",

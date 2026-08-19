@@ -7,19 +7,18 @@ export const swapNodesPairsScenario: DSAScenario = {
   pattern: "linked-list",
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Microsoft"],
-  description: "Swap every two adjacent nodes in a linked list",
+  description: "Exchange each neighboring pair of nodes in a linked list",
   tags: ["linked-list", "recursion"],
   estimatedTime: 20,
-  problemStatement: `Given a linked list, swap every two adjacent nodes and return its head. You must solve the problem without modifying the values in the list's nodes (i.e., only nodes themselves may be changed.)`,
+  problemStatement: `You're given a linked list via its head. Make every two neighboring nodes trade places: the first swaps with the second, the third with the fourth, and so on down the chain. Return the head of the rearranged list.
+
+Carry out the swaps by relinking nodes. Rewriting the values held inside the nodes is off limits.`,
   examples: [
-    { input: "head = [1,2,3,4]", output: "[2,1,4,3]" },
+    { input: "head = [5,9,3,7]", output: "[9,5,7,3]" },
     { input: "head = []", output: "[]" },
-    { input: "head = [1]", output: "[1]" },
+    { input: "head = [6]", output: "[6]" },
   ],
-  constraints: [
-    "The number of nodes in the list is in the range [0, 100].",
-    "0 <= Node.val <= 100",
-  ],
+  constraints: ["The list contains between 0 and 100 nodes.", "Node values sit between 0 and 100"],
   hints: [
     "Use dummy node to handle head swap",
     "Track prev, curr, next pointers",

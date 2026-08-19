@@ -10,34 +10,34 @@ export const mergeTwoSortedListsScenario: DSAScenario = {
   description: "Merge two sorted linked lists into one sorted list.",
   tags: ["linked-list", "recursion", "two-pointers"],
   estimatedTime: 20,
-  problemStatement: `You are given the heads of two sorted linked lists list1 and list2. Merge the two lists into one sorted list. The list should be made by splicing together the nodes of the first two lists. Return the head of the merged linked list.
+  problemStatement: `You're given list1 and list2, the heads of two linked lists whose values already appear in non-decreasing order. Combine them into a single linked list that is still sorted, and build it by relinking the nodes you were handed rather than allocating fresh ones. Return the head of the combined list.
 
 Example:
 
 \`\`\`
-list1:  1 → 2 → 4
-list2:  1 → 3 → 4
+list1:  2 → 5 → 9
+list2:  3 → 5 → 8
 
-Result: 1 → 1 → 2 → 3 → 4 → 4
+Result: 2 → 3 → 5 → 5 → 8 → 9
 \`\`\``,
   examples: [
     {
-      input: "list1 = [1,2,4], list2 = [1,3,4]",
-      output: "[1,1,2,3,4,4]",
+      input: "list1 = [2,5,9], list2 = [3,5,8]",
+      output: "[2,3,5,5,8,9]",
     },
     {
       input: "list1 = [], list2 = []",
       output: "[]",
     },
     {
-      input: "list1 = [], list2 = [0]",
-      output: "[0]",
+      input: "list1 = [], list2 = [4]",
+      output: "[4]",
     },
   ],
   constraints: [
-    "The number of nodes in both lists is in the range [0, 50].",
-    "-100 <= Node.val <= 100",
-    "Both list1 and list2 are sorted in non-decreasing order.",
+    "Each list carries between 0 and 50 nodes.",
+    "Node values stay within -100 <= Node.val <= 100",
+    "list1 and list2 each arrive sorted in non-decreasing order.",
   ],
   hints: [
     "Use a dummy node to simplify edge cases",

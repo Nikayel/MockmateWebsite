@@ -7,46 +7,44 @@ export const linkedListCycleScenario: DSAScenario = {
   pattern: "linked-list",
   difficulty: "easy",
   companies: ["Amazon", "Microsoft", "Meta", "Google", "Oracle"],
-  description: "Detect if a linked list has a cycle",
+  description: "Detect whether a linked list loops back on itself",
   tags: ["linked-list", "two-pointers", "hash-table"],
   estimatedTime: 15,
-  problemStatement: `Given head, the head of a linked list, determine if the linked list has a cycle in it.
+  problemStatement: `You're given head, the first node of a linked list. In a well-formed list, walking node to node along next eventually falls off the end at null. In a malformed one, some next pointer bends back to an earlier node and the walk goes on forever. That closed loop is what we call a cycle.
 
-There is a cycle in a linked list if there is some node in the list that can be reached again by continuously following the next pointer.
-
-Return true if there is a cycle in the linked list. Otherwise, return false.
+Report which kind of list you have: return true when the list contains a cycle, and false when it does not.
 
 Example:
 
 \`\`\`
-With a cycle (the tail links back to index 1)
-3 → 2 → 0 → -4
+Has a cycle (the last node points back to index 1)
+7 → 5 → 9 → -2
     ↑        ↓
     └────────┘
 
-No cycle
-1 → 2 → 3 → 4 → null
+Cycle-free
+4 → 8 → 6 → null
 \`\`\``,
   examples: [
     {
-      input: "head = [3,2,0,-4], pos = 1",
+      input: "head = [7,5,9,-2], pos = 1",
       output: "true",
       explanation:
-        "There is a cycle in the linked list, where the tail connects to the 1st node (0-indexed).",
+        "The last node's next pointer leads back to the node at index 1 (0-indexed), so the walk never terminates.",
     },
     {
-      input: "head = [1,2], pos = 0",
+      input: "head = [4,6], pos = 0",
       output: "true",
     },
     {
-      input: "head = [1], pos = -1",
+      input: "head = [2], pos = -1",
       output: "false",
     },
   ],
   constraints: [
-    "The number of nodes in the list is in the range [0, 10^4]",
-    "-10^5 <= Node.val <= 10^5",
-    "pos is -1 or a valid index in the linked-list",
+    "Anywhere from 0 to 10^4 nodes may be present",
+    "Each value lies in -10^5 <= Node.val <= 10^5",
+    "pos equals -1 when there is no cycle, or else names a valid index into the list",
   ],
   hints: [
     "Use Floyd's Cycle Detection Algorithm (slow and fast pointers)",

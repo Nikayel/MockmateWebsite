@@ -10,32 +10,30 @@ export const intersectionTwoLinkedListsScenario: DSAScenario = {
   description: "Find the node where two linked lists intersect",
   tags: ["linked-list", "two-pointers", "hash-table"],
   estimatedTime: 20,
-  problemStatement: `Given the heads of two singly linked-lists headA and headB, return the node at which the two lists intersect. If the two linked lists have no intersection at all, return null.
+  problemStatement: `You're given headA and headB, the starting nodes of two singly linked lists. Somewhere along the way the two lists might merge and share every node from that point to the tail. Find the earliest node they have in common and return it; when the lists never touch, return null.
 
-The linked lists must retain their original structure after the function returns.
-
-Note that the linked lists may intersect at different positions, and the intersection is defined based on reference, not value.`,
+Common here means the same physical node, not two separate nodes that happen to hold equal values. The point where they merge can sit at a different distance from each head. Both lists must be left in their original shape once your function finishes.`,
   examples: [
     {
-      input: "listA = [4,1,8,4,5], listB = [5,6,1,8,4,5], intersectVal = 8",
-      output: "Reference to node with value 8",
-      explanation: "The intersected node's value is 8.",
+      input: "listA = [3,7,12,9,2], listB = [10,4,6,12,9,2], intersectVal = 12",
+      output: "Reference to node with value 12",
+      explanation: "The lists merge at the node holding 12 and share the tail 12 → 9 → 2.",
     },
     {
-      input: "listA = [1,9,1,2,4], listB = [3,2,4], intersectVal = 2",
-      output: "Reference to node with value 2",
+      input: "listA = [8,5,6,11,7], listB = [2,11,7], intersectVal = 11",
+      output: "Reference to node with value 11",
     },
     {
-      input: "listA = [2,6,4], listB = [1,5], intersectVal = 0",
+      input: "listA = [9,3,8], listB = [7,6], intersectVal = 0",
       output: "null",
-      explanation: "The two lists do not intersect.",
+      explanation: "These two lists never share a node.",
     },
   ],
   constraints: [
-    "The number of nodes of listA is in the m.",
-    "The number of nodes of listB is in the n.",
-    "1 <= m, n <= 3 * 10^4",
-    "1 <= Node.val <= 10^5",
+    "m denotes how many nodes listA holds.",
+    "n denotes how many nodes listB holds.",
+    "Both m and n fall between 1 and 3 * 10^4",
+    "Every node's value sits between 1 and 10^5",
   ],
   hints: [
     "Two pointer approach: traverse both lists",

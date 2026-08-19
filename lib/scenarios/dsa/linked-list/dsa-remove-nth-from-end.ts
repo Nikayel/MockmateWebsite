@@ -7,26 +7,30 @@ export const removeNthFromEndScenario: DSAScenario = {
   pattern: "linked-list",
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Apple"],
-  description: "Remove the nth node from the end of the list",
+  description: "Delete a linked list's nth-from-last node",
   tags: ["linked-list", "two-pointers"],
   estimatedTime: 20,
-  problemStatement: `Given the head of a linked list, remove the nth node from the end of the list and return its head.
+  problemStatement: `You're given the head of a linked list together with an integer n. Count positions starting from the tail, delete the node that lands at position n, and return the head of the list that remains.
 
-Example, with n = 2:
+Example, with n = 3:
 
 \`\`\`
-Input    1 → 2 → 3 → 4 → 5
-                     ↑
-               second from the end
+Input    7 → 3 → 9 → 1 → 6
+                 ↑
+         third from the end
 
-Output   1 → 2 → 3 → 5
+Output   7 → 3 → 1 → 6
 \`\`\``,
   examples: [
-    { input: "head = [1,2,3,4,5], n = 2", output: "[1,2,3,5]" },
-    { input: "head = [1], n = 1", output: "[]" },
-    { input: "head = [1,2], n = 1", output: "[1]" },
+    { input: "head = [7,3,9,1,6], n = 3", output: "[7,3,1,6]" },
+    { input: "head = [4], n = 1", output: "[]" },
+    { input: "head = [5,8], n = 1", output: "[5]" },
   ],
-  constraints: ["1 <= sz <= 30", "0 <= Node.val <= 100", "1 <= n <= sz"],
+  constraints: [
+    "The list's length sz obeys 1 <= sz <= 30",
+    "Node values range from 0 to 100",
+    "n is at least 1 and never exceeds sz",
+  ],
   hints: [
     "Use two pointers: fast and slow",
     "Move fast n steps ahead",

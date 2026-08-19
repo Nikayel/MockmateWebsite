@@ -7,37 +7,36 @@ export const linkedListCycleIiScenario: DSAScenario = {
   pattern: "linked-list",
   difficulty: "medium",
   companies: ["Amazon", "Microsoft", "Meta", "Google", "Apple"],
-  description: "Find the node where the cycle begins in a linked list",
+  description: "Locate the entry node of a linked list's loop",
   tags: ["linked-list", "two-pointers", "hash-table"],
   estimatedTime: 25,
-  problemStatement: `Given the head of a linked list, return the node where the cycle begins. If there is no cycle, return null.
+  problemStatement: `You're given head, the first node of a linked list that might contain a loop. A loop exists when some node can be visited twice just by walking forward along next pointers. Your task is to identify the exact node where that loop is entered and return it. When no loop exists, return null.
 
-There is a cycle in a linked list if there is some node in the list that can be reached again by continuously following the next pointer.
+The list must come through untouched: inspect it, but change nothing.
 
-Do not modify the linked list.
-
-Follow up: Can you solve it using O(1) memory?`,
+As a stretch goal, try to manage it with O(1) memory.`,
   examples: [
     {
-      input: "head = [3,2,0,-4], pos = 1",
-      output: "Node at index 1 (value 2)",
-      explanation: "There is a cycle, where tail connects to the second node.",
+      input: "head = [5,9,4,-7], pos = 1",
+      output: "Node at index 1 (value 9)",
+      explanation:
+        "The tail's next pointer leads back to the second node, so the loop is entered there.",
     },
     {
-      input: "head = [1,2], pos = 0",
-      output: "Node at index 0 (value 1)",
-      explanation: "Tail connects to the first node.",
+      input: "head = [6,3], pos = 0",
+      output: "Node at index 0 (value 6)",
+      explanation: "The tail loops straight back to the head.",
     },
     {
-      input: "head = [1], pos = -1",
+      input: "head = [8], pos = -1",
       output: "null",
-      explanation: "There is no cycle.",
+      explanation: "This list has no loop.",
     },
   ],
   constraints: [
-    "The number of the nodes in the list is in the range [0, 10^4]",
-    "-10^5 <= Node.val <= 10^5",
-    "pos is -1 or a valid index in the linked-list",
+    "The list contains between 0 and 10^4 nodes",
+    "Values span -10^5 <= Node.val <= 10^5",
+    "pos is -1 when no loop exists; otherwise it is a valid index into the list",
   ],
   hints: [
     "Use Floyd's Cycle Detection (fast/slow pointers) to detect cycle",

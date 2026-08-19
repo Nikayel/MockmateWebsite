@@ -19,45 +19,42 @@ export const lruCacheScenario: DSAScenario = {
     "Palantir",
   ],
   roles: ["new-grad", "junior", "senior", "swe"],
-  description: "Design a data structure that follows Least Recently Used (LRU) cache constraints",
+  description: "Build a fixed-capacity cache that evicts its least recently used key",
   tags: ["hash-table", "linked-list", "design"],
   estimatedTime: 30,
-  problemStatement: `Design a data structure that follows the constraints of a Least Recently Used (LRU) cache.
+  problemStatement: `You're building LRUCache, a bounded key-value store that makes room by discarding whichever entry has sat unused the longest. That eviction rule is the "least recently used" policy, and both reading a key and writing a key refresh its recency.
 
-Implement the LRUCache class:
-- LRUCache(int capacity) Initialize the LRU cache with positive size capacity.
-- int get(int key) Return the value of the key if the key exists, otherwise return -1.
-- void put(int key, int value) Update the value of the key if the key exists. Otherwise, add the key-value pair to the cache. If the number of keys exceeds the capacity from this operation, evict the least recently used key.
+The class needs three operations. LRUCache(int capacity) sets up the cache with a positive capacity. int get(int key) hands back the value stored under key, or -1 when the key is absent. void put(int key, int value) stores value under key, overwriting any earlier value; when the insertion would push the number of keys past capacity, the least recently used key is thrown out first.
 
-The functions get and put must each run in O(1) average time complexity.
+Every call to get and put has to finish in O(1) average time.
 
-Example, with capacity 2:
+Walkthrough with capacity 2:
 
 \`\`\`
 LRUCache(2)
-put(1, 1)     cache holds 1
-put(2, 2)     cache holds 1, 2
-get(1)   -> 1 reading 1 counts as using it
-put(3, 3)     over capacity, so 2 is evicted
-get(2)   -> -1
-put(4, 4)     over capacity, so 1 is evicted
-get(1)   -> -1
-get(3)   -> 3
-get(4)   -> 4
+put(5, 50)      cache holds key 5
+put(6, 60)      cache holds keys 5, 6
+get(5)   -> 50  reading 5 refreshes it, so 6 is now the stalest
+put(7, 70)      over capacity, so 6 is dropped
+get(6)   -> -1
+put(8, 80)      over capacity, so 5 is dropped
+get(5)   -> -1
+get(7)   -> 70
+get(8)   -> 80
 \`\`\``,
   examples: [
     {
-      input: "LRUCache(2); put(1,1); put(2,2); get(1); put(3,3); get(2)",
-      output: "1, -1",
+      input: "LRUCache(2); put(5,50); put(6,60); get(5); put(7,70); get(6)",
+      output: "50, -1",
       explanation:
-        "Cache is {1=1, 2=2}. get(1) returns 1. put(3,3) evicts key 2. get(2) returns -1 (not found).",
+        "The cache holds {5=50, 6=60}. get(5) returns 50 and refreshes key 5. put(7,70) must make room, so key 6, the stalest entry, is dropped. get(6) then comes up empty and returns -1.",
     },
   ],
   constraints: [
-    "1 <= capacity <= 3000",
-    "0 <= key <= 10^4",
-    "0 <= value <= 10^5",
-    "At most 2 * 10^5 calls will be made to get and put",
+    "capacity is at least 1 and at most 3000",
+    "Keys satisfy 0 <= key <= 10^4",
+    "Values satisfy 0 <= value <= 10^5",
+    "get and put are called at most 2 * 10^5 times combined",
   ],
   hints: [
     "Use a HashMap for O(1) access",

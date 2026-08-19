@@ -10,15 +10,15 @@ export const removeDuplicatesSortedListScenario: DSAScenario = {
   description: "Remove all duplicates from a sorted linked list",
   tags: ["linked-list"],
   estimatedTime: 15,
-  problemStatement: `Given the head of a sorted linked list, delete all duplicates such that each element appears only once. Return the linked list sorted as well.`,
+  problemStatement: `You're given head, the front of a linked list whose values are already sorted. Some values may occupy more than one node. Prune the list so every distinct value is represented by exactly one node, then return the head of what's left. The result must still be sorted.`,
   examples: [
-    { input: "head = [1,1,2]", output: "[1,2]" },
-    { input: "head = [1,1,2,3,3]", output: "[1,2,3]" },
+    { input: "head = [2,2,5]", output: "[2,5]" },
+    { input: "head = [3,3,4,7,7]", output: "[3,4,7]" },
   ],
   constraints: [
-    "The number of nodes in the list is in the range [0, 300].",
-    "-100 <= Node.val <= 100",
-    "The list is guaranteed to be sorted in ascending order.",
+    "The node count sits between 0 and 300.",
+    "Values are bounded by -100 <= Node.val <= 100",
+    "The input arrives sorted in ascending order.",
   ],
   hints: [
     "Since the list is sorted, duplicates will be adjacent",
