@@ -12,7 +12,7 @@ export const recoverBstScenario: DSAScenario = {
   estimatedTime: 30,
   problemStatement: `You're handed the root of a binary search tree that was damaged in one specific way: the values of exactly two of its nodes got traded with each other. Nothing else moved, and the tree's shape is still the intended one.
 
-Recall what a healthy BST promises: inside any node's left subtree every value stays strictly below that node's value, and inside its right subtree every value stays strictly above it. Restore that promise by putting the two traded values back where they belong. Adjust values only; every parent-child link must remain exactly as it is.`,
+Recall what a healthy BST promises: inside any node's left subtree every value stays strictly below that node's value, and inside its right subtree every value stays strictly above it. Restore that promise by putting the two traded values back where they belong. Adjust values only; every parent-child link must remain exactly as it is. Return root once the repair is done.`,
   examples: [
     {
       input: "root = [2,6,null,null,4]",
@@ -38,8 +38,8 @@ Recall what a healthy BST promises: inside any node's left subtree every value s
   ],
   starterCode: {
     javascript: `function recoverTree(root) {\n  // Find and swap two nodes\n}`,
-    typescript: `function recoverTree(root: TreeNode | null): void {\n  // Find and swap two nodes\n}`,
-    python: `def recoverTree(root: Optional[TreeNode]) -> None:\n    # Find and swap two nodes\n    pass`,
+    typescript: `function recoverTree(root: TreeNode | null): TreeNode | null {\n  // Write your solution here\n\n}`,
+    python: `def recoverTree(root: Optional[TreeNode]) -> Optional[TreeNode]:\n    # Write your solution here\n    pass`,
     java: `class Solution {\n    public void recoverTree(TreeNode root) {\n        // Find and swap two nodes\n    }\n}`,
   },
   optimalComplexity: { time: "O(n)", space: "O(1) with Morris" },

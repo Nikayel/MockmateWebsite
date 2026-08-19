@@ -14,7 +14,7 @@ export const dsaNextPermutationScenario: DSAScenario = {
 
 Rearrange nums into the ordering that comes immediately after its current one in that list. If nums is already the last ordering, cycle back to the first one, which is the values in ascending order. For instance, [2,4,6] becomes [2,6,4], while [9,7,4] has nothing after it and wraps around to [4,7,9].
 
-Carry out the rearrangement in place, using only constant extra memory.`,
+Carry out the rearrangement in place, using only constant extra memory, and return nums when it holds the new ordering.`,
   examples: [
     { input: "nums = [2,4,6]", output: "[2,6,4]" },
     { input: "nums = [9,7,4]", output: "[4,7,9]" },
@@ -32,7 +32,7 @@ Carry out the rearrangement in place, using only constant extra memory.`,
   // Modify nums in-place to the next permutation
 
 }`,
-    typescript: `function nextPermutation(nums: number[]): void {
+    typescript: `function nextPermutation(nums: number[]): number[] {
   // Modify nums in-place to the next permutation
 
 }`,

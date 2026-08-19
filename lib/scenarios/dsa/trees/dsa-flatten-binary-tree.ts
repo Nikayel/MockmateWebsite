@@ -13,7 +13,9 @@ export const flattenBinaryTreeScenario: DSAScenario = {
   problemStatement: `You're given the root of a binary tree. Rework it, in place, into a single right-leaning chain that stands in for a linked list:
 
 - Keep the existing TreeNode objects. In the finished chain, each node's right pointer leads to the node that follows it, and every left pointer ends up null.
-- The chain must present the nodes in the tree's preorder sequence, where each node comes before its left subtree, which comes before its right subtree.`,
+- The chain must present the nodes in the tree's preorder sequence, where each node comes before its left subtree, which comes before its right subtree.
+
+Return root once the chain is built.`,
   examples: [
     { input: "root = [8,3,10,2,6,null,12]", output: "[8,null,3,null,2,null,6,null,10,null,12]" },
     { input: "root = []", output: "[]" },
@@ -28,7 +30,7 @@ export const flattenBinaryTreeScenario: DSAScenario = {
   ],
   starterCode: {
     javascript: `function flatten(root) {\n  // Write your solution here (modify in-place)\n\n}`,
-    typescript: `function flatten(root: TreeNode | null): void {\n  // Write your solution here\n\n}`,
+    typescript: `function flatten(root: TreeNode | null): TreeNode | null {\n  // Write your solution here\n\n}`,
     python: `def flatten(root):\n    # Write your solution here\n    pass`,
   },
   optimalComplexity: { time: "O(n)", space: "O(1) with Morris" },

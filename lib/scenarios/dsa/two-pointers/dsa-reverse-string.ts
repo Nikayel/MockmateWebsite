@@ -12,7 +12,7 @@ export const dsaReverseStringScenario: DSAScenario = {
   estimatedTime: 10,
   problemStatement: `You're given a character array s that spells out a string. Reverse it, so the characters end up running from last to first.
 
-All rearranging has to happen inside s itself, and you may claim no more than O(1) additional memory.`,
+All rearranging has to happen inside s itself, and you may claim no more than O(1) additional memory. Return s once it is reversed.`,
   examples: [
     {
       input: 's = ["s","p","a","r","k"]',
@@ -37,7 +37,7 @@ All rearranging has to happen inside s itself, and you may claim no more than O(
   // Write your solution here
 
 }`,
-    typescript: `function reverseString(s: string[]): void {
+    typescript: `function reverseString(s: string[]): string[] {
   // Write your solution here
 
 }`,

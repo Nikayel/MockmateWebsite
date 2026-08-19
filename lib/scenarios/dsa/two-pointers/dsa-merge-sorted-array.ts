@@ -14,7 +14,7 @@ export const dsaMergeSortedArrayScenario: DSAScenario = {
 
 Fold every value of nums2 into nums1 so that nums1 ends up holding all m + n values in non-decreasing order.
 
-Write the result directly into nums1 rather than returning it. There is room because nums1 has length m + n: its first m slots carry the values to merge, and its trailing n slots hold placeholder 0s that exist only to be overwritten. nums2 has length n.`,
+Write the result directly into nums1, and return nums1 when you're done. There is room because nums1 has length m + n: its first m slots carry the values to merge, and its trailing n slots hold placeholder 0s that exist only to be overwritten. nums2 has length n.`,
   examples: [
     {
       input: "nums1 = [2,4,7,0,0,0], m = 3, nums2 = [1,4,9], n = 3",
@@ -50,7 +50,7 @@ Write the result directly into nums1 rather than returning it. There is room bec
   // Write your solution here (modify nums1 in-place)
 
 }`,
-    typescript: `function merge(nums1: number[], m: number, nums2: number[], n: number): void {
+    typescript: `function merge(nums1: number[], m: number, nums2: number[], n: number): number[] {
   // Write your solution here (modify nums1 in-place)
 
 }`,

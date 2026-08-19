@@ -12,7 +12,7 @@ export const dsaMoveZeroesScenario: DSAScenario = {
   estimatedTime: 15,
   problemStatement: `You're given an integer array nums. Shift every 0 it contains to the tail of the array, keeping the remaining values in the same relative order they started in.
 
-Work inside nums itself; building a copy of the array is off limits.`,
+Work inside nums itself; building a copy of the array is off limits. Return nums when you're done.`,
   examples: [
     {
       input: "nums = [6,0,0,5,9]",
@@ -37,7 +37,7 @@ Work inside nums itself; building a copy of the array is off limits.`,
   // Write your solution here
 
 }`,
-    typescript: `function moveZeroes(nums: number[]): void {
+    typescript: `function moveZeroes(nums: number[]): number[] {
   // Write your solution here
 
 }`,

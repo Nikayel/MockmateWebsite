@@ -10,7 +10,7 @@ export const dsaRotateArrayScenario: DSAScenario = {
   description: "Rotate an array to the right by k steps in-place",
   tags: ["array", "math", "two-pointers"],
   estimatedTime: 20,
-  problemStatement: `You're given an integer array nums and a non-negative integer k. Shift every element k positions to the right, with values that fall off the end wrapping around to the front, and apply the change directly to nums.
+  problemStatement: `You're given an integer array nums and a non-negative integer k. Shift every element k positions to the right, with values that fall off the end wrapping around to the front, and apply the change directly to nums. Return nums once it is rotated.
 
 Follow-up: more than one approach exists here, and at least three are worth knowing. Can you manage it in-place with O(1) extra space?`,
   examples: [
@@ -40,7 +40,7 @@ Follow-up: more than one approach exists here, and at least three are worth know
   // Modify nums in-place
 
 }`,
-    typescript: `function rotate(nums: number[], k: number): void {
+    typescript: `function rotate(nums: number[], k: number): number[] {
   // Modify nums in-place
 
 }`,

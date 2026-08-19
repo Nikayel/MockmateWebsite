@@ -10,7 +10,7 @@ export const dsaSortColorsScenario: DSAScenario = {
   description: "Sort an array of 0s, 1s, and 2s in place without a library sort",
   tags: ["array", "two-pointers", "sorting"],
   estimatedTime: 20,
-  problemStatement: `You're given an array nums describing n objects, each painted red, white, or blue. The colors are encoded as integers: 0 for red, 1 for white, 2 for blue. Rearrange nums in place until objects sharing a color sit side by side, reds first, whites next, blues last.
+  problemStatement: `You're given an array nums describing n objects, each painted red, white, or blue. The colors are encoded as integers: 0 for red, 1 for white, 2 for blue. Rearrange nums in place until objects sharing a color sit side by side, reds first, whites next, blues last, then return nums.
 
 Calling your language's built-in sort is off the table.
 
@@ -40,7 +40,7 @@ Follow up: can you finish the job in a single pass while keeping extra memory co
   // Write your solution here
 
 }`,
-    typescript: `function sortColors(nums: number[]): void {
+    typescript: `function sortColors(nums: number[]): number[] {
   // Write your solution here
 
 }`,
