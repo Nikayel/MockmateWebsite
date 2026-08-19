@@ -10,41 +10,39 @@ export const dsaLowestCommonAncestorBstScenario: DSAScenario = {
   description: "Find the lowest common ancestor in a binary search tree",
   tags: ["tree", "binary-search-tree", "depth-first-search"],
   estimatedTime: 20,
-  problemStatement: `Given a binary search tree (BST), find the lowest common ancestor (LCA) node of two given nodes in the BST.
+  problemStatement: `You're given root, the entry point of a binary search tree, together with two of its nodes, p and q. Return their lowest common ancestor (LCA): the deepest node that has both p and q somewhere among its descendants.
 
-According to the definition of LCA: "The lowest common ancestor is defined between two nodes p and q as the lowest node in T that has both p and q as descendants (where we allow a node to be a descendant of itself)."
-
-Example:
+For this purpose a node counts as a descendant of itself, so whenever p is an ancestor of q, the LCA is p.
 
 \`\`\`
-          6
-         / \\
-        2   8
-       / \\  / \\
-      0   4 7   9
-         / \\
-        3   5
+          14
+         /  \\
+        6    20
+       / \\   / \\
+      2  10 17  25
+        /  \\
+       8   12
 \`\`\`
 
-The LCA of 2 and 8 is 6. The LCA of 2 and 4 is 2, because a node counts as a descendant of itself.`,
+Here the LCA of 6 and 20 is 14, while the LCA of 6 and 10 is 6 itself.`,
   examples: [
     {
-      input: "root = [6,2,8,0,4,7,9,null,null,3,5], p = 2, q = 8",
-      output: "6",
-      explanation: "The LCA of nodes 2 and 8 is 6.",
+      input: "root = [14,6,20,2,10,17,25,null,null,8,12], p = 6, q = 20",
+      output: "14",
+      explanation: "6 and 20 sit on opposite sides of 14, and no deeper node covers both.",
     },
     {
-      input: "root = [6,2,8,0,4,7,9,null,null,3,5], p = 2, q = 4",
-      output: "2",
-      explanation: "The LCA of nodes 2 and 4 is 2.",
+      input: "root = [14,6,20,2,10,17,25,null,null,8,12], p = 6, q = 10",
+      output: "6",
+      explanation: "10 lies inside 6's subtree, and 6 descends from itself, so 6 is the answer.",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [2, 10^5]",
-    "-10^9 <= Node.val <= 10^9",
-    "All Node.val are unique",
-    "p != q",
-    "p and q will exist in the BST",
+    "Expect between 2 and 10^5 nodes",
+    "Values span -10^9 <= Node.val <= 10^9",
+    "No two nodes carry the same value",
+    "p and q are two different nodes",
+    "Both p and q are always present in the tree",
   ],
   hints: [
     "Use the BST property: left < node < right",

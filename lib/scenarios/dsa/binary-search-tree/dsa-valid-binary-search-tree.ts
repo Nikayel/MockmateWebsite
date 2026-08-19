@@ -10,39 +10,35 @@ export const dsaValidBinarySearchTreeScenario: DSAScenario = {
   description: "Determine if a binary tree is a valid BST",
   tags: ["tree", "binary-search-tree", "depth-first-search"],
   estimatedTime: 20,
-  problemStatement: `Given the root of a binary tree, determine if it is a valid binary search tree (BST).
+  problemStatement: `You're given the root of a binary tree. Report whether it upholds the binary search tree invariant.
 
-A valid BST is defined as follows:
-- The left subtree of a node contains only nodes with keys less than the node's key.
-- The right subtree of a node contains only nodes with keys greater than the node's key.
-- Both the left and right subtrees must also be binary search trees.
-
-Example:
+The invariant is strict and reaches whole subtrees, not just direct children: every key stored anywhere in a node's left subtree must be smaller than the node's own key, every key anywhere in its right subtree must be larger, and each subtree must satisfy the same rule internally. Equal keys never qualify, so a repeated value anywhere makes the tree invalid.
 
 \`\`\`
 Valid                  Invalid
-     5                      5
+     8                      8
     / \\                    / \\
-   3   7                  3   4
+   4  11                  4   7
   / \\   \\                / \\
- 1   4   8              1   6
+ 2   6   14              2   9
 \`\`\`
 
-The second tree fails twice: 4 sits to the right of 5 but is smaller, and 6 sits in the left subtree of 5 but is larger.`,
+The right-hand tree breaks the rule twice: 7 sits to the right of 8 despite being smaller, and 9 lives inside the left subtree of 8 despite being larger.`,
   examples: [
     {
-      input: "root = [2,1,3]",
+      input: "root = [7,4,9]",
       output: "true",
     },
     {
-      input: "root = [5,1,4,null,null,3,6]",
+      input: "root = [10,3,8,null,null,6,12]",
       output: "false",
-      explanation: "The root node's value is 5 but its right child's value is 4.",
+      explanation:
+        "The root holds 10, yet its right child holds 8, which is too small for that side.",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in the range [1, 10^4]",
-    "-2^31 <= Node.val <= 2^31 - 1",
+    "The tree holds between 1 and 10^4 nodes",
+    "Every value fits -2^31 <= Node.val <= 2^31 - 1",
   ],
   hints: [
     "Use recursion with min and max bounds",

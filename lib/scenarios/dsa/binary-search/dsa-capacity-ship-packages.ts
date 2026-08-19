@@ -10,19 +10,22 @@ export const dsaCapacityShipPackagesScenario: DSAScenario = {
   description: "Find minimum ship capacity to ship all packages within D days",
   tags: ["binary-search", "array"],
   estimatedTime: 25,
-  problemStatement: `A conveyor belt has packages that must be shipped within days days. The ith package has a weight of weights[i]. Each day, we load packages in order of their weights (not reordering). We may not load more weight than the ship capacity.
+  problemStatement: `A line of packages is waiting at a dock, and package i weighs weights[i]. You have days days to ship all of them. Each day you load packages from the front of the line, keeping their original order, and the total weight loaded on any single day can't exceed the ship's capacity.
 
-Return the least weight capacity of the ship that will result in all packages being shipped within days days.`,
+Work out the smallest capacity that still gets every package shipped within days days, and return it.`,
   examples: [
     {
-      input: "weights = [1,2,3,4,5,6,7,8,9,10], days = 5",
-      output: "15",
-      explanation: "Ship 1-2, 3-4, 5-6, 7-8, 9-10 each day",
+      input: "weights = [2,4,6,8,10,12], days = 3",
+      output: "18",
+      explanation: "Day 1: 2+4+6. Day 2: 8+10. Day 3: 12. No capacity under 18 finishes in 3 days",
     },
-    { input: "weights = [3,2,2,4,1,4], days = 3", output: "6" },
-    { input: "weights = [1,2,3,1,1], days = 4", output: "3" },
+    { input: "weights = [5,1,6,2,7,3], days = 3", output: "10" },
+    { input: "weights = [2,1,1,2], days = 3", output: "2" },
   ],
-  constraints: ["1 <= days <= weights.length <= 5 * 10^4", "1 <= weights[i] <= 500"],
+  constraints: [
+    "days is at least 1 and never more than weights.length, which itself tops out at 5 * 10^4",
+    "Each individual package weighs between 1 and 500",
+  ],
   hints: [
     "Binary search on ship capacity",
     "Min capacity = max(weights), max capacity = sum(weights)",

@@ -10,26 +10,29 @@ export const dsaMedianTwoSortedArraysScenario: DSAScenario = {
   description: "Find the median of two sorted arrays in O(log(m+n)) time",
   tags: ["array", "binary-search", "divide-and-conquer"],
   estimatedTime: 40,
-  problemStatement: `Given two sorted arrays nums1 and nums2 of size m and n respectively, return the median of the two sorted arrays. The overall run time complexity should be O(log (m+n)).`,
+  problemStatement: `Two sorted arrays arrive together: nums1 holding m numbers and nums2 holding n. Imagine their contents pooled into one sorted list; your job is to return the median of that combined list.
+
+The required runtime is O(log (m+n)).`,
   examples: [
     {
-      input: "nums1 = [1,3], nums2 = [2]",
-      output: "2.00000",
-      explanation: "merged array = [1,2,3] and median is 2.",
+      input: "nums1 = [2,6], nums2 = [4]",
+      output: "4.00000",
+      explanation: "Pooled together the values read [2,4,6], and the middle one is 4.",
     },
     {
-      input: "nums1 = [1,2], nums2 = [3,4]",
-      output: "2.50000",
-      explanation: "merged array = [1,2,3,4] and median is (2 + 3) / 2 = 2.5.",
+      input: "nums1 = [1,4], nums2 = [7,9]",
+      output: "5.50000",
+      explanation:
+        "Combined, the values are [1,4,7,9]; the median averages the two middle entries: (4 + 7) / 2 = 5.5.",
     },
   ],
   constraints: [
-    "nums1.length == m",
-    "nums2.length == n",
-    "0 <= m <= 1000",
-    "0 <= n <= 1000",
-    "1 <= m + n <= 2000",
-    "-10^6 <= nums1[i], nums2[i] <= 10^6",
+    "m is the length of nums1",
+    "n is the length of nums2",
+    "m ranges from 0 to 1000",
+    "n ranges from 0 to 1000",
+    "Together the arrays hold between 1 and 2000 values",
+    "Entries of nums1 and nums2 all sit between -10^6 and 10^6",
   ],
   hints: [
     "Binary search on the smaller array",

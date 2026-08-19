@@ -7,20 +7,22 @@ export const dsaFindFirstLastPositionScenario: DSAScenario = {
   pattern: "binary-search",
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Microsoft", "NVIDIA"],
-  description: "Find the starting and ending position of a target value in a sorted array",
+  description: "Locate the first and last index of a target value in a sorted array",
   tags: ["array", "binary-search"],
   estimatedTime: 25,
-  problemStatement: `Given an array of integers nums sorted in non-decreasing order, find the starting and ending position of a given target value. If target is not found in the array, return [-1, -1]. You must write an algorithm with O(log n) runtime complexity.`,
+  problemStatement: `You're handed an integer array nums sorted in non-decreasing order, along with a target value. Work out the index range that target occupies: the position where it first shows up and the position where it last does, returned as a pair. If nums doesn't contain target anywhere, return [-1, -1].
+
+Your solution needs to run in O(log n) time.`,
   examples: [
-    { input: "nums = [5,7,7,8,8,10], target = 8", output: "[3,4]" },
-    { input: "nums = [5,7,7,8,8,10], target = 6", output: "[-1,-1]" },
-    { input: "nums = [], target = 0", output: "[-1,-1]" },
+    { input: "nums = [2,4,4,4,9,11], target = 4", output: "[1,3]" },
+    { input: "nums = [2,4,4,4,9,11], target = 7", output: "[-1,-1]" },
+    { input: "nums = [], target = 3", output: "[-1,-1]" },
   ],
   constraints: [
-    "0 <= nums.length <= 10^5",
-    "-10^9 <= nums[i] <= 10^9",
-    "nums is a non-decreasing array",
-    "-10^9 <= target <= 10^9",
+    "nums holds anywhere from 0 to 10^5 values",
+    "Each entry of nums fits between -10^9 and 10^9",
+    "Values in nums never decrease from left to right",
+    "target also fits between -10^9 and 10^9",
   ],
   hints: [
     "Use two separate binary searches",

@@ -10,26 +10,24 @@ export const dsaBstIteratorScenario: DSAScenario = {
   description: "Implement an iterator over a BST",
   tags: ["tree", "bst", "design", "stack"],
   estimatedTime: 25,
-  problemStatement: `Implement the BSTIterator class that represents an iterator over the in-order traversal of a binary search tree (BST):
+  problemStatement: `You're implementing BSTIterator, a class that walks a binary search tree and serves its stored values one at a time in ascending order.
 
-- BSTIterator(TreeNode root) Initializes an object with the root of the BST.
-- boolean hasNext() Returns true if there exists a number in the traversal to the right of the pointer.
-- int next() Moves the pointer to the right, then returns the number at the pointer.
+- BSTIterator(root) receives the tree's root and parks an internal cursor just before the smallest value.
+- next() advances the cursor one position and returns the value it lands on, so the very first call produces the tree's minimum.
+- hasNext() reports whether any value remains beyond the cursor.
 
-Notice that by initializing the pointer to a non-existent smallest number, the first call to next() will return the smallest element in the BST.
-
-You may assume that next() calls will always be valid.`,
+Every call to next() that arrives will be legal: the caller never requests a value once the traversal is exhausted.`,
   examples: [
     {
       input:
-        "BSTIterator([7, 3, 15, null, null, 9, 20]); next(); next(); hasNext(); next(); hasNext(); next(); hasNext(); next(); hasNext();",
-      output: "3, 7, true, 9, true, 15, true, 20, false",
+        "BSTIterator([10, 4, 21, null, null, 14, 27]); next(); next(); hasNext(); next(); hasNext(); next(); hasNext(); next(); hasNext();",
+      output: "4, 10, true, 14, true, 21, true, 27, false",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in range [1, 10^5]",
-    "0 <= Node.val <= 10^6",
-    "At most 10^5 calls will be made to hasNext and next",
+    "Expect anywhere from 1 to 10^5 nodes in the tree",
+    "Values sit inside 0 <= Node.val <= 10^6",
+    "hasNext and next together receive at most 10^5 calls",
   ],
   hints: [
     "Use a stack to simulate inorder traversal",

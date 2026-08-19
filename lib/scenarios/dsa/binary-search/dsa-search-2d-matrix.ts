@@ -10,16 +10,18 @@ export const dsaSearch2dMatrixScenario: DSAScenario = {
   description: "Search for a value in an m x n matrix with sorted rows",
   tags: ["array", "binary-search", "matrix"],
   estimatedTime: 20,
-  problemStatement: `You are given an m x n integer matrix with the following properties: Each row is sorted in non-decreasing order. The first integer of each row is greater than the last integer of the previous row. Given an integer target, return true if target is in matrix or false otherwise. You must write a solution in O(log(m * n)) time complexity.`,
+  problemStatement: `You're working with an m x n integer grid called matrix that keeps two promises: within any row, values never decrease from left to right, and every row opens with a value strictly greater than the last value of the row above it.
+
+Determine whether the integer target appears in matrix at all. Return true when it's present and false when it's not. Your solution has to run in O(log(m * n)) time.`,
   examples: [
-    { input: "matrix = [[1,3,5,7],[10,11,16,20],[23,30,34,60]], target = 3", output: "true" },
-    { input: "matrix = [[1,3,5,7],[10,11,16,20],[23,30,34,60]], target = 13", output: "false" },
+    { input: "matrix = [[2,4,6,9],[12,15,19,21],[26,31,44,58]], target = 6", output: "true" },
+    { input: "matrix = [[2,4,6,9],[12,15,19,21],[26,31,44,58]], target = 17", output: "false" },
   ],
   constraints: [
-    "m == matrix.length",
-    "n == matrix[i].length",
-    "1 <= m, n <= 100",
-    "-10^4 <= matrix[i][j], target <= 10^4",
+    "m counts the rows of matrix",
+    "n counts the entries in each row",
+    "Both m and n fall between 1 and 100",
+    "Every cell of matrix, and target too, lies between -10^4 and 10^4",
   ],
   hints: [
     "Treat matrix as a 1D sorted array",

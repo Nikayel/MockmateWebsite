@@ -10,35 +10,33 @@ export const dsaKthSmallestBstScenario: DSAScenario = {
   description: "Find the kth smallest element in a BST.",
   tags: ["tree", "dfs", "bst"],
   estimatedTime: 20,
-  problemStatement: `Given the root of a binary search tree, and an integer k, return the kth smallest value (1-indexed) of all the values of the nodes in the tree.
-
-Example:
+  problemStatement: `You're given the root of a binary search tree and an integer k. Rank every value stored in the tree from smallest to largest, then return the value holding rank k, where k = 1 names the smallest.
 
 \`\`\`
-        5
-       / \\
-      3   6
-     / \\
-    2   4
-   /
-  1
+        20
+       /  \\
+     12    26
+    /  \\
+   8   16
+  /
+ 6
 \`\`\`
 
-For this tree, k = 1 returns 1 and k = 3 returns 3.`,
+For the tree above, k = 1 gives 6 and k = 3 gives 12.`,
   examples: [
     {
-      input: "root = [3,1,4,null,2], k = 1",
-      output: "1",
+      input: "root = [8,5,9,null,7], k = 1",
+      output: "5",
     },
     {
-      input: "root = [5,3,6,2,4,null,null,1], k = 3",
-      output: "3",
+      input: "root = [20,12,26,8,16,null,null,6], k = 3",
+      output: "12",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is n.",
-    "1 <= k <= n <= 10^4",
-    "0 <= Node.val <= 10^4",
+    "Let n be the tree's node count.",
+    "k satisfies 1 <= k <= n <= 10^4",
+    "Values stay within 0 <= Node.val <= 10^4",
   ],
   hints: [
     "Inorder traversal of BST gives sorted order",

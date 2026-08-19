@@ -10,24 +10,24 @@ export const dsaClosestBstValueScenario: DSAScenario = {
   description: "Find the value in BST closest to a given target",
   tags: ["tree", "bst", "binary-search"],
   estimatedTime: 15,
-  problemStatement: `Given the root of a binary search tree and a target value, return the value in the BST that is closest to the target.
+  problemStatement: `You're handed the root of a binary search tree and a floating-point number target. Find the stored value sitting nearest to target, measured by absolute difference, and return it.
 
-If there are multiple answers, print the smallest.`,
+When target lands exactly halfway between two stored values, both are equally near. Break that tie by returning the smaller value.`,
   examples: [
     {
-      input: "root = [4,2,5,1,3], target = 3.714286",
-      output: "4",
-      explanation: "The closest value to 3.714286 is 4.",
+      input: "root = [8,5,12,3,6], target = 7.204918",
+      output: "8",
+      explanation: "Among 3, 5, 6, 8, and 12, the value 8 sits nearest to 7.204918.",
     },
     {
-      input: "root = [1], target = 4.428571",
-      output: "1",
+      input: "root = [6], target = 2.153846",
+      output: "6",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in range [1, 10^4]",
-    "0 <= Node.val <= 10^9",
-    "-10^9 <= target <= 10^9",
+    "The tree carries between 1 and 10^4 nodes",
+    "Stored values obey 0 <= Node.val <= 10^9",
+    "The target satisfies -10^9 <= target <= 10^9",
   ],
   hints: [
     "Use BST property to navigate: go left if target < node, right if target > node",

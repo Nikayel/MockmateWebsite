@@ -10,23 +10,25 @@ export const dsaTwoSumBstScenario: DSAScenario = {
   description: "Find if two nodes in BST sum to target value",
   tags: ["tree", "bst", "two-pointers", "hash-table"],
   estimatedTime: 20,
-  problemStatement: `Given the root of a binary search tree and an integer k, return true if there exist two elements in the BST such that their sum is equal to k, or false otherwise.`,
+  problemStatement: `You're given the root of a binary search tree and an integer k. Decide whether two nodes in the tree hold values that sum to exactly k, returning true when such a pair exists and false otherwise.
+
+The pair must consist of two distinct nodes. A single node never pairs with itself, so a value only contributes twice when the tree genuinely stores it on two nodes.`,
   examples: [
     {
-      input: "root = [5,3,6,2,4,null,7], k = 9",
+      input: "root = [11,6,14,3,8,null,17], k = 17",
       output: "true",
-      explanation: "2 + 7 = 9 or 3 + 6 = 9",
+      explanation: "3 + 14 = 17, and 6 + 11 = 17 works as well.",
     },
     {
-      input: "root = [5,3,6,2,4,null,7], k = 28",
+      input: "root = [11,6,14,3,8,null,17], k = 33",
       output: "false",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in range [1, 10^4]",
-    "-10^4 <= Node.val <= 10^4",
-    "root is guaranteed to be a valid binary search tree",
-    "-10^5 <= k <= 10^5",
+    "Between 1 and 10^4 nodes are present",
+    "Stored values satisfy -10^4 <= Node.val <= 10^4",
+    "The tree rooted at root is always a valid binary search tree",
+    "The target obeys -10^5 <= k <= 10^5",
   ],
   hints: [
     "Use inorder traversal to get sorted array, then use two pointers",

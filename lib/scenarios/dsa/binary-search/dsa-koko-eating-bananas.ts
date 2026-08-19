@@ -10,13 +10,19 @@ export const dsaKokoEatingBananasScenario: DSAScenario = {
   description: "Find the minimum eating speed to finish all bananas within h hours",
   tags: ["array", "binary-search"],
   estimatedTime: 25,
-  problemStatement: `Koko loves to eat bananas. There are n piles of bananas, the ith pile has piles[i] bananas. The guards have gone and will come back in h hours. Koko can decide her bananas-per-hour eating speed of k. Each hour, she chooses a pile and eats k bananas from it. If the pile has less than k bananas, she eats all of them and won't eat any more bananas during that hour. Return the minimum integer k such that she can eat all the bananas within h hours.`,
+  problemStatement: `Koko is facing n piles of bananas, with piles[i] bananas in pile i, and the guards will be away for h hours. She wants to settle on an eating speed of k bananas per hour and stick with it. Every hour she picks a single pile and eats k bananas from it; if fewer than k are left in that pile, she finishes the pile and waits out the rest of the hour anyway.
+
+Return the smallest whole-number speed k that lets her clear every pile before the guards return, within h hours.`,
   examples: [
-    { input: "piles = [3,6,7,11], h = 8", output: "4" },
-    { input: "piles = [30,11,23,4,20], h = 5", output: "30" },
-    { input: "piles = [30,11,23,4,20], h = 6", output: "23" },
+    { input: "piles = [4,5,9,10], h = 6", output: "5" },
+    { input: "piles = [25,9,17,3,14], h = 5", output: "25" },
+    { input: "piles = [25,9,17,3,14], h = 6", output: "17" },
   ],
-  constraints: ["1 <= piles.length <= 10^4", "piles.length <= h <= 10^9", "1 <= piles[i] <= 10^9"],
+  constraints: [
+    "piles holds between 1 and 10^4 piles",
+    "h is at least piles.length and at most 10^9",
+    "A single pile contains between 1 and 10^9 bananas",
+  ],
   hints: [
     "Binary search on the eating speed k",
     "For each speed, calculate hours needed",

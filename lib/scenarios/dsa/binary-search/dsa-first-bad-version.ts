@@ -10,24 +10,22 @@ export const dsaFirstBadVersionScenario: DSAScenario = {
   description: "Find the first bad version using binary search with minimal API calls",
   tags: ["binary-search", "interactive"],
   estimatedTime: 15,
-  problemStatement: `You are a product manager and currently leading a team to develop a new product. Unfortunately, the latest version of your product fails the quality check. Since each version is developed based on the previous version, all the versions after a bad version are also bad.
+  problemStatement: `Your team cuts releases one after another, numbered 1 through n, and each release builds directly on the one before it. A regression slipped in at some point: one version failed the quality gate, and every version after it inherits the defect. Everything before it is clean.
 
-Suppose you have n versions [1, 2, ..., n] and you want to find out the first bad one, which causes all the following ones to be bad.
-
-You are given an API bool isBadVersion(version) which returns whether version is bad. Implement a function to find the first bad version. You should minimize the number of calls to the API.`,
+There's an API you can call, bool isBadVersion(version), which reports whether a given version is defective. Find the number of the first bad version, and keep your API calls to a minimum.`,
   examples: [
     {
-      input: "n = 5, bad = 4",
-      output: "4",
+      input: "n = 9, bad = 6",
+      output: "6",
       explanation:
-        "isBadVersion(3) -> false, isBadVersion(5) -> true, isBadVersion(4) -> true. So 4 is the first bad version.",
+        "isBadVersion(5) -> false, isBadVersion(7) -> true, isBadVersion(6) -> true. Version 6 is where the breakage starts.",
     },
     {
       input: "n = 1, bad = 1",
       output: "1",
     },
   ],
-  constraints: ["1 <= bad <= n <= 2^31 - 1"],
+  constraints: ["bad is at least 1, n can climb to 2^31 - 1, and bad never exceeds n"],
   hints: [
     "Classic binary search application",
     "Search for leftmost true in a boolean array",

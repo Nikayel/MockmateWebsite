@@ -10,19 +10,19 @@ export const dsaSearchInsertPositionScenario: DSAScenario = {
   description: "Find the index where a target should be inserted in a sorted array",
   tags: ["array", "binary-search"],
   estimatedTime: 15,
-  problemStatement: `Given a sorted array of distinct integers and a target value, return the index if the target is found. If not, return the index where it would be if it were inserted in order.
+  problemStatement: `You're given nums, a sorted array of distinct integers, plus a target value. When target already appears in nums, return its index. When it doesn't, return the index it would need to slot into so the array stays sorted.
 
-You must write an algorithm with O(log n) runtime complexity.`,
+Your solution is expected to run in O(log n) time.`,
   examples: [
-    { input: "nums = [1,3,5,6], target = 5", output: "2" },
-    { input: "nums = [1,3,5,6], target = 2", output: "1" },
-    { input: "nums = [1,3,5,6], target = 7", output: "4" },
+    { input: "nums = [2,4,7,9], target = 7", output: "2" },
+    { input: "nums = [2,4,7,9], target = 5", output: "2" },
+    { input: "nums = [2,4,7,9], target = 12", output: "4" },
   ],
   constraints: [
-    "1 <= nums.length <= 10^4",
-    "-10^4 <= nums[i] <= 10^4",
-    "nums contains distinct values sorted in ascending order.",
-    "-10^4 <= target <= 10^4",
+    "nums holds between 1 and 10^4 values",
+    "Entries range from -10^4 up to 10^4",
+    "No duplicates: nums is strictly increasing.",
+    "target stays within -10^4 to 10^4",
   ],
   hints: [
     "Binary search for leftmost position where element >= target",

@@ -10,33 +10,29 @@ export const dsaSearchRotatedSortedArrayScenario: DSAScenario = {
   description: "Search for a target value in a rotated sorted array",
   tags: ["array", "binary-search"],
   estimatedTime: 20,
-  problemStatement: `There is an integer array nums sorted in ascending order (with distinct values).
+  problemStatement: `You're looking at nums, an array of distinct integers that was sorted in ascending order before it reached you. Along the way it may have been rotated around a hidden position: everything before that position was sliced off the front and reattached after the rest. Rotating [3,5,8,11,14] at position 2, for example, turns it into [8,11,14,3,5].
 
-Prior to being passed to your function, nums is possibly rotated at an unknown pivot index k (1 <= k < nums.length) such that the resulting array is [nums[k], nums[k+1], ..., nums[n-1], nums[0], nums[1], ..., nums[k-1]] (0-indexed). For example, [0,1,2,4,5,6,7] might be rotated at pivot index 3 and become [4,5,6,7,0,1,2].
-
-Given the array nums after the possible rotation and an integer target, return the index of target if it is in nums, or -1 if it is not in nums.
-
-You must write an algorithm with O(log n) runtime complexity.`,
+Find where target lives in this possibly-rotated array and return that index, or return -1 when target isn't there at all. Your solution has to run in O(log n) time.`,
   examples: [
     {
-      input: "nums = [4,5,6,7,0,1,2], target = 0",
+      input: "nums = [9,12,15,1,4,6], target = 4",
       output: "4",
     },
     {
-      input: "nums = [4,5,6,7,0,1,2], target = 3",
+      input: "nums = [9,12,15,1,4,6], target = 8",
       output: "-1",
     },
     {
-      input: "nums = [1], target = 0",
+      input: "nums = [2], target = 5",
       output: "-1",
     },
   ],
   constraints: [
-    "1 <= nums.length <= 5000",
-    "-10^4 <= nums[i] <= 10^4",
-    "All values of nums are unique",
-    "nums is an ascending array that is possibly rotated",
-    "-10^4 <= target <= 10^4",
+    "nums holds between 1 and 5000 entries",
+    "Every entry lies within -10^4 to 10^4",
+    "Values never repeat inside nums",
+    "Before any rotation, nums was sorted ascending",
+    "target is also bounded by -10^4 and 10^4",
   ],
   hints: [
     "Use modified binary search",

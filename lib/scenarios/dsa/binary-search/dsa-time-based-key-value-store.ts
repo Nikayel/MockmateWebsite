@@ -11,25 +11,25 @@ export const dsaTimeBasedKeyValueStoreScenario: DSAScenario = {
   description: "Design a time-based key-value store with get by timestamp",
   tags: ["binary-search", "design", "hash-table"],
   estimatedTime: 30,
-  problemStatement: `Design a time-based key-value data structure that can store multiple values for the same key at different time stamps and retrieve the key's value at a certain timestamp.
+  problemStatement: `Build a key-value store where every write carries a time stamp, so one key can accumulate many values over its history, and reads ask what a key's value was as of a given moment.
 
-Implement the TimeMap class:
-- TimeMap() Initializes the object.
-- void set(String key, String value, int timestamp) Stores the key with the value at the given timestamp.
-- String get(String key, int timestamp) Returns a value such that set was called previously with timestamp_prev <= timestamp. If there are multiple such values, return the value with the largest timestamp_prev. If there are no values, return "".`,
+Concretely, implement the TimeMap class:
+- TimeMap() sets up an empty store.
+- void set(String key, String value, int timestamp) records value for key at time timestamp.
+- String get(String key, int timestamp) considers every set made to key with a stamp at or before timestamp and returns the value from the latest of them. When nothing was stored for key that early, it returns "".`,
   examples: [
     {
       input:
-        '["TimeMap","set","get","get","set","get","get"]\n[[],["foo","bar",1],["foo",1],["foo",3],["foo","bar2",4],["foo",4],["foo",5]]',
-      output: '[null,null,"bar","bar",null,"bar2","bar2"]',
+        '["TimeMap","set","get","get","set","get","get"]\n[[],["plan","draft",2],["plan",2],["plan",6],["plan","final",7],["plan",7],["plan",9]]',
+      output: '[null,null,"draft","draft",null,"final","final"]',
     },
   ],
   constraints: [
-    "1 <= key.length, value.length <= 100",
-    "key and value consist of lowercase English letters and digits.",
-    "1 <= timestamp <= 10^7",
-    "All timestamps are strictly increasing for set.",
-    "At most 2 * 10^5 calls to set and get.",
+    "key and value each run from 1 to 100 characters.",
+    "Lowercase English letters and digits are the only characters in key and value.",
+    "timestamp lies between 1 and 10^7.",
+    "Successive calls to set always arrive with strictly increasing timestamps.",
+    "set and get are invoked at most 2 * 10^5 times combined.",
   ],
   hints: [
     "Store {key: [(timestamp, value), ...]} where list is sorted by timestamp",

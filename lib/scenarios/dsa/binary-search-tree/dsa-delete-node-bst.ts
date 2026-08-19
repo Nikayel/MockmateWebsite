@@ -10,39 +10,35 @@ export const dsaDeleteNodeBstScenario: DSAScenario = {
   description: "Delete a node from a binary search tree",
   tags: ["tree", "bst", "recursion"],
   estimatedTime: 25,
-  problemStatement: `Given a root node reference of a BST and a key, delete the node with the given key in the BST. Return the root node reference (possibly updated) of the BST.
+  problemStatement: `You're maintaining a binary search tree handed to you as root, and you receive an integer key. If some node stores key, remove that node; either way, return the root of the resulting tree. Whatever remains must still be a valid BST, and whenever several rearrangements satisfy that, any one of them is accepted.
 
-Basically, the deletion can be divided into two stages:
-1. Search for a node to remove.
-2. If the node is found, delete the node.
-
-Example, deleting the key 3:
+One accepted way to remove 6:
 
 \`\`\`
-Before                 After
-    5                    5
-   / \\                  / \\
-  3   6                 4   6
- / \\                   /
-2   4                 2
+Before                  After
+     9                     9
+    / \\                   / \\
+   6   11                7   11
+  / \\    \\              /     \\
+ 4   7    14            4      14
 \`\`\``,
   examples: [
     {
-      input: "root = [5,3,6,2,4,null,7], key = 3",
-      output: "[5,4,6,2,null,null,7]",
-      explanation: "One valid answer is [5,4,6,2,null,null,7].",
+      input: "root = [9,6,11,4,7,null,14], key = 6",
+      output: "[9,7,11,4,null,null,14]",
+      explanation: "One accepted result; other valid BSTs over the remaining values pass too.",
     },
     {
-      input: "root = [5,3,6,2,4,null,7], key = 0",
-      output: "[5,3,6,2,4,null,7]",
-      explanation: "The tree does not contain a node with value = 0.",
+      input: "root = [9,6,11,4,7,null,14], key = 2",
+      output: "[9,6,11,4,7,null,14]",
+      explanation: "No node stores 2, so the tree comes back unchanged.",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in range [0, 10^4]",
-    "-10^5 <= Node.val <= 10^5",
-    "Each node has a unique value",
-    "root is a valid binary search tree",
+    "Anywhere from 0 to 10^4 nodes may be present",
+    "Values fall within -10^5 <= Node.val <= 10^5",
+    "No value appears on two different nodes",
+    "The tree you receive is a valid binary search tree",
   ],
   hints: [
     "Handle three cases: leaf node, one child, two children",

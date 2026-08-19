@@ -10,26 +10,26 @@ export const dsaBinarySearchScenario: DSAScenario = {
   description: "Implement binary search on a sorted array",
   tags: ["array", "binary-search"],
   estimatedTime: 15,
-  problemStatement: `Given an array of integers nums which is sorted in ascending order, and an integer target, write a function to search target in nums. If target exists, then return its index. Otherwise, return -1.
+  problemStatement: `You're given a sorted integer array nums, arranged in increasing order, plus an integer target. Track down where target sits in nums and return that index. When target isn't present at all, return -1.
 
-You must write an algorithm with O(log n) runtime complexity.`,
+Your solution has to run in O(log n) time.`,
   examples: [
     {
-      input: "nums = [-1,0,3,5,9,12], target = 9",
+      input: "nums = [-8,-3,0,4,7,10,14], target = 7",
       output: "4",
-      explanation: "9 exists in nums and its index is 4",
+      explanation: "7 is in nums, sitting at index 4",
     },
     {
-      input: "nums = [-1,0,3,5,9,12], target = 2",
+      input: "nums = [-8,-3,0,4,7,10,14], target = 5",
       output: "-1",
-      explanation: "2 does not exist in nums so return -1",
+      explanation: "5 never appears in nums, so the answer is -1",
     },
   ],
   constraints: [
-    "1 <= nums.length <= 10^4",
-    "-10^4 < nums[i], target < 10^4",
-    "All the integers in nums are unique",
-    "nums is sorted in ascending order",
+    "nums holds between 1 and 10^4 entries",
+    "Every value in nums, and target itself, sits strictly between -10^4 and 10^4",
+    "No value appears in nums more than once",
+    "nums comes to you already sorted, smallest to largest",
   ],
   hints: [
     "Use two pointers: left and right",

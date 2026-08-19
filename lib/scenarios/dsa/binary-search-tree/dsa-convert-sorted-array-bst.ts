@@ -10,37 +10,36 @@ export const dsaConvertSortedArrayBstScenario: DSAScenario = {
   description: "Convert sorted array to height-balanced BST",
   tags: ["tree", "bst", "divide-and-conquer", "array"],
   estimatedTime: 20,
-  problemStatement: `Given an integer array nums where the elements are sorted in ascending order, convert it to a height-balanced binary search tree.
+  problemStatement: `You're given nums, an integer array already sorted in ascending order. Turn it into a binary search tree that uses every element exactly once, then return the tree's root. One structural requirement applies: the result must be height-balanced, meaning the two subtrees under any node differ in height by at most one.
 
-A height-balanced binary tree is a binary tree in which the depth of the two subtrees of every node never differs by more than one.
-
-Example, for nums = [-10, -3, 0, 5, 9], one height-balanced answer is:
+One height-balanced possibility for nums = [-7, -2, 3, 8, 12]:
 
 \`\`\`
-        0
+        3
        / \\
-     -3   9
+     -2   12
      /   /
-  -10   5
+   -7   8
 \`\`\`
 
-More than one arrangement is valid, so any height-balanced BST over the same values is accepted.`,
+The shape is not unique. Your answer is accepted whenever it is a height-balanced BST holding exactly the values of nums.`,
   examples: [
     {
-      input: "nums = [-10,-3,0,5,9]",
-      output: "[0,-3,9,-10,null,5]",
-      explanation: "One valid BST is [0,-3,9,-10,null,5].",
+      input: "nums = [-7,-2,3,8,12]",
+      output: "[3,-2,12,-7,null,8]",
+      explanation:
+        "One accepted tree; any other height-balanced arrangement of the same values also passes.",
     },
     {
-      input: "nums = [1,3]",
-      output: "[3,1] or [1,null,3]",
-      explanation: "Either tree is valid.",
+      input: "nums = [2,6]",
+      output: "[6,2] or [2,null,6]",
+      explanation: "Both shapes are height-balanced, so either is accepted.",
     },
   ],
   constraints: [
-    "1 <= nums.length <= 10^4",
-    "-10^4 <= nums[i] <= 10^4",
-    "nums is sorted in strictly increasing order",
+    "nums holds at least 1 and at most 10^4 elements",
+    "Each entry satisfies -10^4 <= nums[i] <= 10^4",
+    "Entries appear in strictly increasing order, with no repeats",
   ],
   hints: [
     "Choose middle element as root for balance",

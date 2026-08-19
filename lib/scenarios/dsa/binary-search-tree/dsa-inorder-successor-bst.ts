@@ -10,26 +10,26 @@ export const dsaInorderSuccessorBstScenario: DSAScenario = {
   description: "Find the inorder successor of a node in BST",
   tags: ["tree", "bst", "binary-search"],
   estimatedTime: 20,
-  problemStatement: `Given the root of a binary search tree and a node p in it, return the in-order successor of that node in the BST. If the given node has no in-order successor in the tree, return null.
+  problemStatement: `You're given the root of a binary search tree and p, a node that lives somewhere inside it. Locate p's in-order successor and return that node, or return null when p has none.
 
-The successor of a node p is the node with the smallest key greater than p.val.`,
+The in-order successor is the node whose key is the smallest one strictly greater than p.val. Equivalently, if you wrote out every key in ascending order, the successor is the node that would appear immediately after p.`,
   examples: [
     {
-      input: "root = [2,1,3], p = 1",
-      output: "2",
-      explanation: "1's in-order successor node is 2.",
+      input: "root = [7,4,9], p = 4",
+      output: "7",
+      explanation: "The smallest key greater than 4 is 7.",
     },
     {
-      input: "root = [5,3,6,2,4,null,null,1], p = 6",
+      input: "root = [12,8,15,5,10,null,null,3], p = 15",
       output: "null",
-      explanation: "6 has no successor since it's the largest.",
+      explanation: "15 is the largest key in the tree, so nothing follows it.",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in range [1, 10^4]",
-    "-10^5 <= Node.val <= 10^5",
-    "All values in the tree are unique",
-    "p is a node in the given BST",
+    "Node count sits between 1 and 10^4",
+    "Every key obeys -10^5 <= Node.val <= 10^5",
+    "Keys never repeat within the tree",
+    "p always refers to a node present in the given BST",
   ],
   hints: [
     "If p has a right subtree, successor is leftmost node in right subtree",

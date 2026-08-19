@@ -10,15 +10,13 @@ export const dsaSerializeDeserializeBstScenario: DSAScenario = {
   description: "Design algorithm to serialize and deserialize a BST",
   tags: ["tree", "bst", "design", "string"],
   estimatedTime: 30,
-  problemStatement: `Serialization is converting a data structure or object into a sequence of bits so that it can be stored in a file or memory buffer, or transmitted across a network connection link to be reconstructed later in the same or another computer environment.
+  problemStatement: `You're building a Codec for binary search trees: serialize(root) flattens a BST into a single string, and deserialize(data) reads such a string and reconstructs a tree with identical structure and values. A full round trip through both methods must reproduce the original tree exactly.
 
-Design an algorithm to serialize and deserialize a binary search tree. There is no restriction on how your serialization/deserialization algorithm should work. You need to ensure that a binary search tree can be serialized to a string, and this string can be deserialized to the original tree structure.
-
-The encoded string should be as compact as possible.`,
+The wire format is entirely yours to choose. Aim for a lean encoding rather than a padded one; part of the exercise is deciding how little information the string really has to carry.`,
   examples: [
     {
-      input: "root = [2,1,3]",
-      output: "[2,1,3]",
+      input: "root = [6,4,9]",
+      output: "[6,4,9]",
     },
     {
       input: "root = []",
@@ -26,9 +24,9 @@ The encoded string should be as compact as possible.`,
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in range [0, 10^4]",
-    "0 <= Node.val <= 10^4",
-    "The input tree is guaranteed to be a binary search tree",
+    "The tree can hold anywhere from 0 to 10^4 nodes",
+    "Values lie in 0 <= Node.val <= 10^4",
+    "Whatever tree you receive is a valid binary search tree",
   ],
   hints: [
     "Preorder traversal uniquely defines a BST (no need for null markers)",

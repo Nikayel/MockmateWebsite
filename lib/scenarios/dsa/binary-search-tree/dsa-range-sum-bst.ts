@@ -10,36 +10,36 @@ export const dsaRangeSumBstScenario: DSAScenario = {
   description: "Calculate sum of values within a range in BST",
   tags: ["tree", "bst", "dfs"],
   estimatedTime: 15,
-  problemStatement: `Given the root node of a binary search tree and two integers low and high, return the sum of values of all nodes with a value in the inclusive range [low, high].
+  problemStatement: `You're given the root of a binary search tree plus two integers, low and high, which mark out an inclusive band [low, high]. Add up every stored value v satisfying low <= v <= high, endpoints included, and return that total.
 
-Example, with low = 7 and high = 15:
+Take low = 9 and high = 23 on this tree:
 
 \`\`\`
-       10
+       16
       /  \\
-     5   15
-    / \\    \\
-   3   7    18
+     9    23
+    / \\     \\
+   4  12     27
 \`\`\`
 
-The values inside the range are 7, 10 and 15, so the answer is 32.`,
+The values 9, 12, 16, and 23 fall inside the band, so the correct return value is 60.`,
   examples: [
     {
-      input: "root = [10,5,15,3,7,null,18], low = 7, high = 15",
-      output: "32",
-      explanation: "Nodes 7, 10, and 15 are in range [7, 15]. 7 + 10 + 15 = 32.",
+      input: "root = [16,9,23,4,12,null,27], low = 9, high = 23",
+      output: "60",
+      explanation: "9, 12, 16, and 23 land inside [9, 23]; together they total 60.",
     },
     {
-      input: "root = [10,5,15,3,7,13,18,1,null,6], low = 6, high = 10",
-      output: "23",
-      explanation: "Nodes 6, 7, and 10 are in range [6, 10]. 6 + 7 + 10 = 23.",
+      input: "root = [16,9,23,4,12,20,27,2,null,10], low = 10, high = 16",
+      output: "38",
+      explanation: "Only 10, 12, and 16 qualify, and 10 + 12 + 16 = 38.",
     },
   ],
   constraints: [
-    "The number of nodes in the tree is in range [1, 2 * 10^4]",
-    "1 <= Node.val <= 10^5",
-    "1 <= low <= high <= 10^5",
-    "All Node.val are unique",
+    "Node count runs from 1 up to 2 * 10^4",
+    "Each stored value obeys 1 <= Node.val <= 10^5",
+    "The band satisfies 1 <= low <= high <= 10^5",
+    "No value appears twice in the tree",
   ],
   hints: [
     "Use BST property to prune search space",
