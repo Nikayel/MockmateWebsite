@@ -11,16 +11,16 @@ export const dsaValidAnagramScenario: DSAScenario = {
   description: "Determine if two strings are anagrams of each other",
   tags: ["string", "hash-table", "sorting"],
   estimatedTime: 15,
-  problemStatement: `Given two strings s and t, return true if t is an anagram of s, and false otherwise.
+  problemStatement: `You're given two strings s and t. Decide whether t is an anagram of s: return true if it is, false if it is not.
 
-An Anagram is a word or phrase formed by rearranging the letters of a different word or phrase, typically using all the original letters exactly once.`,
+An anagram reorders all the letters of one string into another, spending each letter exactly as many times as it occurs in the original.`,
   examples: [
-    { input: 's = "anagram", t = "nagaram"', output: "true" },
-    { input: 's = "rat", t = "car"', output: "false" },
+    { input: 's = "dusty", t = "study"', output: "true" },
+    { input: 's = "grab", t = "crab"', output: "false" },
   ],
   constraints: [
-    "1 <= s.length, t.length <= 5 * 10^4",
-    "s and t consist of lowercase English letters",
+    "s and t each contain between 1 and 5 * 10^4 characters.",
+    "Both strings are made of lowercase English letters only.",
   ],
   hints: [
     "Count character frequencies in both strings",

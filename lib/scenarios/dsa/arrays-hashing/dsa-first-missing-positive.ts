@@ -11,22 +11,27 @@ export const dsaFirstMissingPositiveScenario: DSAScenario = {
   description: "Find smallest missing positive integer in O(n) time and O(1) space.",
   tags: ["array", "hash-table"],
   estimatedTime: 30,
-  problemStatement: `Given an unsorted integer array nums, return the smallest missing positive integer. Must run in O(n) time and use O(1) auxiliary space.`,
+  problemStatement: `You're given an integer array nums in no particular order. Find the smallest positive integer missing from it and return that value.
+
+Your solution has to hit O(n) time while staying within O(1) extra memory.`,
   examples: [
     {
-      input: "nums = [1,2,0]",
+      input: "nums = [1,3,2,0]",
+      output: "4",
+    },
+    {
+      input: "nums = [2,-6,1,5]",
       output: "3",
     },
     {
-      input: "nums = [3,4,-1,1]",
-      output: "2",
-    },
-    {
-      input: "nums = [7,8,9,11,12]",
+      input: "nums = [10,12,14,15,16]",
       output: "1",
     },
   ],
-  constraints: ["1 <= nums.length <= 10^5", "-2^31 <= nums[i] <= 2^31 - 1"],
+  constraints: [
+    "nums holds between 1 and 10^5 entries.",
+    "Entries can be as low as -2^31 and as high as 2^31 - 1.",
+  ],
   hints: [
     "Use array itself as hash table",
     "Place each number n at index n-1 if possible",

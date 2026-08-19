@@ -7,24 +7,24 @@ export const dsaEncodeDecodeStringsScenario: DSAScenario = {
   pattern: "arrays-hashing",
   difficulty: "medium",
   companies: ["Google", "Meta", "Amazon", "Apple"],
-  description: "Design an algorithm to encode and decode a list of strings",
+  description: "Pack a list of strings into one string and losslessly unpack it back",
   tags: ["string", "design", "array"],
   estimatedTime: 25,
-  problemStatement: `Design an algorithm to encode a list of strings to a single string. The encoded string is then decoded back to the original list of strings.
+  problemStatement: `You're working with a list of strings strs. Produce a single string that captures the whole list, and be able to rebuild the exact original list from that single string alone.
 
-Implement encode and decode functions.`,
+Write two functions: encode, which packs strs into one string, and decode, which takes the encoded string s and recovers the original list. Individual strings can contain any character at all, so the round trip has to survive whatever they hold.`,
   examples: [
     {
-      input: 'strs = ["lint","code","love","you"]',
-      output: '["lint","code","love","you"]',
-      explanation: "Encode to a single string, then decode back to original list",
+      input: 'strs = ["spar","ring","code","gym"]',
+      output: '["spar","ring","code","gym"]',
+      explanation: "encode folds the list into one string, and decode restores the identical list",
     },
-    { input: 'strs = ["we","say",":","yes"]', output: '["we","say",":","yes"]' },
+    { input: 'strs = ["par",";","6;7","ok"]', output: '["par",";","6;7","ok"]' },
   ],
   constraints: [
-    "0 <= strs.length <= 200",
-    "0 <= strs[i].length <= 200",
-    "strs[i] contains any possible characters out of 256 valid ASCII characters",
+    "strs contains between 0 and 200 strings.",
+    "Each individual string has a length from 0 up to 200.",
+    "Any of the 256 valid ASCII characters can appear inside a string.",
   ],
   hints: [
     "Use length prefix: store length + delimiter + string",

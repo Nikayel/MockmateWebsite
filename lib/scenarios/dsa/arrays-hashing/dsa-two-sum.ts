@@ -22,34 +22,32 @@ export const dsaTwoSumScenario: DSAScenario = {
     "Palantir",
   ],
   roles: ["intern", "new-grad", "swe", "fdse"],
-  description: "Find two numbers in an array that add up to a target value",
+  description: "Locate the pair of entries in an array whose sum lands on a target value",
   tags: ["array", "hash-table", "two-pointers"],
   estimatedTime: 15,
-  problemStatement: `Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.
+  problemStatement: `You're given an integer array nums along with an integer target. Exactly one pair of entries in nums sums to target, and a single index can't fill both halves of the pair.
 
-You may assume that each input would have exactly one solution, and you may not use the same element twice.
-
-You can return the answer in any order.`,
+Return the indices of those two entries, in either order.`,
   examples: [
     {
-      input: "nums = [2,7,11,15], target = 9",
-      output: "[0,1]",
-      explanation: "Because nums[0] + nums[1] == 9, we return [0, 1].",
+      input: "nums = [4,11,7,15], target = 18",
+      output: "[1,2]",
+      explanation: "nums[1] + nums[2] = 11 + 7 = 18.",
     },
     {
-      input: "nums = [3,2,4], target = 6",
+      input: "nums = [5,1,9], target = 10",
       output: "[1,2]",
     },
     {
-      input: "nums = [3,3], target = 6",
+      input: "nums = [7,7], target = 14",
       output: "[0,1]",
     },
   ],
   constraints: [
-    "2 <= nums.length <= 10^4",
-    "-10^9 <= nums[i] <= 10^9",
-    "-10^9 <= target <= 10^9",
-    "Only one valid answer exists.",
+    "nums holds between 2 and 10^4 integers.",
+    "Every entry lies between -10^9 and 10^9.",
+    "target also falls between -10^9 and 10^9.",
+    "Exactly one pair adds up to target.",
   ],
   hints: [
     "Try using a hash map to store values you've already seen",

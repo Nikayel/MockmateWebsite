@@ -7,25 +7,20 @@ export const dsaNextPermutationScenario: DSAScenario = {
   pattern: "arrays-hashing",
   difficulty: "medium",
   companies: ["Google", "Amazon", "Microsoft", "Meta", "Apple"],
-  description: "Find the next lexicographically greater permutation of numbers",
+  description: "Advance an array to the permutation that follows it in dictionary order",
   tags: ["array", "two-pointers"],
   estimatedTime: 25,
-  problemStatement: `A permutation of an array of integers is an arrangement of its members into a sequence or linear order.
+  problemStatement: `You're given an integer array nums. Treat its contents as one arrangement out of all the possible orderings of those same values, and imagine every ordering listed in lexicographic (dictionary) order.
 
-The next permutation of an array of integers is the next lexicographically greater permutation of its integer. If such arrangement is not possible, the array must be rearranged as the lowest possible order (i.e., sorted in ascending order).
+Rearrange nums into the ordering that comes immediately after its current one in that list. If nums is already the last ordering, cycle back to the first one, which is the values in ascending order. For instance, [2,4,6] becomes [2,6,4], while [9,7,4] has nothing after it and wraps around to [4,7,9].
 
-For example:
-- For arr = [1,2,3], the next permutation is [1,3,2].
-- For arr = [3,2,1], the next permutation is [1,2,3] (no greater permutation exists).
-- For arr = [1,1,5], the next permutation is [1,5,1].
-
-The replacement must be in place and use only constant extra memory.`,
+Carry out the rearrangement in place, using only constant extra memory.`,
   examples: [
-    { input: "nums = [1,2,3]", output: "[1,3,2]" },
-    { input: "nums = [3,2,1]", output: "[1,2,3]" },
-    { input: "nums = [1,1,5]", output: "[1,5,1]" },
+    { input: "nums = [2,4,6]", output: "[2,6,4]" },
+    { input: "nums = [9,7,4]", output: "[4,7,9]" },
+    { input: "nums = [2,2,8]", output: "[2,8,2]" },
   ],
-  constraints: ["1 <= nums.length <= 100", "0 <= nums[i] <= 100"],
+  constraints: ["nums holds between 1 and 100 values.", "Each value sits between 0 and 100."],
   hints: [
     "Find the largest index i such that nums[i] < nums[i+1]",
     "If no such index exists, reverse the entire array",

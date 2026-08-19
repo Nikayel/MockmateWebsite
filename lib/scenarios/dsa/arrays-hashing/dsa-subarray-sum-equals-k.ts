@@ -8,21 +8,30 @@ export const dsaSubarraySumEqualsKScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Meta", "Google", "Amazon", "Microsoft", "Snap", "TikTok", "Reddit", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe", "fdse"],
-  description: "Count subarrays with sum equal to k using prefix sum",
+  description: "Count how many contiguous runs of an array add up to k",
   tags: ["array", "hash-table", "prefix-sum"],
   estimatedTime: 25,
-  problemStatement: `Given an array of integers nums and an integer k, return the total number of subarrays whose sum equals to k.
+  problemStatement: `You're given an integer array nums and an integer k. Count how many subarrays of nums sum to exactly k, and return that count.
 
-A subarray is a contiguous non-empty sequence of elements within an array.`,
+A subarray means a run of one or more elements sitting next to each other in the array, so it is contiguous and never empty.`,
   examples: [
     {
-      input: "nums = [1,1,1], k = 2",
+      input: "nums = [2,2,2], k = 4",
       output: "2",
-      explanation: "Subarrays [1,1] at index 0-1 and 1-2",
+      explanation: "The windows nums[0..1] and nums[1..2] both add up to 4",
     },
-    { input: "nums = [1,2,3], k = 3", output: "2", explanation: "Subarrays [1,2] and [3]" },
+    {
+      input: "nums = [3,2,5], k = 5",
+      output: "2",
+      explanation:
+        "nums[0..1] = 3 + 2 reaches 5, and the single entry nums[2] = 5 matches on its own",
+    },
   ],
-  constraints: ["1 <= nums.length <= 2 * 10^4", "-1000 <= nums[i] <= 1000", "-10^7 <= k <= 10^7"],
+  constraints: [
+    "nums holds between 1 and 2 * 10^4 entries.",
+    "Entries range from -1000 to 1000.",
+    "k lies anywhere between -10^7 and 10^7.",
+  ],
   hints: [
     "Use prefix sum: if prefixSum[j] - prefixSum[i] = k, subarray (i,j] sums to k",
     "Store prefix sums in HashMap with their counts",

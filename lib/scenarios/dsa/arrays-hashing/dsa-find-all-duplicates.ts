@@ -10,19 +10,19 @@ export const dsaFindAllDuplicatesScenario: DSAScenario = {
   description: "Find all duplicates in O(n) time and O(1) extra space",
   tags: ["array", "hash-table"],
   estimatedTime: 20,
-  problemStatement: `Given an integer array nums of length n where all the integers of nums are in the range [1, n] and each integer appears once or twice, return an array of all the integers that appear twice.
+  problemStatement: `You're given an integer array nums with n entries, and every value sits in the range [1, n]. No value shows up more than twice: each one appears either once or twice.
 
-You must write an algorithm that runs in O(n) time and uses only constant extra space.`,
+Collect every value that occurs two times and return those values as an array. Your solution needs to run in O(n) time while using only constant extra space.`,
   examples: [
-    { input: "nums = [4,3,2,7,8,2,3,1]", output: "[2,3]" },
-    { input: "nums = [1,1,2]", output: "[1]" },
-    { input: "nums = [1]", output: "[]" },
+    { input: "nums = [5,4,6,1,1,6,3,8]", output: "[1,6]" },
+    { input: "nums = [2,3,3]", output: "[3]" },
+    { input: "nums = [2,1]", output: "[]" },
   ],
   constraints: [
-    "n == nums.length",
-    "1 <= n <= 10^5",
-    "1 <= nums[i] <= n",
-    "Each element in nums appears once or twice",
+    "n is the size of nums",
+    "n ranges from 1 to 10^5",
+    "Every entry is at least 1 and at most n",
+    "No value occurs more than two times; each shows up once or twice",
   ],
   hints: [
     "Use the array itself as a hash table",

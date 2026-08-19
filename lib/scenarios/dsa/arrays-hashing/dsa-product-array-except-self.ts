@@ -10,25 +10,23 @@ export const dsaProductArrayExceptSelfScenario: DSAScenario = {
   description: "Calculate product of all elements except current element",
   tags: ["array", "prefix-sum"],
   estimatedTime: 25,
-  problemStatement: `Given an integer array nums, return an array answer such that answer[i] is equal to the product of all the elements of nums except nums[i].
+  problemStatement: `You're given an integer array nums. Build a new array answer where each slot answer[i] holds the product of every entry in nums other than nums[i] itself, and return it.
 
-The product of any prefix or suffix of nums is guaranteed to fit in a 32-bit integer.
-
-You must write an algorithm that runs in O(n) time and without using the division operation.`,
+Division is off the table, and your solution has to run in O(n) time. Whatever prefix or suffix of nums you multiply together, the result is promised to fit in a 32-bit integer.`,
   examples: [
     {
-      input: "nums = [1,2,3,4]",
-      output: "[24,12,8,6]",
+      input: "nums = [2,5,3,10]",
+      output: "[150,60,100,30]",
     },
     {
-      input: "nums = [-1,1,0,-3,3]",
-      output: "[0,0,9,0,0]",
+      input: "nums = [4,-2,0,5,-6]",
+      output: "[0,0,240,0,0]",
     },
   ],
   constraints: [
-    "2 <= nums.length <= 10^5",
-    "-30 <= nums[i] <= 30",
-    "The product of any prefix or suffix of nums is guaranteed to fit in a 32-bit integer",
+    "nums holds between 2 and 10^5 entries.",
+    "Each entry sits in the range -30 to 30.",
+    "Multiplying out any prefix or any suffix of nums stays within a 32-bit integer.",
   ],
   hints: [
     "Use two passes: one for prefix products, one for suffix products",

@@ -10,22 +10,25 @@ export const dsaContainsDuplicateScenario: DSAScenario = {
   description: "Determine if an array contains any duplicates",
   tags: ["array", "hash-table", "sorting"],
   estimatedTime: 10,
-  problemStatement: `Given an integer array nums, return true if any value appears at least twice in the array, and return false if every element is distinct.`,
+  problemStatement: `You're given an integer array nums. Decide whether any value shows up more than once: return true if some entry repeats anywhere in nums, and false when all entries are unique.`,
   examples: [
     {
-      input: "nums = [1,2,3,1]",
+      input: "nums = [5,9,2,9]",
       output: "true",
     },
     {
-      input: "nums = [1,2,3,4]",
+      input: "nums = [7,3,8,5]",
       output: "false",
     },
     {
-      input: "nums = [1,1,1,3,3,4,3,2,4,2]",
+      input: "nums = [6,6,6,2,2,8,2,4,8,4]",
       output: "true",
     },
   ],
-  constraints: ["1 <= nums.length <= 10^5", "-10^9 <= nums[i] <= 10^9"],
+  constraints: [
+    "nums contains between 1 and 10^5 entries.",
+    "Each entry falls somewhere between -10^9 and 10^9.",
+  ],
   hints: [
     "Use a Set to track seen numbers",
     "As you iterate, check if the number is already in the set",

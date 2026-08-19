@@ -20,27 +20,27 @@ export const dsaGroupAnagramsScenario: DSAScenario = {
   description: "Group strings that are anagrams of each other",
   tags: ["array", "hash-table", "string", "sorting"],
   estimatedTime: 20,
-  problemStatement: `Given an array of strings strs, group the anagrams together. You can return the answer in any order.
+  problemStatement: `You're given an array of strings strs. Two strings are anagrams when one can be spelled by shuffling the other's letters around, using every letter the same number of times.
 
-An Anagram is a word or phrase formed by rearranging the letters of a different word or phrase, typically using all the original letters exactly once.`,
+Bundle the anagrams of strs into groups and return the groups as a list of lists. Order doesn't matter, either across the groups or inside them.`,
   examples: [
     {
-      input: 'strs = ["eat","tea","tan","ate","nat","bat"]',
-      output: '[["bat"],["nat","tan"],["ate","eat","tea"]]',
+      input: 'strs = ["pots","stop","dear","read","dare","cusp"]',
+      output: '[["pots","stop"],["dear","read","dare"],["cusp"]]',
     },
     {
-      input: 'strs = [""]',
-      output: '[[""]]',
+      input: 'strs = ["",""]',
+      output: '[["",""]]',
     },
     {
-      input: 'strs = ["a"]',
-      output: '[["a"]]',
+      input: 'strs = ["z"]',
+      output: '[["z"]]',
     },
   ],
   constraints: [
-    "1 <= strs.length <= 10^4",
-    "0 <= strs[i].length <= 100",
-    "strs[i] consists of lowercase English letters",
+    "strs has between 1 and 10^4 entries.",
+    "Each string runs from 0 to 100 characters long.",
+    "Every string is made of lowercase English letters.",
   ],
   hints: [
     "Use a hash map where the key is a sorted version of the string",

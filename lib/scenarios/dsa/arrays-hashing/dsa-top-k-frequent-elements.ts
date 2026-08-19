@@ -11,16 +11,16 @@ export const dsaTopKFrequentElementsScenario: DSAScenario = {
   description: "Find k most frequent elements in an array",
   tags: ["array", "hash-table", "heap", "bucket-sort"],
   estimatedTime: 25,
-  problemStatement: `Given an integer array nums and an integer k, return the k most frequent elements. You may return the answer in any order.`,
+  problemStatement: `You're given an integer array nums and an integer k. Work out which k distinct values occur most often in nums and return those k values. Any ordering of them is fine.`,
   examples: [
-    { input: "nums = [1,1,1,2,2,3], k = 2", output: "[1,2]" },
-    { input: "nums = [1], k = 1", output: "[1]" },
+    { input: "nums = [7,7,7,4,4,9], k = 2", output: "[7,4]" },
+    { input: "nums = [5], k = 1", output: "[5]" },
   ],
   constraints: [
-    "1 <= nums.length <= 10^5",
-    "-10^4 <= nums[i] <= 10^4",
-    "k is in the range [1, the number of unique elements]",
-    "The answer is guaranteed to be unique",
+    "nums holds between 1 and 10^5 values.",
+    "Each value lies between -10^4 and 10^4.",
+    "k never exceeds the number of distinct values, and it is at least 1.",
+    "Exactly one correct set of k values exists for each input.",
   ],
   hints: [
     "Count frequencies with a HashMap",

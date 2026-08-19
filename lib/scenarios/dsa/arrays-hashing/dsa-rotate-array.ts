@@ -10,24 +10,26 @@ export const dsaRotateArrayScenario: DSAScenario = {
   description: "Rotate an array to the right by k steps in-place",
   tags: ["array", "math", "two-pointers"],
   estimatedTime: 20,
-  problemStatement: `Given an integer array nums, rotate the array to the right by k steps, where k is non-negative.
+  problemStatement: `You're given an integer array nums and a non-negative integer k. Shift every element k positions to the right, with values that fall off the end wrapping around to the front, and apply the change directly to nums.
 
-Follow up:
-- Try to come up with as many solutions as you can. There are at least three different ways to solve this problem.
-- Could you do it in-place with O(1) extra space?`,
+Follow-up: more than one approach exists here, and at least three are worth knowing. Can you manage it in-place with O(1) extra space?`,
   examples: [
     {
-      input: "nums = [1,2,3,4,5,6,7], k = 3",
-      output: "[5,6,7,1,2,3,4]",
+      input: "nums = [10,20,30,40,50,60], k = 2",
+      output: "[50,60,10,20,30,40]",
       explanation:
-        "rotate 1 step: [7,1,2,3,4,5,6], rotate 2 steps: [6,7,1,2,3,4,5], rotate 3 steps: [5,6,7,1,2,3,4]",
+        "one step gives [60,10,20,30,40,50], and the second step gives [50,60,10,20,30,40]",
     },
     {
-      input: "nums = [-1,-100,3,99], k = 2",
-      output: "[3,99,-1,-100]",
+      input: "nums = [-7,-200,8,44], k = 3",
+      output: "[-200,8,44,-7]",
     },
   ],
-  constraints: ["1 <= nums.length <= 10^5", "-2^31 <= nums[i] <= 2^31 - 1", "0 <= k <= 10^5"],
+  constraints: [
+    "nums holds between 1 and 10^5 elements.",
+    "Each value can be as small as -2^31 or as large as 2^31 - 1.",
+    "k sits between 0 and 10^5.",
+  ],
   hints: [
     "Use modulo: k = k % nums.length to handle k > length",
     "Reverse approach: reverse all, reverse first k, reverse rest",

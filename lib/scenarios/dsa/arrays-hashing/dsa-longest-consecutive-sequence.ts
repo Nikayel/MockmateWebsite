@@ -8,25 +8,28 @@ export const dsaLongestConsecutiveSequenceScenario: DSAScenario = {
   difficulty: "medium",
   companies: ["Google", "Meta", "Amazon", "TikTok", "Snap", "Palantir"],
   roles: ["new-grad", "junior", "senior", "swe"],
-  description: "Find the length of the longest consecutive elements sequence",
+  description: "Measure the longest run of consecutive integers present in an array",
   tags: ["array", "hash-table", "union-find"],
   estimatedTime: 25,
-  problemStatement: `Given an unsorted array of integers nums, return the length of the longest consecutive elements sequence.
+  problemStatement: `You're given an integer array nums, not sorted in any way. Find the longest stretch of consecutive integers, values that follow one another with no gaps, where every value in the stretch appears somewhere in nums. Return the length of that stretch.
 
-You must write an algorithm that runs in O(n) time.`,
+Your solution needs to finish in O(n) time.`,
   examples: [
     {
-      input: "nums = [100,4,200,1,3,2]",
-      output: "4",
+      input: "nums = [7,52,6,400,5,9]",
+      output: "3",
       explanation:
-        "The longest consecutive elements sequence is [1, 2, 3, 4]. Therefore its length is 4.",
+        "The longest run of consecutive values present is [5, 6, 7], so the answer is 3.",
     },
     {
-      input: "nums = [0,3,7,2,5,8,4,6,0,1]",
-      output: "9",
+      input: "nums = [4,7,1,6,2,5,3,7,8]",
+      output: "8",
     },
   ],
-  constraints: ["0 <= nums.length <= 10^5", "-10^9 <= nums[i] <= 10^9"],
+  constraints: [
+    "nums can hold anywhere from 0 to 10^5 entries.",
+    "Values range from -10^9 to 10^9.",
+  ],
   hints: [
     "Use a Set for O(1) lookups",
     "For each number, check if it's the start of a sequence (num-1 not in set)",
