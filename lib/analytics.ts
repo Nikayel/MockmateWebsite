@@ -1,12 +1,17 @@
 /**
- * Firebase Analytics helper functions
+ * The single client-side product-event funnel.
  *
- * Tracks key user events for product analytics and insights
- * Respects user cookie consent preferences (GDPR/CCPA compliant)
+ * Every named event the browser reports goes through `trackEvent` here, and
+ * from there to BOTH vendors: Firebase Analytics (GA4) and PostHog. Keeping one
+ * entry point is what lets 35 call sites stay ignorant of which vendors exist.
+ *
+ * The two vendors are gated differently on purpose, and that asymmetry is the
+ * whole reason this file is worth reading before editing it. See `trackEvent`.
  */
 
 import { setAnalyticsEnabled, startAnalytics } from "./firebase"
 import { logEvent as firebaseLogEvent } from "firebase/analytics"
+import posthog from "posthog-js"
 import { hasAnalyticsConsent } from "@/components/CookieConsent"
 import { getAttributionParams } from "./attribution"
 
@@ -43,21 +48,60 @@ export function syncAnalyticsConsent(): ReturnType<typeof startAnalytics> {
 }
 
 /**
- * Track a custom event (only if user has consented)
+ * Send a named product event to PostHog.
+ *
+ * `posthog.__loaded` is the guard that matters: instrumentation-client.ts only
+ * calls `posthog.init` when NEXT_PUBLIC_POSTHOG_KEY is set, so on a build
+ * without the key this module must stay silent rather than throw into every
+ * caller. Capture failures are swallowed for the same reason the GA4 path
+ * swallows them: analytics must never break the flow it is measuring.
+ */
+function capturePostHogEvent(eventName: string, properties: Record<string, unknown>) {
+  if (typeof window === "undefined") return
+  if (!posthog.__loaded) return
+
+  try {
+    posthog.capture(eventName, properties)
+  } catch (error) {
+    console.error("PostHog analytics error:", error)
+  }
+}
+
+/**
+ * Track a custom event.
+ *
+ * Fans out to both vendors, and they are gated differently ON PURPOSE:
+ *
+ *  - GA4 is gated on `hasAnalyticsConsent()`, because starting it means loading
+ *    gtag.js and writing `_ga` cookies to the device. That needs consent.
+ *  - PostHog is NOT gated here, because instrumentation-client.ts already runs
+ *    it cookieless until consent: nothing is written to the device, so there is
+ *    nothing to ask permission for. Its own consent switch lives there.
+ *
+ * Putting the PostHog call inside the GA4 gate would look tidier and would be a
+ * real bug. Only 2 of the first 41 sessions on this site ever clicked "Accept
+ * All", so a consent-gated PostHog would have recorded roughly 5% of product
+ * events and silently reported that as the truth. The gate you inherit is not
+ * automatically the gate the next vendor needs.
  */
 export function trackEvent(eventName: string, params?: Record<string, any>) {
+  // Attach first-touch channel attribution so every conversion event is
+  // traceable back to the channel (content / community / paid) that drove it.
+  const properties = { ...getAttributionParams(), ...params }
+
+  capturePostHogEvent(eventName, properties)
+
   // Starts GA4 on the first consented event and returns null otherwise, so an
   // unconsented visitor never loads gtag.js at all.
   const analytics = syncAnalyticsConsent()
   if (!analytics) {
-    // Analytics not available (SSR, not configured, or consent not given)
+    // GA4 not available (SSR, not configured, or consent not given). PostHog
+    // above has already recorded the event.
     return
   }
 
   try {
-    // Attach first-touch channel attribution so every conversion event is
-    // traceable back to the channel (content / community / paid) that drove it.
-    firebaseLogEvent(analytics, eventName, { ...getAttributionParams(), ...params })
+    firebaseLogEvent(analytics, eventName, properties)
   } catch (error) {
     console.error("Analytics error:", error)
   }
