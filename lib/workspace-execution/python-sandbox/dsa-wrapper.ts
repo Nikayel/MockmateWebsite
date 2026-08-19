@@ -184,6 +184,11 @@ _candidates = ${toPythonLiteral(candidates)}
 _expects_sequence = ${expectsSequence ? "True" : "False"}
 _tree_keywords = {"root", "tree", "node", "p", "q", "t1", "t2", "left", "right", "subroot"}
 _list_keywords = {"head", "list", "l1", "l2"}
+# Keys whose value is an ARRAY OF lists, each built into its own linked list.
+# dsa-merge-k-sorted-lists passes "lists" and its statement/starter both promise
+# ListNode heads; without this the candidate received raw lists of lists and every
+# textbook solution raised AttributeError on .val.
+_list_array_keywords = {"lists"}
 
 def _process_arg(value, key):
     lowered = key.lower()
@@ -192,6 +197,8 @@ def _process_arg(value, key):
             return build_tree(value)
         if lowered in _list_keywords:
             return build_list(value)
+        if lowered in _list_array_keywords:
+            return [build_list(entry) if isinstance(entry, list) else entry for entry in value]
     return value
 
 _processed_input = [_process_arg(value, _input_keys[index] if index < len(_input_keys) else "") for index, value in enumerate(_input)]

@@ -383,6 +383,11 @@ ${
 
   const _treeKeywords = new Set(['root', 'tree', 'node', 'p', 'q', 't1', 't2', 'left', 'right', 'subroot']);
   const _listKeywords = new Set(['head', 'list', 'l1', 'l2']);
+  // Keys whose value is an ARRAY OF lists, each built into its own linked list.
+  // dsa-merge-k-sorted-lists passes 'lists' and its statement/starter both promise
+  // ListNode heads, but with no entry here the candidate received raw number[][],
+  // so every textbook solution crashed on .val and scored 0.
+  const _listArrayKeywords = new Set(['lists']);
 
   // Provide the isBadVersion API that dsa-first-bad-version's problem statement and starter
   // both promise. It existed nowhere in the repo, so the documented binary search scored 1/5
@@ -401,6 +406,9 @@ ${
     if (Array.isArray(arg)) {
       if (_treeKeywords.has(key)) return arg.length > 0 ? _buildTree(arg) : null;
       if (_listKeywords.has(key)) return arg.length > 0 ? _buildList(arg) : null;
+      if (_listArrayKeywords.has(key)) {
+        return arg.map((entry) => (Array.isArray(entry) ? (entry.length > 0 ? _buildList(entry) : null) : entry));
+      }
     }
     return arg;
   });
@@ -455,12 +463,18 @@ ${roundTripClassNames
     const key = (_inputKeys[i] || '').toLowerCase();
     return Array.isArray(_input[i]) && _treeKeywords.has(key);
   });
+  // A list-of-lists input always answers with a sequence, so an empty answer is []
+  // rather than null. Scoped to _listArrayKeywords so the single-list scenarios that
+  // legitimately answer null (cycle detection, intersection) keep their null.
+  const _hadListArrayInput = _input.some((arg, i) =>
+    Array.isArray(arg) && _listArrayKeywords.has((_inputKeys[i] || '').toLowerCase())
+  );
 
   if (_result instanceof TreeNode) {
     _result = _treeToArray(_result);
   } else if (_result instanceof ListNode) {
     _result = _listToArray(_result);
-  } else if (_result === null && _hadTreeInput) {
+  } else if (_result === null && (_hadTreeInput || _hadListArrayInput)) {
     _result = [];
   }
 
