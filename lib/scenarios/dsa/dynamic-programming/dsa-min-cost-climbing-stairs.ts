@@ -7,27 +7,31 @@ export const minCostClimbingStairsScenario: DSAScenario = {
   pattern: "dp-1d",
   difficulty: "easy",
   companies: ["Amazon", "Google", "Microsoft"],
-  description: "Find minimum cost to reach the top of stairs",
+  description: "Pay as little as possible to climb past the last stair",
   tags: ["dynamic-programming", "array"],
   estimatedTime: 15,
-  problemStatement: `You are given an integer array cost where cost[i] is the cost of ith step on a staircase. Once you pay the cost, you can either climb one or two steps.
+  problemStatement: `You're facing a staircase where standing on stair i costs you cost[i]. Paying a stair's price lets you push off from it and land either one or two stairs higher.
 
-You can either start from the step with index 0, or the step with index 1.
+Your first foothold can be stair 0 or stair 1, whichever you prefer. The goal sits just past the final stair, and stepping beyond the last stair costs nothing extra.
 
-Return the minimum cost to reach the top of the floor.`,
+Return the smallest total you can pay to get there.`,
   examples: [
     {
-      input: "cost = [10,15,20]",
-      output: "15",
-      explanation: "Start at index 1, pay 15, climb two steps to reach the top.",
+      input: "cost = [8,12,30]",
+      output: "12",
+      explanation: "Begin on stair 1, pay 12, and vault two stairs straight past the end.",
     },
     {
-      input: "cost = [1,100,1,1,1,100,1,1,100,1]",
-      output: "6",
-      explanation: "Optimal path: 0 → 2 → 4 → 6 → 7 → 9 → top. Total cost = 1+1+1+1+1+1 = 6.",
+      input: "cost = [2,50,2,2,50,2,2,50,2,2]",
+      output: "12",
+      explanation:
+        "Take the cheap stairs: 0 → 2 → 3 → 5 → 6 → 8 → past the end. That is six payments of 2.",
     },
   ],
-  constraints: ["2 <= cost.length <= 1000", "0 <= cost[i] <= 999"],
+  constraints: [
+    "cost holds between 2 and 1000 stairs.",
+    "Each stair's price falls between 0 and 999.",
+  ],
   hints: [
     "dp[i] = minimum cost to reach step i",
     "dp[i] = cost[i] + min(dp[i-1], dp[i-2])",

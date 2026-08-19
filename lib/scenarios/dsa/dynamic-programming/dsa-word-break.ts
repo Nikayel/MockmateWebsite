@@ -7,29 +7,31 @@ export const wordBreakScenario: DSAScenario = {
   pattern: "dp-1d",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta"],
-  description: "Determine if string can be segmented into dictionary words.",
+  description: "Decide whether a string breaks cleanly into dictionary words.",
   tags: ["dynamic-programming", "hash-table", "string"],
   estimatedTime: 25,
-  problemStatement: `Given a string s and a dictionary of strings wordDict, return true if s can be segmented into a space-separated sequence of one or more dictionary words.`,
+  problemStatement: `You're given a string s and a list of words wordDict. Decide whether s can be sliced into a left-to-right sequence of chunks, with nothing left over, so that every chunk appears in wordDict.
+
+A dictionary word may be reused as many times as needed, and not every word in wordDict has to show up. Return true when at least one complete slicing works, and false when none does.`,
   examples: [
     {
-      input: "s = leetcode, wordDict = [leet,code]",
+      input: "s = sunflower, wordDict = [sun,flower]",
       output: "true",
-      explanation: "leetcode can be segmented as leet code",
+      explanation: "sunflower slices apart as sun flower",
     },
     {
-      input: "s = applepenapple, wordDict = [apple,pen]",
+      input: "s = raincoatrain, wordDict = [rain,coat]",
       output: "true",
     },
     {
-      input: "s = catsandog, wordDict = [cats,dog,sand,and,cat]",
+      input: "s = handshakes, wordDict = [hands,shake,hand,ash,hake]",
       output: "false",
     },
   ],
   constraints: [
-    "1 <= s.length <= 300",
-    "1 <= wordDict.length <= 1000",
-    "All strings consist of lowercase English letters.",
+    "s runs 1 to 300 characters long.",
+    "wordDict holds between 1 and 1000 words.",
+    "Every string involved uses lowercase English letters only.",
   ],
   hints: [
     "1D DP: dp[i] = true if s[0..i] can be segmented",

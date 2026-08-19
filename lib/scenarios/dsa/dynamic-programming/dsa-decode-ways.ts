@@ -10,34 +10,32 @@ export const decodeWaysScenario: DSAScenario = {
   description: "Count ways to decode a digit string into letters",
   tags: ["dynamic-programming", "string"],
   estimatedTime: 25,
-  problemStatement: `A message containing letters from A-Z can be encoded into numbers using the following mapping:
+  problemStatement: `You've intercepted a message that was encoded by swapping every letter for its alphabet position: 'A' became "1", 'B' became "2", and so on up to 'Z', which became "26". The digits were then written out with nothing separating them, leaving you a digit string s.
 
-'A' -> "1"
-'B' -> "2"
-...
-'Z' -> "26"
+Decoding s means cutting it into chunks so that every chunk is some letter's number. A valid chunk reads as a value from 1 to 26 and never starts with '0', so a lone '0' maps to no letter at all.
 
-To decode an encoded message, all the digits must be grouped then mapped back into letters using the reverse of the mapping above (there may be multiple ways).
-
-Given a string s containing only digits, return the number of ways to decode it.`,
+Return how many distinct decodings s has. If no valid cutting exists, that answer is 0.`,
   examples: [
     {
-      input: 's = "12"',
+      input: 's = "18"',
       output: "2",
-      explanation: '"12" could be decoded as "AB" (1 2) or "L" (12).',
+      explanation: '"18" could be read as "AH" (1 8) or "R" (18).',
     },
     {
-      input: 's = "226"',
+      input: 's = "125"',
       output: "3",
-      explanation: '"226" could be decoded as "BZ" (2 26), "VF" (22 6), or "BBF" (2 2 6).',
+      explanation: '"125" could be read as "ABE" (1 2 5), "LE" (12 5), or "AY" (1 25).',
     },
     {
-      input: 's = "06"',
+      input: 's = "07"',
       output: "0",
-      explanation: '"06" cannot be mapped because leading zeros are invalid.',
+      explanation: '"07" has no reading, since a chunk may never start with "0".',
     },
   ],
-  constraints: ["1 <= s.length <= 100", "s contains only digits and may contain leading zero(s)."],
+  constraints: [
+    "s holds between 1 and 100 characters",
+    "s is made of digits only, and leading zeros can appear",
+  ],
   hints: [
     "dp[i] = number of ways to decode s[0:i]",
     "Single digit: if s[i-1] != '0', dp[i] += dp[i-1]",

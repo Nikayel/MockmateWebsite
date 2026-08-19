@@ -7,28 +7,31 @@ export const maximumSubarrayScenario: DSAScenario = {
   pattern: "dp-1d",
   difficulty: "medium",
   companies: ["Amazon", "Microsoft", "Meta", "Apple", "Roblox"],
-  description: "Find the contiguous subarray with the largest sum",
+  description: "Track down the stretch of neighboring entries with the biggest total",
   tags: ["array", "dynamic-programming", "divide-and-conquer"],
   estimatedTime: 20,
-  problemStatement: `Given an integer array nums, find the contiguous subarray (containing at least one number) which has the largest sum and return its sum.
+  problemStatement: `You're given an integer array nums. Out of every stretch of consecutive entries (a stretch must hold at least one number), find the one whose total is highest.
 
-A subarray is a contiguous part of an array.`,
+Entries in a stretch have to sit side by side in nums; leaving gaps is not allowed. Return that highest total, not the stretch itself.`,
   examples: [
     {
-      input: "nums = [-2,1,-3,4,-1,2,1,-5,4]",
-      output: "6",
-      explanation: "The subarray [4,-1,2,1] has the largest sum 6.",
+      input: "nums = [-3,2,-1,6,-5,1,3,-7,2]",
+      output: "7",
+      explanation: "The stretch [2,-1,6] adds up to 7, and nothing else beats it.",
     },
     {
-      input: "nums = [1]",
-      output: "1",
+      input: "nums = [4]",
+      output: "4",
     },
     {
-      input: "nums = [5,4,-1,7,8]",
-      output: "23",
+      input: "nums = [6,3,-2,8,5]",
+      output: "20",
     },
   ],
-  constraints: ["1 <= nums.length <= 10^5", "-10^4 <= nums[i] <= 10^4"],
+  constraints: [
+    "nums contains at least 1 entry and at most 10^5.",
+    "Every entry lies between -10^4 and 10^4.",
+  ],
   hints: [
     "Use Kadane's Algorithm",
     "Keep track of the current sum and maximum sum",

@@ -10,27 +10,29 @@ export const coinChangeScenario: DSAScenario = {
   description: "Find minimum number of coins needed to make amount",
   tags: ["dynamic-programming", "breadth-first-search"],
   estimatedTime: 25,
-  problemStatement: `You are given an integer array coins representing coins of different denominations and an integer amount representing a total amount of money.
+  problemStatement: `You're handed the integer array coins, listing the denominations minted in some currency, together with a target value amount. The till holds an unlimited supply of every denomination, so one coin value may be reused as many times as you like.
 
-Return the fewest number of coins that you need to make up that amount. If that amount of money cannot be made up by any combination of the coins, return -1.
-
-You may assume that you have an infinite number of each kind of coin.`,
+Figure out the smallest number of coins whose values add up to amount exactly, and return that count. When no combination of these denominations can land exactly on amount, return -1. An amount of 0 needs no coins at all.`,
   examples: [
     {
-      input: "coins = [1,2,5], amount = 11",
+      input: "coins = [1,4,6], amount = 14",
       output: "3",
-      explanation: "11 = 5 + 5 + 1",
+      explanation: "14 = 6 + 4 + 4. Starting with two 6s forces 6 + 6 + 1 + 1, a coin worse.",
     },
     {
-      input: "coins = [2], amount = 3",
+      input: "coins = [5], amount = 7",
       output: "-1",
     },
     {
-      input: "coins = [1], amount = 0",
+      input: "coins = [3], amount = 0",
       output: "0",
     },
   ],
-  constraints: ["1 <= coins.length <= 12", "1 <= coins[i] <= 2^31 - 1", "0 <= amount <= 10^4"],
+  constraints: [
+    "coins holds between 1 and 12 denominations",
+    "each coins[i] is at least 1 and at most 2^31 - 1",
+    "amount runs from 0 up to 10^4",
+  ],
   hints: [
     "Use dynamic programming with dp[i] = minimum coins for amount i",
     "For each amount, try all coin denominations",

@@ -10,33 +10,29 @@ export const longestCommonSubsequenceScenario: DSAScenario = {
   description: "Find the length of the longest common subsequence of two strings",
   tags: ["dynamic-programming", "string"],
   estimatedTime: 25,
-  problemStatement: `Given two strings text1 and text2, return the length of their longest common subsequence. If there is no common subsequence, return 0.
+  problemStatement: `You're comparing two strings, text1 and text2. A subsequence of a string is whatever is left after deleting any of its characters (possibly none) while keeping the survivors in their original order; "tor" is one subsequence of "storm". When a string is a subsequence of both inputs at once, it is a common subsequence of the pair.
 
-A subsequence of a string is a new string generated from the original string with some characters (can be none) deleted without changing the relative order of the remaining characters.
-
-For example, "ace" is a subsequence of "abcde".
-
-A common subsequence of two strings is a subsequence that is common to both strings.`,
+Return the length of the longest common subsequence that text1 and text2 share. If they share none at all, return 0.`,
   examples: [
     {
-      input: 'text1 = "abcde", text2 = "ace"',
+      input: 'text1 = "storm", text2 = "sort"',
       output: "3",
-      explanation: 'The longest common subsequence is "ace" with length 3.',
+      explanation: 'The longest common subsequence is "sor" with length 3.',
     },
     {
-      input: 'text1 = "abc", text2 = "abc"',
-      output: "3",
-      explanation: 'The longest common subsequence is "abc" with length 3.',
+      input: 'text1 = "ridge", text2 = "ridge"',
+      output: "5",
+      explanation: 'The longest common subsequence is "ridge" with length 5.',
     },
     {
-      input: 'text1 = "abc", text2 = "def"',
+      input: 'text1 = "fun", text2 = "sky"',
       output: "0",
-      explanation: "No common subsequence exists.",
+      explanation: "The two strings have no characters in common, so nothing is shared.",
     },
   ],
   constraints: [
-    "1 <= text1.length, text2.length <= 1000",
-    "text1 and text2 consist of only lowercase English characters.",
+    "text1.length and text2.length are each between 1 and 1000",
+    "text1 and text2 are built from lowercase English letters only",
   ],
   hints: [
     "Use 2D DP: dp[i][j] = LCS of text1[0..i-1] and text2[0..j-1]",

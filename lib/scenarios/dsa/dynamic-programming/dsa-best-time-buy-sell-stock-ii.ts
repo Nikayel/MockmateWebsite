@@ -10,30 +10,34 @@ export const bestTimeBuySellStockIiScenario: DSAScenario = {
   description: "Maximize profit with unlimited transactions",
   tags: ["dynamic-programming", "array", "greedy"],
   estimatedTime: 20,
-  problemStatement: `You are given an integer array prices where prices[i] is the price of a given stock on the ith day.
+  problemStatement: `You're day-trading a single stock, and the integer array prices records it day by day: prices[i] is the price on day i.
 
-On each day, you may decide to buy and/or sell the stock. You can only hold at most one share of the stock at any time. However, you can buy it then immediately sell it on the same day.
+Each day you may buy one share, sell the share you're holding, or do nothing, and selling then buying back on the very same day is allowed. You can never hold more than one share at a time, but there's no cap on how many trades you make overall.
 
-Find and return the maximum profit you can achieve.`,
+Return the biggest total profit you can finish with.`,
   examples: [
     {
-      input: "prices = [7,1,5,3,6,4]",
-      output: "7",
+      input: "prices = [8,2,6,3,9,5]",
+      output: "10",
       explanation:
-        "Buy on day 2 (price = 1) and sell on day 3 (price = 5), profit = 4. Then buy on day 4 (price = 3) and sell on day 5 (price = 6), profit = 3. Total = 7.",
+        "Buy on day 2 (price = 2) and sell on day 3 (price = 6), gain = 4. Then buy on day 4 (price = 3) and sell on day 5 (price = 9), gain = 6. Total = 10.",
     },
     {
-      input: "prices = [1,2,3,4,5]",
-      output: "4",
-      explanation: "Buy on day 1 (price = 1) and sell on day 5 (price = 5), profit = 4.",
+      input: "prices = [2,3,5,8]",
+      output: "6",
+      explanation:
+        "The price only climbs, so buy on day 1 (price = 2) and sell on day 4 (price = 8), gain = 6.",
     },
     {
-      input: "prices = [7,6,4,3,1]",
+      input: "prices = [9,7,5,2]",
       output: "0",
-      explanation: "No profitable transactions possible.",
+      explanation: "The price never rises, so the best move is to stay out entirely.",
     },
   ],
-  constraints: ["1 <= prices.length <= 3 * 10^4", "0 <= prices[i] <= 10^4"],
+  constraints: [
+    "there are between 1 and 3 * 10^4 trading days in prices",
+    "every price sits between 0 and 10^4",
+  ],
   hints: [
     "Greedy: collect all upward price movements",
     "If prices[i] > prices[i-1], add the difference to profit",

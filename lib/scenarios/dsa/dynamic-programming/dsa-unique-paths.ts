@@ -7,21 +7,23 @@ export const uniquePathsScenario: DSAScenario = {
   pattern: "dp-2d",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta"],
-  description: "Count unique paths from top-left to bottom-right in grid.",
+  description: "Count every distinct down-and-right route across an m x n grid.",
   tags: ["dynamic-programming", "math", "combinatorics"],
   estimatedTime: 20,
-  problemStatement: `There is a robot on an m x n grid. The robot starts at the top-left corner and wants to reach the bottom-right corner. The robot can only move down or right. How many unique paths are there?`,
+  problemStatement: `You've parked a delivery robot on the top-left square of an m x n grid, and its charging dock sits on the bottom-right square. The robot's firmware allows exactly two moves: one square down or one square right. It can never back up or drift left.
+
+Count the distinct routes the robot could take from its starting square to the dock, and return that number.`,
   examples: [
     {
-      input: "m = 3, n = 7",
-      output: "28",
+      input: "m = 3, n = 4",
+      output: "10",
     },
     {
-      input: "m = 3, n = 2",
-      output: "3",
+      input: "m = 2, n = 2",
+      output: "2",
     },
   ],
-  constraints: ["1 <= m, n <= 100"],
+  constraints: ["m and n each fall between 1 and 100."],
   hints: [
     "2D DP: dp[i][j] = paths to reach cell (i,j)",
     "dp[i][j] = dp[i-1][j] + dp[i][j-1]",

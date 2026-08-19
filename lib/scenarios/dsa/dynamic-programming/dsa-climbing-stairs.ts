@@ -10,22 +10,23 @@ export const climbingStairsScenario: DSAScenario = {
   description: "Calculate number of ways to climb stairs",
   tags: ["dynamic-programming", "math", "memoization"],
   estimatedTime: 15,
-  problemStatement: `You are climbing a staircase. It takes n steps to reach the top.
+  problemStatement: `You're standing at the bottom of a staircase that is n steps tall. Every stride you take moves you up by either 1 step or 2 steps.
 
-Each time you can either climb 1 or 2 steps. In how many distinct ways can you climb to the top?`,
+Strides happen in order, so two climbs count as different whenever their stride sequences differ. How many distinct climbs can carry you from the ground to the top?`,
   examples: [
     {
-      input: "n = 2",
-      output: "2",
-      explanation: "There are two ways to climb to the top: 1. 1 step + 1 step, 2. 2 steps",
+      input: "n = 4",
+      output: "5",
+      explanation: "Five climbs work: 1+1+1+1, 1+1+2, 1+2+1, 2+1+1, and 2+2",
     },
     {
-      input: "n = 3",
-      output: "3",
-      explanation: "There are three ways: 1. 1+1+1, 2. 1+2, 3. 2+1",
+      input: "n = 5",
+      output: "8",
+      explanation:
+        "Eight climbs: 1+1+1+1+1, four orders that use one 2-stride, and three orders that use two 2-strides",
     },
   ],
-  constraints: ["1 <= n <= 45"],
+  constraints: ["n is at least 1 and at most 45"],
   hints: [
     "This is a Fibonacci sequence problem",
     "dp[i] = dp[i-1] + dp[i-2]",

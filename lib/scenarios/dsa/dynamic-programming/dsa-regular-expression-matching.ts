@@ -7,38 +7,39 @@ export const regularExpressionMatchingScenario: DSAScenario = {
   pattern: "dp-2d",
   difficulty: "hard",
   companies: ["Google", "Amazon", "Meta", "Microsoft", "Apple"],
-  description: "Implement regular expression matching with '.' and '*' support",
+  description:
+    "Build a matcher where '.' takes any one character and '*' repeats the element before it",
   tags: ["dynamic-programming", "string", "recursion"],
   estimatedTime: 40,
-  problemStatement: `Given an input string s and a pattern p, implement regular expression matching with support for '.' and '*' where:
+  problemStatement: `You're building a tiny pattern matcher. It receives a string s and a pattern p, and it must decide whether p matches all of s.
 
-- '.' Matches any single character.
-- '*' Matches zero or more of the preceding element.
+Two characters in p carry special meaning. A '.' stands in for exactly one character of s, whatever that character happens to be. A '*' never acts alone: it attaches to the element directly before it and lets that element occur any number of times in a row, including not at all. Every other character in p matches only itself.
 
-The matching should cover the entire input string (not partial).`,
+Partial coverage doesn't count. Return true only when the pattern accounts for s from its first character through its last; otherwise return false.`,
   examples: [
     {
-      input: 's = "aa", p = "a"',
+      input: 's = "bbb", p = "bb"',
       output: "false",
-      explanation: '"a" does not match the entire string "aa".',
+      explanation:
+        'The pattern covers "bb" and leaves the third letter dangling, so the match fails.',
     },
     {
-      input: 's = "aa", p = "a*"',
+      input: 's = "ccc", p = "c*"',
       output: "true",
-      explanation: '"*" means zero or more of the preceding element, "a".',
+      explanation: '"c*" stretches to any run of the letter c, three in a row included.',
     },
     {
-      input: 's = "ab", p = ".*"',
+      input: 's = "xy", p = ".*"',
       output: "true",
-      explanation: '".*" means zero or more (*) of any character (.).',
+      explanation: '".*" pairs a dot with a star, so it can swallow any string, this one included.',
     },
   ],
   constraints: [
-    "1 <= s.length <= 20",
-    "1 <= p.length <= 20",
-    "s contains only lowercase English letters.",
-    "p contains only lowercase English letters, '.', and '*'.",
-    "It is guaranteed for each '*', there will be a previous valid character to match.",
+    "s is between 1 and 20 characters long.",
+    "p is between 1 and 20 characters long.",
+    "s holds lowercase English letters only.",
+    "p holds lowercase English letters plus '.' and '*'.",
+    "Every '*' in p sits directly after a valid element, never first.",
   ],
   hints: [
     "2D DP: dp[i][j] = true if s[0..i-1] matches p[0..j-1]",

@@ -10,25 +10,28 @@ export const longestIncreasingSubsequenceScenario: DSAScenario = {
   description: "Find the length of the longest strictly increasing subsequence",
   tags: ["array", "binary-search", "dynamic-programming"],
   estimatedTime: 25,
-  problemStatement: `Given an integer array nums, return the length of the longest strictly increasing subsequence.
+  problemStatement: `You're given an integer array nums. Deleting any of its elements (or none) while keeping the rest in their original order produces a subsequence of nums.
 
-A subsequence is a sequence that can be derived from an array by deleting some or no elements without changing the order of the remaining elements.`,
+Consider only the subsequences that climb strictly, where each element must be larger than the one just before it, so ties break the climb. Return the length of the longest strictly increasing subsequence you can extract.`,
   examples: [
     {
-      input: "nums = [10,9,2,5,3,7,101,18]",
+      input: "nums = [12,3,8,1,9,2,14,6]",
       output: "4",
-      explanation: "The longest increasing subsequence is [2,3,7,101], therefore the length is 4.",
+      explanation: "The longest strictly increasing subsequence is [3,8,9,14], so the length is 4.",
     },
     {
-      input: "nums = [0,1,0,3,2,3]",
+      input: "nums = [5,6,5,8,7,8]",
       output: "4",
     },
     {
-      input: "nums = [7,7,7,7,7,7,7]",
+      input: "nums = [4,4,4,4,4]",
       output: "1",
     },
   ],
-  constraints: ["1 <= nums.length <= 2500", "-10^4 <= nums[i] <= 10^4"],
+  constraints: [
+    "nums holds between 1 and 2500 elements",
+    "each nums[i] lies between -10^4 and 10^4",
+  ],
   hints: [
     "DP solution: dp[i] = length of longest subsequence ending at i",
     "For better complexity, use binary search with patience sorting",

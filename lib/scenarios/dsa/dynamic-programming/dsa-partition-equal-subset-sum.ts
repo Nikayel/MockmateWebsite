@@ -7,23 +7,25 @@ export const partitionEqualSubsetSumScenario: DSAScenario = {
   pattern: "dp-knapsack",
   difficulty: "medium",
   companies: ["Amazon", "Meta", "Google", "Microsoft"],
-  description: "Determine if array can be partitioned into two subsets with equal sum",
+  description: "Decide whether an array splits into two groups with matching totals",
   tags: ["dynamic-programming", "array"],
   estimatedTime: 25,
-  problemStatement: `Given an integer array nums, return true if you can partition the array into two subsets such that the sum of the elements in both subsets is equal, or false otherwise.`,
+  problemStatement: `You're given an integer array nums and asked whether it splits cleanly in two. Specifically: can you place every entry into one of two groups so that both groups add up to the same total? Each entry must land in exactly one group, and a group keeps no notion of order.
+
+Return true when such a split exists and false when it doesn't.`,
   examples: [
     {
-      input: "nums = [1,5,11,5]",
+      input: "nums = [3,1,4,2,2]",
       output: "true",
-      explanation: "The array can be partitioned as [1, 5, 5] and [11].",
+      explanation: "[4, 2] and [3, 1, 2] both total 6.",
     },
     {
-      input: "nums = [1,2,3,5]",
+      input: "nums = [2,3,4]",
       output: "false",
-      explanation: "The array cannot be partitioned into equal sum subsets.",
+      explanation: "The entries total 9, and an odd amount can never break into two equal halves.",
     },
   ],
-  constraints: ["1 <= nums.length <= 200", "1 <= nums[i] <= 100"],
+  constraints: ["nums holds between 1 and 200 entries.", "Each entry sits in the range 1 to 100."],
   hints: [
     "If total sum is odd, impossible to partition equally",
     "Reduces to: can we find subset with sum = totalSum/2?",

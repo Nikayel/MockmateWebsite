@@ -7,28 +7,35 @@ export const triangleScenario: DSAScenario = {
   pattern: "dp-2d",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Microsoft"],
-  description: "Find minimum path sum from top to bottom of triangle",
+  description: "Descend a triangle of numbers along adjacent cells for the cheapest total",
   tags: ["dynamic-programming", "array"],
   estimatedTime: 25,
-  problemStatement: `Given a triangle array, return the minimum path sum from top to bottom.
+  problemStatement: `You're given a triangle array: the top row holds a single number, and each row after it holds one number more than the row above. Starting at the apex you descend one row per step. From index i of the current row, the only legal landings are index i or index i + 1 of the row below.
 
-For each step, you may move to an adjacent number of the row below. More formally, if you are on index i on the current row, you may move to either index i or index i + 1 on the next row.`,
+\`\`\`
+   3
+  5 1
+ 7 2 6
+4 9 1 5
+\`\`\`
+
+Here the cheapest descent picks up 3, 1, 2, then 1 for a total of 7. Return the smallest total any legal descent through triangle can reach.`,
   examples: [
     {
-      input: "triangle = [[2],[3,4],[6,5,7],[4,1,8,3]]",
-      output: "11",
-      explanation: "The minimum path sum from top to bottom is 2 + 3 + 5 + 1 = 11.",
+      input: "triangle = [[3],[5,1],[7,2,6],[4,9,1,5]]",
+      output: "7",
+      explanation: "The route 3 → 1 → 2 → 1 hugs the cheap side and totals 7.",
     },
     {
-      input: "triangle = [[-10]]",
-      output: "-10",
+      input: "triangle = [[-7]]",
+      output: "-7",
     },
   ],
   constraints: [
-    "1 <= triangle.length <= 200",
-    "triangle[0].length == 1",
-    "triangle[i].length == triangle[i - 1].length + 1",
-    "-10^4 <= triangle[i][j] <= 10^4",
+    "triangle has between 1 and 200 rows.",
+    "Row 0 holds exactly 1 value.",
+    "Each later row holds 1 more value than the one above it, so row i holds i + 1 values.",
+    "Values range from -10^4 to 10^4.",
   ],
   hints: [
     "Work bottom-up: start from second-to-last row",

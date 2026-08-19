@@ -7,31 +7,32 @@ export const maximalSquareScenario: DSAScenario = {
   pattern: "dp-2d",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Apple"],
-  description: "Find the largest square containing only 1's",
+  description: "Measure the largest all-1's square block hiding in a binary grid",
   tags: ["dynamic-programming", "matrix"],
   estimatedTime: 25,
-  problemStatement: `Given an m x n binary matrix filled with 0's and 1's, find the largest square containing only 1's and return its area.`,
+  problemStatement: `You're given an m x n matrix of characters where every cell is either '1' or '0'. Somewhere inside it hides the biggest square block built entirely from '1' cells, and your job is to size that block.
+
+Return its area rather than its side length: a lone '1' counts as a square of area 1, and a grid with no '1' anywhere yields 0.`,
   examples: [
     {
       input:
-        'matrix = [["1","0","1","0","0"],["1","0","1","1","1"],["1","1","1","1","1"],["1","0","0","1","0"]]',
-      output: "4",
-      explanation: "The largest square has side length 2.",
+        'matrix = [["1","1","1","0","1"],["1","1","1","1","0"],["1","1","1","0","1"],["0","1","1","0","0"]]',
+      output: "9",
+      explanation: "A 3 x 3 block of 1's sits in the top-left corner, so the area is 9.",
     },
     {
-      input: 'matrix = [["0","1"],["1","0"]]',
+      input: 'matrix = [["0","1","0"],["1","0","1"]]',
       output: "1",
     },
     {
-      input: 'matrix = [["0"]]',
+      input: 'matrix = [["0","0"],["0","0"]]',
       output: "0",
     },
   ],
   constraints: [
-    "m == matrix.length",
-    "n == matrix[i].length",
-    "1 <= m, n <= 300",
-    "matrix[i][j] is '0' or '1'.",
+    "matrix is an m x n grid of characters.",
+    "m and n each fall in the range 1 to 300.",
+    "Each cell is the character '0' or the character '1'.",
   ],
   hints: [
     "dp[i][j] = side length of largest square with bottom-right corner at (i,j)",

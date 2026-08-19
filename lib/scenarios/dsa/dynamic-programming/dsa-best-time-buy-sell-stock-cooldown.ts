@@ -10,25 +10,24 @@ export const bestTimeBuySellStockCooldownScenario: DSAScenario = {
   description: "Maximize profit with cooldown period after selling",
   tags: ["dynamic-programming", "array"],
   estimatedTime: 30,
-  problemStatement: `You are given an array prices where prices[i] is the price of a given stock on the ith day.
+  problemStatement: `You're trading one stock across several days, and prices[i] is its price on day i. You can buy a share and later sell it, over as many rounds as you like, but you can hold at most one share at a time, so a new purchase has to wait until the share you hold is sold.
 
-Find the maximum profit you can achieve. You may complete as many transactions as you like with the following restrictions:
+One extra rule applies: every sale triggers a cooldown. On the day immediately after you sell, buying is forbidden; the earliest you can buy again is the day after that.
 
-- After you sell your stock, you cannot buy stock on the next day (i.e., cooldown one day).
-
-Note: You may not engage in multiple transactions simultaneously (i.e., you must sell the stock before you buy again).`,
+Return the largest total profit these rules allow.`,
   examples: [
     {
-      input: "prices = [1,2,3,0,2]",
+      input: "prices = [2,3,4,1,3]",
       output: "3",
-      explanation: "Buy on day 1, sell on day 2. Cooldown on day 3. Buy on day 4, sell on day 5.",
+      explanation:
+        "Buy on day 1, sell on day 2 for +1. Sit out day 3 (cooldown), buy on day 4, sell on day 5 for +2.",
     },
     {
-      input: "prices = [1]",
+      input: "prices = [6]",
       output: "0",
     },
   ],
-  constraints: ["1 <= prices.length <= 5000", "0 <= prices[i] <= 1000"],
+  constraints: ["prices spans between 1 and 5000 days", "each prices[i] sits between 0 and 1000"],
   hints: [
     "State machine approach: hold, sold, rest",
     "hold[i] = max(hold[i-1], rest[i-1] - prices[i])",

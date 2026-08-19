@@ -10,21 +10,23 @@ export const editDistanceScenario: DSAScenario = {
   description: "Find minimum edit distance to convert one string to another.",
   tags: ["dynamic-programming", "string"],
   estimatedTime: 35,
-  problemStatement: `Given two strings word1 and word2, return the minimum number of operations required to convert word1 to word2. You can insert, delete, or replace any character.`,
+  problemStatement: `You're given two strings, word1 and word2, and the goal is to transform word1 until it reads exactly like word2. One operation is a single edit: insert a character anywhere, delete one character, or replace one character with a different one.
+
+Return the smallest number of operations that gets word1 all the way to word2.`,
   examples: [
     {
-      input: "word1 = horse, word2 = ros",
-      output: "3",
-      explanation: "horse -> rorse -> rose -> ros",
+      input: "word1 = plane, word2 = lanes",
+      output: "2",
+      explanation: "plane -> lane -> lanes",
     },
     {
-      input: "word1 = intention, word2 = execution",
-      output: "5",
+      input: "word1 = ocean, word2 = canoe",
+      output: "4",
     },
   ],
   constraints: [
-    "0 <= word1.length, word2.length <= 500",
-    "word1 and word2 consist of lowercase English letters.",
+    "word1.length and word2.length each run from 0 to 500",
+    "both word1 and word2 use lowercase English letters only",
   ],
   hints: [
     "2D DP: dp[i][j] = min operations to convert word1[0..i] to word2[0..j]",

@@ -7,27 +7,27 @@ export const palindromicSubstringsScenario: DSAScenario = {
   pattern: "dp-2d",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft"],
-  description: "Count the number of palindromic substrings",
+  description: "Count how many slices of a string read identically in both directions",
   tags: ["dynamic-programming", "string", "two-pointers"],
   estimatedTime: 25,
-  problemStatement: `Given a string s, return the number of palindromic substrings in it.
+  problemStatement: `You're handed a string s and asked to count its palindromic substrings.
 
-A string is a palindrome when it reads the same backward as forward.
+A substring is any unbroken slice of s, and it qualifies as a palindrome when reversing it changes nothing. Count every occurrence on its own: slices taken from different positions count separately even when their letters look identical.
 
-A substring is a contiguous sequence of characters within the string.`,
+Return the total count.`,
   examples: [
     {
-      input: 's = "abc"',
+      input: 's = "xyz"',
       output: "3",
-      explanation: 'Three palindromic substrings: "a", "b", "c".',
+      explanation: 'Only the one-letter slices qualify: "x", "y", and "z".',
     },
     {
-      input: 's = "aaa"',
-      output: "6",
-      explanation: 'Six palindromic substrings: "a", "a", "a", "aa", "aa", "aaa".',
+      input: 's = "zzzz"',
+      output: "10",
+      explanation: 'Four of "z", three of "zz", two of "zzz", and one "zzzz" makes 10.',
     },
   ],
-  constraints: ["1 <= s.length <= 1000", "s consists of lowercase English letters."],
+  constraints: ["s runs from 1 to 1000 characters.", "Only lowercase English letters appear in s."],
   hints: [
     "Expand around center technique: for each center, expand outward",
     "Two types of centers: single character (odd length) and between characters (even length)",

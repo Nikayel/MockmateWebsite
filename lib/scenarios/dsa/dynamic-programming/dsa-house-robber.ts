@@ -10,20 +10,25 @@ export const houseRobberScenario: DSAScenario = {
   description: "Maximize amount robbed without robbing adjacent houses.",
   tags: ["dynamic-programming", "array"],
   estimatedTime: 20,
-  problemStatement: `You are a robber planning to rob houses along a street. Each house has money, but adjacent houses have security that alerts police. Return the maximum amount you can rob without alerting police.`,
+  problemStatement: `You're casing a row of houses along a quiet street, and nums[i] is the cash hidden inside house i. The complication is the wiring: every two houses that sit side by side share a linked alarm, and breaking into both members of such a pair on one night brings the police.
+
+Choose which houses to hit so that no two of them are next-door neighbors, and return the biggest total haul you can carry off.`,
   examples: [
     {
-      input: "nums = [1,2,3,1]",
-      output: "4",
-      explanation: "Rob house 1 and 3",
+      input: "nums = [3,1,4,2]",
+      output: "7",
+      explanation: "Hit houses 1 and 3",
     },
     {
-      input: "nums = [2,7,9,3,1]",
-      output: "12",
-      explanation: "Rob houses 1, 3, and 5",
+      input: "nums = [5,3,8,4,9]",
+      output: "22",
+      explanation: "Hit houses 1, 3, and 5",
     },
   ],
-  constraints: ["1 <= nums.length <= 100", "0 <= nums[i] <= 400"],
+  constraints: [
+    "the street holds between 1 and 100 houses in nums",
+    "every stash nums[i] is between 0 and 400",
+  ],
   hints: [
     "1D DP: dp[i] = max money robbing up to house i",
     "Choice: rob current (nums[i] + dp[i-2]) or skip (dp[i-1])",

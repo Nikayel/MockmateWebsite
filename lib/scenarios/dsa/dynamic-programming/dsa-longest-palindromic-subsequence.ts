@@ -10,22 +10,25 @@ export const longestPalindromicSubsequenceScenario: DSAScenario = {
   description: "Find the length of the longest palindromic subsequence",
   tags: ["dynamic-programming", "string"],
   estimatedTime: 30,
-  problemStatement: `Given a string s, find the longest palindromic subsequence's length in s.
+  problemStatement: `You're given a string s. Strike out any characters you like (or none at all); the survivors, kept in their original order, form a subsequence of s.
 
-A subsequence is a sequence that can be derived from another sequence by deleting some or no elements without changing the order of the remaining elements.`,
+Some subsequences are palindromes, reading the same forward and backward. Return the length of the longest palindromic subsequence hiding inside s.`,
   examples: [
     {
-      input: 's = "bbbab"',
-      output: "4",
-      explanation: 'One possible longest palindromic subsequence is "bbbb".',
+      input: 's = "agbdba"',
+      output: "5",
+      explanation: 'Striking out the "g" leaves "abdba", which reads the same in both directions.',
     },
     {
-      input: 's = "cbbd"',
+      input: 's = "moon"',
       output: "2",
-      explanation: 'One possible longest palindromic subsequence is "bb".',
+      explanation: 'The best palindromic subsequence available is "oo".',
     },
   ],
-  constraints: ["1 <= s.length <= 1000", "s consists only of lowercase English letters."],
+  constraints: [
+    "s runs between 1 and 1000 characters long",
+    "every character of s is a lowercase English letter",
+  ],
   hints: [
     "dp[i][j] = LPS length for s[i:j+1]",
     "If s[i] == s[j]: dp[i][j] = dp[i+1][j-1] + 2",

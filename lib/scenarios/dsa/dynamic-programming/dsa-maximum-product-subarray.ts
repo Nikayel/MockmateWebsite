@@ -7,28 +7,29 @@ export const maximumProductSubarrayScenario: DSAScenario = {
   pattern: "dp-1d",
   difficulty: "medium",
   companies: ["Amazon", "Google", "Meta", "Microsoft", "LinkedIn"],
-  description: "Find the contiguous subarray with the largest product",
+  description: "Hunt down the run of adjacent entries whose product comes out largest",
   tags: ["dynamic-programming", "array"],
   estimatedTime: 25,
-  problemStatement: `Given an integer array nums, find a subarray that has the largest product, and return the product.
+  problemStatement: `You're given an integer array nums. Pick a contiguous run of entries, at least one entry long, whose product comes out as large as possible, and return that product.
 
-The test cases are generated so that the answer will fit in a 32-bit integer.`,
+The run must be unbroken: you can't skip an entry to dodge a zero or a negative value. Every test is built so the answer fits in a 32-bit integer.`,
   examples: [
     {
-      input: "nums = [2,3,-2,4]",
-      output: "6",
-      explanation: "[2,3] has the largest product 6.",
+      input: "nums = [3,-1,4,2]",
+      output: "8",
+      explanation: "[4,2] multiplies to 8, the best any unbroken run manages here.",
     },
     {
-      input: "nums = [-2,0,-1]",
+      input: "nums = [-3,0,-5]",
       output: "0",
-      explanation: "The result cannot be 2, because [-2,-1] is not a subarray.",
+      explanation:
+        "-3 and -5 would multiply to 15, but they sit on opposite sides of the 0 and a run cannot jump over it.",
     },
   ],
   constraints: [
-    "1 <= nums.length <= 2 * 10^4",
-    "-10 <= nums[i] <= 10",
-    "The product of any prefix or suffix of nums is guaranteed to fit in a 32-bit integer.",
+    "nums holds between 1 and 2 * 10^4 entries.",
+    "Each entry sits between -10 and 10.",
+    "Multiplying any prefix or any suffix of nums stays inside a 32-bit integer.",
   ],
   hints: [
     "Track both max and min product ending at each position",
