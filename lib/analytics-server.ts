@@ -8,11 +8,24 @@
  */
 
 import { adminDb } from "./firebase-admin"
+import { capturePostHogServerEvent } from "./posthog-server"
 
 /**
- * Track event server-side (for API routes)
+ * Track event server-side (for API routes).
+ *
+ * Writes to two places, and they answer different questions. The Firestore
+ * `analytics_events` collection is what the admin pages read and what the cost
+ * ledger joins against, so it stays. PostHog is where these events meet the
+ * browser ones: without it, product analytics could see a visitor arrive and
+ * could not see them run a single test.
+ *
+ * The PostHog leg is fired before the Firestore await rather than after it, so
+ * a Firestore outage costs us the durable row but not the analytics event.
+ * Neither leg can throw; see capturePostHogServerEvent.
  */
 export async function trackEventServer(eventName: string, params: Record<string, any>) {
+  capturePostHogServerEvent(eventName, params)
+
   try {
     await adminDb.collection("analytics_events").add({
       event_name: eventName,
