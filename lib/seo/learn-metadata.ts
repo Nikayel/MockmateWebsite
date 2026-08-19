@@ -182,6 +182,21 @@ export function lessonMetaDescription(preview: PublicLessonPreview): string {
 }
 
 /**
+ * The name this lesson should carry in a SERP: the authored `seoTitle` when it exists, otherwise
+ * the curriculum title.
+ *
+ * The fallback is right for most of the corpus, because a lesson's name is usually also what people
+ * call the topic. It is wrong precisely where a curriculum needed a name that reads well inside an
+ * ordered course, and the searcher uses the plain name of the thing. See `seoTitle` in
+ * `lib/tutorials/types.ts` for the measurement that motivated the override.
+ *
+ * Exported so the corpus tests can assert against the same string the head actually renders.
+ */
+export function lessonSearchTitle(preview: PublicLessonPreview): string {
+  return preview.seoTitle ?? preview.title
+}
+
+/**
  * `/learn/{track}/{levelSlug}/{lessonId}` — the canonical reading page.
  *
  * Takes the already-projected {@link PublicLessonPreview} rather than the authored lesson, so the
@@ -193,9 +208,12 @@ export function learnLessonMetadata(preview: PublicLessonPreview): Metadata {
   // reach the `absolute` rung, so it composes its own head and overrides just the title. The
   // Open Graph title keeps the full label: no OG consumer enforces a 60-character budget, and
   // Slack or LinkedIn showing the course is a gain rather than a truncation risk.
-  const title = composeLearnTitle(preview.title, LEARN_COURSE_LABEL[preview.courseId])
+  const searchTitle = lessonSearchTitle(preview)
+  const title = composeLearnTitle(searchTitle, LEARN_COURSE_LABEL[preview.courseId])
   const base = headFor({
     path,
+    // Open Graph keeps the curriculum title: a shared link is read by someone deciding whether to
+    // open it, not by a ranking algorithm, and the authored name is the more honest label there.
     title: `${preview.title} · Learn ${LEARN_COURSE_LABEL[preview.courseId]}`,
     description: lessonMetaDescription(preview),
   })

@@ -112,6 +112,11 @@ export interface PublicLessonPreview {
   title: string
   summary: string
   /**
+   * The authored search title, when the lesson has one. Same disclosure argument as
+   * {@link seoDescription}: it exists to be rendered into this page's own `<head>`.
+   */
+  seoTitle?: string
+  /**
    * The authored meta description, when the lesson has one. Publishing it is not a disclosure: its
    * whole purpose is to be rendered into the `<head>` of this very page. It rides the projection so
    * that `learnLessonMetadata`, which takes the preview and never the authored lesson, can reach it.
@@ -210,6 +215,7 @@ export function toPublicLessonPreview(args: {
     // Written unconditionally, unlike the optional `teach` fields above, so the key set of a
     // preview is the same for every lesson and the sealing test's exact-keys assertion stays exact
     // rather than becoming a subset check. `undefined` does not survive serialization anyway.
+    seoTitle: lesson.seoTitle,
     seoDescription: lesson.seoDescription,
     estimatedMinutes: lesson.estimatedMinutes,
     difficulty: lesson.difficulty,

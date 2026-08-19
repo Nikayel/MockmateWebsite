@@ -72,6 +72,29 @@ export interface TutorialLesson<E> {
   /** One line, for the module list. */
   summary: string
   /**
+   * The `<title>` for this lesson's public reading page, written for a searcher rather than for a
+   * learner already inside the course.
+   *
+   * Optional, and absent on most lessons. `learnLessonMetadata` falls back to {@link title}, which
+   * is usually right: the curriculum title names the lesson well. Where it is wrong is where the
+   * curriculum's name for a topic is not the name people search for it by, and that gap is worth
+   * real positions. The measured case (2026-08-18) was the SLI lesson, titled
+   * "SLI / SLO / SLA Hierarchy": it ranked for THIRTY query variants of "sli definition",
+   * "sli meaning", and "sli vs slo" at an average position near 72, with a title containing the
+   * word "Hierarchy", which none of those thirty queries used.
+   *
+   * Rules, enforced by `lib/seo/__tests__/learn-seo-title.test.ts`:
+   *
+   *  - Must differ from {@link title}; an override identical to the fallback is noise.
+   *  - At most 60 characters INCLUDING the ` | CodeSparring` the root template appends, so it never
+   *    reaches the `absolute` rung of {@link composeLearnTitle} and never gets cut mid-phrase.
+   *  - Must not contain the brand: the template adds it exactly once.
+   *
+   * Set it only where search demand justifies it, same rule as {@link seoDescription}. A guessed
+   * title on a page nobody searches for trades an accurate name for a worse one.
+   */
+  seoTitle?: string
+  /**
    * The meta description for this lesson's public reading page, written for a searcher.
    *
    * Optional, and absent on most lessons. `learnLessonMetadata` falls back to {@link summary}, which

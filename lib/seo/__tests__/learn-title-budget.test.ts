@@ -32,7 +32,12 @@
 import type { Metadata } from "next"
 import { describe, expect, it } from "vitest"
 
-import { composeLearnTitle, learnLessonMetadata, learnLevelMetadata } from "../learn-metadata"
+import {
+  composeLearnTitle,
+  learnLessonMetadata,
+  learnLevelMetadata,
+  lessonSearchTitle,
+} from "../learn-metadata"
 import { listAllCatalogEntries, listAllCourseLevels } from "@/lib/tutorials/course-catalog"
 import { LEARN_COURSE_LABEL } from "@/lib/tutorials/lesson-routes"
 import { toPublicLessonPreview } from "@/lib/tutorials/public-preview"
@@ -120,14 +125,22 @@ describe("Learn lesson titles fit the SERP budget", () => {
     expect(offenders).toEqual([])
   })
 
-  it("never truncates or mangles the lesson's own name", () => {
-    // Degrading the SUFFIX is the whole strategy. Degrading the title would defeat the point:
-    // the lesson name is the only part of the string a searcher is scanning for.
+  it("never truncates or mangles the name the page declares", () => {
+    // Degrading the SUFFIX is the whole strategy. Degrading the name would defeat the point:
+    // it is the only part of the string a searcher is scanning for.
+    //
+    // "The name the page declares" is the lesson's `seoTitle` where one is authored and the
+    // curriculum title everywhere else, which is exactly what `lessonSearchTitle` resolves. Before
+    // that override existed this compared against `lesson.title` unconditionally, and a lesson that
+    // deliberately searches under a different name than it teaches under would have read as a
+    // mangled title. The rule being enforced is unchanged: whatever name we chose to publish
+    // survives into the rendered string whole.
     const offenders: string[] = []
     for (const entry of ENTRIES) {
+      const declared = lessonSearchTitle(toPublicLessonPreview(entry))
       const rendered = renderedLessonTitle(entry)
-      if (!rendered.includes(entry.lesson.title)) {
-        offenders.push(`${entry.lesson.id}: "${entry.lesson.title}" not intact in "${rendered}"`)
+      if (!rendered.includes(declared)) {
+        offenders.push(`${entry.lesson.id}: "${declared}" not intact in "${rendered}"`)
       }
     }
     expect(offenders).toEqual([])

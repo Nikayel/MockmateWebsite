@@ -49,10 +49,10 @@ const ENTRIES = listAllCatalogEntries()
  * added to `ALLOWED_EXERCISE_KEYS` and stayed invisible until the first lesson authored one
  * (`b9f19500`). Add the projection and the allowlist entry in the same commit, every time.
  *
- * `seoDescription` is the newest entry. It is the lesson's own meta description, so publishing it is
- * its purpose rather than a disclosure, and `toPublicLessonPreview` writes the key unconditionally
- * so this assertion stays an equality rather than degrading to a subset check on the majority of
- * lessons that have no value for it.
+ * `seoTitle` and `seoDescription` are the newest entries, and they are the same case: each is the
+ * lesson's own head tag, so publishing it is its purpose rather than a disclosure.
+ * `toPublicLessonPreview` writes both keys unconditionally so this assertion stays an equality
+ * rather than degrading to a subset check on the majority of lessons that have no value for them.
  */
 const ALLOWED_PREVIEW_KEYS = [
   "apply",
@@ -67,6 +67,7 @@ const ALLOWED_PREVIEW_KEYS = [
   "levelTitle",
   "practice",
   "seoDescription",
+  "seoTitle",
   "skills",
   "summary",
   "teach",
