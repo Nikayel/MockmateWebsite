@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { usePathname } from "next/navigation"
 import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -67,8 +67,30 @@ export function isReplayExcludedPath(pathname: string | null): boolean {
  * vendors therefore turn on and off together, which is what /legal promises.
  */
 export function ConsentAnalytics() {
-  const [hasConsent, setHasConsent] = useState(false)
+  /**
+   * `null` means "we have not read the stored preference yet", and it is a
+   * third state rather than a falsy boolean because the two are different
+   * instructions to PostHog. `false` means "opt this visitor out", and
+   * opt_out_capturing() clears persistence as well as capture. Seeding this
+   * `false` therefore told PostHog to wipe the device on every single page
+   * load, including for visitors who had already consented: the effect below
+   * ran once with the seeded value, cleared persistence, and then ran again
+   * with the real value and minted a fresh distinct_id.
+   *
+   * That cost us both halves of the analytics. Identity fragmented, so one
+   * human reading one page arrived as several people, and replay never
+   * survived, because wiping persistence between stop and start hands the
+   * recorder a new session id and leaves orphan fragments with no full
+   * snapshot to render from. We cannot seed from localStorage either, since
+   * this component server-renders and reading it during render is a hydration
+   * mismatch. So the state stays unknown until an effect can read it, and
+   * everything that talks to PostHog no-ops while it is unknown.
+   */
+  const [hasConsent, setHasConsent] = useState<boolean | null>(null)
   const pathname = usePathname()
+
+  /** The consent value last pushed into PostHog, so we push only on change. */
+  const appliedConsent = useRef<boolean | null>(null)
 
   useEffect(() => {
     setHasConsent(hasAnalyticsConsent())
@@ -89,6 +111,7 @@ export function ConsentAnalytics() {
   // that getAnalytics fires, which is the app's only page-view signal since
   // trackPageView has no call sites.
   useEffect(() => {
+    if (hasConsent === null) return
     syncAnalyticsConsent()
   }, [hasConsent])
 
@@ -114,11 +137,24 @@ export function ConsentAnalytics() {
   // recorder to start.
   useEffect(() => {
     if (!posthog.__loaded) return
+    // Unknown consent is not "no consent". Acting on the seeded value here is
+    // what cleared persistence on every load; see the useState comment above.
+    if (hasConsent === null) return
 
     const mayRecord = hasConsent && !isReplayExcludedPath(pathname)
 
     posthog.set_config({ disable_session_recording: !mayRecord })
-    applyPostHogConsent(hasConsent)
+
+    // Only when the answer actually changes. This effect also re-runs on every
+    // client-side navigation, and opt_out_capturing() clears persistence each
+    // time it is called, so re-applying an unchanged decision on every route
+    // change mints a new distinct_id per navigation for visitors who have not
+    // consented. instrumentation-client.ts has already applied the correct
+    // value at init, so the first pass here is normally a no-op in effect.
+    if (appliedConsent.current !== hasConsent) {
+      applyPostHogConsent(hasConsent)
+      appliedConsent.current = hasConsent
+    }
 
     if (mayRecord) {
       posthog.startSessionRecording()

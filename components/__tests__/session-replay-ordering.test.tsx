@@ -17,12 +17,21 @@
  * happened, because "we called stop at some point" is a property the broken
  * version also satisfied.
  *
- * The sequences below have six entries because the effect legitimately runs
- * twice on mount: `hasConsent` is seeded `false` by useState and only becomes
- * true after the first effect reads localStorage. An earlier version of this
- * file compared `invocationCallOrder[0]` of two different spies, which silently
- * compared the first run against the second and passed against a deliberately
- * broken build. Assert whole sequences here, not first-call indices.
+ * An earlier version of this file asserted six-entry sequences beginning with a
+ * "pre-consent pass" of `config:disable_recording=true, optOut, stop`, on the
+ * reasoning that the effect legitimately runs twice on mount because
+ * `hasConsent` is seeded `false` and only becomes true once an effect has read
+ * localStorage. That pass was not legitimate, and pinning it here kept a real
+ * bug alive: `opt_out_capturing()` clears persistence, so every page load wiped
+ * the device and minted a new distinct_id, which fragmented identity and left
+ * session replay with a new session id and orphan fragments on every load.
+ * Consent is now tri-state and nothing is pushed to PostHog until it is known,
+ * so a mount produces ONE pass, not two.
+ *
+ * An even earlier version compared `invocationCallOrder[0]` of two different
+ * spies, which silently compared the first run against the second and passed
+ * against a deliberately broken build. Assert whole sequences here, not
+ * first-call indices.
  */
 
 import { render } from "@testing-library/react"
@@ -64,11 +73,8 @@ vi.mock("@vercel/speed-insights/next", () => ({ SpeedInsights: () => null }))
 
 async function mount() {
   const { ConsentAnalytics } = await import("@/components/ConsentAnalytics")
-  render(<ConsentAnalytics />)
+  return render(<ConsentAnalytics />)
 }
-
-/** The pre-consent pass every mount performs before localStorage is read. */
-const PRE_CONSENT_PASS = ["config:disable_recording=true", "optOut", "stop"]
 
 describe("session replay start/stop ordering", () => {
   beforeEach(() => {
@@ -83,7 +89,6 @@ describe("session replay start/stop ordering", () => {
     await mount()
 
     expect(calls).toEqual([
-      ...PRE_CONSENT_PASS,
       // The hard flag lands first, so nothing posthog-js re-evaluates during
       // the consent call can start the recorder on /admin.
       "config:disable_recording=true",
@@ -97,12 +102,7 @@ describe("session replay start/stop ordering", () => {
 
     await mount()
 
-    expect(calls).toEqual([
-      ...PRE_CONSENT_PASS,
-      "config:disable_recording=true",
-      "optIn:captureEventName=false",
-      "stop",
-    ])
+    expect(calls).toEqual(["config:disable_recording=true", "optIn:captureEventName=false", "stop"])
     expect(calls).not.toContain("start")
   })
 
@@ -112,7 +112,6 @@ describe("session replay start/stop ordering", () => {
     await mount()
 
     expect(calls).toEqual([
-      ...PRE_CONSENT_PASS,
       "config:disable_recording=false",
       "optIn:captureEventName=false",
       "start",
@@ -125,7 +124,7 @@ describe("session replay start/stop ordering", () => {
 
     await mount()
 
-    expect(calls).toEqual(PRE_CONSENT_PASS)
+    expect(calls).toEqual(["config:disable_recording=true", "optOut", "stop"])
     expect(calls).not.toContain("start")
   })
 
@@ -144,5 +143,38 @@ describe("session replay start/stop ordering", () => {
     await mount()
 
     expect(calls).toContain("optIn:captureEventName=false")
+  })
+
+  /**
+   * The bug this file previously pinned as correct. `opt_out_capturing()` does
+   * not merely stop capture, it clears persistence, so issuing it against a
+   * consented visitor discards their distinct_id and the session id replay is
+   * stitching onto. Doing that on every page load is what produced 17 sessions
+   * across 12 device ids in a single day and left replay with zero recordings.
+   */
+  it("NEVER opts out a visitor who has already consented", async () => {
+    consented = true
+    pathname = "/pricing"
+
+    await mount()
+
+    expect(calls).not.toContain("optOut")
+    expect(calls).toContain("start")
+  })
+
+  it("does not re-apply an unchanged consent decision on navigation", async () => {
+    consented = true
+    pathname = "/pricing"
+
+    const { rerender } = await mount()
+    const { ConsentAnalytics } = await import("@/components/ConsentAnalytics")
+
+    pathname = "/careers"
+    rerender(<ConsentAnalytics />)
+
+    // One opt-in for the mount, and none for the navigation: re-applying it
+    // would clear persistence again and mint a new distinct_id per route.
+    expect(calls.filter((c) => c.startsWith("optIn"))).toHaveLength(1)
+    expect(calls).not.toContain("optOut")
   })
 })
