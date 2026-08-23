@@ -10,6 +10,7 @@
 import { useState, useCallback, useRef, useEffect } from "react"
 import { DeepgramVoiceService, DeepgramConfig, DEFAULT_DEEPGRAM_MODEL } from "./deepgram-service"
 import { repairInterviewTranscript } from "./transcript-repair"
+import { classifyVoiceError, type VoiceUnavailableReason } from "./voice-availability"
 import { VOICE } from "@/lib/constants"
 import { logger } from "@/lib/logger"
 
@@ -55,7 +56,20 @@ export interface UseDeepgramReturn {
   cancelCountdown: () => void // Cancel pending auto-send
 
   // Info
+  /**
+   * Whether a credential source EXISTS. Not whether voice will work: this is
+   * `!!apiKey || !!getAuthToken`, and getAuthToken is a function the interview
+   * page always supplies, so it stays true even for a guest whose token
+   * resolves to null. Use `unavailableReason` to decide what to show.
+   */
   isConfigured: boolean
+  /**
+   * Why voice is not usable, or null if nothing has failed yet.
+   *
+   * Set when a start attempt fails and when the stream dies mid-session, since
+   * those are the only moments the truth is actually known.
+   */
+  unavailableReason: VoiceUnavailableReason | null
 }
 
 /** Body of a single POST to /api/usage/voice. */
@@ -104,6 +118,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
   const [status, setStatus] = useState<VoiceStatus>("idle")
   const [transcript, setTranscript] = useState("")
   const [error, setError] = useState<Error | null>(null)
+  const [unavailableReason, setUnavailableReason] = useState<VoiceUnavailableReason | null>(null)
   const [countdownActive, setCountdownActive] = useState(false)
 
   const serviceRef = useRef<DeepgramVoiceService | null>(null)
@@ -223,6 +238,11 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
 
     serviceRef.current.setOnError((err) => {
       setError(err)
+      // Mid-session failures land here rather than in startRecording's catch:
+      // an unplugged microphone or a dropped socket happens long after the
+      // start call resolved, and without this the UI would keep showing a live
+      // recorder for a stream that has already died.
+      setUnavailableReason(classifyVoiceError(err))
       options.onError?.(err)
     })
 
@@ -304,6 +324,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
     }
 
     setError(null)
+    setUnavailableReason(null)
     setStatus("connecting")
     recordingStartTimeRef.current = Date.now()
     usageReportedRef.current = false
@@ -314,6 +335,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
       recordingStartTimeRef.current = null
       const error = err instanceof Error ? err : new Error(String(err))
       setError(error)
+      setUnavailableReason(classifyVoiceError(err))
       setStatus("error")
       throw error
     }
@@ -376,6 +398,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
     clearSentTracker,
     cancelCountdown,
     isConfigured,
+    unavailableReason,
   }
 }
 

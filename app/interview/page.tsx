@@ -37,6 +37,7 @@ import type { ProblemColumnCtx } from "./_components/ProblemColumn"
 // Streaming feedback - Edge function with no timeout
 import { useStreamingFeedback } from "@/lib/hooks/use-streaming-feedback"
 import { useHintAgent } from "@/lib/hooks/useHintAgent"
+import { voiceUnavailableCopy } from "@/lib/voice/voice-availability"
 import { getInitialPartnerMessage, getProblemTypeLabel } from "./_utils/interview-messages"
 import { EDITOR_LANGUAGES, getBugfixScenarioLanguage, type EditorLanguage } from "./_utils/language"
 import {
@@ -278,6 +279,14 @@ function InterviewPageContent() {
   })
 
   // Backwards compatible aliases
+  // Only surfaced once something has actually failed. `isConfigured` cannot
+  // carry this: it is `!!apiKey || !!getAuthToken`, and getAuthToken is a
+  // function we always pass, so it reads true even for a guest whose token
+  // resolves to null. The truth is only known after a start attempt.
+  const interviewerVoiceUnavailable = interviewerVoice.unavailableReason
+    ? voiceUnavailableCopy(interviewerVoice.unavailableReason)
+    : null
+
   const isRecordingInterviewer = interviewerVoice.isRecording
 
   // AI hints states
@@ -2019,6 +2028,7 @@ function InterviewPageContent() {
                   onCancelInterviewerCountdown={onCancelInterviewerCountdown}
                   onSendInterviewerMessage={onSendInterviewerMessage}
                   countdownActive={interviewerVoice.countdownActive}
+                  voiceUnavailable={interviewerVoiceUnavailable}
                   interviewerInput={interviewerInput}
                   onInterviewerInputChange={setInterviewerInput}
                   bugfixTourEnabled={bugfixTourEnabled}

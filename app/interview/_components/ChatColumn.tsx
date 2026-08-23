@@ -26,6 +26,8 @@ interface ChatColumnProps {
   onCancelCountdown: () => void
   onSendMessage: () => void
   countdownActive: boolean
+  /** Why voice is unusable, already turned into copy. Null when voice is fine. */
+  voiceUnavailable?: { title: string; detail: string } | null
   interviewerInput: string
   onInterviewerInputChange: (value: string) => void
   collapsed?: boolean
@@ -47,6 +49,7 @@ export const ChatColumn = memo(function ChatColumn({
   onCancelCountdown,
   onSendMessage,
   countdownActive,
+  voiceUnavailable = null,
   interviewerInput,
   onInterviewerInputChange,
   collapsed = false,
@@ -167,6 +170,7 @@ export const ChatColumn = memo(function ChatColumn({
               onSend={onSendMessage}
               onCancelCountdown={onCancelCountdown}
               countdownActive={countdownActive}
+              unavailable={voiceUnavailable}
               autoSendDelayMs={500}
               isLoading={isBusy}
               transcript={interviewerInput}

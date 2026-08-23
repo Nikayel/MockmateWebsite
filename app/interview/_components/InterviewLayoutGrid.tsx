@@ -80,6 +80,7 @@ interface InterviewLayoutGridProps {
   onCancelInterviewerCountdown: ChatColumnProps["onCancelCountdown"]
   onSendInterviewerMessage: ChatColumnProps["onSendMessage"]
   countdownActive: ChatColumnProps["countdownActive"]
+  voiceUnavailable?: ChatColumnProps["voiceUnavailable"]
   interviewerInput: ChatColumnProps["interviewerInput"]
   onInterviewerInputChange: ChatColumnProps["onInterviewerInputChange"]
   // BugfixOnboardingTour
@@ -146,6 +147,7 @@ export function InterviewLayoutGrid({
   onCancelInterviewerCountdown,
   onSendInterviewerMessage,
   countdownActive,
+  voiceUnavailable = null,
   interviewerInput,
   onInterviewerInputChange,
   bugfixTourEnabled,
@@ -309,6 +311,7 @@ export function InterviewLayoutGrid({
         onCancelCountdown={onCancelInterviewerCountdown}
         onSendMessage={onSendInterviewerMessage}
         countdownActive={countdownActive}
+        voiceUnavailable={voiceUnavailable}
         interviewerInput={interviewerInput}
         onInterviewerInputChange={onInterviewerInputChange}
         collapsed={intCollapsed}

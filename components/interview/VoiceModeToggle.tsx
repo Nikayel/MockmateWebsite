@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Mic, X, Volume2, Send } from "lucide-react"
+import { Mic, MicOff, X, Volume2, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
@@ -22,6 +22,14 @@ interface VoiceModeToggleProps {
   countdownActive?: boolean
   autoSendDelayMs?: number
   onCancelCountdown?: () => void
+  /**
+   * Why voice cannot be used, if it cannot.
+   *
+   * Passed as copy rather than a reason code so this component stays free of
+   * the voice stack: it renders a message and a struck-through mic, and knows
+   * nothing about Deepgram, tokens or getUserMedia.
+   */
+  unavailable?: { title: string; detail: string } | null
 }
 
 /**
@@ -113,6 +121,7 @@ export function VoiceModeToggle({
   onSend,
   isLoading = false,
   countdownActive = false,
+  unavailable = null,
   autoSendDelayMs = 500,
   onCancelCountdown,
 }: VoiceModeToggleProps) {
@@ -127,6 +136,29 @@ export function VoiceModeToggle({
 
   // Compute opacity based on drag distance
   const dragOpacity = Math.max(0.3, 1 - Math.abs(dragOffset) / (CANCEL_THRESHOLD * 2))
+
+  // A dead mic button that throws on click is worse than no mic button: the
+  // candidate cannot tell whether they misclicked, whether the site is broken,
+  // or whether they are meant to do something. Say which it is, and say that
+  // typing still works, because voice is a convenience here and never the only
+  // way to answer.
+  if (unavailable) {
+    return (
+      <div
+        className={cn(
+          "border-border/60 bg-muted/40 flex items-start gap-2 rounded-md border px-3 py-2",
+          className
+        )}
+        role="status"
+      >
+        <MicOff className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <div className="min-w-0">
+          <p className="text-foreground text-xs font-medium">{unavailable.title}</p>
+          <p className="text-muted-foreground text-xs">{unavailable.detail}</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
@@ -204,7 +236,7 @@ export function VoiceModeToggle({
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
-                  className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-white"
+                  className="border-border h-4 w-4 animate-spin rounded-full border-2 border-t-white"
                 />
               ) : (
                 <motion.div
@@ -311,7 +343,7 @@ export function VoiceModeToggle({
                 )}
               >
                 {isLoading ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-white" />
+                  <div className="border-border h-4 w-4 animate-spin rounded-full border-2 border-t-white" />
                 ) : (
                   <>
                     <Send className="mr-1 h-4 w-4" />
