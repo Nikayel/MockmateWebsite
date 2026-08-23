@@ -9,6 +9,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react"
 import { DeepgramVoiceService, DeepgramConfig, DEFAULT_DEEPGRAM_MODEL } from "./deepgram-service"
+import { repairInterviewTranscript } from "./transcript-repair"
 import { VOICE } from "@/lib/constants"
 import { logger } from "@/lib/logger"
 
@@ -430,6 +431,21 @@ export function useVoiceInput(
   // Check if we should use Web Speech API as fallback
   const useWebSpeech = options.fallbackToWebSpeech && !deepgram.isConfigured
 
+  // This downgrade is invisible from the outside: the interview keeps working,
+  // just on a worse recognizer with no keyterm vocabulary. It has now shipped
+  // undetected twice, so say so loudly rather than leaving it to be inferred
+  // from a mangled transcript weeks later.
+  const warnedFallback = useRef(false)
+  useEffect(() => {
+    if (useWebSpeech && !warnedFallback.current) {
+      warnedFallback.current = true
+      logger.warn("Voice downgraded to Web Speech: Deepgram reported itself unconfigured", {
+        hasAuthTokenGetter: Boolean(options.getAuthToken),
+        sessionId: options.sessionId,
+      })
+    }
+  }, [useWebSpeech, options.getAuthToken, options.sessionId])
+
   const [webSpeechRecording, setWebSpeechRecording] = useState(false)
   const [webSpeechTranscript, setWebSpeechTranscript] = useState("")
   const recognitionRef = useRef<SpeechRecognition | null>(null)
@@ -471,8 +487,14 @@ export function useVoiceInput(
       for (let i = 0; i < event.results.length; i++) {
         transcript += event.results[i][0].transcript
       }
-      setWebSpeechTranscript(transcript)
-      options.onTranscript?.(transcript, event.results[event.results.length - 1]?.isFinal ?? false)
+      // Repair here too, not only on the Deepgram path. This fallback produces
+      // the same spoken-complexity mis-hearings that repair exists to fix, and
+      // for a long time it was the only path that skipped it: a 2026-08-22
+      // interview persisted "o of n" and "o off and log in" verbatim into the
+      // transcript the interviewer and the scorer both read.
+      const repaired = repairInterviewTranscript(transcript)
+      setWebSpeechTranscript(repaired)
+      options.onTranscript?.(repaired, event.results[event.results.length - 1]?.isFinal ?? false)
     }
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
