@@ -235,12 +235,17 @@ export async function POST(request: NextRequest) {
         ? {
             sessionId,
             userId,
-            recentMessages: (context as Array<{ type: string; message: string }>)
-              .slice(-10)
-              .map((m) => ({
-                role: m.type === "user" ? "candidate" : "interviewer",
-                content: m.message,
-              })),
+            // The WHOLE conversation, not a tail. This job builds the
+            // conversationTracker that `check_already_discussed` reads, so a
+            // window here is what decides whether the interviewer knows it has
+            // already asked something. At `.slice(-10)` a 43-message session on
+            // 2026-08-22 re-probed one thread seven times: the tracker could
+            // only see the last ten messages, and the earlier probes on that
+            // same thread had fallen out of view.
+            recentMessages: (context as Array<{ type: string; message: string }>).map((m) => ({
+              role: m.type === "user" ? "candidate" : "interviewer",
+              content: m.message,
+            })),
             currentTracker: conversationTracker as unknown as ConversationTracker,
             messageCount: Array.isArray(context) ? context.length : 0,
             lastExtractionAt:
