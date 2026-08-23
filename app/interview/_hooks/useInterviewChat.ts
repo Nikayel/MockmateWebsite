@@ -51,7 +51,6 @@ export interface UseInterviewChatOptions {
   chatMessages: ChatMessage[]
   interviewerMessages: ChatMessage[]
   interviewerVoice: VoiceController
-  partnerVoice: VoiceController
   selectedScenario: Scenario | null
   code: string
   chatWorkspaceContext: unknown
@@ -263,7 +262,6 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
     chatMessages,
     interviewerMessages,
     interviewerVoice,
-    partnerVoice,
     selectedScenario,
     code,
     chatWorkspaceContext,
@@ -322,13 +320,16 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
       setMessages((prev) => [...prev, newUserMessage])
       setLoading(true)
 
-      // Reset voice state first so late WS/onTranscript callbacks don't repopulate input
-      const voice = isInterviewer ? interviewerVoice : partnerVoice
-      if (voice.isRecording) {
+      // Reset voice state first so late WS/onTranscript callbacks don't repopulate input.
+      // Null for the partner panel, which is text only: reaching for the
+      // interviewer's recorder here would wipe a transcript the candidate was
+      // still dictating every time they sent a message to the partner.
+      const voice = isInterviewer ? interviewerVoice : null
+      if (voice?.isRecording) {
         voice.stopRecording()
       }
-      voice.resetTranscript()
-      voice.clearSentTracker()
+      voice?.resetTranscript()
+      voice?.clearSentTracker()
 
       setInput("")
       // Deferred clear wins over any in-flight onTranscript from queued WebSocket messages
@@ -650,7 +651,8 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
   const handleAutoSend = useCallback(
     async (isInterviewer: boolean, transcript: string) => {
       const setInput = isInterviewer ? setInterviewerInput : setChatInput
-      const voice = isInterviewer ? interviewerVoice : partnerVoice
+      // Only the interviewer panel records, so only it can auto-send from voice.
+      const voice = isInterviewer ? interviewerVoice : null
 
       // Update input with final transcript
       const userMessage = transcript.trim()
@@ -659,14 +661,14 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
       setInput(userMessage)
 
       // Stop recording
-      if (voice.isRecording) {
+      if (voice?.isRecording) {
         voice.stopRecording()
       }
 
       // Send the message
       await handleSendMessage(isInterviewer, userMessage)
     },
-    [interviewerVoice, partnerVoice, handleSendMessage]
+    [interviewerVoice, handleSendMessage]
   )
 
   return { handleSendMessage, handleAutoSend }

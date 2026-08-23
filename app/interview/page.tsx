@@ -262,21 +262,11 @@ function InterviewPageContent() {
     },
   })
 
-  const partnerVoice = useVoiceInput({
-    autoSendEnabled: true,
-    autoSendDelayMs: 500,
-    getAuthToken: getVoiceAuthToken,
-    sessionId: currentSessionId ?? undefined,
-    onTranscript: (transcript, _isFinal) => {
-      setChatInput(transcript)
-    },
-    onUtteranceEnd: (transcript) => {
-      // Auto-send on utterance end
-      if (transcript.trim()) {
-        handleAutoSend(false, transcript)
-      }
-    },
-  })
+  // There is deliberately no partnerVoice. The partner panel is text only, and
+  // the hook that used to sit here could never be reached: nothing in the UI
+  // ever started partner recording, so it opened a Deepgram-capable recorder,
+  // registered an onUtteranceEnd that could not fire, and held an auth-token
+  // getter for a credential it would never request.
 
   // Backwards compatible aliases
   // Only surfaced once something has actually failed. `isConfigured` cannot
@@ -1210,7 +1200,6 @@ function InterviewPageContent() {
     hintAgent,
     resetBugfixSessionState,
     interviewerVoice,
-    partnerVoice,
     proactiveTimer,
     setProactiveTimer,
     inactivityTimerRef,
@@ -1502,10 +1491,15 @@ function InterviewPageContent() {
     },
   ]
 
-  // Voice recording with Deepgram (or Web Speech API fallback)
+  // Voice recording. Only the interviewer panel has a recorder; `isInterviewer`
+  // survives as a parameter because both helpers still choose which INPUT to
+  // populate, and only the voice half is interviewer-only.
   const toggleVoiceRecording = async (isInterviewer: boolean) => {
-    const voice = isInterviewer ? interviewerVoice : partnerVoice
+    const voice = isInterviewer ? interviewerVoice : null
     const setInput = isInterviewer ? setInterviewerInput : setChatInput
+
+    // The partner panel has no recorder, so there is nothing to toggle for it.
+    if (!voice) return
 
     try {
       if (voice.isRecording) {
@@ -1579,10 +1573,10 @@ function InterviewPageContent() {
 
   // Stop recording without auto-sending - user will click send button
   const stopVoiceRecording = (isInterviewer: boolean) => {
-    const voice = isInterviewer ? interviewerVoice : partnerVoice
+    const voice = isInterviewer ? interviewerVoice : null
     const setInput = isInterviewer ? setInterviewerInput : setChatInput
 
-    if (voice.isRecording) {
+    if (voice?.isRecording) {
       const finalTranscript = voice.stopRecording()
       if (finalTranscript?.trim()) {
         setInput(finalTranscript)
@@ -1599,7 +1593,6 @@ function InterviewPageContent() {
     chatMessages,
     interviewerMessages,
     interviewerVoice,
-    partnerVoice,
     selectedScenario,
     code,
     chatWorkspaceContext,

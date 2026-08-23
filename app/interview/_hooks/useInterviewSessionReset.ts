@@ -104,7 +104,6 @@ export interface UseInterviewSessionResetOptions {
   hintAgent: { resetHints: () => void }
   resetBugfixSessionState: () => void
   interviewerVoice: VoiceController
-  partnerVoice: VoiceController
   proactiveTimer: NodeJS.Timeout | null
   setProactiveTimer: Dispatch<SetStateAction<NodeJS.Timeout | null>>
   inactivityTimerRef: React.MutableRefObject<NodeJS.Timeout | null>
@@ -228,14 +227,11 @@ export function useInterviewSessionReset(opts: UseInterviewSessionResetOptions) 
       }
     }
 
-    // Stop any active voice recordings and countdowns to prevent Deepgram billing
+    // Stop any active voice recording and countdown to prevent Deepgram billing.
+    // Only the interviewer panel records; the partner panel is text only.
     opts.interviewerVoice.cancelCountdown()
-    opts.partnerVoice.cancelCountdown()
     if (opts.interviewerVoice.isRecording) {
       opts.interviewerVoice.stopRecording()
-    }
-    if (opts.partnerVoice.isRecording) {
-      opts.partnerVoice.stopRecording()
     }
 
     // Clear all proactive interview timers
