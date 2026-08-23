@@ -157,3 +157,80 @@ describe("buildEnvironmentContext", () => {
     expect(buildEnvironmentContext("system-design")).toBe("")
   })
 })
+
+/**
+ * Test results reached the model through `.slice(0, 5)`, which is wrong on any
+ * problem with more than five cases. With 20 tests failing from index 10 the
+ * model saw five passes under a "SOME FAILING" header, and the failing-tests
+ * branch - which uses findIndex over the WHOLE array - told it to ask about
+ * "test 11", a test it had never been shown.
+ */
+describe("test results reaching the interviewer", () => {
+  /** n tests where the ones named in `failing` (0-indexed) fail. */
+  const suite = (n: number, failing: number[]) =>
+    Array.from({ length: n }, (_, i) => ({
+      description: `case ${i + 1}`,
+      passed: !failing.includes(i),
+      ...(failing.includes(i) ? { error: `boom ${i + 1}`, expected: i + 1, actual: 0 } : {}),
+    }))
+
+  it("shows every test, not just the first five", () => {
+    const result = buildConsoleContext(suite(20, [10]), undefined)
+
+    expect(result).toContain("Test 1:")
+    expect(result).toContain("Test 20:")
+    expect(result).toContain("case 20")
+  })
+
+  it("shows the failing test the debug prompt tells it to ask about", () => {
+    const result = buildConsoleContext(suite(20, [10]), undefined)
+
+    // The prompt references test 11 via findIndex; it must be visible with its
+    // failure detail, or the interviewer can name it but not help with it.
+    expect(result).toContain("Looks like test 11 is failing")
+    expect(result).toContain("Test 11: case 11 - FAILED ✗")
+    expect(result).toContain("boom 11")
+  })
+
+  it("numbers tests as the candidate sees them, in the candidate's order", () => {
+    const result = buildConsoleContext(suite(6, [4]), undefined)
+    const lines = result.split("\n").filter((l) => l.startsWith("Test "))
+
+    expect(lines.map((l) => l.slice(0, 7))).toEqual([
+      "Test 1:",
+      "Test 2:",
+      "Test 3:",
+      "Test 4:",
+      "Test 5:",
+      "Test 6:",
+    ])
+    expect(lines[4]).toContain("FAILED ✗")
+  })
+
+  it("still reports the pass count accurately", () => {
+    const result = buildConsoleContext(suite(20, [10, 15]), undefined)
+
+    expect(result).toContain("18/20 passed")
+    expect(result).toContain("✗ SOME FAILING")
+  })
+
+  it("caps one oversized field without dropping any test", () => {
+    const tests = [
+      { description: "huge", passed: false, error: "E".repeat(5000), expected: 1, actual: 2 },
+      { description: "after the huge one", passed: true },
+    ]
+
+    const result = buildConsoleContext(tests, undefined)
+
+    expect(result).toContain("[truncated]")
+    expect(result).toContain("Test 2: after the huge one")
+    expect(result.length).toBeLessThan(5000)
+  })
+
+  it("keeps passing rows compact, with no error or diff noise", () => {
+    const result = buildConsoleContext([{ description: "fine", passed: true }], undefined)
+
+    expect(result).toContain("Test 1: fine - PASSED ✓")
+    expect(result).not.toContain("Expected:")
+  })
+})

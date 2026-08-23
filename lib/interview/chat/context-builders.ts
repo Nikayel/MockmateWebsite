@@ -204,6 +204,51 @@ DO NOT skip edge cases - real interviewers always ask about them.If they haven't
     : ""
 }
 
+/** Longest error / expected / actual value rendered for a single test. */
+const MAX_TEST_FIELD_LENGTH = 600
+
+/**
+ * Render EVERY test result, numbered as the candidate sees them.
+ *
+ * This used to be `.slice(0, 5)`, which broke in two ways at once on any
+ * problem with more than five cases. The obvious one: with 20 tests failing
+ * from index 10, the model saw five passes and was told "SOME FAILING" with no
+ * failure in view. The subtler one: the FAILING-TESTS branch below builds its
+ * question with `findIndex` over the WHOLE array, so it would instruct the
+ * interviewer to say "looks like test 11 is failing" about a test it had never
+ * been shown - no description, no error, no expected-vs-actual. It could repeat
+ * the number and could not help debug it.
+ *
+ * Order and numbering are the candidate's, deliberately. Sorting failures first
+ * would read better in isolation and would put the model's "test 3" beside the
+ * candidate's "test 12", which is the exact disconnect this is fixing.
+ *
+ * Only the size of a single field is bounded, never the number of tests. That
+ * is the same trade made for conversation history in context-window.ts: bound
+ * the shape of one item, never the count, because the count is the information.
+ */
+function formatTestResults(results: TestResultItem[]): string {
+  const cap = (value: unknown): string => {
+    const text = typeof value === "string" ? value : JSON.stringify(value)
+    if (text === undefined) return "undefined"
+    return text.length > MAX_TEST_FIELD_LENGTH
+      ? `${text.slice(0, MAX_TEST_FIELD_LENGTH)}... [truncated]`
+      : text
+  }
+
+  return results
+    .map((t, i) => {
+      const head = `Test ${i + 1}: ${t.description || "Test case"} - ${t.passed ? "PASSED ✓" : "FAILED ✗"}`
+      if (t.passed) return head
+
+      const error = t.error ? ` (Error: ${cap(t.error)})` : ""
+      const diff =
+        t.expected !== undefined ? ` (Expected: ${cap(t.expected)}, Got: ${cap(t.actual)})` : ""
+      return `${head}${error}${diff}`
+    })
+    .join("\n")
+}
+
 export function buildConsoleContext(
   testResultsArray: TestResultItem[] | undefined,
   consoleLogsArray: ConsoleLogItem[] | undefined
@@ -222,15 +267,7 @@ export function buildConsoleContext(
     CONSOLE & TEST RESULTS(IMPORTANT - BE AWARE OF THIS):
 Tests have been run: ${passed}/${total} passed ${allPassed ? "✓ ALL PASSING" : "✗ SOME FAILING"}
 
-${testResultsArray
-  .slice(0, 5)
-  .map(
-    (t, i) =>
-      `Test ${i + 1}: ${t.description || "Test case"} - ${t.passed ? "PASSED ✓" : "FAILED ✗"}${
-        !t.passed && t.error ? ` (Error: ${t.error})` : ""
-      }${!t.passed && t.expected !== undefined ? ` (Expected: ${JSON.stringify(t.expected)}, Got: ${JSON.stringify(t.actual)})` : ""}`
-  )
-  .join("\n")}
+${formatTestResults(testResultsArray)}
 
 ${
   allPassed
