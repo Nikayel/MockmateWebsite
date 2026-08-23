@@ -7,21 +7,6 @@
  */
 
 // =============================================================================
-// API & Rate Limiting
-// =============================================================================
-
-export const API_LIMITS = {
-  /** Maximum messages to include in chat history */
-  MAX_HISTORY_MESSAGES: 20,
-  /** Maximum length of a single message in characters */
-  MAX_MESSAGE_LENGTH: 4000,
-  /** Maximum number of workspace files allowed */
-  MAX_WORKSPACE_FILES: 5,
-  /** Maximum file size in characters */
-  MAX_FILE_SIZE: 10000,
-} as const
-
-// =============================================================================
 // Timing & Delays
 // =============================================================================
 

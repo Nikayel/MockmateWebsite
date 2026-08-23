@@ -118,22 +118,22 @@ ${partnerMessagesCount >= 3 ? `- When they explain code, verify they understand 
       recentNudgeTopics && recentNudgeTopics.length > 0
         ? `
 AVOID REPEATING THESE TOPICS (already asked about):
-${recentNudgeTopics
-  .slice(-3)
-  .map((t: string) => `- ${t}`)
-  .join("\n")}
+${recentNudgeTopics.map((t: string) => `- ${t}`).join("\n")}
 If they're still stuck on these, give a CONCRETE hint instead of asking again.
 `
         : ""
 
+    // These lists are PROHIBITIONS, not samples, so they are never truncated.
+    // Slicing a "do not ask this again" list silently grants permission for
+    // everything it drops: a candidate who had answered eight topics used to
+    // have five of them named here, leaving the interviewer free to re-ask the
+    // other three while being told it was seeing the full list. They are short
+    // topic labels, so there was never a cost reason to cap them either.
     const userAnsweredContext =
       userAnsweredTopics && userAnsweredTopics.length > 0
         ? `
 CANDIDATE HAS ALREADY ANSWERED (do NOT ask about these again):
-${userAnsweredTopics
-  .slice(-5)
-  .map((t: string) => `- ${t}`)
-  .join("\n")}
+${userAnsweredTopics.map((t: string) => `- ${t}`).join("\n")}
 If you want to discuss these topics, ACKNOWLEDGE their answer first, then probe DEEPER or move on.
 `
         : ""
@@ -250,10 +250,7 @@ Keep it conversational and real - like you're actually debriefing someone after 
     fullUserMessage += `
 
 [CONTEXT - CANDIDATE HAS ALREADY ANSWERED]:
-${userAnsweredTopics
-  .slice(-5)
-  .map((t: string) => `- ${t}`)
-  .join("\n")}
+${userAnsweredTopics.map((t: string) => `- ${t}`).join("\n")}
 Remember: Acknowledge what they said, then probe deeper or move on. Do NOT re-ask.`
   }
 
