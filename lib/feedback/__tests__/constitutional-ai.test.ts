@@ -261,10 +261,3 @@ describe("critiqueScores evidence floor integrity guard", () => {
     expect(result.adjustedScores?.communication).toBeGreaterThanOrEqual(50)
   })
 })
-
-describe("Feedback Text Critique", () => {
-  it.todo("should detect harsh tone")
-  it.todo("should detect factual errors")
-  it.todo("should detect vague guidance")
-  it.todo("should suggest revisions when needed")
-})
