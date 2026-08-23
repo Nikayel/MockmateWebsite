@@ -8,6 +8,8 @@
  * event at all. These tests pin the report to the exits themselves, and pin it to firing once.
  */
 
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, renderHook } from "@testing-library/react"
 import { VOICE } from "@/lib/constants"
@@ -188,5 +190,39 @@ describe("buildVoiceUsagePayload", () => {
     const payload = buildVoiceUsagePayload({ ...base, endedAt: 60 * 60 * 1000 })
 
     expect(payload?.durationSeconds).toBe(VOICE.MAX_RECORDING_SECONDS)
+  })
+})
+
+/**
+ * The browser recognizer is gone and must stay gone.
+ *
+ * `useVoiceInput` used to accept `fallbackToWebSpeech` and switch to Chrome's
+ * SpeechRecognition when Deepgram reported itself unconfigured. Quality was the
+ * least of it: /legal tells users audio goes to Deepgram and names Deepgram as
+ * the only voice subprocessor, while Chrome implements SpeechRecognition by
+ * streaming microphone audio to Google. The fallback sent a user's voice to a
+ * company our privacy page does not list, silently, on a path they could not
+ * decline.
+ *
+ * A source-level assertion because there is no behaviour left to test - the
+ * point is the ABSENCE of a code path, and absence is what a behavioural test
+ * cannot see.
+ */
+describe("no browser speech fallback", () => {
+  const SOURCE = readFileSync(join(process.cwd(), "lib/voice/use-deepgram.ts"), "utf8")
+  /** Comments explain why the path was removed; only real code should fail this. */
+  const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
+
+  it("never constructs a browser SpeechRecognition", () => {
+    expect(CODE).not.toMatch(/webkitSpeechRecognition|new\s+SpeechRecognition/)
+  })
+
+  it("exposes no fallbackToWebSpeech option", () => {
+    expect(CODE).not.toContain("fallbackToWebSpeech")
+  })
+
+  it("reports deepgram as the only provider", () => {
+    expect(CODE).toContain('provider: "deepgram" as const')
+    expect(CODE).not.toContain('"web-speech"')
   })
 })

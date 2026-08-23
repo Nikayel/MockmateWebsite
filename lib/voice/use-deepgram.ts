@@ -13,47 +13,6 @@ import { repairInterviewTranscript } from "./transcript-repair"
 import { VOICE } from "@/lib/constants"
 import { logger } from "@/lib/logger"
 
-// Web Speech API types (not included in standard TypeScript lib)
-interface SpeechRecognitionResult {
-  readonly isFinal: boolean
-  readonly length: number
-  item(index: number): SpeechRecognitionAlternative
-  [index: number]: SpeechRecognitionAlternative
-}
-
-interface SpeechRecognitionAlternative {
-  readonly transcript: string
-  readonly confidence: number
-}
-
-interface SpeechRecognitionResultList {
-  readonly length: number
-  item(index: number): SpeechRecognitionResult
-  [index: number]: SpeechRecognitionResult
-}
-
-interface SpeechRecognitionEvent extends Event {
-  readonly resultIndex: number
-  readonly results: SpeechRecognitionResultList
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  readonly error: string
-  readonly message: string
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean
-  interimResults: boolean
-  lang: string
-  onresult: ((event: SpeechRecognitionEvent) => void) | null
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null
-  onend: (() => void) | null
-  start(): void
-  stop(): void
-  abort(): void
-}
-
 export type VoiceStatus = "idle" | "connecting" | "recording" | "error"
 
 export interface UseDeepgramOptions extends DeepgramConfig {
@@ -70,9 +29,9 @@ export interface UseDeepgramOptions extends DeepgramConfig {
   // Usage tracking
   sessionId?: string
   /**
-   * How to get a Firebase ID token. Required for Deepgram: without it the token grant cannot be
-   * authenticated, the service reports itself unconfigured, and `fallbackToWebSpeech` quietly
-   * downgrades the caller to the browser recognizer.
+   * How to get a Firebase ID token. Required: without it the token grant cannot be authenticated,
+   * the service reports itself unconfigured, and voice is unavailable for the session. There is no
+   * fallback recognizer any more, deliberately - see useVoiceInput.
    *
    * A getter rather than a string so the token is always fresh; see `setAuthTokenProvider`.
    */
@@ -421,128 +380,51 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
 }
 
 /**
- * Fallback to Web Speech API if Deepgram is not available
+ * The interview's voice entry point. Deepgram, or nothing.
+ *
+ * This used to accept `fallbackToWebSpeech` and quietly switch to the browser's
+ * SpeechRecognition when Deepgram reported itself unconfigured. That option is
+ * gone, and the browser path with it, because falling back was wrong on three
+ * counts and only one of them was quality.
+ *
+ * The disclosure problem is the serious one. /legal tells users that "audio is
+ * streamed live to Deepgram" and names Deepgram as the only voice
+ * subprocessor. Chrome implements SpeechRecognition by streaming microphone
+ * audio to Google. So the fallback sent a user's voice to a company our own
+ * privacy page does not list, without telling them, on a path they could not
+ * see or decline.
+ *
+ * The quality problem is that the browser recognizer has no keyterm vocabulary
+ * and no notion of this domain, so it renders "O of n log n" as "o off and log
+ * in" - and that transcript is not just displayed, it is fed to the interviewer
+ * and to scoring. A candidate was being graded on a mangled record of what they
+ * said.
+ *
+ * And the failure was invisible. Nothing threw, a transcript still appeared,
+ * and the only symptom was wording nobody was reading closely. It shipped
+ * undetected twice.
+ *
+ * So Deepgram is now the only path. When it is unavailable, startRecording sets
+ * an error and throws rather than silently substituting a different vendor:
+ * voice being unavailable is a state the interview can show and the candidate
+ * can work around by typing. Being transcribed by an undisclosed third party is
+ * not.
  */
-export function useVoiceInput(
-  options: UseDeepgramOptions & { fallbackToWebSpeech?: boolean } = {}
-) {
+export function useVoiceInput(options: UseDeepgramOptions = {}) {
   const deepgram = useDeepgram(options)
 
-  // Check if we should use Web Speech API as fallback
-  const useWebSpeech = options.fallbackToWebSpeech && !deepgram.isConfigured
-
-  // This downgrade is invisible from the outside: the interview keeps working,
-  // just on a worse recognizer with no keyterm vocabulary. It has now shipped
-  // undetected twice, so say so loudly rather than leaving it to be inferred
-  // from a mangled transcript weeks later.
-  const warnedFallback = useRef(false)
+  // Voice is dead, not degraded, when this fires. Worth a log line: the old
+  // silent downgrade is exactly how this went unnoticed for so long.
+  const warned = useRef(false)
   useEffect(() => {
-    if (useWebSpeech && !warnedFallback.current) {
-      warnedFallback.current = true
-      logger.warn("Voice downgraded to Web Speech: Deepgram reported itself unconfigured", {
+    if (!deepgram.isConfigured && !warned.current) {
+      warned.current = true
+      logger.warn("Voice unavailable: Deepgram reported itself unconfigured", {
         hasAuthTokenGetter: Boolean(options.getAuthToken),
         sessionId: options.sessionId,
       })
     }
-  }, [useWebSpeech, options.getAuthToken, options.sessionId])
-
-  const [webSpeechRecording, setWebSpeechRecording] = useState(false)
-  const [webSpeechTranscript, setWebSpeechTranscript] = useState("")
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
-
-  // Cleanup Web Speech recognition on unmount
-  useEffect(() => {
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop()
-          recognitionRef.current = null
-        } catch {
-          // Ignore errors during cleanup
-        }
-      }
-    }
-  }, [])
-
-  const startWebSpeechRecording = useCallback(async () => {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-
-    if (!SpeechRecognition) {
-      throw new Error("Speech recognition not supported in this browser")
-    }
-
-    // Request microphone permission
-    await navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((stream) => stream.getTracks().forEach((track) => track.stop()))
-
-    const recognition = new SpeechRecognition()
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognition.lang = options.language || "en-US"
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let transcript = ""
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript
-      }
-      // Repair here too, not only on the Deepgram path. This fallback produces
-      // the same spoken-complexity mis-hearings that repair exists to fix, and
-      // for a long time it was the only path that skipped it: a 2026-08-22
-      // interview persisted "o of n" and "o off and log in" verbatim into the
-      // transcript the interviewer and the scorer both read.
-      const repaired = repairInterviewTranscript(transcript)
-      setWebSpeechTranscript(repaired)
-      options.onTranscript?.(repaired, event.results[event.results.length - 1]?.isFinal ?? false)
-    }
-
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      logger.error("Web Speech API error", { error: event.error })
-      options.onError?.(new Error(`Speech recognition error: ${event.error}`))
-      setWebSpeechRecording(false)
-    }
-
-    recognition.onend = () => {
-      setWebSpeechRecording(false)
-    }
-
-    recognitionRef.current = recognition
-    recognition.start()
-    setWebSpeechRecording(true)
-  }, [options.language, options.onTranscript, options.onError])
-
-  const stopWebSpeechRecording = useCallback((): string => {
-    recognitionRef.current?.stop()
-    recognitionRef.current = null
-    setWebSpeechRecording(false)
-    return webSpeechTranscript
-  }, [webSpeechTranscript])
-
-  // Return appropriate interface based on which service is used
-  if (useWebSpeech) {
-    return {
-      isRecording: webSpeechRecording,
-      status: webSpeechRecording ? ("recording" as VoiceStatus) : ("idle" as VoiceStatus),
-      transcript: webSpeechTranscript,
-      error: null,
-      countdownActive: false, // Web Speech doesn't support countdown
-      startRecording: startWebSpeechRecording,
-      stopRecording: stopWebSpeechRecording,
-      resetTranscript: () => setWebSpeechTranscript(""),
-      toggleRecording: async () => {
-        if (webSpeechRecording) {
-          stopWebSpeechRecording()
-        } else {
-          await startWebSpeechRecording()
-        }
-      },
-      clearSentTracker: () => {}, // No-op for Web Speech API
-      cancelCountdown: () => {}, // No-op for Web Speech API
-      isConfigured: true,
-      provider: "web-speech" as const,
-    }
-  }
+  }, [deepgram.isConfigured, options.getAuthToken, options.sessionId])
 
   return {
     ...deepgram,
