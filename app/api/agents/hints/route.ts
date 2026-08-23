@@ -341,6 +341,7 @@ async function handleGetNextHint(params: GetNextHintPayload) {
     struggleMetrics = {},
     testResults,
     previousHintIds = [],
+    highestRevealedLevel,
   } = params
 
   // Validate required fields
@@ -401,7 +402,11 @@ async function handleGetNextHint(params: GetNextHintPayload) {
     fullMetrics
   )
 
-  const hint = await getNextHint(request, previousHintIds)
+  // highestRevealedLevel is what escalates the ladder. previousHintIds cannot:
+  // every call regenerates hints tailored to the current code with fresh random
+  // ids, so ids from an earlier batch never match, the filter always passed, and
+  // the caller got level 1 on every request.
+  const hint = await getNextHint(request, previousHintIds, highestRevealedLevel)
 
   if (!hint) {
     return NextResponse.json({

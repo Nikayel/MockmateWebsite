@@ -269,10 +269,18 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
     setError(null)
 
     try {
+      // Send the highest level already revealed, not just the ids. Ids do not
+      // survive regeneration (see GetNextHintPayload), and the server needs a
+      // rung to climb from or it hands back level 1 every time.
+      const revealedLevels = hints.filter((h) => revealedHintIds.has(h.id)).map((h) => h.level)
+      const highestRevealedLevel =
+        revealedLevels.length > 0 ? (Math.max(...revealedLevels) as HintLevel) : undefined
+
       const payload: GetNextHintPayload = {
         action: "get-next",
         ...buildBasePayload(),
         previousHintIds: Array.from(revealedHintIds),
+        highestRevealedLevel,
       }
 
       const headers = await buildHeaders()
@@ -312,7 +320,10 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
     } finally {
       setIsLoading(false)
     }
-  }, [buildBasePayload, buildHeaders, revealedHintIds, problemId, recommendedLevel, userId])
+    // `hints` is a dependency because the revealed LEVEL is derived from it;
+    // without it this closes over a stale list and reports a lower rung than
+    // the candidate has actually seen, which walks the ladder backwards.
+  }, [buildBasePayload, buildHeaders, revealedHintIds, hints, problemId, recommendedLevel, userId])
 
   // Update struggle metrics
   const updateStruggleMetrics = useCallback((metrics: Partial<StruggleMetrics>) => {
