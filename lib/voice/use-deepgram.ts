@@ -13,6 +13,7 @@ import { repairInterviewTranscript } from "./transcript-repair"
 import { classifyVoiceError, type VoiceUnavailableReason } from "./voice-availability"
 import { VOICE } from "@/lib/constants"
 import { logger } from "@/lib/logger"
+import { trackEvent } from "@/lib/analytics"
 
 export type VoiceStatus = "idle" | "connecting" | "recording" | "error"
 
@@ -242,7 +243,9 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
       // an unplugged microphone or a dropped socket happens long after the
       // start call resolved, and without this the UI would keep showing a live
       // recorder for a stream that has already died.
-      setUnavailableReason(classifyVoiceError(err))
+      const midSessionReason = classifyVoiceError(err)
+      setUnavailableReason(midSessionReason)
+      trackEvent("voice_unavailable", { reason: midSessionReason, at: "mid-session" })
       options.onError?.(err)
     })
 
@@ -335,7 +338,11 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
       recordingStartTimeRef.current = null
       const error = err instanceof Error ? err : new Error(String(err))
       setError(error)
-      setUnavailableReason(classifyVoiceError(err))
+      const reason = classifyVoiceError(err)
+      setUnavailableReason(reason)
+      // Records the DECISION, not just the error. Nothing else counts how often
+      // voice is unusable, so today the answer is unknowable.
+      trackEvent("voice_unavailable", { reason, at: "start" })
       setStatus("error")
       throw error
     }

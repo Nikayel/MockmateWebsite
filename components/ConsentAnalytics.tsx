@@ -161,6 +161,18 @@ export function ConsentAnalytics() {
     } else {
       posthog.stopSessionRecording()
     }
+
+    // Replay recorded nothing for three days and it took a hand-run query to
+    // notice, because "no recordings" and "no traffic" look the same. This
+    // makes the decision countable.
+    posthog.capture("replay_decision", {
+      started: mayRecord,
+      reason: !hasConsent
+        ? "no-consent"
+        : isReplayExcludedPath(pathname)
+          ? "excluded-route"
+          : "started",
+    })
   }, [hasConsent, pathname])
 
   if (!hasConsent) return null

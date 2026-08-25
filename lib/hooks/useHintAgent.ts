@@ -298,6 +298,9 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
 
       if (data.hint) {
         const nextHint = data.hint
+        // The level, not just that a hint happened. A ladder stuck on level 1
+        // looks identical to a working one unless the level is recorded.
+        trackEvent("hint_delivered", { problem_id: problemId, level: nextHint.level })
         // Add the new hint to the list
         setHints((prev) => {
           const exists = prev.some((h) => h.id === nextHint.id)

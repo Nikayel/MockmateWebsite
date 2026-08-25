@@ -39,6 +39,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 /** Every posthog call this component makes, in the order it made them. */
 let calls: string[] = []
+/** Telemetry, kept out of `calls` so the ordering assertions stay about the recorder. */
+let captured: Array<{ event: string; props?: Record<string, unknown> }> = []
 
 let pathname = "/"
 let consented = true
@@ -57,6 +59,7 @@ vi.mock("posthog-js", () => ({
     opt_in_capturing: (o: { captureEventName?: unknown }) =>
       calls.push(`optIn:captureEventName=${String(o?.captureEventName)}`),
     opt_out_capturing: () => calls.push("optOut"),
+    capture: (event: string, props?: Record<string, unknown>) => captured.push({ event, props }),
   },
 }))
 
@@ -79,6 +82,7 @@ async function mount() {
 describe("session replay start/stop ordering", () => {
   beforeEach(() => {
     calls = []
+    captured = []
     pathname = "/"
     consented = true
   })
@@ -176,5 +180,45 @@ describe("session replay start/stop ordering", () => {
     // would clear persistence again and mint a new distinct_id per route.
     expect(calls.filter((c) => c.startsWith("optIn"))).toHaveLength(1)
     expect(calls).not.toContain("optOut")
+  })
+
+  /**
+   * "No recordings" and "no traffic" are indistinguishable without this. Replay
+   * was dead for three days and it took a hand-run query to notice.
+   */
+  describe("replay decision telemetry", () => {
+    it("records that recording started on an allowed route", async () => {
+      pathname = "/pricing"
+
+      await mount()
+
+      expect(captured).toContainEqual({
+        event: "replay_decision",
+        props: { started: true, reason: "started" },
+      })
+    })
+
+    it("records the route as the reason on an excluded route", async () => {
+      pathname = "/learn/system-design/foundations/sd-l1-backpressure-shedding"
+
+      await mount()
+
+      expect(captured).toContainEqual({
+        event: "replay_decision",
+        props: { started: false, reason: "excluded-route" },
+      })
+    })
+
+    it("records missing consent as the reason, not the route", async () => {
+      consented = false
+      pathname = "/pricing"
+
+      await mount()
+
+      expect(captured).toContainEqual({
+        event: "replay_decision",
+        props: { started: false, reason: "no-consent" },
+      })
+    })
   })
 })
