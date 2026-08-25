@@ -48,8 +48,16 @@ interface InterviewFeedbackViewProps {
   isGeneratingFeedback: PostInterviewViewProps["isGeneratingFeedback"]
   // FeedbackLoadingState
   feedbackStats: FeedbackLoadingStateProps["interviewStats"]
-  streamingPhase: FeedbackLoadingStateProps["streamingPhase"]
   phaseMessage: FeedbackLoadingStateProps["phaseMessage"]
+  // Progress is computed in the page, above this view: the scoring wait outlives
+  // any single mount of the loader, so its state cannot live inside it.
+  scoringProgress: FeedbackLoadingStateProps["progress"]
+  scoringStepIndex: FeedbackLoadingStateProps["stepIndex"]
+  scoringCompletedThrough: FeedbackLoadingStateProps["completedThrough"]
+  scoringElapsedMs: FeedbackLoadingStateProps["elapsedMs"]
+  scoringStalled: FeedbackLoadingStateProps["stalled"]
+  scoringRingTweenMs: FeedbackLoadingStateProps["ringTweenMs"]
+  scoringRingEase: FeedbackLoadingStateProps["ringEase"]
   // PracticeFeedback
   feedback: PracticeFeedbackProps["feedback"]
   performanceScore: PracticeFeedbackProps["performanceScore"]
@@ -104,8 +112,14 @@ export function InterviewFeedbackView({
   proceedToFinalFeedback,
   isGeneratingFeedback,
   feedbackStats,
-  streamingPhase,
   phaseMessage,
+  scoringProgress,
+  scoringStepIndex,
+  scoringCompletedThrough,
+  scoringElapsedMs,
+  scoringStalled,
+  scoringRingTweenMs,
+  scoringRingEase,
   feedback,
   performanceScore,
   technicalScore,
@@ -153,9 +167,14 @@ export function InterviewFeedbackView({
     <FeedbackLoadingState
       onGoToDashboard={onGoToDashboard}
       interviewStats={feedbackStats}
-      // Pass streaming phase for better UX messaging
-      streamingPhase={streamingPhase}
       phaseMessage={phaseMessage}
+      progress={scoringProgress}
+      stepIndex={scoringStepIndex}
+      completedThrough={scoringCompletedThrough}
+      elapsedMs={scoringElapsedMs}
+      stalled={scoringStalled}
+      ringTweenMs={scoringRingTweenMs}
+      ringEase={scoringRingEase}
     />
   ) : (
     <>

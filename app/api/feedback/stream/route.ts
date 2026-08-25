@@ -1044,7 +1044,16 @@ export async function POST(request: NextRequest) {
       // ========================================
       // PHASE 5: Stream Final Results
       // ========================================
-      await sendEvent("phase", { phase: "complete", message: "Done!" })
+      // NO "complete" PHASE FRAME HERE, deliberately. One used to be sent at this
+      // point, before the `feedback` payload below and before `done`. On the client
+      // "complete" is the terminal state, so the loading gate in app/interview/page.tsx
+      // went false while the payload was still in flight and the persist round trip
+      // had not started: the scoring view unmounted, the empty results view flashed,
+      // and then the client's own "persisting" phase remounted the loader with the
+      // ring reset to 0% and the elapsed timer back to 0s. Every successful run.
+      // The client sets "complete" itself once the results are genuinely
+      // renderable (lib/hooks/use-streaming-feedback.ts), which is the only moment
+      // that word is true.
 
       const bugfixPostSessionReport =
         bugfixEvidenceSummary && bugfixScoreBreakdown

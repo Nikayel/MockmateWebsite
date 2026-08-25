@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { CheckCircle2 } from "lucide-react"
-import { Sparra } from "@/components/brand/Sparra"
+
 import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
+import { Sparra } from "@/components/brand/Sparra"
 
 export interface FeedbackLoadingStateProps {
   onGoToDashboard: () => void
@@ -14,111 +14,120 @@ export interface FeedbackLoadingStateProps {
     messagesExchanged?: number
     codeLines?: number
   }
-  // Optional streaming phase info for more accurate progress display
-  streamingPhase?: string
+  /** Real progress 0..1, from useScoringProgress. */
+  progress: number
+  /** Current checklist row, derived from the same anchors as the ring. */
+  stepIndex: number
+  /** Rows before this index are done. */
+  completedThrough: number
+  /** Wall clock for the wait. Owned above this component so it survives re-renders. */
+  elapsedMs: number
+  /** The current stage is running long; the copy says so rather than pretending. */
+  stalled?: boolean
+  /** Ring tween for this frame. */
+  ringTweenMs: number
+  ringEase: string
+  /** The server's own description of what it is doing right now. */
   phaseMessage?: string
 }
 
+/**
+ * The scoring wait.
+ *
+ * This component holds NO state. Everything it draws is passed in, because the
+ * wait outlives any single mount of this view and progress that restarts when a
+ * parent re-renders is worse than no progress at all.
+ */
+
+/**
+ * Rows name the work, not a workflow.
+ *
+ * These used to read "Reading your code / Evaluating solution / Reviewing
+ * discussion / Saving your results". The third one was the problem: it named an
+ * *input* while the machine was writing, and it sat over the single longest stage
+ * in the pipeline. People grant time to writing. They do not grant it to
+ * reviewing, so the longest part of the wait was also the part that read as
+ * least justified.
+ */
 const ANALYSIS_STEPS = [
-  "Reading your code",
-  "Evaluating solution",
-  "Reviewing discussion",
-  "Saving your results",
+  "Reading your submission",
+  "Reviewing code and transcript",
+  "Writing your feedback",
+  "Saving to your history",
 ]
 
-// Map streaming phases to step indices
-const PHASE_TO_STEP: Record<string, number> = {
-  calculating_scores: 0,
-  analyzing: 1,
-  generating: 2,
-  persisting: 3,
-  complete: 4,
+/** Elapsed time is hidden until this point: a clock before then only adds anxiety. */
+const SHOW_CLOCK_AFTER_MS = 10_000
+/** Past this, offer a way out. It is an escape, not a cancel; scoring continues. */
+const SHOW_EXIT_AFTER_MS = 30_000
+
+function formatElapsed(ms: number): string {
+  const s = Math.floor(ms / 1000)
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`
 }
 
-// The determinate ring is tuned to the observed p95 of scoring (matches the
-// fallback step timers below). It holds at 95% rather than closing — the
-// result view replaces it when the answer actually lands (brand rule).
-const SCORING_P95_MS = 15000
-
 export function FeedbackLoadingState({
+  onGoToDashboard,
   interviewStats,
-  streamingPhase,
+  progress,
+  stepIndex,
+  completedThrough,
+  elapsedMs,
+  stalled,
+  ringTweenMs,
+  ringEase,
   phaseMessage,
 }: FeedbackLoadingStateProps) {
-  const [currentStep, setCurrentStep] = useState(0)
-  const [elapsedTime, setElapsedTime] = useState(0)
-
-  // Use streaming phase if available, otherwise fall back to timed animation
-  useEffect(() => {
-    if (streamingPhase && PHASE_TO_STEP[streamingPhase] !== undefined) {
-      // Use actual streaming progress
-      setCurrentStep(Math.min(PHASE_TO_STEP[streamingPhase], ANALYSIS_STEPS.length - 1))
-    }
-  }, [streamingPhase])
-
-  // Fallback: Progress through steps with animation if no streaming phase
-  useEffect(() => {
-    // If we have streaming phase info, don't use timed animation
-    if (streamingPhase) return
-
-    const stepDurations = [2000, 4000, 3000, 6000]
-    const timers: NodeJS.Timeout[] = []
-    let totalDelay = 0
-
-    stepDurations.forEach((duration, index) => {
-      if (index > 0) {
-        const timer = setTimeout(() => setCurrentStep(index), totalDelay)
-        timers.push(timer)
-      }
-      totalDelay += duration
-    })
-
-    return () => timers.forEach((t) => clearTimeout(t))
-  }, [streamingPhase])
-
-  // Track elapsed time
-  useEffect(() => {
-    const timer = setInterval(() => setElapsedTime((prev) => prev + 1), 1000)
-    return () => clearInterval(timer)
-  }, [])
+  const showClock = elapsedMs >= SHOW_CLOCK_AFTER_MS
+  const showExit = elapsedMs >= SHOW_EXIT_AFTER_MS
 
   return (
     <div className="flex min-h-[500px] flex-col items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm">
-        {/* Sparra scoring — determinate ring bounds the wait */}
-        <div className="mb-8 flex justify-center" role="status">
+        <div className="mb-8 flex justify-center">
           <Sparra
             state="scoring"
             size={88}
-            scoreDurationMs={SCORING_P95_MS}
+            progress={progress}
+            ringTweenMs={ringTweenMs}
+            ringEase={ringEase}
             label="Scoring your submission"
           />
         </div>
 
-        {/* Header - Apple-style clean typography */}
         <div className="mb-12 text-center">
           <h2 className="text-foreground mb-3 text-2xl font-semibold tracking-tight">
             Scoring your submission
             <AnimatedEllipsis />
           </h2>
-          <p className="text-muted-foreground text-sm font-medium">
-            {elapsedTime < 60
-              ? `${elapsedTime}s`
-              : `${Math.floor(elapsedTime / 60)}m ${elapsedTime % 60}s`}
+          {/* The server has been narrating this the whole time ("Analyzing your
+              interview...", "Generating personalized feedback..."). The copy was
+              passed all the way down here and then thrown away. */}
+          <p
+            className="text-muted-foreground min-h-[1.25rem] text-sm font-medium"
+            aria-live="polite"
+          >
+            {stalled
+              ? "Still working. Longer sessions take longer to grade."
+              : (phaseMessage ?? ANALYSIS_STEPS[stepIndex] ?? "")}
           </p>
+          {showClock && (
+            <p className="text-muted-foreground/70 mt-1 text-xs font-medium tabular-nums">
+              {formatElapsed(elapsedMs)}
+            </p>
+          )}
         </div>
 
-        {/* Progress Steps - Apple-style minimal */}
         <div className="mb-12 space-y-4">
           {ANALYSIS_STEPS.map((step, index) => {
-            const isComplete = index < currentStep
-            const isCurrent = index === currentStep
+            const isComplete = index < completedThrough
+            const isCurrent = index === stepIndex && !isComplete
 
             return (
               <div
                 key={step}
                 className={`flex items-center gap-4 transition-all duration-500 ${
-                  index > currentStep ? "opacity-40" : "opacity-100"
+                  index > stepIndex ? "opacity-40" : "opacity-100"
                 }`}
               >
                 <div className="flex h-6 w-6 items-center justify-center">
@@ -142,7 +151,6 @@ export function FeedbackLoadingState({
           })}
         </div>
 
-        {/* Session Summary - Apple-style cards */}
         {interviewStats && (
           <div className="flex justify-center gap-4">
             {interviewStats.testsPassed !== undefined &&
@@ -173,10 +181,25 @@ export function FeedbackLoadingState({
           </div>
         )}
 
-        {/* Subtle footer - Apple style */}
-        <p className="text-muted-foreground mt-10 text-center text-xs font-medium">
-          Your results will be saved automatically
-        </p>
+        {/* Was "Your results will be saved automatically" from the first frame. The
+            checklist and the phase line already say that, and unprompted
+            reassurance invites the suspicion it was meant to settle. It earns its
+            place only once the wait is long enough to want a way out. */}
+        {showExit && (
+          <div className="mt-10 text-center">
+            <p className="text-muted-foreground text-xs font-medium">
+              Scoring runs on our servers. You can wait here, or pick this session up from your
+              dashboard.
+            </p>
+            <button
+              type="button"
+              onClick={onGoToDashboard}
+              className="text-muted-foreground hover:text-foreground mt-3 text-xs font-semibold underline underline-offset-4 transition-colors"
+            >
+              Go to dashboard
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -12,6 +12,7 @@ import { getDbLazy } from "@/lib/firebase-lazy"
 import { doc, getDoc } from "firebase/firestore"
 import { ArrowLeft, Clock, Calendar, Terminal } from "lucide-react"
 import { Sparra } from "@/components/brand/Sparra"
+import { useScoringProgress } from "@/lib/interview/useScoringProgress"
 import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
 import { InterviewSession } from "@/lib/types"
 import Link from "next/link"
@@ -150,6 +151,21 @@ export default function SessionDetailPage() {
       if (timer) clearTimeout(timer)
     }
   }, [session?.feedback_status, isTransitStatus, loadSession])
+
+  // This screen resumes a wait that began elsewhere, so the ring is driven from
+  // when scoring actually started (the session's completed_at), not from when this
+  // page happened to open. Same curve and same ceiling as the interview screen; it
+  // simply has no phase events to anchor to, so it walks the opaque curve and
+  // closes when the poller sees feedback_status flip.
+  const scoringStartedAtMs = session?.completed_at
+    ? new Date(session.completed_at).getTime()
+    : undefined
+  const scoring = useScoringProgress({
+    active: isTransitStatus,
+    hasResult: session?.feedback_status === "complete",
+    stepCount: 4,
+    startedAtMs: Number.isFinite(scoringStartedAtMs) ? scoringStartedAtMs : undefined,
+  })
 
   if (loading || authLoading || !initialized) {
     return <SparraLoader fullPage />
@@ -303,7 +319,9 @@ export default function SessionDetailPage() {
                 <Sparra
                   state="scoring"
                   size={72}
-                  scoreDurationMs={60000}
+                  progress={scoring.progress}
+                  ringTweenMs={scoring.tweenMs}
+                  ringEase={scoring.ease}
                   label="Scoring your submission"
                 />
               </div>
@@ -312,7 +330,8 @@ export default function SessionDetailPage() {
                 <AnimatedEllipsis />
               </h3>
               <p className="text-muted-foreground mb-4 text-sm">
-                Your solution is being reviewed by our AI. This usually takes 30-60 seconds.
+                Your solution is being reviewed by our AI. If it hasn't finished in a few minutes,
+                we'll show a retry here.
               </p>
               <p className="text-muted-foreground text-xs">
                 You can leave this page - we'll have your feedback ready when you return.

@@ -36,6 +36,7 @@ import { InterviewTopBar } from "./_components/InterviewTopBar"
 import type { ProblemColumnCtx } from "./_components/ProblemColumn"
 // Streaming feedback - Edge function with no timeout
 import { useStreamingFeedback } from "@/lib/hooks/use-streaming-feedback"
+import { useScoringProgress } from "@/lib/interview/useScoringProgress"
 import { useHintAgent } from "@/lib/hooks/useHintAgent"
 import { voiceUnavailableCopy } from "@/lib/voice/voice-availability"
 import { getInitialPartnerMessage, getProblemTypeLabel } from "./_utils/interview-messages"
@@ -1830,6 +1831,35 @@ function InterviewPageContent() {
     workspaceContext,
   ])
 
+  // Feedback loading condition (kept in page so streamingFeedback need not be
+  // passed into InterviewFeedbackView).
+  //
+  // Do NOT add a `!isPersisted` clause here to close a flicker. It looks like the
+  // obvious fourth condition and it deadlocks two real paths: the persist-failure
+  // branch sets isPersisted:false with phase "complete" on purpose, and so does
+  // the stream-completed-without-data branch. Both would hang the loader forever.
+  // The flicker this used to have came from the server pushing a "complete" phase
+  // frame before the payload; that frame is gone (app/api/feedback/stream/route.ts).
+  const isFeedbackLoading =
+    isGeneratingFeedback ||
+    (streamingFeedback.state.isConnected && !streamingFeedback.state.isPersisted) ||
+    (streamingFeedback.state.phase !== "idle" &&
+      streamingFeedback.state.phase !== "complete" &&
+      streamingFeedback.state.phase !== "error")
+
+  // Progress lives here, above InterviewFeedbackView, so that re-rendering or
+  // remounting the loading view cannot reset the ring or the clock.
+  const scoring = useScoringProgress({
+    active: isFeedbackLoading,
+    // The system-design path never opens the SSE stream, so its phase never leaves
+    // "idle". Passing undefined puts the model on its opaque curve instead of
+    // pinning the checklist to row 0 for the whole wait, which is what it did.
+    phase: streamingFeedback.state.phase === "idle" ? undefined : streamingFeedback.state.phase,
+    // The one signal that closes the ring: results genuinely renderable.
+    hasResult: streamingFeedback.state.isPersisted && !!streamingFeedback.state.feedback,
+    stepCount: 4,
+  })
+
   if (isLoading) {
     return <SparraLoader fullPage label="Loading interview…" />
   }
@@ -1845,15 +1875,6 @@ function InterviewPageContent() {
 
   // Guest banner visibility guard (kept in page).
   const hasGuestBanner = isGuestMode && !showFeedback
-
-  // Feedback loading condition (kept in page so streamingFeedback need not be
-  // passed into InterviewFeedbackView).
-  const isFeedbackLoading =
-    isGeneratingFeedback ||
-    (streamingFeedback.state.isConnected && !streamingFeedback.state.isPersisted) ||
-    (streamingFeedback.state.phase !== "idle" &&
-      streamingFeedback.state.phase !== "complete" &&
-      streamingFeedback.state.phase !== "error")
 
   // Bugfix onboarding tour enabled condition (kept in page).
   const bugfixTourEnabled =
@@ -2065,8 +2086,14 @@ function InterviewPageContent() {
                     messagesExchanged: interviewerMessages.length,
                     codeLines: code.split("\n").filter((line) => line.trim()).length,
                   }}
-                  streamingPhase={streamingFeedback.state.phase}
                   phaseMessage={streamingFeedback.state.phaseMessage}
+                  scoringProgress={scoring.progress}
+                  scoringStepIndex={scoring.stepIndex}
+                  scoringCompletedThrough={scoring.completedThrough}
+                  scoringElapsedMs={scoring.elapsedMs}
+                  scoringStalled={scoring.stalled}
+                  scoringRingTweenMs={scoring.tweenMs}
+                  scoringRingEase={scoring.ease}
                   feedback={comprehensiveFeedback || ""}
                   performanceScore={performanceScore ?? 0}
                   technicalScore={technicalScore ?? undefined}
