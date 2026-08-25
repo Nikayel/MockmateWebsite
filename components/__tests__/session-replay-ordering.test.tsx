@@ -240,6 +240,45 @@ describe("session replay start/stop ordering", () => {
     })
 
     /**
+     * `pathname` is a dependency of the effect, so every client-side navigation
+     * re-runs it. Capturing unconditionally re-sent an identical answer each
+     * time: 16 events against 54 pageviews in the first 48 hours live.
+     */
+    it("stays silent on a navigation that does not change the answer", async () => {
+      consentState = "granted"
+      pathname = "/pricing"
+
+      const { rerender } = await mount()
+      const { ConsentAnalytics } = await import("@/components/ConsentAnalytics")
+
+      pathname = "/careers"
+      rerender(<ConsentAnalytics />)
+
+      expect(captured.filter((c) => c.event === "replay_decision")).toHaveLength(1)
+    })
+
+    /**
+     * The half that matters: deduping must not swallow a transition. Walking
+     * from a recorded page into an excluded one is the exact event this
+     * telemetry exists to show.
+     */
+    it("still reports a navigation that DOES change the answer", async () => {
+      consentState = "granted"
+      pathname = "/pricing"
+
+      const { rerender } = await mount()
+      const { ConsentAnalytics } = await import("@/components/ConsentAnalytics")
+
+      pathname = "/interview"
+      rerender(<ConsentAnalytics />)
+
+      expect(captured.filter((c) => c.event === "replay_decision")).toEqual([
+        { event: "replay_decision", props: { started: true, reason: "started" } },
+        { event: "replay_decision", props: { started: false, reason: "excluded-route" } },
+      ])
+    })
+
+    /**
      * Consent is checked before the route, so a visitor who has not answered
      * the banner on an excluded route reports the consent state rather than the
      * route. That is deliberate: consent is the blocker they can act on, and

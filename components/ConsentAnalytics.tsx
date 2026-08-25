@@ -97,6 +97,9 @@ export function ConsentAnalytics() {
   const hasConsent = consentState === "granted"
   const pathname = usePathname()
 
+  /** The reason last reported, so a navigation that changes nothing is silent. */
+  const lastDecision = useRef<string | null>(null)
+
   /** The consent value last pushed into PostHog, so we push only on change. */
   const appliedConsent = useRef<boolean | null>(null)
 
@@ -185,23 +188,34 @@ export function ConsentAnalytics() {
       posthog.stopSessionRecording()
     }
 
+    // "no-consent" used to cover the first two together, which is exactly why a
+    // week of zeroes could not say whether the banner was being declined or
+    // never seen. Those need opposite fixes, so they get separate reasons.
+    const reason =
+      consentState === "unanswered"
+        ? "consent-unanswered"
+        : consentState === "declined"
+          ? "consent-declined"
+          : isReplayExcludedPath(pathname)
+            ? "excluded-route"
+            : "started"
+
     // Replay recorded nothing for three days and it took a hand-run query to
     // notice, because "no recordings" and "no traffic" look the same. This
     // makes the decision countable.
-    posthog.capture("replay_decision", {
-      started: mayRecord,
-      // "no-consent" used to cover the first two together, which is exactly why
-      // a week of zeroes could not say whether the banner was being declined or
-      // never seen. Those need opposite fixes, so they get separate reasons.
-      reason:
-        consentState === "unanswered"
-          ? "consent-unanswered"
-          : consentState === "declined"
-            ? "consent-declined"
-            : isReplayExcludedPath(pathname)
-              ? "excluded-route"
-              : "started",
-    })
+    //
+    // Only when the decision CHANGES, though. `pathname` is a dependency of
+    // this effect, so every client-side navigation re-runs it, and capturing
+    // unconditionally re-sent an identical answer on each one: 16 events
+    // against 54 pageviews in the first 48 hours, on course to become the
+    // highest-volume custom event on the site while saying nothing new. What is
+    // worth a row here is a transition (off to on, or one reason giving way to
+    // another), which is also the only thing you would filter for when reading
+    // it back.
+    if (lastDecision.current !== reason) {
+      posthog.capture("replay_decision", { started: mayRecord, reason })
+      lastDecision.current = reason
+    }
   }, [consentState, hasConsent, pathname])
 
   if (!hasConsent) return null
