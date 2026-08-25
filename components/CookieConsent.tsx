@@ -4,6 +4,11 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { X, Cookie, Shield } from "lucide-react"
 import Link from "next/link"
+// This closes an import cycle: lib/analytics imports hasAnalyticsConsent from
+// this file. It is safe because both bindings are hoisted function
+// declarations that are only ever called from handlers and effects, never
+// during module evaluation. Keep it that way.
+import { trackEvent } from "@/lib/analytics"
 
 const CONSENT_COOKIE_NAME = "codesparring_cookie_consent"
 const CONSENT_VERSION = "1.0" // Increment when policy changes
@@ -44,9 +49,27 @@ function getConsentPreferences(): ConsentPreferences | null {
   }
 }
 
-export function hasAnalyticsConsent(): boolean {
+/**
+ * Three answers, not two.
+ *
+ * "Never asked" and "asked, said no" both leave analytics off, so a boolean
+ * describes the behaviour exactly and the CAUSE not at all. They call for
+ * opposite responses: an unanswered banner is a visibility bug, a declined one
+ * is a copy and trust problem. Collapsed into `false`, the numbers can never
+ * tell you which one you have, which is why session replay could sit at zero
+ * for a week with nothing to point at.
+ */
+export type ConsentState = "granted" | "declined" | "unanswered"
+
+export function getConsentState(): ConsentState {
   const preferences = getConsentPreferences()
-  return preferences?.analytics ?? false
+  if (!preferences) return "unanswered"
+  return preferences.analytics ? "granted" : "declined"
+}
+
+/** The boolean view, for the callers that only need to gate on it. */
+export function hasAnalyticsConsent(): boolean {
+  return getConsentState() === "granted"
 }
 
 export function CookieConsent() {
@@ -64,6 +87,37 @@ export function CookieConsent() {
     }
   }, [])
 
+  /**
+   * Count the ask, not only the answer.
+   *
+   * Without this, "nobody accepts" and "nobody is ever shown the banner" are
+   * the same shape in the data: an absence. One is a conversion problem, the
+   * other is a bug, and they were indistinguishable for as long as replay sat
+   * at zero. PostHog stamps the path onto every capture, so this also shows
+   * WHERE the banner gets answered, which is how we found that most accepts
+   * happen on routes where replay is excluded anyway.
+   */
+  useEffect(() => {
+    if (!showBanner) return
+    trackEvent("consent_prompt_shown")
+  }, [showBanner])
+
+  /**
+   * Apply the visitor's choice, whether or not we can remember it.
+   *
+   * `localStorage.setItem` throws for reasons that have nothing to do with what
+   * the visitor wants: Safari private mode, a full quota, storage blocked by
+   * tracking prevention or by an enterprise policy. It used to run first and
+   * unguarded, so a throw skipped every line under it. The banner stayed up,
+   * the choice was dropped, and from the visitor's side the button simply did
+   * nothing. PostHog logged two dead clicks on "Accept All" to prove it.
+   *
+   * Now the write is the only thing allowed to fail, and it fails alone.
+   * Dismissal and the consentUpdated event happen either way, because the
+   * visitor DID answer: we owe them that answer for this page load even when we
+   * cannot carry it to the next one. `persisted` rides along on the event so
+   * the difference stays countable instead of invisible.
+   */
   const savePreferences = (newPreferences: ConsentPreferences) => {
     const updated = {
       ...newPreferences,
@@ -71,7 +125,13 @@ export function CookieConsent() {
       timestamp: new Date().toISOString(),
     }
 
-    localStorage.setItem(CONSENT_COOKIE_NAME, JSON.stringify(updated))
+    let persisted = true
+    try {
+      localStorage.setItem(CONSENT_COOKIE_NAME, JSON.stringify(updated))
+    } catch {
+      persisted = false
+    }
+
     setShowBanner(false)
     setShowSettings(false)
 
@@ -81,7 +141,13 @@ export function CookieConsent() {
     // only because Firebase Analytics was initialized at module load and could
     // not be switched on any other way; it threw away whatever the visitor was
     // in the middle of doing, which is a harsh price for clicking "Accept All".
+    //
+    // The listener acts on `detail`, not on storage. After a failed write
+    // storage still reads "unanswered", and re-reading it there would throw the
+    // visitor's answer away a second time.
     window.dispatchEvent(new CustomEvent("consentUpdated", { detail: updated }))
+
+    trackEvent("consent_choice", { analytics: updated.analytics, persisted })
   }
 
   const acceptAll = () => {
