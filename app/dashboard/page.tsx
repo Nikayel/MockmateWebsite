@@ -657,7 +657,16 @@ export default function DashboardPage() {
                     {sessions.map((session) => {
                       // Determine session state: completed, evaluating, or in-progress
                       // Note: Legacy sessions may not have feedback_status, treat completed_at as complete
-                      const isEvaluating = session.feedback_status === "pending"
+                      // Both transit states count: "pending" is what markSessionEvaluating
+                      // writes today, "processing" is the other transit state the reaper
+                      // and the sessions pages already honor. Counting only "pending"
+                      // made a mid-scoring session render as amber "In Progress" here,
+                      // with a link that reopened the interview workspace instead of the
+                      // scoring wait -- on the exact page the scoring screen's escape
+                      // button sends people to.
+                      const isEvaluating =
+                        session.feedback_status === "pending" ||
+                        session.feedback_status === "processing"
                       const isCompleted =
                         session.completed_at &&
                         (session.feedback_status === "complete" || !session.feedback_status)
