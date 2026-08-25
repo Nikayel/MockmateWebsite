@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import posthog from "posthog-js"
-import { hasAnalyticsConsent } from "@/components/CookieConsent"
+import { getConsentState, type ConsentState } from "@/components/CookieConsent"
 import { syncAnalyticsConsent } from "@/lib/analytics"
 import { applyPostHogConsent } from "@/lib/posthog-consent"
 
@@ -86,16 +86,39 @@ export function ConsentAnalytics() {
    * mismatch. So the state stays unknown until an effect can read it, and
    * everything that talks to PostHog no-ops while it is unknown.
    */
-  const [hasConsent, setHasConsent] = useState<boolean | null>(null)
+  const [consentState, setConsentState] = useState<ConsentState | null>(null)
+
+  /**
+   * `null` and `"unanswered"` are NOT the same and must not be merged. `null`
+   * is "we have not read the stored preference yet" and is the only one that
+   * means we must not talk to PostHog at all. `"unanswered"` is a read result:
+   * the visitor has been offered the banner and has not chosen.
+   */
+  const hasConsent = consentState === "granted"
   const pathname = usePathname()
 
   /** The consent value last pushed into PostHog, so we push only on change. */
   const appliedConsent = useRef<boolean | null>(null)
 
   useEffect(() => {
-    setHasConsent(hasAnalyticsConsent())
+    setConsentState(getConsentState())
 
-    const handleConsentChange = () => setHasConsent(hasAnalyticsConsent())
+    /**
+     * The banner ships the visitor's choice in `event.detail`, and that is what
+     * we act on when it is there. Re-reading storage instead would discard the
+     * choice whenever the write failed, because storage in that case still says
+     * "unanswered" and we would answer a click with silence. The `storage`
+     * event carries no detail and correctly falls through to a read: it fires
+     * for the OTHER tab, whose write did land.
+     */
+    const handleConsentChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ analytics?: boolean }>).detail
+      if (detail && typeof detail.analytics === "boolean") {
+        setConsentState(detail.analytics ? "granted" : "declined")
+        return
+      }
+      setConsentState(getConsentState())
+    }
 
     window.addEventListener("consentUpdated", handleConsentChange)
     window.addEventListener("storage", handleConsentChange)
@@ -111,9 +134,9 @@ export function ConsentAnalytics() {
   // that getAnalytics fires, which is the app's only page-view signal since
   // trackPageView has no call sites.
   useEffect(() => {
-    if (hasConsent === null) return
+    if (consentState === null) return
     syncAnalyticsConsent()
-  }, [hasConsent])
+  }, [consentState])
 
   // PostHog rides the same consent switch. Before consent it runs cookieless
   // (see lib/posthog-consent, nothing written to the device); consent upgrades
@@ -139,7 +162,7 @@ export function ConsentAnalytics() {
     if (!posthog.__loaded) return
     // Unknown consent is not "no consent". Acting on the seeded value here is
     // what cleared persistence on every load; see the useState comment above.
-    if (hasConsent === null) return
+    if (consentState === null) return
 
     const mayRecord = hasConsent && !isReplayExcludedPath(pathname)
 
@@ -167,13 +190,19 @@ export function ConsentAnalytics() {
     // makes the decision countable.
     posthog.capture("replay_decision", {
       started: mayRecord,
-      reason: !hasConsent
-        ? "no-consent"
-        : isReplayExcludedPath(pathname)
-          ? "excluded-route"
-          : "started",
+      // "no-consent" used to cover the first two together, which is exactly why
+      // a week of zeroes could not say whether the banner was being declined or
+      // never seen. Those need opposite fixes, so they get separate reasons.
+      reason:
+        consentState === "unanswered"
+          ? "consent-unanswered"
+          : consentState === "declined"
+            ? "consent-declined"
+            : isReplayExcludedPath(pathname)
+              ? "excluded-route"
+              : "started",
     })
-  }, [hasConsent, pathname])
+  }, [consentState, hasConsent, pathname])
 
   if (!hasConsent) return null
 

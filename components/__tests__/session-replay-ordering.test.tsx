@@ -43,7 +43,7 @@ let calls: string[] = []
 let captured: Array<{ event: string; props?: Record<string, unknown> }> = []
 
 let pathname = "/"
-let consented = true
+let consentState: "granted" | "declined" | "unanswered" = "granted"
 
 vi.mock("next/navigation", () => ({
   usePathname: () => pathname,
@@ -64,7 +64,7 @@ vi.mock("posthog-js", () => ({
 }))
 
 vi.mock("@/components/CookieConsent", () => ({
-  hasAnalyticsConsent: () => consented,
+  getConsentState: () => consentState,
 }))
 
 vi.mock("@/lib/analytics", () => ({
@@ -84,7 +84,7 @@ describe("session replay start/stop ordering", () => {
     calls = []
     captured = []
     pathname = "/"
-    consented = true
+    consentState = "granted"
   })
 
   it("locks the route down BEFORE touching consent, on an excluded route", async () => {
@@ -123,7 +123,7 @@ describe("session replay start/stop ordering", () => {
   })
 
   it("stays off entirely without consent, on an otherwise allowed route", async () => {
-    consented = false
+    consentState = "declined"
     pathname = "/"
 
     await mount()
@@ -133,7 +133,7 @@ describe("session replay start/stop ordering", () => {
   })
 
   it("puts a visitor who has not answered the banner into cookieless mode", async () => {
-    consented = false
+    consentState = "unanswered"
 
     await mount()
 
@@ -142,7 +142,7 @@ describe("session replay start/stop ordering", () => {
   })
 
   it("opts in WITHOUT manufacturing an $opt_in event on every page load", async () => {
-    consented = true
+    consentState = "granted"
 
     await mount()
 
@@ -157,7 +157,7 @@ describe("session replay start/stop ordering", () => {
    * across 12 device ids in a single day and left replay with zero recordings.
    */
   it("NEVER opts out a visitor who has already consented", async () => {
-    consented = true
+    consentState = "granted"
     pathname = "/pricing"
 
     await mount()
@@ -167,7 +167,7 @@ describe("session replay start/stop ordering", () => {
   })
 
   it("does not re-apply an unchanged consent decision on navigation", async () => {
-    consented = true
+    consentState = "granted"
     pathname = "/pricing"
 
     const { rerender } = await mount()
@@ -209,15 +209,51 @@ describe("session replay start/stop ordering", () => {
       })
     })
 
-    it("records missing consent as the reason, not the route", async () => {
-      consented = false
+    /**
+     * These two used to share the single reason "no-consent", so a week of
+     * zero recordings could not say which one it was. They need opposite
+     * fixes: an unanswered banner is a visibility bug, a declined one is a
+     * copy and trust problem.
+     */
+    it("separates a declined banner from an unanswered one", async () => {
+      consentState = "unanswered"
       pathname = "/pricing"
 
       await mount()
 
       expect(captured).toContainEqual({
         event: "replay_decision",
-        props: { started: false, reason: "no-consent" },
+        props: { started: false, reason: "consent-unanswered" },
+      })
+    })
+
+    it("records a declined banner as declined, not as unanswered", async () => {
+      consentState = "declined"
+      pathname = "/pricing"
+
+      await mount()
+
+      expect(captured).toContainEqual({
+        event: "replay_decision",
+        props: { started: false, reason: "consent-declined" },
+      })
+    })
+
+    /**
+     * Consent is checked before the route, so a visitor who has not answered
+     * the banner on an excluded route reports the consent state rather than the
+     * route. That is deliberate: consent is the blocker they can act on, and
+     * the route only matters once they have said yes.
+     */
+    it("reports the consent state ahead of the route when both would block", async () => {
+      consentState = "unanswered"
+      pathname = "/admin"
+
+      await mount()
+
+      expect(captured).toContainEqual({
+        event: "replay_decision",
+        props: { started: false, reason: "consent-unanswered" },
       })
     })
   })
