@@ -99,9 +99,11 @@ export interface UseInterviewFeedbackResult {
 
 /**
  * Owns the deferred final-feedback submission (`proceedToFinalFeedback`) lifted
- * verbatim from `app/interview/page.tsx`. All request/contract literals
- * (markSessionEvaluating args, the feedbackRequest object, every fetch body,
- * updateInterviewSession args, guest-session payloads) are preserved byte-identical.
+ * from `app/interview/page.tsx`. Guest submissions since diverge on purpose:
+ * the score never enters page state or analytics payloads (it is what the
+ * post-trial sign-in is traded for), and the feedback request is staged in
+ * `lastFeedbackRequestRef` instead of streamed, for the sign-in handler to
+ * run after migration. The signed-in contract is unchanged.
  * The streaming-feedback effect + fallback-scoring path live in `useFeedbackStreaming`
  * (`applyFallbackFeedback` + `lastFeedbackRequestRef` injected via opts); the
  * post-interview discussion kickoff lives in `usePostInterviewDiscussion`.
@@ -243,7 +245,12 @@ export function useInterviewFeedback(
         (opts.selectedScenario as any)?.optimalComplexity
       )
 
-      if (opts.currentSessionId && opts.user && opts.code.trim()) {
+      // Guests build the same feedback request as signed-in users but never
+      // stream it: /api/feedback/stream is auth-gated, and the score is what
+      // the post-trial sign-in is traded for. The staged request in
+      // lastFeedbackRequestRef is what the sign-in handler streams the moment
+      // the session has migrated to the new account.
+      if (opts.currentSessionId && opts.code.trim()) {
         try {
           // Prepare conversation transcript - NOW includes ALL messages including post-interview discussion
           const conversationTranscript = [
@@ -287,7 +294,9 @@ export function useInterviewFeedback(
           const hintsUsedCount = opts.revealedHintIndices.size + opts.revealedAIHintIndices.size
           const feedbackRequest = {
             sessionId: opts.currentSessionId,
-            userId: opts.user.id,
+            // Null for guests: the sign-in handler stamps the freshly created
+            // uid onto the staged request after the session migrates.
+            userId: opts.user?.id ?? null,
             code: opts.code,
             language: opts.selectedLanguage,
             testsPassed: testSummary.passed,
@@ -314,19 +323,24 @@ export function useInterviewFeedback(
             // The feedback stream route sources them server-side for scoring.
           }
 
-          // Start streaming feedback - scores come first, then rich feedback
-          // The useEffect above handles updating state as events stream in
+          // Stage the request for both audiences: signed-in users stream it
+          // now; guests stream it from the sign-in handler after migration.
           opts.lastFeedbackRequestRef.current = feedbackRequest
-          opts.streamingFeedback.startStreaming(feedbackRequest)
 
-          // Set initial values while streaming
-          aiFeedbackSucceeded = true
-          calculatedPerformanceScore = testSummary.passRate // Will be updated by stream
-          scoreBreakdownData = {
-            understanding: 50,
-            problemSolving: 50,
-            codeQuality: 50,
-            communication: 50,
+          if (opts.user) {
+            // Start streaming feedback - scores come first, then rich feedback
+            // The useEffect above handles updating state as events stream in
+            opts.streamingFeedback.startStreaming({ ...feedbackRequest, userId: opts.user.id })
+
+            // Set initial values while streaming
+            aiFeedbackSucceeded = true
+            calculatedPerformanceScore = testSummary.passRate // Will be updated by stream
+            scoreBreakdownData = {
+              understanding: 50,
+              problemSolving: 50,
+              codeQuality: 50,
+              communication: 50,
+            }
           }
         } catch (feedbackError) {
           console.error("Error generating feedback:", feedbackError)
@@ -342,7 +356,14 @@ export function useInterviewFeedback(
       // Don't set placeholder feedback - wait for streaming to complete
       // The useEffect watching streamingFeedback.state will update these
       // Only set initial performance score based on test results (will be updated by streaming)
-      opts.setPerformanceScore(calculatedPerformanceScore)
+      //
+      // Signed-in only: a guest's score stays out of page state entirely, so
+      // no surface (modal, feedback view, devtools-visible props) can show it
+      // before the sign-in that pays for it. It reaches the UI again via the
+      // post-signup stream.
+      if (opts.user) {
+        opts.setPerformanceScore(calculatedPerformanceScore)
+      }
 
       // Save basic session completion data (code, test results, etc.)
       // NOTE: The persist endpoint will handle saving the AI-generated feedback and scores
@@ -478,8 +499,9 @@ export function useInterviewFeedback(
       // Show signup prompt for guest users
       if (opts.isGuestMode && opts.guestId) {
         // Guest funnel: the trial reached the score screen
+        // No score on the event: analytics payloads are visible in the
+        // network tab, and the score is withheld until sign-in.
         trackEvent("guest_trial_completed", {
-          score: calculatedPerformanceScore || 0,
           scenarioId: opts.selectedScenario?.id,
         })
         setTimeout(() => opts.setShowSignupPrompt(true), 2000)
@@ -491,7 +513,8 @@ export function useInterviewFeedback(
             scenarioTitle: opts.selectedScenario.title,
             startedAt: new Date().toISOString(),
             feedback: {
-              score: calculatedPerformanceScore || 0,
+              // Score deliberately absent (see GuestSessionData): the server
+              // copy keeps it and migration carries it to the new account.
               summary: feedbackText,
               feedbackData: null,
             },

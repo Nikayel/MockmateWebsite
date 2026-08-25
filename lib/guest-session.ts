@@ -10,15 +10,15 @@
  */
 
 // Storage keys
-const GUEST_ID_KEY = 'mockmate_guest_id'
-const FREE_TRIAL_USED_KEY = 'mockmate_free_trial_used'
-const GUEST_SESSION_KEY = 'mockmate_guest_session'
-const GUEST_SESSION_DATA_KEY = 'mockmate_guest_session_data'
-const GUEST_SESSION_EXPIRY_KEY = 'mockmate_guest_session_expiry'
+const GUEST_ID_KEY = "mockmate_guest_id"
+const FREE_TRIAL_USED_KEY = "mockmate_free_trial_used"
+const GUEST_SESSION_KEY = "mockmate_guest_session"
+const GUEST_SESSION_DATA_KEY = "mockmate_guest_session_data"
+const GUEST_SESSION_EXPIRY_KEY = "mockmate_guest_session_expiry"
 
 // Cookie names (for server-side detection)
-const GUEST_ID_COOKIE = 'mockmate_guest_id'
-const FREE_TRIAL_COOKIE = 'mockmate_free_trial'
+const GUEST_ID_COOKIE = "mockmate_guest_id"
+const FREE_TRIAL_COOKIE = "mockmate_free_trial"
 
 // Session expiry configuration
 const GUEST_SESSION_EXPIRY_DAYS = 7 // Sessions expire after 7 days
@@ -27,13 +27,13 @@ const GUEST_SESSION_EXPIRY_DAYS = 7 // Sessions expire after 7 days
  * Generate a UUID v4 for guest identification
  */
 function generateUUID(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID()
   }
   // Fallback for older browsers
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0
-    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === "x" ? r : (r & 0x3) | 0x8
     return v.toString(16)
   })
 }
@@ -42,7 +42,7 @@ function generateUUID(): string {
  * Set a cookie with the given name and value
  */
 function setCookie(name: string, value: string, days: number = 2): void {
-  if (typeof document === 'undefined') return
+  if (typeof document === "undefined") return
   const expires = new Date()
   expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000)
   document.cookie = `${name}=${value}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`
@@ -52,11 +52,11 @@ function setCookie(name: string, value: string, days: number = 2): void {
  * Get a cookie value by name
  */
 function getCookie(name: string): string | null {
-  if (typeof document === 'undefined') return null
+  if (typeof document === "undefined") return null
   const value = `; ${document.cookie}`
   const parts = value.split(`; ${name}=`)
   if (parts.length === 2) {
-    return parts.pop()?.split(';').shift() || null
+    return parts.pop()?.split(";").shift() || null
   }
   return null
 }
@@ -65,7 +65,7 @@ function getCookie(name: string): string | null {
  * Delete a cookie by name
  */
 function deleteCookie(name: string): void {
-  if (typeof document === 'undefined') return
+  if (typeof document === "undefined") return
   document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
 }
 
@@ -78,7 +78,7 @@ function deleteCookie(name: string): void {
  * Persists in localStorage and cookie for cross-tab/session consistency
  */
 export function getOrCreateGuestId(): string {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return `guest-${generateUUID()}`
   }
 
@@ -108,7 +108,7 @@ export function getOrCreateGuestId(): string {
  * Get the current guest ID (without creating one)
  */
 export function getGuestId(): string | null {
-  if (typeof window === 'undefined') return null
+  if (typeof window === "undefined") return null
   return localStorage.getItem(GUEST_ID_KEY) || getCookie(GUEST_ID_COOKIE)
 }
 
@@ -117,7 +117,7 @@ export function getGuestId(): string | null {
  */
 export function isGuestId(userId: string | null | undefined): boolean {
   if (!userId) return false
-  return userId.startsWith('guest-')
+  return userId.startsWith("guest-")
 }
 
 // ============================================================================
@@ -128,13 +128,13 @@ export function isGuestId(userId: string | null | undefined): boolean {
  * Check if user has already used their free trial
  */
 export function hasFreeTrialBeenUsed(): boolean {
-  if (typeof window === 'undefined') return false
+  if (typeof window === "undefined") return false
 
   // Check localStorage
-  const localUsed = localStorage.getItem(FREE_TRIAL_USED_KEY) === 'true'
+  const localUsed = localStorage.getItem(FREE_TRIAL_USED_KEY) === "true"
 
   // Check cookie as backup
-  const cookieUsed = getCookie(FREE_TRIAL_COOKIE) === 'used'
+  const cookieUsed = getCookie(FREE_TRIAL_COOKIE) === "used"
 
   return localUsed || cookieUsed
 }
@@ -143,10 +143,10 @@ export function hasFreeTrialBeenUsed(): boolean {
  * Mark the free trial as used
  */
 export function markFreeTrialUsed(): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === "undefined") return
 
-  localStorage.setItem(FREE_TRIAL_USED_KEY, 'true')
-  setCookie(FREE_TRIAL_COOKIE, 'used', 30) // Longer expiry to prevent abuse
+  localStorage.setItem(FREE_TRIAL_USED_KEY, "true")
+  setCookie(FREE_TRIAL_COOKIE, "used", 30) // Longer expiry to prevent abuse
 }
 
 /**
@@ -172,7 +172,11 @@ export interface GuestSessionData {
   interviewerMessages?: Array<{ type: string; message: string }>
   testResults?: Array<any>
   feedback?: {
-    score: number
+    // Deliberately optional: the guest's score is withheld until sign-in, so
+    // the local completion marker records THAT the session finished, not how
+    // well. The number lives server-side on the session document and follows
+    // the account through migration.
+    score?: number
     summary: string
     feedbackData: any
   }
@@ -182,7 +186,7 @@ export interface GuestSessionData {
  * Save guest session data to localStorage
  */
 export function saveGuestSessionData(data: Partial<GuestSessionData>): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === "undefined") return
 
   const existing = getGuestSessionData()
   const updated = {
@@ -199,7 +203,7 @@ export function saveGuestSessionData(data: Partial<GuestSessionData>): void {
  * Automatically cleans up expired sessions (older than 7 days)
  */
 export function getGuestSessionData(): GuestSessionData | null {
-  if (typeof window === 'undefined') return null
+  if (typeof window === "undefined") return null
 
   const data = localStorage.getItem(GUEST_SESSION_DATA_KEY)
   if (!data) return null
@@ -215,7 +219,9 @@ export function getGuestSessionData(): GuestSessionData | null {
     if (daysSinceStart > GUEST_SESSION_EXPIRY_DAYS) {
       // Session expired - clean it up
       clearGuestSessionData()
-      console.log(`[Guest Session] Expired session cleaned up (${Math.floor(daysSinceStart)} days old)`)
+      console.log(
+        `[Guest Session] Expired session cleaned up (${Math.floor(daysSinceStart)} days old)`
+      )
       return null
     }
 
@@ -229,7 +235,7 @@ export function getGuestSessionData(): GuestSessionData | null {
  * Clear guest session data
  */
 export function clearGuestSessionData(): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === "undefined") return
   localStorage.removeItem(GUEST_SESSION_DATA_KEY)
 }
 
@@ -269,7 +275,7 @@ export function extractGuestSessionForMigration(): GuestSessionData | null {
  * Clears all guest data from local storage
  */
 export function confirmGuestSessionMigration(): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === "undefined") return
 
   // Clear all guest-related data
   localStorage.removeItem(GUEST_ID_KEY)
@@ -291,7 +297,7 @@ export function getGuestAuthHeaders(): Record<string, string> {
   if (!guestId) return {}
 
   return {
-    'X-Guest-Id': guestId,
+    "X-Guest-Id": guestId,
   }
 }
 
@@ -307,7 +313,7 @@ export function isInGuestMode(): boolean {
  * Reset all guest data (for testing purposes)
  */
 export function resetGuestData(): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === "undefined") return
 
   localStorage.removeItem(GUEST_ID_KEY)
   localStorage.removeItem(FREE_TRIAL_USED_KEY)
