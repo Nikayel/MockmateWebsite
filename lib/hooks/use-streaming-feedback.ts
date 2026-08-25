@@ -25,6 +25,7 @@ import { logger } from "@/lib/logger"
 import { getGuidedLabMasterySummary } from "@/lib/stores/guided-lab-store"
 import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import { REFUSAL_TITLES, isKnownRefusalCode } from "@/lib/interview/refusal-copy"
+import { trackEvent } from "@/lib/analytics"
 
 export interface StreamingScores {
   understanding: number
@@ -240,6 +241,46 @@ export function useStreamingFeedback() {
   const requestRef = useRef<StreamingFeedbackRequest | null>(null)
 
   /**
+   * Segment timings for the scoring wait.
+   *
+   * This exists because four different constants claimed to know how long scoring
+   * takes (15s, 60s, "30-60 seconds", "~10s") and not one of them was measured:
+   * the only latency the app recorded was per-AI-call, server-side, averaged
+   * rather than percentiled. The estimates in lib/interview/scoring-progress.ts
+   * are meant to be replaced by what this collects, not to stand forever.
+   */
+  const marksRef = useRef<{ start: number; phases: Partial<Record<string, number>> }>({
+    start: 0,
+    phases: {},
+  })
+  const waitReportedRef = useRef(false)
+
+  const markPhase = useCallback((phase: string) => {
+    if (!marksRef.current.phases[phase]) marksRef.current.phases[phase] = Date.now()
+  }, [])
+
+  /** Emitted once per wait, on the terminal transition. */
+  const reportWait = useCallback((outcome: "complete" | "error") => {
+    if (waitReportedRef.current || !marksRef.current.start) return
+    waitReportedRef.current = true
+
+    const { start, phases } = marksRef.current
+    const end = Date.now()
+    const span = (from?: number, to?: number) => (from && to && to >= from ? to - from : undefined)
+
+    trackEvent("scoring_wait_completed", {
+      outcome,
+      total_ms: end - start,
+      // Segment-resolved, not just the total: the total cannot tell you WHICH
+      // estimate is wrong, and re-fitting the model means re-fitting segments.
+      connect_ms: span(start, phases.analyzing),
+      analyze_ms: span(phases.analyzing, phases.generating),
+      generate_ms: span(phases.generating, phases.persisting),
+      save_ms: span(phases.persisting, end),
+    })
+  }, [])
+
+  /**
    * Persist feedback to Firestore after streaming completes
    */
   const persistFeedback = useCallback(
@@ -248,6 +289,7 @@ export function useStreamingFeedback() {
       scores: StreamingScores,
       feedback: StreamingFeedback
     ) => {
+      markPhase("persisting")
       setState((prev) => ({
         ...prev,
         phase: "persisting",
@@ -311,6 +353,7 @@ export function useStreamingFeedback() {
 
         const result = await response.json()
 
+        reportWait("complete")
         setState((prev) => ({
           ...prev,
           isPersisted: true,
@@ -323,6 +366,7 @@ export function useStreamingFeedback() {
         return result
       } catch (error) {
         logger.error("[StreamingFeedback] Persist failed:", { error })
+        reportWait("error")
         // Don't fail the whole flow if persist fails - feedback is still shown
         setState((prev) => ({
           ...prev,
@@ -334,7 +378,7 @@ export function useStreamingFeedback() {
         return null
       }
     },
-    []
+    [markPhase, reportWait]
   )
 
   /**
@@ -349,6 +393,9 @@ export function useStreamingFeedback() {
 
       // Store request for persist call
       requestRef.current = request
+
+      marksRef.current = { start: Date.now(), phases: {} }
+      waitReportedRef.current = false
 
       // Reset state
       setState({
@@ -518,70 +565,74 @@ export function useStreamingFeedback() {
   /**
    * Handle incoming SSE events
    */
-  const handleEvent = useCallback((event: string, data: unknown) => {
-    switch (event) {
-      case "phase":
-        setState((prev) => ({
-          ...prev,
-          phase: (data as { phase: string }).phase as StreamingFeedbackState["phase"],
-          phaseMessage: (data as { message: string }).message || "",
-        }))
-        break
+  const handleEvent = useCallback(
+    (event: string, data: unknown) => {
+      switch (event) {
+        case "phase":
+          markPhase((data as { phase: string }).phase)
+          setState((prev) => ({
+            ...prev,
+            phase: (data as { phase: string }).phase as StreamingFeedbackState["phase"],
+            phaseMessage: (data as { message: string }).message || "",
+          }))
+          break
 
-      case "scores":
-        setState((prev) => ({
-          ...prev,
-          instantScores: {
-            understanding: (data as StreamingScores).understanding,
-            problemSolving: (data as StreamingScores).problemSolving,
-            codeQuality: (data as StreamingScores).codeQuality,
-            communication: (data as StreamingScores).communication,
-            overall: (data as StreamingScores).overall,
-          },
-          flags: (data as { flags: StreamingFeedbackState["flags"] }).flags || null,
-        }))
-        break
+        case "scores":
+          setState((prev) => ({
+            ...prev,
+            instantScores: {
+              understanding: (data as StreamingScores).understanding,
+              problemSolving: (data as StreamingScores).problemSolving,
+              codeQuality: (data as StreamingScores).codeQuality,
+              communication: (data as StreamingScores).communication,
+              overall: (data as StreamingScores).overall,
+            },
+            flags: (data as { flags: StreamingFeedbackState["flags"] }).flags || null,
+          }))
+          break
 
-      case "refined_scores":
-        setState((prev) => ({
-          ...prev,
-          refinedScores: {
-            understanding: (data as StreamingScores).understanding,
-            problemSolving: (data as StreamingScores).problemSolving,
-            codeQuality: (data as StreamingScores).codeQuality,
-            communication: (data as StreamingScores).communication,
-            overall: (data as StreamingScores).overall,
-          },
-        }))
-        break
+        case "refined_scores":
+          setState((prev) => ({
+            ...prev,
+            refinedScores: {
+              understanding: (data as StreamingScores).understanding,
+              problemSolving: (data as StreamingScores).problemSolving,
+              codeQuality: (data as StreamingScores).codeQuality,
+              communication: (data as StreamingScores).communication,
+              overall: (data as StreamingScores).overall,
+            },
+          }))
+          break
 
-      case "feedback":
-        setState((prev) => ({
-          ...prev,
-          feedback: data as StreamingFeedback,
-        }))
-        break
+        case "feedback":
+          setState((prev) => ({
+            ...prev,
+            feedback: data as StreamingFeedback,
+          }))
+          break
 
-      case "error":
-        logger.error("[StreamingFeedback] Server error event:", { data })
-        setState((prev) => ({
-          ...prev,
-          phase: "error",
-          error: "Something went wrong generating feedback. Please try again.",
-        }))
-        break
+        case "error":
+          logger.error("[StreamingFeedback] Server error event:", { data })
+          setState((prev) => ({
+            ...prev,
+            phase: "error",
+            error: "Something went wrong generating feedback. Please try again.",
+          }))
+          break
 
-      case "done":
-        // Note: Don't set phase to "complete" here - wait for persist
-        setState((prev) => ({
-          ...prev,
-          isConnected: false,
-          isComplete: true,
-          // Phase will be set to "complete" after persist succeeds
-        }))
-        break
-    }
-  }, [])
+        case "done":
+          // Note: Don't set phase to "complete" here - wait for persist
+          setState((prev) => ({
+            ...prev,
+            isConnected: false,
+            isComplete: true,
+            // Phase will be set to "complete" after persist succeeds
+          }))
+          break
+      }
+    },
+    [markPhase]
+  )
 
   /**
    * Cancel the stream
