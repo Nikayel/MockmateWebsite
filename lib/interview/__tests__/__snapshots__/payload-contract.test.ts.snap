@@ -245,6 +245,12 @@ exports[`interview payload contract (Slice 0 oracle) > captures every API reques
       "targetCompany",
     ],
   ],
+  "fetch POST /api/guest-session/migrate": [
+    [
+      "guestId",
+      "sessionId",
+    ],
+  ],
   "fetch POST /api/rag": [
     [
       "action",
