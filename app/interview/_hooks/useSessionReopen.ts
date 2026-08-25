@@ -51,6 +51,16 @@ export interface UseSessionReopenOptions {
     companyOverride?: InterviewTargetCompany
   ) => void | Promise<void>
 
+  /**
+   * True when this tab is already displaying the given session's submitted
+   * state (feedback view or the guest lock panel). Read through a stable
+   * getter, not a dep-array value: it exists for the moment a guest signs in
+   * from the post-trial prompt — firebaseUser flips, this effect re-runs, and
+   * without the check it would reload the completed session and redirect to
+   * /sessions/{id} mid-handoff, off the very results the sign-in unlocks.
+   */
+  isShowingCompletedSession: (sessionId: string) => boolean
+
   // Bugfix reset callback
   resetBugfixSessionState: () => void
 
@@ -122,6 +132,14 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
 
       // Case 1: Reopening an existing session
       if (sessionId && scenarioId) {
+        // Not a reopen at all: this tab already has the session's terminal
+        // state on screen (see the option's doc). Signing in mid-page is the
+        // one path that gets here — leave the page exactly as it is.
+        if (opts.isShowingCompletedSession(sessionId)) {
+          opts.setIsLoading(false)
+          return
+        }
+
         // Load the scenario and reopen the session
         const scenario = await getScenarioById(scenarioId)
         if (scenario) {

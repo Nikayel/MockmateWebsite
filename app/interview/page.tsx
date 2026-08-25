@@ -13,6 +13,8 @@ import { useAuth } from "@/lib/auth-context"
 import type { Profile } from "@/lib/types"
 import { getUserProfile } from "@/lib/firestore-helpers"
 import { SignupPrompt } from "@/components/SignupPrompt"
+import { upgradeGuestSession } from "@/lib/interview/guest-upgrade"
+import type { User as FirebaseAuthUser } from "firebase/auth"
 import { OnboardingModal } from "@/components/OnboardingModal"
 import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
@@ -30,7 +32,12 @@ import {
 // Extracted utilities
 import { extractTopicsFromMessage } from "@/lib/interview"
 // Local page components
-import { GuestModeBanner, InterviewLayoutGrid, InterviewFeedbackView } from "./_components"
+import {
+  GuestModeBanner,
+  GuestFeedbackLock,
+  InterviewLayoutGrid,
+  InterviewFeedbackView,
+} from "./_components"
 import { InterviewDialogs } from "./_components/InterviewDialogs"
 import { InterviewTopBar } from "./_components/InterviewTopBar"
 import type { ProblemColumnCtx } from "./_components/ProblemColumn"
@@ -1211,6 +1218,19 @@ function InterviewPageContent() {
     resetProactiveState,
   })
 
+  // The reopen effect re-runs when firebaseUser flips — which is exactly what
+  // a guest signing in from the post-trial prompt does. This ref lets the
+  // effect tell "sign-in on top of results already on screen" apart from a
+  // genuine reopen, without widening its dependency array.
+  const completedSessionOnScreenRef = useRef<string | null>(null)
+  useEffect(() => {
+    completedSessionOnScreenRef.current = showFeedback ? currentSessionId : null
+  }, [showFeedback, currentSessionId])
+  const isShowingCompletedSession = useCallback(
+    (sessionId: string) => completedSessionOnScreenRef.current === sessionId,
+    []
+  )
+
   useSessionReopen({
     router,
     searchParams,
@@ -1226,6 +1246,7 @@ function InterviewPageContent() {
     exitGuestMode,
     refreshUsageLimit,
     startInterview,
+    isShowingCompletedSession,
     resetBugfixSessionState,
     setIsLoading,
     setSelectedScenario,
@@ -1374,6 +1395,49 @@ function InterviewPageContent() {
     applyFallbackFeedback,
     lastFeedbackRequestRef,
   })
+
+  // A guest who signs in from the post-trial prompt stays on this page and
+  // gets the regular feedback experience. The handoff has a strict order: the
+  // session must belong to the new account BEFORE the stream runs, because
+  // /api/feedback/persist refuses to write to a session the caller does not
+  // own — streaming first would spend the AI call and save nothing.
+  const handleGuestSignedIn = useCallback(
+    async (signedInUser: FirebaseAuthUser) => {
+      // Cover the migrate window with the loading state so the feedback view
+      // never flashes its empty shell between modal-close and stream-start.
+      // useFeedbackStreaming resets this when the stream completes or errors.
+      setIsGeneratingFeedback(true)
+      try {
+        const staged = lastFeedbackRequestRef.current
+        const idToken = await signedInUser.getIdToken()
+        if (guestId && currentSessionId) {
+          await upgradeGuestSession({ guestId, sessionId: currentSessionId, idToken })
+        }
+        setShowSignupPrompt(false)
+        if (staged) {
+          staged.userId = signedInUser.uid
+          streamingFeedback.startStreaming(staged)
+        } else {
+          // Nothing staged (defensive): the migrated session still has its
+          // stored score and code — land there rather than on a blank view.
+          setIsGeneratingFeedback(false)
+          if (currentSessionId) router.push(`/sessions/${currentSessionId}`)
+        }
+      } catch (error) {
+        setIsGeneratingFeedback(false)
+        throw error // SignupPrompt surfaces this as its "Sign up failed" toast.
+      }
+    },
+    [
+      guestId,
+      currentSessionId,
+      lastFeedbackRequestRef,
+      streamingFeedback,
+      router,
+      setIsGeneratingFeedback,
+      setShowSignupPrompt,
+    ]
+  )
 
   const { triggerSystemDesignFeedback } = useSystemDesignFeedback({
     user,
@@ -2052,6 +2116,18 @@ function InterviewPageContent() {
                   userProfile={cachedUserProfile}
                   onActivePanelChange={setActivePanel}
                 />
+              ) : !user ? (
+                // Guests never stream AI feedback, so the regular feedback
+                // view here was a shell of empty sections (its fallback
+                // caption "Review feedback for details" dead-clicked in the
+                // wild). The locked panel states the truth instead: the
+                // session is scored and saved, and sign-in reveals it. Once
+                // the guest authenticates, `user` flips and the branch below
+                // renders the real view fed by the post-signup stream.
+                <GuestFeedbackLock
+                  onSignIn={() => setShowSignupPrompt(true)}
+                  scenarioTitle={selectedScenario?.title || "Your session"}
+                />
               ) : (
                 <InterviewFeedbackView
                   showPostInterviewDiscussion={showPostInterviewDiscussion}
@@ -2120,13 +2196,15 @@ function InterviewPageContent() {
         </section>
       )}
 
-      {/* Guest User Signup Prompt - shown after feedback */}
-      {isGuestMode && showFeedback && performanceScore !== null && showSignupPrompt && (
+      {/* Guest User Signup Prompt - shown after feedback. No performanceScore
+          condition: a guest's score never enters page state (it is what the
+          sign-in reveals), so gating on it would keep this modal from ever
+          rendering. */}
+      {isGuestMode && showFeedback && showSignupPrompt && (
         <SignupPrompt
-          score={performanceScore}
           sessionId={currentSessionId || ""}
           scenarioTitle={selectedScenario?.title || ""}
-          feedbackSummary={comprehensiveFeedback}
+          onSignedIn={handleGuestSignedIn}
           onDismiss={() => {
             setShowSignupPrompt(false)
             // Note: markFreeTrialUsed() is already called in SignupPrompt component
